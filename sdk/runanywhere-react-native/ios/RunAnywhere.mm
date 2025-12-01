@@ -203,15 +203,30 @@ RCT_EXPORT_METHOD(createBackend:(NSString *)name
                   rejecter:(RCTPromiseRejectBlock)reject) {
     NSLog(@"[RunAnywhere] createBackend called with name: %@", name);
 
-    if (_backend) {
-        NSLog(@"[RunAnywhere] Destroying existing backend");
-        ra_destroy(_backend);
-        _backend = nullptr;
-    }
+    // Route llamacpp to _llamaBackend, others to _backend
+    BOOL isLlamaCpp = [name isEqualToString:@"llamacpp"];
 
-    _backend = ra_create_backend([name UTF8String]);
-    NSLog(@"[RunAnywhere] Backend created: %@", _backend != nullptr ? @"SUCCESS" : @"FAILED");
-    resolve(@(_backend != nullptr));
+    if (isLlamaCpp) {
+        if (_llamaBackend) {
+            NSLog(@"[RunAnywhere] Destroying existing llamacpp backend");
+            ra_destroy(_llamaBackend);
+            _llamaBackend = nullptr;
+        }
+
+        _llamaBackend = ra_create_backend([name UTF8String]);
+        NSLog(@"[RunAnywhere] LlamaCPP backend created: %@", _llamaBackend != nullptr ? @"SUCCESS" : @"FAILED");
+        resolve(@(_llamaBackend != nullptr));
+    } else {
+        if (_backend) {
+            NSLog(@"[RunAnywhere] Destroying existing backend");
+            ra_destroy(_backend);
+            _backend = nullptr;
+        }
+
+        _backend = ra_create_backend([name UTF8String]);
+        NSLog(@"[RunAnywhere] Backend created: %@", _backend != nullptr ? @"SUCCESS" : @"FAILED");
+        resolve(@(_backend != nullptr));
+    }
 }
 
 RCT_EXPORT_METHOD(initialize:(NSString *)configJson
@@ -219,19 +234,36 @@ RCT_EXPORT_METHOD(initialize:(NSString *)configJson
                   rejecter:(RCTPromiseRejectBlock)reject) {
     NSLog(@"[RunAnywhere] initialize called");
 
-    if (!_backend) {
+    // Initialize whichever backend(s) are available
+    BOOL success = YES;
+
+    if (_llamaBackend) {
+        ra_result_code result = ra_initialize(_llamaBackend, configJson ? [configJson UTF8String] : nullptr);
+        NSLog(@"[RunAnywhere] initialize llamacpp backend result: %d (0=SUCCESS)", result);
+        success = success && (result == RA_SUCCESS);
+    }
+
+    if (_backend) {
+        ra_result_code result = ra_initialize(_backend, configJson ? [configJson UTF8String] : nullptr);
+        NSLog(@"[RunAnywhere] initialize onnx backend result: %d (0=SUCCESS)", result);
+        success = success && (result == RA_SUCCESS);
+    }
+
+    if (!_llamaBackend && !_backend) {
         NSLog(@"[RunAnywhere] initialize: No backend available");
         resolve(@NO);
         return;
     }
 
-    ra_result_code result = ra_initialize(_backend, configJson ? [configJson UTF8String] : nullptr);
-    NSLog(@"[RunAnywhere] initialize result: %d (0=SUCCESS)", result);
-    resolve(@(result == RA_SUCCESS));
+    resolve(@(success));
 }
 
 RCT_EXPORT_METHOD(destroy:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
+    if (_llamaBackend) {
+        ra_destroy(_llamaBackend);
+        _llamaBackend = nullptr;
+    }
     if (_backend) {
         ra_destroy(_backend);
         _backend = nullptr;
@@ -241,31 +273,57 @@ RCT_EXPORT_METHOD(destroy:(RCTPromiseResolveBlock)resolve
 
 RCT_EXPORT_METHOD(isInitialized:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    if (!_backend) {
-        resolve(@NO);
-        return;
-    }
-    resolve(@(ra_is_initialized(_backend)));
+    // Check if either backend is initialized
+    BOOL llamaInitialized = _llamaBackend && ra_is_initialized(_llamaBackend);
+    BOOL onnxInitialized = _backend && ra_is_initialized(_backend);
+    resolve(@(llamaInitialized || onnxInitialized));
 }
 
 RCT_EXPORT_METHOD(getBackendInfo:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
     NSLog(@"[RunAnywhere] getBackendInfo called");
 
-    if (!_backend) {
+    // Return info about both backends if available
+    NSMutableDictionary *backendInfo = [NSMutableDictionary new];
+
+    if (_llamaBackend) {
+        char *info = ra_get_backend_info(_llamaBackend);
+        if (info) {
+            NSData *data = [[NSString stringWithUTF8String:info] dataUsingEncoding:NSUTF8StringEncoding];
+            NSDictionary *llamaInfo = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            if (llamaInfo) {
+                backendInfo[@"llamacpp"] = llamaInfo;
+            }
+            ra_free_string(info);
+        }
+    }
+
+    if (_backend) {
+        char *info = ra_get_backend_info(_backend);
+        if (info) {
+            NSData *data = [[NSString stringWithUTF8String:info] dataUsingEncoding:NSUTF8StringEncoding];
+            NSDictionary *onnxInfo = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            if (onnxInfo) {
+                backendInfo[@"onnx"] = onnxInfo;
+            }
+            ra_free_string(info);
+        }
+    }
+
+    if (backendInfo.count == 0) {
         NSLog(@"[RunAnywhere] getBackendInfo: No backend");
         resolve(@"{}");
         return;
     }
 
-    char *info = ra_get_backend_info(_backend);
-    if (info) {
-        NSString *result = [NSString stringWithUTF8String:info];
+    NSError *error = nil;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:backendInfo options:0 error:&error];
+    if (jsonData) {
+        NSString *result = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
         NSLog(@"[RunAnywhere] getBackendInfo: %@", result);
-        ra_free_string(info);
         resolve(result);
     } else {
-        NSLog(@"[RunAnywhere] getBackendInfo: No info returned");
+        NSLog(@"[RunAnywhere] getBackendInfo: JSON serialization error");
         resolve(@"{}");
     }
 }
@@ -299,6 +357,17 @@ RCT_EXPORT_METHOD(loadTextModel:(NSString *)path
     NSString *ext = [[path pathExtension] lowercaseString];
     BOOL isGGUF = [ext isEqualToString:@"gguf"] || [ext isEqualToString:@"ggml"];
     NSLog(@"[RunAnywhere] loadTextModel: Extension: %@, isGGUF: %@", ext, isGGUF ? @"YES" : @"NO");
+
+    // Check for corrupted model files (minimum size check)
+    // GGUF models should be at least 1MB - anything smaller is likely corrupted or incomplete download
+    static const long long MIN_GGUF_SIZE = 1 * 1024 * 1024;  // 1MB minimum
+    if (isGGUF && [fileSize longLongValue] < MIN_GGUF_SIZE) {
+        NSLog(@"[RunAnywhere] loadTextModel: File appears corrupted (size: %@ bytes, minimum: %lld bytes)", fileSize, MIN_GGUF_SIZE);
+        reject(@"MODEL_CORRUPTED",
+               [NSString stringWithFormat:@"Model file appears corrupted or incomplete (size: %@ bytes). Please delete and re-download the model.", fileSize],
+               nil);
+        return;
+    }
 
     // For GGUF models, use the llamacpp backend
     if (isGGUF) {
@@ -548,46 +617,63 @@ RCT_EXPORT_METHOD(cancelGeneration) {
 RCT_EXPORT_METHOD(supportsCapability:(int)capability
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    if (!_backend) {
-        resolve(@NO);
-        return;
+    // Check capability across both backends
+    BOOL supported = NO;
+    if (_backend) {
+        supported = ra_supports_capability(_backend, (ra_capability_type)capability);
     }
-    resolve(@(ra_supports_capability(_backend, (ra_capability_type)capability)));
+    if (!supported && _llamaBackend) {
+        supported = ra_supports_capability(_llamaBackend, (ra_capability_type)capability);
+    }
+    resolve(@(supported));
 }
 
 RCT_EXPORT_METHOD(getCapabilities:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    if (!_backend) {
-        resolve(@[]);
-        return;
+    NSMutableSet *capabilitiesSet = [NSMutableSet new];
+
+    // Collect capabilities from both backends
+    if (_backend) {
+        ra_capability_type caps[10];
+        int count = ra_get_capabilities(_backend, caps, 10);
+        for (int i = 0; i < count; i++) {
+            [capabilitiesSet addObject:@(caps[i])];
+        }
     }
 
-    ra_capability_type caps[10];
-    int count = ra_get_capabilities(_backend, caps, 10);
-
-    NSMutableArray *result = [NSMutableArray arrayWithCapacity:count];
-    for (int i = 0; i < count; i++) {
-        [result addObject:@(caps[i])];
+    if (_llamaBackend) {
+        ra_capability_type caps[10];
+        int count = ra_get_capabilities(_llamaBackend, caps, 10);
+        for (int i = 0; i < count; i++) {
+            [capabilitiesSet addObject:@(caps[i])];
+        }
     }
-    resolve(result);
+
+    resolve([capabilitiesSet allObjects]);
 }
 
 RCT_EXPORT_METHOD(getDeviceType:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    if (!_backend) {
+    // Return device type from any available backend
+    ra_backend_handle backend = _backend ?: _llamaBackend;
+    if (!backend) {
         resolve(@99); // RA_DEVICE_UNKNOWN
         return;
     }
-    resolve(@(ra_get_device(_backend)));
+    resolve(@(ra_get_device(backend)));
 }
 
 RCT_EXPORT_METHOD(getMemoryUsage:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    if (!_backend) {
-        resolve(@0);
-        return;
+    // Sum memory usage from both backends
+    size_t totalMemory = 0;
+    if (_backend) {
+        totalMemory += ra_get_memory_usage(_backend);
     }
-    resolve(@(ra_get_memory_usage(_backend)));
+    if (_llamaBackend) {
+        totalMemory += ra_get_memory_usage(_llamaBackend);
+    }
+    resolve(@(totalMemory));
 }
 
 // ============================================================================
@@ -601,10 +687,31 @@ RCT_EXPORT_METHOD(loadSTTModel:(NSString *)path
                   rejecter:(RCTPromiseRejectBlock)reject) {
     NSLog(@"[RunAnywhere] loadSTTModel called - path: %@, type: %@", path, modelType);
 
+    // Create ONNX backend for STT if not already created
     if (!_backend) {
-        NSLog(@"[RunAnywhere] loadSTTModel: No backend available");
-        resolve(@NO);
-        return;
+        NSLog(@"[RunAnywhere] loadSTTModel: Creating ONNX backend for STT");
+        _backend = ra_create_backend("onnx");
+
+        if (!_backend) {
+            NSLog(@"[RunAnywhere] loadSTTModel: Failed to create ONNX backend");
+            reject(@"BACKEND_CREATE_FAILED", @"Failed to create ONNX backend for STT", nil);
+            return;
+        }
+
+        ra_result_code initResult = ra_initialize(_backend, nullptr);
+        NSLog(@"[RunAnywhere] loadSTTModel: ONNX backend init result: %d (0=SUCCESS)", initResult);
+
+        if (initResult != RA_SUCCESS) {
+            const char *error = ra_get_last_error();
+            NSString *errorMsg = error ? [NSString stringWithUTF8String:error] : @"Unknown error";
+            NSLog(@"[RunAnywhere] loadSTTModel: ONNX init error: %@", errorMsg);
+
+            ra_destroy(_backend);
+            _backend = nullptr;
+
+            reject(@"BACKEND_INIT_FAILED", [NSString stringWithFormat:@"Failed to initialize ONNX backend: %@", errorMsg], nil);
+            return;
+        }
     }
 
     // Check if path exists
@@ -710,20 +817,45 @@ RCT_EXPORT_METHOD(loadTTSModel:(NSString *)path
                   rejecter:(RCTPromiseRejectBlock)reject) {
     NSLog(@"[RunAnywhere] loadTTSModel called - path: %@, type: %@", path, modelType);
 
+    // Create ONNX backend for TTS if not already created
     if (!_backend) {
-        NSLog(@"[RunAnywhere] loadTTSModel: No backend available");
-        resolve(@NO);
-        return;
+        NSLog(@"[RunAnywhere] loadTTSModel: Creating ONNX backend for TTS");
+        _backend = ra_create_backend("onnx");
+
+        if (!_backend) {
+            NSLog(@"[RunAnywhere] loadTTSModel: Failed to create ONNX backend");
+            reject(@"BACKEND_CREATE_FAILED", @"Failed to create ONNX backend for TTS", nil);
+            return;
+        }
+
+        ra_result_code initResult = ra_initialize(_backend, nullptr);
+        NSLog(@"[RunAnywhere] loadTTSModel: ONNX backend init result: %d (0=SUCCESS)", initResult);
+
+        if (initResult != RA_SUCCESS) {
+            const char *error = ra_get_last_error();
+            NSString *errorMsg = error ? [NSString stringWithUTF8String:error] : @"Unknown error";
+            NSLog(@"[RunAnywhere] loadTTSModel: ONNX init error: %@", errorMsg);
+
+            ra_destroy(_backend);
+            _backend = nullptr;
+
+            reject(@"BACKEND_INIT_FAILED", [NSString stringWithFormat:@"Failed to initialize ONNX backend: %@", errorMsg], nil);
+            return;
+        }
     }
 
     // Check if path exists
     BOOL pathExists = [[NSFileManager defaultManager] fileExistsAtPath:path];
     NSLog(@"[RunAnywhere] loadTTSModel: Path exists: %@", pathExists ? @"YES" : @"NO");
 
+    // Always use "vits" model type for Sherpa-ONNX TTS (per Swift SDK pattern)
+    // The modelType parameter from JS is ignored
+    NSLog(@"[RunAnywhere] loadTTSModel: Using hardcoded model type 'vits' (Sherpa-ONNX pattern)");
+
     ra_result_code result = ra_tts_load_model(
         _backend,
         [path UTF8String],
-        [modelType UTF8String],
+        "vits",  // Hardcoded per Swift SDK - Sherpa-ONNX TTS uses VITS architecture
         configJson ? [configJson UTF8String] : nullptr
     );
 
@@ -836,16 +968,52 @@ RCT_EXPORT_METHOD(loadVADModel:(NSString *)path
                   configJson:(NSString *)configJson
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] loadVADModel called - path: %@", path);
+
+    // Create ONNX backend for VAD if not already created
     if (!_backend) {
-        resolve(@NO);
-        return;
+        NSLog(@"[RunAnywhere] loadVADModel: Creating ONNX backend for VAD");
+        _backend = ra_create_backend("onnx");
+
+        if (!_backend) {
+            NSLog(@"[RunAnywhere] loadVADModel: Failed to create ONNX backend");
+            reject(@"BACKEND_CREATE_FAILED", @"Failed to create ONNX backend for VAD", nil);
+            return;
+        }
+
+        ra_result_code initResult = ra_initialize(_backend, nullptr);
+        NSLog(@"[RunAnywhere] loadVADModel: ONNX backend init result: %d (0=SUCCESS)", initResult);
+
+        if (initResult != RA_SUCCESS) {
+            const char *error = ra_get_last_error();
+            NSString *errorMsg = error ? [NSString stringWithUTF8String:error] : @"Unknown error";
+            NSLog(@"[RunAnywhere] loadVADModel: ONNX init error: %@", errorMsg);
+
+            ra_destroy(_backend);
+            _backend = nullptr;
+
+            reject(@"BACKEND_INIT_FAILED", [NSString stringWithFormat:@"Failed to initialize ONNX backend: %@", errorMsg], nil);
+            return;
+        }
     }
+
+    // Check if path exists
+    BOOL pathExists = [[NSFileManager defaultManager] fileExistsAtPath:path];
+    NSLog(@"[RunAnywhere] loadVADModel: Path exists: %@", pathExists ? @"YES" : @"NO");
 
     ra_result_code result = ra_vad_load_model(
         _backend,
         [path UTF8String],
         configJson ? [configJson UTF8String] : nullptr
     );
+
+    NSLog(@"[RunAnywhere] loadVADModel result: %d (0=SUCCESS)", result);
+
+    if (result != RA_SUCCESS) {
+        const char *error = ra_get_last_error();
+        NSLog(@"[RunAnywhere] loadVADModel error: %s", error ? error : "NULL");
+    }
+
     resolve(@(result == RA_SUCCESS));
 }
 
