@@ -95,14 +95,25 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
             "format" to "onnx",
             "modelType" to "silero"
         ),
-        "piper-en-us-lessac" to mapOf(
-            "id" to "piper-en-us-lessac",
-            "name" to "Piper US English (Lessac)",
-            "description" to "High quality US English TTS",
+        "piper-en-us-lessac-medium" to mapOf(
+            "id" to "piper-en-us-lessac-medium",
+            "name" to "Piper TTS (US English - Medium)",
+            "description" to "High quality US English TTS voice",
             "category" to "tts",
             "modality" to "tts",
             "size" to 65000000L,
             "downloadUrl" to "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
+            "format" to "sherpa-onnx",
+            "modelType" to "piper"
+        ),
+        "piper-en-gb-alba-medium" to mapOf(
+            "id" to "piper-en-gb-alba-medium",
+            "name" to "Piper TTS (British English)",
+            "description" to "British English TTS voice",
+            "category" to "tts",
+            "modality" to "tts",
+            "size" to 65000000L,
+            "downloadUrl" to "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
             "format" to "sherpa-onnx",
             "modelType" to "piper"
         ),
