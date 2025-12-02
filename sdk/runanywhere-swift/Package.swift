@@ -228,8 +228,8 @@ func binaryTargets() -> [Target] {
         return [
             .binaryTarget(
                 name: "RunAnywhereCoreBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.df97abe/RunAnywhereCore.xcframework.zip",
-                checksum: "b250a568629ec40b40357b1d50f9b2bc466dafb735636c26ce79c8fcf6bb0b01"
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.aade097/RunAnywhereCore.xcframework.zip",
+                checksum: "b678cbfea242a2a9004c8d52cdf3637483b4a3f4376cd51ae939c3671f33dc5c"
             )
         ]
     }
