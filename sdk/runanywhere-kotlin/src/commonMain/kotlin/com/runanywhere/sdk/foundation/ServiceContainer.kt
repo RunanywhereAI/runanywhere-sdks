@@ -265,7 +265,8 @@ class ServiceContainer {
             modelInfoService.initialize()
 
             // Scan file system for already downloaded models
-            val modelsPath = fileSystem.getDataDirectory() + "/models"
+            // IMPORTANT: Use SimplifiedFileManager.modelsDirectory for path consistency
+            val modelsPath = com.runanywhere.sdk.foundation.filemanager.SimplifiedFileManager.shared.modelsDirectory.toString()
             (modelInfoRepository as? ModelInfoRepositoryImpl)?.scanAndUpdateDownloadedModels(modelsPath, fileSystem)
             logger.info("🔍 Scanned file system for downloaded models at: $modelsPath")
 
@@ -393,7 +394,8 @@ class ServiceContainer {
             fetchAndPopulateModels()
 
             // Scan file system for already downloaded models
-            val modelsPath = fileSystem.getDataDirectory() + "/models"
+            // IMPORTANT: Use SimplifiedFileManager.modelsDirectory for path consistency
+            val modelsPath = com.runanywhere.sdk.foundation.filemanager.SimplifiedFileManager.shared.modelsDirectory.toString()
             (modelInfoRepository as? ModelInfoRepositoryImpl)?.scanAndUpdateDownloadedModels(modelsPath, fileSystem)
             logger.info("🔍 Scanned file system for downloaded models at: $modelsPath")
 
