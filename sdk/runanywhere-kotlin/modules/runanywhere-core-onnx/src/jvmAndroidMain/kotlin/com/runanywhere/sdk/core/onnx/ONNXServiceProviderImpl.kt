@@ -178,17 +178,58 @@ private class ONNXSTTServiceWrapper(
         options: STTOptions,
         onPartial: (String) -> Unit
     ): STTTranscriptionResult {
-        // Collect all audio chunks and transcribe
-        val audioChunks = mutableListOf<ByteArray>()
+        // iOS-style pseudo-streaming for Whisper (batch) models:
+        // Periodically transcribe accumulated audio to provide partial results
+
+        val allAudioChunks = mutableListOf<ByteArray>()
+        var accumulatedTranscript = ""
+        var lastProcessedSize = 0
+
+        // Process every ~3 seconds of audio (16kHz * 2 bytes * 3 sec = 96000 bytes)
+        val batchThreshold = 16000 * 2 * 3  // ~3 seconds at 16kHz Int16
+
+        logger.debug("Starting pseudo-streaming transcription with batch threshold: $batchThreshold bytes")
+
         audioStream.collect { chunk ->
-            audioChunks.add(chunk)
-            // Emit partial result (placeholder)
-            onPartial("...")
+            allAudioChunks.add(chunk)
+
+            // Calculate total accumulated size
+            val totalSize = allAudioChunks.sumOf { it.size }
+            val newDataSize = totalSize - lastProcessedSize
+
+            // Process periodically when we have enough new audio
+            if (newDataSize >= batchThreshold) {
+                logger.debug("Processing batch chunk: $totalSize bytes total")
+
+                try {
+                    // Combine all accumulated audio
+                    val combinedAudio = allAudioChunks.fold(byteArrayOf()) { acc, c -> acc + c }
+                    val result = transcribe(combinedAudio, options)
+
+                    if (result.transcript.isNotEmpty()) {
+                        accumulatedTranscript = result.transcript
+                        onPartial(accumulatedTranscript)
+                        logger.debug("Partial transcription: $accumulatedTranscript")
+                    }
+                } catch (e: Exception) {
+                    logger.error("Periodic batch transcription failed: ${e.message}")
+                }
+
+                lastProcessedSize = totalSize
+            }
+            // Note: iOS doesn't emit placeholders - only real transcription text
         }
 
-        // Combine all chunks and transcribe
-        val combinedAudio = audioChunks.fold(byteArrayOf()) { acc, chunk -> acc + chunk }
-        return transcribe(combinedAudio, options)
+        // Final transcription with all accumulated audio
+        val combinedAudio = allAudioChunks.fold(byteArrayOf()) { acc, c -> acc + c }
+        logger.info("Final batch transcription: ${combinedAudio.size} bytes")
+
+        val finalResult = transcribe(combinedAudio, options)
+        if (finalResult.transcript.isNotEmpty()) {
+            onPartial(finalResult.transcript)
+        }
+
+        return finalResult
     }
 
     override fun transcribeStream(
@@ -198,15 +239,54 @@ private class ONNXSTTServiceWrapper(
         return flow {
             emit(STTStreamEvent.SpeechStarted)
 
-            val audioChunks = mutableListOf<ByteArray>()
+            // iOS-style pseudo-streaming for Whisper (batch) models:
+            // Periodically transcribe accumulated audio to provide partial results
+
+            val allAudioChunks = mutableListOf<ByteArray>()
+            var lastProcessedSize = 0
+
+            // Process every ~3 seconds of audio (16kHz * 2 bytes * 3 sec = 96000 bytes)
+            val batchThreshold = 16000 * 2 * 3  // ~3 seconds at 16kHz Int16
+
+            logger.debug("Starting pseudo-streaming transcription (Flow version)")
+
             audioStream.collect { chunk ->
-                audioChunks.add(chunk)
-                // Emit partial transcription placeholder
-                emit(STTStreamEvent.PartialTranscription(text = "...", confidence = 0.5f))
+                allAudioChunks.add(chunk)
+
+                // Calculate total accumulated size
+                val totalSize = allAudioChunks.sumOf { it.size }
+                val newDataSize = totalSize - lastProcessedSize
+
+                // Process periodically when we have enough new audio
+                if (newDataSize >= batchThreshold) {
+                    logger.debug("Processing batch chunk: $totalSize bytes total")
+
+                    try {
+                        // Combine all accumulated audio
+                        val combinedAudio = allAudioChunks.fold(byteArrayOf()) { acc, c -> acc + c }
+                        val defaultOptions = STTOptions(language = options.language ?: "en")
+                        val result = transcribe(combinedAudio, defaultOptions)
+
+                        if (result.transcript.isNotEmpty()) {
+                            emit(STTStreamEvent.PartialTranscription(
+                                text = result.transcript,
+                                confidence = result.confidence ?: 0.9f
+                            ))
+                            logger.debug("Partial transcription: ${result.transcript}")
+                        }
+                    } catch (e: Exception) {
+                        logger.error("Periodic batch transcription failed: ${e.message}")
+                    }
+
+                    lastProcessedSize = totalSize
+                }
+                // Note: iOS doesn't emit placeholders - only real transcription text
             }
 
-            // Combine all chunks and transcribe
-            val combinedAudio = audioChunks.fold(byteArrayOf()) { acc, chunk -> acc + chunk }
+            // Final transcription with all accumulated audio
+            val combinedAudio = allAudioChunks.fold(byteArrayOf()) { acc, c -> acc + c }
+            logger.info("Final batch transcription: ${combinedAudio.size} bytes")
+
             val defaultOptions = STTOptions(language = options.language ?: "en")
             val result = transcribe(combinedAudio, defaultOptions)
 
