@@ -3,6 +3,8 @@ package com.runanywhere.runanywhereai.presentation.settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.models.storage.StoredModel
 import com.runanywhere.sdk.public.extensions.clearCache
 import com.runanywhere.sdk.public.extensions.cleanTempFiles
@@ -86,6 +88,31 @@ class SettingsViewModel : ViewModel() {
     init {
         loadCurrentConfiguration()
         loadStorageData()
+        subscribeToModelEvents()
+    }
+
+    /**
+     * Subscribe to SDK model events to automatically refresh storage when models are downloaded/deleted
+     * This ensures the settings screen shows up-to-date storage information
+     */
+    private fun subscribeToModelEvents() {
+        viewModelScope.launch {
+            EventBus.modelEvents.collect { event ->
+                when (event) {
+                    is SDKModelEvent.DownloadCompleted -> {
+                        Log.d(TAG, "📥 Model download completed: ${event.modelId}, refreshing storage...")
+                        loadStorageData()
+                    }
+                    is SDKModelEvent.DeleteCompleted -> {
+                        Log.d(TAG, "🗑️ Model deleted: ${event.modelId}, refreshing storage...")
+                        loadStorageData()
+                    }
+                    else -> {
+                        // Other events don't require storage refresh
+                    }
+                }
+            }
+        }
     }
 
     /**
