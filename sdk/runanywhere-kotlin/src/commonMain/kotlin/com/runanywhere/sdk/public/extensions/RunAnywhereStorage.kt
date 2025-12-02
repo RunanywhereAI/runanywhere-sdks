@@ -27,14 +27,14 @@ private val logger: SDKLogger by lazy { SDKLogger.shared }
 
 /**
  * Get comprehensive storage information
- * Matches iOS static func getStorageInfo() async throws -> StorageInfo
+ * Matches iOS static func getStorageInfo() async -> StorageInfo
  */
 suspend fun RunAnywhereSDK.getStorageInfo(): StorageInfo {
     logger.debug("Getting storage info")
 
     return try {
         val storageInfo = storageAnalyzer.analyzeStorage()
-        logger.info("Storage info retrieved: ${storageInfo.appStorage.totalUsed} bytes used")
+        logger.info("Storage info retrieved: ${storageInfo.appStorage.totalSize} bytes used, ${storageInfo.storedModels.size} models stored")
         storageInfo
     } catch (e: Exception) {
         logger.error("Failed to get storage info", e)
@@ -99,28 +99,37 @@ suspend fun RunAnywhereSDK.deleteStoredModel(modelId: String) {
 
     try {
         val modelsDir = fileManager.modelsDirectory.toString()
-        val modelFiles = fileManager.listFiles(modelsDir)
+        val modelEntries = fileManager.listFiles(modelsDir)
 
-        // Find files matching the model ID
-        val matchingFiles = modelFiles.filter { filePath ->
-            val fileName = filePath.substringAfterLast("/")
-            fileName.startsWith(modelId)
+        // Find files or directories matching the model ID
+        val matchingEntries = modelEntries.filter { entryPath ->
+            val entryName = entryPath.substringAfterLast("/")
+            entryName.startsWith(modelId) ||
+            entryName.contains(modelId, ignoreCase = true)
         }
 
-        if (matchingFiles.isEmpty()) {
+        if (matchingEntries.isEmpty()) {
             logger.warn("Model not found: $modelId")
             throw IllegalArgumentException("Model not found: $modelId")
         }
 
         var deletedCount = 0
-        matchingFiles.forEach { filePath ->
-            if (fileManager.deleteFile(filePath)) {
+        matchingEntries.forEach { entryPath ->
+            // Try to delete as directory first (for ONNX models in folders)
+            val deletedAsDir = fileManager.deleteDirectory(entryPath)
+            if (deletedAsDir) {
                 deletedCount++
-                logger.debug("Deleted model file: $filePath")
+                logger.debug("Deleted model directory: $entryPath")
+            } else {
+                // Try to delete as file
+                if (fileManager.deleteFile(entryPath)) {
+                    deletedCount++
+                    logger.debug("Deleted model file: $entryPath")
+                }
             }
         }
 
-        logger.info("Deleted $deletedCount file(s) for model: $modelId")
+        logger.info("Deleted $deletedCount item(s) for model: $modelId")
     } catch (e: Exception) {
         logger.error("Error deleting model: $modelId", e)
         throw e
