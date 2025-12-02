@@ -115,3 +115,7 @@ hs_err_pid*
 
 # Detekt
 detekt.sarif
+
+# Sentry
+sentry.properties
+.sentryclirc

@@ -11,6 +11,7 @@ import WhisperKitTranscription
 import FluidAudioDiarization
 import ONNXRuntime
 import LlamaCPPRuntime
+import Sentry
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -26,6 +27,57 @@ struct RunAnywhereAIApp: App {
     @StateObject private var modelManager = ModelManager.shared
     @State private var isSDKInitialized = false
     @State private var initializationError: Error?
+
+    init() {
+        // Initialize Sentry for crash reporting before anything else
+        initializeSentry()
+    }
+
+    /// Initialize Sentry for crash reporting.
+    /// Only initializes if SENTRY_DSN is provided via environment variable or Info.plist.
+    /// This ensures the DSN is not exposed in the open source repository.
+    private func initializeSentry() {
+        // Try to get DSN from environment variable first, then Info.plist
+        let sentryDsn = ProcessInfo.processInfo.environment["SENTRY_DSN"]
+            ?? Bundle.main.object(forInfoDictionaryKey: "SENTRY_DSN") as? String
+            ?? ""
+
+        guard !sentryDsn.isEmpty else {
+            logger.info("📊 Sentry: Disabled (no DSN configured)")
+            logger.info("💡 To enable crash reporting, set SENTRY_DSN environment variable")
+            return
+        }
+
+        SentrySDK.start { options in
+            options.dsn = sentryDsn
+
+            // Enable debug logging only in DEBUG builds
+            #if DEBUG
+            options.debug = true
+            options.environment = "development"
+            #else
+            options.debug = false
+            options.environment = "production"
+            #endif
+
+            // Only capture crashes (errors), not performance data
+            options.tracesSampleRate = 0
+
+            // Minimal data collection for privacy
+            options.sendDefaultPii = false
+
+            // Attach stack traces to all events
+            options.attachStacktrace = true
+
+            // Disable session tracking for minimal data collection
+            options.enableAutoSessionTracking = false
+
+            // Disable performance monitoring
+            options.enableAutoPerformanceTracing = false
+        }
+
+        logger.info("✅ Sentry initialized for crash reporting")
+    }
 
     var body: some Scene {
         WindowGroup {
