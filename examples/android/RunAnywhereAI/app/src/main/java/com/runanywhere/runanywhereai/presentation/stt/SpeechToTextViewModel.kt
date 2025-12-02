@@ -402,8 +402,12 @@ class SpeechToTextViewModel : ViewModel() {
     private fun handleSTTStreamEvent(event: STTStreamEvent) {
         when (event) {
             is STTStreamEvent.PartialTranscription -> {
-                _uiState.update { it.copy(transcription = event.text) }
-                Log.d(TAG, "Partial: ${event.text}")
+                // Filter out placeholder "..." - only update UI with actual transcription text
+                // This matches iOS behavior where partials are only emitted with real text
+                if (event.text.isNotBlank() && event.text != "...") {
+                    _uiState.update { it.copy(transcription = event.text) }
+                    Log.d(TAG, "Partial transcription: ${event.text}")
+                }
             }
             is STTStreamEvent.FinalTranscription -> {
                 _uiState.update { it.copy(transcription = event.result.transcript) }
