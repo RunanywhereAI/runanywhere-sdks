@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -126,45 +127,82 @@ fun ModelSelectionBottomSheet(
 
                     item {
                         Text(
-                            text = "Models for ${expandedFw.displayName}",
+                            text = if (expandedFw == LLMFramework.SYSTEM_TTS) "System TTS" else "Models for ${expandedFw.displayName}",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = Dimensions.small)
                         )
                     }
 
-                    // Filter models by expanded framework using enum
-                    val filteredModels = viewModel.getModelsForFramework(expandedFw)
-
-                    // Debug logging
-                    android.util.Log.d("ModelSelectionSheet", "🔍 Filtering models for framework: ${expandedFw.displayName}")
-                    android.util.Log.d("ModelSelectionSheet", "📦 Total models: ${uiState.models.size}")
-                    android.util.Log.d("ModelSelectionSheet", "✅ Filtered models: ${filteredModels.size}")
-
-                    if (filteredModels.isEmpty()) {
-                        // Empty state
+                    // Special handling for System TTS (matches iOS ModelSelectionSheet.swift)
+                    if (expandedFw == LLMFramework.SYSTEM_TTS) {
                         item {
-                            EmptyModelsMessage(framework = expandedFw)
-                        }
-                    } else {
-                        // Model rows
-                        items(filteredModels, key = { it.id }) { model ->
-                            SelectableModelRow(
-                                model = model,
-                                isSelected = uiState.currentModel?.id == model.id,
-                                isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
-                                onDownloadModel = {
-                                    viewModel.downloadModel(model.id)
-                                },
-                                onSelectModel = {
+                            SystemTTSRow(
+                                isLoading = uiState.isLoadingModel,
+                                onSelect = {
                                     scope.launch {
-                                        viewModel.selectModel(model.id)
-                                        kotlinx.coroutines.delay(500)
-                                        onModelSelected(model)
-                                        onDismiss()
+                                        // Create pseudo ModelInfo for System TTS (matches iOS)
+                                        val systemTTSModel = com.runanywhere.sdk.models.ModelInfo(
+                                            id = "system-tts",
+                                            name = "System TTS",
+                                            downloadURL = null,
+                                            format = com.runanywhere.sdk.models.enums.ModelFormat.UNKNOWN,
+                                            category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_SYNTHESIS,
+                                            compatibleFrameworks = listOf(LLMFramework.SYSTEM_TTS),
+                                            preferredFramework = LLMFramework.SYSTEM_TTS
+                                        )
+                                        viewModel.setLoadingModel(true)
+
+                                        try {
+                                            // Load System TTS via SDK to trigger lifecycle tracker
+                                            // (matches iOS selectSystemTTS() calling onModelSelected)
+                                            com.runanywhere.sdk.public.RunAnywhere.loadTTSModel("system-tts")
+                                            kotlinx.coroutines.delay(300)
+                                            onModelSelected(systemTTSModel)
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("ModelSelectionSheet", "Failed to load System TTS: ${e.message}")
+                                        } finally {
+                                            viewModel.setLoadingModel(false)
+                                            onDismiss()
+                                        }
                                     }
                                 }
                             )
+                        }
+                    } else {
+                        // Filter models by expanded framework using enum
+                        val filteredModels = viewModel.getModelsForFramework(expandedFw)
+
+                        // Debug logging
+                        android.util.Log.d("ModelSelectionSheet", "🔍 Filtering models for framework: ${expandedFw.displayName}")
+                        android.util.Log.d("ModelSelectionSheet", "📦 Total models: ${uiState.models.size}")
+                        android.util.Log.d("ModelSelectionSheet", "✅ Filtered models: ${filteredModels.size}")
+
+                        if (filteredModels.isEmpty()) {
+                            // Empty state
+                            item {
+                                EmptyModelsMessage(framework = expandedFw)
+                            }
+                        } else {
+                            // Model rows
+                            items(filteredModels, key = { it.id }) { model ->
+                                SelectableModelRow(
+                                    model = model,
+                                    isSelected = uiState.currentModel?.id == model.id,
+                                    isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
+                                    onDownloadModel = {
+                                        viewModel.downloadModel(model.id)
+                                    },
+                                    onSelectModel = {
+                                        scope.launch {
+                                            viewModel.selectModel(model.id)
+                                            kotlinx.coroutines.delay(500)
+                                            onModelSelected(model)
+                                            onDismiss()
+                                        }
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -680,6 +718,104 @@ private fun LoadingOverlay(
                     text = progress,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// ====================
+// SYSTEM TTS ROW (Matches iOS systemTTSRow)
+// ====================
+
+/**
+ * System TTS selection row - uses built-in Android TextToSpeech
+ * iOS Reference: ModelSelectionSheet.swift - systemTTSRow
+ */
+@Composable
+private fun SystemTTSRow(
+    isLoading: Boolean,
+    onSelect: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Dimensions.mediumLarge),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Dimensions.large),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Default System Voice",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.VolumeUp,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Built-in",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest
+                    ) {
+                        Text(
+                            text = "Android TTS",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = AppColors.primaryGreen
+                    )
+                    Text(
+                        text = "Always available",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppColors.primaryGreen
+                    )
+                }
+            }
+
+            Button(
+                onClick = onSelect,
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppColors.primaryPurple
+                ),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Select",
+                    style = MaterialTheme.typography.labelMedium
                 )
             }
         }

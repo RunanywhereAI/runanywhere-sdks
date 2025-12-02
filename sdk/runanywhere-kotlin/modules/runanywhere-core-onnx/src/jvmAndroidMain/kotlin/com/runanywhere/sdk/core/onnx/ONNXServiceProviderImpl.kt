@@ -100,22 +100,57 @@ actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTSer
     return ONNXSTTServiceWrapper(service)
 }
 
+// Cached ONNX TTS service for reuse
+private var cachedTTSCoreService: ONNXCoreService? = null
+private var cachedTTSModelPath: String? = null
+
 /**
  * JVM/Android implementation of ONNX TTS synthesis
+ * Matches iOS ONNXTTSService.synthesize() behavior
  */
 actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteArray {
     logger.info("Synthesizing with ONNX: ${text.take(50)}...")
 
-    val service = ONNXCoreService()
-    service.initialize()
+    // Get the model path from options.voiceId (which contains the model path)
+    val modelPath = options.voiceId
 
-    // TTS model should be loaded before synthesis
+    if (modelPath.isNullOrEmpty()) {
+        logger.error("No TTS model path provided in options.voiceId")
+        throw IllegalStateException("TTS model not loaded. Please select a TTS model first.")
+    }
+
+    logger.info("Using TTS model path: $modelPath")
+
+    // Check if we can reuse the cached service
+    val service: ONNXCoreService
+    if (cachedTTSCoreService != null && cachedTTSModelPath == modelPath) {
+        logger.debug("Reusing cached TTS service")
+        service = cachedTTSCoreService!!
+    } else {
+        // Create and initialize new service
+        logger.info("Creating new ONNX TTS service...")
+        service = ONNXCoreService()
+        service.initialize()
+
+        // Load the TTS model
+        logger.info("Loading TTS model from: $modelPath")
+        service.loadTTSModel(modelPath, "vits")
+        logger.info("TTS model loaded successfully")
+
+        // Cache for reuse
+        cachedTTSCoreService = service
+        cachedTTSModelPath = modelPath
+    }
+
+    // Synthesize
     val result = service.synthesize(
         text = text,
-        voiceId = options.voiceId,
+        voiceId = "0", // Speaker ID for multi-speaker models
         speedRate = options.rate,
         pitchShift = options.pitch
     )
+
+    logger.info("Synthesized ${result.samples.size} samples at ${result.sampleRate} Hz")
 
     // Convert samples to WAV format
     return convertToWav(result.samples, result.sampleRate)

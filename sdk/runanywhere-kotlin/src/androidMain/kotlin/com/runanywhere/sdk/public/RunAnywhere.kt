@@ -153,6 +153,12 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         ServiceContainer.shared.initialize(platformContext, currentEnvironment, apiKey, baseURL)
 
         androidLogger.info("ServiceContainer initialized with environment: $currentEnvironment")
+
+        // Register Android System TTS provider (matches iOS SystemTTSServiceProvider)
+        // This enables "System TTS" option in the TTS model selection
+        val androidTTSProvider = com.runanywhere.sdk.components.tts.AndroidTTSServiceProvider(context)
+        com.runanywhere.sdk.core.ModuleRegistry.registerTTS(androidTTSProvider)
+        androidLogger.info("📢 Registered Android System TTS provider")
     }
 
     /**
