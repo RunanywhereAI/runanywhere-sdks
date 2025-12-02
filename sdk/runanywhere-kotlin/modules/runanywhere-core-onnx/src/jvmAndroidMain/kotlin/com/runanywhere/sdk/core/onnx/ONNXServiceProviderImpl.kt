@@ -15,8 +15,53 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 private val logger = SDKLogger("ONNXServiceProviderImpl")
+
+/**
+ * JSON structure returned by native STT transcription
+ * Matches the format from runanywhere-core
+ */
+@Serializable
+private data class NativeSTTResult(
+    val text: String = "",
+    val confidence: Double = 0.0,
+    val detected_language: String = "",
+    val audio_duration_ms: Double = 0.0,
+    val inference_time_ms: Double = 0.0,
+    val is_final: Boolean = true,
+    val metadata: String? = null
+)
+
+private val jsonParser = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+}
+
+/**
+ * Parse native STT JSON result and extract just the text
+ * Returns the raw string if JSON parsing fails (fallback)
+ */
+private fun parseSTTResult(jsonResult: String): STTTranscriptionResult {
+    return try {
+        val result = jsonParser.decodeFromString<NativeSTTResult>(jsonResult)
+        STTTranscriptionResult(
+            transcript = result.text.trim(),
+            confidence = result.confidence.toFloat(),
+            language = result.detected_language.ifEmpty { null }
+        )
+    } catch (e: Exception) {
+        logger.warn("Failed to parse STT JSON result, using raw string: ${e.message}")
+        // Fallback: return raw string if not JSON
+        STTTranscriptionResult(
+            transcript = jsonResult.trim(),
+            confidence = 1.0f,
+            language = null
+        )
+    }
+}
 
 /**
  * JVM/Android implementation of ONNX STT service creation
@@ -164,13 +209,17 @@ private class ONNXSTTServiceWrapper(
         options: STTOptions
     ): STTTranscriptionResult {
         val samples = convertToFloat32Samples(audioData)
-        val transcript = coreService.transcribe(samples, 16000, options.language)
+        val jsonResult = coreService.transcribe(samples, 16000, options.language)
 
-        return STTTranscriptionResult(
-            transcript = transcript,
-            confidence = 1.0f,
-            language = options.language
-        )
+        // Parse JSON result from native code to extract just the text
+        val result = parseSTTResult(jsonResult)
+
+        // Use language from options if not detected
+        return if (result.language.isNullOrEmpty()) {
+            result.copy(language = options.language)
+        } else {
+            result
+        }
     }
 
     override suspend fun streamTranscribe(

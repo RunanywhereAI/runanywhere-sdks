@@ -128,6 +128,7 @@ fun SpeechToTextScreen(
                         transcription = uiState.transcription,
                         isRecording = uiState.recordingState == RecordingState.RECORDING,
                         isTranscribing = uiState.isTranscribing || uiState.recordingState == RecordingState.PROCESSING,
+                        metrics = uiState.metrics,
                         modifier = Modifier.weight(1f)
                     )
 
@@ -252,6 +253,7 @@ private fun TranscriptionArea(
     transcription: String,
     isRecording: Boolean,
     isTranscribing: Boolean,
+    metrics: TranscriptionMetrics?,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -359,9 +361,150 @@ private fun TranscriptionArea(
                             }
                         )
                     }
+
+                    // Metrics display - only show when we have results and not recording
+                    if (metrics != null && transcription.isNotEmpty() && !isRecording && !isTranscribing) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        TranscriptionMetricsBar(metrics = metrics)
+                    }
                 }
             }
         }
+    }
+}
+
+/**
+ * Metrics bar showing transcription statistics
+ * Clean, minimal design that doesn't distract from the transcription
+ */
+@Composable
+private fun TranscriptionMetricsBar(
+    metrics: TranscriptionMetrics
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Words count
+            MetricItem(
+                icon = Icons.Outlined.TextFields,
+                value = "${metrics.wordCount}",
+                label = "words",
+                color = AppColors.primaryBlue
+            )
+
+            MetricDivider()
+
+            // Audio duration
+            if (metrics.audioDurationMs > 0) {
+                MetricItem(
+                    icon = Icons.Outlined.Timer,
+                    value = formatDuration(metrics.audioDurationMs),
+                    label = "duration",
+                    color = AppColors.primaryGreen
+                )
+
+                MetricDivider()
+            }
+
+            // Inference time
+            if (metrics.inferenceTimeMs > 0) {
+                MetricItem(
+                    icon = Icons.Outlined.Speed,
+                    value = "${metrics.inferenceTimeMs.toLong()}ms",
+                    label = "inference",
+                    color = AppColors.primaryOrange
+                )
+
+                MetricDivider()
+            }
+
+            // Real-time factor (only for batch mode with valid duration)
+            if (metrics.audioDurationMs > 0 && metrics.inferenceTimeMs > 0) {
+                val rtf = metrics.inferenceTimeMs / metrics.audioDurationMs
+                MetricItem(
+                    icon = Icons.Outlined.Analytics,
+                    value = String.format("%.2fx", rtf),
+                    label = "RTF",
+                    color = if (rtf < 1.0) AppColors.primaryGreen else AppColors.primaryOrange
+                )
+            } else if (metrics.confidence > 0) {
+                // Show confidence for live mode
+                MetricItem(
+                    icon = Icons.Outlined.CheckCircle,
+                    value = "${(metrics.confidence * 100).toInt()}%",
+                    label = "confidence",
+                    color = when {
+                        metrics.confidence >= 0.8f -> AppColors.primaryGreen
+                        metrics.confidence >= 0.5f -> AppColors.primaryOrange
+                        else -> Color.Red
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    label: String,
+    color: Color
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(14.dp),
+            tint = color.copy(alpha = 0.8f)
+        )
+        Column {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MetricDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(24.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    )
+}
+
+private fun formatDuration(ms: Double): String {
+    val totalSeconds = (ms / 1000).toLong()
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return if (minutes > 0) {
+        "${minutes}m ${seconds}s"
+    } else {
+        "${seconds}s"
     }
 }
 
