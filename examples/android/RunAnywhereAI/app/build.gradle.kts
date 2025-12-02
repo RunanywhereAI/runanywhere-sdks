@@ -125,16 +125,9 @@ android {
             // Use legacy packaging to extract libraries to filesystem
             // This helps with symbol resolution for transitive dependencies
             useLegacyPackaging = true
-            // Handle duplicate native libraries when using multiple backend modules
-            // Both llamacpp and onnx modules include shared JNI bridge libs
-            pickFirsts += listOf(
-                "lib/arm64-v8a/librunanywhere_bridge.so",
-                "lib/arm64-v8a/librunanywhere_jni.so",
-                "lib/arm64-v8a/libc++_shared.so",
-                "lib/armeabi-v7a/librunanywhere_bridge.so",
-                "lib/armeabi-v7a/librunanywhere_jni.so",
-                "lib/armeabi-v7a/libc++_shared.so"
-            )
+            // NOTE: pickFirsts no longer needed!
+            // All native libraries now come from the unified runanywhere-core-native module,
+            // so there are no duplicates when using multiple backend modules.
         }
     }
 
