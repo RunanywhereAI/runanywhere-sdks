@@ -8,6 +8,9 @@ import com.runanywhere.sdk.public.extensions.addModelFromURL
 import com.runanywhere.sdk.public.extensions.listAvailableModels
 import com.runanywhere.sdk.public.extensions.loadModelWithInfo
 import com.runanywhere.sdk.llm.llamacpp.LlamaCppServiceProvider
+import io.sentry.Sentry
+import io.sentry.SentryLevel
+import io.sentry.android.core.SentryAndroid
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -27,11 +30,62 @@ class RunAnywhereApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        Log.i("RunAnywhereApp", "🏁 App launched, initializing SDK...")
+        Log.i("RunAnywhereApp", "🏁 App launched, initializing...")
+
+        // Initialize Sentry for crash reporting (only if DSN is configured)
+        initializeSentry()
+
+        Log.i("RunAnywhereApp", "🚀 Initializing SDK...")
 
         // Initialize SDK asynchronously to match iOS pattern
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             initializeSDK()
+        }
+    }
+
+    /**
+     * Initialize Sentry for crash reporting.
+     * Only initializes if SENTRY_DSN is provided via environment variable at build time.
+     * This ensures the DSN is not exposed in the open source repository.
+     */
+    private fun initializeSentry() {
+        val sentryDsn = BuildConfig.SENTRY_DSN
+
+        if (sentryDsn.isBlank()) {
+            Log.i("RunAnywhereApp", "📊 Sentry: Disabled (no DSN configured)")
+            Log.i("RunAnywhereApp", "💡 To enable crash reporting, set SENTRY_DSN environment variable at build time")
+            return
+        }
+
+        try {
+            SentryAndroid.init(this) { options ->
+                options.dsn = sentryDsn
+
+                // Only capture crashes (errors), not performance data
+                options.tracesSampleRate = 0.0
+
+                // Set environment based on build type
+                options.environment = if (BuildConfig.DEBUG) "development" else "production"
+
+                // Set release version
+                options.release = "${BuildConfig.APPLICATION_ID}@${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}"
+
+                // Minimal data collection for privacy
+                options.isSendDefaultPii = false
+
+                // Only log errors in debug builds
+                options.setDiagnosticLevel(if (BuildConfig.DEBUG) SentryLevel.DEBUG else SentryLevel.ERROR)
+
+                // Attach stack traces to all events
+                options.isAttachStacktrace = true
+
+                // Disable ANR (Application Not Responding) tracking
+                options.isAnrEnabled = false
+            }
+
+            Log.i("RunAnywhereApp", "✅ Sentry initialized for crash reporting")
+        } catch (e: Exception) {
+            Log.e("RunAnywhereApp", "❌ Failed to initialize Sentry: ${e.message}")
         }
     }
 

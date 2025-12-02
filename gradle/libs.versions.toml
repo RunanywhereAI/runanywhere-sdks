@@ -134,6 +134,12 @@ playCoreKtx = "1.8.1"
 accompanist = "0.36.0"
 
 # ============================================================================
+# Crash Reporting - Sentry
+# ============================================================================
+sentry = "8.3.0"
+sentryPlugin = "5.6.0"
+
+# ============================================================================
 # LIBRARIES
 # ============================================================================
 
@@ -303,6 +309,11 @@ google-play-core-ktx = { group = "com.google.android.play", name = "core-ktx", v
 # ----------------------------------------------------------------------------
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 
+# ----------------------------------------------------------------------------
+# Crash Reporting - Sentry
+# ----------------------------------------------------------------------------
+sentry-android = { group = "io.sentry", name = "sentry-android", version.ref = "sentry" }
+
 # ============================================================================
 # PLUGINS
 # ============================================================================
@@ -332,3 +343,8 @@ detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 # IDE Plugin Development
 # ----------------------------------------------------------------------------
 intellij = { id = "org.jetbrains.intellij", version.ref = "intellij" }
+
+# ----------------------------------------------------------------------------
+# Crash Reporting - Sentry
+# ----------------------------------------------------------------------------
+sentry = { id = "io.sentry.android.gradle", version.ref = "sentryPlugin" }
