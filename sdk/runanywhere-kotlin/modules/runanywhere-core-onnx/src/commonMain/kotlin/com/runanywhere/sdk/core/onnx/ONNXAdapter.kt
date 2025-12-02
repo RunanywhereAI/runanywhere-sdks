@@ -4,6 +4,7 @@ import com.runanywhere.sdk.components.llm.HardwareConfiguration
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.core.frameworks.ComponentInitParameters
 import com.runanywhere.sdk.core.frameworks.DownloadStrategy
+import com.runanywhere.sdk.core.frameworks.ModelStorageStrategy
 import com.runanywhere.sdk.core.frameworks.UnifiedFrameworkAdapter
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.currentTimeMillis
@@ -188,6 +189,14 @@ class ONNXAdapter : UnifiedFrameworkAdapter {
      */
     override fun getDownloadStrategy(): DownloadStrategy? {
         return ONNXDownloadStrategy()
+    }
+
+    /**
+     * Get model storage strategy for ONNX models
+     * Used to detect downloaded models on disk with ONNX-specific structures
+     */
+    override fun getModelStorageStrategy(): ModelStorageStrategy? {
+        return ONNXModelStorageStrategy()
     }
 
     /**

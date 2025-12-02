@@ -40,6 +40,16 @@ interface FileSystem {
     fun existsSync(path: String): Boolean = runBlocking { exists(path) }
 
     /**
+     * Check if path is a directory (synchronous version)
+     */
+    fun isDirectorySync(path: String): Boolean = runBlocking { isDirectory(path) }
+
+    /**
+     * List files in a directory (synchronous version)
+     */
+    fun listSync(path: String): List<String> = runBlocking { listFiles(path) }
+
+    /**
      * Delete a file or directory
      */
     suspend fun delete(path: String): Boolean

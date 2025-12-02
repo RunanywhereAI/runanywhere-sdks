@@ -277,6 +277,28 @@ object ModuleRegistry {
         return synchronized(_adaptersByFramework) { _adaptersByFramework.containsKey(framework) }
     }
 
+    /**
+     * Get model storage strategy for a specific framework
+     * @param framework The framework to get storage strategy for
+     * @return Storage strategy if available, null otherwise
+     */
+    fun getStorageStrategy(framework: LLMFramework): com.runanywhere.sdk.core.frameworks.ModelStorageStrategy? {
+        return synchronized(_adaptersByFramework) {
+            _adaptersByFramework[framework]?.getModelStorageStrategy()
+        }
+    }
+
+    /**
+     * Get all registered model storage strategies
+     * @return Map of framework to storage strategy
+     */
+    val allStorageStrategies: Map<LLMFramework, com.runanywhere.sdk.core.frameworks.ModelStorageStrategy>
+        get() = synchronized(_adaptersByFramework) {
+            _adaptersByFramework.mapNotNull { (framework, adapter) ->
+                adapter.getModelStorageStrategy()?.let { framework to it }
+            }.toMap()
+        }
+
     // MARK: - Provider Access
 
     /**

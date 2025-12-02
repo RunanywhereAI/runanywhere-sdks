@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.data.repositories
 
+import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
@@ -29,6 +30,10 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
     /**
      * Scan file system to find downloaded models and update localPath
      * This is called on startup to restore download state from disk
+     * Matches iOS RegistryService behavior of discovering models on disk
+     *
+     * Uses registered ModelStorageStrategy from each framework adapter
+     * to detect framework-specific model structures.
      */
     suspend fun scanAndUpdateDownloadedModels(baseModelsPath: String, fileSystem: com.runanywhere.sdk.storage.FileSystem) {
         mutex.withLock {
@@ -36,33 +41,49 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
             var foundCount = 0
 
             models.values.forEach { model ->
-                // Skip if already has localPath
-                if (model.localPath != null) {
-                    logger.debug("Model ${model.id} already has localPath: ${model.localPath}")
+                // Skip if already has valid localPath that exists
+                if (model.localPath != null && com.runanywhere.sdk.data.models.fileExists(model.localPath!!)) {
+                    logger.debug("Model ${model.id} already has valid localPath: ${model.localPath}")
                     return@forEach
                 }
 
                 // Build expected path based on framework
                 val framework = model.preferredFramework ?: model.compatibleFrameworks.firstOrNull()
                 if (framework != null) {
-                    // Try multiple path variations to ensure compatibility
+                    // Try framework-specific storage strategy first (e.g., ONNX, LlamaCpp)
+                    val storageStrategy = ModuleRegistry.getStorageStrategy(framework)
+                    val modelDir = "$baseModelsPath/${framework.value.lowercase()}/${model.id}"
+
+                    if (storageStrategy != null) {
+                        logger.debug("Using ${framework.name} storage strategy for ${model.id}")
+
+                        // Use framework's strategy to find the model
+                        val foundPath = storageStrategy.findModelPath(model.id, modelDir)
+                        if (foundPath != null) {
+                            model.localPath = foundPath
+                            model.updatedAt = SimpleInstant.now()
+                            foundCount++
+                            logger.info("✅ Found ${framework.name} model: ${model.name} at $foundPath")
+                            return@forEach
+                        }
+                    }
+
+                    // Fallback: Check standard path patterns for frameworks without storage strategy
                     val pathVariations = listOf(
-                        "$baseModelsPath/${framework.value}/${model.id}/${model.id}.${model.format.value}",  // CamelCase: LlamaCpp
-                        "$baseModelsPath/llama_cpp/${model.id}/${model.id}.${model.format.value}",          // snake_case for llama.cpp
-                        "$baseModelsPath/${framework.value.lowercase()}/${model.id}/${model.id}.${model.format.value}" // lowercase
+                        "$baseModelsPath/${framework.value}/${model.id}/${model.id}.${model.format.value}",
+                        "$baseModelsPath/${framework.value.lowercase()}/${model.id}/${model.id}.${model.format.value}",
+                        "$baseModelsPath/llama_cpp/${model.id}/${model.id}.${model.format.value}"
                     )
 
                     for (expectedPath in pathVariations) {
                         logger.debug("Checking path for ${model.id}: $expectedPath")
 
-                        // Check if file exists using FileSystem
-                        if (fileSystem.existsSync(expectedPath)) {
-                            // File found! Update model with localPath
+                        if (fileSystem.existsSync(expectedPath) && !fileSystem.isDirectorySync(expectedPath)) {
                             model.localPath = expectedPath
                             model.updatedAt = SimpleInstant.now()
                             foundCount++
                             logger.info("✅ Found downloaded model: ${model.name} at $expectedPath")
-                            return@forEach // Stop checking other paths for this model
+                            return@forEach
                         }
                     }
 

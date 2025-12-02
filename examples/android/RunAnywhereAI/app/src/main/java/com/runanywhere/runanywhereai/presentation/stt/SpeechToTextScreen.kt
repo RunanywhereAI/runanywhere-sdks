@@ -1,6 +1,9 @@
 package com.runanywhere.runanywhereai.presentation.stt
 
-import androidx.compose.animation.animateContentSize
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,10 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
@@ -39,7 +42,8 @@ import kotlinx.coroutines.launch
  * Features:
  * - Batch mode: Record full audio then transcribe
  * - Live mode: Real-time streaming transcription
- * - Recording button with 3 states (idle, recording, processing)
+ * - Recording button with GREEN color when recording (matching iOS)
+ * - Audio level visualization with GREEN bars
  * - Model status banner
  * - Transcription display
  */
@@ -48,9 +52,24 @@ import kotlinx.coroutines.launch
 fun SpeechToTextScreen(
     viewModel: SpeechToTextViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showModelPicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    // Initialize ViewModel with context
+    LaunchedEffect(Unit) {
+        viewModel.initialize(context)
+    }
+
+    // Permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.initialize(context)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -81,8 +100,6 @@ fun SpeechToTextScreen(
                 onSelectModel = { showModelPicker = true }
             )
 
-            HorizontalDivider()
-
             // Main content - only enabled when model is selected
             if (uiState.isModelLoaded) {
                 Column(
@@ -94,46 +111,25 @@ fun SpeechToTextScreen(
                     // iOS Reference: ModeSelector in SpeechToTextView
                     STTModeSelector(
                         selectedMode = uiState.mode,
+                        supportsLiveMode = uiState.supportsLiveMode,
                         onModeChange = { viewModel.setMode(it) }
                     )
 
-                    // Main recording area
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        // Recording button with pulsing animation
-                        RecordingButton(
-                            recordingState = uiState.recordingState,
-                            audioLevel = uiState.audioLevel,
-                            onToggleRecording = { viewModel.toggleRecording() }
-                        )
+                    // Mode description
+                    ModeDescription(
+                        mode = uiState.mode,
+                        supportsLiveMode = uiState.supportsLiveMode
+                    )
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-                        // Status text
-                        Text(
-                            text = when (uiState.recordingState) {
-                                RecordingState.IDLE -> "Tap to start recording"
-                                RecordingState.RECORDING -> "Recording... Tap to stop"
-                                RecordingState.PROCESSING -> "Processing..."
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Transcription display
-                    if (uiState.transcription.isNotEmpty()) {
-                        TranscriptionDisplay(
-                            transcription = uiState.transcription,
-                            language = uiState.language
-                        )
-                    }
+                    // Transcription display area
+                    TranscriptionArea(
+                        transcription = uiState.transcription,
+                        isRecording = uiState.recordingState == RecordingState.RECORDING,
+                        isTranscribing = uiState.isTranscribing || uiState.recordingState == RecordingState.PROCESSING,
+                        modifier = Modifier.weight(1f)
+                    )
 
                     // Error message
                     uiState.errorMessage?.let { error ->
@@ -143,10 +139,30 @@ fun SpeechToTextScreen(
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
+                                .padding(horizontal = 16.dp),
                             textAlign = TextAlign.Center
                         )
                     }
+
+                    // Audio level indicator - iOS style green bars
+                    // iOS Reference: Audio level indicator in SpeechToTextView
+                    if (uiState.recordingState == RecordingState.RECORDING) {
+                        AudioLevelIndicator(
+                            audioLevel = uiState.audioLevel,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+
+                    // Controls section
+                    ControlsSection(
+                        recordingState = uiState.recordingState,
+                        audioLevel = uiState.audioLevel,
+                        isModelLoaded = uiState.isModelLoaded,
+                        onToggleRecording = {
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            viewModel.toggleRecording()
+                        }
+                    )
                 }
             } else {
                 // No model selected - show spacer
@@ -177,6 +193,321 @@ fun SpeechToTextScreen(
                 }
             )
         }
+    }
+}
+
+/**
+ * Mode Description text
+ * iOS Reference: Mode description under segmented control
+ */
+@Composable
+private fun ModeDescription(
+    mode: STTMode,
+    supportsLiveMode: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = when (mode) {
+                STTMode.BATCH -> Icons.Filled.GraphicEq
+                STTMode.LIVE -> Icons.Filled.Waves
+            },
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = when (mode) {
+                STTMode.BATCH -> "Record audio, then transcribe all at once"
+                STTMode.LIVE -> "Real-time transcription as you speak"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        // Show warning if live mode not supported
+        if (!supportsLiveMode && mode == STTMode.LIVE) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "(will use batch)",
+                style = MaterialTheme.typography.bodySmall,
+                color = AppColors.primaryOrange
+            )
+        }
+    }
+}
+
+/**
+ * Transcription display area
+ * iOS Reference: Transcription ScrollView in SpeechToTextView
+ */
+@Composable
+private fun TranscriptionArea(
+    transcription: String,
+    isRecording: Boolean,
+    isTranscribing: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        when {
+            transcription.isEmpty() && !isRecording && !isTranscribing -> {
+                // Ready state - iOS Reference: Ready state view
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Mic,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = AppColors.primaryGreen.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = "Ready to transcribe",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Tap the microphone button to start recording",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            isTranscribing && transcription.isEmpty() -> {
+                // Processing state - iOS Reference: Processing state (batch mode)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        strokeWidth = 4.dp,
+                        color = AppColors.primaryGreen
+                    )
+                    Text(
+                        text = "Processing audio...",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Transcribing your recording",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            else -> {
+                // Transcription display - iOS Reference: Live transcription view
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Header with status badge
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Transcription",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        // Status badge - iOS Reference: RECORDING/TRANSCRIBING badge
+                        if (isRecording) {
+                            RecordingBadge()
+                        } else if (isTranscribing) {
+                            TranscribingBadge()
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Transcription text box
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = transcription.ifEmpty { "Listening..." },
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .verticalScroll(rememberScrollState()),
+                            color = if (transcription.isEmpty()) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Recording badge - iOS style red recording indicator
+ */
+@Composable
+private fun RecordingBadge() {
+    val infiniteTransition = rememberInfiniteTransition(label = "recording_pulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(500),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "badge_pulse"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = Color.Red.copy(alpha = 0.1f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Color.Red.copy(alpha = alpha))
+            )
+            Text(
+                text = "RECORDING",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.Red
+            )
+        }
+    }
+}
+
+/**
+ * Transcribing badge - iOS style orange processing indicator
+ */
+@Composable
+private fun TranscribingBadge() {
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = AppColors.primaryOrange.copy(alpha = 0.1f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(10.dp),
+                strokeWidth = 1.5.dp,
+                color = AppColors.primaryOrange
+            )
+            Text(
+                text = "TRANSCRIBING",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.primaryOrange
+            )
+        }
+    }
+}
+
+/**
+ * Audio level indicator - GREEN bars matching iOS exactly
+ * iOS Reference: Audio level indicator bars in SpeechToTextView
+ */
+@Composable
+private fun AudioLevelIndicator(
+    audioLevel: Float,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val barsCount = 10
+        val activeBars = (audioLevel * barsCount).toInt()
+
+        repeat(barsCount) { index ->
+            val isActive = index < activeBars
+            val barColor by animateColorAsState(
+                targetValue = if (isActive) AppColors.primaryGreen else Color.Gray.copy(alpha = 0.3f),
+                animationSpec = tween(100),
+                label = "bar_color_$index"
+            )
+
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 2.dp)
+                    .width(25.dp)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(barColor)
+            )
+        }
+    }
+}
+
+/**
+ * Controls Section with recording button
+ */
+@Composable
+private fun ControlsSection(
+    recordingState: RecordingState,
+    audioLevel: Float,
+    isModelLoaded: Boolean,
+    onToggleRecording: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .background(MaterialTheme.colorScheme.background),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Recording button - GREEN when recording (matching iOS)
+        RecordingButton(
+            recordingState = recordingState,
+            audioLevel = audioLevel,
+            onToggleRecording = onToggleRecording,
+            enabled = isModelLoaded && recordingState != RecordingState.PROCESSING
+        )
+
+        // Status text
+        Text(
+            text = when (recordingState) {
+                RecordingState.IDLE -> "Tap to start recording"
+                RecordingState.RECORDING -> "Tap to stop recording"
+                RecordingState.PROCESSING -> "Processing transcription..."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -278,6 +609,7 @@ private fun ModelStatusBannerSTT(
 @Composable
 private fun STTModeSelector(
     selectedMode: STTMode,
+    supportsLiveMode: Boolean,
     onModeChange: (STTMode) -> Unit
 ) {
     Surface(
@@ -316,14 +648,15 @@ private fun STTModeSelector(
 }
 
 /**
- * Recording Button with pulsing animation
- * iOS Reference: Recording button in SpeechToTextView with 3 states
+ * Recording Button - GREEN when recording (matching iOS exactly)
+ * iOS Reference: Recording button in SpeechToTextView with mic color change
  */
 @Composable
 private fun RecordingButton(
     recordingState: RecordingState,
     audioLevel: Float,
-    onToggleRecording: () -> Unit
+    onToggleRecording: () -> Unit,
+    enabled: Boolean = true
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "recording_pulse")
     val scale by infiniteTransition.animateFloat(
@@ -336,11 +669,18 @@ private fun RecordingButton(
         label = "pulse_scale"
     )
 
-    val buttonColor = when (recordingState) {
-        RecordingState.IDLE -> AppColors.primaryBlue
-        RecordingState.RECORDING -> AppColors.primaryRed
-        RecordingState.PROCESSING -> AppColors.primaryOrange
-    }
+    // iOS Reference: Blue when idle, GREEN when recording (matching iOS green mic indicator)
+    // iOS shows green mic.circle icon when ready, and the button turns red only on stop.fill
+    // For active recording, iOS shows a pulsing effect - we match with GREEN to indicate active capture
+    val buttonColor by animateColorAsState(
+        targetValue = when (recordingState) {
+            RecordingState.IDLE -> AppColors.primaryBlue
+            RecordingState.RECORDING -> AppColors.primaryGreen // GREEN when recording - matching iOS
+            RecordingState.PROCESSING -> AppColors.primaryOrange
+        },
+        animationSpec = tween(300),
+        label = "button_color"
+    )
 
     val buttonIcon = when (recordingState) {
         RecordingState.IDLE -> Icons.Filled.Mic
@@ -354,14 +694,14 @@ private fun RecordingButton(
             .size(120.dp)
             .scale(if (recordingState == RecordingState.RECORDING) scale else 1f)
     ) {
-        // Pulsing ring when recording
+        // Pulsing ring when recording - GREEN to match iOS
         if (recordingState == RecordingState.RECORDING) {
             Box(
                 modifier = Modifier
                     .size(120.dp)
                     .border(
                         width = 3.dp,
-                        color = buttonColor.copy(alpha = 0.3f),
+                        color = AppColors.primaryGreen.copy(alpha = 0.3f), // GREEN ring
                         shape = CircleShape
                     )
                     .scale(scale * 1.1f)
@@ -373,7 +713,7 @@ private fun RecordingButton(
             modifier = Modifier
                 .size(100.dp)
                 .clickable(
-                    enabled = recordingState != RecordingState.PROCESSING,
+                    enabled = enabled,
                     onClick = onToggleRecording
                 ),
             shape = CircleShape,

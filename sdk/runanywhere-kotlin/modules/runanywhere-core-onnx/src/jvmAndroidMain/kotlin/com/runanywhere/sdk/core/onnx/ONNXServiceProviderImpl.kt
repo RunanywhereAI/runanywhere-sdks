@@ -20,6 +20,11 @@ private val logger = SDKLogger("ONNXServiceProviderImpl")
 
 /**
  * JVM/Android implementation of ONNX STT service creation
+ *
+ * NOTE: The actual model loading happens when the caller provides a model path.
+ * The configuration.modelId can be either:
+ * - A full file path (e.g., /data/.../model.onnx)
+ * - A model ID that requires the caller to load the model separately
  */
 actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTService {
     logger.info("Creating ONNX STT service with configuration: ${configuration.modelId}")
@@ -27,10 +32,24 @@ actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTSer
     val service = ONNXCoreService()
     service.initialize()
 
-    // Load model if path provided
+    // Load model if the modelId looks like a path (contains / or ends with common model extensions)
     configuration.modelId?.let { modelId ->
-        // Model loading will be handled by the calling code with full path
-        logger.debug("Model ID specified: $modelId - caller should load model")
+        try {
+            if (modelId.contains("/") || modelId.endsWith(".onnx") || modelId.endsWith(".gguf")) {
+                // modelId is actually a path - load it directly
+                logger.info("Loading STT model from path: $modelId")
+                val modelType = detectSTTModelType(modelId)
+                service.loadSTTModel(modelId, modelType)
+                logger.info("STT model loaded successfully from path")
+            } else {
+                // modelId is just an ID - the model needs to be loaded via a different mechanism
+                // Log this but don't fail - the service will return an error when transcribe is called
+                logger.info("Model ID specified: $modelId - model path should be provided for actual loading")
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to load STT model: ${e.message}")
+            // Don't throw - let the service return an error when transcribe is called
+        }
     }
 
     return ONNXSTTServiceWrapper(service)

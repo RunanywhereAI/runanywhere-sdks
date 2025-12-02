@@ -95,6 +95,13 @@ interface UnifiedFrameworkAdapter {
     fun getDownloadStrategy(): DownloadStrategy?
 
     /**
+     * Get model storage strategy provided by this adapter (if any)
+     * Used for detecting downloaded models on disk
+     * @return Storage strategy or null if none
+     */
+    fun getModelStorageStrategy(): ModelStorageStrategy? = null
+
+    /**
      * Initialize adapter with component parameters
      * @param parameters Component initialization parameters
      * @param modality The modality to initialize for

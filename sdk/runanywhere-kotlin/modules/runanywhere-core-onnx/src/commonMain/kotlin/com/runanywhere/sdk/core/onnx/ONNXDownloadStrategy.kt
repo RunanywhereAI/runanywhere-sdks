@@ -96,25 +96,50 @@ class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
     // MARK: - Private Methods
 
     /**
-     * Download and extract archive
+     * Download and extract archive (e.g., .tar.bz2 from sherpa-onnx)
+     *
+     * Process:
+     * 1. Download archive to temp location
+     * 2. Extract to destination folder
+     * 3. Find model directory in extracted contents
+     * 4. Return path to model directory (not individual .onnx file for multi-file models)
      */
     private suspend fun downloadArchive(
         url: String,
         destinationFolder: String,
         progressHandler: ((Double) -> Unit)?
     ): String {
-        logger.info("Downloading archive from: $url")
+        logger.info("Downloading archive from: $url to $destinationFolder")
 
-        // Download the archive
-        val archivePath = downloadFile(url, destinationFolder, progressHandler)
+        // Create destination folder
+        createDirectory(destinationFolder)
 
-        // Extract the archive
-        logger.info("Extracting archive: $archivePath")
+        // Download the archive to a temp file within the destination folder
+        // This ensures we can extract to the same filesystem (avoid cross-device issues)
+        val archivePath = downloadFile(url, destinationFolder) { progress ->
+            // Scale progress: 0-50% for download
+            progressHandler?.invoke(progress * 0.5)
+        }
+        logger.info("Archive downloaded to: $archivePath")
+
+        // Report extraction starting
+        progressHandler?.invoke(0.55)
+
+        // Extract the archive to destination folder
+        logger.info("Extracting archive to: $destinationFolder")
         val extractedPath = extractArchive(archivePath, destinationFolder)
+        logger.info("Archive extracted to: $extractedPath")
+
+        // Report extraction progress
+        progressHandler?.invoke(0.9)
 
         // Find the model within extracted contents
+        // For sherpa-onnx models, this returns the DIRECTORY containing encoder.onnx, decoder.onnx, tokens.txt
         val modelPath = findONNXModelPath("", extractedPath)
-            ?: throw ONNXError.ModelLoadFailed("No ONNX model found in extracted archive")
+            ?: throw ONNXError.ModelLoadFailed("No ONNX model found in extracted archive at $extractedPath")
+
+        logger.info("Found model at: $modelPath")
+        progressHandler?.invoke(1.0)
 
         return modelPath
     }
