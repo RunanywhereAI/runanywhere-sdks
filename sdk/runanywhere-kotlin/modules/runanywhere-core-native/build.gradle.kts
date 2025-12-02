@@ -142,11 +142,16 @@ android {
  * Task to download pre-built native libraries from GitHub releases
  */
 val downloadNativeLibs by tasks.registering {
-    description = "Downloads pre-built unified native libraries from GitHub releases"
+    description = "Downloads pre-built native libraries from GitHub releases"
     group = "build setup"
 
     val versionFile = file("$jniLibsDir/.version")
-    val zipFile = file("$downloadedLibsDir/RunAnywhereCore-android.zip")
+
+    // Separate archives for each backend
+    val archives = listOf(
+        "RunAnywhereONNX-android.zip",
+        "RunAnywhereLlamaCPP-android.zip"
+    )
 
     outputs.dir(jniLibsDir)
     outputs.upToDateWhen {
@@ -165,53 +170,59 @@ val downloadNativeLibs by tasks.registering {
             return@doLast
         }
 
-        logger.lifecycle("Downloading unified native libraries version $nativeLibVersion...")
-
-        // Download unified package containing ALL backends
-        val downloadUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/RunAnywhereCore-android.zip"
+        logger.lifecycle("Downloading native libraries version $nativeLibVersion...")
 
         // Create download directory
         downloadedLibsDir.mkdirs()
-
-        // Download the ZIP file
-        try {
-            logger.lifecycle("Downloading from: $downloadUrl")
-            URL(downloadUrl).openStream().use { input ->
-                zipFile.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-            logger.lifecycle("Downloaded: ${zipFile.length() / 1024}KB")
-        } catch (e: Exception) {
-            logger.error("Failed to download native libraries: ${e.message}")
-            logger.error("URL: $downloadUrl")
-            logger.lifecycle("")
-            logger.lifecycle("Options:")
-            logger.lifecycle("  1. Check that version $nativeLibVersion exists in the releases")
-            logger.lifecycle("  2. Build locally: cd runanywhere-core && ./scripts/android/build.sh all")
-            logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
-            throw GradleException("Failed to download native libraries", e)
-        }
 
         // Clear existing jniLibs
         jniLibsDir.deleteRecursively()
         jniLibsDir.mkdirs()
 
-        // Extract the ZIP
-        logger.lifecycle("Extracting native libraries...")
-        copy {
-            from(zipTree(zipFile))
-            into(downloadedLibsDir)
-        }
+        // Download and extract each archive
+        for (archiveName in archives) {
+            val downloadUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/$archiveName"
+            val zipFile = file("$downloadedLibsDir/$archiveName")
 
-        // Move libraries to jniLibs directory
-        // ZIP structure: <abi>/lib*.so -> jniLibs/<abi>/lib*.so
-        downloadedLibsDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
-            val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
-            targetAbiDir.mkdirs()
-            abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
-                soFile.copyTo(file("$targetAbiDir/${soFile.name}"), overwrite = true)
-                logger.lifecycle("  Extracted: ${abiDir.name}/${soFile.name}")
+            // Download the ZIP file
+            try {
+                logger.lifecycle("Downloading from: $downloadUrl")
+                URL(downloadUrl).openStream().use { input ->
+                    zipFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                logger.lifecycle("Downloaded: ${zipFile.length() / 1024}KB")
+            } catch (e: Exception) {
+                logger.error("Failed to download native libraries: ${e.message}")
+                logger.error("URL: $downloadUrl")
+                logger.lifecycle("")
+                logger.lifecycle("Options:")
+                logger.lifecycle("  1. Check that version $nativeLibVersion exists in the releases")
+                logger.lifecycle("  2. Build locally: cd runanywhere-core && ./scripts/android/build.sh all")
+                logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
+                throw GradleException("Failed to download native libraries", e)
+            }
+
+            // Extract the ZIP to a temp directory
+            val extractDir = file("$downloadedLibsDir/${archiveName.removeSuffix(".zip")}")
+            extractDir.mkdirs()
+
+            logger.lifecycle("Extracting $archiveName...")
+            copy {
+                from(zipTree(zipFile))
+                into(extractDir)
+            }
+
+            // Move libraries to jniLibs directory
+            // ZIP structure: <abi>/lib*.so -> jniLibs/<abi>/lib*.so
+            extractDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
+                val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
+                targetAbiDir.mkdirs()
+                abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
+                    soFile.copyTo(file("$targetAbiDir/${soFile.name}"), overwrite = true)
+                    logger.lifecycle("  Extracted: ${abiDir.name}/${soFile.name}")
+                }
             }
         }
 

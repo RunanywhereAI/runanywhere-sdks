@@ -11,10 +11,12 @@ import com.runanywhere.sdk.models.enums.ModelFormat
  * IMPORTANT: This is the SINGLE SOURCE OF TRUTH for model paths in the SDK.
  * All model path calculations should use this utility to ensure consistency.
  *
- * Path Pattern: {baseDir}/Models/{framework.value}/{modelId}/{filename}
- * Example: /data/data/app/files/runanywhere/Models/ONNX/sherpa-whisper-tiny-onnx/model.onnx
+ * Path Pattern: {baseDir}/models/{framework.value}/{modelId}/{filename}
+ * Example Android: /data/data/app/files/runanywhere/models/LlamaCpp/lfm2-350m-q4-k-m/lfm2-350m-q4-k-m.gguf
+ * Example iOS: {Documents}/RunAnywhere/Models/{framework}/{modelId}/{filename} (iOS uses uppercase "Models")
  *
- * Reference: Matches iOS ModelPathUtils.swift exactly
+ * Note: Android uses lowercase "models", iOS uses uppercase "Models" - both are correct for their platforms.
+ * Reference: Matches iOS ModelPathUtils.swift structure (adapted for Android conventions)
  */
 object ModelPathUtils {
 
