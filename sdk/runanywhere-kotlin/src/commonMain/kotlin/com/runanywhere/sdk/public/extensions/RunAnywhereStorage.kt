@@ -5,6 +5,7 @@ import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.filemanager.SimplifiedFileManager
 import com.runanywhere.sdk.foundation.storage.DefaultStorageAnalyzer
 import com.runanywhere.sdk.foundation.storage.StorageAnalyzer
+import com.runanywhere.sdk.foundation.utils.ModelPathUtils
 import com.runanywhere.sdk.models.storage.StorageInfo
 import com.runanywhere.sdk.public.RunAnywhereSDK
 
@@ -207,19 +208,19 @@ fun RunAnywhereSDK.getBaseDirectoryURL(): String {
  * Get models directory path (bonus method for convenience)
  */
 fun RunAnywhereSDK.getModelsDirectoryURL(): String {
-    return fileManager.modelsDirectory.toString()
+    return ModelPathUtils.getModelsDirectory()
 }
 
 /**
  * Get cache directory path (bonus method for convenience)
  */
 fun RunAnywhereSDK.getCacheDirectoryURL(): String {
-    return fileManager.cacheDirectory.toString()
+    return ModelPathUtils.getCacheDirectory()
 }
 
 /**
  * Get temporary directory path (bonus method for convenience)
  */
 fun RunAnywhereSDK.getTempDirectoryURL(): String {
-    return fileManager.temporaryDirectory.toString()
+    return ModelPathUtils.getTempDirectory()
 }

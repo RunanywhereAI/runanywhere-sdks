@@ -2,7 +2,7 @@ package com.runanywhere.sdk.services.download
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
-import com.runanywhere.sdk.foundation.filemanager.SimplifiedFileManager
+import com.runanywhere.sdk.foundation.utils.ModelPathUtils
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.storage.FileSystem
@@ -503,17 +503,13 @@ class KtorDownloadService(
         }
     }
 
-    // Model folder helpers - USE SimplifiedFileManager to ensure path consistency
-    // IMPORTANT: Must use same paths as SimplifiedFileManager for model discovery to work
-    // iOS pattern: Models/{framework.rawValue}/{modelId}/ e.g., Models/LlamaCpp/liquid-ai-4b/
+    // Model folder helpers - Use centralized ModelPathUtils
     private fun getModelFolder(modelId: String, framework: LLMFramework): String {
-        val modelsDir = SimplifiedFileManager.shared.modelsDirectory.toString()
-        return "$modelsDir/${framework.value}/$modelId"
+        return ModelPathUtils.getModelFolder(modelId, framework)
     }
 
     private fun getModelFolder(modelId: String): String {
-        val modelsDir = SimplifiedFileManager.shared.modelsDirectory.toString()
-        return "$modelsDir/$modelId"
+        return ModelPathUtils.getModelFolder(modelId)
     }
 
     // MARK: - Helper Methods (EXACT copy of iOS)
@@ -721,16 +717,13 @@ suspend fun KtorDownloadService.downloadModelWithResume(model: ModelInfo, resume
     )
 }
 
-// IMPORTANT: Use SimplifiedFileManager to ensure path consistency with model discovery
-// iOS pattern: Models/{framework.rawValue}/{modelId}/ e.g., Models/LlamaCpp/liquid-ai-4b/
+// Extension functions using centralized ModelPathUtils
 private fun KtorDownloadService.getModelFolder(modelId: String, framework: LLMFramework): String {
-    val modelsDir = SimplifiedFileManager.shared.modelsDirectory.toString()
-    return "$modelsDir/${framework.value}/$modelId"
+    return ModelPathUtils.getModelFolder(modelId, framework)
 }
 
 private fun KtorDownloadService.getModelFolder(modelId: String): String {
-    val modelsDir = SimplifiedFileManager.shared.modelsDirectory.toString()
-    return "$modelsDir/$modelId"
+    return ModelPathUtils.getModelFolder(modelId)
 }
 
 private fun mapKtorError(error: Throwable): DownloadError {

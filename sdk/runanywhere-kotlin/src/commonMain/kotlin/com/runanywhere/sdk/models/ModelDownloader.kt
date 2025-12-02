@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.filemanager.SimplifiedFileManager
+import com.runanywhere.sdk.foundation.utils.ModelPathUtils
 import com.runanywhere.sdk.services.download.DownloadService
 import com.runanywhere.sdk.storage.FileSystem
 import kotlinx.coroutines.flow.Flow
@@ -9,13 +9,12 @@ import kotlinx.coroutines.flow.flow
 
 /**
  * Model downloader for handling model downloads
- * Uses platform abstractions for file operations
- * IMPORTANT: Uses SimplifiedFileManager.modelsDirectory for path consistency
+ * Uses centralized ModelPathUtils for path consistency
  */
 class ModelDownloader(
     private val fileSystem: FileSystem,
     private val downloadService: DownloadService,
-    private val modelsDirectory: String = SimplifiedFileManager.shared.modelsDirectory.toString()
+    private val modelsDirectory: String = ModelPathUtils.getModelsDirectory()
 ) {
     private val logger = SDKLogger("ModelDownloader")
 
