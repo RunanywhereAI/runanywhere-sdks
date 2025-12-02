@@ -164,12 +164,14 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     /**
      * Scan file system for downloaded models and restore their localPath
      * Should be called after models are registered
+     *
+     * Uses centralized ModelPathUtils for path consistency
      */
     suspend fun scanForDownloadedModels() {
-        val context = androidContext ?: throw IllegalStateException("Android context not provided")
-
         try {
-            val modelsPath = context.filesDir.absolutePath + "/models"
+            // Use centralized ModelPathUtils for path consistency
+            // Path: {baseDir}/models/{framework}/{modelId}
+            val modelsPath = com.runanywhere.sdk.foundation.utils.ModelPathUtils.getModelsDirectory()
             val repository = ServiceContainer.shared.modelInfoRepository
             if (repository is com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl) {
                 repository.scanAndUpdateDownloadedModels(modelsPath, ServiceContainer.shared.fileSystem)
