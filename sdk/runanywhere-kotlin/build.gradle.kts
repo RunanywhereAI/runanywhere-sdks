@@ -13,19 +13,35 @@ version = "0.1.3"
 // =============================================================================
 // Project Path Resolution
 // =============================================================================
-// When included as a subproject in composite builds (e.g., from example app),
-// the module path changes. This function resolves the correct path for sibling modules.
+// When included as a subproject in composite builds (e.g., from example app or Android Studio),
+// the module path changes. This function constructs the full absolute path for sibling modules
+// based on the current project's location in the hierarchy.
+//
+// Examples:
+// - When SDK is root project: path = ":" → module path = ":modules:$moduleName"
+// - When SDK is at ":sdk:runanywhere-kotlin": path → ":sdk:runanywhere-kotlin:modules:$moduleName"
 fun resolveModulePath(moduleName: String): String {
-    val possiblePaths = listOf(
-        ":modules:$moduleName",                           // When building SDK directly
-        ":sdk:runanywhere-kotlin:modules:$moduleName",    // When included from example app
-    )
-    for (path in possiblePaths) {
-        if (project.findProject(path) != null) {
-            return path
-        }
+    val basePath = project.path
+    val computedPath = if (basePath == ":") {
+        ":modules:$moduleName"
+    } else {
+        "$basePath:modules:$moduleName"
     }
-    return ":modules:$moduleName"
+
+    // Try to find the project using rootProject to handle Android Studio sync ordering
+    val foundProject = rootProject.findProject(computedPath)
+    if (foundProject != null) {
+        return computedPath
+    }
+
+    // Fallback: Try just :modules:$moduleName (when SDK is at non-root but modules are siblings)
+    val simplePath = ":modules:$moduleName"
+    if (rootProject.findProject(simplePath) != null) {
+        return simplePath
+    }
+
+    // Return computed path (will fail with clear error if not found)
+    return computedPath
 }
 
 kotlin {

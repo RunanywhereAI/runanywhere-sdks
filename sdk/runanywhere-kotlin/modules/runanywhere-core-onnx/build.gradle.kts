@@ -61,8 +61,12 @@ kotlin {
         // Shared JVM/Android code
         val jvmAndroidMain by creating {
             dependsOn(commonMain)
-            // NOTE: No additional dependencies needed here!
-            // The main SDK (parent) includes RunAnywhereBridge and native libs transitively
+            // NOTE: The main SDK (parent) includes RunAnywhereBridge and native libs transitively
+            dependencies {
+                // Apache Commons Compress for tar.bz2 extraction on Android
+                // (native libarchive is not available on Android)
+                implementation("org.apache.commons:commons-compress:1.26.0")
+            }
         }
 
         val jvmMain by getting {

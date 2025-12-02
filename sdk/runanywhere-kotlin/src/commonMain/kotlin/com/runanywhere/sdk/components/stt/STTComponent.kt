@@ -7,7 +7,10 @@ import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import com.runanywhere.sdk.events.ModularPipelineEvent
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 
 /**
  * Speech-to-Text component matching iOS STTComponent architecture exactly
@@ -205,12 +208,13 @@ class STTComponent(
 
     /**
      * Enhanced stream transcription with Speaker Diarization support (matches iOS architecture)
+     * Uses callbackFlow for thread-safe emissions from any coroutine context
      */
     fun streamTranscribe(
         audioStream: Flow<ByteArray>,
         language: String? = null,
         enableSpeakerDiarization: Boolean = sttConfiguration.enableDiarization
-    ): Flow<STTStreamEvent> = kotlinx.coroutines.flow.flow {
+    ): Flow<STTStreamEvent> = callbackFlow {
         requireReady()
 
         val service = service?.wrappedService
@@ -224,45 +228,51 @@ class STTComponent(
             enableAudioLevelMonitoring = true
         )
 
-        try {
-            // Use enhanced streaming if available, otherwise fall back to basic streaming
-            if (service.supportsStreaming) {
-                service.transcribeStream(audioStream, streamingOptions).collect { event ->
-                    emit(event)
-                }
-            } else {
-                // Fallback to basic streaming
-                emit(STTStreamEvent.SpeechStarted)
-
-                val basicOptions = STTOptions(
-                    language = streamingOptions.language ?: "en",
-                    detectLanguage = streamingOptions.detectLanguage,
-                    enablePunctuation = sttConfiguration.enablePunctuation,
-                    enableDiarization = streamingOptions.enableSpeakerDiarization,
-                    enableTimestamps = false,
-                    vocabularyFilter = sttConfiguration.vocabularyList,
-                    audioFormat = AudioFormat.PCM
-                )
-
-                val result = service.streamTranscribe(
-                    audioStream = audioStream,
-                    options = basicOptions
-                ) { partial ->
-                    kotlinx.coroutines.runBlocking {
-                        emit(STTStreamEvent.PartialTranscription(partial))
+        // Launch transcription in a coroutine
+        val transcriptionJob = launch {
+            try {
+                // Use enhanced streaming if available, otherwise fall back to basic streaming
+                if (service.supportsStreaming) {
+                    service.transcribeStream(audioStream, streamingOptions).collect { event ->
+                        trySend(event)
                     }
-                }
+                } else {
+                    // Fallback to basic streaming
+                    trySend(STTStreamEvent.SpeechStarted)
 
-                // Emit final result
-                emit(STTStreamEvent.FinalTranscription(result))
-                emit(STTStreamEvent.SpeechEnded)
+                    val basicOptions = STTOptions(
+                        language = streamingOptions.language ?: "en",
+                        detectLanguage = streamingOptions.detectLanguage,
+                        enablePunctuation = sttConfiguration.enablePunctuation,
+                        enableDiarization = streamingOptions.enableSpeakerDiarization,
+                        enableTimestamps = false,
+                        vocabularyFilter = sttConfiguration.vocabularyList,
+                        audioFormat = AudioFormat.PCM
+                    )
+
+                    val result = service.streamTranscribe(
+                        audioStream = audioStream,
+                        options = basicOptions
+                    ) { partial ->
+                        trySend(STTStreamEvent.PartialTranscription(partial))
+                    }
+
+                    // Emit final result
+                    trySend(STTStreamEvent.FinalTranscription(result))
+                    trySend(STTStreamEvent.SpeechEnded)
+                }
+            } catch (error: Exception) {
+                val sttError = when (error) {
+                    is STTError -> error
+                    else -> STTError.transcriptionFailed(error)
+                }
+                trySend(STTStreamEvent.Error(sttError))
             }
-        } catch (error: Exception) {
-            val sttError = when (error) {
-                is STTError -> error
-                else -> STTError.transcriptionFailed(error)
-            }
-            emit(STTStreamEvent.Error(sttError))
+        }
+
+        // Wait for flow to be closed
+        awaitClose {
+            transcriptionJob.cancel()
         }
     }
 
