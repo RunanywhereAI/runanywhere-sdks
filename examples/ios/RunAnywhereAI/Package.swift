@@ -28,6 +28,13 @@ let package = Package(
         .package(path: "../../../sdk/runanywhere-swift"),
 
         // ===================================
+        // CRASH REPORTING - SENTRY
+        // ===================================
+        // Sentry for crash reporting. DSN is configured via environment
+        // variable to keep secrets out of the open source repository.
+        .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.43.0"),
+
+        // ===================================
         // TRANSITIVE DEPENDENCIES (auto-included)
         // ===================================
         // The following dependencies are automatically pulled in
@@ -62,6 +69,9 @@ let package = Package(
                 .product(name: "RunAnywhereWhisperKit", package: "runanywhere-swift"),     // CoreML STT
                 .product(name: "RunAnywhereFluidAudio", package: "runanywhere-swift"),     // Speaker Diarization
                 .product(name: "RunAnywhereAppleAI", package: "runanywhere-swift"),        // Apple Intelligence (iOS 26+)
+
+                // Crash Reporting
+                .product(name: "Sentry", package: "sentry-cocoa"),
             ],
             path: "RunAnywhereAI",
             exclude: [

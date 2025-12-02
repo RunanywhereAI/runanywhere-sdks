@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.sentry)
 }
 
 android {
@@ -47,6 +48,14 @@ android {
             // Disable optimizations for faster builds
             buildConfigField("boolean", "DEBUG_MODE", "true")
             buildConfigField("String", "BUILD_TYPE", "\"debug\"")
+
+            // Sentry DSN - disabled in debug builds for open source privacy
+            // Set SENTRY_DSN environment variable if you want to enable for local testing
+            buildConfigField(
+                "String",
+                "SENTRY_DSN",
+                "\"${System.getenv("SENTRY_DSN") ?: ""}\""
+            )
         }
 
         release {
@@ -63,6 +72,14 @@ android {
             buildConfigField("boolean", "DEBUG_MODE", "false")
             buildConfigField("String", "BUILD_TYPE", "\"release\"")
 
+            // Sentry DSN - only populated in release builds via CI/CD environment variable
+            // This ensures DSN is not exposed in open source repository
+            buildConfigField(
+                "String",
+                "SENTRY_DSN",
+                "\"${System.getenv("SENTRY_DSN") ?: ""}\""
+            )
+
             // Optimization flags
             isJniDebuggable = false
 
@@ -76,6 +93,12 @@ android {
 
             // Additional optimizations for benchmarking
             buildConfigField("boolean", "BENCHMARK_MODE", "true")
+            // Sentry DSN from release build type
+            buildConfigField(
+                "String",
+                "SENTRY_DSN",
+                "\"${System.getenv("SENTRY_DSN") ?: ""}\""
+            )
             applicationIdSuffix = ".benchmark"
             versionNameSuffix = "-benchmark"
         }
@@ -303,6 +326,11 @@ dependencies {
     implementation(libs.timber)
 
     // ========================================
+    // Crash Reporting - Sentry
+    // ========================================
+    implementation(libs.sentry.android)
+
+    // ========================================
     // Testing
     // ========================================
     testImplementation(libs.junit)
@@ -346,4 +374,24 @@ dependencies {
 
 detekt {
     config.setFrom("${project.rootDir}/detekt.yml")
+}
+
+// Sentry plugin configuration
+// Only uploads symbols/mappings when SENTRY_AUTH_TOKEN is set (in CI/CD)
+sentry {
+    // Disable auto-init since we initialize manually in RunAnywhereApplication
+    autoInstallation.enabled.set(false)
+
+    // Enable source context for better stack traces (only in release builds with auth token)
+    includeSourceContext.set(System.getenv("SENTRY_AUTH_TOKEN") != null)
+
+    // Upload proguard mappings for release builds
+    autoUploadProguardMapping.set(System.getenv("SENTRY_AUTH_TOKEN") != null)
+
+    // Disable telemetry to Sentry
+    telemetry.set(false)
+
+    // Organization and project for uploads (only used when auth token is set)
+    org.set(System.getenv("SENTRY_ORG") ?: "")
+    projectName.set(System.getenv("SENTRY_PROJECT") ?: "")
 }

@@ -98,3 +98,7 @@ weight.bin
 */weight.bin
 **/*.mlpackage/Data/com.apple.CoreML/weight.bin
 *.mlmodelc/coremldata.bin
+
+# Sentry
+.sentryclirc
+sentry.properties
