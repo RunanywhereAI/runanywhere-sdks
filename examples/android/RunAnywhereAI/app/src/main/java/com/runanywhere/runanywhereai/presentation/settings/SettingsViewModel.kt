@@ -1,8 +1,14 @@
 package com.runanywhere.runanywhereai.presentation.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
+import com.runanywhere.sdk.models.storage.StoredModel
+import com.runanywhere.sdk.public.extensions.clearCache
+import com.runanywhere.sdk.public.extensions.cleanTempFiles
+import com.runanywhere.sdk.public.extensions.deleteStoredModel
+import com.runanywhere.sdk.public.extensions.getStorageInfo
+import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,25 +27,12 @@ enum class RoutingPolicy(val displayName: String, val rawValue: String) {
 }
 
 /**
- * Stored Model Information
- * iOS Reference: StoredModel in StorageViewModel.swift
- */
-data class StoredModelInfo(
-    val id: String,
-    val name: String,
-    val format: String,
-    val framework: String?,
-    val size: Long,
-    val path: String,
-    val createdDate: Long,
-    val lastUsed: Long? = null,
-    val contextLength: Int? = null
-)
-
-/**
  * Settings UI State
  * iOS Reference: State properties in CombinedSettingsView.swift
+ *
+ * Uses SDK's StoredModel directly instead of a custom StoredModelInfo class
  */
+@OptIn(kotlin.time.ExperimentalTime::class)
 data class SettingsUiState(
     // SDK Configuration
     val routingPolicy: RoutingPolicy = RoutingPolicy.AUTOMATIC,
@@ -52,13 +45,13 @@ data class SettingsUiState(
     val apiKey: String = "",
     val isApiKeyConfigured: Boolean = false,
 
-    // Storage Overview
+    // Storage Overview - populated from SDK's getStorageInfo()
     val totalStorageSize: Long = 0L,
     val availableSpace: Long = 0L,
     val modelStorageSize: Long = 0L,
 
-    // Downloaded Models
-    val downloadedModels: List<StoredModelInfo> = emptyList(),
+    // Downloaded Models - using SDK's StoredModel
+    val downloadedModels: List<StoredModel> = emptyList(),
 
     // Logging Configuration
     val analyticsLogToLocal: Boolean = false,
@@ -69,7 +62,7 @@ data class SettingsUiState(
 )
 
 /**
- * Settings ViewModel
+ * Settings ViewModel matching iOS CombinedSettingsView + StorageViewModel
  *
  * iOS Reference: CombinedSettingsView state management and StorageViewModel
  *
@@ -77,16 +70,18 @@ data class SettingsUiState(
  * - SDK configuration settings
  * - Generation parameters
  * - API key management
- * - Storage overview and model management
+ * - Storage overview via RunAnywhere.getStorageInfo() (matching iOS exactly)
+ * - Model management via RunAnywhere storage APIs
  * - Logging configuration
- *
- * TODO: Integrate with RunAnywhere SDK for actual settings persistence
- * iOS equivalent: UserDefaults, KeychainService, RunAnywhere SDK
  */
 class SettingsViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    companion object {
+        private const val TAG = "SettingsViewModel"
+    }
 
     init {
         loadCurrentConfiguration()
@@ -96,7 +91,7 @@ class SettingsViewModel : ViewModel() {
     /**
      * Load current configuration from storage
      *
-     * TODO: Integrate with actual storage (SharedPreferences, DataStore, Keychain)
+     * TODO: Integrate with actual storage (SharedPreferences, DataStore)
      * iOS equivalent: loadCurrentConfiguration() in CombinedSettingsView
      */
     private fun loadCurrentConfiguration() {
@@ -108,7 +103,6 @@ class SettingsViewModel : ViewModel() {
             // - UserDefaults.standard.double(forKey: "defaultTemperature")
             // - UserDefaults.standard.integer(forKey: "defaultMaxTokens")
 
-            // Mock configuration for now
             _uiState.update {
                 it.copy(
                     routingPolicy = RoutingPolicy.AUTOMATIC,
@@ -122,58 +116,44 @@ class SettingsViewModel : ViewModel() {
     }
 
     /**
-     * Load storage data (models, sizes)
+     * Load storage data from SDK
      *
-     * TODO: Integrate with RunAnywhere SDK for actual storage data
-     * iOS equivalent: StorageViewModel.loadData()
+     * iOS equivalent: StorageViewModel.loadData() which calls:
+     *   let storageInfo = await RunAnywhere.getStorageInfo()
+     *   totalStorageSize = storageInfo.appStorage.totalSize
+     *   availableSpace = storageInfo.deviceStorage.freeSpace
+     *   modelStorageSize = storageInfo.modelStorage.totalSize
+     *   storedModels = storageInfo.storedModels
      */
     private fun loadStorageData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                // TODO: Get actual storage data from SDK
-                // iOS equivalent:
-                // let storedModels = try await RunAnywhere.storedModels()
-                // Calculate storage sizes from file system
+                Log.d(TAG, "Loading storage info from SDK...")
 
-                // Mock storage data
-                delay(500)
+                // Use SDK's getStorageInfo() - matches iOS exactly
+                val storageInfo = RunAnywhere.getStorageInfo()
 
-                val mockModels = listOf(
-                    StoredModelInfo(
-                        id = "smollm2-135m",
-                        name = "SmolLM2 135M",
-                        format = "gguf",
-                        framework = "LlamaCpp",
-                        size = 135_000_000L,
-                        path = "/data/models/smollm2-135m.gguf",
-                        createdDate = System.currentTimeMillis() - 86400000,
-                        contextLength = 2048
-                    ),
-                    StoredModelInfo(
-                        id = "whisper-tiny",
-                        name = "Whisper Tiny",
-                        format = "gguf",
-                        framework = "WhisperKit",
-                        size = 75_000_000L,
-                        path = "/data/models/whisper-tiny.gguf",
-                        createdDate = System.currentTimeMillis() - 172800000
-                    )
-                )
-
-                val totalModelSize = mockModels.sumOf { it.size }
+                Log.d(TAG, "Storage info received:")
+                Log.d(TAG, "  - App total size: ${storageInfo.appStorage.totalSize}")
+                Log.d(TAG, "  - Device free space: ${storageInfo.deviceStorage.freeSpace}")
+                Log.d(TAG, "  - Model storage size: ${storageInfo.modelStorage.totalSize}")
+                Log.d(TAG, "  - Stored models count: ${storageInfo.storedModels.size}")
 
                 _uiState.update {
                     it.copy(
-                        downloadedModels = mockModels,
-                        totalStorageSize = totalModelSize + 50_000_000L, // Add cache
-                        modelStorageSize = totalModelSize,
-                        availableSpace = 10_000_000_000L, // 10 GB mock
+                        totalStorageSize = storageInfo.appStorage.totalSize,
+                        availableSpace = storageInfo.deviceStorage.freeSpace,
+                        modelStorageSize = storageInfo.modelStorage.totalSize,
+                        downloadedModels = storageInfo.storedModels,
                         isLoading = false
                     )
                 }
+
+                Log.d(TAG, "Storage data loaded successfully")
             } catch (e: Exception) {
+                Log.e(TAG, "Failed to load storage data", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -263,21 +243,26 @@ class SettingsViewModel : ViewModel() {
     /**
      * Delete a downloaded model
      *
-     * TODO: Integrate with RunAnywhere SDK
-     * iOS equivalent: storageViewModel.deleteModel(model.id)
+     * iOS equivalent:
+     * func deleteModel(_ modelId: String) async {
+     *     try await RunAnywhere.deleteStoredModel(modelId)
+     *     await refreshData()
+     * }
      */
     fun deleteModel(modelId: String) {
         viewModelScope.launch {
-            // TODO: Delete model using SDK
-            // iOS equivalent:
-            // await storageViewModel.deleteModel(model.id)
+            try {
+                Log.d(TAG, "Deleting model: $modelId")
+                RunAnywhere.deleteStoredModel(modelId)
+                Log.d(TAG, "Model deleted successfully: $modelId")
 
-            _uiState.update { state ->
-                val filteredModels = state.downloadedModels.filter { it.id != modelId }
-                state.copy(
-                    downloadedModels = filteredModels,
-                    modelStorageSize = filteredModels.sumOf { it.size }
-                )
+                // Refresh storage data after deletion
+                loadStorageData()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete model: $modelId", e)
+                _uiState.update {
+                    it.copy(errorMessage = "Failed to delete model: ${e.message}")
+                }
             }
         }
     }
@@ -285,18 +270,26 @@ class SettingsViewModel : ViewModel() {
     /**
      * Clear cache
      *
-     * TODO: Integrate with storage management
-     * iOS equivalent: storageViewModel.clearCache()
+     * iOS equivalent:
+     * func clearCache() async {
+     *     try await RunAnywhere.clearCache()
+     *     await refreshData()
+     * }
      */
     fun clearCache() {
         viewModelScope.launch {
-            // TODO: Clear app cache
-            // iOS equivalent: Clear cache directories
+            try {
+                Log.d(TAG, "Clearing cache...")
+                RunAnywhere.clearCache()
+                Log.d(TAG, "Cache cleared successfully")
 
-            _uiState.update {
-                it.copy(
-                    totalStorageSize = it.modelStorageSize // Remove cache from total
-                )
+                // Refresh storage data after clearing cache
+                loadStorageData()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to clear cache", e)
+                _uiState.update {
+                    it.copy(errorMessage = "Failed to clear cache: ${e.message}")
+                }
             }
         }
     }
@@ -304,13 +297,27 @@ class SettingsViewModel : ViewModel() {
     /**
      * Clean temporary files
      *
-     * TODO: Integrate with storage management
-     * iOS equivalent: storageViewModel.cleanTempFiles()
+     * iOS equivalent:
+     * func cleanTempFiles() async {
+     *     try await RunAnywhere.cleanTempFiles()
+     *     await refreshData()
+     * }
      */
     fun cleanTempFiles() {
         viewModelScope.launch {
-            // TODO: Clean temp files
-            // iOS equivalent: Remove temporary files and logs
+            try {
+                Log.d(TAG, "Cleaning temp files...")
+                RunAnywhere.cleanTempFiles()
+                Log.d(TAG, "Temp files cleaned successfully")
+
+                // Refresh storage data after cleaning
+                loadStorageData()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to clean temp files", e)
+                _uiState.update {
+                    it.copy(errorMessage = "Failed to clean temporary files: ${e.message}")
+                }
+            }
         }
     }
 

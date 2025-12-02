@@ -1,5 +1,8 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.runanywhere.runanywhereai.presentation.settings
 
+import android.text.format.Formatter
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -20,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.sdk.models.storage.StoredModel
 
 /**
  * Combined Settings & Storage Screen - Matching iOS CombinedSettingsView.swift exactly
@@ -42,8 +47,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var showApiKeyDialog by remember { mutableStateOf(false) }
-    var showDeleteConfirmDialog by remember { mutableStateOf<StoredModelInfo?>(null) }
+    var showDeleteConfirmDialog by remember { mutableStateOf<StoredModel?>(null) }
 
     Column(
         modifier = Modifier
@@ -171,7 +177,7 @@ fun SettingsScreen(
         }
 
         // Storage Overview Section
-        // iOS Reference: Section with storage stats
+        // iOS Reference: Section with storage stats from RunAnywhere.getStorageInfo()
         SettingsSection(
             title = "Storage Overview",
             trailing = {
@@ -183,20 +189,20 @@ fun SettingsScreen(
             StorageOverviewRow(
                 icon = Icons.Outlined.Storage,
                 label = "Total Usage",
-                value = formatBytes(uiState.totalStorageSize)
+                value = Formatter.formatFileSize(context, uiState.totalStorageSize)
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageOverviewRow(
                 icon = Icons.Outlined.CloudQueue,
                 label = "Available Space",
-                value = formatBytes(uiState.availableSpace),
+                value = Formatter.formatFileSize(context, uiState.availableSpace),
                 valueColor = AppColors.primaryGreen
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageOverviewRow(
                 icon = Icons.Outlined.Memory,
                 label = "Models Storage",
-                value = formatBytes(uiState.modelStorageSize),
+                value = Formatter.formatFileSize(context, uiState.modelStorageSize),
                 valueColor = AppColors.primaryBlue
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -499,12 +505,15 @@ private fun StorageOverviewRow(
 /**
  * Stored Model Row
  * iOS Reference: StoredModelRow in CombinedSettingsView
+ * Uses SDK's StoredModel type directly
  */
 @Composable
 private fun StoredModelRow(
-    model: StoredModelInfo,
+    model: StoredModel,
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -553,7 +562,7 @@ private fun StoredModelRow(
 
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = formatBytes(model.size),
+                text = Formatter.formatFileSize(context, model.size),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium
             )
@@ -667,12 +676,5 @@ private fun ApiKeyDialog(
     )
 }
 
-// Helper function to format bytes
-private fun formatBytes(bytes: Long): String {
-    return when {
-        bytes < 1024 -> "$bytes B"
-        bytes < 1024 * 1024 -> String.format("%.1f KB", bytes / 1024.0)
-        bytes < 1024 * 1024 * 1024 -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
-        else -> String.format("%.1f GB", bytes / (1024.0 * 1024.0 * 1024.0))
-    }
-}
+// Note: Using android.text.format.Formatter.formatFileSize() for consistent byte formatting
+// This matches iOS ByteCountFormatter behavior

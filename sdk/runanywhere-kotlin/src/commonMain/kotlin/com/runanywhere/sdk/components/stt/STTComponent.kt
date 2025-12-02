@@ -230,42 +230,42 @@ class STTComponent(
 
         // Launch transcription in a coroutine
         val transcriptionJob = launch {
-            try {
-                // Use enhanced streaming if available, otherwise fall back to basic streaming
-                if (service.supportsStreaming) {
-                    service.transcribeStream(audioStream, streamingOptions).collect { event ->
+        try {
+            // Use enhanced streaming if available, otherwise fall back to basic streaming
+            if (service.supportsStreaming) {
+                service.transcribeStream(audioStream, streamingOptions).collect { event ->
                         trySend(event)
-                    }
-                } else {
-                    // Fallback to basic streaming
+                }
+            } else {
+                // Fallback to basic streaming
                     trySend(STTStreamEvent.SpeechStarted)
 
-                    val basicOptions = STTOptions(
-                        language = streamingOptions.language ?: "en",
-                        detectLanguage = streamingOptions.detectLanguage,
-                        enablePunctuation = sttConfiguration.enablePunctuation,
-                        enableDiarization = streamingOptions.enableSpeakerDiarization,
-                        enableTimestamps = false,
-                        vocabularyFilter = sttConfiguration.vocabularyList,
-                        audioFormat = AudioFormat.PCM
-                    )
+                val basicOptions = STTOptions(
+                    language = streamingOptions.language ?: "en",
+                    detectLanguage = streamingOptions.detectLanguage,
+                    enablePunctuation = sttConfiguration.enablePunctuation,
+                    enableDiarization = streamingOptions.enableSpeakerDiarization,
+                    enableTimestamps = false,
+                    vocabularyFilter = sttConfiguration.vocabularyList,
+                    audioFormat = AudioFormat.PCM
+                )
 
-                    val result = service.streamTranscribe(
-                        audioStream = audioStream,
-                        options = basicOptions
-                    ) { partial ->
+                val result = service.streamTranscribe(
+                    audioStream = audioStream,
+                    options = basicOptions
+                ) { partial ->
                         trySend(STTStreamEvent.PartialTranscription(partial))
-                    }
+                }
 
-                    // Emit final result
+                // Emit final result
                     trySend(STTStreamEvent.FinalTranscription(result))
                     trySend(STTStreamEvent.SpeechEnded)
-                }
-            } catch (error: Exception) {
-                val sttError = when (error) {
-                    is STTError -> error
-                    else -> STTError.transcriptionFailed(error)
-                }
+            }
+        } catch (error: Exception) {
+            val sttError = when (error) {
+                is STTError -> error
+                else -> STTError.transcriptionFailed(error)
+            }
                 trySend(STTStreamEvent.Error(sttError))
             }
         }
