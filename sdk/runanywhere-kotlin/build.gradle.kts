@@ -98,6 +98,9 @@ kotlin {
         androidMain {
             dependsOn(jvmAndroidMain)
             dependencies {
+                // Unified native library package (all backends)
+                api(project(":modules:runanywhere-core-native"))
+
                 implementation(libs.androidx.core.ktx)
                 implementation(libs.kotlinx.coroutines.android)
                 implementation(libs.android.vad.webrtc)

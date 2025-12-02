@@ -14,6 +14,7 @@ import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.models.ModelDownloader
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.ModelStorage
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -100,6 +101,15 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT
     ) {
         androidContext = context.applicationContext
+
+        // CRITICAL: Set native library directory FIRST, before any native library loading.
+        // This is required for ONNX library loading with RTLD_GLOBAL on Android.
+        // The loader needs full paths to load libraries with dlopen().
+        context.applicationInfo.nativeLibraryDir?.let { nativeLibDir ->
+            androidLogger.info("Setting native library directory: $nativeLibDir")
+            RunAnywhereBridge.setNativeLibraryDir(nativeLibDir)
+        }
+
         initialize(apiKey, baseURL, environment)
     }
 

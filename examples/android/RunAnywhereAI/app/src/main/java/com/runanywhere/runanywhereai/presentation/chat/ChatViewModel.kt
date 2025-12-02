@@ -10,6 +10,7 @@ import com.runanywhere.runanywhereai.domain.models.*
 import com.runanywhere.sdk.models.lifecycle.Modality
 import com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.getFirstAvailableChatModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -558,35 +559,62 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Check model status
+     * Check model status and load appropriate chat model.
+     *
+     * This method uses the SDK's model discovery API to find and load
+     * only TEXT_TO_TEXT (chat) models, ensuring we don't accidentally
+     * load STT/TTS models on the chat screen.
      */
     suspend fun checkModelStatus() {
         try {
             if (app.isSDKReady()) {
-                val availableModels = RunAnywhere.availableModels()
-                val downloadedModel = availableModels.firstOrNull { it.localPath != null }
+                // Check if LLM is already loaded via lifecycle tracker
+                if (ModelLifecycleTracker.isModelLoaded(Modality.LLM)) {
+                    val loadedModel = ModelLifecycleTracker.loadedModel(Modality.LLM)
+                    Log.i("ChatViewModel", "✅ LLM model already loaded: ${loadedModel?.modelName}")
+                    _uiState.value = _uiState.value.copy(
+                        isModelLoaded = true,
+                        loadedModelName = loadedModel?.modelName
+                    )
+                    addSystemMessageIfNeeded()
+                    return
+                }
 
-                if (downloadedModel != null) {
+                // Use SDK's clean API to find first available TEXT_TO_TEXT model
+                // This ensures we only load chat models, not STT/TTS
+                val chatModel = RunAnywhere.getFirstAvailableChatModel()
+
+                if (chatModel != null) {
                     Log.i(
                         "ChatViewModel",
-                        "📦 Found downloaded model: ${downloadedModel.name}, loading into memory..."
+                        "📦 Found downloaded chat model: ${chatModel.name} (modality: ${chatModel.category.frameworkModality}), loading..."
                     )
 
                     try {
-                        // Load the model into memory
-                        RunAnywhere.loadModel(downloadedModel.id)
+                        // Load the chat model into memory
+                        val loaded = RunAnywhere.loadModel(chatModel.id)
 
-                        _uiState.value = _uiState.value.copy(
-                            isModelLoaded = true,
-                            loadedModelName = downloadedModel.name
-                        )
-
-                        Log.i(
-                            "ChatViewModel",
-                            "✅ Model loaded successfully: ${downloadedModel.name}"
-                        )
+                        if (loaded) {
+                            _uiState.value = _uiState.value.copy(
+                                isModelLoaded = true,
+                                loadedModelName = chatModel.name
+                            )
+                            Log.i(
+                                "ChatViewModel",
+                                "✅ Chat model loaded successfully: ${chatModel.name}"
+                            )
+                        } else {
+                            Log.w(
+                                "ChatViewModel",
+                                "⚠️ Model loading returned false for: ${chatModel.name}"
+                            )
+                            _uiState.value = _uiState.value.copy(
+                                isModelLoaded = false,
+                                loadedModelName = null
+                            )
+                        }
                     } catch (e: Exception) {
-                        Log.e("ChatViewModel", "❌ Failed to load model: ${e.message}", e)
+                        Log.e("ChatViewModel", "❌ Failed to load chat model: ${e.message}", e)
                         _uiState.value = _uiState.value.copy(
                             isModelLoaded = false,
                             loadedModelName = null,
@@ -598,19 +626,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         isModelLoaded = false,
                         loadedModelName = null
                     )
-                    Log.i("ChatViewModel", "ℹ️ No downloaded models found")
+                    Log.i(
+                        "ChatViewModel",
+                        "ℹ️ No downloaded chat models (TEXT_TO_TEXT) found. STT/TTS models are ignored for chat."
+                    )
                 }
 
-                // Update system message to reflect current state
-                val currentMessages = _uiState.value.messages.toMutableList()
-                if (currentMessages.firstOrNull()?.role == MessageRole.SYSTEM) {
-                    currentMessages.removeAt(0)
-                }
-                _uiState.value = _uiState.value.copy(messages = currentMessages)
+                addSystemMessageIfNeeded()
 
-                if (_uiState.value.isModelLoaded) {
-                    addSystemMessage()
-                }
             } else {
                 _uiState.value = _uiState.value.copy(
                     isModelLoaded = false,
@@ -624,6 +647,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 isModelLoaded = false,
                 loadedModelName = null
             )
+        }
+    }
+
+    /**
+     * Helper to add system message if model is loaded and not already present.
+     */
+    private fun addSystemMessageIfNeeded() {
+        // Update system message to reflect current state
+        val currentMessages = _uiState.value.messages.toMutableList()
+        if (currentMessages.firstOrNull()?.role == MessageRole.SYSTEM) {
+            currentMessages.removeAt(0)
+        }
+        _uiState.value = _uiState.value.copy(messages = currentMessages)
+
+        if (_uiState.value.isModelLoaded) {
+            addSystemMessage()
         }
     }
 
