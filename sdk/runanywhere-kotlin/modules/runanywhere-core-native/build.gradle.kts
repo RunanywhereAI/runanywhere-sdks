@@ -61,7 +61,7 @@ val downloadedLibsDir = file("build/downloaded-libs")
 // =============================================================================
 
 android {
-    namespace = "com.runanywhere.sdk.core.native"
+    namespace = "com.runanywhere.sdk.core.nativelibs"
     compileSdk = 36
 
     defaultConfig {
@@ -293,41 +293,41 @@ val printNativeLibInfo by tasks.registering {
 // Publishing Configuration
 // =============================================================================
 
-publishing {
-    publications {
-        create<MavenPublication>("release") {
-            groupId = "com.runanywhere.sdk"
-            artifactId = "runanywhere-core-native"
-            version = nativeLibVersion
+afterEvaluate {
+    publishing {
+        publications {
+            register<MavenPublication>("release") {
+                groupId = "com.runanywhere.sdk"
+                artifactId = "runanywhere-core-native"
+                version = nativeLibVersion
 
-            afterEvaluate {
-                from(components["release"])
-            }
+                from(components.findByName("release"))
 
-            pom {
-                name.set("RunAnywhere Core Native")
-                description.set("Unified native libraries for RunAnywhere SDK (all backends)")
-                url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
-
-                licenses {
-                    license {
-                        name.set("The Apache License, Version 2.0")
-                        url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
-                    }
-                }
-
-                developers {
-                    developer {
-                        id.set("runanywhere")
-                        name.set("RunAnywhere Team")
-                        email.set("founders@runanywhere.ai")
-                    }
-                }
-
-                scm {
-                    connection.set("scm:git:git://github.com/RunanywhereAI/runanywhere-sdks.git")
-                    developerConnection.set("scm:git:ssh://github.com/RunanywhereAI/runanywhere-sdks.git")
+                pom {
+                    name.set("RunAnywhere Core Native")
+                    description.set("Unified native libraries for RunAnywhere SDK (all backends)")
                     url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
+
+                    licenses {
+                        license {
+                            name.set("The Apache License, Version 2.0")
+                            url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                        }
+                    }
+
+                    developers {
+                        developer {
+                            id.set("runanywhere")
+                            name.set("RunAnywhere Team")
+                            email.set("founders@runanywhere.ai")
+                        }
+                    }
+
+                    scm {
+                        connection.set("scm:git:git://github.com/RunanywhereAI/runanywhere-sdks.git")
+                        developerConnection.set("scm:git:ssh://github.com/RunanywhereAI/runanywhere-sdks.git")
+                        url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
+                    }
                 }
             }
         }

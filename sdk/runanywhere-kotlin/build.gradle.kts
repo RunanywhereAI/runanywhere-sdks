@@ -10,6 +10,24 @@ plugins {
 group = "com.runanywhere.sdk"
 version = "0.1.3"
 
+// =============================================================================
+// Project Path Resolution
+// =============================================================================
+// When included as a subproject in composite builds (e.g., from example app),
+// the module path changes. This function resolves the correct path for sibling modules.
+fun resolveModulePath(moduleName: String): String {
+    val possiblePaths = listOf(
+        ":modules:$moduleName",                           // When building SDK directly
+        ":sdk:runanywhere-kotlin:modules:$moduleName",    // When included from example app
+    )
+    for (path in possiblePaths) {
+        if (project.findProject(path) != null) {
+            return path
+        }
+    }
+    return ":modules:$moduleName"
+}
+
 kotlin {
     // Use Java 17 toolchain across targets
     jvmToolchain(17)
@@ -99,7 +117,7 @@ kotlin {
             dependsOn(jvmAndroidMain)
             dependencies {
                 // Unified native library package (all backends)
-                api(project(":modules:runanywhere-core-native"))
+                api(project(resolveModulePath("runanywhere-core-native")))
 
                 implementation(libs.androidx.core.ktx)
                 implementation(libs.kotlinx.coroutines.android)
