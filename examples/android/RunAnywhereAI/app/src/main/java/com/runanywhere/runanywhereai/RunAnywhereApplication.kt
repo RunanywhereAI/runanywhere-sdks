@@ -115,18 +115,20 @@ class RunAnywhereApplication : Application() {
      * - ModelFormat.GGUF, ModelFormat.ONNX
      */
     private suspend fun registerAdaptersForDevelopment() {
-        Log.i("RunAnywhereApp", "🔧 Registering Framework Adapters for DEVELOPMENT mode")
+        Log.i("RunAnywhereApp", "📦 Registering adapters with custom models for DEVELOPMENT mode")
 
         // =====================================================
         // 1. LlamaCPP Framework (TEXT_TO_TEXT modality)
         // Matches iOS: RunAnywhere.registerFramework(LlamaCPPCoreAdapter(), models: [...])
+        // This provides native C++ llama.cpp performance
         // =====================================================
         Log.i("RunAnywhereApp", "📝 Registering LlamaCPP adapter with LLM models...")
 
         RunAnywhere.registerFramework(
             adapter = LlamaCppAdapter.shared,
             models = listOf(
-                // SmolLM2 360M - smallest and fastest (~500MB)
+                // SmolLM2 360M Q8_0 - Smallest and fastest (~500MB)
+                // Matches iOS: smollm2-360m-q8-0
                 ModelRegistration(
                     id = "smollm2-360m-q8-0",
                     name = "SmolLM2 360M Q8_0",
@@ -136,7 +138,30 @@ class RunAnywhereApplication : Application() {
                     format = ModelFormat.GGUF,
                     memoryRequirement = 500_000_000L
                 ),
-                // Qwen 2.5 0.5B - small but capable (~600MB)
+                // Llama 2 7B Chat Q4_K_M - High quality conversational model (~4GB)
+                // Matches iOS: llama2-7b-q4-k-m
+                ModelRegistration(
+                    id = "llama2-7b-q4-k-m",
+                    name = "Llama 2 7B Chat Q4_K_M",
+                    url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 4_000_000_000L
+                ),
+                // Mistral 7B Instruct Q4_K_M - Excellent instruction-following model (~4GB)
+                // Matches iOS: mistral-7b-q4-k-m
+                ModelRegistration(
+                    id = "mistral-7b-q4-k-m",
+                    name = "Mistral 7B Instruct Q4_K_M",
+                    url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 4_000_000_000L
+                ),
+                // Qwen 2.5 0.5B Instruct Q6_K - Small but capable (~600MB)
+                // Matches iOS: qwen-2.5-0.5b-instruct-q6-k
                 ModelRegistration(
                     id = "qwen-2.5-0.5b-instruct-q6-k",
                     name = "Qwen 2.5 0.5B Instruct Q6_K",
@@ -146,47 +171,8 @@ class RunAnywhereApplication : Application() {
                     format = ModelFormat.GGUF,
                     memoryRequirement = 600_000_000L
                 ),
-                // Llama 3.2 1B - good quality
-                ModelRegistration(
-                    id = "llama-3.2-1b-instruct-q6-k",
-                    name = "Llama 3.2 1B Instruct Q6_K",
-                    url = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 1_000_000_000L
-                ),
-                // QWEN 2 0.5B - compact model
-                ModelRegistration(
-                    id = "qwen2-0.5b-instruct-q4-0",
-                    name = "QWEN 2 0.5B Q4_0 Instruct",
-                    url = "https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_0.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 400_000_000L
-                ),
-                // SmolLM2 1.7B - larger but capable
-                ModelRegistration(
-                    id = "smollm2-1.7b-instruct-q6-k-l",
-                    name = "SmolLM2 1.7B Instruct Q6_K_L",
-                    url = "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 1_700_000_000L
-                ),
-                // Qwen 2.5 1.5B - good for longer context
-                ModelRegistration(
-                    id = "qwen-2.5-1.5b-instruct-q6-k",
-                    name = "Qwen 2.5 1.5B Instruct Q6_K",
-                    url = "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 1_500_000_000L
-                ),
-                // LiquidAI LFM2 350M Q4_K_M - smallest and fastest (~250MB)
+                // LiquidAI LFM2 350M Q4_K_M - Smallest and fastest (~250MB)
+                // Matches iOS: lfm2-350m-q4-k-m
                 ModelRegistration(
                     id = "lfm2-350m-q4-k-m",
                     name = "LiquidAI LFM2 350M Q4_K_M",
@@ -196,7 +182,8 @@ class RunAnywhereApplication : Application() {
                     format = ModelFormat.GGUF,
                     memoryRequirement = 250_000_000L
                 ),
-                // LiquidAI LFM2 350M Q8_0 - highest quality (~400MB)
+                // LiquidAI LFM2 350M Q8_0 - Highest quality small model (~400MB)
+                // Matches iOS: lfm2-350m-q8-0
                 ModelRegistration(
                     id = "lfm2-350m-q8-0",
                     name = "LiquidAI LFM2 350M Q8_0",
@@ -208,12 +195,12 @@ class RunAnywhereApplication : Application() {
                 )
             )
         )
-        Log.i("RunAnywhereApp", "✅ Registered LlamaCPP adapter with 8 LLM models")
+        Log.i("RunAnywhereApp", "✅ LlamaCPP Core registered (runanywhere-core backend)")
 
         // =====================================================
         // 2. ONNX Runtime Framework (VOICE_TO_TEXT, TEXT_TO_VOICE modalities)
         // Matches iOS: RunAnywhere.registerFramework(ONNXAdapter.shared, models: [...])
-        // Note: On Android we use ONNX Sherpa models (WhisperKit is iOS-only CoreML)
+        // Note: WhisperKit models are iOS-only (CoreML), we use ONNX Sherpa models on Android
         // =====================================================
         Log.i("RunAnywhereApp", "🎤🔊 Registering ONNX adapter with STT and TTS models...")
 
@@ -221,7 +208,9 @@ class RunAnywhereApplication : Application() {
             adapter = ONNXAdapter.shared,
             models = listOf(
                 // STT Models (VOICE_TO_TEXT modality)
+                // NOTE: tar.bz2 extraction is supported on Android via Commons Compress
                 // Sherpa ONNX Whisper Tiny English (~75MB)
+                // Matches iOS: sherpa-whisper-tiny-onnx
                 ModelRegistration(
                     id = "sherpa-whisper-tiny-onnx",
                     name = "Sherpa Whisper Tiny (ONNX)",
@@ -232,6 +221,7 @@ class RunAnywhereApplication : Application() {
                     memoryRequirement = 75_000_000L
                 ),
                 // Sherpa ONNX Whisper Small (~250MB)
+                // Matches iOS: sherpa-whisper-small-onnx
                 ModelRegistration(
                     id = "sherpa-whisper-small-onnx",
                     name = "Sherpa Whisper Small (ONNX)",
@@ -243,10 +233,12 @@ class RunAnywhereApplication : Application() {
                 ),
 
                 // TTS Models (TEXT_TO_VOICE modality)
+                // Using sherpa-onnx tar.bz2 packages (includes model, tokens, and espeak-ng-data)
                 // Piper TTS - US English Lessac Medium (~65MB)
+                // Matches iOS: piper-en-us-lessac-medium
                 ModelRegistration(
                     id = "piper-en-us-lessac-medium",
-                    name = "Piper TTS US English Medium",
+                    name = "Piper TTS (US English - Medium)",
                     url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
                     framework = LLMFramework.ONNX,
                     modality = FrameworkModality.TEXT_TO_VOICE,
@@ -254,9 +246,10 @@ class RunAnywhereApplication : Application() {
                     memoryRequirement = 65_000_000L
                 ),
                 // Piper TTS - British English Alba Medium (~65MB)
+                // Matches iOS: piper-en-gb-alba-medium
                 ModelRegistration(
                     id = "piper-en-gb-alba-medium",
-                    name = "Piper TTS British English Medium",
+                    name = "Piper TTS (British English)",
                     url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
                     framework = LLMFramework.ONNX,
                     modality = FrameworkModality.TEXT_TO_VOICE,
@@ -265,22 +258,18 @@ class RunAnywhereApplication : Application() {
                 )
             )
         )
-        Log.i("RunAnywhereApp", "✅ Registered ONNX adapter with 2 STT + 2 TTS models")
+        Log.i("RunAnywhereApp", "✅ ONNX Runtime registered (includes STT and TTS providers)")
 
-        // Note: WhisperKit is iOS-only (uses CoreML), ONNX serves the same purpose on Android
-        // Note: FluidAudioDiarization registration can be added when the module is available
-        // Note: FoundationModels is iOS 26+ only, not applicable to Android
+        // Note: WhisperKit is iOS-only (uses CoreML), ONNX Sherpa serves the same purpose on Android
+        // Note: FluidAudioDiarization is iOS-only, can be added when Android module is available
+        // Note: FoundationModels requires iOS 26+ / macOS 26+, not applicable to Android
 
         // Scan file system for already downloaded models
         Log.i("RunAnywhereApp", "🔍 Scanning for previously downloaded models...")
         RunAnywhere.scanForDownloadedModels()
         Log.i("RunAnywhereApp", "✅ File system scan complete")
 
-        Log.i("RunAnywhereApp", "🎉 All frameworks registered for development:")
-        Log.i("RunAnywhereApp", "   📝 LLM: 8 models (LLAMA_CPP, TEXT_TO_TEXT)")
-        Log.i("RunAnywhereApp", "   🎤 STT: 2 models (ONNX, VOICE_TO_TEXT)")
-        Log.i("RunAnywhereApp", "   🔊 TTS: 2 models (ONNX, TEXT_TO_VOICE)")
-        Log.i("RunAnywhereApp", "   📦 Total: 12 models")
+        Log.i("RunAnywhereApp", "🎉 All adapters registered for development")
     }
 
     /**

@@ -1420,8 +1420,11 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
                 modality = com.runanywhere.sdk.models.lifecycle.Modality.STT
             )
 
-            // Create STT configuration
-            val sttConfig = com.runanywhere.sdk.components.stt.STTConfiguration(modelId = modelId)
+            // Create STT configuration - use localPath for ONNX models
+            // This matches iOS behavior where the model path is passed to the STT configuration
+            val effectiveModelPath = modelInfo?.localPath ?: modelId
+            logger.info("Using STT model path: $effectiveModelPath")
+            val sttConfig = com.runanywhere.sdk.components.stt.STTConfiguration(modelId = effectiveModelPath)
 
             // Create and initialize STT component
             val sttComponent = com.runanywhere.sdk.components.stt.STTComponent(sttConfig)
@@ -1484,8 +1487,11 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
                 modality = com.runanywhere.sdk.models.lifecycle.Modality.TTS
             )
 
-            // Create TTS configuration
-            val ttsConfig = com.runanywhere.sdk.components.TTSConfiguration(modelId = modelId)
+            // Create TTS configuration - use localPath for ONNX models, modelId for system TTS
+            // This matches iOS behavior where the model path is passed to the TTS configuration
+            val effectiveModelPath = modelInfo?.localPath ?: modelId
+            logger.info("Using TTS model path: $effectiveModelPath")
+            val ttsConfig = com.runanywhere.sdk.components.TTSConfiguration(modelId = effectiveModelPath)
 
             // Create and initialize TTS component
             val ttsComponent = com.runanywhere.sdk.components.TTSComponent(ttsConfig)

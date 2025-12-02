@@ -84,9 +84,23 @@ class ModelSelectionViewModel(
                 }
 
                 // Filter frameworks by context - matches iOS shouldShowFramework logic
-                val relevantFrameworks = allRegisteredFrameworks.filter { framework ->
+                var relevantFrameworks = allRegisteredFrameworks.filter { framework ->
                     context.isFrameworkRelevant(framework)
-                }.sortedBy { it.displayName }
+                }.sortedBy { it.displayName }.toMutableList()
+
+                // For TTS context, ensure System TTS is included (matches iOS behavior)
+                // iOS Reference: ModelSelectionSheet.swift line 167
+                // Only add if not already present from registered TTS providers
+                if (context == ModelSelectionContext.TTS && !relevantFrameworks.contains(LLMFramework.SYSTEM_TTS)) {
+                    // Add System TTS at the beginning of the list
+                    relevantFrameworks.add(0, LLMFramework.SYSTEM_TTS)
+                    android.util.Log.d("ModelSelectionVM", "📱 Added System TTS for TTS context (not from provider)")
+                } else if (context == ModelSelectionContext.TTS && relevantFrameworks.contains(LLMFramework.SYSTEM_TTS)) {
+                    // Move System TTS to the beginning if already present
+                    relevantFrameworks.remove(LLMFramework.SYSTEM_TTS)
+                    relevantFrameworks.add(0, LLMFramework.SYSTEM_TTS)
+                    android.util.Log.d("ModelSelectionVM", "📱 System TTS already registered, moved to top")
+                }
 
                 android.util.Log.d("ModelSelectionVM", "✅ Loaded ${filteredModels.size} models and ${relevantFrameworks.size} frameworks for context $context")
                 relevantFrameworks.forEach { fw ->
@@ -274,6 +288,16 @@ class ModelSelectionViewModel(
      */
     fun refreshModels() {
         loadModelsAndFrameworks()
+    }
+
+    /**
+     * Set loading model state
+     * Used for System TTS which doesn't require model download
+     */
+    fun setLoadingModel(isLoading: Boolean) {
+        _uiState.update {
+            it.copy(isLoadingModel = isLoading)
+        }
     }
 
     /**

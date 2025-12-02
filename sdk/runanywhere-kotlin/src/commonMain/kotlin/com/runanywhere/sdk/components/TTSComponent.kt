@@ -297,6 +297,8 @@ class TTSComponent(
 
     /**
      * Create TTSOptions from TTSInput (iOS-style options creation)
+     * Note: The voiceId is set to the model path (ttsConfiguration.modelId) for ONNX models,
+     * similar to iOS where the voice field in TTSConfiguration contains the model path.
      */
     private fun createTTSOptions(input: TTSInput): TTSOptions {
         val voice = if (input.voiceId != null) {
@@ -305,8 +307,12 @@ class TTSComponent(
             ttsConfiguration.defaultVoice
         }
 
+        // Use model ID from configuration as the voice ID for ONNX model path resolution
+        // This matches iOS behavior where configuration.voice contains the model path
+        val effectiveVoiceId = ttsConfiguration.modelId ?: input.voiceId
+
         return TTSOptions(
-            voiceId = input.voiceId,
+            voiceId = effectiveVoiceId,
             voice = voice,
             language = input.language ?: voice.language,
             rate = ttsConfiguration.defaultRate,

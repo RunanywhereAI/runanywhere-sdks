@@ -73,9 +73,17 @@ val LLMFramework.supportedModalities: Set<FrameworkModality>
             FrameworkModality.TEXT_TO_IMAGE
         )
 
-        LLMFramework.TENSOR_FLOW_LITE, LLMFramework.ONNX -> setOf(
+        LLMFramework.TENSOR_FLOW_LITE -> setOf(
             FrameworkModality.TEXT_TO_TEXT,
             FrameworkModality.VOICE_TO_TEXT,
+            FrameworkModality.IMAGE_TO_TEXT
+        )
+
+        // ONNX supports STT (Sherpa Whisper) and TTS (Piper) models
+        LLMFramework.ONNX -> setOf(
+            FrameworkModality.TEXT_TO_TEXT,
+            FrameworkModality.VOICE_TO_TEXT,
+            FrameworkModality.TEXT_TO_VOICE,  // Piper TTS models
             FrameworkModality.IMAGE_TO_TEXT
         )
 
