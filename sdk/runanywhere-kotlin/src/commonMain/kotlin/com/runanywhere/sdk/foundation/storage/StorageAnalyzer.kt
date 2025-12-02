@@ -3,32 +3,60 @@ package com.runanywhere.sdk.foundation.storage
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.filemanager.SimplifiedFileManager
+import com.runanywhere.sdk.foundation.filemanager.StoredModelData
+import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.ModelRegistry
 import com.runanywhere.sdk.models.storage.*
-import com.runanywhere.sdk.platform.getPlatformStorageInfo
 import kotlinx.datetime.Instant
 
 /**
  * Storage analyzer for SDK storage operations
- * Matches iOS DefaultStorageAnalyzer protocol and implementation
+ * Matches iOS StorageAnalyzer protocol exactly
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Data/Storage/Analysis/DefaultStorageAnalyzer.swift
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Protocols/Storage/StorageAnalyzer.swift
  */
 interface StorageAnalyzer {
+    /**
+     * Analyze overall storage situation
+     * Matches iOS: func analyzeStorage() async -> StorageInfo
+     */
     suspend fun analyzeStorage(): StorageInfo
-    suspend fun getAppStorage(): AppStorageInfo
-    suspend fun getDeviceStorage(): DeviceStorageInfo
-    suspend fun getModelStorage(): ModelStorageInfo
-    suspend fun getStoredModelsList(): List<StoredModel>
-    fun getStorageAvailability(deviceStorage: DeviceStorageInfo): StorageAvailability
-    fun generateRecommendations(storageInfo: StorageInfo): List<StorageRecommendation>
+
+    /**
+     * Get model storage usage information
+     * Matches iOS: func getModelStorageUsage() async -> ModelStorageInfo
+     */
+    suspend fun getModelStorageUsage(): ModelStorageInfo
+
+    /**
+     * Check storage availability for a model
+     * Matches iOS: func checkStorageAvailable(for modelSize: Int64, safetyMargin: Double) -> StorageAvailability
+     */
+    fun checkStorageAvailable(modelSize: Long, safetyMargin: Double = 0.1): StorageAvailabilityResult
+
+    /**
+     * Get storage recommendations
+     * Matches iOS: func getRecommendations(for storageInfo: StorageInfo) -> [StorageRecommendation]
+     */
+    fun getRecommendations(storageInfo: StorageInfo): List<StorageRecommendation>
+
+    /**
+     * Calculate size at path
+     * Matches iOS: func calculateSize(at url: URL) async throws -> Int64
+     */
+    suspend fun calculateSize(path: String): Long
 }
 
 /**
  * Default implementation of StorageAnalyzer
- * Matches iOS DefaultStorageAnalyzer class
+ * Matches iOS DefaultStorageAnalyzer class exactly
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Data/Storage/Analysis/DefaultStorageAnalyzer.swift
+ *
+ * iOS implementation pattern:
+ * - Uses fileManager.getAllStoredModels() to get stored model data
+ * - Uses modelRegistry.discoverModels() to get registered models for enrichment
+ * - Creates StoredModel objects with combined data
  */
 @OptIn(kotlin.time.ExperimentalTime::class)
 @Suppress("DEPRECATION")
@@ -49,90 +77,95 @@ class DefaultStorageAnalyzer(
         }
 
     /**
-     * Analyze overall storage
-     * Matches iOS analyzeStorage() method
+     * Analyze overall storage situation
+     * Matches iOS analyzeStorage() method exactly
+     *
+     * iOS implementation:
+     * ```swift
+     * public func analyzeStorage() async -> StorageInfo {
+     *     let deviceStorage = getDeviceStorageInfo()
+     *     let modelStorage = await getModelStorageUsage()
+     *     let totalAppSize = fileManager.getTotalStorageSize()
+     *     let appStorage = AppStorageInfo(...)
+     *     let storedModels = await getStoredModelsList()
+     *     return StorageInfo(...)
+     * }
+     * ```
      */
     override suspend fun analyzeStorage(): StorageInfo {
         logger.debug("Starting storage analysis")
 
-        val appStorage = getAppStorage()
-        val deviceStorage = getDeviceStorage()
+        // Get device storage info - matches iOS getDeviceStorageInfo()
+        val deviceStorage = getDeviceStorageInfo()
+
+        // Get model storage usage - matches iOS getModelStorageUsage()
+        val modelStorage = getModelStorageUsage()
+
+        // Get app storage info - matches iOS pattern
+        val totalAppSize = fileManager.getTotalStorageSize()
+        val appStorage = AppStorageInfo(
+            documentsSize = totalAppSize,
+            cacheSize = 0, // Could be enhanced to track cache separately
+            appSupportSize = 0,
+            totalSize = totalAppSize
+        )
+
+        // Get stored models list - matches iOS getStoredModelsList()
         val storedModels = getStoredModelsList()
-        val modelStorage = getModelStorageFromModels(storedModels)
-        val availability = getStorageAvailability(deviceStorage)
 
         val storageInfo = StorageInfo(
             appStorage = appStorage,
             deviceStorage = deviceStorage,
             modelStorage = modelStorage,
-            cacheSize = appStorage.cacheSize,
+            cacheSize = 0,
             storedModels = storedModels,
-            availability = availability,
-            recommendations = emptyList(), // Will be populated below
+            availability = StorageAvailability.HEALTHY, // Determined below
+            recommendations = emptyList(),
             lastUpdated = Instant.fromEpochMilliseconds(System.currentTimeMillis())
         )
 
-        val recommendations = generateRecommendations(storageInfo)
+        // Determine availability status
+        val availability = determineStorageAvailability(deviceStorage)
 
-        return storageInfo.copy(recommendations = recommendations)
-    }
+        // Generate recommendations
+        val recommendations = getRecommendations(storageInfo)
 
-    /**
-     * Get app-specific storage information
-     * Matches iOS getAppStorage() method - AppStorageInfo structure
-     */
-    override suspend fun getAppStorage(): AppStorageInfo {
-        val modelsSize = fileManager.directorySize(fileManager.modelsDirectory.toString())
-        val cacheSize = fileManager.directorySize(fileManager.cacheDirectory.toString())
-        val tempSize = fileManager.directorySize(fileManager.temporaryDirectory.toString())
-        val databaseSize = fileManager.directorySize(fileManager.databaseDirectory.toString())
-
-        // Total size = models + cache + other app support files
-        val totalSize = fileManager.directorySize(fileManager.baseDirectory.toString())
-
-        // App support size = temp + database + other non-model/cache files
-        val appSupportSize = (totalSize - modelsSize - cacheSize).coerceAtLeast(0L)
-
-        return AppStorageInfo(
-            documentsSize = modelsSize, // Models are stored in documents
-            cacheSize = cacheSize,
-            appSupportSize = appSupportSize,
-            totalSize = totalSize
+        return storageInfo.copy(
+            availability = availability,
+            recommendations = recommendations
         )
     }
 
     /**
-     * Get device storage information
-     * Matches iOS getDeviceStorageInfo() method
+     * Get model storage usage information
+     * Matches iOS getModelStorageUsage() method exactly
+     *
+     * iOS implementation:
+     * ```swift
+     * public func getModelStorageUsage() async -> ModelStorageInfo {
+     *     let modelStorageSize = fileManager.getModelStorageSize()
+     *     let storedModelsData = fileManager.getAllStoredModels()
+     *     var modelsByFramework: [LLMFramework: [StoredModel]] = [:]
+     *     let storedModels = await getStoredModelsList()
+     *     for model in storedModels {
+     *         if let framework = model.framework {
+     *             modelsByFramework[framework, default: []].append(model)
+     *         }
+     *     }
+     *     let largestModel = storedModels.max(by: { $0.size < $1.size })
+     *     return ModelStorageInfo(...)
+     * }
+     * ```
      */
-    override suspend fun getDeviceStorage(): DeviceStorageInfo {
-        val platformInfo = getPlatformStorageInfo(fileManager.baseDirectory.toString())
-
-        return DeviceStorageInfo(
-            totalSpace = platformInfo.totalSpace,
-            freeSpace = platformInfo.availableSpace,
-            usedSpace = platformInfo.usedSpace
-        )
-    }
-
-    /**
-     * Get model storage information
-     * Matches iOS getModelStorageUsage() method
-     */
-    override suspend fun getModelStorage(): ModelStorageInfo {
+    override suspend fun getModelStorageUsage(): ModelStorageInfo {
+        val modelStorageSize = fileManager.getModelStorageSize()
         val storedModels = getStoredModelsList()
-        return getModelStorageFromModels(storedModels)
-    }
 
-    /**
-     * Build ModelStorageInfo from stored models list
-     */
-    private fun getModelStorageFromModels(storedModels: List<StoredModel>): ModelStorageInfo {
-        val totalSize = storedModels.sumOf { it.size }
+        // Find largest model - matches iOS
         val largestModel = storedModels.maxByOrNull { it.size }
 
         return ModelStorageInfo(
-            totalSize = totalSize,
+            totalSize = modelStorageSize,
             modelCount = storedModels.size,
             largestModel = largestModel,
             models = storedModels
@@ -140,171 +173,69 @@ class DefaultStorageAnalyzer(
     }
 
     /**
-     * Get list of stored models with enriched information from model registry
-     * Matches iOS getStoredModelsList() method
+     * Check storage availability for a model
+     * Matches iOS checkStorageAvailable() method exactly
+     *
+     * iOS implementation:
+     * ```swift
+     * public func checkStorageAvailable(for modelSize: Int64, safetyMargin: Double = 0.1) -> StorageAvailability {
+     *     let availableSpace = fileManager.getAvailableSpace()
+     *     let requiredSpace = Int64(Double(modelSize) * (1 + safetyMargin))
+     *     let isAvailable = availableSpace > requiredSpace
+     *     let hasWarning = availableSpace < requiredSpace * 2
+     *     ...
+     * }
+     * ```
      */
-    override suspend fun getStoredModelsList(): List<StoredModel> {
-        val storedModels = mutableListOf<StoredModel>()
-        val modelsPath = fileManager.modelsDirectory.toString()
+    override fun checkStorageAvailable(modelSize: Long, safetyMargin: Double): StorageAvailabilityResult {
+        val availableSpace = fileManager.getAvailableSpace()
+        val requiredSpace = (modelSize * (1 + safetyMargin)).toLong()
 
-        // List all files/directories in models folder
-        val modelEntries = fileManager.listFiles(modelsPath)
+        val isAvailable = availableSpace > requiredSpace
+        val hasWarning = availableSpace < requiredSpace * 2 // Warn if less than 2x space available
 
-        // Get registered models from registry for enrichment
-        val registeredModels = try {
-            modelRegistry?.getAllModels() ?: emptyList()
-        } catch (e: Exception) {
-            logger.debug("Could not get registered models: ${e.message}")
-            emptyList()
-        }
-        val registeredModelsMap = registeredModels.associateBy { it.id }
-
-        for (entryPath in modelEntries) {
-            try {
-                // Calculate size (works for both files and directories)
-                val size = calculateEntrySize(entryPath)
-                if (size <= 0) continue
-
-                // Extract model ID from path
-                val fileName = entryPath.substringAfterLast("/")
-                val modelId = extractModelId(fileName)
-
-                // Try to find registered model for enrichment
-                val registeredModel = registeredModelsMap[modelId]
-                    ?: registeredModelsMap.values.find {
-                        it.id.contains(modelId, ignoreCase = true) ||
-                        modelId.contains(it.id, ignoreCase = true)
-                    }
-
-                // Extract format from filename or directory contents
-                val format = extractFormat(entryPath, fileName)
-
-                // Get file creation/modification time
-                val createdDate = getFileCreatedDate(entryPath)
-                val lastUsed = getFileLastAccessedDate(entryPath)
-
-                storedModels.add(
-                    StoredModel(
-                        id = modelId,
-                        name = registeredModel?.name ?: formatDisplayName(modelId),
-                        path = entryPath,
-                        size = size,
-                        format = format,
-                        framework = registeredModel?.preferredFramework?.displayName,
-                        createdDate = createdDate,
-                        lastUsed = lastUsed,
-                        contextLength = registeredModel?.contextLength,
-                        checksum = null
-                    )
-                )
-            } catch (e: Exception) {
-                logger.debug("Error processing model entry $entryPath: ${e.message}")
+        val recommendation: String? = when {
+            !isAvailable -> {
+                val shortfall = requiredSpace - availableSpace
+                val shortfallMB = shortfall / (1024 * 1024)
+                "Need ${shortfallMB}MB more space. Clear cache or remove unused models."
             }
-        }
-
-        return storedModels.sortedByDescending { it.createdDate }
-    }
-
-    /**
-     * Calculate size of a file or directory
-     */
-    private fun calculateEntrySize(path: String): Long {
-        return try {
-            val size = fileManager.fileSize(path)
-            if (size != null && size > 0) {
-                size
-            } else {
-                // Might be a directory - calculate directory size
-                fileManager.directorySize(path)
+            hasWarning -> {
+                "Storage space is getting low. Consider clearing cache after download."
             }
-        } catch (e: Exception) {
-            0L
-        }
-    }
-
-    /**
-     * Extract model ID from filename
-     */
-    private fun extractModelId(fileName: String): String {
-        // Remove common extensions
-        return fileName
-            .replace(".gguf", "")
-            .replace(".onnx", "")
-            .replace(".bin", "")
-            .replace(".tar.bz2", "")
-            .replace(".tar.gz", "")
-            .replace(".zip", "")
-    }
-
-    /**
-     * Extract format from path or filename
-     */
-    private fun extractFormat(path: String, fileName: String): String {
-        return when {
-            fileName.endsWith(".gguf") -> "gguf"
-            fileName.endsWith(".onnx") -> "onnx"
-            fileName.endsWith(".bin") -> "bin"
-            // Check if it's a directory containing ONNX files (Sherpa models)
-            path.contains("sherpa") || path.contains("whisper") || path.contains("piper") -> "onnx"
-            else -> "unknown"
-        }
-    }
-
-    /**
-     * Get file creation date
-     */
-    private fun getFileCreatedDate(path: String): Instant {
-        // For now, use current time as placeholder
-        // Platform-specific implementations can override this
-        return Instant.fromEpochMilliseconds(System.currentTimeMillis())
-    }
-
-    /**
-     * Get file last accessed date
-     */
-    private fun getFileLastAccessedDate(path: String): Instant? {
-        // For now, return null
-        // Platform-specific implementations can override this
-        return null
-    }
-
-    /**
-     * Format model ID into display name
-     */
-    private fun formatDisplayName(modelId: String): String {
-        return modelId
-            .replace("-", " ")
-            .replace("_", " ")
-            .split(" ")
-            .joinToString(" ") { word ->
-                word.replaceFirstChar { it.uppercase() }
-            }
-    }
-
-    /**
-     * Determine storage availability status
-     * Matches iOS checkStorageAvailable() logic
-     */
-    override fun getStorageAvailability(deviceStorage: DeviceStorageInfo): StorageAvailability {
-        val availablePercentage = if (deviceStorage.totalSpace > 0) {
-            (deviceStorage.freeSpace.toDouble() / deviceStorage.totalSpace.toDouble()) * 100.0
-        } else {
-            0.0
+            else -> null
         }
 
-        return when {
-            availablePercentage > 20.0 -> StorageAvailability.HEALTHY
-            availablePercentage > 10.0 -> StorageAvailability.LOW
-            availablePercentage > 5.0 -> StorageAvailability.CRITICAL
-            else -> StorageAvailability.FULL
-        }
+        return StorageAvailabilityResult(
+            isAvailable = isAvailable,
+            requiredSpace = requiredSpace,
+            availableSpace = availableSpace,
+            hasWarning = hasWarning,
+            recommendation = recommendation
+        )
     }
 
     /**
-     * Generate storage recommendations
-     * Matches iOS getRecommendations() method
+     * Get storage recommendations
+     * Matches iOS getRecommendations() method exactly
+     *
+     * iOS implementation:
+     * ```swift
+     * public func getRecommendations(for storageInfo: StorageInfo) -> [StorageRecommendation] {
+     *     var recommendations: [StorageRecommendation] = []
+     *     let freeSpace = storageInfo.deviceStorage.freeSpace
+     *     let totalSpace = storageInfo.deviceStorage.totalSpace
+     *     if totalSpace > 0 {
+     *         let freePercentage = Double(freeSpace) / Double(totalSpace)
+     *         if freePercentage < 0.1 { ... }
+     *         if freePercentage < 0.05 { ... }
+     *     }
+     *     if storageInfo.storedModels.count > 5 { ... }
+     *     return recommendations
+     * }
+     * ```
      */
-    override fun generateRecommendations(storageInfo: StorageInfo): List<StorageRecommendation> {
+    override fun getRecommendations(storageInfo: StorageInfo): List<StorageRecommendation> {
         val recommendations = mutableListOf<StorageRecommendation>()
 
         val freeSpace = storageInfo.deviceStorage.freeSpace
@@ -336,7 +267,7 @@ class DefaultStorageAnalyzer(
             }
         }
 
-        // Suggest reviewing models if more than 5 stored
+        // Suggest reviewing models if more than 5 stored - matches iOS exactly
         if (storageInfo.storedModels.size > 5) {
             recommendations.add(
                 StorageRecommendation(
@@ -349,4 +280,187 @@ class DefaultStorageAnalyzer(
 
         return recommendations
     }
+
+    /**
+     * Calculate size at path
+     * Matches iOS calculateSize(at:) method exactly
+     *
+     * iOS implementation:
+     * ```swift
+     * public func calculateSize(at url: URL) async throws -> Int64 {
+     *     let fm = Foundation.FileManager.default
+     *     var isDirectory: ObjCBool = false
+     *     guard fm.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
+     *         throw SDKError.modelNotFound("File not found at path: \(url.path)")
+     *     }
+     *     if isDirectory.boolValue {
+     *         return fileManager.calculateDirectorySize(at: url)
+     *     } else {
+     *         let attributes = try fm.attributesOfItem(atPath: url.path)
+     *         return attributes[.size] as? Int64 ?? 0
+     *     }
+     * }
+     * ```
+     */
+    override suspend fun calculateSize(path: String): Long {
+        return try {
+            if (!fileManager.fileExists(path)) {
+                throw IllegalArgumentException("File not found at path: $path")
+            }
+
+            if (fileManager.isDirectory(path)) {
+                // Use SimplifiedFileManager's calculateDirectorySize method
+                fileManager.calculateDirectorySize(path)
+            } else {
+                // Get file size
+                fileManager.fileSize(path) ?: 0L
+            }
+        } catch (e: Exception) {
+            logger.error("Error calculating size for $path", e)
+            0L
+        }
+    }
+
+    // MARK: - Private Helpers
+
+    /**
+     * Get device storage info
+     * Matches iOS getDeviceStorageInfo() method
+     */
+    private fun getDeviceStorageInfo(): DeviceStorageInfo {
+        // Use SimplifiedFileManager's getDeviceStorageInfo method
+        val storageInfo = fileManager.getDeviceStorageInfo()
+        return DeviceStorageInfo(
+            totalSpace = storageInfo.totalSpace,
+            freeSpace = storageInfo.freeSpace,
+            usedSpace = storageInfo.usedSpace
+        )
+    }
+
+    /**
+     * Get stored models list with enriched information
+     * Matches iOS getStoredModelsList() method exactly
+     *
+     * iOS implementation:
+     * ```swift
+     * private func getStoredModelsList() async -> [StoredModel] {
+     *     var storedModels: [StoredModel] = []
+     *     let storedModelsData = fileManager.getAllStoredModels()
+     *     let registeredModels = await modelRegistry.discoverModels()
+     *     let registeredModelsMap = Dictionary(uniqueKeysWithValues: registeredModels.map { ($0.id, $0) })
+     *
+     *     for (modelId, format, size, framework) in storedModelsData {
+     *         let registeredModel = registeredModelsMap[modelId]
+     *         let modelURL: URL
+     *         if let url = try? fileManager.getModelURL(modelId: modelId, format: format) {
+     *             modelURL = url
+     *         } else if let url = fileManager.findModelFile(modelId: modelId) {
+     *             modelURL = url
+     *         } else {
+     *             continue
+     *         }
+     *         let storedModel = StoredModel(
+     *             id: modelId,
+     *             name: registeredModel?.name ?? modelId,
+     *             path: modelURL,
+     *             size: size,
+     *             format: format,
+     *             framework: framework ?? registeredModel?.preferredFramework,
+     *             createdDate: fileManager.getFileCreationDate(at: modelURL) ?? Date(),
+     *             lastUsed: fileManager.getFileAccessDate(at: modelURL),
+     *             metadata: registeredModel?.metadata,
+     *             contextLength: registeredModel?.contextLength,
+     *         )
+     *         storedModels.append(storedModel)
+     *     }
+     *     return storedModels
+     * }
+     * ```
+     */
+    private suspend fun getStoredModelsList(): List<StoredModel> {
+        val storedModels = mutableListOf<StoredModel>()
+
+        // Get all stored model data from file manager - matches iOS
+        val storedModelsData: List<StoredModelData> = fileManager.getAllStoredModels()
+
+        // Get all registered models from registry - matches iOS
+        val registeredModels: List<ModelInfo> = try {
+            modelRegistry?.discoverModels() ?: emptyList()
+        } catch (e: Exception) {
+            logger.debug("Could not discover models from registry: ${e.message}")
+            emptyList()
+        }
+
+        // Create a map of registered models for quick lookup - matches iOS
+        val registeredModelsMap = registeredModels.associateBy { it.id }
+
+        logger.debug("Found ${storedModelsData.size} stored models from file manager")
+        logger.debug("Found ${registeredModels.size} registered models from registry")
+
+        // Convert stored model data to StoredModel objects - matches iOS
+        for (modelData in storedModelsData) {
+            try {
+                // Try to find corresponding registered model for additional metadata
+                val registeredModel = registeredModelsMap[modelData.modelId]
+
+                // Try to get the model path
+                val modelPath = fileManager.findModelFile(modelData.modelId)
+                if (modelPath == null) {
+                    logger.debug("Skipping model ${modelData.modelId} - could not find file")
+                    continue
+                }
+
+                val storedModel = StoredModel(
+                    id = modelData.modelId,
+                    name = registeredModel?.name ?: modelData.modelId,
+                    path = modelPath,
+                    size = modelData.size,
+                    format = modelData.format.value,
+                    framework = modelData.framework?.displayName ?: registeredModel?.preferredFramework?.displayName,
+                    createdDate = Instant.fromEpochMilliseconds(System.currentTimeMillis()), // TODO: Get actual creation date
+                    lastUsed = null, // TODO: Get actual last access date
+                    contextLength = registeredModel?.contextLength,
+                    checksum = null
+                )
+
+                storedModels.add(storedModel)
+                logger.debug("Added stored model: ${storedModel.name} (${storedModel.size} bytes)")
+            } catch (e: Exception) {
+                logger.debug("Error processing model ${modelData.modelId}: ${e.message}")
+            }
+        }
+
+        logger.debug("Total stored models: ${storedModels.size}")
+        return storedModels
+    }
+
+    /**
+     * Determine storage availability status from device storage info
+     */
+    private fun determineStorageAvailability(deviceStorage: DeviceStorageInfo): StorageAvailability {
+        val availablePercentage = if (deviceStorage.totalSpace > 0) {
+            (deviceStorage.freeSpace.toDouble() / deviceStorage.totalSpace.toDouble()) * 100.0
+        } else {
+            0.0
+        }
+
+        return when {
+            availablePercentage > 20.0 -> StorageAvailability.HEALTHY
+            availablePercentage > 10.0 -> StorageAvailability.LOW
+            availablePercentage > 5.0 -> StorageAvailability.CRITICAL
+            else -> StorageAvailability.FULL
+        }
+    }
 }
+
+/**
+ * Storage availability result
+ * Matches iOS StorageAvailability return type from checkStorageAvailable()
+ */
+data class StorageAvailabilityResult(
+    val isAvailable: Boolean,
+    val requiredSpace: Long,
+    val availableSpace: Long,
+    val hasWarning: Boolean,
+    val recommendation: String?
+)

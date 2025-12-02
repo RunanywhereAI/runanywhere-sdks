@@ -48,11 +48,14 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
                 }
 
                 // Build expected path based on framework
+                // IMPORTANT: Use framework.value to match iOS's framework.rawValue exactly
+                // iOS folder pattern: Models/{framework.rawValue}/{modelId}/ e.g., Models/LlamaCpp/liquid-ai-4b/
                 val framework = model.preferredFramework ?: model.compatibleFrameworks.firstOrNull()
                 if (framework != null) {
                     // Try framework-specific storage strategy first (e.g., ONNX, LlamaCpp)
                     val storageStrategy = ModuleRegistry.getStorageStrategy(framework)
-                    val modelDir = "$baseModelsPath/${framework.value.lowercase()}/${model.id}"
+                    // Use framework.value (matches iOS rawValue) - e.g., "LlamaCpp", "ONNX"
+                    val modelDir = "$baseModelsPath/${framework.value}/${model.id}"
 
                     if (storageStrategy != null) {
                         logger.debug("Using ${framework.name} storage strategy for ${model.id}")
@@ -69,10 +72,12 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
                     }
 
                     // Fallback: Check standard path patterns for frameworks without storage strategy
+                    // Use framework.value to match iOS pattern exactly
                     val pathVariations = listOf(
+                        // Primary pattern matching iOS: Models/{framework.rawValue}/{modelId}/{filename}
                         "$baseModelsPath/${framework.value}/${model.id}/${model.id}.${model.format.value}",
-                        "$baseModelsPath/${framework.value.lowercase()}/${model.id}/${model.id}.${model.format.value}",
-                        "$baseModelsPath/llama_cpp/${model.id}/${model.id}.${model.format.value}"
+                        // Also check for directory-based models (ONNX)
+                        "$baseModelsPath/${framework.value}/${model.id}"
                     )
 
                     for (expectedPath in pathVariations) {
