@@ -54,6 +54,20 @@ enum class RecordingState {
 }
 
 /**
+ * Transcription metrics for display
+ */
+data class TranscriptionMetrics(
+    val confidence: Float = 0f,
+    val audioDurationMs: Double = 0.0,
+    val inferenceTimeMs: Double = 0.0,
+    val detectedLanguage: String = "",
+    val wordCount: Int = 0
+) {
+    val realTimeFactor: Double
+        get() = if (audioDurationMs > 0) inferenceTimeMs / audioDurationMs else 0.0
+}
+
+/**
  * STT UI State
  * iOS Reference: STTViewModel state properties in SpeechToTextView.swift
  */
@@ -69,7 +83,8 @@ data class STTUiState(
     val language: String = "en",
     val errorMessage: String? = null,
     val supportsLiveMode: Boolean = false,
-    val isTranscribing: Boolean = false
+    val isTranscribing: Boolean = false,
+    val metrics: TranscriptionMetrics? = null
 )
 
 /**
@@ -405,13 +420,35 @@ class SpeechToTextViewModel : ViewModel() {
                 // Filter out placeholder "..." - only update UI with actual transcription text
                 // This matches iOS behavior where partials are only emitted with real text
                 if (event.text.isNotBlank() && event.text != "...") {
-                    _uiState.update { it.copy(transcription = event.text) }
+                    val wordCount = event.text.trim().split("\\s+".toRegex()).size
+                    _uiState.update {
+                        it.copy(
+                            transcription = event.text,
+                            metrics = TranscriptionMetrics(
+                                confidence = event.confidence,
+                                wordCount = wordCount
+                            )
+                        )
+                    }
                     Log.d(TAG, "Partial transcription: ${event.text}")
                 }
             }
             is STTStreamEvent.FinalTranscription -> {
-                _uiState.update { it.copy(transcription = event.result.transcript) }
-                Log.i(TAG, "Final: ${event.result.transcript}")
+                val result = event.result
+                val wordCount = result.transcript.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+                _uiState.update {
+                    it.copy(
+                        transcription = result.transcript,
+                        metrics = TranscriptionMetrics(
+                            confidence = result.confidence ?: 0f,
+                            audioDurationMs = 0.0, // Not available in stream result
+                            inferenceTimeMs = 0.0,
+                            detectedLanguage = result.language ?: "",
+                            wordCount = wordCount
+                        )
+                    )
+                }
+                Log.i(TAG, "Final: ${result.transcript}")
             }
             is STTStreamEvent.AudioLevelChanged -> {
                 _uiState.update { it.copy(audioLevel = event.level) }
@@ -492,8 +529,13 @@ class SpeechToTextViewModel : ViewModel() {
 
         try {
             withContext(Dispatchers.IO) {
+                val startTime = System.currentTimeMillis()
+
                 // Convert PCM bytes to float samples for SDK
                 val samples = bytesToFloats(audioBytes)
+
+                // Calculate audio duration: bytes / (sample_rate * 2 bytes per sample) * 1000 ms
+                val audioDurationMs = (audioBytes.size.toDouble() / (SAMPLE_RATE * 2)) * 1000
 
                 // Transcribe using SDK's STTComponent
                 // iOS Reference: component.transcribe(audioBuffer, options: options)
@@ -502,17 +544,27 @@ class SpeechToTextViewModel : ViewModel() {
                     language = _uiState.value.language
                 )
 
+                val inferenceTimeMs = System.currentTimeMillis() - startTime
+                val wordCount = result.text.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+
                 withContext(Dispatchers.Main) {
                     _uiState.update {
                         it.copy(
                             transcription = result.text,
                             recordingState = RecordingState.IDLE,
-                            isTranscribing = false
+                            isTranscribing = false,
+                            metrics = TranscriptionMetrics(
+                                confidence = result.confidence,
+                                audioDurationMs = audioDurationMs,
+                                inferenceTimeMs = inferenceTimeMs.toDouble(),
+                                detectedLanguage = result.detectedLanguage ?: _uiState.value.language,
+                                wordCount = wordCount
+                            )
                         )
                     }
                 }
 
-                Log.i(TAG, "✅ Batch transcription complete: ${result.text}")
+                Log.i(TAG, "✅ Batch transcription complete: ${result.text} (${inferenceTimeMs}ms, ${wordCount} words)")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Batch transcription failed: ${e.message}", e)
@@ -520,7 +572,8 @@ class SpeechToTextViewModel : ViewModel() {
                 it.copy(
                     errorMessage = "Transcription failed: ${e.message}",
                     recordingState = RecordingState.IDLE,
-                    isTranscribing = false
+                    isTranscribing = false,
+                    metrics = null
                 )
             }
         }
