@@ -42,6 +42,8 @@ import com.runanywhere.sdk.models.collectDeviceInfo
 import com.runanywhere.sdk.services.analytics.AnalyticsService
 import com.runanywhere.sdk.data.repositories.TelemetryRepository
 import com.runanywhere.sdk.services.sync.SyncCoordinator
+import com.runanywhere.sdk.data.network.services.AnalyticsNetworkService
+import com.runanywhere.sdk.data.datasources.RemoteTelemetryDataSource
 import com.runanywhere.sdk.memory.MemoryService
 import com.runanywhere.sdk.memory.MemoryManager
 import com.runanywhere.sdk.events.SDKInitializationEvent
@@ -163,6 +165,13 @@ class ServiceContainer {
     private var _analyticsService: AnalyticsService? = null
     val analyticsService: AnalyticsService? get() = _analyticsService
 
+    // Analytics network services (for production analytics)
+    private var _analyticsNetworkService: AnalyticsNetworkService? = null
+    val analyticsNetworkService: AnalyticsNetworkService? get() = _analyticsNetworkService
+
+    private var _remoteTelemetryDataSource: RemoteTelemetryDataSource? = null
+    val remoteTelemetryDataSource: RemoteTelemetryDataSource? get() = _remoteTelemetryDataSource
+
     // Device info (collected during initialization)
     private var _deviceInfo: DeviceInfo? = null
     private var _deviceInfoData: com.runanywhere.sdk.data.models.DeviceInfoData? = null
@@ -280,6 +289,28 @@ class ServiceContainer {
             EventBus.publish(SDKInitializationEvent.StepStarted(5, "Analytics service setup"))
 
             try {
+                // Create analytics network services for production mode
+                if (params.environment == SDKEnvironment.PRODUCTION && params.baseURL != null) {
+                    logger.debug("Creating production analytics network services...")
+                    
+                    // Create AnalyticsNetworkService
+                    _analyticsNetworkService = AnalyticsNetworkService(
+                        httpClient = httpClient,
+                        baseURL = params.baseURL,
+                        apiKey = params.apiKey,
+                        authenticationService = authenticationService
+                    )
+                    
+                    // Create RemoteTelemetryDataSource
+                    _remoteTelemetryDataSource = RemoteTelemetryDataSource(
+                        analyticsNetworkService = _analyticsNetworkService!!
+                    )
+                    
+                    logger.info("✅ Production analytics network services created")
+                } else {
+                    logger.debug("Skipping production analytics services (dev mode or no baseURL)")
+                }
+
                 // AnalyticsService will get device ID dynamically from BaseRunAnywhereSDK.sharedDeviceId
                 _analyticsService = AnalyticsService(
                     telemetryRepository = telemetryRepository,

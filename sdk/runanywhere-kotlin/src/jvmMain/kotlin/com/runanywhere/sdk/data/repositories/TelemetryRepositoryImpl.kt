@@ -1,17 +1,24 @@
 package com.runanywhere.sdk.data.repositories
 
+import com.runanywhere.sdk.data.datasources.RemoteTelemetryDataSource
 import com.runanywhere.sdk.data.models.TelemetryData
 import com.runanywhere.sdk.data.models.TelemetryEventData
 import com.runanywhere.sdk.data.models.TelemetryBatch
 import com.runanywhere.sdk.foundation.SDKLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * JVM implementation of TelemetryRepository using in-memory storage
  * Note: This is a simple implementation for development/testing purposes
+ *
+ * Updated to support RemoteTelemetryDataSource for production analytics
  */
-class TelemetryRepositoryImpl : TelemetryRepository {
+class TelemetryRepositoryImpl(
+    private val remoteTelemetryDataSource: RemoteTelemetryDataSource? = null
+) : TelemetryRepository {
 
     private val logger = SDKLogger("TelemetryRepository")
     private val events = ConcurrentHashMap<String, TelemetryData>()
@@ -63,15 +70,40 @@ class TelemetryRepositoryImpl : TelemetryRepository {
         }
     }
 
-    override suspend fun sendBatch(batch: TelemetryBatch) {
-        try {
-            // For JVM, we'll just mark these as processed
-            logger.info("Processing telemetry batch with ${batch.events.size} events (JVM stub implementation)")
-            val eventIds = batch.events.map { it.id }
-            markEventsSent(eventIds, System.currentTimeMillis())
-        } catch (e: Exception) {
-            logger.error("Failed to send telemetry batch", e)
-            throw e
+    override suspend fun sendBatch(batch: TelemetryBatch) = withContext(Dispatchers.IO) {
+        runCatching {
+            if (batch.events.isEmpty()) {
+                logger.debug("No events to send")
+                return@runCatching
+            }
+
+            logger.debug("Sending batch of ${batch.events.size} events")
+
+            // Submit to remote data source if available (production mode)
+            if (remoteTelemetryDataSource != null) {
+                remoteTelemetryDataSource.submitBatch(batch)
+                    .onSuccess {
+                        // Mark events as sent in memory
+                        val eventIds = batch.events.map { it.id }
+                        eventIds.forEach { sentEventIds[it] = System.currentTimeMillis() }
+                        logger.info("✅ Marked ${eventIds.size} events as sent")
+                    }
+                    .onFailure { error ->
+                        logger.error("❌ Failed to send batch: ${error.message}")
+                        // Events remain unsent for retry
+                        throw error
+                    }
+                    .getOrThrow()
+            } else {
+                // Fallback: Just mark as processed (development mode or no remote data source)
+                logger.debug("No remote telemetry data source available, marking events as processed locally")
+                val eventIds = batch.events.map { it.id }
+                eventIds.forEach { sentEventIds[it] = System.currentTimeMillis() }
+                logger.info("Marked ${eventIds.size} events as processed (local only)")
+            }
+        }.getOrElse { exception ->
+            logger.error("Failed to send telemetry batch: ${exception.message}", exception)
+            throw exception
         }
     }
 
