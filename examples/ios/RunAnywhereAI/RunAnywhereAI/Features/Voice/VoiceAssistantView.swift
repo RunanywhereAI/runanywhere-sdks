@@ -374,6 +374,37 @@ struct VoiceAssistantView: View {
                                 .padding(.horizontal, 20)
                         }
 
+                        // Audio level indicator (visible when recording/listening)
+                        if viewModel.sessionState == .listening || viewModel.isListening {
+                            VStack(spacing: 8) {
+                                // Recording status badge
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 8, height: 8)
+                                    Text("RECORDING")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.red)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(4)
+
+                                // Audio level bars
+                                HStack(spacing: 4) {
+                                    ForEach(0..<10, id: \.self) { index in
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(index < Int(viewModel.audioLevel * 10) ? Color.green : Color.gray.opacity(0.3))
+                                            .frame(width: 25, height: 8)
+                                    }
+                                }
+                            }
+                            .padding(.bottom, 8)
+                            .animation(.easeInOut(duration: 0.2), value: viewModel.audioLevel)
+                        }
+
                         // Main mic button
                         HStack {
                             Spacer()
@@ -576,15 +607,15 @@ struct VoiceAssistantView: View {
     private var instructionText: String {
         switch viewModel.sessionState {
         case .listening:
-            return "Listening... Tap to stop"
+            return "Listening... Pause to send"
         case .processing:
-            return "Processing..."
+            return "Processing your message..."
         case .speaking:
             return "Speaking..."
         case .connecting:
             return "Connecting..."
         default:
-            return "Tap to speak"
+            return "Tap to start conversation"
         }
     }
 }

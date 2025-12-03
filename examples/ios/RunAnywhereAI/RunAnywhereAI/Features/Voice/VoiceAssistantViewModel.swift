@@ -20,6 +20,7 @@ class VoiceAssistantViewModel: ObservableObject {
     @Published var currentLLMModel: String = ""
     @Published var whisperModel: String = "Whisper Base"
     @Published var isListening: Bool = false
+    @Published var audioLevel: Float = 0.0  // For audio level visualization
 
     // MARK: - Model Selection State (for Voice Pipeline Setup)
     @Published var sttModel: (framework: LLMFramework, name: String)?
@@ -278,9 +279,9 @@ class VoiceAssistantViewModel: ObservableObject {
         currentStatus = "Initializing components..."
 
         // Create pipeline configuration using the actually loaded models
+        // NOTE: VAD removed for manual control mode - user taps to start/stop recording
         let config = ModularPipelineConfig(
-            components: [.vad, .stt, .llm, .tts],
-            vad: VADConfig(energyThreshold: 0.005), // Lower threshold for better short phrase detection
+            components: [.stt, .llm, .tts],  // No VAD - manual mode
             stt: VoiceSTTConfig(modelId: sttModelId),
             llm: VoiceLLMConfig(
                 modelId: llmModelId,
@@ -414,15 +415,22 @@ class VoiceAssistantViewModel: ObservableObject {
     private func handlePipelineEvent(_ event: ModularPipelineEvent) async {
         await MainActor.run {
             switch event {
+            case .vadAudioLevel(let level):
+                // Update audio level for visualization
+                audioLevel = level
+
             case .vadSpeechStart:
                 sessionState = .listening
                 currentStatus = "Listening..."
                 isSpeechDetected = true
-                logger.info("Speech detected")
+                isListening = true  // Ensure isListening is set for audio bars
+                logger.info("Recording started")
 
             case .vadSpeechEnd:
                 isSpeechDetected = false
-                logger.info("Speech ended")
+                // Don't reset audioLevel immediately - let the UI fade out naturally
+                // audioLevel = 0.0
+                logger.info("Recording ended")
 
             case .sttPartialTranscript(let text):
                 currentTranscript = text
