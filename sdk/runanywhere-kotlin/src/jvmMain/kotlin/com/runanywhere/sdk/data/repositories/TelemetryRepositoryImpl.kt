@@ -77,27 +77,18 @@ internal class TelemetryRepositoryImpl(
                 return@runCatching
             }
 
+            val eventIds = batch.events.map { it.id }
             logger.debug("Sending batch of ${batch.events.size} events")
 
             // Submit to remote data source if available (production mode)
             if (remoteTelemetryDataSource != null) {
-                remoteTelemetryDataSource.submitBatch(batch)
-                    .onSuccess {
-                        // Mark events as sent in memory
-                        val eventIds = batch.events.map { it.id }
-                        eventIds.forEach { sentEventIds[it] = System.currentTimeMillis() }
-                        logger.info("✅ Marked ${eventIds.size} events as sent")
-                    }
-                    .onFailure { error ->
-                        logger.error("❌ Failed to send batch: ${error.message}")
-                        // Events remain unsent for retry
-                        throw error
-                    }
-                    .getOrThrow()
+                remoteTelemetryDataSource.submitBatch(batch).getOrThrow()
+                // Mark events as sent in memory
+                eventIds.forEach { sentEventIds[it] = System.currentTimeMillis() }
+                logger.info("✅ Marked ${eventIds.size} events as sent")
             } else {
                 // Fallback: Just mark as processed (development mode or no remote data source)
                 logger.debug("No remote telemetry data source available, marking events as processed locally")
-                val eventIds = batch.events.map { it.id }
                 eventIds.forEach { sentEventIds[it] = System.currentTimeMillis() }
                 logger.info("Marked ${eventIds.size} events as processed (local only)")
             }

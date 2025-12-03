@@ -33,14 +33,8 @@ internal class RemoteTelemetryDataSource(
             withTimeout(30.seconds) {
                 logger.debug("Submitting telemetry batch with ${batch.events.size} events")
 
-                analyticsNetworkService.submitTelemetryBatch(batch)
-                    .onSuccess {
-                        logger.info("✅ Successfully submitted telemetry batch")
-                    }
-                    .onFailure { error ->
-                        logger.error("❌ Failed to submit telemetry batch: ${error.message}")
-                    }
-                    .getOrThrow()
+                analyticsNetworkService.submitTelemetryBatch(batch).getOrThrow()
+                    .also { logger.info("✅ Successfully submitted telemetry batch") }
             }
         }
     }
@@ -56,15 +50,8 @@ internal class RemoteTelemetryDataSource(
         runCatching {
             logger.debug("Submitting single telemetry event: ${event.name}")
 
-            analyticsNetworkService.submitTelemetryEvent(event)
-                .onSuccess {
-                    logger.debug("✅ Successfully submitted telemetry event")
-                }
-                .onFailure { error ->
-                    logger.error("❌ Failed to submit telemetry event: ${error.message}")
-                }
-                .getOrThrow()
+            analyticsNetworkService.submitTelemetryEvent(event).getOrThrow()
+                .also { logger.debug("✅ Successfully submitted telemetry event") }
         }
     }
 }
-

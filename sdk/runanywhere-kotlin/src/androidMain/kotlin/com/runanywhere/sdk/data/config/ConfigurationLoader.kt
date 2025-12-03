@@ -1,6 +1,7 @@
 package com.runanywhere.sdk.data.config
 
 import android.content.Context
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,12 +32,12 @@ internal actual suspend fun loadResourceFile(fileName: String): String = withCon
                 ""
             }
         } else {
-            // Fallback: try to load from external storage or app files
-            // This is a simplified implementation
+            // No Android context available - return empty string
+            // This indicates configuration loading is not yet available in this context
             ""
         }
     } catch (e: Exception) {
+        SDKLogger("ConfigurationLoader").debug("Failed to load resource file: ${e.message}")
         ""
     }
 }
-

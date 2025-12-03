@@ -13,8 +13,10 @@ import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.data.models.generateUUID
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 
 /**
  * LLM Service Wrapper to allow protocol-based LLM service to work with BaseComponent
@@ -292,6 +294,7 @@ class LLMComponent(
     /**
      * Process LLM input
      */
+    @OptIn(DelicateCoroutinesApi::class)
     suspend fun process(input: LLMInput): LLMOutput {
         ensureReady()
 
@@ -319,27 +322,36 @@ class LLMComponent(
         val modelName = modelId
         val framework = "llama.cpp" // TODO: Get from service provider
 
-        // Calculate prompt tokens
+        // Rough token estimation: ~4 characters per token average
+        // LIMITATION: This is a very rough approximation. Actual token counts vary significantly based on:
+        // - Tokenizer type (BPE, WordPiece, SentencePiece, etc.)
+        // - Language and character encoding (ASCII vs Unicode)
+        // - Vocabulary and token boundaries
+        // For precise token counts, use the model's actual tokenizer.
         val promptTokens = prompt.length / 4
 
-        // Track generation started
-        try {
-            telemetryService?.trackGenerationStarted(
-                generationId = generationId,
-                modelId = modelId,
-                modelName = modelName,
-                framework = framework,
-                promptTokens = promptTokens,
-                maxTokens = options.maxTokens,
-                device = PlatformUtils.getDeviceModel(),
-                osVersion = PlatformUtils.getOSVersion()
-            )
-        } catch (e: Exception) {
-            logger.error("Failed to track generation started: ${e.message}")
-        }
-
-        // Track generation time
+        // Track generation time - start before telemetry to avoid blocking
         val startTime = currentTimeMillis()
+
+        logger.info("Starting LLM generation with model: $modelId")
+
+        // Track generation started - fire and forget to avoid blocking generation
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                telemetryService?.trackGenerationStarted(
+                    generationId = generationId,
+                    modelId = modelId,
+                    modelName = modelName,
+                    framework = framework,
+                    promptTokens = promptTokens,
+                    maxTokens = options.maxTokens,
+                    device = PlatformUtils.getDeviceModel(),
+                    osVersion = PlatformUtils.getOSVersion()
+                )
+            } catch (e: Exception) {
+                logger.debug("Failed to track generation started: ${e.message}")
+            }
+        }
         var firstTokenTime: Long? = null
 
         try {
@@ -348,30 +360,34 @@ class LLMComponent(
 
             val generationTime = currentTimeMillis() - startTime
 
-            // Calculate tokens
+            // Calculate completion tokens using same rough estimation (~4 chars per token)
             val completionTokens = response.length / 4
             val totalTokens = promptTokens + completionTokens
             val tokensPerSecond = if (generationTime > 0) {
                 (completionTokens.toDouble() * 1000.0) / generationTime
             } else null
 
-            // Track generation completed
-            try {
-                telemetryService?.trackGenerationCompleted(
-                    generationId = generationId,
-                    modelId = modelId,
-                    modelName = modelName,
-                    framework = framework,
-                    inputTokens = promptTokens,
-                    outputTokens = completionTokens,
-                    totalTimeMs = generationTime.toDouble(),
-                    timeToFirstTokenMs = firstTokenTime?.toDouble() ?: 0.0,
-                    tokensPerSecond = tokensPerSecond ?: 0.0,
-                    device = PlatformUtils.getDeviceModel(),
-                    osVersion = PlatformUtils.getOSVersion()
-                )
-            } catch (e: Exception) {
-                logger.error("Failed to track generation completed: ${e.message}")
+            // Track generation completed - fire and forget
+            val finalTokensPerSecond = tokensPerSecond ?: 0.0
+            val finalFirstTokenTime = firstTokenTime?.toDouble() ?: 0.0
+            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    telemetryService?.trackGenerationCompleted(
+                        generationId = generationId,
+                        modelId = modelId,
+                        modelName = modelName,
+                        framework = framework,
+                        inputTokens = promptTokens,
+                        outputTokens = completionTokens,
+                        totalTimeMs = generationTime.toDouble(),
+                        timeToFirstTokenMs = finalFirstTokenTime,
+                        tokensPerSecond = finalTokensPerSecond,
+                        device = PlatformUtils.getDeviceModel(),
+                        osVersion = PlatformUtils.getOSVersion()
+                    )
+                } catch (e: Exception) {
+                    logger.debug("Failed to track generation completed: ${e.message}")
+                }
             }
 
             // Create output
@@ -392,22 +408,25 @@ class LLMComponent(
             )
         } catch (e: Exception) {
             val generationTime = currentTimeMillis() - startTime
+            val errorMsg = e.message ?: "Unknown error"
 
-            // Track generation failed
-            try {
-                telemetryService?.trackGenerationFailed(
-                    generationId = generationId,
-                    modelId = modelId,
-                    modelName = modelName,
-                    framework = framework,
-                    inputTokens = promptTokens,
-                    totalTimeMs = generationTime.toDouble(),
-                    errorMessage = e.message ?: "Unknown error",
-                    device = PlatformUtils.getDeviceModel(),
-                    osVersion = PlatformUtils.getOSVersion()
-                )
-            } catch (telemetryError: Exception) {
-                logger.error("Failed to track generation failed: ${telemetryError.message}")
+            // Track generation failed - fire and forget
+            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    telemetryService?.trackGenerationFailed(
+                        generationId = generationId,
+                        modelId = modelId,
+                        modelName = modelName,
+                        framework = framework,
+                        inputTokens = promptTokens,
+                        totalTimeMs = generationTime.toDouble(),
+                        errorMessage = errorMsg,
+                        device = PlatformUtils.getDeviceModel(),
+                        osVersion = PlatformUtils.getOSVersion()
+                    )
+                } catch (telemetryError: Exception) {
+                    logger.debug("Failed to track generation failed: ${telemetryError.message}")
+                }
             }
 
             throw e
@@ -496,6 +515,9 @@ class LLMComponent(
 
     /**
      * Get token count for text
+     *
+     * NOTE: If the LLM service doesn't provide accurate tokenization, falls back to rough estimation
+     * of ~4 characters per token. See line 322 for detailed limitations of this approximation.
      */
     fun getTokenCount(text: String): Int {
         return llmService?.getTokenCount(text) ?: (text.length / 4) // Fallback estimation

@@ -11,9 +11,11 @@ import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.*
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.data.models.generateUUID
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -78,6 +80,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         )
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     actual override suspend fun streamGenerate(
         prompt: String,
         options: RunAnywhereGenerationOptions,
@@ -101,24 +104,28 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         // Calculate prompt tokens
         val promptTokens = estimateTokenCount(prompt)
 
-        // Track generation started
-        try {
-            telemetryService?.trackGenerationStarted(
-                generationId = generationId,
-                modelId = modelId,
-                modelName = modelName,
-                framework = framework,
-                promptTokens = promptTokens,
-                maxTokens = options.maxTokens,
-                device = PlatformUtils.getDeviceModel(),
-                osVersion = PlatformUtils.getOSVersion()
-            )
-        } catch (e: Exception) {
-            logger.error("Failed to track generation started: ${e.message}")
-        }
-
-        // Track generation time
+        // Track generation time - start before telemetry to avoid blocking
         val startTime = currentTimeMillis()
+
+        logger.info("Starting LLM generation with model: $modelId")
+
+        // Track generation started - fire and forget to avoid blocking generation
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            try {
+                telemetryService?.trackGenerationStarted(
+                    generationId = generationId,
+                    modelId = modelId,
+                    modelName = modelName,
+                    framework = framework,
+                    promptTokens = promptTokens,
+                    maxTokens = options.maxTokens,
+                    device = PlatformUtils.getDeviceModel(),
+                    osVersion = PlatformUtils.getOSVersion()
+                )
+            } catch (e: Exception) {
+                logger.debug("Failed to track generation started: ${e.message}")
+            }
+        }
         val generatedText = StringBuilder()
 
         try {
@@ -143,44 +150,49 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
                 (outputTokens.toDouble() * 1000.0) / generationTime
             } else 0.0
 
-            // Track generation completed
-            try {
-                telemetryService?.trackGenerationCompleted(
-                    generationId = generationId,
-                    modelId = modelId,
-                    modelName = modelName,
-                    framework = framework,
-                    inputTokens = promptTokens,
-                    outputTokens = outputTokens,
-                    totalTimeMs = generationTime.toDouble(),
-                    timeToFirstTokenMs = 0.0, // TODO: Track first token time
-                    tokensPerSecond = tokensPerSecond,
-                    device = PlatformUtils.getDeviceModel(),
-                    osVersion = PlatformUtils.getOSVersion()
-                )
-            } catch (e: Exception) {
-                logger.error("Failed to track generation completed: ${e.message}")
+            // Track generation completed - fire and forget
+            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    telemetryService?.trackGenerationCompleted(
+                        generationId = generationId,
+                        modelId = modelId,
+                        modelName = modelName,
+                        framework = framework,
+                        inputTokens = promptTokens,
+                        outputTokens = outputTokens,
+                        totalTimeMs = generationTime.toDouble(),
+                        timeToFirstTokenMs = 0.0,
+                        tokensPerSecond = tokensPerSecond,
+                        device = PlatformUtils.getDeviceModel(),
+                        osVersion = PlatformUtils.getOSVersion()
+                    )
+                } catch (e: Exception) {
+                    logger.debug("Failed to track generation completed: ${e.message}")
+                }
             }
 
             logger.info("streamGenerate completed")
         } catch (e: Exception) {
             val generationTime = currentTimeMillis() - startTime
+            val errorMsg = e.message ?: "Unknown error"
 
-            // Track generation failed
-            try {
-                telemetryService?.trackGenerationFailed(
-                    generationId = generationId,
-                    modelId = modelId,
-                    modelName = modelName,
-                    framework = framework,
-                    inputTokens = promptTokens,
-                    totalTimeMs = generationTime.toDouble(),
-                    errorMessage = e.message ?: "Unknown error",
-                    device = PlatformUtils.getDeviceModel(),
-                    osVersion = PlatformUtils.getOSVersion()
-                )
-            } catch (telemetryError: Exception) {
-                logger.error("Failed to track generation failed: ${telemetryError.message}")
+            // Track generation failed - fire and forget
+            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    telemetryService?.trackGenerationFailed(
+                        generationId = generationId,
+                        modelId = modelId,
+                        modelName = modelName,
+                        framework = framework,
+                        inputTokens = promptTokens,
+                        totalTimeMs = generationTime.toDouble(),
+                        errorMessage = errorMsg,
+                        device = PlatformUtils.getDeviceModel(),
+                        osVersion = PlatformUtils.getOSVersion()
+                    )
+                } catch (telemetryError: Exception) {
+                    logger.debug("Failed to track generation failed: ${telemetryError.message}")
+                }
             }
 
             throw e

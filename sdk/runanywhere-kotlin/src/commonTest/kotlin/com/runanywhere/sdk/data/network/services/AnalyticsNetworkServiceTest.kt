@@ -48,7 +48,7 @@ class AnalyticsNetworkServiceTest {
 
         val result = service.submitTelemetryBatch(batch)
         assertTrue(result.isSuccess)
-        
+
         httpClient.close()
     }
 
@@ -67,7 +67,7 @@ class AnalyticsNetworkServiceTest {
             baseURL = "https://api.runanywhere.ai",
             apiKey = "test-api-key"
         )
-        
+
         val batch = TelemetryBatch(
             events = listOf(createTestEvent()),
             deviceId = "test-device",
@@ -77,14 +77,14 @@ class AnalyticsNetworkServiceTest {
 
         val result = service.submitTelemetryBatch(batch)
         assertTrue(result.isFailure)
-        
+
         httpClient.close()
     }
 
     @Test
     fun `submitTelemetryEvent creates batch with single event`() = runTest {
         var capturedBatch: TelemetryBatch? = null
-        
+
         val mockEngine = MockEngine { request ->
             // Capture the request body to verify batch structure
             capturedBatch = null // Would need to parse body in real test
@@ -103,10 +103,10 @@ class AnalyticsNetworkServiceTest {
 
         val event = createTestEvent()
         val result = service.submitTelemetryEvent(event)
-        
+
         // Verify request was made
         assertTrue(result.isSuccess)
-        
+
         httpClient.close()
     }
 
@@ -115,7 +115,7 @@ class AnalyticsNetworkServiceTest {
         val mockEngine = MockEngine { request ->
             assertEquals("/api/v1/devices/register", request.url.encodedPath)
             assertEquals(HttpMethod.Post, request.method)
-            
+
             respond(
                 content = """{"deviceId": "test-device-123", "registered": true}""",
                 status = HttpStatusCode.OK,
@@ -137,12 +137,12 @@ class AnalyticsNetworkServiceTest {
 
         val result = service.registerDevice(deviceInfo)
         assertTrue(result.isSuccess)
-        
+
         result.onSuccess { response ->
             assertEquals("test-device-123", response.deviceId)
             assertTrue(response.registered)
         }
-        
+
         httpClient.close()
     }
 
@@ -154,7 +154,6 @@ class AnalyticsNetworkServiceTest {
         deviceId = "test-device",
         sdkVersion = "0.1.0",
         osVersion = "Android 13",
-        timestamp = System.currentTimeMillis()
+        timestamp = 1234567890L
     )
 }
-

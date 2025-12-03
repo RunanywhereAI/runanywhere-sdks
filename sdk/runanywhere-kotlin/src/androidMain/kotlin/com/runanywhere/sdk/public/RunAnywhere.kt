@@ -102,13 +102,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     ) {
         androidContext = context.applicationContext
 
-        // CRITICAL: Set native library directory FIRST, before any native library loading.
-        // This is required for ONNX library loading with RTLD_GLOBAL on Android.
-        // The loader needs full paths to load libraries with dlopen().
-        context.applicationInfo.nativeLibraryDir?.let { nativeLibDir ->
-            androidLogger.info("Setting native library directory: $nativeLibDir")
-            RunAnywhereBridge.setNativeLibraryDir(nativeLibDir)
-        }
+        // Load unified native library
+        RunAnywhereBridge.loadLibrary()
 
         initialize(apiKey, baseURL, environment)
     }

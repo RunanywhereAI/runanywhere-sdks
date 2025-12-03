@@ -321,16 +321,17 @@ class ServiceContainer {
                     }
 
                     // Create AnalyticsNetworkService
-                    _analyticsNetworkService = AnalyticsNetworkService(
+                    val analyticsService = AnalyticsNetworkService(
                         httpClient = analyticsKtorClient,
                         baseURL = params.baseURL,
                         apiKey = params.apiKey,
                         authenticationService = authenticationService
                     )
+                    _analyticsNetworkService = analyticsService
 
                     // Create RemoteTelemetryDataSource
                     _remoteTelemetryDataSource = RemoteTelemetryDataSource(
-                        analyticsNetworkService = _analyticsNetworkService!!
+                        analyticsNetworkService = analyticsService
                     )
 
                     logger.info("✅ Production analytics network services created")
