@@ -37,42 +37,64 @@ public final class LlamaCPPServiceProvider: LLMServiceProvider {
     public func canHandle(modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
 
-        let lowercased = modelId.lowercased()
-
         Self.logger.debug("Checking if can handle model: \(modelId)")
+
+        // PRIMARY CHECK: Use cached model info from the registry (most reliable)
+        // This uses the model's actual metadata rather than pattern matching
+        if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
+            // Check if llama.cpp is the preferred framework
+            if modelInfo.preferredFramework == .llamaCpp {
+                Self.logger.debug("Model \(modelId) has llamaCpp as preferred framework")
+                return true
+            }
+
+            // Check if llama.cpp is in compatible frameworks
+            if modelInfo.compatibleFrameworks.contains(.llamaCpp) {
+                Self.logger.debug("Model \(modelId) has llamaCpp in compatible frameworks")
+                return true
+            }
+
+            // Check if format is GGUF or GGML (native llama.cpp formats)
+            if modelInfo.format == .gguf || modelInfo.format == .ggml {
+                Self.logger.debug("Model \(modelId) has GGUF/GGML format")
+                return true
+            }
+
+            // Model info exists but doesn't indicate llama.cpp compatibility
+            Self.logger.debug("Model \(modelId) found in cache but not llama.cpp compatible")
+            return false
+        }
+
+        // FALLBACK: Pattern-based matching for models not yet in cache
+        // This handles edge cases during initialization or for dynamically added models
+        let lowercased = modelId.lowercased()
 
         // Handle GGUF models (primary format for llama.cpp)
         if lowercased.contains("gguf") || lowercased.hasSuffix(".gguf") {
-            Self.logger.debug("Model \(modelId) matches GGUF pattern")
+            Self.logger.debug("Model \(modelId) matches GGUF pattern (fallback)")
             return true
         }
 
         // Handle GGML models (older format)
         if lowercased.contains("ggml") || lowercased.hasSuffix(".ggml") {
-            Self.logger.debug("Model \(modelId) matches GGML pattern")
+            Self.logger.debug("Model \(modelId) matches GGML pattern (fallback)")
             return true
         }
 
         // Handle explicit llama.cpp references
-        if lowercased.contains("llamacpp") || lowercased.contains("llama-cpp") {
-            Self.logger.debug("Model \(modelId) matches LlamaCPP pattern")
+        if lowercased.contains("llamacpp") || lowercased.contains("llama-cpp") || lowercased.contains("llama_cpp") {
+            Self.logger.debug("Model \(modelId) matches LlamaCPP pattern (fallback)")
             return true
         }
 
-        // Handle common model names that are typically GGUF
-        if lowercased.contains("smollm") ||
-           lowercased.contains("mistral") ||
-           lowercased.contains("llama") ||
-           lowercased.contains("phi") ||
-           lowercased.contains("qwen") ||
-           lowercased.contains("gemma") {
-            // Only if it contains quantization patterns typical of GGUF
-            if lowercased.contains("q4") || lowercased.contains("q5") ||
-               lowercased.contains("q6") || lowercased.contains("q8") ||
-               lowercased.contains("q2") || lowercased.contains("q3") {
-                Self.logger.debug("Model \(modelId) matches common GGUF model pattern")
-                return true
-            }
+        // Check for GGUF quantization patterns (q2-q8 with optional suffixes like _k, _k_m, -k-m, _0)
+        // These patterns strongly indicate a GGUF model that llama.cpp can handle
+        // Supports both underscore and hyphen separators: q4_k_m, q4-k-m, q8_0, q8-0
+        let quantizationPattern = #"q[2-8]([_-][kK])?([_-][mMsS0])?"#
+        if let regex = try? NSRegularExpression(pattern: quantizationPattern, options: []),
+           regex.firstMatch(in: lowercased, range: NSRange(lowercased.startIndex..., in: lowercased)) != nil {
+            Self.logger.debug("Model \(modelId) matches GGUF quantization pattern (fallback)")
+            return true
         }
 
         Self.logger.debug("Model \(modelId) does not match any LlamaCPP patterns")

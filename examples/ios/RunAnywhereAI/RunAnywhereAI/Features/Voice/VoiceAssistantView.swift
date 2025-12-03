@@ -445,9 +445,66 @@ struct VoiceAssistantView: View {
             #endif
         }
         .sheet(isPresented: $showModelSelection) {
-            ModelSelectionSheet(context: .voice) { model in
-                // Model selected - the voice assistant will use this
-                // For now, just close the sheet. Voice pipeline has its own model management.
+            // Use the same VoicePipelineSetupView UI for changing models
+            NavigationView {
+                VoicePipelineSetupView(
+                    sttModel: Binding(
+                        get: { viewModel.sttModel },
+                        set: { viewModel.sttModel = $0 }
+                    ),
+                    llmModel: Binding(
+                        get: { viewModel.llmModel },
+                        set: { viewModel.llmModel = $0 }
+                    ),
+                    ttsModel: Binding(
+                        get: { viewModel.ttsModel },
+                        set: { viewModel.ttsModel = $0 }
+                    ),
+                    sttLoadState: viewModel.sttModelState,
+                    llmLoadState: viewModel.llmModelState,
+                    ttsLoadState: viewModel.ttsModelState,
+                    onSelectSTT: {
+                        showModelSelection = false
+                        // Delay to allow sheet dismiss animation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showSTTModelSelection = true
+                        }
+                    },
+                    onSelectLLM: {
+                        showModelSelection = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showLLMModelSelection = true
+                        }
+                    },
+                    onSelectTTS: {
+                        showModelSelection = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showTTSModelSelection = true
+                        }
+                    },
+                    onStartVoice: {
+                        showModelSelection = false
+                    }
+                )
+                .navigationTitle("Voice Models")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            showModelSelection = false
+                        }
+                    }
+                }
+                #else
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            showModelSelection = false
+                        }
+                    }
+                }
+                #endif
             }
         }
         .sheet(isPresented: $showSTTModelSelection) {
