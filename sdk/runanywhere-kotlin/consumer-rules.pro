@@ -1,21 +1,60 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# RunAnywhere SDK Consumer ProGuard Rules
+# These rules are automatically applied to apps that depend on the SDK
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# ========================================================================================
+# JNI Native Bridge - CRITICAL: These classes are accessed from native code
+# ========================================================================================
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep native methods
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep the unified JNI bridge class and all its methods
+-keep class com.runanywhere.sdk.native.bridge.RunAnywhereBridge {
+    *;
+}
+
+# Keep result types used by JNI - constructors must be preserved for JNI instantiation
+-keep class com.runanywhere.sdk.native.bridge.NativeTTSSynthesisResult {
+    <init>(...);
+    <fields>;
+    *;
+}
+-keep class com.runanywhere.sdk.native.bridge.NativeVADResult {
+    <init>(...);
+    <fields>;
+    *;
+}
+-keep class com.runanywhere.sdk.native.bridge.NativeBridgeException {
+    *;
+}
+
+# Keep all classes and enums in native.bridge package
+-keep class com.runanywhere.sdk.native.bridge.** {
+    *;
+}
+-keep enum com.runanywhere.sdk.native.bridge.** {
+    *;
+}
+
+# ========================================================================================
+# SDK Public API
+# ========================================================================================
+
+# Keep model classes
+-keep class com.runanywhere.sdk.models.** { *; }
+
+# Keep public API
+-keep class com.runanywhere.sdk.public.** { *; }
+-keep class com.runanywhere.sdk.components.** { *; }
+
+# ========================================================================================
+# Third-party JNI Libraries used by SDK
+# ========================================================================================
+
+# Keep Whisper JNI classes
+-keep class io.github.givimad.whisperjni.** { *; }
+
+# Keep VAD classes
+-keep class com.konovalov.vad.** { *; }
