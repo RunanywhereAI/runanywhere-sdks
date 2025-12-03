@@ -468,6 +468,19 @@ class VoiceAssistantViewModel: ObservableObject {
                 // Clear transcript for next interaction
                 currentTranscript = ""
 
+            case .audioControlPauseRecording:
+                // Pause microphone to prevent TTS audio feedback loop
+                logger.info("⏸️ Pausing microphone for TTS playback")
+                audioCapture.pauseCapture()
+                isListening = false
+                audioLevel = 0.0
+
+            case .audioControlResumeRecording:
+                // Resume microphone after TTS playback completes
+                logger.info("▶️ Resuming microphone after TTS")
+                audioCapture.resumeCapture()
+                isListening = true
+
             case .pipelineError(let error):
                 errorMessage = error.localizedDescription
                 sessionState = .error(error.localizedDescription)
