@@ -79,8 +79,8 @@ class RunAnywhereApplication : Application() {
                 // Production Mode - Real API key required
                 // In production mode, analytics are sent to RunAnywhere backend
                 // for telemetry and performance monitoring
-                val apiKey = "contact_runanywhere_team_for_api_key"
-                val baseURL = "https://runanywhere.ai"
+                val apiKey = "runa_prod_PJ8ZbRGeoGUVMsP_x1MhCvovmYyX5X36EJo-pHyWvtI"
+                val baseURL = "https://runanywhere-backend-production.up.railway.app/"
 
                 RunAnywhere.initialize(
                     context = this@RunAnywhereApplication,
@@ -130,39 +130,6 @@ class RunAnywhereApplication : Application() {
         RunAnywhere.registerFramework(
             adapter = LlamaCppAdapter.shared,
             models = listOf(
-                // SmolLM2 360M Q8_0 - Smallest and fastest (~500MB)
-                // Matches iOS: smollm2-360m-q8-0
-                ModelRegistration(
-                    id = "smollm2-360m-q8-0",
-                    name = "SmolLM2 360M Q8_0",
-                    url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 500_000_000L
-                ),
-                // Llama 2 7B Chat Q4_K_M - High quality conversational model (~4GB)
-                // Matches iOS: llama2-7b-q4-k-m
-                ModelRegistration(
-                    id = "llama2-7b-q4-k-m",
-                    name = "Llama 2 7B Chat Q4_K_M",
-                    url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 4_000_000_000L
-                ),
-                // Mistral 7B Instruct Q4_K_M - Excellent instruction-following model (~4GB)
-                // Matches iOS: mistral-7b-q4-k-m
-                ModelRegistration(
-                    id = "mistral-7b-q4-k-m",
-                    name = "Mistral 7B Instruct Q4_K_M",
-                    url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 4_000_000_000L
-                ),
                 // Qwen 2.5 0.5B Instruct Q6_K - Small but capable (~600MB)
                 // Matches iOS: qwen-2.5-0.5b-instruct-q6-k
                 ModelRegistration(
@@ -293,36 +260,6 @@ class RunAnywhereApplication : Application() {
         RunAnywhere.registerFramework(
             adapter = LlamaCppAdapter.shared,
             models = listOf(
-                // SmolLM2 360M Q8_0 - Smallest and fastest (~500MB)
-                ModelRegistration(
-                    id = "smollm2-360m-q8-0",
-                    name = "SmolLM2 360M Q8_0",
-                    url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 500_000_000L
-                ),
-                // Llama 2 7B Chat Q4_K_M - High quality conversational model (~4GB)
-                ModelRegistration(
-                    id = "llama2-7b-q4-k-m",
-                    name = "Llama 2 7B Chat Q4_K_M",
-                    url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 4_000_000_000L
-                ),
-                // Mistral 7B Instruct Q4_K_M - Excellent instruction-following model (~4GB)
-                ModelRegistration(
-                    id = "mistral-7b-q4-k-m",
-                    name = "Mistral 7B Instruct Q4_K_M",
-                    url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 4_000_000_000L
-                ),
                 // Qwen 2.5 0.5B Instruct Q6_K - Small but capable (~600MB)
                 ModelRegistration(
                     id = "qwen-2.5-0.5b-instruct-q6-k",

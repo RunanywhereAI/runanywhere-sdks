@@ -257,6 +257,62 @@
 -dontwarn org.jetbrains.annotations.**
 
 # ========================================================================================
+# R8 Generated Missing Rules
+# ========================================================================================
+
+# Zstd compression library
+-dontwarn com.github.luben.zstd.ZstdInputStream
+-dontwarn com.github.luben.zstd.ZstdOutputStream
+
+# Google API Client HTTP library
+-dontwarn com.google.api.client.http.GenericUrl
+-dontwarn com.google.api.client.http.HttpHeaders
+-dontwarn com.google.api.client.http.HttpRequest
+-dontwarn com.google.api.client.http.HttpRequestFactory
+-dontwarn com.google.api.client.http.HttpResponse
+-dontwarn com.google.api.client.http.HttpTransport
+-dontwarn com.google.api.client.http.javanet.NetHttpTransport$Builder
+-dontwarn com.google.api.client.http.javanet.NetHttpTransport
+
+# Apache Commons codec
+-dontwarn org.apache.commons.codec.digest.PureJavaCrc32C
+-dontwarn org.apache.commons.codec.digest.XXHash32
+
+# Brotli decompression
+-dontwarn org.brotli.dec.BrotliInputStream
+
+# Joda time
+-dontwarn org.joda.time.Instant
+
+# ASM (bytecode manipulation)
+-dontwarn org.objectweb.asm.AnnotationVisitor
+-dontwarn org.objectweb.asm.Attribute
+-dontwarn org.objectweb.asm.ClassReader
+-dontwarn org.objectweb.asm.ClassVisitor
+-dontwarn org.objectweb.asm.FieldVisitor
+-dontwarn org.objectweb.asm.MethodVisitor
+
+# XZ compression library
+-dontwarn org.tukaani.xz.ARMOptions
+-dontwarn org.tukaani.xz.ARMThumbOptions
+-dontwarn org.tukaani.xz.DeltaOptions
+-dontwarn org.tukaani.xz.FilterOptions
+-dontwarn org.tukaani.xz.FinishableOutputStream
+-dontwarn org.tukaani.xz.FinishableWrapperOutputStream
+-dontwarn org.tukaani.xz.IA64Options
+-dontwarn org.tukaani.xz.LZMA2InputStream
+-dontwarn org.tukaani.xz.LZMA2Options
+-dontwarn org.tukaani.xz.LZMAInputStream
+-dontwarn org.tukaani.xz.LZMAOutputStream
+-dontwarn org.tukaani.xz.MemoryLimitException
+-dontwarn org.tukaani.xz.PowerPCOptions
+-dontwarn org.tukaani.xz.SPARCOptions
+-dontwarn org.tukaani.xz.UnsupportedOptionsException
+-dontwarn org.tukaani.xz.X86Options
+-dontwarn org.tukaani.xz.XZ
+-dontwarn org.tukaani.xz.XZOutputStream
+
+# ========================================================================================
 # Debug Information (Comment out for release builds)
 # ========================================================================================
 
