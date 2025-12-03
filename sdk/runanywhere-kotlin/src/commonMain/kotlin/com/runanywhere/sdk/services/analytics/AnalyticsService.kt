@@ -263,18 +263,25 @@ class AnalyticsService internal constructor(
     ) {
         // Only submit in development mode
         if (environment != SDKEnvironment.DEVELOPMENT) {
-            logger.debug("Skipping analytics submission (not in development mode)")
+            logger.info("📊 [ANALYTICS] Skipping analytics submission (environment=${environment.name}, not DEVELOPMENT)")
             return
         }
+
+        logger.info("📊 [ANALYTICS] ========== Starting Analytics Submission ==========")
+        logger.info("📊 [ANALYTICS] Environment: ${environment.name}")
+        logger.info("📊 [ANALYTICS] Generation ID: $generationId")
+        logger.info("📊 [ANALYTICS] Model ID: $modelId")
 
         // Non-blocking background submission
         analyticsScope.launch(Dispatchers.IO) {
             try {
                 // Get device ID dynamically from BaseRunAnywhereSDK (set during registration)
                 val currentDeviceId = com.runanywhere.sdk.public.BaseRunAnywhereSDK.sharedDeviceId ?: "unknown"
+                logger.info("📊 [ANALYTICS] Device ID: $currentDeviceId")
 
                 // Capture host app information
                 val hostAppInfo = com.runanywhere.sdk.foundation.getHostAppInfo()
+                logger.info("📊 [ANALYTICS] Host App: ${hostAppInfo.name} (${hostAppInfo.identifier}) v${hostAppInfo.version}")
 
                 val request = DevAnalyticsSubmissionRequest(
                     generationId = generationId,
@@ -295,14 +302,19 @@ class AnalyticsService internal constructor(
                     hostAppVersion = hostAppInfo.version
                 )
 
+                logger.info("📊 [ANALYTICS] Analytics request prepared")
+                logger.info("📊 [ANALYTICS] Supabase config available: ${supabaseConfig != null}")
+
                 if (supabaseConfig != null) {
+                    logger.info("📊 [ANALYTICS] Submitting to Supabase...")
                     submitAnalyticsViaSupabase(request, supabaseConfig)
                 } else {
-                    logger.warning("No Supabase config available for analytics submission")
+                    logger.warning("📊 [ANALYTICS] ❌ No Supabase config available for analytics submission")
                 }
             } catch (e: Exception) {
                 // Fail silently - analytics should never break the SDK
-                logger.debug("Analytics submission failed (non-critical): ${e.message}")
+                logger.warning("📊 [ANALYTICS] ❌ Analytics submission failed (non-critical): ${e.message}")
+                e.printStackTrace()
             }
         }
     }

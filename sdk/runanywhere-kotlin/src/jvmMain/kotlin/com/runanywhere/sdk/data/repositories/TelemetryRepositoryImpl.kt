@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * Updated to support RemoteTelemetryDataSource for production analytics
  */
-class TelemetryRepositoryImpl(
+internal class TelemetryRepositoryImpl(
     private val remoteTelemetryDataSource: RemoteTelemetryDataSource? = null
 ) : TelemetryRepository {
 

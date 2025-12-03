@@ -2,7 +2,9 @@ package com.runanywhere.sdk.data.network.services
 
 import com.runanywhere.sdk.core.SDKConstants
 import com.runanywhere.sdk.data.models.TelemetryBatch
+import com.runanywhere.sdk.data.models.TelemetryBatchRequest
 import com.runanywhere.sdk.data.models.TelemetryData
+import com.runanywhere.sdk.data.models.toPayload
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.services.AuthenticationService
@@ -49,11 +51,28 @@ internal class AnalyticsNetworkService(
         runCatching {
             logger.debug("Submitting telemetry batch with ${batch.events.size} events to ${APIEndpoint.telemetry.url}")
 
+            // Convert TelemetryData events to TelemetryEventPayload (matches iOS pattern)
+            // This converts from flexible properties dict to strongly-typed fields
+            val typedEvents = batch.events.map { it.toPayload() }
+
+            // Debug: Log the first event to see what we're sending
+            if (typedEvents.isNotEmpty()) {
+                val firstEvent = typedEvents.first()
+                logger.debug("🔍 First event being sent: event_type=${firstEvent.eventType}, modality=${firstEvent.modality}, model_id=${firstEvent.modelId}, model_name=${firstEvent.modelName}")
+            }
+
+            // Create batch request with typed events and batch-level timestamp
+            val batchRequest = TelemetryBatchRequest(
+                events = typedEvents,
+                deviceId = batch.deviceId,
+                timestamp = batch.createdAt
+            )
+
             val url = buildFullUrl(APIEndpoint.telemetry)
 
             val response: HttpResponse = httpClient.post(url) {
                 contentType(ContentType.Application.Json)
-                
+
                 // Add authentication header
                 addAuthHeaders()
 
@@ -64,7 +83,7 @@ internal class AnalyticsNetworkService(
                     append("X-Platform", getPlatform())
                 }
 
-                setBody(batch)
+                setBody(batchRequest)
             }
 
             if (response.status.isSuccess()) {

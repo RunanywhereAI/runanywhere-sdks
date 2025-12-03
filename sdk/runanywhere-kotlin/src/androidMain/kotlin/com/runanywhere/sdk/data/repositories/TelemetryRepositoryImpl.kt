@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
  *
  * Updated to support RemoteTelemetryDataSource for production analytics
  */
-class TelemetryRepositoryImpl(
+internal class TelemetryRepositoryImpl(
     private val database: Any, // Will be cast to get telemetryDao
     private val networkService: NetworkService,
     private val remoteTelemetryDataSource: RemoteTelemetryDataSource? = null

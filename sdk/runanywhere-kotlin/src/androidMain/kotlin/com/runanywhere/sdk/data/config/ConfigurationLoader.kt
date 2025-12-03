@@ -10,7 +10,7 @@ import java.io.IOException
  * Android implementation of ConfigurationLoader
  * Loads configuration files from assets directory
  */
-actual suspend fun ConfigurationLoader.loadResourceFile(fileName: String): String = withContext(Dispatchers.IO) {
+internal actual suspend fun loadResourceFile(fileName: String): String = withContext(Dispatchers.IO) {
     try {
         // Try to get Android context from ServiceContainer
         // Note: This requires ServiceContainer to have context available

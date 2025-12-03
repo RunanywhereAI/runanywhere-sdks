@@ -11,6 +11,8 @@ import com.runanywhere.sdk.models.*
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.utils.PlatformUtils
+import com.runanywhere.sdk.data.models.generateUUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -308,37 +310,108 @@ class LLMComponent(
         // Build prompt
         val prompt = buildPrompt(input.messages, input.systemPrompt ?: llmConfiguration.effectiveSystemPrompt)
 
+        // Get telemetry service for tracking
+        val telemetryService = serviceContainer?.telemetryService
+
+        // Generate generation ID for telemetry tracking
+        val generationId = generateUUID()
+        val modelId = llmConfiguration.modelId ?: service.currentModel ?: "unknown"
+        val modelName = modelId
+        val framework = "llama.cpp" // TODO: Get from service provider
+
+        // Calculate prompt tokens
+        val promptTokens = prompt.length / 4
+
+        // Track generation started
+        try {
+            telemetryService?.trackGenerationStarted(
+                generationId = generationId,
+                modelId = modelId,
+                modelName = modelName,
+                framework = framework,
+                promptTokens = promptTokens,
+                maxTokens = options.maxTokens,
+                device = PlatformUtils.getDeviceModel(),
+                osVersion = PlatformUtils.getOSVersion()
+            )
+        } catch (e: Exception) {
+            logger.error("Failed to track generation started: ${e.message}")
+        }
+
         // Track generation time
         val startTime = currentTimeMillis()
+        var firstTokenTime: Long? = null
 
-        // Generate response
-        val response = service.generate(prompt, options)
+        try {
+            // Generate response
+            val response = service.generate(prompt, options)
 
-        val generationTime = currentTimeMillis() - startTime
+            val generationTime = currentTimeMillis() - startTime
 
-        // Calculate tokens (rough estimate - real implementation would get from service)
-        val promptTokens = prompt.length / 4
-        val completionTokens = response.length / 4
-        val tokensPerSecond = if (generationTime > 0) {
-            (completionTokens.toDouble() * 1000.0) / generationTime
-        } else null
+            // Calculate tokens
+            val completionTokens = response.length / 4
+            val totalTokens = promptTokens + completionTokens
+            val tokensPerSecond = if (generationTime > 0) {
+                (completionTokens.toDouble() * 1000.0) / generationTime
+            } else null
 
-        // Create output
-        return LLMOutput(
-            text = response,
-            tokenUsage = TokenUsage(
-                promptTokens = promptTokens,
-                completionTokens = completionTokens
-            ),
-            metadata = GenerationMetadata(
-                modelId = service.currentModel ?: "unknown",
-                temperature = options.temperature,
-                generationTime = generationTime,
-                tokensPerSecond = tokensPerSecond
-            ),
-            finishReason = FinishReason.COMPLETED,
-            timestamp = currentTimeMillis()
-        )
+            // Track generation completed
+            try {
+                telemetryService?.trackGenerationCompleted(
+                    generationId = generationId,
+                    modelId = modelId,
+                    modelName = modelName,
+                    framework = framework,
+                    inputTokens = promptTokens,
+                    outputTokens = completionTokens,
+                    totalTimeMs = generationTime.toDouble(),
+                    timeToFirstTokenMs = firstTokenTime?.toDouble() ?: 0.0,
+                    tokensPerSecond = tokensPerSecond ?: 0.0,
+                    device = PlatformUtils.getDeviceModel(),
+                    osVersion = PlatformUtils.getOSVersion()
+                )
+            } catch (e: Exception) {
+                logger.error("Failed to track generation completed: ${e.message}")
+            }
+
+            // Create output
+            return LLMOutput(
+                text = response,
+                tokenUsage = TokenUsage(
+                    promptTokens = promptTokens,
+                    completionTokens = completionTokens
+                ),
+                metadata = GenerationMetadata(
+                    modelId = service.currentModel ?: "unknown",
+                    temperature = options.temperature,
+                    generationTime = generationTime,
+                    tokensPerSecond = tokensPerSecond
+                ),
+                finishReason = FinishReason.COMPLETED,
+                timestamp = currentTimeMillis()
+            )
+        } catch (e: Exception) {
+            val generationTime = currentTimeMillis() - startTime
+
+            // Track generation failed
+            try {
+                telemetryService?.trackGenerationFailed(
+                    generationId = generationId,
+                    modelId = modelId,
+                    modelName = modelName,
+                    framework = framework,
+                    inputTokens = promptTokens,
+                    totalTimeMs = generationTime.toDouble(),
+                    errorMessage = e.message ?: "Unknown error",
+                    device = PlatformUtils.getDeviceModel(),
+                    osVersion = PlatformUtils.getOSVersion()
+                )
+            } catch (telemetryError: Exception) {
+                logger.error("Failed to track generation failed: ${telemetryError.message}")
+            }
+
+            throw e
+        }
     }
 
     /**

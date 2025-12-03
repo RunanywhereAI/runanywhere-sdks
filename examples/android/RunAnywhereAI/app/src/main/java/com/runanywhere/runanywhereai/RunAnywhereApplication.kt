@@ -53,12 +53,11 @@ class RunAnywhereApplication : Application() {
 
             // Determine environment (matches iOS pattern)
             val environment = if (BuildConfig.DEBUG) {
-                Log.i("RunAnywhereApp", "🛠️ Using DEVELOPMENT mode - No API key required!")
                 SDKEnvironment.DEVELOPMENT
             } else {
-                Log.i("RunAnywhereApp", "🚀 Using PRODUCTION mode")
                 SDKEnvironment.PRODUCTION
             }
+            Log.i("RunAnywhereApp", "🚀 Environment: $environment (DEBUG=${BuildConfig.DEBUG})")
 
             // Initialize SDK based on environment (matches iOS pattern)
             if (environment == SDKEnvironment.DEVELOPMENT) {
@@ -80,8 +79,8 @@ class RunAnywhereApplication : Application() {
                 // Production Mode - Real API key required
                 // In production mode, analytics are sent to RunAnywhere backend
                 // for telemetry and performance monitoring
-                val apiKey = getSecureApiKey()
-                val baseURL = "https://api.runanywhere.ai"
+                val apiKey = "contact_runanywhere_team_for_api_key"
+                val baseURL = "https://runanywhere.ai"
 
                 RunAnywhere.initialize(
                     context = this@RunAnywhereApplication,
@@ -277,21 +276,151 @@ class RunAnywhereApplication : Application() {
     }
 
     /**
-     * Register framework adapters only for PRODUCTION mode.
-     * Models will be fetched from backend console.
-     * Matches iOS registerAdaptersForProduction() pattern.
+     * Register framework adapters with custom models for PRODUCTION mode.
+     * Hardcoded models provide immediate user access, backend can add more dynamically.
+     * Matches iOS registerAdaptersForProduction() pattern exactly.
      */
     private suspend fun registerAdaptersForProduction() {
-        Log.i("RunAnywhereApp", "🔧 Registering Framework Adapters for PRODUCTION mode")
+        Log.i("RunAnywhereApp", "📦 Registering adapters with custom models for PRODUCTION mode")
+        Log.i("RunAnywhereApp", "💡 Hardcoded models provide immediate user access, backend can add more dynamically")
 
-        // Register adapters without hardcoded models (models come from backend)
-        RunAnywhere.registerFramework(adapter = LlamaCppAdapter.shared)
-        Log.i("RunAnywhereApp", "✅ Registered LlamaCPP adapter")
+        // =====================================================
+        // 1. LlamaCPP Framework (TEXT_TO_TEXT modality)
+        // Same models as development mode for consistent user experience
+        // =====================================================
+        Log.i("RunAnywhereApp", "📝 Registering LlamaCPP adapter with LLM models...")
 
-        RunAnywhere.registerFramework(adapter = ONNXAdapter.shared)
-        Log.i("RunAnywhereApp", "✅ Registered ONNX adapter")
+        RunAnywhere.registerFramework(
+            adapter = LlamaCppAdapter.shared,
+            models = listOf(
+                // SmolLM2 360M Q8_0 - Smallest and fastest (~500MB)
+                ModelRegistration(
+                    id = "smollm2-360m-q8-0",
+                    name = "SmolLM2 360M Q8_0",
+                    url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 500_000_000L
+                ),
+                // Llama 2 7B Chat Q4_K_M - High quality conversational model (~4GB)
+                ModelRegistration(
+                    id = "llama2-7b-q4-k-m",
+                    name = "Llama 2 7B Chat Q4_K_M",
+                    url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 4_000_000_000L
+                ),
+                // Mistral 7B Instruct Q4_K_M - Excellent instruction-following model (~4GB)
+                ModelRegistration(
+                    id = "mistral-7b-q4-k-m",
+                    name = "Mistral 7B Instruct Q4_K_M",
+                    url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 4_000_000_000L
+                ),
+                // Qwen 2.5 0.5B Instruct Q6_K - Small but capable (~600MB)
+                ModelRegistration(
+                    id = "qwen-2.5-0.5b-instruct-q6-k",
+                    name = "Qwen 2.5 0.5B Instruct Q6_K",
+                    url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 600_000_000L
+                ),
+                // LiquidAI LFM2 350M Q4_K_M - Smallest and fastest (~250MB)
+                ModelRegistration(
+                    id = "lfm2-350m-q4-k-m",
+                    name = "LiquidAI LFM2 350M Q4_K_M",
+                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 250_000_000L
+                ),
+                // LiquidAI LFM2 350M Q8_0 - Highest quality small model (~400MB)
+                ModelRegistration(
+                    id = "lfm2-350m-q8-0",
+                    name = "LiquidAI LFM2 350M Q8_0",
+                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 400_000_000L
+                )
+            )
+        )
+        Log.i("RunAnywhereApp", "✅ LlamaCPP adapter registered with hardcoded models")
 
-        Log.i("RunAnywhereApp", "📡 Models will be fetched from backend console via API")
+        // =====================================================
+        // 2. ONNX Runtime Framework (VOICE_TO_TEXT, TEXT_TO_VOICE modalities)
+        // Same models as development mode for consistent user experience
+        // =====================================================
+        Log.i("RunAnywhereApp", "🎤🔊 Registering ONNX adapter with STT and TTS models...")
+
+        RunAnywhere.registerFramework(
+            adapter = ONNXAdapter.shared,
+            models = listOf(
+                // STT Models (VOICE_TO_TEXT modality)
+                // Sherpa ONNX Whisper Tiny English (~75MB)
+                ModelRegistration(
+                    id = "sherpa-whisper-tiny-onnx",
+                    name = "Sherpa Whisper Tiny (ONNX)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.VOICE_TO_TEXT,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 75_000_000L
+                ),
+                // Sherpa ONNX Whisper Small (~250MB)
+                ModelRegistration(
+                    id = "sherpa-whisper-small-onnx",
+                    name = "Sherpa Whisper Small (ONNX)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.VOICE_TO_TEXT,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 250_000_000L
+                ),
+
+                // TTS Models (TEXT_TO_VOICE modality)
+                // Piper TTS - US English Lessac Medium (~65MB)
+                ModelRegistration(
+                    id = "piper-en-us-lessac-medium",
+                    name = "Piper TTS (US English - Medium)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.TEXT_TO_VOICE,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 65_000_000L
+                ),
+                // Piper TTS - British English Alba Medium (~65MB)
+                ModelRegistration(
+                    id = "piper-en-gb-alba-medium",
+                    name = "Piper TTS (British English)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.TEXT_TO_VOICE,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 65_000_000L
+                )
+            )
+        )
+        Log.i("RunAnywhereApp", "✅ ONNX adapter registered with hardcoded models")
+
+        // Scan file system for already downloaded models
+        // This allows models downloaded previously to be discovered
+        Log.i("RunAnywhereApp", "🔍 Scanning for previously downloaded models...")
+        RunAnywhere.scanForDownloadedModels()
+        Log.i("RunAnywhereApp", "✅ File system scan complete")
+
+        Log.i("RunAnywhereApp", "🎉 All adapters registered for production with hardcoded models")
+        Log.i("RunAnywhereApp", "📡 Backend can dynamically add more models via console API")
     }
 
     /**

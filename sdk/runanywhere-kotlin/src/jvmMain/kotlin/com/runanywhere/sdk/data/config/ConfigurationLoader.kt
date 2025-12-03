@@ -9,7 +9,7 @@ import java.io.FileNotFoundException
  * JVM implementation of ConfigurationLoader
  * Loads configuration files from classpath resources or file system
  */
-actual suspend fun ConfigurationLoader.loadResourceFile(fileName: String): String = withContext(Dispatchers.IO) {
+internal actual suspend fun loadResourceFile(fileName: String): String = withContext(Dispatchers.IO) {
     try {
         // First, try to load from classpath resources
         val resourceStream = ConfigurationLoader::class.java.classLoader

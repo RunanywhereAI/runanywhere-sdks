@@ -194,8 +194,9 @@
 # ========================================================================================
 
 # Keep model files in assets
--keepresourcefiles assets/models/**
--keepresourcefiles assets/tokenizers/**
+# Note: -keepresourcefiles is not supported in R8, resources are kept by default
+# -keepresourcefiles assets/models/**
+# -keepresourcefiles assets/tokenizers/**
 
 # Don't obfuscate model loading code
 -keep class com.runanywhere.runanywhereai.data.repository.ModelRepository { *; }
