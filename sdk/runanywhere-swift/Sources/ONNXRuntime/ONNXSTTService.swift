@@ -393,6 +393,22 @@ public class ONNXSTTService: STTService {
     ///   - inputSampleRate: Sample rate of the input audio (default: 48000Hz for device recordings)
     /// - Returns: Float32 samples resampled to 16kHz
     private func convertToFloat32Samples(audioData: Data, inputSampleRate: Int = 48000) throws -> [Float] {
+        // Validate input parameters
+        guard !audioData.isEmpty else {
+            logger.error("Audio data is empty")
+            throw ONNXError.invalidParameters
+        }
+
+        guard inputSampleRate > 0 else {
+            logger.error("Invalid input sample rate: \(inputSampleRate)")
+            throw ONNXError.invalidParameters
+        }
+
+        guard audioData.count % MemoryLayout<Int16>.size == 0 else {
+            logger.error("Audio data size (\(audioData.count) bytes) is not a multiple of Int16 size")
+            throw ONNXError.invalidParameters
+        }
+
         let targetSampleRate = 16000
         let int16Count = audioData.count / MemoryLayout<Int16>.size
 
