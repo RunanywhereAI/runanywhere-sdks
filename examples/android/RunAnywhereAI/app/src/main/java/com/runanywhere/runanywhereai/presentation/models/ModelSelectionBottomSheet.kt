@@ -141,29 +141,29 @@ fun ModelSelectionBottomSheet(
                                 isLoading = uiState.isLoadingModel,
                                 onSelect = {
                                     scope.launch {
-                                        // Create pseudo ModelInfo for System TTS (matches iOS)
-                                        val systemTTSModel = com.runanywhere.sdk.models.ModelInfo(
-                                            id = "system-tts",
-                                            name = "System TTS",
-                                            downloadURL = null,
-                                            format = com.runanywhere.sdk.models.enums.ModelFormat.UNKNOWN,
-                                            category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_SYNTHESIS,
-                                            compatibleFrameworks = listOf(LLMFramework.SYSTEM_TTS),
-                                            preferredFramework = LLMFramework.SYSTEM_TTS
-                                        )
                                         viewModel.setLoadingModel(true)
-
                                         try {
                                             // Load System TTS via SDK to trigger lifecycle tracker
-                                            // (matches iOS selectSystemTTS() calling onModelSelected)
                                             com.runanywhere.sdk.public.RunAnywhere.loadTTSModel("system-tts")
+
+                                            // Create pseudo ModelInfo for System TTS (matches iOS)
+                                            val systemTTSModel = com.runanywhere.sdk.models.ModelInfo(
+                                                id = "system-tts",
+                                                name = "System TTS",
+                                                downloadURL = null,
+                                                format = com.runanywhere.sdk.models.enums.ModelFormat.UNKNOWN,
+                                                category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_SYNTHESIS,
+                                                compatibleFrameworks = listOf(LLMFramework.SYSTEM_TTS),
+                                                preferredFramework = LLMFramework.SYSTEM_TTS
+                                            )
+
                                             kotlinx.coroutines.delay(300)
                                             onModelSelected(systemTTSModel)
+                                            onDismiss()
                                         } catch (e: Exception) {
                                             android.util.Log.e("ModelSelectionSheet", "Failed to load System TTS: ${e.message}")
                                         } finally {
                                             viewModel.setLoadingModel(false)
-                                            onDismiss()
                                         }
                                     }
                                 }

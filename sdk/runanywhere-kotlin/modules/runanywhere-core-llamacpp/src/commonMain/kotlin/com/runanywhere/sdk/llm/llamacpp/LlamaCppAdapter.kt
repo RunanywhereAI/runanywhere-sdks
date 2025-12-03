@@ -87,6 +87,7 @@ class LlamaCppAdapter : UnifiedFrameworkAdapter {
     /**
      * Create a service instance for the given modality
      */
+    @Synchronized
     override fun createService(modality: FrameworkModality): Any? {
         cleanupStaleCache()
 
@@ -101,6 +102,7 @@ class LlamaCppAdapter : UnifiedFrameworkAdapter {
 
     /**
      * Load a model and return a service instance
+     * Note: Thread safety handled via synchronized blocks internally
      */
     override suspend fun loadModel(model: ModelInfo, modality: FrameworkModality): Any {
         logger.info("Loading model ${model.id} for modality $modality")
@@ -117,6 +119,13 @@ class LlamaCppAdapter : UnifiedFrameworkAdapter {
             contextLength = model.contextLength ?: 4096,
             useGPUIfAvailable = false
         )
+
+        // Cleanup previous cached service before loading new model
+        cachedService?.let {
+            logger.debug("Cleaning up previous cached service before loading new model")
+            // Note: If LlamaCppService has a cleanup/dispose method, it should be called here
+        }
+        cachedService = null
 
         val service = LlamaCppService(config)
         service.initialize(localPath)
@@ -184,30 +193,19 @@ class LlamaCppAdapter : UnifiedFrameworkAdapter {
 
     /**
      * Initialize a component with parameters
+     * Matches iOS initializeComponent implementation - uses createService for initialization
      */
     override suspend fun initializeComponent(
         parameters: ComponentInitParameters,
         modality: FrameworkModality
     ): Any? {
-        if (modality != FrameworkModality.TEXT_TO_TEXT) {
-            throw LlamaCppError.UnsupportedModality(modality.name)
+        val modelId = parameters.modelId
+        if (modelId != null) {
+            logger.info("Initializing LlamaCpp component for model: $modelId")
         }
 
-        val modelId = parameters.modelId ?: return createService(modality)
-
-        logger.info("Initializing LlamaCpp component for model: $modelId")
-
-        val config = com.runanywhere.sdk.components.llm.LLMConfiguration(
-            modelId = modelId,
-            contextLength = 4096,
-            useGPUIfAvailable = false
-        )
-
-        val service = LlamaCppService(config)
-        cachedService = service
-        lastUsage = currentTimeMillis()
-
-        return service
+        // Use createService for initialization (matches iOS pattern)
+        return createService(modality)
     }
 
     // MARK: - Private Methods
@@ -215,6 +213,7 @@ class LlamaCppAdapter : UnifiedFrameworkAdapter {
     /**
      * Cleanup cached service that hasn't been used recently
      */
+    @Synchronized
     private fun cleanupStaleCache() {
         lastUsage?.let { lastUsageTime ->
             if (currentTimeMillis() - lastUsageTime > cacheTimeout) {

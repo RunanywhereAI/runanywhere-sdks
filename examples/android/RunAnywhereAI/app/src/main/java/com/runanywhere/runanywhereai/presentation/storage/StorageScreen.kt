@@ -65,106 +65,108 @@ fun StorageScreen(
             )
         }
     ) { paddingValues ->
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
-                // Storage Overview Section
-                item {
-                    StorageOverviewSection(
-                        totalStorageSize = uiState.totalStorageSize,
-                        availableSpace = uiState.availableSpace,
-                        modelStorageSize = uiState.modelStorageSize,
-                        storedModelsCount = uiState.storedModelsCount
-                    )
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (uiState.isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
                 }
-
-                // Downloaded Models Section
-                item {
-                    Text(
-                        text = "Downloaded Models",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                if (uiState.storedModels.isEmpty()) {
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(vertical = 16.dp)
+                ) {
+                    // Storage Overview Section
                     item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                        StorageOverviewSection(
+                            totalStorageSize = uiState.totalStorageSize,
+                            availableSpace = uiState.availableSpace,
+                            modelStorageSize = uiState.modelStorageSize,
+                            storedModelsCount = uiState.storedModelsCount
+                        )
+                    }
+
+                    // Downloaded Models Section
+                    item {
+                        Text(
+                            text = "Downloaded Models",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    if (uiState.storedModels.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Storage,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(
-                                    text = "No models downloaded yet",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(32.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Storage,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(48.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "No models downloaded yet",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
+                    } else {
+                        items(uiState.storedModels) { model ->
+                            StoredModelRow(
+                                model = model,
+                                onDelete = { viewModel.deleteModel(model.id) }
+                            )
+                        }
                     }
-                } else {
-                    items(uiState.storedModels) { model ->
-                        StoredModelRow(
-                            model = model,
-                            onDelete = { viewModel.deleteModel(model.id) }
+
+                    // Storage Management Section
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Storage Management",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    item {
+                        StorageManagementSection(
+                            onClearCache = { viewModel.clearCache() },
+                            onCleanTempFiles = { viewModel.cleanTempFiles() }
                         )
                     }
                 }
-
-                // Storage Management Section
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Storage Management",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                item {
-                    StorageManagementSection(
-                        onClearCache = { viewModel.clearCache() },
-                        onCleanTempFiles = { viewModel.cleanTempFiles() }
-                    )
-                }
             }
-        }
 
-        // Error Snackbar
-        uiState.errorMessage?.let { error ->
-            LaunchedEffect(error) {
-                // Show error briefly then clear
-                kotlinx.coroutines.delay(3000)
-                viewModel.clearError()
+            // Error Snackbar
+            uiState.errorMessage?.let { error ->
+                LaunchedEffect(error) {
+                    // Show error briefly then clear
+                    kotlinx.coroutines.delay(3000)
+                    viewModel.clearError()
+                }
             }
         }
     }

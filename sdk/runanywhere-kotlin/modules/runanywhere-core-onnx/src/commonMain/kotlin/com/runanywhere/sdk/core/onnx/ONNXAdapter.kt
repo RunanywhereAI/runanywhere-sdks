@@ -153,7 +153,7 @@ class ONNXAdapter : UnifiedFrameworkAdapter {
         return HardwareConfiguration(
             preferGPU = false, // ONNX uses CPU on mobile by default
             minMemoryMB = (estimateMemoryUsage(model) / 1024 / 1024).toInt(),
-            recommendedThreads = Runtime.getRuntime().availableProcessors()
+            recommendedThreads = 4 // Default thread count for cross-platform compatibility
         )
     }
 
