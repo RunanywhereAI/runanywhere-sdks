@@ -147,8 +147,13 @@ val downloadNativeLibs by tasks.registering {
 
     val versionFile = file("$jniLibsDir/.version")
 
-    // Separate archives for each backend
-    val archives = listOf(
+    // Extract just the commit hash from version (e.g., "0.0.1-dev.2cd70fc" -> "2cd70fc")
+    val shortVersion = nativeLibVersion.substringAfterLast(".")
+
+    // Try unified archive first (recommended - has both backends in one bridge)
+    // Fall back to separate archives for backwards compatibility
+    val unifiedArchive = "RunAnywhereUnified-android-${shortVersion}.zip"
+    val separateArchives = listOf(
         "RunAnywhereONNX-android.zip",
         "RunAnywhereLlamaCPP-android.zip"
     )
@@ -179,51 +184,95 @@ val downloadNativeLibs by tasks.registering {
         jniLibsDir.deleteRecursively()
         jniLibsDir.mkdirs()
 
-        // Download and extract each archive
-        for (archiveName in archives) {
-            val downloadUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/$archiveName"
-            val zipFile = file("$downloadedLibsDir/$archiveName")
+        // Try to download unified archive first
+        val unifiedUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/$unifiedArchive"
+        val unifiedZipFile = file("$downloadedLibsDir/$unifiedArchive")
+        var unifiedSuccess = false
 
-            // Download the ZIP file
-            try {
-                logger.lifecycle("Downloading from: $downloadUrl")
-                URL(downloadUrl).openStream().use { input ->
-                    zipFile.outputStream().use { output ->
-                        input.copyTo(output)
+        try {
+            logger.lifecycle("Trying unified archive: $unifiedArchive")
+            logger.lifecycle("Downloading from: $unifiedUrl")
+            URL(unifiedUrl).openStream().use { input ->
+                unifiedZipFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            logger.lifecycle("Downloaded: ${unifiedZipFile.length() / 1024}KB")
+
+            // Extract unified archive directly to jniLibs
+            logger.lifecycle("Extracting unified archive...")
+            copy {
+                from(zipTree(unifiedZipFile))
+                into(jniLibsDir)
+            }
+
+            // List extracted files
+            jniLibsDir.listFiles()?.filter { it.isDirectory }?.forEach { abiDir ->
+                logger.lifecycle("  ${abiDir.name}/")
+                abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
+                    logger.lifecycle("    ${soFile.name} (${soFile.length() / 1024}KB)")
+                }
+            }
+
+            unifiedSuccess = true
+            logger.lifecycle("✅ Using unified archive (recommended - single bridge with all backends)")
+        } catch (e: Exception) {
+            logger.warn("Unified archive not available, falling back to separate archives")
+            logger.lifecycle("Note: Unified archive provides better backend support")
+
+            // Clear and retry with separate archives
+            jniLibsDir.deleteRecursively()
+            jniLibsDir.mkdirs()
+
+            // Download and extract separate archives (backwards compatibility)
+            for (archiveName in separateArchives) {
+                val downloadUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/$archiveName"
+                val zipFile = file("$downloadedLibsDir/$archiveName")
+
+                // Download the ZIP file
+                try {
+                    logger.lifecycle("Downloading from: $downloadUrl")
+                    URL(downloadUrl).openStream().use { input ->
+                        zipFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    logger.lifecycle("Downloaded: ${zipFile.length() / 1024}KB")
+                } catch (downloadException: Exception) {
+                    logger.error("Failed to download native libraries: ${downloadException.message}")
+                    logger.error("URL: $downloadUrl")
+                    logger.lifecycle("")
+                    logger.lifecycle("Options:")
+                    logger.lifecycle("  1. Check that version $nativeLibVersion exists in the releases")
+                    logger.lifecycle("  2. Build locally: cd runanywhere-core && ./scripts/build-android.sh all")
+                    logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
+                    throw GradleException("Failed to download native libraries", downloadException)
+                }
+
+                // Extract the ZIP to a temp directory
+                val extractDir = file("$downloadedLibsDir/${archiveName.removeSuffix(".zip")}")
+                extractDir.mkdirs()
+
+                logger.lifecycle("Extracting $archiveName...")
+                copy {
+                    from(zipTree(zipFile))
+                    into(extractDir)
+                }
+
+                // Move libraries to jniLibs directory
+                // ZIP structure: <abi>/lib*.so -> jniLibs/<abi>/lib*.so
+                extractDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
+                    val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
+                    targetAbiDir.mkdirs()
+                    abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
+                        soFile.copyTo(file("$targetAbiDir/${soFile.name}"), overwrite = true)
+                        logger.lifecycle("  Extracted: ${abiDir.name}/${soFile.name}")
                     }
                 }
-                logger.lifecycle("Downloaded: ${zipFile.length() / 1024}KB")
-            } catch (e: Exception) {
-                logger.error("Failed to download native libraries: ${e.message}")
-                logger.error("URL: $downloadUrl")
-                logger.lifecycle("")
-                logger.lifecycle("Options:")
-                logger.lifecycle("  1. Check that version $nativeLibVersion exists in the releases")
-                logger.lifecycle("  2. Build locally: cd runanywhere-core && ./scripts/android/build.sh all")
-                logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
-                throw GradleException("Failed to download native libraries", e)
             }
 
-            // Extract the ZIP to a temp directory
-            val extractDir = file("$downloadedLibsDir/${archiveName.removeSuffix(".zip")}")
-            extractDir.mkdirs()
-
-            logger.lifecycle("Extracting $archiveName...")
-            copy {
-                from(zipTree(zipFile))
-                into(extractDir)
-            }
-
-            // Move libraries to jniLibs directory
-            // ZIP structure: <abi>/lib*.so -> jniLibs/<abi>/lib*.so
-            extractDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
-                val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
-                targetAbiDir.mkdirs()
-                abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
-                    soFile.copyTo(file("$targetAbiDir/${soFile.name}"), overwrite = true)
-                    logger.lifecycle("  Extracted: ${abiDir.name}/${soFile.name}")
-                }
-            }
+            logger.warn("⚠️  WARNING: Using separate archives - bridge may only support one backend!")
+            logger.warn("   Upgrade to unified archive for full backend support.")
         }
 
         // Write version marker
