@@ -321,49 +321,65 @@ class STTComponent(
 
         // Launch transcription in a coroutine
         val transcriptionJob = launch {
-        try {
-            // Use enhanced streaming if available, otherwise fall back to basic streaming
-            if (service.supportsStreaming) {
-                service.transcribeStream(audioStream, streamingOptions).collect { event ->
+            try {
+                // Use enhanced streaming if available, otherwise fall back to basic streaming
+                if (service.supportsStreaming) {
+                    service.transcribeStream(audioStream, streamingOptions).collect { event ->
                         trySend(event)
-                }
-            } else {
-                // Fallback to basic streaming
+                    }
+                } else {
+                    // Fallback to basic streaming
                     trySend(STTStreamEvent.SpeechStarted)
 
-                val basicOptions = STTOptions(
-                    language = streamingOptions.language ?: "en",
-                    detectLanguage = streamingOptions.detectLanguage,
-                    enablePunctuation = sttConfiguration.enablePunctuation,
-                    enableDiarization = streamingOptions.enableSpeakerDiarization,
-                    enableTimestamps = false,
-                    vocabularyFilter = sttConfiguration.vocabularyList,
-                    audioFormat = AudioFormat.PCM
-                )
+                    val basicOptions = STTOptions(
+                        language = streamingOptions.language ?: "en",
+                        detectLanguage = streamingOptions.detectLanguage,
+                        enablePunctuation = sttConfiguration.enablePunctuation,
+                        enableDiarization = streamingOptions.enableSpeakerDiarization,
+                        enableTimestamps = false,
+                        vocabularyFilter = sttConfiguration.vocabularyList,
+                        audioFormat = AudioFormat.PCM
+                    )
 
-                val result = service.streamTranscribe(
-                    audioStream = audioStream,
-                    options = basicOptions
-                ) { partial ->
+                    val result = service.streamTranscribe(
+                        audioStream = audioStream,
+                        options = basicOptions
+                    ) { partial ->
                         trySend(STTStreamEvent.PartialTranscription(partial))
-                }
+                    }
 
-                // Emit final result
+                    // Emit final result
                     trySend(STTStreamEvent.FinalTranscription(result))
                     trySend(STTStreamEvent.SpeechEnded)
-            }
-        } catch (error: Exception) {
-            val sttError = when (error) {
-                is STTError -> error
-                else -> STTError.transcriptionFailed(error)
-            }
+                }
+            } catch (error: Exception) {
+                // Wrap exception in STTError if needed
+                val sttError = when (error) {
+                    is STTError -> error
+                    else -> STTError.transcriptionFailed(error)
+                }
+
+                // Send error event to flow
                 trySend(STTStreamEvent.Error(sttError))
+
+                // Log the error for debugging
+                logger.error("STT streaming error: ${sttError.message}", sttError)
+            } finally {
+                // Ensure cleanup happens regardless of success or failure
+                try {
+                    // Perform any necessary cleanup
+                    logger.debug("STT streaming transcription job completed")
+                } catch (cleanupError: Exception) {
+                    logger.error("Error during streaming cleanup: ${cleanupError.message}", cleanupError)
+                }
             }
         }
 
         // Wait for flow to be closed
         awaitClose {
+            // Cancel the transcription job on flow cancellation
             transcriptionJob.cancel()
+            logger.debug("STT streaming flow closed, transcription job cancelled")
         }
     }
 

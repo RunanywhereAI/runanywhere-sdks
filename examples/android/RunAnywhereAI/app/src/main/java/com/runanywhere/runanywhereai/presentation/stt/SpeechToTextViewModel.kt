@@ -626,12 +626,13 @@ class SpeechToTextViewModel : ViewModel() {
         super.onCleared()
         recordingJob?.cancel()
         audioCaptureService?.release()
-        viewModelScope.launch {
-            try {
+        // Cleanup synchronously
+        try {
+            kotlinx.coroutines.runBlocking {
                 sttComponent?.cleanup()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error cleaning up STT component on cleared: ${e.message}", e)
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error cleaning up STT component on cleared: ${e.message}", e)
         }
     }
 

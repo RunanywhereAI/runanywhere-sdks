@@ -190,73 +190,6 @@ class TextToSpeechViewModel : ViewModel() {
     }
 
     /**
-     * Load a TTS model/voice via TTSComponent
-     * iOS Reference: loadModelFromSelection() in TTSViewModel
-     *
-     * @param modelName Display name of the voice
-     * @param modelId Voice/model identifier for SDK
-     * @param isSystemTTS Whether this is the system TTS (plays directly)
-     */
-    fun loadModel(modelName: String, modelId: String, isSystemTTS: Boolean) {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isGenerating = true,
-                    errorMessage = null
-                )
-            }
-
-            try {
-                Log.i(TAG, "Loading TTS model: $modelName (id: $modelId, isSystem: $isSystemTTS)")
-
-                // Get the model info to find the local path
-                val modelInfo = ServiceContainer.shared.modelRegistry.getModel(modelId)
-                val effectiveModelId = modelInfo?.localPath ?: modelId
-
-                Log.i(TAG, "Using effective model path: $effectiveModelId")
-
-                // Create TTS configuration (matches iOS TTSConfiguration)
-                val config = TTSConfiguration(
-                    modelId = effectiveModelId,
-                    defaultRate = _uiState.value.speed,
-                    defaultPitch = _uiState.value.pitch,
-                    defaultVolume = 1.0f,
-                    audioFormat = SDKAudioFormat.WAV,
-                    sampleRate = if (isSystemTTS) 16000 else 22050 // Piper uses 22050 Hz
-                )
-
-                val component = TTSComponent(config)
-                component.initialize()
-
-                ttsComponent = component
-
-                val framework = if (isSystemTTS) "System TTS" else "Piper ONNX"
-
-                _uiState.update {
-                    it.copy(
-                        isModelLoaded = true,
-                        selectedFramework = framework,
-                        selectedModelName = modelName,
-                        selectedModelId = modelId,
-                        isSystemTTS = isSystemTTS,
-                        isGenerating = false
-                    )
-                }
-
-                Log.i(TAG, "✅ TTS model loaded successfully: $modelName")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load TTS model: ${e.message}", e)
-                _uiState.update {
-                    it.copy(
-                        errorMessage = "Failed to load voice: ${e.message}",
-                        isGenerating = false
-                    )
-                }
-            }
-        }
-    }
-
-    /**
      * Generate speech from text via TTSComponent
      * iOS Reference: generateSpeech(text:) in TTSViewModel
      */
@@ -408,13 +341,19 @@ class TextToSpeechViewModel : ViewModel() {
                 audioTrack?.write(pcmData, 0, pcmData.size)
                 audioTrack?.play()
 
-                // Track playback progress
+                // Track playback progress (matches iOS timer pattern)
                 val duration = _uiState.value.audioDuration ?: (pcmData.size.toDouble() / (sampleRate * 2))
                 var currentTime = 0.0
 
-                while (currentTime < duration && _uiState.value.isPlaying) {
+                while (_uiState.value.isPlaying && audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) {
                     delay(100)
                     currentTime += 0.1
+
+                    // Check if we've reached the end of audio
+                    if (currentTime >= duration) {
+                        break
+                    }
+
                     withContext(Dispatchers.Main) {
                         _uiState.update {
                             it.copy(
@@ -425,7 +364,7 @@ class TextToSpeechViewModel : ViewModel() {
                     }
                 }
 
-                // Playback finished
+                // Playback finished - stop and reset state
                 withContext(Dispatchers.Main) {
                     stopPlayback()
                 }
@@ -448,13 +387,7 @@ class TextToSpeechViewModel : ViewModel() {
      * iOS Reference: stopPlayback() using AVAudioPlayer
      */
     private fun stopPlayback() {
-        playbackJob?.cancel()
-        playbackJob = null
-
-        audioTrack?.stop()
-        audioTrack?.release()
-        audioTrack = null
-
+        // Update state first to signal the playback loop to stop
         _uiState.update {
             it.copy(
                 isPlaying = false,
@@ -463,41 +396,16 @@ class TextToSpeechViewModel : ViewModel() {
             )
         }
 
+        // Cancel the playback job
+        playbackJob?.cancel()
+        playbackJob = null
+
+        // Stop and release AudioTrack
+        audioTrack?.stop()
+        audioTrack?.release()
+        audioTrack = null
+
         Log.d(TAG, "Playback stopped")
-    }
-
-    /**
-     * Unload the current voice/model
-     * iOS Reference: cleanup() in TTSComponent
-     */
-    fun unloadModel() {
-        viewModelScope.launch {
-            Log.i(TAG, "Unloading TTS model")
-            stopPlayback()
-
-            try {
-                ttsComponent?.cleanup()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error during TTS cleanup: ${e.message}")
-            }
-
-            ttsComponent = null
-            generatedAudioData = null
-
-            _uiState.update {
-                it.copy(
-                    isModelLoaded = false,
-                    selectedFramework = null,
-                    selectedModelName = null,
-                    selectedModelId = null,
-                    hasGeneratedAudio = false,
-                    audioDuration = null,
-                    audioSize = null,
-                    sampleRate = null,
-                    processingTimeMs = null
-                )
-            }
-        }
     }
 
     override fun onCleared() {
