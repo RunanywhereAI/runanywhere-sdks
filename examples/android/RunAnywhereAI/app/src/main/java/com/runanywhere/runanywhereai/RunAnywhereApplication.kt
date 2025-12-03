@@ -45,40 +45,30 @@ class RunAnywhereApplication : Application() {
     }
 
     private suspend fun initializeSDK() {
+        initializationError = null
+        Log.i("RunAnywhereApp", "🎯 Starting SDK initialization...")
+
+        val startTime = System.currentTimeMillis()
+
+        // Determine environment (matches iOS pattern)
+        val environment = if (BuildConfig.DEBUG) {
+            SDKEnvironment.DEVELOPMENT
+        } else {
+            SDKEnvironment.PRODUCTION
+        }
+        Log.i("RunAnywhereApp", "🚀 Environment: $environment (DEBUG=${BuildConfig.DEBUG})")
+
+        // Try to initialize SDK - log failures but continue regardless
         try {
-            initializationError = null
-            Log.i("RunAnywhereApp", "🎯 Starting SDK initialization...")
-
-            val startTime = System.currentTimeMillis()
-
-            // Determine environment (matches iOS pattern)
-            val environment = if (BuildConfig.DEBUG) {
-                SDKEnvironment.DEVELOPMENT
-            } else {
-                SDKEnvironment.PRODUCTION
-            }
-            Log.i("RunAnywhereApp", "🚀 Environment: $environment (DEBUG=${BuildConfig.DEBUG})")
-
-            // Initialize SDK based on environment (matches iOS pattern)
             if (environment == SDKEnvironment.DEVELOPMENT) {
-                // Development Mode - No API key needed!
-                // In development mode, analytics are automatically sent to Supabase
-                // for performance tracking and debugging. No user data is collected.
                 RunAnywhere.initialize(
                     context = this@RunAnywhereApplication,
                     apiKey = "dev",
                     baseURL = "localhost",
                     environment = SDKEnvironment.DEVELOPMENT
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (dev analytics enabled)")
-
-                // Register frameworks and models using iOS-matching pattern
-                registerAdaptersForDevelopment()
-
+                Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode")
             } else {
-                // Production Mode - Real API key required
-                // In production mode, analytics are sent to RunAnywhere backend
-                // for telemetry and performance monitoring
                 val apiKey = "talk_to_runanywhere_team"
                 val baseURL = "talk_to_runanywhere_team"
 
@@ -88,24 +78,46 @@ class RunAnywhereApplication : Application() {
                     baseURL = baseURL,
                     environment = SDKEnvironment.PRODUCTION
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode (production analytics enabled)")
+                Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode")
+            }
+        } catch (e: Exception) {
+            // Log the failure but continue - we'll still register adapters for local model usage
+            Log.w("RunAnywhereApp", "⚠️ SDK initialization failed (backend may be unavailable): ${e.message}")
+            initializationError = e
 
-                // In production, register adapters only (models come from backend)
+            // Fall back to development mode so adapters can still be registered
+            try {
+                RunAnywhere.initialize(
+                    context = this@RunAnywhereApplication,
+                    apiKey = "offline",
+                    baseURL = "localhost",
+                    environment = SDKEnvironment.DEVELOPMENT
+                )
+                Log.i("RunAnywhereApp", "✅ SDK initialized in OFFLINE mode (local models only)")
+            } catch (fallbackError: Exception) {
+                Log.e("RunAnywhereApp", "❌ Fallback initialization also failed: ${fallbackError.message}")
+            }
+        }
+
+        // ALWAYS register adapters regardless of initialization success
+        // This ensures local models are available even when backend is down
+        try {
+            if (environment == SDKEnvironment.DEVELOPMENT) {
+                registerAdaptersForDevelopment()
+            } else {
                 registerAdaptersForProduction()
             }
-
-            val initTime = System.currentTimeMillis() - startTime
-            Log.i("RunAnywhereApp", "✅ SDK successfully initialized in ${initTime}ms")
-            Log.i("RunAnywhereApp", "🎯 SDK Status: Active=${RunAnywhere.isInitialized}")
-
-            isSDKInitialized = true
-
+            Log.i("RunAnywhereApp", "✅ Adapters registered successfully")
         } catch (e: Exception) {
-            Log.e("RunAnywhereApp", "❌ SDK initialization failed: ${e.message}")
+            Log.e("RunAnywhereApp", "❌ Failed to register adapters: ${e.message}")
             e.printStackTrace()
-            initializationError = e
-            isSDKInitialized = false
         }
+
+        val initTime = System.currentTimeMillis() - startTime
+        Log.i("RunAnywhereApp", "✅ SDK setup completed in ${initTime}ms")
+        Log.i("RunAnywhereApp", "🎯 SDK Status: Active=${RunAnywhere.isInitialized}")
+
+        isSDKInitialized = RunAnywhere.isInitialized
     }
 
     /**

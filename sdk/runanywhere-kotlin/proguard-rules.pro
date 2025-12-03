@@ -1,56 +1,63 @@
-# Add project specific ProGuard rules here.
+# ========================================================================================
+# RunAnywhere SDK - ProGuard Rules
+# ========================================================================================
+# These rules ensure the SDK works correctly in release builds with R8/ProGuard enabled.
 
 # ========================================================================================
-# JNI Native Bridge - CRITICAL: These classes are accessed from native code
+# MASTER RULE: Keep ALL SDK classes
+# ========================================================================================
+# The SDK uses dynamic registration, reflection-like patterns, and JNI callbacks.
+# We must keep ALL classes, interfaces, enums, and their members.
+
+-keep class com.runanywhere.sdk.** { *; }
+-keep interface com.runanywhere.sdk.** { *; }
+-keep enum com.runanywhere.sdk.** { *; }
+
+# Keep all constructors (critical for JNI object creation like NativeTTSSynthesisResult)
+-keepclassmembers class com.runanywhere.sdk.** {
+    <init>(...);
+}
+
+# Keep companion objects and their members (Kotlin singletons like LlamaCppAdapter.shared)
+-keepclassmembers class com.runanywhere.sdk.** {
+    public static ** Companion;
+    public static ** INSTANCE;
+    public static ** shared;
+}
+
+# Prevent obfuscation of class names (important for JNI, logging, and debugging)
+-keepnames class com.runanywhere.sdk.** { *; }
+-keepnames interface com.runanywhere.sdk.** { *; }
+-keepnames enum com.runanywhere.sdk.** { *; }
+
+# Keep Kotlin metadata for reflection
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
+-keep class kotlin.Metadata { *; }
+
+# ========================================================================================
+# Native Methods (JNI)
 # ========================================================================================
 
-# Keep native methods
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# Keep the unified JNI bridge class and all its methods
--keep class com.runanywhere.sdk.native.bridge.RunAnywhereBridge {
-    *;
-}
-
-# Keep result types used by JNI - constructors must be preserved for JNI instantiation
--keep class com.runanywhere.sdk.native.bridge.NativeTTSSynthesisResult {
-    <init>(...);
-    <fields>;
-    *;
-}
--keep class com.runanywhere.sdk.native.bridge.NativeVADResult {
-    <init>(...);
-    <fields>;
-    *;
-}
--keep class com.runanywhere.sdk.native.bridge.NativeBridgeException {
-    *;
-}
-
-# Keep all enums in native.bridge package
--keep enum com.runanywhere.sdk.native.bridge.** {
-    *;
-}
-
 # ========================================================================================
-# Third-party JNI Libraries
+# Third-party Dependencies
 # ========================================================================================
 
-# Keep Whisper JNI classes
+# Whisper JNI
 -keep class io.github.givimad.whisperjni.** { *; }
+-dontwarn io.github.givimad.whisperjni.**
 
-# Keep VAD classes
+# VAD classes
 -keep class com.konovalov.vad.** { *; }
+-dontwarn com.konovalov.vad.**
 
-# ========================================================================================
-# SDK Public API
-# ========================================================================================
+# ONNX Runtime
+-keep class ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**
 
-# Keep model classes
--keep class com.runanywhere.sdk.models.** { *; }
-
-# Keep public API
--keep class com.runanywhere.sdk.public.** { *; }
--keep class com.runanywhere.sdk.components.** { *; }
+# Suppress warnings for optional dependencies
+-dontwarn org.slf4j.**
+-dontwarn ch.qos.logback.**

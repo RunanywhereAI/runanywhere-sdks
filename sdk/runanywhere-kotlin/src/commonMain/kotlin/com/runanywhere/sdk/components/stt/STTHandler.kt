@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.components.stt
 
+import com.runanywhere.sdk.data.models.generateUUID
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.services.analytics.STTAnalyticsService
@@ -7,10 +8,11 @@ import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.events.ModularPipelineEvent
 import com.runanywhere.sdk.events.SpeakerInfo
-import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 /**
  * Handles Speech-to-Text processing in the voice pipeline (matches iOS STTHandler exactly)
@@ -20,6 +22,9 @@ class STTHandler(
     private val sttAnalytics: STTAnalyticsService? = null
 ) {
     private val logger = SDKLogger("STTHandler")
+
+    // Coroutine scope for fire-and-forget telemetry operations (avoids GlobalScope)
+    private val telemetryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Get telemetry service from ServiceContainer (matches iOS pattern)
     private val telemetryService get() = ServiceContainer.shared.telemetryService
@@ -34,7 +39,6 @@ class STTHandler(
      * @param continuation Event stream continuation
      * @return Transcription result
      */
-    @OptIn(DelicateCoroutinesApi::class)
     suspend fun transcribeAudio(
         samples: FloatArray,
         service: STTService,
@@ -51,7 +55,7 @@ class STTHandler(
         logger.debug("Starting transcription with ${samples.size} samples")
 
         // Generate session ID for telemetry tracking
-        val sessionId = UUID.randomUUID().toString()
+        val sessionId = generateUUID()
 
         // Calculate audio length (assuming 16kHz sample rate like iOS)
         val audioLength = samples.size.toDouble() / 16000.0
@@ -66,7 +70,7 @@ class STTHandler(
         logger.info("Starting STT transcription with model: $currentModelId")
 
         // Track transcription started - fire and forget to avoid blocking transcription
-        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        telemetryScope.launch {
             try {
                 telemetryService?.trackSTTTranscriptionStarted(
                     sessionId = sessionId,
@@ -119,7 +123,7 @@ class STTHandler(
                 // Track transcription completion - fire and forget
                 val completionModelId = service.currentModel
                 val completionLanguage = options.language ?: result.language ?: "en"
-                kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                telemetryScope.launch {
                     try {
                         telemetryService?.trackSTTTranscriptionCompleted(
                             sessionId = sessionId,
@@ -170,7 +174,7 @@ class STTHandler(
             val failureModelId = service.currentModel
             val errorMsg = error.message ?: error.toString()
 
-            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            telemetryScope.launch {
                 try {
                     telemetryService?.trackSTTTranscriptionFailed(
                         sessionId = sessionId,

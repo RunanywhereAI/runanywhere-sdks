@@ -4,11 +4,59 @@ import AVFoundation
 import Combine
 import os
 
+/// Collection of funny sample texts for TTS demo
+private let funnyTTSSampleTexts: [String] = [
+    "I'm not saying I'm Batman, but have you ever seen me and Batman in the same room?",
+    "According to my calculations, I should have been a millionaire by now. My calculations were wrong.",
+    "I told my computer I needed a break, and now it won't stop sending me vacation ads.",
+    "Why do programmers prefer dark mode? Because light attracts bugs!",
+    "I speak fluent sarcasm. Unfortunately, my phone's voice assistant doesn't.",
+    "I'm on a seafood diet. I see food and I eat it. Then I feel regret.",
+    "My brain has too many tabs open and I can't find the one playing music.",
+    "I put my phone on airplane mode but it didn't fly. Worst paper airplane ever.",
+    "I'm not lazy, I'm just on energy-saving mode. Like a responsible gadget.",
+    "If Monday had a face, I would politely ask it to reconsider its life choices.",
+    "I tried to be normal once. Worst two minutes of my life.",
+    "My favorite exercise is a cross between a lunge and a crunch. I call it lunch.",
+    "I don't need anger management. I need people to stop irritating me.",
+    "I'm not arguing, I'm just explaining why I'm right. There's a difference.",
+    "Coffee: because adulting is hard and mornings are a cruel joke.",
+    "I finally found my spirit animal. It's a sloth having a bad hair day.",
+    "My wallet is like an onion. When I open it, I cry.",
+    "I'm not short, I'm concentrated awesome in a compact package.",
+    "Life update: currently holding it all together with one bobby pin.",
+    "I would lose weight, but I hate losing.",
+    "Behind every great person is a cat judging them silently.",
+    "I'm on the whiskey diet. I've lost three days already.",
+    "My houseplants are thriving! Just kidding, they're plastic.",
+    "I don't sweat, I sparkle. Aggressively. With visible discomfort.",
+    "Plot twist: the hokey pokey really IS what it's all about.",
+    // RunAnywhere SDK promotional texts
+    "RunAnywhere: because your AI should work even when your WiFi doesn't.",
+    "We're a Y Combinator company now. Our moms are finally proud of us.",
+    "On-device AI means your voice data stays on your phone. Unlike your ex, we respect privacy.",
+    "RunAnywhere: Making cloud APIs jealous since 2024.",
+    "Our SDK is so fast, it finished processing before you finished reading this sentence.",
+    "Why pay per API call when you can run AI locally? Your wallet called, it says thank you.",
+    "RunAnywhere: We put the 'smart' in smartphone, and the 'savings' in your bank account.",
+    "Backed by Y Combinator. Powered by caffeine. Fueled by the dream of affordable AI.",
+    "Our on-device models are like introverts. They do great work without needing the cloud.",
+    "RunAnywhere SDK: Because latency is just a fancy word for 'too slow'.",
+    "Voice AI that runs offline? That's not magic, that's just good engineering. Okay, maybe a little magic.",
+    "We optimized our models so hard, they now run faster than your excuses for not exercising.",
+    "RunAnywhere: Where 'it works offline' isn't a bug, it's the whole feature.",
+    "Y Combinator believed in us. Your device believes in us. Now it's your turn.",
+    "On-device AI: All the intelligence, none of the monthly subscription fees.",
+    "Our SDK is like a good friend: fast, reliable, and doesn't share your secrets with big tech.",
+    "RunAnywhere makes voice AI accessible. Like, actually accessible. Not 'enterprise pricing' accessible."
+]
+
 /// Dedicated Text-to-Speech view with text input and playback
 struct TextToSpeechView: View {
     @StateObject private var viewModel = TTSViewModel()
     @State private var showModelPicker = false
-    @State private var inputText: String = "Hello! This is a text to speech test."
+    @State private var inputText: String = funnyTTSSampleTexts.randomElement()
+        ?? "Hello! This is a text to speech test."
 
     private var hasModelSelected: Bool {
         viewModel.selectedModelName != nil
@@ -63,9 +111,26 @@ struct TextToSpeechView: View {
                                     .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                             )
 
-                        Text("\(inputText.count) characters")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Text("\(inputText.count) characters")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+
+                            Spacer()
+
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    inputText = funnyTTSSampleTexts.randomElement() ?? inputText
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "dice.fill")
+                                    Text("Surprise me!")
+                                }
+                                .font(.caption)
+                                .foregroundColor(.purple)
+                            }
+                        }
                     }
 
                     // Voice settings
@@ -245,6 +310,12 @@ struct TextToSpeechView: View {
         .onAppear {
             Task {
                 await viewModel.initialize()
+            }
+        }
+        .onChange(of: viewModel.selectedModelName) { oldValue, newValue in
+            // Set a new random funny text when a model is loaded
+            if oldValue == nil && newValue != nil {
+                inputText = funnyTTSSampleTexts.randomElement() ?? inputText
             }
         }
     }

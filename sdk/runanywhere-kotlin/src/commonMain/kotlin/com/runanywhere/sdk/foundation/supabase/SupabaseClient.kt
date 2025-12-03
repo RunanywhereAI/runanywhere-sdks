@@ -91,10 +91,11 @@ internal class SupabaseClient(private val config: SupabaseConfig) {
     suspend fun registerDevice(request: DevDeviceRegistrationRequest): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             logger.info("📱 [SUPABASE] Registering device with Supabase")
-            logger.info("📱 [SUPABASE] Device ID: ${request.deviceId}")
-            logger.info("📱 [SUPABASE] Platform: ${request.platform}")
-            logger.info("📱 [SUPABASE] SDK Version: ${request.sdkVersion}")
-            logger.info("📱 [SUPABASE] URL: ${config.projectUrl}/rest/v1/sdk_devices")
+            // Log device ID at debug level to avoid exposing user identifiers in production logs
+            logger.debug("📱 [SUPABASE] Device ID: ${request.deviceId.take(8)}...")
+            logger.debug("📱 [SUPABASE] Platform: ${request.platform}")
+            logger.debug("📱 [SUPABASE] SDK Version: ${request.sdkVersion}")
+            logger.debug("📱 [SUPABASE] URL: ${config.projectUrl}/rest/v1/sdk_devices")
 
             val response: HttpResponse = httpClient.post("${config.projectUrl}/rest/v1/sdk_devices") {
                 headers {
@@ -133,17 +134,19 @@ internal class SupabaseClient(private val config: SupabaseConfig) {
     suspend fun submitAnalytics(request: DevAnalyticsSubmissionRequest): Result<Unit> =
         withContext(Dispatchers.IO) {
         try {
-            logger.info("📊 [SUPABASE] ========== Submitting Analytics to Supabase ==========")
-            logger.info("📊 [SUPABASE] Generation ID: ${request.generationId}")
-            logger.info("📊 [SUPABASE] Device ID: ${request.deviceId}")
-            logger.info("📊 [SUPABASE] Model ID: ${request.modelId}")
-            logger.info("📊 [SUPABASE] Build Token: ${request.buildToken}")
-            logger.info("📊 [SUPABASE] SDK Version: ${request.sdkVersion}")
-            logger.info("📊 [SUPABASE] Timestamp: ${request.timestamp}")
-            logger.info("📊 [SUPABASE] URL: ${config.projectUrl}/rest/v1/sdk_generation_analytics")
-            logger.info("📊 [SUPABASE] Performance: TTFT=${request.timeToFirstTokenMs}ms, TPS=${request.tokensPerSecond}, Total=${request.totalGenerationTimeMs}ms")
-            logger.info("📊 [SUPABASE] Tokens: input=${request.inputTokens}, output=${request.outputTokens}")
-            logger.info("📊 [SUPABASE] Execution Target: ${request.executionTarget}")
+            logger.info("📊 [SUPABASE] Submitting analytics to Supabase")
+            // Log sensitive identifiers at debug level with partial masking to protect user privacy
+            logger.debug("📊 [SUPABASE] Generation ID: ${request.generationId.take(8)}...")
+            logger.debug("📊 [SUPABASE] Device ID: ${request.deviceId.take(8)}...")
+            logger.debug("📊 [SUPABASE] Model ID: ${request.modelId}")
+            logger.debug("📊 [SUPABASE] Build Token: ${request.buildToken?.take(8) ?: "null"}...")
+            logger.debug("📊 [SUPABASE] SDK Version: ${request.sdkVersion}")
+            logger.debug("📊 [SUPABASE] Timestamp: ${request.timestamp}")
+            logger.debug("📊 [SUPABASE] URL: ${config.projectUrl}/rest/v1/sdk_generation_analytics")
+            // Performance metrics are non-sensitive and can be logged at debug level
+            logger.debug("📊 [SUPABASE] Performance: TTFT=${request.timeToFirstTokenMs}ms, TPS=${request.tokensPerSecond}, Total=${request.totalGenerationTimeMs}ms")
+            logger.debug("📊 [SUPABASE] Tokens: input=${request.inputTokens}, output=${request.outputTokens}")
+            logger.debug("📊 [SUPABASE] Execution Target: ${request.executionTarget}")
 
             // Make POST request and get raw HTTP response (like iOS)
             val httpResponse = httpClient.post(

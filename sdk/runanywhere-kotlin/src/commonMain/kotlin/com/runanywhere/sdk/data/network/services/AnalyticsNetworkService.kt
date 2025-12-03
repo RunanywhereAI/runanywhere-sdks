@@ -80,7 +80,7 @@ internal class AnalyticsNetworkService(
 
             if (response.status.isSuccess()) {
                 logger.debug("✅ Successfully submitted telemetry batch (HTTP ${response.status.value})")
-                Result.success(Unit)
+                // Return Unit - runCatching will wrap it in Result.success
             } else {
                 val errorBody = try {
                     response.bodyAsText()
@@ -92,11 +92,10 @@ internal class AnalyticsNetworkService(
                 val errorMsg = "Telemetry batch submission failed with HTTP ${response.status.value}"
                 logger.warning("⚠️ $errorMsg")
                 logger.warning("⚠️ Response body: $truncatedBody")
-                Result.failure(Exception("$errorMsg - Response: $truncatedBody"))
+                throw Exception("$errorMsg - Response: $truncatedBody")
             }
-        }.getOrElse { exception ->
+        }.onFailure { exception ->
             logger.warning("⚠️ Failed to submit telemetry batch: ${exception.message}")
-            Result.failure(exception)
         }
     }
 
@@ -125,10 +124,10 @@ internal class AnalyticsNetworkService(
      * Register device for analytics tracking
      * Used for device registration in production mode
      *
-     * @param deviceInfo Device information to register
+     * @param deviceInfo Device information to register (all values must be strings for serialization)
      * @return Result with device registration response
      */
-    suspend fun registerDevice(deviceInfo: Map<String, Any>): Result<DeviceRegistrationResponse> = withContext(Dispatchers.IO) {
+    suspend fun registerDevice(deviceInfo: Map<String, String>): Result<DeviceRegistrationResponse> = withContext(Dispatchers.IO) {
         runCatching {
             logger.debug("Registering device for analytics tracking")
 
@@ -144,10 +143,9 @@ internal class AnalyticsNetworkService(
             }.body()
 
             logger.debug("✅ Device registered successfully: ${response.deviceId}")
-            Result.success(response)
-        }.getOrElse { exception ->
+            response // Return the response directly - runCatching will wrap it in Result.success
+        }.onFailure { exception ->
             logger.warning("⚠️ Device registration failed: ${exception.message}")
-            Result.failure(exception)
         }
     }
 
