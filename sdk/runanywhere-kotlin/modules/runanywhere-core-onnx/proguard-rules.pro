@@ -1,40 +1,32 @@
+# ========================================================================================
 # RunAnywhere Core ONNX Module - ProGuard Rules
+# ========================================================================================
 
-# Keep JNI methods
+# Keep ALL SDK classes (inherited from main SDK rules, but explicit for safety)
+-keep class com.runanywhere.sdk.** { *; }
+-keep interface com.runanywhere.sdk.** { *; }
+-keep enum com.runanywhere.sdk.** { *; }
+
+# Keep all constructors (critical for JNI)
+-keepclassmembers class com.runanywhere.sdk.** {
+    <init>(...);
+}
+
+# Keep companion objects and singletons
+-keepclassmembers class com.runanywhere.sdk.** {
+    public static ** Companion;
+    public static ** INSTANCE;
+    public static ** shared;
+}
+
+# Prevent obfuscation
+-keepnames class com.runanywhere.sdk.** { *; }
+
+# Keep native methods
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# Keep the unified JNI bridge class and all its methods
--keep class com.runanywhere.sdk.native.bridge.RunAnywhereBridge {
-    *;
-}
-
-# Keep result types used by JNI (correct package: native.bridge)
--keep class com.runanywhere.sdk.native.bridge.NativeTTSSynthesisResult {
-    <init>(...);
-    *;
-}
--keep class com.runanywhere.sdk.native.bridge.NativeVADResult {
-    <init>(...);
-    *;
-}
--keep class com.runanywhere.sdk.native.bridge.NativeBridgeException {
-    *;
-}
--keep class com.runanywhere.sdk.native.bridge.NativeResultCode {
-    *;
-}
-
-# Keep all enums in native.bridge package
--keep enum com.runanywhere.sdk.native.bridge.** {
-    *;
-}
-
-# Keep public service API
--keep class com.runanywhere.sdk.core.onnx.ONNXCoreService {
-    public *;
-}
--keep class com.runanywhere.sdk.core.onnx.ONNXServiceProviderImpl {
-    public *;
-}
+# ONNX Runtime
+-keep class ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**

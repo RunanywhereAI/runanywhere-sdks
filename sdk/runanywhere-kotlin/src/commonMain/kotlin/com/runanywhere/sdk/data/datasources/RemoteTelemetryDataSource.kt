@@ -40,7 +40,7 @@ internal class RemoteTelemetryDataSource(
     }
 
     /**
-     * Submit single event
+     * Submit single event with timeout
      * Convenience method for single event submission
      *
      * @param event Telemetry event to submit
@@ -48,10 +48,12 @@ internal class RemoteTelemetryDataSource(
      */
     suspend fun submitEvent(event: TelemetryData): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            logger.debug("Submitting single telemetry event: ${event.name}")
+            withTimeout(30.seconds) {
+                logger.debug("Submitting single telemetry event: ${event.name}")
 
-            analyticsNetworkService.submitTelemetryEvent(event).getOrThrow()
-                .also { logger.debug("✅ Successfully submitted telemetry event") }
+                analyticsNetworkService.submitTelemetryEvent(event).getOrThrow()
+                    .also { logger.debug("✅ Successfully submitted telemetry event") }
+            }
         }
     }
 }

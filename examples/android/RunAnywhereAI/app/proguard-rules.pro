@@ -68,39 +68,37 @@
 }
 
 # ========================================================================================
-# RunAnywhere SDK JNI Bridge - CRITICAL for TTS/STT/VAD native operations
+# RunAnywhere SDK - KEEP ENTIRE SDK (CRITICAL)
 # ========================================================================================
+# The SDK uses dynamic registration, reflection-like patterns, and JNI callbacks.
+# We must keep ALL classes, interfaces, enums, and their members to prevent R8/ProGuard
+# from obfuscating or removing them.
 
-# Keep the unified JNI bridge class and all its methods
--keep class com.runanywhere.sdk.native.bridge.RunAnywhereBridge {
-    *;
-}
+# MASTER RULE: Keep ALL classes in com.runanywhere.sdk package and all subpackages
+-keep class com.runanywhere.sdk.** { *; }
+-keep interface com.runanywhere.sdk.** { *; }
+-keep enum com.runanywhere.sdk.** { *; }
 
-# Keep result types used by JNI - constructors must be preserved for JNI instantiation
--keep class com.runanywhere.sdk.native.bridge.NativeTTSSynthesisResult {
+# Keep all constructors (critical for JNI object creation)
+-keepclassmembers class com.runanywhere.sdk.** {
     <init>(...);
-    <fields>;
-    *;
-}
--keep class com.runanywhere.sdk.native.bridge.NativeVADResult {
-    <init>(...);
-    <fields>;
-    *;
-}
--keep class com.runanywhere.sdk.native.bridge.NativeBridgeException {
-    *;
-}
--keep class com.runanywhere.sdk.native.bridge.NativeResultCode {
-    *;
 }
 
-# Keep all classes in native.bridge package (covers enums and future additions)
--keep class com.runanywhere.sdk.native.bridge.** {
-    *;
+# Keep companion objects and their members (Kotlin singletons like LlamaCppAdapter.shared)
+-keepclassmembers class com.runanywhere.sdk.** {
+    public static ** Companion;
+    public static ** INSTANCE;
+    public static ** shared;
 }
--keep enum com.runanywhere.sdk.native.bridge.** {
-    *;
-}
+
+# Keep Kotlin metadata for reflection
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
+-keep class kotlin.Metadata { *; }
+
+# Prevent obfuscation of class names (important for logging and debugging)
+-keepnames class com.runanywhere.sdk.** { *; }
+-keepnames interface com.runanywhere.sdk.** { *; }
+-keepnames enum com.runanywhere.sdk.** { *; }
 
 # ========================================================================================
 # TensorFlow Lite
