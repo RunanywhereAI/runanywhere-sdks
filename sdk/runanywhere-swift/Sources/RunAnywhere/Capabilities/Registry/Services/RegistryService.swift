@@ -61,9 +61,15 @@ public class RegistryService: ModelRegistry {
         // Simply return all registered models
         // Don't auto-discover local models as it causes confusion with download status
         // Models should only be marked as downloaded when explicitly downloaded via the app
-        return accessQueue.sync {
+        let allModels = accessQueue.sync {
             Array(models.values)
         }
+
+        // Cache models for synchronous lookup by providers
+        // This allows providers to check framework compatibility without async calls
+        ModelInfoCache.shared.cacheModels(allModels)
+
+        return allModels
     }
 
     public func registerModel(_ model: ModelInfo) {
@@ -89,6 +95,9 @@ public class RegistryService: ModelRegistry {
             self.models[updatedModel.id] = updatedModel
             self.logger.info("Successfully registered model: \(updatedModel.id)")
         }
+
+        // Also cache for synchronous lookup by providers
+        ModelInfoCache.shared.cacheModels([updatedModel])
     }
 
     /// Register model and save to database for persistence
