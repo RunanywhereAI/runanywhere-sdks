@@ -63,19 +63,23 @@ class RunAnywhereApplication : Application() {
             // Initialize SDK based on environment (matches iOS pattern)
             if (environment == SDKEnvironment.DEVELOPMENT) {
                 // Development Mode - No API key needed!
+                // In development mode, analytics are automatically sent to Supabase
+                // for performance tracking and debugging. No user data is collected.
                 RunAnywhere.initialize(
                     context = this@RunAnywhereApplication,
                     apiKey = "dev",
                     baseURL = "localhost",
                     environment = SDKEnvironment.DEVELOPMENT
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode")
+                Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (dev analytics enabled)")
 
                 // Register frameworks and models using iOS-matching pattern
                 registerAdaptersForDevelopment()
 
             } else {
                 // Production Mode - Real API key required
+                // In production mode, analytics are sent to RunAnywhere backend
+                // for telemetry and performance monitoring
                 val apiKey = getSecureApiKey()
                 val baseURL = "https://api.runanywhere.ai"
 
@@ -85,7 +89,7 @@ class RunAnywhereApplication : Application() {
                     baseURL = baseURL,
                     environment = SDKEnvironment.PRODUCTION
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode")
+                Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode (production analytics enabled)")
 
                 // In production, register adapters only (models come from backend)
                 registerAdaptersForProduction()

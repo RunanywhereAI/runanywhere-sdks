@@ -7,5 +7,12 @@ import com.runanywhere.sdk.data.repositories.TelemetryRepositoryImpl
  * JVM implementation for creating telemetry repository
  */
 actual fun createTelemetryRepository(): TelemetryRepository {
-    return TelemetryRepositoryImpl()
+    // Get RemoteTelemetryDataSource from ServiceContainer if available (production mode)
+    val remoteTelemetryDataSource = try {
+        ServiceContainer.shared.remoteTelemetryDataSource
+    } catch (e: Exception) {
+        null // Not available yet or not in production mode
+    }
+
+    return TelemetryRepositoryImpl(remoteTelemetryDataSource)
 }
