@@ -376,6 +376,414 @@ class TelemetryService(
         trackEvent(TelemetryEventType.PERFORMANCE_BENCHMARK, properties)
     }
 
+    // MARK: - STT (Speech-to-Text) Telemetry
+    // Matches iOS TelemetryService STT tracking methods
+
+    /**
+     * Track STT model load
+     * Matches iOS: trackSTTModelLoad(...)
+     */
+    suspend fun trackSTTModelLoad(
+        modelId: String,
+        modelName: String,
+        framework: String,
+        loadTimeMs: Double,
+        modelSizeBytes: Long? = null,
+        device: String,
+        osVersion: String,
+        success: Boolean,
+        errorMessage: String? = null
+    ) {
+        val properties = mutableMapOf<String, String>()
+        properties["model_id"] = modelId
+        properties["model_name"] = modelName
+        properties["framework"] = framework
+        properties["load_time_ms"] = String.format("%.1f", loadTimeMs)
+        properties["device"] = device
+        properties["os_version"] = osVersion
+        properties["success"] = success.toString()
+
+        modelSizeBytes?.let { properties["model_size_bytes"] = it.toString() }
+        errorMessage?.let { properties["error_message"] = it }
+
+        val eventType = if (success) {
+            TelemetryEventType.STT_MODEL_LOADED
+        } else {
+            TelemetryEventType.STT_MODEL_LOAD_FAILED
+        }
+
+        trackEvent(eventType, properties)
+    }
+
+    /**
+     * Track STT transcription start
+     * Matches iOS: trackSTTTranscriptionStarted(...)
+     */
+    suspend fun trackSTTTranscriptionStarted(
+        sessionId: String,
+        modelId: String,
+        modelName: String,
+        framework: String,
+        language: String,
+        device: String,
+        osVersion: String
+    ) {
+        val properties = mapOf(
+            "session_id" to sessionId,
+            "model_id" to modelId,
+            "model_name" to modelName,
+            "framework" to framework,
+            "modality" to "stt",  // Add modality field
+            "language" to language,
+            "device" to device,
+            "os_version" to osVersion
+        )
+
+        logger.debug("🔍 STT_TRANSCRIPTION_STARTED properties: modality=${properties["modality"]}, model_id=${properties["model_id"]}, model_name=${properties["model_name"]}")
+        trackEvent(TelemetryEventType.STT_TRANSCRIPTION_STARTED, properties)
+    }
+
+    /**
+     * Track STT transcription completion with full metrics
+     * Matches iOS: trackSTTTranscriptionCompleted(...)
+     */
+    suspend fun trackSTTTranscriptionCompleted(
+        sessionId: String,
+        modelId: String,
+        modelName: String,
+        framework: String,
+        language: String,
+        audioDurationMs: Double,
+        processingTimeMs: Double,
+        realTimeFactor: Double,
+        wordCount: Int,
+        characterCount: Int,
+        confidence: Float,
+        device: String,
+        osVersion: String
+    ) {
+        val properties = mapOf(
+            "session_id" to sessionId,
+            "model_id" to modelId,
+            "model_name" to modelName,
+            "framework" to framework,
+            "modality" to "stt",  // Add modality field
+            "language" to language,
+            "audio_duration_ms" to String.format("%.1f", audioDurationMs),
+            "processing_time_ms" to String.format("%.1f", processingTimeMs),
+            "real_time_factor" to String.format("%.3f", realTimeFactor),
+            "word_count" to wordCount.toString(),
+            "character_count" to characterCount.toString(),
+            "confidence" to String.format("%.3f", confidence),
+            "device" to device,
+            "os_version" to osVersion
+        )
+
+        trackEvent(TelemetryEventType.STT_TRANSCRIPTION_COMPLETED, properties)
+    }
+
+    /**
+     * Track STT transcription failure
+     * Matches iOS: trackSTTTranscriptionFailed(...)
+     */
+    suspend fun trackSTTTranscriptionFailed(
+        sessionId: String,
+        modelId: String,
+        modelName: String,
+        framework: String,
+        language: String,
+        audioDurationMs: Double,
+        processingTimeMs: Double,
+        errorMessage: String,
+        device: String,
+        osVersion: String
+    ) {
+        val properties = mapOf(
+            "session_id" to sessionId,
+            "model_id" to modelId,
+            "model_name" to modelName,
+            "framework" to framework,
+            "modality" to "stt",  // Add modality field
+            "language" to language,
+            "audio_duration_ms" to String.format("%.1f", audioDurationMs),
+            "processing_time_ms" to String.format("%.1f", processingTimeMs),
+            "error_message" to errorMessage,
+            "device" to device,
+            "os_version" to osVersion
+        )
+
+        trackEvent(TelemetryEventType.STT_TRANSCRIPTION_FAILED, properties)
+    }
+
+    /**
+     * Track STT streaming update (for real-time transcription)
+     * Matches iOS: trackSTTStreamingUpdate(...)
+     */
+    suspend fun trackSTTStreamingUpdate(
+        sessionId: String,
+        modelId: String,
+        framework: String,
+        partialWordCount: Int,
+        elapsedMs: Double
+    ) {
+        val properties = mapOf(
+            "session_id" to sessionId,
+            "model_id" to modelId,
+            "framework" to framework,
+            "partial_word_count" to partialWordCount.toString(),
+            "elapsed_ms" to String.format("%.1f", elapsedMs)
+        )
+
+        trackEvent(TelemetryEventType.STT_STREAMING_UPDATE, properties)
+    }
+
+    // MARK: - TTS (Text-to-Speech) Telemetry
+    // Matches iOS TelemetryService TTS tracking methods
+
+    /**
+     * Track TTS model load
+     * Matches iOS: trackTTSModelLoad(...)
+     */
+    suspend fun trackTTSModelLoad(
+        modelId: String,
+        modelName: String,
+        framework: String,
+        loadTimeMs: Double,
+        modelSizeBytes: Long? = null,
+        device: String,
+        osVersion: String,
+        success: Boolean,
+        errorMessage: String? = null
+    ) {
+        val properties = mutableMapOf<String, String>()
+        properties["model_id"] = modelId
+        properties["model_name"] = modelName
+        properties["framework"] = framework
+        properties["load_time_ms"] = String.format("%.1f", loadTimeMs)
+        properties["device"] = device
+        properties["os_version"] = osVersion
+        properties["success"] = success.toString()
+
+        modelSizeBytes?.let { properties["model_size_bytes"] = it.toString() }
+        errorMessage?.let { properties["error_message"] = it }
+
+        val eventType = if (success) {
+            TelemetryEventType.TTS_MODEL_LOADED
+        } else {
+            TelemetryEventType.TTS_MODEL_LOAD_FAILED
+        }
+
+        trackEvent(eventType, properties)
+    }
+
+    /**
+     * Track TTS synthesis start
+     * Matches iOS: trackTTSSynthesisStarted(...)
+     */
+    suspend fun trackTTSSynthesisStarted(
+        synthesisId: String,
+        modelId: String,
+        modelName: String,
+        framework: String,
+        language: String,
+        voice: String,
+        characterCount: Int,
+        speakingRate: Float,
+        pitch: Float,
+        device: String,
+        osVersion: String
+    ) {
+        val properties = mapOf(
+            "session_id" to synthesisId,  // Use session_id for API compatibility
+            "synthesis_id" to synthesisId,
+            "model_id" to modelId,
+            "model_name" to modelName,
+            "framework" to framework,
+            "modality" to "tts",
+            "language" to language,
+            "voice" to voice,
+            "character_count" to characterCount.toString(),
+            "speaking_rate" to String.format("%.2f", speakingRate),
+            "pitch" to String.format("%.2f", pitch),
+            "device" to device,
+            "os_version" to osVersion
+        )
+
+        trackEvent(TelemetryEventType.TTS_SYNTHESIS_STARTED, properties)
+    }
+
+    /**
+     * Track TTS synthesis completion with full metrics
+     * Matches iOS: trackTTSSynthesisCompleted(...)
+     */
+    suspend fun trackTTSSynthesisCompleted(
+        synthesisId: String,
+        modelId: String,
+        modelName: String,
+        framework: String,
+        language: String,
+        characterCount: Int,
+        audioDurationMs: Double,
+        processingTimeMs: Double,
+        realTimeFactor: Double,
+        device: String,
+        osVersion: String
+    ) {
+        val properties = mapOf(
+            "session_id" to synthesisId,  // Use session_id for API compatibility
+            "synthesis_id" to synthesisId,
+            "model_id" to modelId,
+            "model_name" to modelName,
+            "framework" to framework,
+            "modality" to "tts",
+            "language" to language,
+            "character_count" to characterCount.toString(),
+            "audio_duration_ms" to String.format("%.1f", audioDurationMs),
+            "processing_time_ms" to String.format("%.1f", processingTimeMs),
+            "real_time_factor" to String.format("%.3f", realTimeFactor),
+            "device" to device,
+            "os_version" to osVersion
+        )
+
+        trackEvent(TelemetryEventType.TTS_SYNTHESIS_COMPLETED, properties)
+    }
+
+    /**
+     * Track TTS synthesis failure
+     * Matches iOS: trackTTSSynthesisFailed(...)
+     */
+    suspend fun trackTTSSynthesisFailed(
+        synthesisId: String,
+        modelId: String,
+        modelName: String,
+        framework: String,
+        language: String,
+        characterCount: Int,
+        processingTimeMs: Double,
+        errorMessage: String,
+        device: String,
+        osVersion: String
+    ) {
+        val properties = mapOf(
+            "session_id" to synthesisId,  // Use session_id for API compatibility
+            "synthesis_id" to synthesisId,
+            "model_id" to modelId,
+            "model_name" to modelName,
+            "framework" to framework,
+            "modality" to "tts",
+            "language" to language,
+            "character_count" to characterCount.toString(),
+            "processing_time_ms" to String.format("%.1f", processingTimeMs),
+            "error_message" to errorMessage,
+            "device" to device,
+            "os_version" to osVersion
+        )
+
+        trackEvent(TelemetryEventType.TTS_SYNTHESIS_FAILED, properties)
+    }
+
+    // MARK: - LLM Generation Telemetry
+    // Matches iOS TelemetryService LLM tracking methods
+
+    /**
+     * Track LLM generation start
+     * Matches iOS: trackGenerationStarted(...)
+     */
+    suspend fun trackGenerationStarted(
+        generationId: String,
+        modelId: String,
+        modelName: String,
+        framework: String,
+        promptTokens: Int,
+        maxTokens: Int,
+        device: String,
+        osVersion: String
+    ) {
+        val properties = mapOf(
+            "session_id" to generationId,  // Use session_id for API compatibility
+            "generation_id" to generationId,
+            "model_id" to modelId,
+            "model_name" to modelName,
+            "framework" to framework,
+            "modality" to "llm",
+            "prompt_tokens" to promptTokens.toString(),
+            "max_tokens" to maxTokens.toString(),
+            "device" to device,
+            "os_version" to osVersion
+        )
+
+        trackEvent(TelemetryEventType.GENERATION_STARTED, properties)
+    }
+
+    /**
+     * Track LLM generation completion with full metrics
+     * Matches iOS: trackGenerationCompleted(...)
+     */
+    suspend fun trackGenerationCompleted(
+        generationId: String,
+        modelId: String,
+        modelName: String,
+        framework: String,
+        inputTokens: Int,
+        outputTokens: Int,
+        totalTimeMs: Double,
+        timeToFirstTokenMs: Double,
+        tokensPerSecond: Double,
+        device: String,
+        osVersion: String
+    ) {
+        val properties = mapOf(
+            "session_id" to generationId,  // Use session_id for API compatibility
+            "generation_id" to generationId,
+            "model_id" to modelId,
+            "model_name" to modelName,
+            "framework" to framework,
+            "modality" to "llm",
+            "input_tokens" to inputTokens.toString(),
+            "output_tokens" to outputTokens.toString(),
+            "total_tokens" to (inputTokens + outputTokens).toString(),
+            "total_time_ms" to String.format("%.1f", totalTimeMs),
+            "time_to_first_token_ms" to String.format("%.1f", timeToFirstTokenMs),
+            "tokens_per_second" to String.format("%.2f", tokensPerSecond),
+            "device" to device,
+            "os_version" to osVersion
+        )
+
+        trackEvent(TelemetryEventType.GENERATION_COMPLETED, properties)
+    }
+
+    /**
+     * Track LLM generation failure
+     * Matches iOS: trackGenerationFailed(...)
+     */
+    suspend fun trackGenerationFailed(
+        generationId: String,
+        modelId: String,
+        modelName: String,
+        framework: String,
+        inputTokens: Int,
+        totalTimeMs: Double,
+        errorMessage: String,
+        device: String,
+        osVersion: String
+    ) {
+        val properties = mapOf(
+            "session_id" to generationId,  // Use session_id for API compatibility
+            "generation_id" to generationId,
+            "model_id" to modelId,
+            "model_name" to modelName,
+            "framework" to framework,
+            "modality" to "llm",
+            "input_tokens" to inputTokens.toString(),
+            "total_time_ms" to String.format("%.1f", totalTimeMs),
+            "error_message" to errorMessage,
+            "device" to device,
+            "os_version" to osVersion
+        )
+
+        trackEvent(TelemetryEventType.GENERATION_FAILED, properties)
+    }
+
     /**
      * Initialize telemetry service
      */

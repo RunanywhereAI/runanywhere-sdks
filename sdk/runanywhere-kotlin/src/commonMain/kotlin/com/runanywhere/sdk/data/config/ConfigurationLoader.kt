@@ -54,8 +54,16 @@ class ConfigurationLoader {
 
     /**
      * Load resource file from platform-specific location
-     * Expect/actual pattern for platform-specific implementations
+     * Delegates to platform-specific implementation
      */
-    private expect suspend fun loadResourceFile(fileName: String): String
+    private suspend fun loadResourceFile(fileName: String): String {
+        return com.runanywhere.sdk.data.config.loadResourceFile(fileName)
+    }
 }
+
+/**
+ * Platform-specific resource file loading
+ * Expect/actual pattern for platform-specific implementations
+ */
+internal expect suspend fun loadResourceFile(fileName: String): String
 

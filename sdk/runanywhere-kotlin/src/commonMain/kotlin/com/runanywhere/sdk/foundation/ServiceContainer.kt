@@ -45,6 +45,7 @@ import com.runanywhere.sdk.services.sync.SyncCoordinator
 import com.runanywhere.sdk.data.network.services.AnalyticsNetworkService
 import com.runanywhere.sdk.data.datasources.RemoteTelemetryDataSource
 import com.runanywhere.sdk.memory.MemoryService
+import io.ktor.serialization.kotlinx.json.*
 import com.runanywhere.sdk.memory.MemoryManager
 import com.runanywhere.sdk.events.SDKInitializationEvent
 import com.runanywhere.sdk.events.SDKBootstrapEvent
@@ -165,12 +166,17 @@ class ServiceContainer {
     private var _analyticsService: AnalyticsService? = null
     val analyticsService: AnalyticsService? get() = _analyticsService
 
+    // Telemetry service for production event tracking (STT/TTS/LLM)
+    // Matches iOS ServiceContainer.shared.telemetryService
+    private var _telemetryService: com.runanywhere.sdk.services.telemetry.TelemetryService? = null
+    val telemetryService: com.runanywhere.sdk.services.telemetry.TelemetryService? get() = _telemetryService
+
     // Analytics network services (for production analytics)
     private var _analyticsNetworkService: AnalyticsNetworkService? = null
-    val analyticsNetworkService: AnalyticsNetworkService? get() = _analyticsNetworkService
+    internal val analyticsNetworkService: AnalyticsNetworkService? get() = _analyticsNetworkService
 
     private var _remoteTelemetryDataSource: RemoteTelemetryDataSource? = null
-    val remoteTelemetryDataSource: RemoteTelemetryDataSource? get() = _remoteTelemetryDataSource
+    internal val remoteTelemetryDataSource: RemoteTelemetryDataSource? get() = _remoteTelemetryDataSource
 
     // Device info (collected during initialization)
     private var _deviceInfo: DeviceInfo? = null
@@ -263,6 +269,12 @@ class ServiceContainer {
             stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(3, "Authentication service initialization"))
 
+            // Initialize SDKConfig with baseURL before authentication
+            if (params.baseURL != null) {
+                com.runanywhere.sdk.config.SDKConfig.baseURL = params.baseURL
+                logger.debug("SDKConfig.baseURL set to: ${params.baseURL}")
+            }
+
             authenticationService.authenticate(params.apiKey)
 
             EventBus.publish(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", currentTimeMillis() - stepStartTime))
@@ -292,20 +304,35 @@ class ServiceContainer {
                 // Create analytics network services for production mode
                 if (params.environment == SDKEnvironment.PRODUCTION && params.baseURL != null) {
                     logger.debug("Creating production analytics network services...")
-                    
+
+                    // Create a dedicated Ktor HttpClient for analytics
+                    val analyticsKtorClient = io.ktor.client.HttpClient {
+                        install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+                            json(kotlinx.serialization.json.Json {
+                                ignoreUnknownKeys = true
+                                prettyPrint = false
+                                isLenient = true
+                            })
+                        }
+                        install(io.ktor.client.plugins.HttpTimeout) {
+                            requestTimeoutMillis = 30000
+                            connectTimeoutMillis = 10000
+                        }
+                    }
+
                     // Create AnalyticsNetworkService
                     _analyticsNetworkService = AnalyticsNetworkService(
-                        httpClient = httpClient,
+                        httpClient = analyticsKtorClient,
                         baseURL = params.baseURL,
                         apiKey = params.apiKey,
                         authenticationService = authenticationService
                     )
-                    
+
                     // Create RemoteTelemetryDataSource
                     _remoteTelemetryDataSource = RemoteTelemetryDataSource(
                         analyticsNetworkService = _analyticsNetworkService!!
                     )
-                    
+
                     logger.info("✅ Production analytics network services created")
                 } else {
                     logger.debug("Skipping production analytics services (dev mode or no baseURL)")
@@ -321,6 +348,23 @@ class ServiceContainer {
                 _analyticsService?.initialize()
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitialized)
                 logger.info("✅ Analytics service initialized successfully")
+
+                // Initialize TelemetryService for production event tracking (STT/TTS/LLM)
+                // Matches iOS ServiceContainer.shared.telemetryService
+                _telemetryService = com.runanywhere.sdk.services.telemetry.TelemetryService(
+                    telemetryRepository = telemetryRepository,
+                    syncCoordinator = syncCoordinator
+                )
+                _telemetryService?.initialize()
+
+                // Set telemetry context with device info
+                val deviceId = _deviceInfoData?.deviceId ?: "unknown-device"
+                _telemetryService?.setContext(
+                    deviceId = deviceId,
+                    appVersion = null,  // App version not available at SDK init time
+                    sdkVersion = com.runanywhere.sdk.core.SDKConstants.SDK_VERSION
+                )
+                logger.info("✅ Telemetry service initialized successfully with device ID: $deviceId")
             } catch (e: Exception) {
                 logger.error("Analytics initialization failed: ${e.message}")
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitializationFailed(e.message ?: "Unknown error"))
@@ -452,6 +496,23 @@ class ServiceContainer {
                 _analyticsService?.initialize()
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitialized)
                 logger.info("✅ Analytics service initialized with Supabase support")
+
+                // Initialize TelemetryService for event tracking (STT/TTS/LLM)
+                // Matches iOS ServiceContainer.shared.telemetryService
+                _telemetryService = com.runanywhere.sdk.services.telemetry.TelemetryService(
+                    telemetryRepository = telemetryRepository,
+                    syncCoordinator = syncCoordinator
+                )
+                _telemetryService?.initialize()
+
+                // Set telemetry context with device info
+                val deviceId = _deviceInfoData?.deviceId ?: "unknown-device"
+                _telemetryService?.setContext(
+                    deviceId = deviceId,
+                    appVersion = null,  // App version not available at SDK init time
+                    sdkVersion = com.runanywhere.sdk.core.SDKConstants.SDK_VERSION
+                )
+                logger.info("✅ Telemetry service initialized successfully with device ID: $deviceId")
             } catch (e: Exception) {
                 logger.warn("Analytics initialization failed (non-critical in dev mode): ${e.message}")
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitializationFailed(e.message ?: "Unknown error"))

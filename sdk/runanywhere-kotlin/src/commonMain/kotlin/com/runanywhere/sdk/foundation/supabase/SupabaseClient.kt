@@ -90,7 +90,11 @@ internal class SupabaseClient(private val config: SupabaseConfig) {
      */
     suspend fun registerDevice(request: DevDeviceRegistrationRequest): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            logger.debug("Registering device with Supabase: ${request.deviceId}")
+            logger.info("📱 [SUPABASE] Registering device with Supabase")
+            logger.info("📱 [SUPABASE] Device ID: ${request.deviceId}")
+            logger.info("📱 [SUPABASE] Platform: ${request.platform}")
+            logger.info("📱 [SUPABASE] SDK Version: ${request.sdkVersion}")
+            logger.info("📱 [SUPABASE] URL: ${config.projectUrl}/rest/v1/sdk_devices")
 
             val response: HttpResponse = httpClient.post("${config.projectUrl}/rest/v1/sdk_devices") {
                 headers {
@@ -102,6 +106,8 @@ internal class SupabaseClient(private val config: SupabaseConfig) {
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
+
+            logger.info("📱 [SUPABASE] Response status: ${response.status.value}")
 
             if (response.status.isSuccess()) {
                 logger.info("✅ Device registered successfully with Supabase")
@@ -127,8 +133,17 @@ internal class SupabaseClient(private val config: SupabaseConfig) {
     suspend fun submitAnalytics(request: DevAnalyticsSubmissionRequest): Result<Unit> =
         withContext(Dispatchers.IO) {
         try {
-            logger.debug("Submitting analytics to Supabase: generation=${request.generationId}")
-            logger.debug("📤 Analytics data: deviceId=${request.deviceId}, modelId=${request.modelId}, buildToken=${request.buildToken}, timestamp=${request.timestamp}")
+            logger.info("📊 [SUPABASE] ========== Submitting Analytics to Supabase ==========")
+            logger.info("📊 [SUPABASE] Generation ID: ${request.generationId}")
+            logger.info("📊 [SUPABASE] Device ID: ${request.deviceId}")
+            logger.info("📊 [SUPABASE] Model ID: ${request.modelId}")
+            logger.info("📊 [SUPABASE] Build Token: ${request.buildToken}")
+            logger.info("📊 [SUPABASE] SDK Version: ${request.sdkVersion}")
+            logger.info("📊 [SUPABASE] Timestamp: ${request.timestamp}")
+            logger.info("📊 [SUPABASE] URL: ${config.projectUrl}/rest/v1/sdk_generation_analytics")
+            logger.info("📊 [SUPABASE] Performance: TTFT=${request.timeToFirstTokenMs}ms, TPS=${request.tokensPerSecond}, Total=${request.totalGenerationTimeMs}ms")
+            logger.info("📊 [SUPABASE] Tokens: input=${request.inputTokens}, output=${request.outputTokens}")
+            logger.info("📊 [SUPABASE] Execution Target: ${request.executionTarget}")
 
             // Make POST request and get raw HTTP response (like iOS)
             val httpResponse = httpClient.post(
@@ -142,6 +157,8 @@ internal class SupabaseClient(private val config: SupabaseConfig) {
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
+
+            logger.info("📊 [SUPABASE] Response HTTP Status: ${httpResponse.status.value}")
 
             // Check HTTP status code (matches iOS behavior exactly)
             if (httpResponse.status == HttpStatusCode.OK || httpResponse.status == HttpStatusCode.Created) {

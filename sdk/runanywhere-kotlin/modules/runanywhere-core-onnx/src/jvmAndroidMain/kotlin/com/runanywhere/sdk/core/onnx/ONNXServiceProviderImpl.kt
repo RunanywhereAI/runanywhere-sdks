@@ -12,11 +12,15 @@ import com.runanywhere.sdk.components.vad.VADResult
 import com.runanywhere.sdk.components.vad.VADService
 import com.runanywhere.sdk.components.vad.SpeechActivityEvent
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.utils.PlatformUtils
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.util.UUID
 
 private val logger = SDKLogger("ONNXServiceProviderImpl")
 
@@ -77,6 +81,8 @@ actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTSer
     val service = ONNXCoreService()
     service.initialize()
 
+    var loadedModelPath: String? = null
+
     // Load model if the modelId looks like a path (contains / or ends with common model extensions)
     configuration.modelId?.let { modelId ->
         try {
@@ -85,7 +91,8 @@ actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTSer
                 logger.info("Loading STT model from path: $modelId")
                 val modelType = detectSTTModelType(modelId)
                 service.loadSTTModel(modelId, modelType)
-                logger.info("STT model loaded successfully from path")
+                loadedModelPath = modelId  // Track the path for telemetry
+                logger.info("STT model loaded successfully from path: $loadedModelPath")
             } else {
                 // modelId is just an ID - the model needs to be loaded via a different mechanism
                 // Log this but don't fail - the service will return an error when transcribe is called
@@ -97,7 +104,13 @@ actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTSer
         }
     }
 
-    return ONNXSTTServiceWrapper(service)
+    // Create wrapper and pass the loaded model path for telemetry
+    val wrapper = ONNXSTTServiceWrapper(service)
+    // Set the model path in the wrapper for telemetry tracking
+    if (loadedModelPath != null) {
+        wrapper.setModelPath(loadedModelPath!!)
+    }
+    return wrapper
 }
 
 // Cached ONNX TTS service for reuse
@@ -121,6 +134,38 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
 
     logger.info("Using TTS model path: $modelPath")
 
+    // Extract model name from path for telemetry
+    val modelName = modelPath.substringAfterLast("/").substringBeforeLast(".")
+
+    // Get telemetry service for tracking
+    val telemetryService = ServiceContainer.shared.telemetryService
+
+    // Generate synthesis ID for telemetry tracking
+    val synthesisId = UUID.randomUUID().toString()
+    val characterCount = text.length
+
+    // Track synthesis started
+    try {
+        telemetryService?.trackTTSSynthesisStarted(
+            synthesisId = synthesisId,
+            modelId = modelName,
+            modelName = modelName,
+            framework = "ONNX Runtime",
+            language = options.language ?: "en",
+            voice = modelName,  // Use model name instead of full path (DB has 50 char limit)
+            characterCount = characterCount,
+            speakingRate = options.rate,
+            pitch = options.pitch,
+            device = PlatformUtils.getDeviceModel(),
+            osVersion = PlatformUtils.getOSVersion()
+        )
+    } catch (e: Exception) {
+        logger.info("Failed to track TTS synthesis started: ${e.message}")
+    }
+
+    // Track processing time
+    val startTime = getCurrentTimeMillis()
+
     // Check if we can reuse the cached service
     val service: ONNXCoreService
     if (cachedTTSCoreService != null && cachedTTSModelPath == modelPath) {
@@ -143,14 +188,64 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
     }
 
     // Synthesize
-    val result = service.synthesize(
-        text = text,
-        voiceId = "0", // Speaker ID for multi-speaker models
-        speedRate = options.rate,
-        pitchShift = options.pitch
-    )
+    val result = try {
+        service.synthesize(
+            text = text,
+            voiceId = "0", // Speaker ID for multi-speaker models
+            speedRate = options.rate,
+            pitchShift = options.pitch
+        )
+    } catch (error: Exception) {
+        // Track synthesis failure
+        val endTime = getCurrentTimeMillis()
+        val processingTimeMs = (endTime - startTime).toDouble()
+
+        try {
+            telemetryService?.trackTTSSynthesisFailed(
+                synthesisId = synthesisId,
+                modelId = modelName,
+                modelName = modelName,
+                framework = "ONNX Runtime",
+                language = options.language ?: "en",
+                characterCount = characterCount,
+                processingTimeMs = processingTimeMs,
+                errorMessage = error.message ?: error.toString(),
+                device = PlatformUtils.getDeviceModel(),
+                osVersion = PlatformUtils.getOSVersion()
+            )
+        } catch (e: Exception) {
+            logger.debug("Failed to track TTS synthesis failure: ${e.message}")
+        }
+
+        throw error
+    }
+
+    val processingTimeMs = (getCurrentTimeMillis() - startTime).toDouble()
 
     logger.info("Synthesized ${result.samples.size} samples at ${result.sampleRate} Hz")
+
+    // Calculate audio duration in milliseconds
+    val audioDurationMs = (result.samples.size.toDouble() / result.sampleRate.toDouble()) * 1000.0
+    val realTimeFactor = if (audioDurationMs > 0) processingTimeMs / audioDurationMs else 0.0
+
+    // Track successful synthesis completion
+    try {
+        telemetryService?.trackTTSSynthesisCompleted(
+            synthesisId = synthesisId,
+            modelId = modelName,
+            modelName = modelName,
+            framework = "ONNX Runtime",
+            language = options.language ?: "en",
+            characterCount = characterCount,
+            audioDurationMs = audioDurationMs,
+            processingTimeMs = processingTimeMs,
+            realTimeFactor = realTimeFactor,
+            device = PlatformUtils.getDeviceModel(),
+            osVersion = PlatformUtils.getOSVersion()
+        )
+    } catch (e: Exception) {
+        logger.debug("Failed to track TTS synthesis completed: ${e.message}")
+    }
 
     // Convert samples to WAV format
     return convertToWav(result.samples, result.sampleRate)
@@ -197,7 +292,10 @@ actual suspend fun createONNXSTTServiceFromPath(modelPath: String): Any {
     val modelType = detectSTTModelType(modelPath)
     service.loadSTTModel(modelPath, modelType)
 
-    return ONNXSTTServiceWrapper(service)
+    // Create wrapper and set model path for telemetry
+    val wrapper = ONNXSTTServiceWrapper(service)
+    wrapper.setModelPath(modelPath)
+    return wrapper
 }
 
 /**
@@ -222,10 +320,17 @@ private class ONNXSTTServiceWrapper(
     private val coreService: ONNXCoreService
 ) : STTService {
 
+    // Track the loaded model path for telemetry
+    private var loadedModelPath: String? = null
+
     override val isReady: Boolean
         get() = coreService.isInitialized && coreService.isSTTModelLoaded
 
-    override val currentModel: String? = null
+    override val currentModel: String?
+        get() {
+            val modelName = loadedModelPath?.substringAfterLast("/")?.substringBeforeLast(".")
+            return modelName
+        }
 
     override val supportsStreaming: Boolean
         get() = coreService.supportsSTTStreaming
@@ -236,7 +341,17 @@ private class ONNXSTTServiceWrapper(
         modelPath?.let { path ->
             val modelType = detectSTTModelType(path)
             coreService.loadSTTModel(path, modelType)
+            loadedModelPath = path  // Track model path for telemetry
+        } ?: run {
         }
+    }
+
+    /**
+     * Set the model path for telemetry tracking.
+     * Used when the model is loaded externally before the wrapper is created.
+     */
+    fun setModelPath(path: String) {
+        loadedModelPath = path
     }
 
     override suspend fun transcribe(
