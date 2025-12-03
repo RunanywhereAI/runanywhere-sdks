@@ -79,8 +79,8 @@ class RunAnywhereApplication : Application() {
                 // Production Mode - Real API key required
                 // In production mode, analytics are sent to RunAnywhere backend
                 // for telemetry and performance monitoring
-                val apiKey = "REDACTED_API_KEY"
-                val baseURL = "https://REDACTED_URL"
+                val apiKey = "talk_to_runanywhere_team"
+                val baseURL = "talk_to_runanywhere_team"
 
                 RunAnywhere.initialize(
                     context = this@RunAnywhereApplication,
