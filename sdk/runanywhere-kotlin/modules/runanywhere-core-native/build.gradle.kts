@@ -187,7 +187,6 @@ val downloadNativeLibs by tasks.registering {
         // Try to download unified archive first
         val unifiedUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/$unifiedArchive"
         val unifiedZipFile = file("$downloadedLibsDir/$unifiedArchive")
-        var unifiedSuccess = false
 
         try {
             logger.lifecycle("Trying unified archive: $unifiedArchive")
@@ -214,10 +213,10 @@ val downloadNativeLibs by tasks.registering {
                 }
             }
 
-            unifiedSuccess = true
             logger.lifecycle("✅ Using unified archive (recommended - single bridge with all backends)")
         } catch (e: Exception) {
-            logger.warn("Unified archive not available, falling back to separate archives")
+            logger.warn("Unified archive not available: ${e.message}")
+            logger.warn("Falling back to separate archives (backwards compatibility mode)")
             logger.lifecycle("Note: Unified archive provides better backend support")
 
             // Clear and retry with separate archives
@@ -239,14 +238,14 @@ val downloadNativeLibs by tasks.registering {
                     }
                     logger.lifecycle("Downloaded: ${zipFile.length() / 1024}KB")
                 } catch (downloadException: Exception) {
-                    logger.error("Failed to download native libraries: ${downloadException.message}")
-                    logger.error("URL: $downloadUrl")
-                    logger.lifecycle("")
-                    logger.lifecycle("Options:")
-                    logger.lifecycle("  1. Check that version $nativeLibVersion exists in the releases")
-                    logger.lifecycle("  2. Build locally: cd runanywhere-core && ./scripts/build-android.sh all")
-                    logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
-                    throw GradleException("Failed to download native libraries", downloadException)
+                    logger.error("Failed to download $archiveName: ${downloadException.message}")
+                    logger.error("Download URL: $downloadUrl")
+                    logger.error("")
+                    logger.error("Resolution options:")
+                    logger.error("  1. Check that version $nativeLibVersion exists in GitHub releases")
+                    logger.error("  2. Build locally: cd runanywhere-core && ./scripts/android/build.sh all")
+                    logger.error("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
+                    throw GradleException("Failed to download native libraries: $archiveName", downloadException)
                 }
 
                 // Extract the ZIP to a temp directory

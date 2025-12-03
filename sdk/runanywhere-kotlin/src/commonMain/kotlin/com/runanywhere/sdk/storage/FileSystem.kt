@@ -1,5 +1,7 @@
 package com.runanywhere.sdk.storage
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -37,17 +39,17 @@ interface FileSystem {
     /**
      * Check if a file or directory exists (synchronous version)
      */
-    fun existsSync(path: String): Boolean = runBlocking { exists(path) }
+    fun existsSync(path: String): Boolean = runBlocking(Dispatchers.IO) { exists(path) }
 
     /**
      * Check if path is a directory (synchronous version)
      */
-    fun isDirectorySync(path: String): Boolean = runBlocking { isDirectory(path) }
+    fun isDirectorySync(path: String): Boolean = runBlocking(Dispatchers.IO) { isDirectory(path) }
 
     /**
      * List files in a directory (synchronous version)
      */
-    fun listSync(path: String): List<String> = runBlocking { listFiles(path) }
+    fun listSync(path: String): List<String> = runBlocking(Dispatchers.IO) { listFiles(path) }
 
     /**
      * Delete a file or directory

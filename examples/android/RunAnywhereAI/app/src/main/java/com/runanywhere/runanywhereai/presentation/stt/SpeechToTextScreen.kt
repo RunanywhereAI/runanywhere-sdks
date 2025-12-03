@@ -3,6 +3,8 @@ package com.runanywhere.runanywhereai.presentation.stt
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -62,12 +64,13 @@ fun SpeechToTextScreen(
         viewModel.initialize(context)
     }
 
-    // Permission launcher
+    // Permission launcher - start recording after permission granted
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
             viewModel.initialize(context)
+            viewModel.toggleRecording()
         }
     }
 
@@ -160,8 +163,19 @@ fun SpeechToTextScreen(
                         audioLevel = uiState.audioLevel,
                         isModelLoaded = uiState.isModelLoaded,
                         onToggleRecording = {
-                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            viewModel.toggleRecording()
+                            // Check if permission is already granted
+                            val hasPermission = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.RECORD_AUDIO
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                            if (hasPermission) {
+                                // Permission already granted, toggle recording directly
+                                viewModel.toggleRecording()
+                            } else {
+                                // Request permission, toggleRecording will be called in callback
+                                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
                         }
                     )
                 }

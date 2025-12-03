@@ -463,7 +463,7 @@ private class ONNXVADServiceWrapper(
 
     override fun processAudioChunk(audioSamples: FloatArray): VADResult {
         // Use runBlocking since processVAD is suspend but this isn't
-        val result = runBlocking { coreService.processVAD(audioSamples, sampleRate) }
+        val result = runBlocking(kotlinx.coroutines.Dispatchers.Default) { coreService.processVAD(audioSamples, sampleRate) }
         val wasActive = isSpeechActive
         isSpeechActive = result.isSpeech
 

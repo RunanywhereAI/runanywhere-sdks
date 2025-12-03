@@ -142,18 +142,21 @@ class AndroidAudioCapture(
             isRecording = false
             captureJob.cancel()
 
-            try {
-                if (record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-                    record.stop()
+            synchronized(this@AndroidAudioCapture) {
+                audioRecord?.let { rec ->
+                    try {
+                        if (rec.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                            rec.stop()
+                        }
+                        rec.release()
+                        logger.info("AudioRecord stopped and released")
+                    } catch (e: Exception) {
+                        logger.error("Error releasing AudioRecord", e)
+                    }
+                    audioRecord = null
                 }
-                record.release()
-                logger.info("AudioRecord stopped and released")
-            } catch (e: Exception) {
-                logger.error("Error releasing AudioRecord", e)
+                sequenceNumber = 0
             }
-
-            audioRecord = null
-            sequenceNumber = 0
         }
     }
 
