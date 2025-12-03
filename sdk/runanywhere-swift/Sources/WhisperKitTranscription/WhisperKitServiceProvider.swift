@@ -31,7 +31,7 @@ public final class WhisperKitServiceProvider: STTServiceProvider {
 
     public func canHandle(modelId: String?) -> Bool {
         // WhisperKit can handle whisper models
-        guard let modelId = modelId else { return true }
+        guard let modelId = modelId else { return false }
 
         logger.debug("Checking if can handle STT model: \(modelId)")
 

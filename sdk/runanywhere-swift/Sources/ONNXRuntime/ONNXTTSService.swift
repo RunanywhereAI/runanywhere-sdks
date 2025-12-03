@@ -337,7 +337,14 @@ public struct ONNXTTSServiceProvider: TTSServiceProvider {
         var modelPath: String? = nil
 
         // Query all available models and find the one we need
-        let allModels = try await RunAnywhere.availableModels()
+        let allModels: [ModelInfo]
+        do {
+            allModels = try await RunAnywhere.availableModels()
+        } catch {
+            Self.logger.error("Failed to fetch available models: \(error)")
+            throw SDKError.modelNotFound("Failed to query available models: \(error.localizedDescription)")
+        }
+
         let modelInfo = allModels.first { $0.id == modelId }
 
         // Check if model is downloaded and has a local path

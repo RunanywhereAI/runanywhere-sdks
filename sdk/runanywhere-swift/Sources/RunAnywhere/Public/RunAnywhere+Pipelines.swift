@@ -152,13 +152,14 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
     // Audio playback for Piper/ONNX TTS (which returns audio data instead of playing directly)
     private var audioPlayer: AVAudioPlayer?
     private var audioPlaybackContinuation: CheckedContinuation<Void, Error>?
-    private let logger = SDKLogger(category: "ModularVoicePipeline")
+    private let logger: SDKLogger
 
     public init(
         config: ModularPipelineConfig,
         speakerDiarization: SpeakerDiarizationService? = nil
     ) async throws {
         self.config = config
+        self.logger = SDKLogger(category: "ModularVoicePipeline")
         super.init()
 
         // Create components based on config
@@ -240,6 +241,8 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
     // MARK: - AVAudioPlayerDelegate
 
     public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        // Guard against stale callbacks from replaced players
+        guard player === audioPlayer else { return }
         logger.info("TTS audio playback finished (success: \(flag))")
         audioPlayer = nil
 
@@ -252,6 +255,8 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
     }
 
     public func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        // Guard against stale callbacks from replaced players
+        guard player === audioPlayer else { return }
         logger.error("TTS audio decode error: \(error?.localizedDescription ?? "unknown")")
         audioPlayer = nil
         audioPlaybackContinuation?.resume(throwing: error ?? SDKError.generationFailed("TTS audio decode error"))
@@ -604,9 +609,9 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
                                                 silenceFrameCount = 0
                                                 speechFrameCount = 0
                                                 hasRecordedSpeech = false
+                                                isSpeaking = true
                                                 await stateManager.transition(to: .listening)
                                                 continuation.yield(.vadSpeechStart)
-                                                isSpeaking = true
                                                 continue
                                             }
 
