@@ -109,6 +109,7 @@ object RunAnywhereBridge {
         } catch (e: UnsatisfiedLinkError) {
             // Loader not available - this is OK for builds without it
             logD(TAG, "librunanywhere_loader.so not available: ${e.message}")
+            logD(TAG, "Stack trace: ${e.stackTraceToString()}")
             false
         }
     }
@@ -251,6 +252,7 @@ object RunAnywhereBridge {
             }
         } catch (e: UnsatisfiedLinkError) {
             logE(TAG, "Failed to load lib$name.so: ${e.message}")
+            e.printStackTrace()
             // Check if it's already loaded (different error message)
             if (e.message?.contains("already loaded") == true) {
                 logI(TAG, "Library lib$name.so was already loaded")

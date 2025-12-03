@@ -87,7 +87,9 @@ fun RunAnywhereSDK.getModelLoadState(modality: Modality): ModelLoadState {
 suspend fun RunAnywhereSDK.loadModelWithTracking(modelId: String, modality: Modality = Modality.LLM) {
     // Get model info from registry
     val modelInfo = com.runanywhere.sdk.foundation.ServiceContainer.shared.modelRegistry.getModel(modelId)
-        ?: throw IllegalArgumentException("Model not found: $modelId")
+    if (modelInfo == null) {
+        throw IllegalArgumentException("Model not found: $modelId")
+    }
 
     val framework = modelInfo.preferredFramework ?: LLMFramework.LLAMA_CPP
 
