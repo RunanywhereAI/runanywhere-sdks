@@ -337,6 +337,15 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
                     let silenceThresholdFrames = 5  // 5 frames × 100ms = 0.5 seconds of silence
                     let silenceEnergyThreshold: Float = 0.05  // Audio level below this is "silence"
                     var hasRecordedSpeech = false  // Track if we've recorded any real speech
+                    var speechFrameCount = 0  // Track how many frames of actual speech we've recorded
+                    let minimumSpeechFrames = 3  // Require at least ~0.3 seconds of speech before processing
+
+                    // Garbage transcript patterns to filter out (STT artifacts when no real speech)
+                    let garbagePatterns = [
+                        "[BLANK_AUDIO]", "[BLANK_", "[ Silence ]", "[Silence]", "(buzzer)",
+                        "(mumbling)", "(clicking)", "(typing)", "(noise)", "(static)",
+                        "(inaudible)", "(music)", "[MUSIC]", "(background)", "(breathing)"
+                    ]
 
                     for await voiceChunk in audioStream {
                         // Extract float samples from VoiceAudioChunk
@@ -445,7 +454,11 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
                                                     vad.notifyTTSWillStart()
                                                 }
 
-                                                try await Task.sleep(nanoseconds: 20_000_000) // 20ms
+                                                // PAUSE RECORDING before TTS - prevents feedback loop
+                                                print("⏸️ Pausing recording for TTS playback")
+                                                continuation.yield(.audioControlPauseRecording)
+
+                                                try await Task.sleep(nanoseconds: 50_000_000) // 50ms buffer before TTS
 
                                                 let transitionedToPlaying = await stateManager.transition(to: .playingTTS)
 
@@ -476,8 +489,9 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
                                                     }
                                                 }
 
+                                                // Wait for audio system to settle after TTS
                                                 #if os(iOS) || os(tvOS) || os(watchOS)
-                                                try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                                                try await Task.sleep(nanoseconds: 300_000_000) // 300ms post-TTS cooldown
                                                 #endif
                                             }
 
@@ -493,6 +507,13 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
                                             while await stateManager.state == .cooldown {
                                                 try await Task.sleep(nanoseconds: 50_000_000)
                                             }
+
+                                            // Additional delay to let echo/reverb dissipate
+                                            try await Task.sleep(nanoseconds: 200_000_000) // 200ms extra
+
+                                            // RESUME RECORDING after cooldown complete
+                                            print("▶️ Resuming recording after TTS")
+                                            continuation.yield(.audioControlResumeRecording)
 
                                             audioBuffer.removeAll()
                                             await vadComponent?.resume()
@@ -529,14 +550,26 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
                                 // User is speaking
                                 silenceFrameCount = 0
                                 hasRecordedSpeech = true
+                                speechFrameCount += 1
                                 speechDetected = true
                             } else if hasRecordedSpeech {
                                 // Silence detected after user spoke
                                 silenceFrameCount += 1
 
                                 if silenceFrameCount >= silenceThresholdFrames {
-                                    // User paused for ~0.5 seconds - process the speech
-                                    print("🔇 Silence detected (\(silenceFrameCount) frames) - processing speech")
+                                    // User paused for ~0.5 seconds
+                                    // Only process if we have enough actual speech (not just noise/silence)
+                                    if speechFrameCount < minimumSpeechFrames {
+                                        print("⚠️ Not enough speech (\(speechFrameCount) frames) - ignoring, need at least \(minimumSpeechFrames)")
+                                        // Reset and continue listening
+                                        audioBuffer.removeAll()
+                                        silenceFrameCount = 0
+                                        speechFrameCount = 0
+                                        hasRecordedSpeech = false
+                                        continue
+                                    }
+
+                                    print("🔇 Silence detected (\(silenceFrameCount) frames, \(speechFrameCount) speech frames) - processing speech")
                                     await stateManager.transition(to: .processingSpeech)
                                     continuation.yield(.vadSpeechEnd)
                                     isSpeaking = false
@@ -556,6 +589,26 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
 
                                         do {
                                             let transcript = try await stt.transcribe(accumulatedData, options: sttOptions)
+
+                                            // Check for garbage/artifact transcripts
+                                            let trimmedText = transcript.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            let isGarbage = garbagePatterns.contains { pattern in
+                                                trimmedText.localizedCaseInsensitiveContains(pattern) ||
+                                                trimmedText.hasPrefix("[") || trimmedText.hasPrefix("(")
+                                            }
+
+                                            if isGarbage {
+                                                print("🗑️ Filtered garbage transcript: '\(transcript.text)' - resuming listening")
+                                                // Reset and continue listening
+                                                audioBuffer.removeAll()
+                                                silenceFrameCount = 0
+                                                speechFrameCount = 0
+                                                hasRecordedSpeech = false
+                                                await stateManager.transition(to: .listening)
+                                                continuation.yield(.vadSpeechStart)
+                                                isSpeaking = true
+                                                continue
+                                            }
 
                                             if !transcript.text.isEmpty {
                                                 print("📝 Got transcript: '\(transcript.text)'")
@@ -590,7 +643,11 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
 
                                                     // Process through TTS if available
                                                     if let tts = ttsComponent {
-                                                        try await Task.sleep(nanoseconds: 20_000_000)
+                                                        // PAUSE RECORDING before TTS - prevents feedback loop
+                                                        print("⏸️ Pausing recording for TTS playback")
+                                                        continuation.yield(.audioControlPauseRecording)
+
+                                                        try await Task.sleep(nanoseconds: 50_000_000) // 50ms buffer before TTS
 
                                                         let transitionedToPlaying = await stateManager.transition(to: .playingTTS)
                                                         if transitionedToPlaying {
@@ -613,8 +670,9 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
                                                             }
                                                         }
 
+                                                        // Wait for audio system to settle after TTS
                                                         #if os(iOS) || os(tvOS) || os(watchOS)
-                                                        try await Task.sleep(nanoseconds: 100_000_000)
+                                                        try await Task.sleep(nanoseconds: 300_000_000) // 300ms post-TTS cooldown
                                                         #endif
                                                     }
 
@@ -623,11 +681,19 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
                                                         try await Task.sleep(nanoseconds: 50_000_000)
                                                     }
 
-                                                    // Resume listening for next turn
+                                                    // Additional delay to let echo/reverb dissipate
+                                                    try await Task.sleep(nanoseconds: 200_000_000) // 200ms extra
+
+                                                    // Resume listening for next turn - CLEAR ALL STATE
                                                     audioBuffer.removeAll()
                                                     silenceFrameCount = 0
+                                                    speechFrameCount = 0  // Reset speech frame count
                                                     hasRecordedSpeech = false
                                                     isSpeaking = false
+
+                                                    // RESUME RECORDING after cooldown complete
+                                                    print("▶️ Resuming recording after TTS")
+                                                    continuation.yield(.audioControlResumeRecording)
 
                                                     // Start listening again automatically
                                                     await stateManager.transition(to: .listening)
@@ -642,6 +708,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
                                                 // Resume listening
                                                 audioBuffer.removeAll()
                                                 silenceFrameCount = 0
+                                                speechFrameCount = 0
                                                 hasRecordedSpeech = false
                                                 await stateManager.transition(to: .listening)
                                                 continuation.yield(.vadSpeechStart)
@@ -651,6 +718,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
                                             print("⚠️ STT failed: \(error), resuming listening")
                                             audioBuffer.removeAll()
                                             silenceFrameCount = 0
+                                            speechFrameCount = 0
                                             hasRecordedSpeech = false
                                             await stateManager.transition(to: .listening)
                                             continuation.yield(.vadSpeechStart)
