@@ -149,19 +149,17 @@ internal class TelemetryRepositoryImpl(
 
             // Submit to remote data source if available (production mode)
             if (remoteTelemetryDataSource != null) {
-                remoteTelemetryDataSource.submitBatch(batch)
-                    .onSuccess {
-                        // Mark events as sent in local database
-                        val eventIds = batch.events.map { it.id }
-                        markEventsSent(eventIds, System.currentTimeMillis())
-                        logger.info("✅ Marked ${eventIds.size} events as sent")
-                    }
-                    .onFailure { error ->
-                        logger.error("❌ Failed to send batch: ${error.message}")
-                        // Events remain unsent in database for retry
-                        throw error
-                    }
-                    .getOrThrow()
+                // Simplified: submitBatch returns Result<Unit>, outer runCatching handles exceptions
+                val result = remoteTelemetryDataSource.submitBatch(batch)
+                if (result.isSuccess) {
+                    // Mark events as sent in local database
+                    val eventIds = batch.events.map { it.id }
+                    markEventsSent(eventIds, System.currentTimeMillis())
+                    logger.info("✅ Marked ${eventIds.size} events as sent")
+                } else {
+                    // Let the exception propagate to outer runCatching
+                    throw result.exceptionOrNull() ?: Exception("Unknown error submitting batch")
+                }
             } else {
                 // Fallback: Just mark as sent (development mode or no remote data source)
                 logger.debug("No remote telemetry data source available, marking events as sent locally")

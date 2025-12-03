@@ -17,7 +17,6 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 
 /**
  * Network service for analytics operations.
@@ -32,13 +31,6 @@ internal class AnalyticsNetworkService(
     private val authenticationService: AuthenticationService? = null
 ) {
     private val logger = SDKLogger("AnalyticsNetworkService")
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        prettyPrint = false
-        isLenient = true
-        encodeDefaults = false
-    }
 
     /**
      * Submit batch of telemetry events to production backend
@@ -95,10 +87,12 @@ internal class AnalyticsNetworkService(
                 } catch (e: Exception) {
                     "Unable to read response body: ${e.message}"
                 }
+                // Truncate error body to avoid logging sensitive data
+                val truncatedBody = errorBody.take(500) + if (errorBody.length > 500) "..." else ""
                 val errorMsg = "Telemetry batch submission failed with HTTP ${response.status.value}"
                 logger.warning("⚠️ $errorMsg")
-                logger.warning("⚠️ Response body: $errorBody")
-                Result.failure(Exception("$errorMsg - Response: $errorBody"))
+                logger.warning("⚠️ Response body: $truncatedBody")
+                Result.failure(Exception("$errorMsg - Response: $truncatedBody"))
             }
         }.getOrElse { exception ->
             logger.warning("⚠️ Failed to submit telemetry batch: ${exception.message}")
@@ -142,7 +136,7 @@ internal class AnalyticsNetworkService(
 
             val response: DeviceRegistrationResponse = httpClient.post(url) {
                 contentType(ContentType.Application.Json)
-                
+
                 // Add authentication header
                 addAuthHeaders()
 
@@ -165,7 +159,7 @@ internal class AnalyticsNetworkService(
         try {
             // Try to get Bearer token from authentication service
             val authToken = authenticationService?.getAccessToken()
-            
+
             if (authToken != null) {
                 headers {
                     append(HttpHeaders.Authorization, "Bearer $authToken")
@@ -221,10 +215,12 @@ internal class AnalyticsNetworkService(
     }
 
     /**
-     * Close HTTP client resources
+     * Close resources.
+     * Note: The httpClient is passed in and managed externally, so we don't close it here.
+     * Callers should manage the httpClient lifecycle themselves.
      */
     fun close() {
-        // Don't close shared HttpClient - it's managed elsewhere
+        // No-op: httpClient lifecycle is managed externally
     }
 }
 
@@ -238,4 +234,3 @@ data class DeviceRegistrationResponse(
     val registered: Boolean,
     val timestamp: Long? = null
 )
-

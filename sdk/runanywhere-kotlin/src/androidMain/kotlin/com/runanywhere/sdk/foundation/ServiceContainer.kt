@@ -29,7 +29,7 @@ actual fun createTelemetryRepository(): TelemetryRepository {
     // Get RemoteTelemetryDataSource from ServiceContainer if available (production mode)
     val remoteTelemetryDataSource = try {
         com.runanywhere.sdk.foundation.ServiceContainer.shared.remoteTelemetryDataSource
-    } catch (e: Exception) {
+    } catch (e: UninitializedPropertyAccessException) {
         null // Not available yet or not in production mode
     }
 

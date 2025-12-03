@@ -15,8 +15,10 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -121,6 +123,7 @@ private var cachedTTSModelPath: String? = null
  * JVM/Android implementation of ONNX TTS synthesis
  * Matches iOS ONNXTTSService.synthesize() behavior
  */
+@OptIn(DelicateCoroutinesApi::class)
 actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteArray {
     logger.info("Synthesizing with ONNX: ${text.take(50)}...")
 
@@ -134,37 +137,47 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
 
     logger.info("Using TTS model path: $modelPath")
 
+    // Track processing time - start before any telemetry to avoid blocking
+    val startTime = getCurrentTimeMillis()
+
     // Extract model name from path for telemetry
     val modelName = modelPath.substringAfterLast("/").substringBeforeLast(".")
-
-    // Get telemetry service for tracking
-    val telemetryService = ServiceContainer.shared.telemetryService
 
     // Generate synthesis ID for telemetry tracking
     val synthesisId = UUID.randomUUID().toString()
     val characterCount = text.length
 
-    // Track synthesis started
-    try {
-        telemetryService?.trackTTSSynthesisStarted(
-            synthesisId = synthesisId,
-            modelId = modelName,
-            modelName = modelName,
-            framework = "ONNX Runtime",
-            language = options.language ?: "en",
-            voice = modelName,  // Use model name instead of full path (DB has 50 char limit)
-            characterCount = characterCount,
-            speakingRate = options.rate,
-            pitch = options.pitch,
-            device = PlatformUtils.getDeviceModel(),
-            osVersion = PlatformUtils.getOSVersion()
-        )
+    // Track synthesis started - fire and forget to avoid blocking synthesis
+    // Use a try-catch and don't await to prevent any telemetry issues from blocking TTS
+    val telemetryService = try {
+        ServiceContainer.shared.telemetryService
     } catch (e: Exception) {
-        logger.info("Failed to track TTS synthesis started: ${e.message}")
+        logger.debug("Could not get telemetry service: ${e.message}")
+        null
     }
 
-    // Track processing time
-    val startTime = getCurrentTimeMillis()
+    // Fire-and-forget telemetry tracking - don't block synthesis on telemetry
+    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            telemetryService?.trackTTSSynthesisStarted(
+                synthesisId = synthesisId,
+                modelId = modelName,
+                modelName = modelName,
+                framework = "ONNX Runtime",
+                language = options.language,
+                voice = modelName,  // Use model name instead of full path (DB has 50 char limit)
+                characterCount = characterCount,
+                speakingRate = options.rate,
+                pitch = options.pitch,
+                device = PlatformUtils.getDeviceModel(),
+                osVersion = PlatformUtils.getOSVersion()
+            )
+        } catch (e: Exception) {
+            logger.debug("Failed to track TTS synthesis started: ${e.message}")
+        }
+    }
+
+    logger.info("Starting ONNX TTS synthesis...")
 
     // Check if we can reuse the cached service
     val service: ONNXCoreService
@@ -196,25 +209,28 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
             pitchShift = options.pitch
         )
     } catch (error: Exception) {
-        // Track synthesis failure
+        // Track synthesis failure - fire and forget
         val endTime = getCurrentTimeMillis()
         val processingTimeMs = (endTime - startTime).toDouble()
+        val errorMsg = error.message ?: error.toString()
 
-        try {
-            telemetryService?.trackTTSSynthesisFailed(
-                synthesisId = synthesisId,
-                modelId = modelName,
-                modelName = modelName,
-                framework = "ONNX Runtime",
-                language = options.language ?: "en",
-                characterCount = characterCount,
-                processingTimeMs = processingTimeMs,
-                errorMessage = error.message ?: error.toString(),
-                device = PlatformUtils.getDeviceModel(),
-                osVersion = PlatformUtils.getOSVersion()
-            )
-        } catch (e: Exception) {
-            logger.debug("Failed to track TTS synthesis failure: ${e.message}")
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                telemetryService?.trackTTSSynthesisFailed(
+                    synthesisId = synthesisId,
+                    modelId = modelName,
+                    modelName = modelName,
+                    framework = "ONNX Runtime",
+                    language = options.language ?: "en",
+                    characterCount = characterCount,
+                    processingTimeMs = processingTimeMs,
+                    errorMessage = errorMsg,
+                    device = PlatformUtils.getDeviceModel(),
+                    osVersion = PlatformUtils.getOSVersion()
+                )
+            } catch (e: Exception) {
+                logger.debug("Failed to track TTS synthesis failure: ${e.message}")
+            }
         }
 
         throw error
@@ -228,23 +244,25 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
     val audioDurationMs = (result.samples.size.toDouble() / result.sampleRate.toDouble()) * 1000.0
     val realTimeFactor = if (audioDurationMs > 0) processingTimeMs / audioDurationMs else 0.0
 
-    // Track successful synthesis completion
-    try {
-        telemetryService?.trackTTSSynthesisCompleted(
-            synthesisId = synthesisId,
-            modelId = modelName,
-            modelName = modelName,
-            framework = "ONNX Runtime",
-            language = options.language ?: "en",
-            characterCount = characterCount,
-            audioDurationMs = audioDurationMs,
-            processingTimeMs = processingTimeMs,
-            realTimeFactor = realTimeFactor,
-            device = PlatformUtils.getDeviceModel(),
-            osVersion = PlatformUtils.getOSVersion()
-        )
-    } catch (e: Exception) {
-        logger.debug("Failed to track TTS synthesis completed: ${e.message}")
+    // Track successful synthesis completion - fire and forget
+    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            telemetryService?.trackTTSSynthesisCompleted(
+                synthesisId = synthesisId,
+                modelId = modelName,
+                modelName = modelName,
+                framework = "ONNX Runtime",
+                language = options.language ?: "en",
+                characterCount = characterCount,
+                audioDurationMs = audioDurationMs,
+                processingTimeMs = processingTimeMs,
+                realTimeFactor = realTimeFactor,
+                device = PlatformUtils.getDeviceModel(),
+                osVersion = PlatformUtils.getOSVersion()
+            )
+        } catch (e: Exception) {
+            logger.debug("Failed to track TTS synthesis completed: ${e.message}")
+        }
     }
 
     // Convert samples to WAV format

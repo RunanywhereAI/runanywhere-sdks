@@ -78,6 +78,7 @@ class TextToSpeechViewModel : ViewModel() {
 
     // SDK Components - matches iOS TTSComponent pattern
     private var ttsComponent: TTSComponent? = null
+    private var currentComponentModelId: String? = null  // Track which model the component is configured for
 
     // Audio playback
     private var audioTrack: AudioTrack? = null
@@ -103,8 +104,9 @@ class TextToSpeechViewModel : ViewModel() {
                     )
                 }
 
-                // Restore component if model is already loaded
-                if (isNowLoaded && ttsComponent == null && ttsState != null) {
+                // Restore component if model is loaded (handles both initial load and model switching)
+                // The restoreTTSComponent method will handle checking if we need to create a new component
+                if (isNowLoaded && ttsState != null) {
                     restoreTTSComponent(ttsState.modelId)
                 }
 
@@ -116,10 +118,29 @@ class TextToSpeechViewModel : ViewModel() {
     /**
      * Restore TTSComponent from a previously loaded model
      * iOS Reference: restoreComponentIfNeeded() in TTSViewModel
+     *
+     * IMPORTANT: This now properly handles model switching by cleaning up
+     * the old component when a different model is selected.
      */
     private fun restoreTTSComponent(modelId: String) {
         viewModelScope.launch {
-            if (ttsComponent != null) return@launch
+            // Check if we already have a component for this exact model
+            if (ttsComponent != null && currentComponentModelId == modelId) {
+                Log.d(TAG, "TTS component already configured for model: $modelId")
+                return@launch
+            }
+
+            // Clean up existing component if switching to a different model
+            if (ttsComponent != null && currentComponentModelId != modelId) {
+                Log.i(TAG, "Switching TTS model from $currentComponentModelId to $modelId - cleaning up old component")
+                try {
+                    ttsComponent?.cleanup()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error cleaning up old TTS component: ${e.message}")
+                }
+                ttsComponent = null
+                currentComponentModelId = null
+            }
 
             Log.i(TAG, "Restoring TTS component for model: $modelId")
             try {
@@ -142,8 +163,9 @@ class TextToSpeechViewModel : ViewModel() {
                 val component = TTSComponent(config)
                 component.initialize()
                 ttsComponent = component
+                currentComponentModelId = modelId  // Track which model this component is for
 
-                Log.i(TAG, "✅ TTS component restored successfully")
+                Log.i(TAG, "✅ TTS component restored successfully for model: $modelId")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to restore TTS component: ${e.message}", e)
             }
@@ -422,6 +444,7 @@ class TextToSpeechViewModel : ViewModel() {
         }
 
         ttsComponent = null
+        currentComponentModelId = null
         generatedAudioData = null
     }
 }

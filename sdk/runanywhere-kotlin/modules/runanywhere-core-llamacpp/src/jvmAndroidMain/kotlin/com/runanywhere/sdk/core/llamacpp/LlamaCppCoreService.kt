@@ -51,9 +51,8 @@ class LlamaCppCoreService {
     private val mutex = Mutex()
 
     init {
-        // Load JNI bridge and LlamaCPP backend libraries on construction
+        // Load unified JNI bridge on construction
         RunAnywhereBridge.loadLibrary()
-        RunAnywhereBridge.loadBackend("llamacpp")
     }
 
     // =============================================================================
