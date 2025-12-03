@@ -309,7 +309,7 @@ class STTViewModel: ObservableObject {
     private var audioBuffer = Data()
     private var streamingTask: Task<Void, Never>?
     private var audioContinuation: AsyncStream<Data>.Continuation?
-    private var recordedSampleRate: Double = 48000
+    private var audioConverter: AVAudioConverter?
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
@@ -458,7 +458,27 @@ class STTViewModel: ObservableObject {
             let engine = AVAudioEngine()
             let inputNode = engine.inputNode
             let inputFormat = inputNode.outputFormat(forBus: 0)
-            recordedSampleRate = inputFormat.sampleRate
+
+            // Create 16kHz mono output format (required by STT models)
+            guard let outputFormat = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: 16000,
+                channels: 1,
+                interleaved: false
+            ) else {
+                errorMessage = "Failed to create audio format"
+                return
+            }
+
+            // Create audio converter if sample rate or channel count differs
+            let needsConversion = inputFormat.sampleRate != outputFormat.sampleRate ||
+                                inputFormat.channelCount != outputFormat.channelCount
+            if needsConversion {
+                audioConverter = AVAudioConverter(from: inputFormat, to: outputFormat)
+                logger.info("Audio converter created: \(inputFormat.sampleRate)Hz -> 16000Hz")
+            } else {
+                audioConverter = nil
+            }
 
             if selectedMode == .live {
                 // Live mode: Create audio stream for real-time transcription
@@ -466,10 +486,10 @@ class STTViewModel: ObservableObject {
                     self.audioContinuation = continuation
                 }
 
-                // Install tap for live streaming
+                // Install tap for live streaming with proper resampling
                 inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
                     guard let self = self else { return }
-                    if let audioData = self.convertBufferToData(buffer) {
+                    if let audioData = self.convertBufferToData(buffer, outputFormat: outputFormat) {
                         Task { @MainActor in
                             self.audioContinuation?.yield(audioData)
                             self.updateAudioLevel(buffer)
@@ -502,10 +522,10 @@ class STTViewModel: ObservableObject {
                     }
                 }
             } else {
-                // Batch mode: Just collect audio data
+                // Batch mode: Collect audio data with proper resampling
                 inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
                     guard let self = self else { return }
-                    if let audioData = self.convertBufferToData(buffer) {
+                    if let audioData = self.convertBufferToData(buffer, outputFormat: outputFormat) {
                         Task { @MainActor in
                             self.audioBuffer.append(audioData)
                             self.updateAudioLevel(buffer)
@@ -527,11 +547,48 @@ class STTViewModel: ObservableObject {
         }
     }
 
-    /// Convert AVAudioPCMBuffer to Data (Int16 PCM)
-    private func convertBufferToData(_ buffer: AVAudioPCMBuffer) -> Data? {
-        guard let floatData = buffer.floatChannelData else { return nil }
+    /// Convert AVAudioPCMBuffer to Data (Int16 PCM at 16kHz)
+    /// - Parameters:
+    ///   - buffer: Input audio buffer (may be at 48kHz or other sample rate)
+    ///   - outputFormat: Target format (16kHz mono)
+    /// - Returns: Int16 PCM data at 16kHz
+    private func convertBufferToData(_ buffer: AVAudioPCMBuffer, outputFormat: AVAudioFormat) -> Data? {
+        var processedBuffer = buffer
 
-        let frameCount = Int(buffer.frameLength)
+        // Resample to 16kHz if converter is available
+        if let converter = audioConverter {
+            let inputFormat = buffer.format
+            let capacity = outputFormat.sampleRate * Double(buffer.frameLength) / inputFormat.sampleRate
+            guard let convertedBuffer = AVAudioPCMBuffer(
+                pcmFormat: outputFormat,
+                frameCapacity: AVAudioFrameCount(capacity)
+            ) else {
+                return nil
+            }
+
+            var error: NSError?
+            var inputBufferUsed = false
+            let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
+                if inputBufferUsed {
+                    outStatus.pointee = .noDataNow
+                    return nil
+                }
+                inputBufferUsed = true
+                outStatus.pointee = .haveData
+                return buffer
+            }
+
+            converter.convert(to: convertedBuffer, error: &error, withInputFrom: inputBlock)
+            if error == nil && convertedBuffer.frameLength > 0 {
+                processedBuffer = convertedBuffer
+            } else {
+                return nil
+            }
+        }
+
+        guard let floatData = processedBuffer.floatChannelData else { return nil }
+
+        let frameCount = Int(processedBuffer.frameLength)
         var samples: [Int16] = []
         samples.reserveCapacity(frameCount)
 
@@ -567,6 +624,7 @@ class STTViewModel: ObservableObject {
         audioEngine?.stop()
         audioEngine = nil
         inputNode = nil
+        audioConverter = nil
 
         isRecording = false
         audioLevel = 0.0
