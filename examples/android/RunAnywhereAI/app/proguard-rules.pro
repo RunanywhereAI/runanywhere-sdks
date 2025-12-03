@@ -68,6 +68,41 @@
 }
 
 # ========================================================================================
+# RunAnywhere SDK JNI Bridge - CRITICAL for TTS/STT/VAD native operations
+# ========================================================================================
+
+# Keep the unified JNI bridge class and all its methods
+-keep class com.runanywhere.sdk.native.bridge.RunAnywhereBridge {
+    *;
+}
+
+# Keep result types used by JNI - constructors must be preserved for JNI instantiation
+-keep class com.runanywhere.sdk.native.bridge.NativeTTSSynthesisResult {
+    <init>(...);
+    <fields>;
+    *;
+}
+-keep class com.runanywhere.sdk.native.bridge.NativeVADResult {
+    <init>(...);
+    <fields>;
+    *;
+}
+-keep class com.runanywhere.sdk.native.bridge.NativeBridgeException {
+    *;
+}
+-keep class com.runanywhere.sdk.native.bridge.NativeResultCode {
+    *;
+}
+
+# Keep all classes in native.bridge package (covers enums and future additions)
+-keep class com.runanywhere.sdk.native.bridge.** {
+    *;
+}
+-keep enum com.runanywhere.sdk.native.bridge.** {
+    *;
+}
+
+# ========================================================================================
 # TensorFlow Lite
 # ========================================================================================
 
