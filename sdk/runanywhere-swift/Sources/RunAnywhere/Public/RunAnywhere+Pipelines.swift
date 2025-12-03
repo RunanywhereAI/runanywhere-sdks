@@ -131,7 +131,7 @@ public protocol ModularPipelineDelegate: AnyObject {
 // MARK: - Modular Voice Pipeline
 
 /// Modular voice pipeline that orchestrates individual components
-public class ModularVoicePipeline {
+public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
     private var vadComponent: VADComponent?
     private var sttComponent: STTComponent?
     private var llmComponent: LLMComponent?
@@ -149,11 +149,17 @@ public class ModularVoicePipeline {
     private var enableDiarization = false
     private var enableContinuousMode = false
 
+    // Audio playback for Piper/ONNX TTS (which returns audio data instead of playing directly)
+    private var audioPlayer: AVAudioPlayer?
+    private var audioPlaybackContinuation: CheckedContinuation<Void, Error>?
+    private let logger = SDKLogger(category: "ModularVoicePipeline")
+
     public init(
         config: ModularPipelineConfig,
         speakerDiarization: SpeakerDiarizationService? = nil
     ) async throws {
         self.config = config
+        super.init()
 
         // Create components based on config
         if config.components.contains(.vad), let vadConfig = config.vadConfig {
@@ -180,6 +186,76 @@ public class ModularVoicePipeline {
             let diarizationConfig = SpeakerDiarizationConfiguration()
             speakerDiarizationComponent = await SpeakerDiarizationComponent(configuration: diarizationConfig)
         }
+    }
+
+    // MARK: - TTS Audio Playback
+
+    /// Play TTS audio data using AVAudioPlayer
+    /// For Piper/ONNX TTS models that return audio data instead of playing directly
+    private func playTTSAudio(_ audioData: Data) async throws {
+        guard !audioData.isEmpty else {
+            // System TTS returns empty data - audio already played via AVSpeechSynthesizer
+            logger.info("Empty audio data - System TTS already played audio directly")
+            return
+        }
+
+        logger.info("Playing Piper/ONNX TTS audio: \(audioData.count) bytes")
+
+        // Configure audio session for playback
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
+            try audioSession.setActive(true)
+            try audioSession.overrideOutputAudioPort(.speaker)
+        } catch {
+            logger.error("Failed to configure audio session for TTS playback: \(error)")
+        }
+        #endif
+
+        return try await withCheckedThrowingContinuation { continuation in
+            do {
+                // Create audio player from WAV data
+                audioPlayer = try AVAudioPlayer(data: audioData)
+                audioPlayer?.delegate = self
+                audioPlayer?.prepareToPlay()
+
+                // Store continuation to resume when playback completes
+                audioPlaybackContinuation = continuation
+
+                // Start playback
+                if audioPlayer?.play() == true {
+                    logger.info("TTS audio playback started")
+                } else {
+                    audioPlaybackContinuation = nil
+                    continuation.resume(throwing: SDKError.generationFailed("Failed to start TTS audio playback"))
+                }
+            } catch {
+                logger.error("Failed to create audio player: \(error)")
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    // MARK: - AVAudioPlayerDelegate
+
+    public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        logger.info("TTS audio playback finished (success: \(flag))")
+        audioPlayer = nil
+
+        if flag {
+            audioPlaybackContinuation?.resume()
+        } else {
+            audioPlaybackContinuation?.resume(throwing: SDKError.generationFailed("TTS audio playback failed"))
+        }
+        audioPlaybackContinuation = nil
+    }
+
+    public func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        logger.error("TTS audio decode error: \(error?.localizedDescription ?? "unknown")")
+        audioPlayer = nil
+        audioPlaybackContinuation?.resume(throwing: error ?? SDKError.generationFailed("TTS audio decode error"))
+        audioPlaybackContinuation = nil
     }
 
     /// Enable or disable speaker diarization
@@ -246,6 +322,7 @@ public class ModularVoicePipeline {
     }
 
     /// Process audio stream through the pipeline
+    /// Uses silence detection to automatically trigger STT → LLM → TTS flow
     public func process(audioStream: AsyncStream<VoiceAudioChunk>) -> PipelineEventStream {
         AsyncThrowingStream { continuation in
             Task {
@@ -253,6 +330,13 @@ public class ModularVoicePipeline {
                     var currentSpeaker: SpeakerInfo?
                     var audioBuffer: [Float] = []  // Accumulate audio samples
                     var isSpeaking = false
+
+                    // Silence detection for live conversational mode
+                    // When user pauses speaking for ~0.5-0.8 seconds, we process
+                    var silenceFrameCount = 0
+                    let silenceThresholdFrames = 5  // 5 frames × 100ms = 0.5 seconds of silence
+                    let silenceEnergyThreshold: Float = 0.05  // Audio level below this is "silence"
+                    var hasRecordedSpeech = false  // Track if we've recorded any real speech
 
                     for await voiceChunk in audioStream {
                         // Extract float samples from VoiceAudioChunk
@@ -266,6 +350,8 @@ public class ModularVoicePipeline {
                         if currentState == .playingTTS || currentState == .generatingResponse || currentState == .cooldown {
                             // Clear buffer during these critical states
                             audioBuffer.removeAll()
+                            silenceFrameCount = 0
+                            hasRecordedSpeech = false
                             if currentState == .cooldown {
                                 print("🛡️ Blocking audio during cooldown - preventing feedback")
                             } else {
@@ -274,7 +360,11 @@ public class ModularVoicePipeline {
                             continue
                         }
 
-                        // Process through VAD if available
+                        // Calculate audio level for visualization (RMS energy)
+                        let audioLevel = Self.calculateAudioLevel(floatSamples)
+                        continuation.yield(.vadAudioLevel(audioLevel))
+
+                        // Process through VAD if available, otherwise use silence-based detection
                         var speechDetected = false
                         if let vad = vadComponent {
                             let vadResult = try await vad.detectSpeech(in: floatSamples)
@@ -294,173 +384,283 @@ public class ModularVoicePipeline {
                                 continuation.yield(.vadSpeechEnd)
                                 isSpeaking = false
 
-                                // Now transcribe the accumulated audio
+                                // Now transcribe the accumulated audio - NO minimum threshold
                                 if let stt = sttComponent, !audioBuffer.isEmpty {
-                                    // Check minimum audio duration (at least 0.8 seconds = 12800 samples at 16kHz)
-                                    // This reduces "Audio too short" errors while maintaining responsiveness
-                                    let minimumSamples = 12800
+                                    print("📤 Sending \(audioBuffer.count) samples to STT")
+                                    // Convert Float32 samples to Int16 PCM (what STT expects)
+                                    let accumulatedData = Self.convertFloatToInt16PCM(audioBuffer)
 
-                                    if audioBuffer.count >= minimumSamples {
-                                        print("📤 Sending \(audioBuffer.count) samples to STT")
-                                        // Convert accumulated float samples to Data
-                                        let accumulatedData = audioBuffer.withUnsafeBytes { bytes in
-                                            Data(bytes)
+                                    // Use proper STTOptions - AudioCapture outputs 16kHz audio
+                                    let sttOptions = STTOptions(
+                                        language: "en",
+                                        enablePunctuation: true,
+                                        audioFormat: .pcm,
+                                        sampleRate: 16000  // AudioCapture already resamples to 16kHz
+                                    )
+                                    let transcript = try await stt.transcribe(accumulatedData, options: sttOptions)
+
+                                    // Only emit if we got actual text
+                                    if !transcript.text.isEmpty {
+                                        print("📝 Got transcript: '\(transcript.text)'")
+
+                                        // Emit transcript with or without speaker info
+                                        if enableDiarization, let speaker = currentSpeaker {
+                                            continuation.yield(.sttFinalTranscriptWithSpeaker(transcript.text, speaker))
+                                        } else {
+                                            continuation.yield(.sttFinalTranscript(transcript.text))
                                         }
 
-                                        let transcript = try await stt.transcribe(accumulatedData)
+                                        // Process through LLM if available
+                                        if let llm = llmComponent {
+                                            // Transition to generating response
+                                            await stateManager.transition(to: .generatingResponse)
 
-                                        // Only emit if we got actual text
-                                        if !transcript.text.isEmpty {
-                                            print("📝 Got transcript: '\(transcript.text)'")
+                                            // Pause VAD IMMEDIATELY when starting LLM generation
+                                            await vadComponent?.pause()
 
-                                            // Emit transcript with or without speaker info
-                                            if enableDiarization, let speaker = currentSpeaker {
-                                                continuation.yield(.sttFinalTranscriptWithSpeaker(transcript.text, speaker))
-                                            } else {
-                                                continuation.yield(.sttFinalTranscript(transcript.text))
+                                            print("🤖 Sending to LLM: '\(transcript.text)'")
+                                            continuation.yield(.llmThinking)
+
+                                            // Use streaming for better UX
+                                            var fullResponse = ""
+                                            var lastYieldTime = Date()
+                                            let yieldInterval: TimeInterval = 0.1
+
+                                            for try await token in await llm.streamGenerate(transcript.text) {
+                                                fullResponse += token
+
+                                                let now = Date()
+                                                if now.timeIntervalSince(lastYieldTime) >= yieldInterval {
+                                                    continuation.yield(.llmPartialResponse(fullResponse))
+                                                    lastYieldTime = now
+                                                }
                                             }
 
-                                            // Process through LLM if available
-                                            if let llm = llmComponent {
-                                                // Transition to generating response
-                                                await stateManager.transition(to: .generatingResponse)
+                                            print("💬 LLM Response: '\(fullResponse)'")
+                                            continuation.yield(.llmFinalResponse(fullResponse))
 
-                                                // Pause VAD IMMEDIATELY when starting LLM generation
-                                                await vadComponent?.pause()  // Pause VAD during response generation
-
-                                                print("🤖 Sending to LLM: '\(transcript.text)'")
-                                                continuation.yield(.llmThinking)
-
-                                                // Use streaming for better UX - user sees response as it's generated
-                                                var fullResponse = ""
-                                                var lastYieldTime = Date()
-                                                let yieldInterval: TimeInterval = 0.1  // Yield every 100ms for smooth updates
-
-                                                for try await token in await llm.streamGenerate(transcript.text) {
-                                                    fullResponse += token
-
-                                                    // Yield partial responses at regular intervals for smooth UI updates
-                                                    let now = Date()
-                                                    if now.timeIntervalSince(lastYieldTime) >= yieldInterval {
-                                                        continuation.yield(.llmPartialResponse(fullResponse))
-                                                        lastYieldTime = now
-                                                    }
+                                            // Process through TTS if available
+                                            if let tts = ttsComponent {
+                                                if let vad = await vadComponent?.service as? SimpleEnergyVAD {
+                                                    vad.notifyTTSWillStart()
                                                 }
 
-                                                // Always yield the final complete response
-                                                print("💬 LLM Response: '\(fullResponse)'")
-                                                continuation.yield(.llmFinalResponse(fullResponse))
+                                                try await Task.sleep(nanoseconds: 20_000_000) // 20ms
 
-                                                // Process through TTS if available
-                                                if let tts = ttsComponent {
-                                                    // Notify VAD BEFORE starting TTS that it should block
-                                                    if let vad = await vadComponent?.service as? SimpleEnergyVAD {
-                                                        vad.notifyTTSWillStart()
-                                                    }
+                                                let transitionedToPlaying = await stateManager.transition(to: .playingTTS)
 
-                                                    // Keep audio session as-is since we're already in playAndRecord mode
-                                                    // Just ensure speaker output for TTS
-                                                    #if os(iOS) || os(tvOS) || os(watchOS)
-                                                    let audioSession = AVAudioSession.sharedInstance()
+                                                if transitionedToPlaying {
+                                                    print("🔊 Starting TTS for: '\(fullResponse.prefix(50))...'")
+                                                    continuation.yield(.ttsStarted)
 
                                                     do {
-                                                        // Simply ensure speaker output without changing category
-                                                        try audioSession.overrideOutputAudioPort(.speaker)
-                                                        print("🔊 Audio routed to speaker for TTS")
-                                                    } catch {
-                                                        // Non-critical if we can't override port
-                                                        print("⚠️ Could not route audio to speaker: \(error)")
-                                                    }
-                                                    #endif
+                                                        // Generate TTS audio
+                                                        let ttsOutput = try await tts.synthesize(fullResponse)
 
-                                                    // Small delay for audio configuration
-                                                    try await Task.sleep(nanoseconds: 20_000_000) // 20ms
+                                                        // Play audio - handles both System TTS (empty data) and Piper TTS (WAV data)
+                                                        try await self.playTTSAudio(ttsOutput.audioData)
 
-                                                    // Transition to TTS playback
-                                                    let transitionedToPlaying = await stateManager.transition(to: .playingTTS)
+                                                        print("✅ TTS completed")
+                                                        continuation.yield(.ttsCompleted)
 
-                                                    if transitionedToPlaying {
-                                                        print("🔊 Starting TTS for: '\(fullResponse.prefix(50))...'")
-                                                        continuation.yield(.ttsStarted)
-
-                                                        do {
-                                                            _ = try await tts.synthesize(fullResponse)
-                                                            print("✅ TTS completed")
-                                                            continuation.yield(.ttsCompleted)
-
-                                                            // Only transition to cooldown if we're still in playingTTS state
-                                                            // This prevents invalid transitions if state was changed elsewhere
-                                                            let currentState = await stateManager.state
-                                                            if currentState == .playingTTS {
-                                                                await stateManager.transition(to: .cooldown)
-                                                            } else {
-                                                                print("⚠️ State changed during TTS (now \(currentState.rawValue)), skipping cooldown transition")
-                                                            }
-                                                        } catch {
-                                                            print("⚠️ TTS synthesis failed: \(error)")
-                                                            // Ensure we transition out of playingTTS state even on error
-                                                            let currentState = await stateManager.state
-                                                            if currentState == .playingTTS {
-                                                                await stateManager.transition(to: .cooldown)
-                                                            }
+                                                        let currentState = await stateManager.state
+                                                        if currentState == .playingTTS {
+                                                            await stateManager.transition(to: .cooldown)
                                                         }
-                                                    } else {
-                                                        print("⚠️ Failed to transition to playingTTS state, skipping TTS")
+                                                    } catch {
+                                                        print("⚠️ TTS synthesis failed: \(error)")
+                                                        let currentState = await stateManager.state
+                                                        if currentState == .playingTTS {
+                                                            await stateManager.transition(to: .cooldown)
+                                                        }
                                                     }
-
-                                                    // Audio session stays in playAndRecord mode
-                                                    // Just add a small delay to ensure TTS audio has cleared
-                                                    #if os(iOS) || os(tvOS) || os(watchOS)
-                                                    // Smaller delay since we're not switching modes
-                                                    try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-
-                                                    print("🎤 Ready for recording - Sample rate: \(audioSession.sampleRate)Hz")
-                                                    #endif
                                                 }
 
-                                                // Notify VAD that TTS finished
-                                                if let vad = await vadComponent?.service as? SimpleEnergyVAD {
-                                                    vad.notifyTTSDidFinish()
-                                                }
-
-                                                // Clear any buffered audio before resuming
-                                                audioBuffer.removeAll()
-                                                isSpeaking = false  // Reset speaking state
-
-                                                // Wait for state manager cooldown to complete
-                                                // The AudioPipelineStateManager already handles 800ms cooldown
-                                                while await stateManager.state == .cooldown {
-                                                    try await Task.sleep(nanoseconds: 50_000_000) // Check every 50ms
-                                                }
-
-                                                // Clear buffer and resume VAD
-                                                audioBuffer.removeAll()
-                                                await vadComponent?.resume()
-                                                print("▶️ VAD resumed")
-                                                print("🎤 VAD resumed, ready for next input")
-                                            } else {
-                                                // No LLM, just transition back to idle
-                                                await stateManager.transition(to: .idle)
+                                                #if os(iOS) || os(tvOS) || os(watchOS)
+                                                try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                                                #endif
                                             }
+
+                                            // Notify VAD that TTS finished
+                                            if let vad = await vadComponent?.service as? SimpleEnergyVAD {
+                                                vad.notifyTTSDidFinish()
+                                            }
+
+                                            // Clear buffer and wait for cooldown
+                                            audioBuffer.removeAll()
+                                            isSpeaking = false
+
+                                            while await stateManager.state == .cooldown {
+                                                try await Task.sleep(nanoseconds: 50_000_000)
+                                            }
+
+                                            audioBuffer.removeAll()
+                                            await vadComponent?.resume()
+                                            print("🎤 VAD resumed, ready for next input")
                                         } else {
-                                            print("⚠️ Empty transcript, skipping")
                                             await stateManager.transition(to: .idle)
                                         }
                                     } else {
-                                        // Audio too short, return to idle
-                                        print("Audio too short for transcription")
+                                        print("⚠️ Empty transcript, skipping")
                                         await stateManager.transition(to: .idle)
                                     }
 
-                                    // Clear buffer after processing
                                     audioBuffer = []
                                 } else {
-                                    // No STT component, return to idle
                                     await stateManager.transition(to: .idle)
                                 }
                             }
                         } else {
-                            // No VAD, treat all audio as speech
+                            // No VAD - Live conversational mode with silence detection
+                            // Automatically detect when user stops speaking and process
+
+                            // Start recording on first chunk
+                            if !isSpeaking {
+                                await stateManager.transition(to: .listening)
+                                print("🎙️ Live mode: Recording started (silence detection active)")
+                                continuation.yield(.vadSpeechStart)
+                                isSpeaking = true
+                                silenceFrameCount = 0
+                                hasRecordedSpeech = false
+                            }
+
+                            // Detect if this is speech or silence based on audio level
+                            if audioLevel > silenceEnergyThreshold {
+                                // User is speaking
+                                silenceFrameCount = 0
+                                hasRecordedSpeech = true
+                                speechDetected = true
+                            } else if hasRecordedSpeech {
+                                // Silence detected after user spoke
+                                silenceFrameCount += 1
+
+                                if silenceFrameCount >= silenceThresholdFrames {
+                                    // User paused for ~0.5 seconds - process the speech
+                                    print("🔇 Silence detected (\(silenceFrameCount) frames) - processing speech")
+                                    await stateManager.transition(to: .processingSpeech)
+                                    continuation.yield(.vadSpeechEnd)
+                                    isSpeaking = false
+
+                                    // Process through STT → LLM → TTS
+                                    if let stt = sttComponent, !audioBuffer.isEmpty {
+                                        print("📤 Sending \(audioBuffer.count) samples to STT")
+                                        let accumulatedData = Self.convertFloatToInt16PCM(audioBuffer)
+
+                                        // Use proper STTOptions - AudioCapture outputs 16kHz audio
+                                        let sttOptions = STTOptions(
+                                            language: "en",
+                                            enablePunctuation: true,
+                                            audioFormat: .pcm,
+                                            sampleRate: 16000  // AudioCapture already resamples to 16kHz
+                                        )
+
+                                        do {
+                                            let transcript = try await stt.transcribe(accumulatedData, options: sttOptions)
+
+                                            if !transcript.text.isEmpty {
+                                                print("📝 Got transcript: '\(transcript.text)'")
+
+                                                if enableDiarization, let speaker = currentSpeaker {
+                                                    continuation.yield(.sttFinalTranscriptWithSpeaker(transcript.text, speaker))
+                                                } else {
+                                                    continuation.yield(.sttFinalTranscript(transcript.text))
+                                                }
+
+                                                // Process through LLM if available
+                                                if let llm = llmComponent {
+                                                    await stateManager.transition(to: .generatingResponse)
+                                                    print("🤖 Sending to LLM: '\(transcript.text)'")
+                                                    continuation.yield(.llmThinking)
+
+                                                    var fullResponse = ""
+                                                    var lastYieldTime = Date()
+                                                    let yieldInterval: TimeInterval = 0.1
+
+                                                    for try await token in await llm.streamGenerate(transcript.text) {
+                                                        fullResponse += token
+                                                        let now = Date()
+                                                        if now.timeIntervalSince(lastYieldTime) >= yieldInterval {
+                                                            continuation.yield(.llmPartialResponse(fullResponse))
+                                                            lastYieldTime = now
+                                                        }
+                                                    }
+
+                                                    print("💬 LLM Response: '\(fullResponse)'")
+                                                    continuation.yield(.llmFinalResponse(fullResponse))
+
+                                                    // Process through TTS if available
+                                                    if let tts = ttsComponent {
+                                                        try await Task.sleep(nanoseconds: 20_000_000)
+
+                                                        let transitionedToPlaying = await stateManager.transition(to: .playingTTS)
+                                                        if transitionedToPlaying {
+                                                            print("🔊 Starting TTS")
+                                                            continuation.yield(.ttsStarted)
+
+                                                            do {
+                                                                // Generate TTS audio
+                                                                let ttsOutput = try await tts.synthesize(fullResponse)
+
+                                                                // Play audio - handles both System TTS (empty data) and Piper TTS (WAV data)
+                                                                try await self.playTTSAudio(ttsOutput.audioData)
+
+                                                                print("✅ TTS completed")
+                                                                continuation.yield(.ttsCompleted)
+                                                                await stateManager.transition(to: .cooldown)
+                                                            } catch {
+                                                                print("⚠️ TTS failed: \(error)")
+                                                                await stateManager.transition(to: .cooldown)
+                                                            }
+                                                        }
+
+                                                        #if os(iOS) || os(tvOS) || os(watchOS)
+                                                        try await Task.sleep(nanoseconds: 100_000_000)
+                                                        #endif
+                                                    }
+
+                                                    // Wait for cooldown, then resume listening
+                                                    while await stateManager.state == .cooldown {
+                                                        try await Task.sleep(nanoseconds: 50_000_000)
+                                                    }
+
+                                                    // Resume listening for next turn
+                                                    audioBuffer.removeAll()
+                                                    silenceFrameCount = 0
+                                                    hasRecordedSpeech = false
+                                                    isSpeaking = false
+
+                                                    // Start listening again automatically
+                                                    await stateManager.transition(to: .listening)
+                                                    print("🎤 Ready for next input")
+                                                    continuation.yield(.vadSpeechStart)
+                                                    isSpeaking = true
+                                                } else {
+                                                    await stateManager.transition(to: .idle)
+                                                }
+                                            } else {
+                                                print("⚠️ Empty transcript, resuming listening")
+                                                // Resume listening
+                                                audioBuffer.removeAll()
+                                                silenceFrameCount = 0
+                                                hasRecordedSpeech = false
+                                                await stateManager.transition(to: .listening)
+                                                continuation.yield(.vadSpeechStart)
+                                                isSpeaking = true
+                                            }
+                                        } catch {
+                                            print("⚠️ STT failed: \(error), resuming listening")
+                                            audioBuffer.removeAll()
+                                            silenceFrameCount = 0
+                                            hasRecordedSpeech = false
+                                            await stateManager.transition(to: .listening)
+                                            continuation.yield(.vadSpeechStart)
+                                            isSpeaking = true
+                                        }
+                                    }
+
+                                    audioBuffer = []
+                                }
+                            }
                             speechDetected = true
                         }
 
@@ -505,11 +705,109 @@ public class ModularVoicePipeline {
                             }
                         }
                     }
+
+                    // Stream ended - process any remaining accumulated audio
+                    // This handles the case when user manually stops the stream
+                    if vadComponent == nil && !audioBuffer.isEmpty {
+                        print("🎙️ Stream ended with \(audioBuffer.count) samples")
+                        continuation.yield(.vadSpeechEnd)
+
+                        // Process accumulated audio through STT - NO minimum threshold
+                        if let stt = sttComponent {
+                            print("📤 Sending \(audioBuffer.count) samples to STT")
+                            let accumulatedData = Self.convertFloatToInt16PCM(audioBuffer)
+
+                            // Use proper STTOptions - AudioCapture outputs 16kHz audio
+                            let sttOptions = STTOptions(
+                                language: "en",
+                                enablePunctuation: true,
+                                audioFormat: .pcm,
+                                sampleRate: 16000  // AudioCapture already resamples to 16kHz
+                            )
+
+                            do {
+                                let transcript = try await stt.transcribe(accumulatedData, options: sttOptions)
+                                if !transcript.text.isEmpty {
+                                    print("📝 Got transcript: '\(transcript.text)'")
+                                    continuation.yield(.sttFinalTranscript(transcript.text))
+
+                                    // Process through LLM if available
+                                    if let llm = llmComponent {
+                                        await stateManager.transition(to: .generatingResponse)
+                                        print("🤖 Sending to LLM: '\(transcript.text)'")
+                                        continuation.yield(.llmThinking)
+
+                                        var fullResponse = ""
+                                        for try await token in await llm.streamGenerate(transcript.text) {
+                                            fullResponse += token
+                                        }
+
+                                        print("💬 LLM Response: '\(fullResponse)'")
+                                        continuation.yield(.llmFinalResponse(fullResponse))
+
+                                        // Process through TTS if available
+                                        if let tts = ttsComponent {
+                                            await stateManager.transition(to: .playingTTS)
+                                            print("🔊 Starting TTS")
+                                            continuation.yield(.ttsStarted)
+
+                                            do {
+                                                // Generate TTS audio
+                                                let ttsOutput = try await tts.synthesize(fullResponse)
+
+                                                // Play audio - handles both System TTS (empty data) and Piper TTS (WAV data)
+                                                try await self.playTTSAudio(ttsOutput.audioData)
+
+                                                print("✅ TTS completed")
+                                                continuation.yield(.ttsCompleted)
+                                            } catch {
+                                                print("⚠️ TTS synthesis failed: \(error)")
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch {
+                                print("⚠️ STT transcription failed: \(error)")
+                            }
+                        }
+                    }
+
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
                 }
             }
+        }
+    }
+
+    /// Calculate audio level (RMS) for visualization - returns 0.0 to 1.0
+    private static func calculateAudioLevel(_ samples: [Float]) -> Float {
+        guard !samples.isEmpty else { return 0.0 }
+        var sum: Float = 0.0
+        for sample in samples {
+            sum += sample * sample
+        }
+        let rms = sqrt(sum / Float(samples.count))
+        // Convert RMS to dB and normalize to 0-1 range
+        let dbLevel = 20 * log10(rms + 0.0001)
+        return max(0, min(1, (dbLevel + 60) / 60))
+    }
+
+    /// Convert Float32 audio samples to Int16 PCM Data (what STT expects)
+    /// This matches the conversion done in the working STT view
+    private static func convertFloatToInt16PCM(_ floatSamples: [Float]) -> Data {
+        var int16Samples: [Int16] = []
+        int16Samples.reserveCapacity(floatSamples.count)
+
+        for sample in floatSamples {
+            // Clamp to [-1.0, 1.0] and convert to Int16 range
+            let clampedSample = max(-1.0, min(1.0, sample))
+            let int16Sample = Int16(clampedSample * Float(Int16.max))
+            int16Samples.append(int16Sample)
+        }
+
+        return int16Samples.withUnsafeBytes { bytes in
+            Data(bytes)
         }
     }
 

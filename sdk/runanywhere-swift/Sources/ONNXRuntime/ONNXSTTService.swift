@@ -124,10 +124,11 @@ public class ONNXSTTService: STTService {
             throw ONNXError.invalidHandle
         }
 
-        logger.info("Transcribing audio: \(audioData.count) bytes")
+        logger.info("Transcribing audio: \(audioData.count) bytes, input sample rate: \(options.sampleRate)Hz")
 
-        // Convert audio data to float32 samples
-        let samples = try convertToFloat32Samples(audioData: audioData)
+        // Convert audio data to float32 samples at 16kHz (STT model requirement)
+        // Use the sample rate from options to determine if resampling is needed
+        let samples = try convertToFloat32Samples(audioData: audioData, inputSampleRate: options.sampleRate)
         let sampleRate: Int32 = 16000
 
         var resultPtr: UnsafeMutablePointer<CChar>? = nil
@@ -236,8 +237,8 @@ public class ONNXSTTService: STTService {
             chunkCount += 1
             logger.debug("Received audio chunk #\(chunkCount), size: \(audioChunk.count) bytes")
 
-            // Convert chunk to float32 samples
-            let samples = try convertToFloat32Samples(audioData: audioChunk)
+            // Convert chunk to float32 samples (use sample rate from options)
+            let samples = try convertToFloat32Samples(audioData: audioChunk, inputSampleRate: options.sampleRate)
 
             // Feed audio to stream
             let feedStatus = samples.withUnsafeBufferPointer { buffer in
@@ -386,26 +387,44 @@ public class ONNXSTTService: STTService {
         )
     }
 
-    private func convertToFloat32Samples(audioData: Data) throws -> [Float] {
-        // Assuming input is Int16 PCM at 48kHz
-        // Resample to 16kHz for STT (downsample by factor of 3)
+    /// Convert Int16 PCM audio data to Float32 samples at 16kHz
+    /// - Parameters:
+    ///   - audioData: Raw Int16 PCM audio data
+    ///   - inputSampleRate: Sample rate of the input audio (default: 48000Hz for device recordings)
+    /// - Returns: Float32 samples resampled to 16kHz
+    private func convertToFloat32Samples(audioData: Data, inputSampleRate: Int = 48000) throws -> [Float] {
+        let targetSampleRate = 16000
         let int16Count = audioData.count / MemoryLayout<Int16>.size
+
+        // Calculate downsampling factor based on input sample rate
+        // If input is already at 16kHz, no downsampling needed (factor = 1)
+        // If input is at 48kHz, downsample by 3 (factor = 3)
+        let downsampleFactor = max(1, inputSampleRate / targetSampleRate)
+
         var samples: [Float] = []
-        samples.reserveCapacity(int16Count / 3)
+        samples.reserveCapacity(int16Count / downsampleFactor)
 
         audioData.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
             let int16Buffer = bytes.bindMemory(to: Int16.self)
 
-            // Simple downsampling: take every 3rd sample (48kHz -> 16kHz)
-            var i = 0
-            while i < int16Count {
-                let normalized = Float(int16Buffer[i]) / Float(Int16.max)
-                samples.append(normalized)
-                i += 3
+            if downsampleFactor == 1 {
+                // No downsampling needed - input is already at target sample rate
+                for i in 0..<int16Count {
+                    let normalized = Float(int16Buffer[i]) / Float(Int16.max)
+                    samples.append(normalized)
+                }
+            } else {
+                // Downsample by taking every Nth sample
+                var i = 0
+                while i < int16Count {
+                    let normalized = Float(int16Buffer[i]) / Float(Int16.max)
+                    samples.append(normalized)
+                    i += downsampleFactor
+                }
             }
         }
 
-        logger.debug("Converted \(int16Count) samples at 48kHz to \(samples.count) samples at 16kHz")
+        logger.debug("Converted \(int16Count) samples at \(inputSampleRate)Hz to \(samples.count) samples at \(targetSampleRate)Hz (factor: \(downsampleFactor))")
         return samples
     }
 }
