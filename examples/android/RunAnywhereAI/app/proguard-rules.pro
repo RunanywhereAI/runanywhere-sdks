@@ -68,6 +68,39 @@
 }
 
 # ========================================================================================
+# RunAnywhere SDK - KEEP ENTIRE SDK (CRITICAL)
+# ========================================================================================
+# The SDK uses dynamic registration, reflection-like patterns, and JNI callbacks.
+# We must keep ALL classes, interfaces, enums, and their members to prevent R8/ProGuard
+# from obfuscating or removing them.
+
+# MASTER RULE: Keep ALL classes in com.runanywhere.sdk package and all subpackages
+-keep class com.runanywhere.sdk.** { *; }
+-keep interface com.runanywhere.sdk.** { *; }
+-keep enum com.runanywhere.sdk.** { *; }
+
+# Keep all constructors (critical for JNI object creation)
+-keepclassmembers class com.runanywhere.sdk.** {
+    <init>(...);
+}
+
+# Keep companion objects and their members (Kotlin singletons like LlamaCppAdapter.shared)
+-keepclassmembers class com.runanywhere.sdk.** {
+    public static ** Companion;
+    public static ** INSTANCE;
+    public static ** shared;
+}
+
+# Keep Kotlin metadata for reflection
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
+-keep class kotlin.Metadata { *; }
+
+# Prevent obfuscation of class names (important for logging and debugging)
+-keepnames class com.runanywhere.sdk.** { *; }
+-keepnames interface com.runanywhere.sdk.** { *; }
+-keepnames enum com.runanywhere.sdk.** { *; }
+
+# ========================================================================================
 # TensorFlow Lite
 # ========================================================================================
 
@@ -194,8 +227,9 @@
 # ========================================================================================
 
 # Keep model files in assets
--keepresourcefiles assets/models/**
--keepresourcefiles assets/tokenizers/**
+# Note: -keepresourcefiles is not supported in R8, resources are kept by default
+# -keepresourcefiles assets/models/**
+# -keepresourcefiles assets/tokenizers/**
 
 # Don't obfuscate model loading code
 -keep class com.runanywhere.runanywhereai.data.repository.ModelRepository { *; }
@@ -256,11 +290,85 @@
 -dontwarn org.jetbrains.annotations.**
 
 # ========================================================================================
+# R8 Generated Missing Rules
+# ========================================================================================
+
+# Zstd compression library
+-dontwarn com.github.luben.zstd.ZstdInputStream
+-dontwarn com.github.luben.zstd.ZstdOutputStream
+
+# Google API Client HTTP library
+-dontwarn com.google.api.client.http.GenericUrl
+-dontwarn com.google.api.client.http.HttpHeaders
+-dontwarn com.google.api.client.http.HttpRequest
+-dontwarn com.google.api.client.http.HttpRequestFactory
+-dontwarn com.google.api.client.http.HttpResponse
+-dontwarn com.google.api.client.http.HttpTransport
+-dontwarn com.google.api.client.http.javanet.NetHttpTransport$Builder
+-dontwarn com.google.api.client.http.javanet.NetHttpTransport
+
+# Apache Commons codec
+-dontwarn org.apache.commons.codec.digest.PureJavaCrc32C
+-dontwarn org.apache.commons.codec.digest.XXHash32
+
+# Brotli decompression
+-dontwarn org.brotli.dec.BrotliInputStream
+
+# Joda time
+-dontwarn org.joda.time.Instant
+
+# ASM (bytecode manipulation)
+-dontwarn org.objectweb.asm.AnnotationVisitor
+-dontwarn org.objectweb.asm.Attribute
+-dontwarn org.objectweb.asm.ClassReader
+-dontwarn org.objectweb.asm.ClassVisitor
+-dontwarn org.objectweb.asm.FieldVisitor
+-dontwarn org.objectweb.asm.MethodVisitor
+
+# XZ compression library
+-dontwarn org.tukaani.xz.ARMOptions
+-dontwarn org.tukaani.xz.ARMThumbOptions
+-dontwarn org.tukaani.xz.DeltaOptions
+-dontwarn org.tukaani.xz.FilterOptions
+-dontwarn org.tukaani.xz.FinishableOutputStream
+-dontwarn org.tukaani.xz.FinishableWrapperOutputStream
+-dontwarn org.tukaani.xz.IA64Options
+-dontwarn org.tukaani.xz.LZMA2InputStream
+-dontwarn org.tukaani.xz.LZMA2Options
+-dontwarn org.tukaani.xz.LZMAInputStream
+-dontwarn org.tukaani.xz.LZMAOutputStream
+-dontwarn org.tukaani.xz.MemoryLimitException
+-dontwarn org.tukaani.xz.PowerPCOptions
+-dontwarn org.tukaani.xz.SPARCOptions
+-dontwarn org.tukaani.xz.UnsupportedOptionsException
+-dontwarn org.tukaani.xz.X86Options
+-dontwarn org.tukaani.xz.XZ
+-dontwarn org.tukaani.xz.XZOutputStream
+
+# ========================================================================================
 # Debug Information (Comment out for release builds)
 # ========================================================================================
 
 # Keep debug information for crash reporting
 -keepattributes SourceFile,LineNumberTable
+
+# ========================================================================================
+# Logging - Keep Log statements for debugging release builds
+# ========================================================================================
+
+# Keep all android.util.Log methods (do NOT strip logs in release for debugging)
+-assumenosideeffects class android.util.Log {
+    # Comment out these lines to KEEP logs in release builds
+    # public static int v(...);
+    # public static int d(...);
+    # public static int i(...);
+    # public static int w(...);
+    # public static int e(...);
+}
+
+# Keep Timber logging if used
+-keep class timber.log.Timber { *; }
+-keep class timber.log.Timber$* { *; }
 
 # Print configuration for debugging (remove in final release)
 #-printconfiguration proguard-config.txt

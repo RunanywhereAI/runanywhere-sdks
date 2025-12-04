@@ -1,20 +1,36 @@
 package com.runanywhere.sdk.components.stt
 
+import com.runanywhere.sdk.data.models.generateUUID
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.services.analytics.STTAnalyticsService
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
+import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.events.ModularPipelineEvent
 import com.runanywhere.sdk.events.SpeakerInfo
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
 
 /**
  * Handles Speech-to-Text processing in the voice pipeline (matches iOS STTHandler exactly)
+ *
+ * @param voiceAnalytics Voice analytics service (optional)
+ * @param sttAnalytics STT analytics service (optional)
+ * @param telemetryScope Coroutine scope for telemetry operations. Should be provided by parent
+ *                       component for proper lifecycle management. Defaults to a new scope if not provided.
  */
 class STTHandler(
     private val voiceAnalytics: Any? = null, // VoiceAnalyticsService - avoiding dependency for now
-    private val sttAnalytics: STTAnalyticsService? = null
+    private val sttAnalytics: STTAnalyticsService? = null,
+    private val telemetryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 ) {
     private val logger = SDKLogger("STTHandler")
+
+    // Get telemetry service from ServiceContainer (matches iOS pattern)
+    private val telemetryService get() = ServiceContainer.shared.telemetryService
 
     /**
      * Transcribe audio samples to text (matches iOS signature exactly)
@@ -41,13 +57,37 @@ class STTHandler(
 
         logger.debug("Starting transcription with ${samples.size} samples")
 
+        // Generate session ID for telemetry tracking
+        val sessionId = generateUUID()
+
         // Calculate audio length (assuming 16kHz sample rate like iOS)
         val audioLength = samples.size.toDouble() / 16000.0
+        val audioDurationMs = audioLength * 1000.0
 
         // Track transcription start
         sttAnalytics?.trackTranscriptionStarted(audioLength)
 
         val startTime = getCurrentTimeMillis()
+        val currentModelId = service.currentModel
+
+        logger.info("Starting STT transcription with model: $currentModelId")
+
+        // Track transcription started - fire and forget to avoid blocking transcription
+        telemetryScope.launch {
+            try {
+                telemetryService?.trackSTTTranscriptionStarted(
+                    sessionId = sessionId,
+                    modelId = currentModelId ?: "unknown",
+                    modelName = currentModelId ?: "Unknown STT Model",
+                    framework = "ONNX Runtime",
+                    language = options.language,
+                    device = PlatformUtils.getDeviceModel(),
+                    osVersion = PlatformUtils.getOSVersion()
+                )
+            } catch (e: Exception) {
+                logger.debug("Failed to track STT transcription started: ${e.message}")
+            }
+        }
 
         try {
             // Get transcription result based on service's preferred format
@@ -58,15 +98,18 @@ class STTHandler(
             )
 
             val endTime = getCurrentTimeMillis()
-            val duration = (endTime - startTime) / 1000.0
+            val processingTimeMs = (endTime - startTime).toDouble()
+            val duration = processingTimeMs / 1000.0
 
             val transcript = result.text
             logger.info("STT transcription result: '$transcript'")
 
             if (transcript.isNotEmpty()) {
                 // Track successful transcription completion
-                val wordCount = transcript.split(" ").size
+                val wordCount = transcript.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+                val characterCount = transcript.length
                 val confidence = result.confidence ?: 0.8f // Default confidence if not provided
+                val realTimeFactor = if (audioDurationMs > 0) processingTimeMs / audioDurationMs else 0.0
 
                 sttAnalytics?.trackTranscription(
                     text = transcript,
@@ -79,6 +122,31 @@ class STTHandler(
                     text = transcript,
                     confidence = confidence
                 )
+
+                // Track transcription completion - fire and forget
+                val completionModelId = service.currentModel
+                val completionLanguage = options.language ?: result.language ?: "en"
+                telemetryScope.launch {
+                    try {
+                        telemetryService?.trackSTTTranscriptionCompleted(
+                            sessionId = sessionId,
+                            modelId = completionModelId ?: "unknown",
+                            modelName = completionModelId ?: "Unknown STT Model",
+                            framework = "ONNX Runtime",
+                            language = completionLanguage,
+                            audioDurationMs = audioDurationMs,
+                            processingTimeMs = processingTimeMs,
+                            realTimeFactor = realTimeFactor,
+                            wordCount = wordCount,
+                            characterCount = characterCount,
+                            confidence = confidence,
+                            device = PlatformUtils.getDeviceModel(),
+                            osVersion = PlatformUtils.getOSVersion()
+                        )
+                    } catch (e: Exception) {
+                        logger.debug("Failed to track STT transcription completed: ${e.message}")
+                    }
+                }
 
                 // Handle speaker diarization if available (matching iOS pattern)
                 if (speakerDiarization != null && options.enableDiarization) {
@@ -102,6 +170,31 @@ class STTHandler(
 
             // Track transcription error
             sttAnalytics?.trackError(error, "transcription")
+
+            // Track transcription failure - fire and forget
+            val endTime = getCurrentTimeMillis()
+            val processingTimeMs = (endTime - startTime).toDouble()
+            val failureModelId = service.currentModel
+            val errorMsg = error.message ?: error.toString()
+
+            telemetryScope.launch {
+                try {
+                    telemetryService?.trackSTTTranscriptionFailed(
+                        sessionId = sessionId,
+                        modelId = failureModelId ?: "unknown",
+                        modelName = failureModelId ?: "Unknown STT Model",
+                        framework = "ONNX Runtime",
+                        language = options.language ?: "en",
+                        audioDurationMs = audioDurationMs,
+                        processingTimeMs = processingTimeMs,
+                        errorMessage = errorMsg,
+                        device = PlatformUtils.getDeviceModel(),
+                        osVersion = PlatformUtils.getOSVersion()
+                    )
+                } catch (e: Exception) {
+                    logger.debug("Failed to track STT transcription failure: ${e.message}")
+                }
+            }
 
             throw error
         }

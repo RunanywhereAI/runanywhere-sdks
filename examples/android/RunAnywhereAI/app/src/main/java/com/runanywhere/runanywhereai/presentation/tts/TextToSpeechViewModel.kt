@@ -29,12 +29,67 @@ import kotlinx.coroutines.withContext
 private const val TAG = "TTSViewModel"
 
 /**
+ * Collection of funny sample texts for TTS demo
+ * Matches iOS funnyTTSSampleTexts in TextToSpeechView.swift
+ */
+val funnyTTSSampleTexts = listOf(
+    "I'm not saying I'm Batman, but have you ever seen me and Batman in the same room?",
+    "According to my calculations, I should have been a millionaire by now. My calculations were wrong.",
+    "I told my computer I needed a break, and now it won't stop sending me vacation ads.",
+    "Why do programmers prefer dark mode? Because light attracts bugs!",
+    "I speak fluent sarcasm. Unfortunately, my phone's voice assistant doesn't.",
+    "I'm on a seafood diet. I see food and I eat it. Then I feel regret.",
+    "My brain has too many tabs open and I can't find the one playing music.",
+    "I put my phone on airplane mode but it didn't fly. Worst paper airplane ever.",
+    "I'm not lazy, I'm just on energy-saving mode. Like a responsible gadget.",
+    "If Monday had a face, I would politely ask it to reconsider its life choices.",
+    "I tried to be normal once. Worst two minutes of my life.",
+    "My favorite exercise is a cross between a lunge and a crunch. I call it lunch.",
+    "I don't need anger management. I need people to stop irritating me.",
+    "I'm not arguing, I'm just explaining why I'm right. There's a difference.",
+    "Coffee: because adulting is hard and mornings are a cruel joke.",
+    "I finally found my spirit animal. It's a sloth having a bad hair day.",
+    "My wallet is like an onion. When I open it, I cry.",
+    "I'm not short, I'm concentrated awesome in a compact package.",
+    "Life update: currently holding it all together with one bobby pin.",
+    "I would lose weight, but I hate losing.",
+    "Behind every great person is a cat judging them silently.",
+    "I'm on the whiskey diet. I've lost three days already.",
+    "My houseplants are thriving! Just kidding, they're plastic.",
+    "I don't sweat, I sparkle. Aggressively. With visible discomfort.",
+    "Plot twist: the hokey pokey really IS what it's all about.",
+    // RunAnywhere SDK promotional texts
+    "RunAnywhere: because your AI should work even when your WiFi doesn't.",
+    "We're a Y Combinator company now. Our moms are finally proud of us.",
+    "On-device AI means your voice data stays on your phone. Unlike your ex, we respect privacy.",
+    "RunAnywhere: Making cloud APIs jealous since 2024.",
+    "Our SDK is so fast, it finished processing before you finished reading this sentence.",
+    "Why pay per API call when you can run AI locally? Your wallet called, it says thank you.",
+    "RunAnywhere: We put the 'smart' in smartphone, and the 'savings' in your bank account.",
+    "Backed by Y Combinator. Powered by caffeine. Fueled by the dream of affordable AI.",
+    "Our on-device models are like introverts. They do great work without needing the cloud.",
+    "RunAnywhere SDK: Because latency is just a fancy word for 'too slow'.",
+    "Voice AI that runs offline? That's not magic, that's just good engineering. Okay, maybe a little magic.",
+    "We optimized our models so hard, they now run faster than your excuses for not exercising.",
+    "RunAnywhere: Where 'it works offline' isn't a bug, it's the whole feature.",
+    "Y Combinator believed in us. Your device believes in us. Now it's your turn.",
+    "On-device AI: All the intelligence, none of the monthly subscription fees.",
+    "Our SDK is like a good friend: fast, reliable, and doesn't share your secrets with big tech.",
+    "RunAnywhere makes voice AI accessible. Like, actually accessible. Not 'enterprise pricing' accessible."
+)
+
+private fun getRandomSampleText(): String = funnyTTSSampleTexts.random()
+
+// Initial random text for default state
+private val initialSampleText = getRandomSampleText()
+
+/**
  * TTS UI State
  * iOS Reference: TTSViewModel published properties in TextToSpeechView.swift
  */
 data class TTSUiState(
-    val inputText: String = "Hello! This is a text to speech test.",
-    val characterCount: Int = "Hello! This is a text to speech test.".length,
+    val inputText: String = initialSampleText,
+    val characterCount: Int = initialSampleText.length,
     val maxCharacters: Int = 5000,
     val isModelLoaded: Boolean = false,
     val selectedFramework: String? = null,
@@ -78,6 +133,7 @@ class TextToSpeechViewModel : ViewModel() {
 
     // SDK Components - matches iOS TTSComponent pattern
     private var ttsComponent: TTSComponent? = null
+    private var currentComponentModelId: String? = null  // Track which model the component is configured for
 
     // Audio playback
     private var audioTrack: AudioTrack? = null
@@ -92,6 +148,7 @@ class TextToSpeechViewModel : ViewModel() {
             ModelLifecycleTracker.modelsByModality.collect { modelsByModality ->
                 val ttsState = modelsByModality[Modality.TTS]
                 val isNowLoaded = ttsState?.state?.isLoaded == true
+                val wasLoaded = _uiState.value.isModelLoaded
 
                 _uiState.update {
                     it.copy(
@@ -103,8 +160,15 @@ class TextToSpeechViewModel : ViewModel() {
                     )
                 }
 
-                // Restore component if model is already loaded
-                if (isNowLoaded && ttsComponent == null && ttsState != null) {
+                // Shuffle sample text when model is first loaded
+                // iOS Reference: .onChange(of: viewModel.selectedModelName) in TextToSpeechView
+                if (isNowLoaded && !wasLoaded) {
+                    shuffleSampleText()
+                }
+
+                // Restore component if model is loaded (handles both initial load and model switching)
+                // The restoreTTSComponent method will handle checking if we need to create a new component
+                if (isNowLoaded && ttsState != null) {
                     restoreTTSComponent(ttsState.modelId)
                 }
 
@@ -116,10 +180,29 @@ class TextToSpeechViewModel : ViewModel() {
     /**
      * Restore TTSComponent from a previously loaded model
      * iOS Reference: restoreComponentIfNeeded() in TTSViewModel
+     *
+     * IMPORTANT: This now properly handles model switching by cleaning up
+     * the old component when a different model is selected.
      */
     private fun restoreTTSComponent(modelId: String) {
         viewModelScope.launch {
-            if (ttsComponent != null) return@launch
+            // Check if we already have a component for this exact model
+            if (ttsComponent != null && currentComponentModelId == modelId) {
+                Log.d(TAG, "TTS component already configured for model: $modelId")
+                return@launch
+            }
+
+            // Clean up existing component if switching to a different model
+            if (ttsComponent != null && currentComponentModelId != modelId) {
+                Log.i(TAG, "Switching TTS model from $currentComponentModelId to $modelId - cleaning up old component")
+                try {
+                    ttsComponent?.cleanup()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error cleaning up old TTS component: ${e.message}")
+                }
+                ttsComponent = null
+                currentComponentModelId = null
+            }
 
             Log.i(TAG, "Restoring TTS component for model: $modelId")
             try {
@@ -142,8 +225,9 @@ class TextToSpeechViewModel : ViewModel() {
                 val component = TTSComponent(config)
                 component.initialize()
                 ttsComponent = component
+                currentComponentModelId = modelId  // Track which model this component is for
 
-                Log.i(TAG, "✅ TTS component restored successfully")
+                Log.i(TAG, "✅ TTS component restored successfully for model: $modelId")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to restore TTS component: ${e.message}", e)
             }
@@ -167,6 +251,20 @@ class TextToSpeechViewModel : ViewModel() {
             it.copy(
                 inputText = text,
                 characterCount = text.length
+            )
+        }
+    }
+
+    /**
+     * Shuffle to a random sample text
+     * iOS Reference: "Surprise me!" button in TextToSpeechView
+     */
+    fun shuffleSampleText() {
+        val newText = getRandomSampleText()
+        _uiState.update {
+            it.copy(
+                inputText = newText,
+                characterCount = newText.length
             )
         }
     }
@@ -422,6 +520,7 @@ class TextToSpeechViewModel : ViewModel() {
         }
 
         ttsComponent = null
+        currentComponentModelId = null
         generatedAudioData = null
     }
 }

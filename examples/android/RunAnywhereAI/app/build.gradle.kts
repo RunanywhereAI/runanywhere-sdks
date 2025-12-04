@@ -10,12 +10,28 @@ android {
     namespace = "com.runanywhere.runanywhereai"
     compileSdk = 36
 
+    signingConfigs {
+        val keystorePath = System.getenv("KEYSTORE_PATH")
+        val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+        val keyAlias = System.getenv("KEY_ALIAS")
+        val keyPassword = System.getenv("KEY_PASSWORD")
+
+        if (keystorePath != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -50,6 +66,7 @@ android {
         }
 
         release {
+            // MUST be false for Play Store publishing
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
@@ -63,10 +80,14 @@ android {
             buildConfigField("boolean", "DEBUG_MODE", "false")
             buildConfigField("String", "BUILD_TYPE", "\"release\"")
 
-            // Optimization flags
+            // MUST be false for Play Store publishing
             isJniDebuggable = false
 
-            // Using default debug signing for now
+            // Use release signing config if available
+            val releaseSigningConfig = signingConfigs.findByName("release")
+            if (releaseSigningConfig != null) {
+                signingConfig = releaseSigningConfig
+            }
         }
 
         create("benchmark") {
@@ -285,10 +306,10 @@ dependencies {
     implementation(libs.androidx.room.ktx)
 
     // ========================================
-    // Play Services
+    // Play Services (Updated for targetSdk 34+)
     // ========================================
-    implementation(libs.google.play.core)
-    implementation(libs.google.play.core.ktx)
+    implementation(libs.google.play.app.update)
+    implementation(libs.google.play.app.update.ktx)
 
     // ========================================
     // Logging
