@@ -37,9 +37,10 @@ class TelemetryService(
     private val sessionId = generateUUID()
     private var currentSession: SessionTelemetryData? = null
 
-    // Batching configuration
-    private val batchSize = 10
-    private val batchTimeoutMs = 30_000L // 30 seconds
+    // Batching configuration - optimized for immediate delivery
+    // Events are sent immediately (batch size 1) to prevent data loss on app kill/background
+    private val batchSize = 1  // Send immediately on each event
+    private val batchTimeoutMs = 500L // 500ms backup flush (in case any events slip through)
     private var pendingEvents = mutableListOf<TelemetryData>()
     private var lastBatchSent = getCurrentTimeMillis()
 
@@ -609,6 +610,7 @@ class TelemetryService(
             "os_version" to osVersion
         )
 
+        logger.debug("🔍 TTS_SYNTHESIS_STARTED properties: modality=${properties["modality"]}, model_id=${properties["model_id"]}, model_name=${properties["model_name"]}")
         trackEvent(TelemetryEventType.TTS_SYNTHESIS_STARTED, properties)
     }
 
@@ -848,6 +850,17 @@ class TelemetryService(
 
         // Send final batch
         sendBatch()
+    }
+
+    /**
+     * Flush all pending telemetry events immediately
+     * Call this on app pause/stop/background to ensure events are sent before app is killed
+     */
+    suspend fun flush() = mutex.withLock {
+        logger.info("Flushing telemetry events (${pendingEvents.size} pending)")
+        if (pendingEvents.isNotEmpty()) {
+            sendBatch()
+        }
     }
 
     // Private helper methods

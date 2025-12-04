@@ -302,8 +302,9 @@ class ServiceContainer {
 
             try {
                 // Create analytics network services for production mode
+                logger.info("🔍 Analytics setup - environment=${params.environment}, baseURL=${if (params.baseURL != null) "SET (${params.baseURL})" else "NULL"}")
                 if (params.environment == SDKEnvironment.PRODUCTION && params.baseURL != null) {
-                    logger.debug("Creating production analytics network services...")
+                    logger.info("Creating production analytics network services...")
 
                     // Create a dedicated Ktor HttpClient for analytics
                     val analyticsKtorClient = io.ktor.client.HttpClient {
@@ -334,9 +335,9 @@ class ServiceContainer {
                         analyticsNetworkService = analyticsService
                     )
 
-                    logger.info("✅ Production analytics network services created")
+                    logger.info("✅ Production analytics network services created - remoteTelemetryDataSource is READY")
                 } else {
-                    logger.debug("Skipping production analytics services (dev mode or no baseURL)")
+                    logger.warn("⚠️ SKIPPING production analytics - remoteTelemetryDataSource will be NULL! Reason: environment=${params.environment}, baseURL=${params.baseURL}")
                 }
 
                 // AnalyticsService will get device ID dynamically from BaseRunAnywhereSDK.sharedDeviceId
@@ -932,6 +933,14 @@ class ServiceContainer {
      * Cleanup all services
      */
     suspend fun cleanup() {
+        // Flush telemetry before cleanup to ensure events are sent
+        try {
+            _telemetryService?.flush()
+            logger.info("✅ Telemetry flushed during cleanup")
+        } catch (e: Exception) {
+            logger.warn("Failed to flush telemetry during cleanup: ${e.message}")
+        }
+
         // Only clear authentication if not in development mode
         // This avoids lazy-initializing the authenticationService in dev mode
         if (currentEnvironment != SDKEnvironment.DEVELOPMENT) {

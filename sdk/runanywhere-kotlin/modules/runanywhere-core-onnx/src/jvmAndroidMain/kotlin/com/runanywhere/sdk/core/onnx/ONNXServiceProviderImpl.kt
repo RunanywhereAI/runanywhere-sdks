@@ -157,8 +157,15 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
     }
 
     // Fire-and-forget telemetry tracking - don't block synthesis on telemetry
+    logger.info("📊 TTS Telemetry check: telemetryService=${if (telemetryService != null) "AVAILABLE" else "NULL"}")
+    if (telemetryService == null) {
+        logger.warn("⚠️ TTS telemetry SKIPPED - telemetryService is NULL (check ServiceContainer initialization)")
+    }
     kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         try {
+            if (telemetryService != null) {
+                logger.info("📊 TTS_SYNTHESIS_STARTED tracking: synthesisId=$synthesisId, model=$modelName")
+            }
             telemetryService?.trackTTSSynthesisStarted(
                 synthesisId = synthesisId,
                 modelId = modelName,
@@ -172,8 +179,9 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
                 device = PlatformUtils.getDeviceModel(),
                 osVersion = PlatformUtils.getOSVersion()
             )
+            logger.info("✅ TTS_SYNTHESIS_STARTED tracked successfully")
         } catch (e: Exception) {
-            logger.debug("Failed to track TTS synthesis started: ${e.message}")
+            logger.warn("⚠️ Failed to track TTS synthesis started: ${e.message}")
         }
     }
 
@@ -229,7 +237,7 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
                     osVersion = PlatformUtils.getOSVersion()
                 )
             } catch (e: Exception) {
-                logger.debug("Failed to track TTS synthesis failure: ${e.message}")
+                logger.warn("⚠️ Failed to track TTS synthesis failure: ${e.message}")
             }
         }
 
@@ -247,6 +255,9 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
     // Track successful synthesis completion - fire and forget
     kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         try {
+            if (telemetryService != null) {
+                logger.info("📊 TTS_SYNTHESIS_COMPLETED tracking: synthesisId=$synthesisId, duration=${audioDurationMs}ms")
+            }
             telemetryService?.trackTTSSynthesisCompleted(
                 synthesisId = synthesisId,
                 modelId = modelName,
@@ -260,8 +271,11 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
                 device = PlatformUtils.getDeviceModel(),
                 osVersion = PlatformUtils.getOSVersion()
             )
+            if (telemetryService != null) {
+                logger.info("✅ TTS_SYNTHESIS_COMPLETED tracked successfully")
+            }
         } catch (e: Exception) {
-            logger.debug("Failed to track TTS synthesis completed: ${e.message}")
+            logger.warn("⚠️ Failed to track TTS synthesis completed: ${e.message}")
         }
     }
 
