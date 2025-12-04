@@ -61,7 +61,7 @@ export class ModelInfoService {
   /**
    * Load models for specific frameworks
    */
-  public async loadModels(frameworks: LLMFramework[]): Promise<ModelInfo[]> {
+  public async loadModelsForFrameworks(frameworks: LLMFramework[]): Promise<ModelInfo[]> {
     const models: ModelInfo[] = [];
     for (const framework of frameworks) {
       const frameworkModels = await this.modelInfoRepository.fetchByFramework(
@@ -116,7 +116,7 @@ export class ModelInfoService {
   /**
    * Get models by framework
    */
-  public async getModels(framework: LLMFramework): Promise<ModelInfo[]> {
+  public async getModelsByFramework(framework: LLMFramework): Promise<ModelInfo[]> {
     return await this.modelInfoRepository.fetchByFramework(framework);
   }
 
@@ -150,4 +150,3 @@ export class ModelInfoService {
     this.logger.info('Cleared all model metadata');
   }
 }
-

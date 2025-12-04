@@ -6,11 +6,11 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Memory/Services/AllocationManager.swift
  */
 
-import type {
-  MemoryLoadedModel,
-  MemoryLoadedModelInfo,
+import {
+  type MemoryLoadedModel,
+  type MemoryLoadedModelInfo,
+  MemoryPriority,
 } from '../../../Core/Protocols/Memory/MemoryModels';
-import { MemoryPriority } from '../../../Core/Protocols/Memory/MemoryModels';
 import type { LLMService } from '../../../Core/Protocols/LLM/LLMService';
 
 /**
@@ -232,4 +232,3 @@ export class AllocationManager {
     return actualFreed;
   }
 }
-

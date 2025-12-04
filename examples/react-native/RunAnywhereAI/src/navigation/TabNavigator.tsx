@@ -1,7 +1,7 @@
 /**
  * TabNavigator - Bottom Tab Navigation
  *
- * Reference: iOS ContentView with 5 tabs
+ * Reference: iOS ContentView with 6 tabs (Chat, STT, TTS, Quiz, Voice, Settings)
  */
 
 import React from 'react';
@@ -15,6 +15,7 @@ import { RootTabParamList } from '../types';
 import ChatScreen from '../screens/ChatScreen';
 import STTScreen from '../screens/STTScreen';
 import TTSScreen from '../screens/TTSScreen';
+import QuizScreen from '../screens/QuizScreen';
 import VoiceAssistantScreen from '../screens/VoiceAssistantScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
@@ -27,6 +28,7 @@ const tabIcons: Record<keyof RootTabParamList, { focused: string; unfocused: str
   Chat: { focused: 'chatbubble', unfocused: 'chatbubble-outline' },
   STT: { focused: 'mic', unfocused: 'mic-outline' },
   TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' },
+  Quiz: { focused: 'school', unfocused: 'school-outline' },
   VoiceAssistant: { focused: 'person-circle', unfocused: 'person-circle-outline' },
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
@@ -38,6 +40,7 @@ const tabLabels: Record<keyof RootTabParamList, string> = {
   Chat: 'Chat',
   STT: 'Speech',
   TTS: 'Voice',
+  Quiz: 'Quiz',
   VoiceAssistant: 'Assistant',
   Settings: 'Settings',
 };
@@ -78,6 +81,11 @@ export const TabNavigator: React.FC = () => {
         name="TTS"
         component={TTSScreen}
         options={{ tabBarLabel: tabLabels.TTS }}
+      />
+      <Tab.Screen
+        name="Quiz"
+        component={QuizScreen}
+        options={{ tabBarLabel: tabLabels.Quiz }}
       />
       <Tab.Screen
         name="VoiceAssistant"

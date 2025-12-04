@@ -9,7 +9,7 @@
 import { ModelCategory } from './ModelCategory';
 import { ModelFormat } from './ModelFormat';
 import { LLMFramework } from '../Framework/LLMFramework';
-import { ThinkingTagPattern } from '../../Capabilities/TextGeneration/Models/ThinkingTagPattern';
+import { ThinkingTagPattern, ThinkingTagPatternImpl } from '../../../Capabilities/TextGeneration/Models/ThinkingTagPattern';
 import { ModelInfoMetadata } from './ModelInfoMetadata';
 import { ConfigurationSource } from '../Configuration/ConfigurationSource';
 import { requiresContextLength, supportsThinking as categorySupportsThinking } from './ModelCategory';
@@ -56,6 +56,10 @@ export interface ModelInfo {
 
   /** Non-Codable runtime properties */
   additionalProperties: { [key: string]: string };
+
+  /** Computed properties - availability status */
+  readonly isDownloaded?: boolean;
+  readonly isAvailable?: boolean;
 }
 
 /**
@@ -142,8 +146,7 @@ export class ModelInfoImpl implements ModelInfo {
 
     // Set thinking pattern based on supportsThinking
     if (this.supportsThinking) {
-      const { ThinkingTagPattern } = require('../../Capabilities/TextGeneration/Models/ThinkingTagPattern');
-      this.thinkingPattern = options.thinkingPattern ?? ThinkingTagPattern.defaultPattern;
+      this.thinkingPattern = options.thinkingPattern ?? ThinkingTagPatternImpl.defaultPattern;
     } else {
       this.thinkingPattern = null;
     }
@@ -175,4 +178,3 @@ export class ModelInfoImpl implements ModelInfo {
     return this.isDownloaded;
   }
 }
-

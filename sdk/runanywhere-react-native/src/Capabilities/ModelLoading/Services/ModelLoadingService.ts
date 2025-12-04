@@ -11,6 +11,7 @@ import type { ModelInfo } from '../../../Core/Models/Model/ModelInfo';
 import type { MemoryManager } from '../../../Core/Protocols/Memory/MemoryManager';
 import type { ModelRegistry } from '../../../Core/Protocols/Registry/ModelRegistry';
 import { FrameworkModality } from '../../../Core/Models/Framework/FrameworkModality';
+import { LLMFramework } from '../../../types';
 
 /**
  * Service for loading and unloading models
@@ -90,7 +91,7 @@ export class ModelLoadingService {
     // ModelLoadingService handles LLM models only
     if (
       modelInfo.category === 'speech-recognition' ||
-      modelInfo.preferredFramework?.rawValue === 'WhisperKit'
+      modelInfo.preferredFramework === LLMFramework.WhisperKit
     ) {
       throw new Error(
         `Model '${modelId}' is a speech recognition model. STT models are loaded automatically through STTComponent.`
@@ -184,4 +185,3 @@ export class ModelLoadingService {
     return this.loadedModels.get(modelId) ?? null;
   }
 }
-

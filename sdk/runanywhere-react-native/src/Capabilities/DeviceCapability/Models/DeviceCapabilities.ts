@@ -129,4 +129,3 @@ export class DeviceCapabilitiesImpl implements DeviceCapabilities {
     return this.availableMemory >= (model.memoryRequired ?? 0);
   }
 }
-

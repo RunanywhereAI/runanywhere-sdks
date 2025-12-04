@@ -6,11 +6,11 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Memory/Services/CacheEviction.swift
  */
 
-import type {
-  MemoryLoadedModelInfo,
-  EvictionStatistics,
+import {
+  type MemoryLoadedModelInfo,
+  MemoryPriority,
+  type EvictionStatistics,
 } from '../../../Core/Protocols/Memory/MemoryModels';
-import { MemoryPriority } from '../../../Core/Protocols/Memory/MemoryModels';
 import type { AllocationManager } from './AllocationManager';
 
 /**
@@ -276,4 +276,3 @@ export class CacheEviction {
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   }
 }
-

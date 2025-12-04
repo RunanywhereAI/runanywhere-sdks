@@ -500,6 +500,217 @@ export interface NativeRunAnywhereModule {
    * Remove event listeners
    */
   removeListeners(count: number): void;
+
+  // ============================================================================
+  // Authentication (TODO: Implement in native module)
+  // ============================================================================
+
+  /**
+   * Authenticate with API key
+   */
+  authenticate(apiKey: string): Promise<boolean>;
+
+  /**
+   * Get access token
+   */
+  getAccessToken(): Promise<string | null>;
+
+  /**
+   * Refresh access token
+   */
+  refreshAccessToken(): Promise<string | null>;
+
+  /**
+   * Check if authenticated
+   */
+  isAuthenticated(): Promise<boolean>;
+
+  /**
+   * Clear authentication
+   */
+  clearAuthentication(): Promise<void>;
+
+  /**
+   * Load stored tokens
+   */
+  loadStoredTokens(): Promise<boolean>;
+
+  /**
+   * Get user ID
+   */
+  getUserId(): Promise<string | null>;
+
+  /**
+   * Get organization ID
+   */
+  getOrganizationId(): Promise<string | null>;
+
+  /**
+   * Get device ID
+   */
+  getDeviceId(): Promise<string | null>;
+
+  /**
+   * Register device
+   */
+  registerDevice(deviceInfo: string): Promise<boolean>;
+
+  /**
+   * Health check
+   */
+  healthCheck(): Promise<boolean>;
+
+  // ============================================================================
+  // Configuration (TODO: Implement in native module)
+  // ============================================================================
+
+  /**
+   * Get configuration
+   */
+  getConfiguration(): Promise<string>;
+
+  /**
+   * Load configuration on launch
+   */
+  loadConfigurationOnLaunch(): Promise<string>;
+
+  /**
+   * Set consumer configuration
+   */
+  setConsumerConfiguration(configJson: string): Promise<void>;
+
+  /**
+   * Update configuration
+   */
+  updateConfiguration(configJson: string): Promise<void>;
+
+  /**
+   * Sync configuration to cloud
+   */
+  syncConfigurationToCloud(): Promise<void>;
+
+  /**
+   * Clear configuration cache
+   */
+  clearConfigurationCache(): Promise<void>;
+
+  /**
+   * Get current environment
+   */
+  getCurrentEnvironment(): Promise<string>;
+
+  // ============================================================================
+  // Extended Download Operations (TODO: Implement in native module)
+  // ============================================================================
+
+  /**
+   * Start model download (alias for downloadModel)
+   */
+  startModelDownload(modelId: string): Promise<string>;
+
+  /**
+   * Pause a download
+   */
+  pauseDownload(modelId: string): Promise<void>;
+
+  /**
+   * Resume a paused download
+   */
+  resumeDownload(modelId: string): Promise<void>;
+
+  /**
+   * Pause all downloads
+   */
+  pauseAllDownloads(): Promise<void>;
+
+  /**
+   * Resume all downloads
+   */
+  resumeAllDownloads(): Promise<void>;
+
+  /**
+   * Cancel all downloads
+   */
+  cancelAllDownloads(): Promise<void>;
+
+  /**
+   * Get download progress
+   */
+  getDownloadProgress(modelId: string): Promise<number>;
+
+  /**
+   * Configure download service
+   */
+  configureDownloadService(configJson: string): Promise<void>;
+
+  /**
+   * Check download service health
+   */
+  isDownloadServiceHealthy(): Promise<boolean>;
+
+  /**
+   * Get download resume data
+   */
+  getDownloadResumeData(modelId: string): Promise<string | null>;
+
+  /**
+   * Resume download with data
+   */
+  resumeDownloadWithData(modelId: string, resumeData: string): Promise<string>;
+
+  // ============================================================================
+  // Model Registry Extended (TODO: Implement in native module)
+  // ============================================================================
+
+  /**
+   * Initialize registry
+   */
+  initializeRegistry(): Promise<void>;
+
+  /**
+   * Discover models
+   */
+  discoverModels(): Promise<string>;
+
+  /**
+   * Register model
+   */
+  registerModel(modelInfoJson: string): Promise<void>;
+
+  /**
+   * Register model persistently
+   */
+  registerModelPersistently(modelInfoJson: string): Promise<void>;
+
+  /**
+   * Get model by ID
+   */
+  getModel(modelId: string): Promise<string | null>;
+
+  /**
+   * Filter models
+   */
+  filterModels(filterJson: string): Promise<string>;
+
+  /**
+   * Update model
+   */
+  updateModel(modelId: string, updateJson: string): Promise<void>;
+
+  /**
+   * Remove model
+   */
+  removeModel(modelId: string): Promise<void>;
+
+  /**
+   * Add model from URL
+   */
+  addModelFromURL(url: string, metadataJson: string): Promise<string>;
+
+  /**
+   * Get available models (alternative name)
+   */
+  availableModels(): Promise<string>;
 }
 
 /**

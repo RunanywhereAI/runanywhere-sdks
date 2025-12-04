@@ -195,15 +195,13 @@ class DownloadServiceImpl {
     // Create promise that resolves when download completes
     const promise = new Promise<string>((resolve, reject) => {
       const unsubscribe = EventBus.onModel((event) => {
-        if (event.modelId === model.id) {
-          if (event.type === 'downloadCompleted') {
-            unsubscribe();
-            resolve(event.localPath ?? '');
-          }
-          if (event.type === 'downloadFailed') {
-            unsubscribe();
-            reject(new Error(event.error ?? 'Download failed'));
-          }
+        if (event.type === 'downloadCompleted' && event.modelId === model.id) {
+          unsubscribe();
+          resolve(event.localPath ?? '');
+        }
+        if (event.type === 'downloadFailed' && event.modelId === model.id) {
+          unsubscribe();
+          reject(new Error(event.error ?? 'Download failed'));
         }
       });
     });
@@ -256,17 +254,15 @@ class DownloadServiceImpl {
     // Wait for completion
     return new Promise<string>((resolve, reject) => {
       const unsubscribe = EventBus.onModel((event) => {
-        if (event.modelId === modelId) {
-          if (event.type === 'downloadCompleted') {
-            unsubscribe();
-            this.progressCallbacks.delete(taskId);
-            resolve(event.localPath ?? '');
-          }
-          if (event.type === 'downloadFailed') {
-            unsubscribe();
-            this.progressCallbacks.delete(taskId);
-            reject(new Error(event.error ?? 'Download failed'));
-          }
+        if (event.type === 'downloadCompleted' && event.modelId === modelId) {
+          unsubscribe();
+          this.progressCallbacks.delete(taskId);
+          resolve(event.localPath ?? '');
+        }
+        if (event.type === 'downloadFailed' && event.modelId === modelId) {
+          unsubscribe();
+          this.progressCallbacks.delete(taskId);
+          reject(new Error(event.error ?? 'Download failed'));
         }
       });
     });
@@ -380,11 +376,12 @@ class DownloadServiceImpl {
    * Get download progress for a model
    *
    * @param modelId - Model ID to check
-   * @returns Current progress or null if not downloading
+   * @returns Current progress (0-1 fraction) or null if not downloading
    */
-  async getDownloadProgress(modelId: string): Promise<DownloadProgress | null> {
+  async getDownloadProgress(modelId: string): Promise<number | null> {
     const native = requireNativeModule();
-    return native.getDownloadProgress(modelId);
+    const progress = await native.getDownloadProgress(modelId);
+    return progress >= 0 ? progress : null;
   }
 
   /**
@@ -414,7 +411,7 @@ class DownloadServiceImpl {
    */
   async configure(config: DownloadConfiguration): Promise<void> {
     const native = requireNativeModule();
-    await native.configureDownloadService(config);
+    await native.configureDownloadService(JSON.stringify(config));
   }
 
   /**
@@ -454,15 +451,13 @@ class DownloadServiceImpl {
 
     const promise = new Promise<string>((resolve, reject) => {
       const unsubscribe = EventBus.onModel((event) => {
-        if (event.modelId === modelId) {
-          if (event.type === 'downloadCompleted') {
-            unsubscribe();
-            resolve(event.localPath ?? '');
-          }
-          if (event.type === 'downloadFailed') {
-            unsubscribe();
-            reject(new Error(event.error ?? 'Download failed'));
-          }
+        if (event.type === 'downloadCompleted' && event.modelId === modelId) {
+          unsubscribe();
+          resolve(event.localPath ?? '');
+        }
+        if (event.type === 'downloadFailed' && event.modelId === modelId) {
+          unsubscribe();
+          reject(new Error(event.error ?? 'Download failed'));
         }
       });
     });

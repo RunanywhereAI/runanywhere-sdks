@@ -24,6 +24,7 @@ import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius, IconSize, ButtonHeight, Layout } from '../theme/spacing';
 import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
+import { ModelSelectionSheet, ModelSelectionContext } from '../components/model';
 import { ModelInfo, ModelModality, LLMFramework } from '../types/model';
 
 // Import RunAnywhere SDK
@@ -50,6 +51,7 @@ export const TTSScreen: React.FC = () => {
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [audioFilePath, setAudioFilePath] = useState<string | null>(null);
   const [sampleRate, setSampleRate] = useState(22050);
+  const [showModelSelection, setShowModelSelection] = useState(false);
 
   // Audio player ref
   const audioRecorderPlayer = useRef(new AudioRecorderPlayer()).current;
@@ -124,40 +126,18 @@ export const TTSScreen: React.FC = () => {
   );
 
   /**
-   * Handle model selection - shows available downloaded models
+   * Handle model selection - opens model selection sheet
    */
-  const handleSelectModel = useCallback(async () => {
-    // Refresh models list to get latest download status
-    try {
-      const allModels = await RunAnywhere.getAvailableModels();
-      const ttsModels = allModels.filter((m) => m.modality === 'tts');
-      setAvailableModels(ttsModels);
+  const handleSelectModel = useCallback(() => {
+    setShowModelSelection(true);
+  }, []);
 
-      // Get downloaded TTS models
-      const downloadedModels = ttsModels.filter((m) => m.isDownloaded);
-      console.log('[TTSScreen] Downloaded TTS models:', downloadedModels.map(m => m.name));
-
-      if (downloadedModels.length === 0) {
-        Alert.alert(
-          'No Models Downloaded',
-          'Please download a text-to-speech model from the Settings tab first.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      const buttons = downloadedModels.map((model) => ({
-        text: currentModel?.id === model.id ? `${model.name} (Current)` : model.name,
-        onPress: () => { loadModel(model); },
-      }));
-      buttons.push({ text: 'Cancel', onPress: () => { /* no-op */ } });
-
-      Alert.alert('Select TTS Model', 'Choose a downloaded text-to-speech model', buttons as any);
-    } catch (error) {
-      console.error('[TTSScreen] Error refreshing models:', error);
-      Alert.alert('Error', 'Failed to load model list');
-    }
-  }, [currentModel]);
+  /**
+   * Handle model selected from the sheet
+   */
+  const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
+    await loadModel(model);
+  }, []);
 
   /**
    * Load a model from its info
@@ -563,6 +543,13 @@ export const TTSScreen: React.FC = () => {
           modality={ModelModality.TTS}
           onSelectModel={handleSelectModel}
         />
+        {/* Model Selection Sheet */}
+        <ModelSelectionSheet
+          visible={showModelSelection}
+          context={ModelSelectionContext.TTS}
+          onClose={() => setShowModelSelection(false)}
+          onModelSelected={handleModelSelected}
+        />
       </SafeAreaView>
     );
   }
@@ -691,6 +678,14 @@ export const TTSScreen: React.FC = () => {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Model Selection Sheet */}
+      <ModelSelectionSheet
+        visible={showModelSelection}
+        context={ModelSelectionContext.TTS}
+        onClose={() => setShowModelSelection(false)}
+        onModelSelected={handleModelSelected}
+      />
     </SafeAreaView>
   );
 };
