@@ -304,7 +304,6 @@ class LLMComponent(
     /**
      * Process LLM input
      */
-    @OptIn(DelicateCoroutinesApi::class)
     suspend fun process(input: LLMInput): LLMOutput {
         ensureReady()
 

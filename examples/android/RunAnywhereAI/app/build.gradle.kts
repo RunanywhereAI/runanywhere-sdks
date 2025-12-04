@@ -295,6 +295,11 @@ dependencies {
     implementation(libs.androidx.security.crypto)
 
     // ========================================
+    // DataStore
+    // ========================================
+    implementation(libs.androidx.datastore.preferences)
+
+    // ========================================
     // Permissions
     // ========================================
     implementation(libs.accompanist.permissions)

@@ -7,6 +7,7 @@ import com.runanywhere.sdk.foundation.filemanager.StoredModelData
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.ModelRegistry
 import com.runanywhere.sdk.models.storage.*
+import com.runanywhere.sdk.foundation.currentTimeMillis
 import kotlinx.datetime.Instant
 
 /**
@@ -121,7 +122,7 @@ class DefaultStorageAnalyzer(
             storedModels = storedModels,
             availability = StorageAvailability.HEALTHY, // Determined below
             recommendations = emptyList(),
-            lastUpdated = kotlinx.datetime.Clock.System.now()
+            lastUpdated = Instant.fromEpochMilliseconds(currentTimeMillis())
         )
 
         // Determine availability status
@@ -417,7 +418,7 @@ class DefaultStorageAnalyzer(
                     size = modelData.size,
                     format = modelData.format.value,
                     framework = modelData.framework?.displayName ?: registeredModel?.preferredFramework?.displayName,
-                    createdDate = kotlinx.datetime.Clock.System.now(), // TODO: Get actual creation date
+                    createdDate = Instant.fromEpochMilliseconds(currentTimeMillis()), // TODO: Get actual creation date
                     lastUsed = null, // TODO: Get actual last access date
                     contextLength = registeredModel?.contextLength,
                     checksum = null
