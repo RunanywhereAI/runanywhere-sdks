@@ -97,7 +97,8 @@ fun TextToSpeechScreen(
                         text = uiState.inputText,
                         onTextChange = { viewModel.updateInputText(it) },
                         characterCount = uiState.characterCount,
-                        maxCharacters = uiState.maxCharacters
+                        maxCharacters = uiState.maxCharacters,
+                        onShuffle = { viewModel.shuffleSampleText() }
                     )
 
                     // Voice settings section
@@ -268,7 +269,8 @@ private fun TextInputSection(
     text: String,
     onTextChange: (String) -> Unit,
     characterCount: Int,
-    maxCharacters: Int
+    maxCharacters: Int,
+    onShuffle: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
@@ -289,11 +291,37 @@ private fun TextInputSection(
             shape = RoundedCornerShape(12.dp)
         )
 
-        Text(
-            text = "$characterCount characters",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        // Character count and Surprise me! button row
+        // iOS Reference: HStack with character count and dice button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "$characterCount characters",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            TextButton(
+                onClick = onShuffle,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Casino,
+                    contentDescription = "Shuffle",
+                    modifier = Modifier.size(16.dp),
+                    tint = AppColors.primaryPurple
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Surprise me!",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppColors.primaryPurple
+                )
+            }
+        }
     }
 }
 

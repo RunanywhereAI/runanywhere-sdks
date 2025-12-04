@@ -102,6 +102,8 @@ class MockNetworkService : NetworkService {
             APIEndpoint.healthCheck -> getMockStatusResponse()
             APIEndpoint.registerDevice -> getMockDeviceInfoResponse()
             APIEndpoint.deviceInfo -> getMockDeviceInfoResponse()
+            APIEndpoint.devDeviceRegistration -> getMockDeviceInfoResponse() // Dev device registration
+            APIEndpoint.devAnalytics -> ByteArray(0) // Empty response for dev analytics
             APIEndpoint.authenticate -> getMockAuthResponse()
             APIEndpoint.refreshToken -> getMockRefreshTokenResponse()
             APIEndpoint.history -> getMockHistoryResponse()

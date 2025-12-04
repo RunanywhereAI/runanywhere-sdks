@@ -6,11 +6,16 @@ import com.runanywhere.sdk.components.llm.LLMOutput
 import com.runanywhere.sdk.components.llm.LLMService
 import com.runanywhere.sdk.core.llamacpp.LlamaCppCoreService
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.*
+import com.runanywhere.sdk.utils.PlatformUtils
+import com.runanywhere.sdk.data.models.generateUUID
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -75,6 +80,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         )
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     actual override suspend fun streamGenerate(
         prompt: String,
         options: RunAnywhereGenerationOptions,
@@ -86,18 +92,111 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
 
         logger.info("streamGenerate called")
 
-        // C++ layer will apply chat template automatically
-        coreService.generateStream(
-            prompt = prompt,
-            systemPrompt = null,
-            maxTokens = options.maxTokens,
-            temperature = options.temperature
-        ) { token ->
-            onToken(token)
-            true // continue
-        }
+        // Get telemetry service for tracking
+        val telemetryService = ServiceContainer.shared.telemetryService
 
-        logger.info("streamGenerate completed")
+        // Generate generation ID for telemetry tracking
+        val generationId = generateUUID()
+        val modelId = currentModel ?: modelPath?.split("/")?.lastOrNull() ?: "unknown"
+        val modelName = modelId
+        val framework = "llama.cpp"
+
+        // Calculate prompt tokens
+        val promptTokens = estimateTokenCount(prompt)
+
+        // Track generation time - start before telemetry to avoid blocking
+        val startTime = currentTimeMillis()
+
+        logger.info("Starting LLM generation with model: $modelId")
+
+        // Track generation started - fire and forget to avoid blocking generation
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            try {
+                telemetryService?.trackGenerationStarted(
+                    generationId = generationId,
+                    modelId = modelId,
+                    modelName = modelName,
+                    framework = framework,
+                    promptTokens = promptTokens,
+                    maxTokens = options.maxTokens,
+                    device = PlatformUtils.getDeviceModel(),
+                    osVersion = PlatformUtils.getOSVersion()
+                )
+            } catch (e: Exception) {
+                logger.debug("Failed to track generation started: ${e.message}")
+            }
+        }
+        val generatedText = StringBuilder()
+
+        try {
+            // C++ layer will apply chat template automatically
+            coreService.generateStream(
+                prompt = prompt,
+                systemPrompt = null,
+                maxTokens = options.maxTokens,
+                temperature = options.temperature
+            ) { token ->
+                generatedText.append(token)
+                onToken(token)
+                true // continue
+            }
+
+            val generationTime = currentTimeMillis() - startTime
+
+            // Estimate tokens from the actual generated text
+            val outputTokens = estimateTokenCount(generatedText.toString())
+
+            val tokensPerSecond = if (generationTime > 0) {
+                (outputTokens.toDouble() * 1000.0) / generationTime
+            } else 0.0
+
+            // Track generation completed - fire and forget
+            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    telemetryService?.trackGenerationCompleted(
+                        generationId = generationId,
+                        modelId = modelId,
+                        modelName = modelName,
+                        framework = framework,
+                        inputTokens = promptTokens,
+                        outputTokens = outputTokens,
+                        totalTimeMs = generationTime.toDouble(),
+                        timeToFirstTokenMs = 0.0,
+                        tokensPerSecond = tokensPerSecond,
+                        device = PlatformUtils.getDeviceModel(),
+                        osVersion = PlatformUtils.getOSVersion()
+                    )
+                } catch (e: Exception) {
+                    logger.debug("Failed to track generation completed: ${e.message}")
+                }
+            }
+
+            logger.info("streamGenerate completed")
+        } catch (e: Exception) {
+            val generationTime = currentTimeMillis() - startTime
+            val errorMsg = e.message ?: "Unknown error"
+
+            // Track generation failed - fire and forget
+            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    telemetryService?.trackGenerationFailed(
+                        generationId = generationId,
+                        modelId = modelId,
+                        modelName = modelName,
+                        framework = framework,
+                        inputTokens = promptTokens,
+                        totalTimeMs = generationTime.toDouble(),
+                        errorMessage = errorMsg,
+                        device = PlatformUtils.getDeviceModel(),
+                        osVersion = PlatformUtils.getOSVersion()
+                    )
+                } catch (telemetryError: Exception) {
+                    logger.debug("Failed to track generation failed: ${telemetryError.message}")
+                }
+            }
+
+            throw e
+        }
     }
 
     actual override suspend fun cleanup() {

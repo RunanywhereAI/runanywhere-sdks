@@ -259,6 +259,12 @@ interface RunAnywhereSDK {
     // MARK: - Lifecycle
 
     suspend fun cleanup()
+
+    /**
+     * Flush all pending telemetry events immediately
+     * Call this on app pause/stop/background to ensure events are sent before app is killed
+     */
+    suspend fun flushTelemetry()
 }
 
 /**
@@ -542,6 +548,19 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
 
     override suspend fun cleanup() {
         shutdown()
+    }
+
+    /**
+     * Flush all pending telemetry events immediately
+     * Call this on app pause/stop/background to ensure events are sent before app is killed
+     */
+    override suspend fun flushTelemetry() {
+        try {
+            serviceContainer.telemetryService?.flush()
+            logger.info("✅ Telemetry flushed successfully")
+        } catch (e: Exception) {
+            logger.error("Failed to flush telemetry: ${e.message}")
+        }
     }
 
     /**

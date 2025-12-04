@@ -1,26 +1,18 @@
 /**
- * RunAnywhere Core Native Module
+ * RunAnywhere Core Native Module - Unified Native Library Package
  *
- * This module provides ALL native libraries for RunAnywhere Core.
+ * This module provides a SINGLE UNIFIED native library package for RunAnywhere Core.
  * It mirrors the iOS XCFramework approach - a single binary package with everything.
  *
  * Architecture (mirrors iOS):
  *   iOS:     RunAnywhereCoreBinary.xcframework (single binary)
- *   Android: runanywhere-core-native AAR (single native package)
+ *   Android: runanywhere-core-native AAR (unified native package)
  *
- * Contains ALL native libraries:
- *   - librunanywhere_loader.so  (bootstrap loader, no dependencies)
- *   - librunanywhere_jni.so     (JNI bridge)
- *   - librunanywhere_bridge.so  (C API bridge)
- *   - libc++_shared.so          (C++ standard library)
- *   - librunanywhere_llamacpp.so (LlamaCpp backend)
- *   - libomp.so                 (OpenMP for LlamaCpp)
- *   - librunanywhere_onnx.so    (ONNX backend)
- *   - libonnxruntime.so         (ONNX Runtime)
- *   - libsherpa-onnx-c-api.so   (Sherpa-ONNX for STT/TTS/VAD)
+ * The unified package contains all required native libraries with a single JNI entry point.
+ * All backend libraries (ONNX, LlamaCPP) are included in the unified archive.
  *
  * Build modes:
- *   - Remote (default): Downloads pre-built native libraries from GitHub releases
+ *   - Remote (default): Downloads pre-built unified library from GitHub releases
  *   - Local: Uses locally built libraries from runanywhere-core/dist/android/unified
  *
  * To use local mode: ./gradlew build -Prunanywhere.testLocal=true
@@ -139,10 +131,13 @@ android {
 // =============================================================================
 
 /**
- * Task to download pre-built native libraries from GitHub releases
+ * Task to download pre-built unified native library from GitHub releases.
+ *
+ * Downloads a SINGLE unified archive that contains all backends (ONNX, LlamaCPP)
+ * with a unified bridge. This is the recommended approach for production.
  */
 val downloadNativeLibs by tasks.registering {
-    description = "Downloads pre-built native libraries from GitHub releases"
+    description = "Downloads pre-built unified native library from GitHub releases"
     group = "build setup"
 
     val versionFile = file("$jniLibsDir/.version")
@@ -150,13 +145,8 @@ val downloadNativeLibs by tasks.registering {
     // Extract just the commit hash from version (e.g., "0.0.1-dev.2cd70fc" -> "2cd70fc")
     val shortVersion = nativeLibVersion.substringAfterLast(".")
 
-    // Try unified archive first (recommended - has both backends in one bridge)
-    // Fall back to separate archives for backwards compatibility
+    // Unified archive with all backends in one package
     val unifiedArchive = "RunAnywhereUnified-android-${shortVersion}.zip"
-    val separateArchives = listOf(
-        "RunAnywhereONNX-android.zip",
-        "RunAnywhereLlamaCPP-android.zip"
-    )
 
     outputs.dir(jniLibsDir)
     outputs.upToDateWhen {
@@ -175,7 +165,7 @@ val downloadNativeLibs by tasks.registering {
             return@doLast
         }
 
-        logger.lifecycle("Downloading native libraries version $nativeLibVersion...")
+        logger.lifecycle("Downloading unified native library version $nativeLibVersion...")
 
         // Create download directory
         downloadedLibsDir.mkdirs()
@@ -184,13 +174,13 @@ val downloadNativeLibs by tasks.registering {
         jniLibsDir.deleteRecursively()
         jniLibsDir.mkdirs()
 
-        // Try to download unified archive first
+        // Download unified archive
         val unifiedUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/$unifiedArchive"
         val unifiedZipFile = file("$downloadedLibsDir/$unifiedArchive")
 
         try {
-            logger.lifecycle("Trying unified archive: $unifiedArchive")
-            logger.lifecycle("Downloading from: $unifiedUrl")
+            logger.lifecycle("Downloading unified archive: $unifiedArchive")
+            logger.lifecycle("URL: $unifiedUrl")
             URL(unifiedUrl).openStream().use { input ->
                 unifiedZipFile.outputStream().use { output ->
                     input.copyTo(output)
@@ -213,70 +203,21 @@ val downloadNativeLibs by tasks.registering {
                 }
             }
 
-            logger.lifecycle("✅ Using unified archive (recommended - single bridge with all backends)")
+            logger.lifecycle("✅ Unified native library installed successfully")
         } catch (e: Exception) {
-            logger.warn("Unified archive not available: ${e.message}")
-            logger.warn("Falling back to separate archives (backwards compatibility mode)")
-            logger.lifecycle("Note: Unified archive provides better backend support")
-
-            // Clear and retry with separate archives
-            jniLibsDir.deleteRecursively()
-            jniLibsDir.mkdirs()
-
-            // Download and extract separate archives (backwards compatibility)
-            for (archiveName in separateArchives) {
-                val downloadUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/$archiveName"
-                val zipFile = file("$downloadedLibsDir/$archiveName")
-
-                // Download the ZIP file
-                try {
-                    logger.lifecycle("Downloading from: $downloadUrl")
-                    URL(downloadUrl).openStream().use { input ->
-                        zipFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                    logger.lifecycle("Downloaded: ${zipFile.length() / 1024}KB")
-                } catch (downloadException: Exception) {
-                    logger.error("Failed to download $archiveName: ${downloadException.message}")
-                    logger.error("Download URL: $downloadUrl")
-                    logger.error("")
-                    logger.error("Resolution options:")
-                    logger.error("  1. Check that version $nativeLibVersion exists in GitHub releases")
-                    logger.error("  2. Build locally: cd runanywhere-core && ./scripts/android/build.sh all")
-                    logger.error("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
-                    throw GradleException("Failed to download native libraries: $archiveName", downloadException)
-                }
-
-                // Extract the ZIP to a temp directory
-                val extractDir = file("$downloadedLibsDir/${archiveName.removeSuffix(".zip")}")
-                extractDir.mkdirs()
-
-                logger.lifecycle("Extracting $archiveName...")
-                copy {
-                    from(zipTree(zipFile))
-                    into(extractDir)
-                }
-
-                // Move libraries to jniLibs directory
-                // ZIP structure: <abi>/lib*.so -> jniLibs/<abi>/lib*.so
-                extractDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
-                    val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
-                    targetAbiDir.mkdirs()
-                    abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
-                        soFile.copyTo(file("$targetAbiDir/${soFile.name}"), overwrite = true)
-                        logger.lifecycle("  Extracted: ${abiDir.name}/${soFile.name}")
-                    }
-                }
-            }
-
-            logger.warn("⚠️  WARNING: Using separate archives - bridge may only support one backend!")
-            logger.warn("   Upgrade to unified archive for full backend support.")
+            logger.error("Failed to download unified native library: ${e.message}")
+            logger.error("Download URL: $unifiedUrl")
+            logger.error("")
+            logger.error("Resolution options:")
+            logger.error("  1. Check that version $nativeLibVersion exists in GitHub releases")
+            logger.error("  2. Build locally: cd runanywhere-core && ./scripts/android/build.sh all")
+            logger.error("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
+            throw GradleException("Failed to download unified native library: $unifiedArchive", e)
         }
 
         // Write version marker
         versionFile.writeText(nativeLibVersion)
-        logger.lifecycle("Native libraries version $nativeLibVersion installed")
+        logger.lifecycle("Unified native library version $nativeLibVersion installed")
     }
 }
 
@@ -302,18 +243,18 @@ tasks.named("clean") {
 }
 
 /**
- * Task to print native library info
+ * Task to print unified native library info
  */
 val printNativeLibInfo by tasks.registering {
-    description = "Prints information about native library configuration"
+    description = "Prints information about unified native library configuration"
     group = "help"
 
     doLast {
         println()
         println("RunAnywhere Core Native - Unified Native Library Package")
-        println("=" .repeat(60))
+        println("=".repeat(60))
         println()
-        println("This module provides ALL native libraries for RunAnywhere Core.")
+        println("This module provides a SINGLE UNIFIED native library package.")
         println("Similar to iOS XCFramework, this is a single binary package.")
         println()
         println("Build Mode:        ${if (useLocalBuild) "LOCAL" else "REMOTE"}")
@@ -337,7 +278,7 @@ val printNativeLibInfo by tasks.registering {
         }
 
         println()
-        println("Libraries:")
+        println("Unified Library Contents:")
         jniLibsDir.listFiles()?.filter { it.isDirectory }?.forEach { abiDir ->
             println("  ${abiDir.name}/")
             abiDir.listFiles()?.filter { it.extension == "so" }?.sortedBy { it.name }?.forEach { soFile ->
