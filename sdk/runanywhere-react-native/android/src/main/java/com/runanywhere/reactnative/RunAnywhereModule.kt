@@ -8,7 +8,7 @@ import android.util.Base64
 import android.util.Log
 import org.json.JSONObject
 import org.json.JSONArray
-import com.runanywhere.sdk.core.onnx.RunAnywhereBridge
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
@@ -34,19 +34,8 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
         private const val TAG = "RunAnywhere"
         private const val MIN_GGUF_SIZE = 1L * 1024 * 1024 // 1MB minimum for GGUF files
 
-        init {
-            try {
-                // Load native libraries in order
-                Log.d(TAG, "Loading native libraries...")
-                System.loadLibrary("c++_shared")
-                System.loadLibrary("onnxruntime")
-                System.loadLibrary("runanywhere_bridge")
-                System.loadLibrary("runanywhere_jni")
-                Log.d(TAG, "Native libraries loaded successfully")
-            } catch (e: UnsatisfiedLinkError) {
-                Log.e(TAG, "Failed to load native libraries: ${e.message}")
-            }
-        }
+        // Native libraries are loaded in RunAnywhereBridge.kt init block
+        // Do not load them here to avoid conflicts
     }
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())

@@ -72,7 +72,7 @@ export class ModelLoadingService {
     }
 
     // Get model info from registry
-    const modelInfo = this.registry.getModel(by: modelId);
+    const modelInfo = this.registry.getModel(modelId);
     if (!modelInfo) {
       throw new Error(`Model not found in registry: ${modelId}`);
     }

@@ -47,8 +47,8 @@ export class ModelInfoService {
   /**
    * Get model metadata by ID
    */
-  public async getModel(by modelId: string): Promise<ModelInfo | null> {
-    return await this.modelInfoRepository.fetch(id: modelId);
+  public async getModel(modelId: string): Promise<ModelInfo | null> {
+    return await this.modelInfoRepository.fetch(modelId);
   }
 
   /**
@@ -61,7 +61,7 @@ export class ModelInfoService {
   /**
    * Load models for specific frameworks
    */
-  public async loadModels(for frameworks: LLMFramework[]): Promise<ModelInfo[]> {
+  public async loadModels(frameworks: LLMFramework[]): Promise<ModelInfo[]> {
     const models: ModelInfo[] = [];
     for (const framework of frameworks) {
       const frameworkModels = await this.modelInfoRepository.fetchByFramework(
@@ -79,8 +79,8 @@ export class ModelInfoService {
   /**
    * Update model last used date
    */
-  public async updateLastUsed(for modelId: string): Promise<void> {
-    await this.modelInfoRepository.updateLastUsed(for: modelId);
+  public async updateLastUsed(modelId: string): Promise<void> {
+    await this.modelInfoRepository.updateLastUsed(modelId);
     this.logger.debug(`Updated last used date for model: ${modelId}`);
   }
 
@@ -88,7 +88,7 @@ export class ModelInfoService {
    * Remove model metadata
    */
   public async removeModel(modelId: string): Promise<void> {
-    await this.modelInfoRepository.delete(id: modelId);
+    await this.modelInfoRepository.delete(modelId);
     this.logger.info(`Removed model metadata: ${modelId}`);
   }
 
@@ -116,14 +116,14 @@ export class ModelInfoService {
   /**
    * Get models by framework
    */
-  public async getModels(for framework: LLMFramework): Promise<ModelInfo[]> {
+  public async getModels(framework: LLMFramework): Promise<ModelInfo[]> {
     return await this.modelInfoRepository.fetchByFramework(framework);
   }
 
   /**
    * Get models by category
    */
-  public async getModels(for category: ModelCategory): Promise<ModelInfo[]> {
+  public async getModelsByCategory(category: ModelCategory): Promise<ModelInfo[]> {
     return await this.modelInfoRepository.fetchByCategory(category);
   }
 
@@ -145,7 +145,7 @@ export class ModelInfoService {
   public async clearAllModels(): Promise<void> {
     const models = await this.modelInfoRepository.fetchAll();
     for (const model of models) {
-      await this.modelInfoRepository.delete(id: model.id);
+      await this.modelInfoRepository.delete(model.id);
     }
     this.logger.info('Cleared all model metadata');
   }

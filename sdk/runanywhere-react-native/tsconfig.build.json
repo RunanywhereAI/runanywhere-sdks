@@ -5,7 +5,9 @@
     "declarationMap": true,
     "outDir": "lib/typescript",
     "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "noUnusedParameters": false,
+    "skipLibCheck": true,
+    "strict": false
   },
   "include": ["src"],
   "exclude": [

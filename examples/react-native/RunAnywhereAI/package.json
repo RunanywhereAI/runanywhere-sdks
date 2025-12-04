@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@react-navigation/bottom-tabs": "^6.5.20",
+    "@react-navigation/core": "^7.13.5",
     "@react-navigation/native": "^6.1.18",
     "react": "18.2.0",
     "react-native": "0.74.5",
@@ -23,6 +24,7 @@
     "react-native-screens": "^3.34.0",
     "react-native-vector-icons": "^10.1.0",
     "runanywhere-react-native": "file:../../../sdk/runanywhere-react-native",
+    "simple-swizzle": "^0.2.4",
     "zustand": "^4.5.4"
   },
   "devDependencies": {

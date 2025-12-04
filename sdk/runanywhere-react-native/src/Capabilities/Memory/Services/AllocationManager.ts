@@ -9,8 +9,8 @@
 import type {
   MemoryLoadedModel,
   MemoryLoadedModelInfo,
-  MemoryPriority,
 } from '../../../Core/Protocols/Memory/MemoryModels';
+import { MemoryPriority } from '../../../Core/Protocols/Memory/MemoryModels';
 import type { LLMService } from '../../../Core/Protocols/LLM/LLMService';
 
 /**

@@ -18,10 +18,10 @@ export interface UnifiedFrameworkAdapter {
   readonly supportedModalities: FrameworkModality[];
   readonly supportedFormats: string[];
   canHandle(model: ModelInfo): boolean;
-  createService(for modality: FrameworkModality): any | null;
-  loadModel(model: ModelInfo, for modality: FrameworkModality): Promise<any>;
-  estimateMemoryUsage(for model: ModelInfo): number;
-  optimalConfiguration(for model: ModelInfo): any;
+  createService(modality: FrameworkModality): any | null;
+  loadModel(model: ModelInfo, modality: FrameworkModality): Promise<any>;
+  estimateMemoryUsage(model: ModelInfo): number;
+  optimalConfiguration(model: ModelInfo): any;
   getProvidedModels(): ModelInfo[];
   getDownloadStrategy?(): any;
   onRegistration?(): void;
@@ -61,7 +61,7 @@ export class AdapterRegistry {
   /**
    * Get adapter for a specific framework
    */
-  public getAdapter(for framework: LLMFramework): UnifiedFrameworkAdapter | null {
+  public getAdapter(framework: LLMFramework): UnifiedFrameworkAdapter | null {
     return this.adapters.get(framework) ?? null;
   }
 
@@ -69,10 +69,10 @@ export class AdapterRegistry {
    * Find best adapter for a model
    */
   public async findBestAdapter(
-    for model: ModelInfo,
+    model: ModelInfo,
     modality?: FrameworkModality
   ): Promise<UnifiedFrameworkAdapter | null> {
-    const targetModality = modality ?? this.determineModality(for: model);
+    const targetModality = modality ?? this.determineModality(model);
 
     // First try preferred framework
     if (model.preferredFramework) {
@@ -96,7 +96,7 @@ export class AdapterRegistry {
   /**
    * Get adapters for a specific modality
    */
-  public getAdapters(for modality: FrameworkModality): UnifiedFrameworkAdapter[] {
+  public getAdapters(modality: FrameworkModality): UnifiedFrameworkAdapter[] {
     return Array.from(this.adapters.values()).filter((adapter) =>
       adapter.supportedModalities.includes(modality)
     );
@@ -119,7 +119,7 @@ export class AdapterRegistry {
   /**
    * Determine modality from model info
    */
-  private determineModality(for model: ModelInfo): FrameworkModality {
+  private determineModality(model: ModelInfo): FrameworkModality {
     // Check if it's a speech model
     if (
       model.category === 'speech-recognition' ||

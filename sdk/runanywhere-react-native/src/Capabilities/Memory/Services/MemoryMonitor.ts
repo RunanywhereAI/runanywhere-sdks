@@ -8,8 +8,10 @@
 
 import type {
   MemoryMonitoringStats,
-  MemoryPressureLevel,
   MemoryUsageTrend,
+} from '../../../Core/Protocols/Memory/MemoryModels';
+import {
+  MemoryPressureLevel,
   TrendDirection,
 } from '../../../Core/Protocols/Memory/MemoryModels';
 
@@ -115,6 +117,10 @@ export class MemoryMonitor {
     const firstEntry = recentHistory[0];
     const lastEntry = recentHistory[recentHistory.length - 1];
 
+    if (!firstEntry || !lastEntry) {
+      return null;
+    }
+
     const memoryDelta = lastEntry.availableMemory - firstEntry.availableMemory;
     const timeDelta =
       (lastEntry.timestamp.getTime() - firstEntry.timestamp.getTime()) / 1000;
@@ -184,11 +190,18 @@ export class MemoryMonitor {
     let total = 0;
 
     for (let i = 1; i < entries.length; i++) {
-      const delta =
-        entries[i].availableMemory - entries[i - 1].availableMemory;
+      const currentEntry = entries[i];
+      const prevEntry = entries[i - 1];
+      const prevPrevEntry = i > 1 ? entries[i - 2] : null;
+
+      if (!currentEntry || !prevEntry) {
+        continue;
+      }
+
+      const delta = currentEntry.availableMemory - prevEntry.availableMemory;
       const previousDelta =
-        i > 1
-          ? entries[i - 1].availableMemory - entries[i - 2].availableMemory
+        prevPrevEntry
+          ? prevEntry.availableMemory - prevPrevEntry.availableMemory
           : delta;
 
       if (

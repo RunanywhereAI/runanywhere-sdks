@@ -42,14 +42,14 @@ export interface ModelRegistry {
    * @param id - Model identifier
    * @returns Model information if found
    */
-  getModel(by: string): ModelInfo | null;
+  getModel(id: string): ModelInfo | null;
 
   /**
    * Filter models by criteria
    * @param criteria - Filter criteria
    * @returns Filtered models
    */
-  filterModels(by: ModelCriteria): ModelInfo[];
+  filterModels(criteria: ModelCriteria): ModelInfo[];
 
   /**
    * Update model information

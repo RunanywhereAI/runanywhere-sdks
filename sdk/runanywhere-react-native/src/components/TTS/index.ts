@@ -3,17 +3,8 @@
  */
 export {
   TTSComponent,
-  createTTSComponent,
   TTSServiceWrapper,
-  DEFAULT_TTS_CONFIGURATION,
-  createTTSConfiguration,
-  getAudioFormatSampleRate,
-  type TTSConfiguration,
-  type TTSInput,
-  type TTSOutput,
-  type TTSOptions,
-  type TTSService,
-  type PhonemeTimestamp,
-  type SynthesisMetadata,
-  type VoiceInfo,
 } from './TTSComponent';
+
+export type { TTSConfiguration } from './TTSConfiguration';
+export type { TTSInput, TTSOutput, TTSOptions } from './TTSModels';

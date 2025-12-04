@@ -60,7 +60,7 @@ export interface ModelInfoRepository {
   /**
    * Update last used date
    */
-  updateLastUsed(for modelId: string): Promise<void>;
+  updateLastUsed(modelId: string): Promise<void>;
 }
 
 /**
@@ -115,7 +115,7 @@ export class ModelInfoRepositoryImpl implements ModelInfoRepository {
     }
   }
 
-  public async updateLastUsed(for modelId: string): Promise<void> {
+  public async updateLastUsed(modelId: string): Promise<void> {
     const model = this.models.get(modelId);
     if (model) {
       const updated = {
