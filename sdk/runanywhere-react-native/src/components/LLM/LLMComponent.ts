@@ -11,7 +11,7 @@ import { SDKComponent } from '../../Core/Models/Common/SDKComponent';
 import { ModuleRegistry } from '../../Core/ModuleRegistry';
 import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 import type { LLMConfiguration } from './LLMConfiguration';
-import type { LLMInput, LLMOutput, Message, MessageRole, FinishReason } from './LLMModels';
+import { type LLMInput, type LLMOutput, type Message, MessageRole, FinishReason } from './LLMModels';
 import type { LLMService } from '../../Core/Protocols/LLM/LLMService';
 import type { LLMServiceProvider } from '../../Core/Protocols/LLM/LLMServiceProvider';
 import type { GenerationOptions } from '../../Capabilities/TextGeneration/Models/GenerationOptions';

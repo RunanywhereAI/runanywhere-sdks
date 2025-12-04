@@ -72,7 +72,7 @@ export class HardwareCapabilityManager {
   /**
    * Get optimal hardware configuration for a model
    */
-  public optimalConfiguration(for model: ModelInfo): any {
+  public optimalConfiguration(model: ModelInfo): any {
     // Placeholder - would use capabilityAnalyzer
     return {};
   }
@@ -133,4 +133,3 @@ export class HardwareCapabilityManager {
     });
   }
 }
-

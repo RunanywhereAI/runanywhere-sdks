@@ -39,37 +39,38 @@ export interface StructuredOutputConfig {
 
 /**
  * Options for text generation
+ * All properties are optional with sensible defaults provided by GenerationOptionsImpl
  */
 export interface GenerationOptions {
   /** Maximum number of tokens to generate */
-  readonly maxTokens: number;
+  readonly maxTokens?: number;
 
   /** Temperature for sampling (0.0 - 1.0) */
-  readonly temperature: number;
+  readonly temperature?: number;
 
   /** Top-p sampling parameter */
-  readonly topP: number;
+  readonly topP?: number;
 
   /** Enable real-time tracking for cost dashboard */
-  readonly enableRealTimeTracking: boolean;
+  readonly enableRealTimeTracking?: boolean;
 
   /** Stop sequences */
-  readonly stopSequences: string[];
+  readonly stopSequences?: string[];
 
   /** Enable streaming mode */
-  readonly streamingEnabled: boolean;
+  readonly streamingEnabled?: boolean;
 
   /** Preferred execution target */
-  readonly preferredExecutionTarget: ExecutionTarget | null;
+  readonly preferredExecutionTarget?: ExecutionTarget | null;
 
   /** Preferred framework for generation */
-  readonly preferredFramework: LLMFramework | null;
+  readonly preferredFramework?: LLMFramework | null;
 
   /** Structured output configuration (optional) */
-  readonly structuredOutput: StructuredOutputConfig | null;
+  readonly structuredOutput?: StructuredOutputConfig | null;
 
   /** System prompt to define AI behavior and formatting rules */
-  readonly systemPrompt: string | null;
+  readonly systemPrompt?: string | null;
 }
 
 /**
@@ -111,4 +112,3 @@ export class GenerationOptionsImpl implements GenerationOptions {
     this.systemPrompt = options.systemPrompt ?? null;
   }
 }
-

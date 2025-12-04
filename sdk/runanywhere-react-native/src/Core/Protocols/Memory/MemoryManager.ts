@@ -6,39 +6,14 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Protocols/Memory/MemoryManager.swift
  */
 
-// Placeholder types - will be defined in their respective files
-export interface LoadedModel {
-  id: string;
-  name: string;
-  [key: string]: any;
-}
+import type { LoadedModel } from '../../../Capabilities/ModelLoading/Models/LoadedModel';
+import type { LLMService } from '../LLM/LLMService';
+import { MemoryPriority, type MemoryLoadedModel } from './MemoryModels';
 
-export interface LLMService {
-  [key: string]: any;
-}
-
-/**
- * Memory priority levels
- */
-export enum MemoryPriority {
-  Low = 0,
-  Normal = 1,
-  High = 2,
-  Critical = 3,
-}
-
-/**
- * Memory-tracked model information
- */
-export interface MemoryLoadedModel {
-  readonly id: string;
-  readonly name: string;
-  readonly size: number; // bytes
-  readonly framework: string;
-  readonly loadedAt: Date;
-  lastUsed: Date;
-  readonly priority: MemoryPriority;
-}
+// Re-export for convenience
+export { MemoryPriority, type MemoryLoadedModel } from './MemoryModels';
+export type { LoadedModel } from '../../../Capabilities/ModelLoading/Models/LoadedModel';
+export type { LLMService } from '../LLM/LLMService';
 
 /**
  * Lifecycle stages for progress tracking
@@ -185,4 +160,3 @@ export interface MemoryManager {
    */
   isHealthy(): boolean;
 }
-

@@ -86,6 +86,7 @@ export enum SDKErrorCode {
   InvalidAPIKey = 'invalidAPIKey',
   ModelNotFound = 'modelNotFound',
   LoadingFailed = 'loadingFailed',
+  ModelLoadFailed = 'modelLoadFailed',
   GenerationFailed = 'generationFailed',
   GenerationTimeout = 'generationTimeout',
   FrameworkNotAvailable = 'frameworkNotAvailable',
@@ -99,9 +100,11 @@ export enum SDKErrorCode {
   NetworkError = 'networkError',
   InvalidState = 'invalidState',
   ComponentNotInitialized = 'componentNotInitialized',
+  ComponentNotReady = 'componentNotReady',
+  CleanupFailed = 'cleanupFailed',
+  ProcessingFailed = 'processingFailed',
   Timeout = 'timeout',
   ServerError = 'serverError',
   StorageError = 'storageError',
   InvalidConfiguration = 'invalidConfiguration',
 }
-

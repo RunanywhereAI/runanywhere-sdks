@@ -6,20 +6,9 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Models/ComponentTypes.swift
  */
 
-/**
- * Represents all initializable components in the SDK
- */
-export enum SDKComponent {
-  LLM = 'LLM',
-  STT = 'STT',
-  TTS = 'TTS',
-  VAD = 'VAD',
-  VLM = 'VLM',
-  Embedding = 'Embedding',
-  SpeakerDiarization = 'SpeakerDiarization',
-  VoiceAgent = 'VoiceAgent',
-  WakeWord = 'wakeWord',
-}
+// Re-export from the central types location to avoid duplicate definitions
+export { SDKComponent } from '../../../types/enums';
+import { SDKComponent } from '../../../types/enums';
 
 /**
  * Human-readable display name for a component
@@ -72,4 +61,3 @@ export function componentRequiresModel(component: SDKComponent): boolean {
 export function getAllSDKComponents(): SDKComponent[] {
   return Object.values(SDKComponent);
 }
-

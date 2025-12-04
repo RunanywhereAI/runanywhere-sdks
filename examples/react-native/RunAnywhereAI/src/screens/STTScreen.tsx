@@ -34,6 +34,7 @@ import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius, IconSize, ButtonHeight } from '../theme/spacing';
 import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
+import { ModelSelectionSheet, ModelSelectionContext } from '../components/model';
 import { ModelInfo, ModelModality, ModelCategory, LLMFramework } from '../types/model';
 import { STTMode, STTResult } from '../types/voice';
 
@@ -59,6 +60,7 @@ export const STTScreen: React.FC = () => {
   const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [showModelSelection, setShowModelSelection] = useState(false);
 
   // Audio recorder ref (for batch mode only)
   const audioRecorderPlayer = useRef(new AudioRecorderPlayer()).current;
@@ -162,29 +164,18 @@ export const STTScreen: React.FC = () => {
   );
 
   /**
-   * Handle model selection - shows available downloaded models
+   * Handle model selection - opens model selection sheet
    */
-  const handleSelectModel = useCallback(async () => {
-    // Get downloaded STT models
-    const downloadedModels = availableModels.filter((m) => m.isDownloaded);
+  const handleSelectModel = useCallback(() => {
+    setShowModelSelection(true);
+  }, []);
 
-    if (downloadedModels.length === 0) {
-      Alert.alert(
-        'No Models Downloaded',
-        'Please download a speech recognition model from the Settings tab first.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    const buttons = downloadedModels.map((model) => ({
-      text: model.name,
-      onPress: () => loadModel(model),
-    }));
-    buttons.push({ text: 'Cancel', onPress: () => {} });
-
-    Alert.alert('Select STT Model', 'Choose a downloaded speech recognition model', buttons as any);
-  }, [availableModels]);
+  /**
+   * Handle model selected from the sheet
+   */
+  const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
+    await loadModel(model);
+  }, []);
 
   /**
    * Load a model from its info
@@ -634,6 +625,13 @@ export const STTScreen: React.FC = () => {
           modality={ModelModality.STT}
           onSelectModel={handleSelectModel}
         />
+        {/* Model Selection Sheet */}
+        <ModelSelectionSheet
+          visible={showModelSelection}
+          context={ModelSelectionContext.STT}
+          onClose={() => setShowModelSelection(false)}
+          onModelSelected={handleModelSelected}
+        />
       </SafeAreaView>
     );
   }
@@ -741,6 +739,14 @@ export const STTScreen: React.FC = () => {
           {isRecording ? 'Tap to stop' : 'Tap to record'}
         </Text>
       </View>
+
+      {/* Model Selection Sheet */}
+      <ModelSelectionSheet
+        visible={showModelSelection}
+        context={ModelSelectionContext.STT}
+        onClose={() => setShowModelSelection(false)}
+        onModelSelected={handleModelSelected}
+      />
     </SafeAreaView>
   );
 };

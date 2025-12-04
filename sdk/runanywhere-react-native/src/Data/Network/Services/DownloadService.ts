@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Protocols/Downloading/DownloadManager.swift
  */
 
-import type { ModelInfo } from '../../Core/Models/Model/ModelInfo';
+import type { ModelInfo } from '../../../Core/Models/Model/ModelInfo';
 import type { DownloadTask } from '../../Models/Downloading/DownloadTask';
 
 /**
@@ -33,7 +33,7 @@ export interface DownloadService {
  * Simple download service implementation
  */
 export class DownloadServiceImpl implements DownloadService {
-  private activeDownloads: Map<string, DownloadTask> = new Map();
+  private readonly _activeDownloads: Map<string, DownloadTask> = new Map();
 
   public async downloadModel(model: ModelInfo): Promise<DownloadTask> {
     const taskId = `download-${Date.now()}`;
@@ -54,22 +54,22 @@ export class DownloadServiceImpl implements DownloadService {
       result: resultPromise,
     };
 
-    this.activeDownloads.set(taskId, task);
+    this._activeDownloads.set(taskId, task);
 
     // Clean up when done
     resultPromise.finally(() => {
-      this.activeDownloads.delete(taskId);
+      this._activeDownloads.delete(taskId);
     });
 
     return task;
   }
 
   public cancelDownload(taskId: string): void {
-    this.activeDownloads.delete(taskId);
+    this._activeDownloads.delete(taskId);
   }
 
   public activeDownloads(): DownloadTask[] {
-    return Array.from(this.activeDownloads.values());
+    return Array.from(this._activeDownloads.values());
   }
 
   /**
@@ -102,4 +102,3 @@ export class DownloadServiceImpl implements DownloadService {
     return model.downloadURL;
   }
 }
-

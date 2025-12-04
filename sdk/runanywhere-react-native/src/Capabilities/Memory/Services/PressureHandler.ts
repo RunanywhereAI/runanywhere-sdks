@@ -6,9 +6,9 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Memory/Services/PressureHandler.swift
  */
 
-import type {
+import {
   MemoryPressureLevel,
-  MemoryLoadedModelInfo,
+  type MemoryLoadedModelInfo,
 } from '../../../Core/Protocols/Memory/MemoryModels';
 import type { CacheEviction } from './CacheEviction';
 import type { AllocationManager } from './AllocationManager';
@@ -178,4 +178,3 @@ export class PressureHandler {
     }
   }
 }
-

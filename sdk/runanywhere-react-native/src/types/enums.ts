@@ -135,15 +135,18 @@ export enum ComponentState {
 
 /**
  * SDK component identifiers
+ * Note: Values match iOS SDK rawValue (uppercase)
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Models/ComponentTypes.swift
  */
 export enum SDKComponent {
-  LLM = 'llm',
-  STT = 'stt',
-  TTS = 'tts',
-  VAD = 'vad',
-  VLM = 'vlm',
-  VoiceAgent = 'voiceAgent',
-  SpeakerDiarization = 'speakerDiarization',
+  LLM = 'LLM',
+  STT = 'STT',
+  TTS = 'TTS',
+  VAD = 'VAD',
+  VLM = 'VLM',
+  Embedding = 'Embedding',
+  SpeakerDiarization = 'SpeakerDiarization',
+  VoiceAgent = 'VoiceAgent',
   WakeWord = 'wakeWord',
 }
 

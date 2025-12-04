@@ -26,6 +26,7 @@ export {
 // Models
 export type {
   ComponentHealth,
+  ConfigurationData,
   DefaultGenerationSettings,
   DeviceInfoData,
   FrameworkAvailability,

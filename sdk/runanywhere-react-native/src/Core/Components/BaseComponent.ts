@@ -9,7 +9,8 @@
 
 import { ComponentState } from '../Models/Common/ComponentState';
 import { SDKComponent } from '../Models/Common/SDKComponent';
-import type { ComponentInitParameters, EmptyComponentParameters } from '../Models/Common/ComponentInitParameters';
+import type { ComponentInitParameters } from '../Models/Common/ComponentInitParameters';
+import { EmptyComponentParameters } from '../Models/Common/ComponentInitParameters';
 import { ServiceContainer } from '../../Foundation/DependencyInjection/ServiceContainer';
 // EventBus and SDKError will be moved to Public/ later - using relative paths for now
 import { EventBus } from '../../Public/Events/EventBus';
@@ -25,7 +26,10 @@ import type { ComponentInitializationEvent } from '../../types/events';
  * Reference: ComponentInput protocol in BaseComponent.swift
  */
 export interface ComponentInput {
+  /** Validate the input */
   validate(): void;
+  /** Optional timestamp for the input */
+  timestamp?: Date;
 }
 
 /**
@@ -231,24 +235,13 @@ export abstract class BaseComponent<TService> implements ServiceComponent<TServi
   // ============================================================================
 
   /**
-   * Initialize the component (Component protocol)
+   * Initialize the component
    * Reference: initialize(with:) in BaseComponent.swift
    *
-   * @param parameters - Optional initialization parameters (uses configuration if not provided)
+   * @param _parameters - Optional initialization parameters (uses configuration if not provided)
    * @throws {SDKError} If initialization fails or component is in invalid state
    */
-  async initialize(parameters?: ComponentInitParameters): Promise<void> {
-    // For now, ignore the parameters since we already have configuration
-    await this.initialize();
-  }
-
-  /**
-   * Initialize the component
-   * Reference: initialize() in BaseComponent.swift
-   *
-   * @throws {SDKError} If initialization fails or component is in invalid state
-   */
-  async initialize(): Promise<void> {
+  async initialize(_parameters?: ComponentInitParameters): Promise<void> {
     if (this._state !== ComponentState.NotInitialized) {
       if (this._state === ComponentState.Ready) {
         return; // Already initialized
@@ -268,7 +261,7 @@ export abstract class BaseComponent<TService> implements ServiceComponent<TServi
       this.eventBus.emitComponentInitialization({
         type: 'componentChecking',
         component: this.componentType,
-        modelId: null,
+        modelId: undefined,
       } as ComponentInitializationEvent);
 
       this.configuration.validate();
@@ -278,7 +271,7 @@ export abstract class BaseComponent<TService> implements ServiceComponent<TServi
       this.eventBus.emitComponentInitialization({
         type: 'componentInitializing',
         component: this.componentType,
-        modelId: null,
+        modelId: undefined,
       } as ComponentInitializationEvent);
 
       this.service = await this.createService();
@@ -293,14 +286,14 @@ export abstract class BaseComponent<TService> implements ServiceComponent<TServi
       this.eventBus.emitComponentInitialization({
         type: 'componentReady',
         component: this.componentType,
-        modelId: null,
+        modelId: undefined,
       } as ComponentInitializationEvent);
     } catch (error) {
       this.updateState(ComponentState.Failed);
       this.eventBus.emitComponentInitialization({
         type: 'componentFailed',
         component: this.componentType,
-        error: error instanceof Error ? error : new Error(String(error)),
+        error: error instanceof Error ? error.message : String(error),
       } as ComponentInitializationEvent);
       throw error;
     }
@@ -388,8 +381,8 @@ export abstract class BaseComponent<TService> implements ServiceComponent<TServi
     this.eventBus.emitComponentInitialization({
       type: 'componentStateChanged',
       component: this.componentType,
-      oldState: oldState,
-      newState: newState,
+      oldState: String(oldState),
+      newState: String(newState),
     } as ComponentInitializationEvent);
   }
 
@@ -430,8 +423,7 @@ export abstract class BaseComponent<TService> implements ServiceComponent<TServi
     return (
       'componentType' in config &&
       'modelId' in config &&
-      typeof (config as any).componentType === 'string'
+      typeof (config as ComponentInitParameters).componentType === 'string'
     );
   }
 }
-

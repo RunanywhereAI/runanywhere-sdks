@@ -8,6 +8,26 @@ import type { TTSConfiguration } from '../../Models/Configuration/TTSConfigurati
 import type { TTSResult } from '../../Models/TTS/TTSResult';
 
 /**
+ * Voice information for TTS
+ */
+export interface VoiceInfo {
+  /** Voice identifier */
+  readonly id: string;
+  /** Voice name */
+  readonly name: string;
+  /** Language code */
+  readonly language: string;
+  /** Voice gender */
+  readonly gender?: 'male' | 'female' | 'neutral';
+  /** Whether this is a neural voice */
+  readonly isNeural?: boolean;
+  /** Quality level */
+  readonly quality?: 'low' | 'medium' | 'high' | 'enhanced';
+  /** Sample preview URL */
+  readonly sampleUrl?: string;
+}
+
+/**
  * Protocol for TTS service implementations
  */
 export interface TTSService {
@@ -27,6 +47,11 @@ export interface TTSService {
   getAvailableVoices?(): Promise<string[]>;
 
   /**
+   * Get detailed voice info
+   */
+  getVoiceInfo?(): Promise<VoiceInfo[]>;
+
+  /**
    * Check if service is ready
    */
   readonly isReady: boolean;
@@ -41,4 +66,3 @@ export interface TTSService {
    */
   cleanup(): Promise<void>;
 }
-

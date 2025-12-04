@@ -171,33 +171,45 @@ export class StreamingService {
         throw new Error('Service does not support streaming');
       }
 
-      // Stream tokens
+      // Stream tokens using callback-based API
       let isThinking = false;
       let thinkingBuffer = '';
+      const tokens: string[] = [];
 
-      for await (const token of service.generateStream(effectivePrompt, resolvedOptions)) {
+      // generateStream uses callback for tokens, returns final result
+      const onToken = (token: string): void => {
+        tokens.push(token);
+
         // Check if this is a thinking token
         if (currentModel.model.supportsThinking && currentModel.model.thinkingPattern) {
-          const parseResult = ThinkingParser.parseStreaming(
+          const state = { buffer: thinkingBuffer, inThinkingSection: isThinking };
+          const parseResult = ThinkingParser.parseStreamingToken(
             token,
             currentModel.model.thinkingPattern,
-            thinkingBuffer
+            state
           );
 
-          if (parseResult.isThinking) {
-            isThinking = true;
-            thinkingBuffer += token;
+          thinkingBuffer = state.buffer;
+          isThinking = state.inThinkingSection;
+
+          if (parseResult.tokenType === 'thinking') {
             callbacks.onToken(token, true);
-            continue;
-          } else if (isThinking) {
+            return;
+          } else if (!isThinking && thinkingBuffer.length > 0) {
             // Thinking ended
-            isThinking = false;
             callbacks.onThinkingEnd(thinkingBuffer);
             thinkingBuffer = '';
           }
         }
 
         callbacks.onToken(token, false);
+      };
+
+      // Call generateStream with callback
+      await service.generateStream(effectivePrompt, resolvedOptions, onToken);
+
+      // Yield all collected tokens
+      for (const token of tokens) {
         yield token;
       }
 
@@ -230,9 +242,8 @@ export class StreamingService {
     // Parse thinking content if present
     let finalText = fullText;
     if (thinkingContent) {
-      // Extract final text without thinking
-      const parseResult = ThinkingParser.parse(fullText, null);
-      finalText = parseResult.content;
+      // If thinkingContent is already extracted, just remove it from fullText
+      finalText = fullText.replace(thinkingContent, '').trim();
     }
 
     // Calculate token counts
@@ -288,4 +299,3 @@ export class StreamingService {
     };
   }
 }
-

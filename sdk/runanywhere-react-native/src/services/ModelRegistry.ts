@@ -8,7 +8,6 @@
  */
 
 import { requireNativeModule } from '../native';
-import { EventBus } from '../Public/Events';
 import type { LLMFramework, ModelCategory, ModelFormat, ModelInfo } from '../types';
 
 /**
@@ -64,12 +63,10 @@ class ModelRegistryImpl {
 
   /**
    * Initialize the registry
-   *
-   * @param apiKey - The API key for fetching remote models
    */
-  async initialize(apiKey: string): Promise<void> {
+  async initialize(): Promise<void> {
     const native = requireNativeModule();
-    await native.initializeRegistry(apiKey);
+    await native.initializeRegistry();
     this.initialized = true;
 
     // Load initial models into cache
@@ -83,7 +80,8 @@ class ModelRegistryImpl {
    */
   async discoverModels(): Promise<ModelInfo[]> {
     const native = requireNativeModule();
-    const models = await native.discoverModels();
+    const modelsJson = await native.discoverModels();
+    const models: ModelInfo[] = JSON.parse(modelsJson);
 
     // Update cache
     for (const model of models) {
@@ -100,7 +98,7 @@ class ModelRegistryImpl {
    */
   async registerModel(model: ModelInfo): Promise<void> {
     const native = requireNativeModule();
-    await native.registerModel(model);
+    await native.registerModel(JSON.stringify(model));
     this.modelsCache.set(model.id, model);
   }
 
@@ -111,7 +109,7 @@ class ModelRegistryImpl {
    */
   async registerModelPersistently(model: ModelInfo): Promise<void> {
     const native = requireNativeModule();
-    await native.registerModelPersistently(model);
+    await native.registerModelPersistently(JSON.stringify(model));
     this.modelsCache.set(model.id, model);
   }
 
@@ -130,13 +128,15 @@ class ModelRegistryImpl {
 
     // Fetch from native
     const native = requireNativeModule();
-    const model = await native.getModel(id);
+    const modelJson = await native.getModel(id);
 
-    if (model) {
+    if (modelJson) {
+      const model: ModelInfo = JSON.parse(modelJson);
       this.modelsCache.set(id, model);
+      return model;
     }
 
-    return model;
+    return null;
   }
 
   /**
@@ -147,7 +147,8 @@ class ModelRegistryImpl {
    */
   async filterModels(criteria: ModelCriteria): Promise<ModelInfo[]> {
     const native = requireNativeModule();
-    return native.filterModels(criteria);
+    const modelsJson = await native.filterModels(JSON.stringify(criteria));
+    return JSON.parse(modelsJson) as ModelInfo[];
   }
 
   /**
@@ -157,7 +158,7 @@ class ModelRegistryImpl {
    */
   async updateModel(model: ModelInfo): Promise<void> {
     const native = requireNativeModule();
-    await native.updateModel(model);
+    await native.updateModel(model.id, JSON.stringify(model));
     this.modelsCache.set(model.id, model);
   }
 
@@ -182,7 +183,8 @@ class ModelRegistryImpl {
    */
   async addModelFromURL(options: AddModelFromURLOptions): Promise<ModelInfo> {
     const native = requireNativeModule();
-    const model = await native.addModelFromURL(options);
+    const modelJson = await native.addModelFromURL(options.url, JSON.stringify(options));
+    const model: ModelInfo = JSON.parse(modelJson);
     this.modelsCache.set(model.id, model);
     return model;
   }
@@ -273,7 +275,8 @@ class ModelRegistryImpl {
   private async refreshCache(): Promise<void> {
     try {
       const native = requireNativeModule();
-      const models = await native.availableModels();
+      const modelsJson = await native.availableModels();
+      const models: ModelInfo[] = JSON.parse(modelsJson);
 
       this.modelsCache.clear();
       for (const model of models) {
