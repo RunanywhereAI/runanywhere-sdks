@@ -817,7 +817,6 @@ class ServiceContainer {
 
         } catch (e: Exception) {
             logger.error("❌ Failed to populate hardcoded models: ${e.message}", e)
-            e.printStackTrace()
         }
     }
 

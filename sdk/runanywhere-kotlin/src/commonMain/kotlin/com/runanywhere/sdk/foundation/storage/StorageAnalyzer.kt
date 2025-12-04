@@ -121,7 +121,7 @@ class DefaultStorageAnalyzer(
             storedModels = storedModels,
             availability = StorageAvailability.HEALTHY, // Determined below
             recommendations = emptyList(),
-            lastUpdated = Instant.fromEpochMilliseconds(System.currentTimeMillis())
+            lastUpdated = kotlinx.datetime.Clock.System.now()
         )
 
         // Determine availability status
@@ -417,7 +417,7 @@ class DefaultStorageAnalyzer(
                     size = modelData.size,
                     format = modelData.format.value,
                     framework = modelData.framework?.displayName ?: registeredModel?.preferredFramework?.displayName,
-                    createdDate = Instant.fromEpochMilliseconds(System.currentTimeMillis()), // TODO: Get actual creation date
+                    createdDate = kotlinx.datetime.Clock.System.now(), // TODO: Get actual creation date
                     lastUsed = null, // TODO: Get actual last access date
                     contextLength = registeredModel?.contextLength,
                     checksum = null
