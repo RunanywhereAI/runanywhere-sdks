@@ -23,7 +23,8 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
-import { ModelInfo } from '../types/model';
+import { ModelSelectionSheet, ModelSelectionContext } from '../components/model';
+import { ModelInfo, LLMFramework } from '../types/model';
 import { VoicePipelineStatus, VoiceConversationEntry } from '../types/voice';
 
 // Import actual RunAnywhere SDK
@@ -47,6 +48,8 @@ export const VoiceAssistantScreen: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [showModelInfo, setShowModelInfo] = useState(true);
+  const [showModelSelection, setShowModelSelection] = useState(false);
+  const [modelSelectionType, setModelSelectionType] = useState<'stt' | 'llm' | 'tts'>('stt');
 
   // Check if all models are loaded (or demo mode is enabled)
   const allModelsLoaded = demoMode || (sttModel && llmModel && ttsModel);
@@ -106,77 +109,76 @@ export const VoiceAssistantScreen: React.FC = () => {
   };
 
   /**
-   * Handle model selection
+   * Handle model selection - opens model selection sheet
    */
-  const handleSelectModel = useCallback(
-    async (type: 'stt' | 'llm' | 'tts') => {
-      const titles = {
-        stt: 'Select Speech Model',
-        llm: 'Select Language Model',
-        tts: 'Select Voice Model',
-      };
+  const handleSelectModel = useCallback((type: 'stt' | 'llm' | 'tts') => {
+    setModelSelectionType(type);
+    setShowModelSelection(true);
+  }, []);
 
-      // Get downloaded models of this type
-      const downloadedModels = availableModels.filter(
-        (m) => m.modality === type && m.isDownloaded
-      );
+  /**
+   * Get context for model selection
+   */
+  const getSelectionContext = (type: 'stt' | 'llm' | 'tts'): ModelSelectionContext => {
+    switch (type) {
+      case 'stt':
+        return ModelSelectionContext.STT;
+      case 'llm':
+        return ModelSelectionContext.LLM;
+      case 'tts':
+        return ModelSelectionContext.TTS;
+    }
+  };
 
-      if (type === 'llm') {
-        // LLM models are not in catalog yet
-        Alert.alert(
-          titles[type],
-          'LLM models are not yet available in the catalog. Use Demo Mode to test the pipeline.',
-          [
-            { text: 'Enable Demo Mode', onPress: enableDemoMode },
-            { text: 'Cancel', style: 'cancel' },
-          ]
-        );
-        return;
-      }
+  /**
+   * Handle model selected from the sheet
+   */
+  const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
+    try {
+      console.log(`[VoiceAssistant] Loading ${modelSelectionType} model:`, model.id, model.localPath);
 
-      if (downloadedModels.length === 0) {
-        Alert.alert(
-          'No Models Downloaded',
-          `Please download a ${type.toUpperCase()} model from the Settings tab first, or use Demo Mode.`,
-          [
-            { text: 'Enable Demo Mode', onPress: enableDemoMode },
-            { text: 'OK' },
-          ]
-        );
-        return;
-      }
-
-      const buttons = downloadedModels.map((model) => ({
-        text: model.name,
-        onPress: async () => {
-          try {
-            console.log(`[VoiceAssistant] Loading ${type} model:`, model.id, model.localPath);
-
-            switch (type) {
-              case 'stt':
-                const sttSuccess = await RunAnywhere.loadSTTModel(model.localPath!, model.modelType || 'whisper');
-                if (sttSuccess) {
-                  setSTTModel({ id: model.id, name: model.name } as ModelInfo);
-                }
-                break;
-              case 'tts':
-                const ttsSuccess = await RunAnywhere.loadTTSModel(model.localPath!, model.modelType || 'piper');
-                if (ttsSuccess) {
-                  setTTSModel({ id: model.id, name: model.name } as ModelInfo);
-                }
-                break;
+      switch (modelSelectionType) {
+        case 'stt':
+          if (model.localPath) {
+            const sttSuccess = await RunAnywhere.loadSTTModel(model.localPath, model.modelType || 'whisper');
+            if (sttSuccess) {
+              setSTTModel({
+                id: model.id,
+                name: model.name,
+                preferredFramework: LLMFramework.ONNX,
+              } as ModelInfo);
             }
-          } catch (error) {
-            Alert.alert('Error', `Failed to load model: ${error}`);
           }
-        },
-      }));
-      buttons.push({ text: 'Cancel', onPress: () => {} });
-
-      Alert.alert(titles[type], 'Choose a downloaded model', buttons as any);
-    },
-    [availableModels]
-  );
+          break;
+        case 'llm':
+          if (model.localPath) {
+            const llmSuccess = await RunAnywhere.loadTextModel(model.localPath);
+            if (llmSuccess) {
+              setLLMModel({
+                id: model.id,
+                name: model.name,
+                preferredFramework: LLMFramework.LlamaCpp,
+              } as ModelInfo);
+            }
+          }
+          break;
+        case 'tts':
+          if (model.localPath) {
+            const ttsSuccess = await RunAnywhere.loadTTSModel(model.localPath, model.modelType || 'piper');
+            if (ttsSuccess) {
+              setTTSModel({
+                id: model.id,
+                name: model.name,
+                preferredFramework: LLMFramework.PiperTTS,
+              } as ModelInfo);
+            }
+          }
+          break;
+      }
+    } catch (error) {
+      Alert.alert('Error', `Failed to load model: ${error}`);
+    }
+  }, [modelSelectionType]);
 
   /**
    * Start/stop recording
@@ -540,6 +542,14 @@ export const VoiceAssistantScreen: React.FC = () => {
           </View>
         </>
       )}
+
+      {/* Model Selection Sheet */}
+      <ModelSelectionSheet
+        visible={showModelSelection}
+        context={getSelectionContext(modelSelectionType)}
+        onClose={() => setShowModelSelection(false)}
+        onModelSelected={handleModelSelected}
+      />
     </SafeAreaView>
   );
 };

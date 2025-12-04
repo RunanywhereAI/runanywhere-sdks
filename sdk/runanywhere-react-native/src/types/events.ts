@@ -95,10 +95,19 @@ export type SDKModelEvent =
   | { type: 'unloadStarted' }
   | { type: 'unloadCompleted' }
   | { type: 'unloadFailed'; error: string }
-  | { type: 'downloadStarted'; modelId: string }
-  | { type: 'downloadProgress'; modelId: string; progress: number }
-  | { type: 'downloadCompleted'; modelId: string }
-  | { type: 'downloadFailed'; modelId: string; error: string }
+  | { type: 'downloadStarted'; modelId: string; taskId?: string }
+  | {
+      type: 'downloadProgress';
+      modelId: string;
+      taskId?: string;
+      progress: number;
+      bytesDownloaded?: number;
+      totalBytes?: number;
+      downloadState?: string;
+      error?: string;
+    }
+  | { type: 'downloadCompleted'; modelId: string; taskId?: string; localPath?: string }
+  | { type: 'downloadFailed'; modelId: string; taskId?: string; error: string }
   | { type: 'listRequested' }
   | { type: 'listCompleted'; models: ModelInfo[] }
   | { type: 'listFailed'; error: string }

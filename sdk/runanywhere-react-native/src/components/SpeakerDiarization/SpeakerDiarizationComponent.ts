@@ -209,11 +209,11 @@ export class SpeakerDiarizationComponent extends BaseComponent<SpeakerDiarizatio
     const startTime = Date.now();
 
     // Convert audio data to ArrayBuffer for service
-    const audioBuffer = Buffer.isBuffer(input.audioData)
-      ? input.audioData.buffer
+    const audioBuffer: ArrayBuffer = Buffer.isBuffer(input.audioData)
+      ? (input.audioData.buffer.slice(input.audioData.byteOffset, input.audioData.byteOffset + input.audioData.byteLength) as ArrayBuffer)
       : input.audioData instanceof Uint8Array
-      ? input.audioData.buffer
-      : Buffer.from(input.audioData).buffer;
+      ? (input.audioData.buffer.slice(input.audioData.byteOffset, input.audioData.byteOffset + input.audioData.byteLength) as ArrayBuffer)
+      : (Buffer.from(input.audioData).buffer as ArrayBuffer);
 
     // Process audio to detect speakers
     const result = await this.service.wrappedService.processAudio(audioBuffer, 16000);
@@ -318,4 +318,3 @@ export class SpeakerDiarizationComponent extends BaseComponent<SpeakerDiarizatio
     return { segments: labeledSegments };
   }
 }
-

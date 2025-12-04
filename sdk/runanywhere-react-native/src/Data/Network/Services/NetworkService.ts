@@ -57,7 +57,8 @@ export class NetworkServiceImpl implements NetworkService {
     requiresAuth: boolean = true
   ): Promise<R> {
     const data = JSON.stringify(payload);
-    const arrayBuffer = new TextEncoder().encode(data).buffer;
+    const encoded = new TextEncoder().encode(data);
+    const arrayBuffer = encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength) as ArrayBuffer;
     const responseData = await this.postRaw(endpoint, arrayBuffer, requiresAuth);
     const text = new TextDecoder().decode(responseData);
     return JSON.parse(text) as R;
@@ -124,4 +125,3 @@ export class NetworkServiceImpl implements NetworkService {
     return arrayBuffer;
   }
 }
-

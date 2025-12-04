@@ -1,13 +1,23 @@
 /**
  * TTSConfiguration.ts
- * Placeholder - needs full implementation matching iOS
+ *
+ * Core TTS configuration interface used by TTS services
+ *
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Models/Configuration/TTSConfiguration.swift
  */
 
+import { SDKComponent } from '../Common/SDKComponent';
+
 export interface TTSConfiguration {
+  componentType?: SDKComponent;
   modelId?: string | null;
   voice?: string;
-  rate?: number;
+  language?: string;
+  speakingRate?: number;
   pitch?: number;
-  // Add all other properties from iOS TTSConfiguration
+  volume?: number;
+  audioFormat?: string;
+  useNeuralVoice?: boolean;
+  enableSSML?: boolean;
+  validate?: () => void;
 }
-

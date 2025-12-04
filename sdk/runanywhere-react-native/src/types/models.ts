@@ -398,6 +398,35 @@ export interface VADConfiguration {
 // ============================================================================
 
 /**
+ * Configuration data returned by the native SDK
+ */
+export interface ConfigurationData {
+  /** Current environment */
+  environment: SDKEnvironment;
+
+  /** API key (masked for security) */
+  apiKey?: string;
+
+  /** Base URL for API requests */
+  baseURL?: string;
+
+  /** Configuration source */
+  source: ConfigurationSource;
+
+  /** Default generation settings */
+  defaultGenerationSettings?: DefaultGenerationSettings;
+
+  /** Feature flags */
+  featureFlags?: Record<string, boolean>;
+
+  /** Last updated timestamp */
+  lastUpdated?: string;
+
+  /** Additional configuration values */
+  [key: string]: unknown;
+}
+
+/**
  * SDK initialization options
  */
 export interface SDKInitOptions {

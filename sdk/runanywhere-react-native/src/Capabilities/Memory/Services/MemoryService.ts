@@ -6,18 +6,16 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Memory/Services/MemoryService.swift
  */
 
-import type {
-  MemoryLoadedModel,
-  MemoryStatistics,
-  MemoryLoadedModelInfo,
-} from '../../../Core/Protocols/Memory/MemoryModels';
 import {
+  type MemoryLoadedModel,
   MemoryPriority,
   MemoryPressureLevel,
+  type MemoryStatistics,
+  type MemoryLoadedModelInfo,
 } from '../../../Core/Protocols/Memory/MemoryModels';
 import type { MemoryManager } from '../../../Core/Protocols/Memory/MemoryManager';
-import type { LoadedModel } from '../../ModelLoading/Models/LoadedModel';
 import type { LLMService } from '../../../Core/Protocols/LLM/LLMService';
+import type { LoadedModel } from '../../ModelLoading/Models/LoadedModel';
 import { AllocationManager } from './AllocationManager';
 import { PressureHandler } from './PressureHandler';
 import { CacheEviction } from './CacheEviction';
@@ -160,9 +158,9 @@ export class MemoryService implements MemoryManager {
   }
 
   /**
-   * Handle memory pressure (MemoryManager protocol)
+   * Handle memory pressure with default level (MemoryManager protocol)
    */
-  public async handleMemoryPressureDefault(): Promise<void> {
+  public async handleDefaultMemoryPressure(): Promise<void> {
     await this.handleMemoryPressure(MemoryPressureLevel.Warning);
   }
 
@@ -176,11 +174,9 @@ export class MemoryService implements MemoryManager {
   /**
    * Get loaded models (MemoryManager protocol)
    */
-  public getLoadedModels(): LoadedModel[] {
-    // MemoryManager interface expects LoadedModel[] but we store MemoryLoadedModelInfo
-    // For now, return an empty array as we can't reconstruct full LoadedModel from MemoryLoadedModel
-    // This is a known limitation - in the future, we should store the original LoadedModel reference
-    return [];
+  public getLoadedModels(): MemoryLoadedModel[] {
+    const memoryModels = this.allocationManager.getLoadedModels();
+    return memoryModels.map((memModelInfo) => memModelInfo.model);
   }
 
   /**
@@ -279,4 +275,3 @@ export class MemoryService implements MemoryManager {
     }
   }
 }
-

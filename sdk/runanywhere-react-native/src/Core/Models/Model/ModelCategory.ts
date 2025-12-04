@@ -149,7 +149,7 @@ export function modelCategoryFromFramework(framework: LLMFramework): ModelCatego
     case LLMFramework.WhisperKit:
     case LLMFramework.OpenAIWhisper:
       return ModelCategory.SpeechRecognition;
-    case LLMFramework.LlamaCPP:
+    case LLMFramework.LlamaCpp:
     case LLMFramework.MLX:
     case LLMFramework.MLC:
     case LLMFramework.ExecuTorch:
@@ -166,6 +166,9 @@ export function modelCategoryFromFramework(framework: LLMFramework): ModelCatego
       return ModelCategory.Multimodal;
     case LLMFramework.SystemTTS:
       return ModelCategory.SpeechSynthesis;
+    default:
+      // For any unknown or new frameworks, default to Multimodal
+      return ModelCategory.Multimodal;
   }
 }
 
@@ -177,7 +180,7 @@ export function modelCategoryFromFormatAndFrameworks(
   frameworks: LLMFramework[]
 ): ModelCategory {
   // First check if we have framework hints
-  if (frameworks.length > 0) {
+  if (frameworks.length > 0 && frameworks[0] !== undefined) {
     return modelCategoryFromFramework(frameworks[0]);
   }
 

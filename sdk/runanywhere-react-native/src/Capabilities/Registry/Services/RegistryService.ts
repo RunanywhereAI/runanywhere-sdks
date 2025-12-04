@@ -164,4 +164,3 @@ export class RegistryService implements ModelRegistry {
     // For now, placeholder
   }
 }
-

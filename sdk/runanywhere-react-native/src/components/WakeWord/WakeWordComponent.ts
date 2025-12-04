@@ -137,7 +137,7 @@ export class WakeWordComponent extends BaseComponent<WakeWordServiceWrapper> {
     // Create output
     return {
       detected: result.detected,
-      wakeWord: result.detected ? (result.word ?? this.wakeWordConfiguration.wakeWords[0]) : null,
+      wakeWord: result.detected ? (result.word ?? this.wakeWordConfiguration.wakeWords[0] ?? null) : null,
       confidence: result.detected ? (result.confidence ?? this.wakeWordConfiguration.confidenceThreshold) : 0.0,
       metadata: {
         processingTime,
@@ -148,4 +148,3 @@ export class WakeWordComponent extends BaseComponent<WakeWordServiceWrapper> {
     };
   }
 }
-

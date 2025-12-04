@@ -41,7 +41,8 @@ class ConfigurationServiceImpl {
 
     try {
       const native = requireNativeModule();
-      const config = await native.getConfiguration();
+      const configJson = await native.getConfiguration();
+      const config = JSON.parse(configJson) as ConfigurationData;
       this.cachedConfig = config;
       return config;
     } catch {
@@ -58,12 +59,12 @@ class ConfigurationServiceImpl {
    * 3. Consumer configuration (app-provided defaults)
    * 4. SDK defaults
    *
-   * @param apiKey - The API key for authentication
    * @returns Loaded configuration data
    */
-  async loadConfigurationOnLaunch(apiKey: string): Promise<ConfigurationData> {
+  async loadConfigurationOnLaunch(): Promise<ConfigurationData> {
     const native = requireNativeModule();
-    const config = await native.loadConfigurationOnLaunch(apiKey);
+    const configJson = await native.loadConfigurationOnLaunch();
+    const config = JSON.parse(configJson) as ConfigurationData;
     this.cachedConfig = config;
     return config;
   }
@@ -78,21 +79,23 @@ class ConfigurationServiceImpl {
    */
   async setConsumerConfiguration(config: Partial<ConfigurationData>): Promise<void> {
     const native = requireNativeModule();
-    await native.setConsumerConfiguration(config);
+    await native.setConsumerConfiguration(JSON.stringify(config));
   }
 
   /**
    * Update configuration with a modifier function
    *
    * @param updates - Partial configuration updates
-   * @param options - Update options
+   * @param _options - Update options (not yet supported by native module)
    */
   async updateConfiguration(
     updates: Partial<ConfigurationData>,
-    options?: ConfigurationUpdateOptions
+    _options?: ConfigurationUpdateOptions
   ): Promise<void> {
     const native = requireNativeModule();
-    await native.updateConfiguration(updates, options);
+    // Native module expects a single JSON string argument
+    const configJson = JSON.stringify(updates);
+    await native.updateConfiguration(configJson);
 
     // Update cache
     if (this.cachedConfig) {
@@ -122,7 +125,10 @@ class ConfigurationServiceImpl {
    */
   async getCurrentEnvironment(): Promise<SDKEnvironment | null> {
     const native = requireNativeModule();
-    return native.getCurrentEnvironment();
+    const envString = await native.getCurrentEnvironment();
+    // Parse the string environment to SDKEnvironment enum
+    if (!envString) return null;
+    return envString as SDKEnvironment;
   }
 
   /**

@@ -132,4 +132,3 @@ export class AdapterRegistry {
     return FrameworkModality.TextToText;
   }
 }
-

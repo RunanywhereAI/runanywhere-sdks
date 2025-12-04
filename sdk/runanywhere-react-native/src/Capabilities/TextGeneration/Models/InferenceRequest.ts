@@ -9,22 +9,17 @@
 import { RequestPriority } from '../../../Core/Models/Common/RequestPriority';
 import type { GenerationOptions } from './GenerationOptions';
 
-// Polyfill for crypto.randomUUID in React Native
-const getCrypto = () => {
-  if (typeof globalThis !== 'undefined' && (globalThis as any).crypto?.randomUUID) {
-    return (globalThis as any).crypto;
-  }
-  // Fallback UUID implementation for React Native
-  return {
-    randomUUID: () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = (Math.random() * 16) | 0;
-        const v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      });
-    },
-  };
-};
+/**
+ * Generate a UUID v4
+ */
+function generateUUID(): string {
+  // Simple UUID v4 generator that works in all environments
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 /**
  * Request for inference
@@ -55,7 +50,7 @@ export class InferenceRequestImpl implements InferenceRequest {
     estimatedTokens: number | null = null,
     priority: RequestPriority = RequestPriority.Normal
   ) {
-    this.id = getCrypto().randomUUID();
+    this.id = generateUUID();
     this.prompt = prompt;
     this.options = options;
     this.timestamp = new Date();
@@ -63,4 +58,3 @@ export class InferenceRequestImpl implements InferenceRequest {
     this.priority = priority;
   }
 }
-

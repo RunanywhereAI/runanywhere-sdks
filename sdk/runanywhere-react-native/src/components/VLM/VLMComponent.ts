@@ -11,7 +11,7 @@ import { SDKComponent } from '../../Core/Models/Common/SDKComponent';
 import { ModuleRegistry } from '../../Core/ModuleRegistry';
 import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 import type { VLMConfiguration } from './VLMConfiguration';
-import type { VLMInput, VLMOutput, ImageFormat, VLMOptions, DetectedObject } from './VLMModels';
+import { ImageFormat, type VLMInput, type VLMOutput, type VLMOptions, type DetectedObject } from './VLMModels';
 import type { VLMService } from '../../Core/Protocols/VLM/VLMService';
 import type { VLMServiceProvider } from '../../Core/Protocols/VLM/VLMServiceProvider';
 import type { VLMResult } from '../../Core/Models/VLM/VLMResult';
@@ -21,13 +21,17 @@ import { AnyServiceWrapper } from '../../Core/Components/BaseComponent';
  * Unavailable VLM Service (placeholder)
  */
 class UnavailableVLMService implements VLMService {
-  async initialize(modelPath?: string | null): Promise<void> {
+  async initialize(_modelPath?: string | null): Promise<void> {
     throw new SDKError(SDKErrorCode.ComponentNotInitialized, 'VLM service not available');
   }
 
-  async processImage(
-    imagePath: string,
-    prompt: string
+  async process(
+    _imageData: string | ArrayBuffer,
+    _textPrompt: string,
+    _options?: {
+      maxTokens?: number;
+      temperature?: number;
+    }
   ): Promise<VLMResult> {
     throw new SDKError(SDKErrorCode.ComponentNotInitialized, 'VLM service not available');
   }
@@ -189,11 +193,21 @@ export class VLMComponent extends BaseComponent<VLMServiceWrapper> {
     input.validate();
 
     // Convert image to ArrayBuffer for service
-    const imageBuffer = Buffer.isBuffer(input.image)
-      ? input.image.buffer
-      : input.image instanceof Uint8Array
-      ? input.image.buffer
-      : Buffer.from(input.image).buffer;
+    let imageBuffer: ArrayBuffer;
+    if (Buffer.isBuffer(input.image)) {
+      // Get the underlying ArrayBuffer, slicing to avoid shared buffer issues
+      imageBuffer = input.image.buffer.slice(
+        input.image.byteOffset,
+        input.image.byteOffset + input.image.byteLength
+      ) as ArrayBuffer;
+    } else if (input.image instanceof Uint8Array) {
+      imageBuffer = input.image.buffer.slice(
+        input.image.byteOffset,
+        input.image.byteOffset + input.image.byteLength
+      ) as ArrayBuffer;
+    } else {
+      imageBuffer = Buffer.from(input.image).buffer as ArrayBuffer;
+    }
 
     // Track processing time
     const startTime = Date.now();
@@ -247,4 +261,3 @@ export class VLMComponent extends BaseComponent<VLMServiceWrapper> {
     };
   }
 }
-

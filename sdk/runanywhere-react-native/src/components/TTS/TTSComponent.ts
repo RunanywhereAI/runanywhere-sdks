@@ -220,6 +220,10 @@ export class TTSComponent extends BaseComponent<TTSServiceWrapper> {
       throw new SDKError(SDKErrorCode.ComponentNotReady, 'TTS service not available');
     }
 
+    if (!this.service.wrappedService.getAvailableVoices) {
+      return [];
+    }
+
     return await this.service.wrappedService.getAvailableVoices();
   }
 }

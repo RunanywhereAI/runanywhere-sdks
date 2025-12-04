@@ -8,29 +8,12 @@
 
 import type { LoadedModel } from '../../../Capabilities/ModelLoading/Models/LoadedModel';
 import type { LLMService } from '../LLM/LLMService';
+import { MemoryPriority, type MemoryLoadedModel } from './MemoryModels';
 
-/**
- * Memory priority levels
- */
-export enum MemoryPriority {
-  Low = 0,
-  Normal = 1,
-  High = 2,
-  Critical = 3,
-}
-
-/**
- * Memory-tracked model information
- */
-export interface MemoryLoadedModel {
-  readonly id: string;
-  readonly name: string;
-  readonly size: number; // bytes
-  readonly framework: string;
-  readonly loadedAt: Date;
-  lastUsed: Date;
-  readonly priority: MemoryPriority;
-}
+// Re-export for convenience
+export { MemoryPriority, type MemoryLoadedModel } from './MemoryModels';
+export type { LoadedModel } from '../../../Capabilities/ModelLoading/Models/LoadedModel';
+export type { LLMService } from '../LLM/LLMService';
 
 /**
  * Lifecycle stages for progress tracking
@@ -161,7 +144,7 @@ export interface MemoryManager {
    * Get loaded models
    * @returns Array of loaded model information
    */
-  getLoadedModels(): LoadedModel[];
+  getLoadedModels(): MemoryLoadedModel[];
 
   /**
    * Request memory for a model
@@ -177,4 +160,3 @@ export interface MemoryManager {
    */
   isHealthy(): boolean;
 }
-
