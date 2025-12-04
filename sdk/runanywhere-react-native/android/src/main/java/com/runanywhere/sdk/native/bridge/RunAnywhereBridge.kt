@@ -1,14 +1,59 @@
-package com.runanywhere.sdk.core.onnx
+package com.runanywhere.sdk.native.bridge
 
 /**
  * RunAnywhereBridge - JNI bridge to native RunAnywhere C library
  *
  * This class MUST be in this exact package to match the JNI function signatures
- * in runanywhere-core/src/bridge/jni/runanywhere_jni.cpp
+ * in the unified Android binaries (librunanywhere_jni.so)
  *
- * JNI functions are named: Java_com_runanywhere_sdk_core_onnx_RunAnywhereBridge_*
+ * JNI functions are named: Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_*
  */
 object RunAnywhereBridge {
+
+    private var librariesLoaded = false
+
+    init {
+        // Load unified Android native libraries
+        // These are from runanywhere-binaries v0.0.1-dev.e0bac69
+        synchronized(this) {
+            if (!librariesLoaded) {
+                try {
+                    android.util.Log.d("RunAnywhere", "Loading native libraries...")
+
+                    // Load dependencies first
+                    System.loadLibrary("c++_shared")
+
+                    // Load ONNX Runtime (required by ONNX backend and Sherpa-ONNX)
+                    System.loadLibrary("onnxruntime")
+
+                    // Load Sherpa-ONNX libraries in dependency order
+                    // runanywhere_onnx uses the Sherpa C API (not JNI), so we need c-api/cxx-api
+                    // sherpa-onnx-cxx-api depends on onnxruntime
+                    System.loadLibrary("sherpa-onnx-cxx-api")
+                    // sherpa-onnx-c-api depends on sherpa-onnx-cxx-api
+                    System.loadLibrary("sherpa-onnx-c-api")
+
+                    // Load RunAnywhere ONNX backend (depends on onnxruntime and sherpa-onnx C API)
+                    System.loadLibrary("runanywhere_onnx")
+
+                    // Load LlamaCPP backend
+                    System.loadLibrary("runanywhere_llamacpp")
+
+                    // Load RunAnywhere bridge (depends on backend libraries)
+                    System.loadLibrary("runanywhere_bridge")
+
+                    // Load JNI bridge (depends on all above)
+                    System.loadLibrary("runanywhere_jni")
+
+                    librariesLoaded = true
+                    android.util.Log.d("RunAnywhere", "Native libraries loaded successfully")
+                } catch (e: UnsatisfiedLinkError) {
+                    android.util.Log.e("RunAnywhereBridge", "Failed to load native library", e)
+                    throw e
+                }
+            }
+        }
+    }
 
     // =============================================================================
     // Backend Lifecycle

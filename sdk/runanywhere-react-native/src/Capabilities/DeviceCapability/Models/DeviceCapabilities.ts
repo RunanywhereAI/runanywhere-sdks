@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/DeviceCapability/Models/DeviceCapabilities.swift
  */
 
-import { MemoryPressureLevel } from '../../Memory/Services/MemoryMonitor';
+import { MemoryPressureLevel } from '../../../Core/Protocols/Memory/MemoryModels';
 import { HardwareAcceleration } from '../../TextGeneration/Models/GenerationOptions';
 import type { ModelInfo } from '../../../Core/Models/Model/ModelInfo';
 

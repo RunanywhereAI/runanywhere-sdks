@@ -16,9 +16,9 @@ buildscript {
 // =============================================================================
 // Update these values when new versions are released
 // Latest unified release with ONNX Runtime + LlamaCPP + Sherpa-ONNX
-def NATIVE_VERSION = "0.0.1-dev.df97abe"
-def ONNX_NATIVE_CHECKSUM = "484769949a3e16bbee891df800ec037d3c0e0cdbe53154027fddc19c3a2f940c"
-def LLAMACPP_NATIVE_CHECKSUM = "9819f4819eeef979ed592debf85e8f599ad00290151993c15c160547f565d03d"
+def NATIVE_VERSION = "0.0.1-dev.e0bac69"
+def ONNX_NATIVE_CHECKSUM = ""  // Will be updated after download
+def LLAMACPP_NATIVE_CHECKSUM = ""  // Will be updated after download
 
 def isNewArchitectureEnabled() {
     return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"

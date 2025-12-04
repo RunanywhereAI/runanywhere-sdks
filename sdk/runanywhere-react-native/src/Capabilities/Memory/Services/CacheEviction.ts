@@ -8,9 +8,9 @@
 
 import type {
   MemoryLoadedModelInfo,
-  MemoryPriority,
   EvictionStatistics,
 } from '../../../Core/Protocols/Memory/MemoryModels';
+import { MemoryPriority } from '../../../Core/Protocols/Memory/MemoryModels';
 import type { AllocationManager } from './AllocationManager';
 
 /**
@@ -49,7 +49,7 @@ export class CacheEviction {
   /**
    * Select models to evict by count
    */
-  public selectModelsToEvict(count: number): string[] {
+  public selectModelsToEvictByCount(count: number): string[] {
     const models = this.getCurrentModels();
     const sortedModels = this.sortModelsByEvictionPriority(models, false);
     return sortedModels.slice(0, count).map((m) => m.model.id);

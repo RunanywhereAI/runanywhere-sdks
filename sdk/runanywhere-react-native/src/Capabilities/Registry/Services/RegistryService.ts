@@ -30,7 +30,7 @@ export class RegistryService implements ModelRegistry {
   /**
    * Initialize registry with configuration
    */
-  public async initialize(with apiKey: string): Promise<void> {
+  public async initialize(apiKey: string): Promise<void> {
     // Load pre-configured models
     await this.loadPreconfiguredModels();
 
@@ -39,7 +39,7 @@ export class RegistryService implements ModelRegistry {
 
     // Update existing registered models with discovered local paths
     for (const discoveredModel of localModels) {
-      const existingModel = this.getModel(by: discoveredModel.id);
+      const existingModel = this.getModel(discoveredModel.id);
       if (existingModel) {
         // Model already registered - just update its localPath if needed
         if (!existingModel.localPath && discoveredModel.localPath) {
@@ -100,14 +100,14 @@ export class RegistryService implements ModelRegistry {
   /**
    * Get model by ID
    */
-  public getModel(by id: string): ModelInfo | null {
+  public getModel(id: string): ModelInfo | null {
     return this.models.get(id) ?? null;
   }
 
   /**
    * Filter models by criteria
    */
-  public filterModels(by criteria: ModelCriteria): ModelInfo[] {
+  public filterModels(criteria: ModelCriteria): ModelInfo[] {
     return Array.from(this.models.values()).filter((model) => {
       // Framework filter
       if (criteria.framework) {

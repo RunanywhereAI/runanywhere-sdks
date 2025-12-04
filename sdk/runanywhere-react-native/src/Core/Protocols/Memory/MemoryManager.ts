@@ -6,16 +6,8 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Protocols/Memory/MemoryManager.swift
  */
 
-// Placeholder types - will be defined in their respective files
-export interface LoadedModel {
-  id: string;
-  name: string;
-  [key: string]: any;
-}
-
-export interface LLMService {
-  [key: string]: any;
-}
+import type { LoadedModel } from '../../../Capabilities/ModelLoading/Models/LoadedModel';
+import type { LLMService } from '../LLM/LLMService';
 
 /**
  * Memory priority levels
@@ -169,7 +161,7 @@ export interface MemoryManager {
    * Get loaded models
    * @returns Array of loaded model information
    */
-  getLoadedModels(): MemoryLoadedModel[];
+  getLoadedModels(): LoadedModel[];
 
   /**
    * Request memory for a model

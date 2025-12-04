@@ -99,6 +99,7 @@ export enum SDKErrorCode {
   NetworkError = 'networkError',
   InvalidState = 'invalidState',
   ComponentNotInitialized = 'componentNotInitialized',
+  ComponentNotReady = 'componentNotReady',
   Timeout = 'timeout',
   ServerError = 'serverError',
   StorageError = 'storageError',

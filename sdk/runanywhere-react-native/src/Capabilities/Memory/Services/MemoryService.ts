@@ -8,10 +8,12 @@
 
 import type {
   MemoryLoadedModel,
-  MemoryPriority,
-  MemoryPressureLevel,
   MemoryStatistics,
   MemoryLoadedModelInfo,
+} from '../../../Core/Protocols/Memory/MemoryModels';
+import {
+  MemoryPriority,
+  MemoryPressureLevel,
 } from '../../../Core/Protocols/Memory/MemoryModels';
 import type { MemoryManager } from '../../../Core/Protocols/Memory/MemoryManager';
 import type { LoadedModel } from '../../ModelLoading/Models/LoadedModel';
@@ -146,7 +148,7 @@ export class MemoryService implements MemoryManager {
   /**
    * Check if enough memory is available
    */
-  public hasAvailableMemory(for size: number): boolean {
+  public hasAvailableMemory(size: number): boolean {
     return this.getAvailableMemory() >= size;
   }
 
@@ -160,7 +162,7 @@ export class MemoryService implements MemoryManager {
   /**
    * Handle memory pressure (MemoryManager protocol)
    */
-  public async handleMemoryPressure(): Promise<void> {
+  public async handleMemoryPressureDefault(): Promise<void> {
     await this.handleMemoryPressure(MemoryPressureLevel.Warning);
   }
 
@@ -175,20 +177,10 @@ export class MemoryService implements MemoryManager {
    * Get loaded models (MemoryManager protocol)
    */
   public getLoadedModels(): LoadedModel[] {
-    const memoryModels = this.allocationManager.getLoadedModels();
-    return memoryModels
-      .map((memModelInfo) => {
-        const service = memModelInfo.service;
-        if (!service) {
-          return null;
-        }
-
-        // Create a ModelInfo from the MemoryLoadedModel
-        // This is a simplified version - in production, we'd need to reconstruct ModelInfo
-        // For now, return null as we don't have full ModelInfo reconstruction
-        return null;
-      })
-      .filter((model): model is LoadedModel => model !== null);
+    // MemoryManager interface expects LoadedModel[] but we store MemoryLoadedModelInfo
+    // For now, return an empty array as we can't reconstruct full LoadedModel from MemoryLoadedModel
+    // This is a known limitation - in the future, we should store the original LoadedModel reference
+    return [];
   }
 
   /**
