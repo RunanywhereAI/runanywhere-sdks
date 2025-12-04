@@ -15,7 +15,9 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
-import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
@@ -25,6 +27,10 @@ import kotlinx.serialization.json.Json
 import java.util.UUID
 
 private val logger = SDKLogger("ONNXServiceProviderImpl")
+
+// Module-level telemetry scope for fire-and-forget telemetry operations (avoids GlobalScope)
+// Uses SupervisorJob to prevent failures from affecting other telemetry operations
+private val telemetryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /**
  * JSON structure returned by native STT transcription
@@ -161,7 +167,7 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
     if (telemetryService == null) {
         logger.warn("⚠️ TTS telemetry SKIPPED - telemetryService is NULL (check ServiceContainer initialization)")
     }
-    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+    telemetryScope.launch {
         try {
             if (telemetryService != null) {
                 logger.info("📊 TTS_SYNTHESIS_STARTED tracking: synthesisId=$synthesisId, model=$modelName")
@@ -222,7 +228,7 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
         val processingTimeMs = (endTime - startTime).toDouble()
         val errorMsg = error.message ?: error.toString()
 
-        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        telemetryScope.launch {
             try {
                 telemetryService?.trackTTSSynthesisFailed(
                     synthesisId = synthesisId,
@@ -253,7 +259,7 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
     val realTimeFactor = if (audioDurationMs > 0) processingTimeMs / audioDurationMs else 0.0
 
     // Track successful synthesis completion - fire and forget
-    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+    telemetryScope.launch {
         try {
             if (telemetryService != null) {
                 logger.info("📊 TTS_SYNTHESIS_COMPLETED tracking: synthesisId=$synthesisId, duration=${audioDurationMs}ms")

@@ -19,8 +19,10 @@
     public static ** shared;
 }
 
-# Prevent obfuscation
+# Prevent obfuscation (class, interface, and enum names for consistency)
 -keepnames class com.runanywhere.sdk.** { *; }
+-keepnames interface com.runanywhere.sdk.** { *; }
+-keepnames enum com.runanywhere.sdk.** { *; }
 
 # Keep native methods
 -keepclasseswithmembernames class * {
