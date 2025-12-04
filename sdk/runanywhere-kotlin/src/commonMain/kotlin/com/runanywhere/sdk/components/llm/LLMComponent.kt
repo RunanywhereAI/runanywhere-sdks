@@ -13,10 +13,15 @@ import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.data.models.generateUUID
-import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+
+// Note: DelicateCoroutinesApi removed - now using component-scoped telemetryScope instead of GlobalScope
 
 /**
  * LLM Service Wrapper to allow protocol-based LLM service to work with BaseComponent
@@ -42,6 +47,9 @@ class LLMComponent(
 
     private val logger = SDKLogger("LLMComponent")
     private val serviceContainer: ServiceContainer? = ServiceContainer.shared
+
+    // Coroutine scope for fire-and-forget telemetry operations (avoids GlobalScope)
+    private val telemetryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // MARK: - Properties
 
@@ -130,6 +138,8 @@ class LLMComponent(
     }
 
     override suspend fun performCleanup() {
+        // Cancel any pending telemetry operations to prevent memory leaks
+        telemetryScope.cancel()
         service?.wrappedService?.cleanup()
         _isModelLoaded = false
         modelPath = null
@@ -336,7 +346,7 @@ class LLMComponent(
         logger.info("Starting LLM generation with model: $modelId")
 
         // Track generation started - fire and forget to avoid blocking generation
-        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        telemetryScope.launch {
             try {
                 telemetryService?.trackGenerationStarted(
                     generationId = generationId,
@@ -370,7 +380,7 @@ class LLMComponent(
             // Track generation completed - fire and forget
             val finalTokensPerSecond = tokensPerSecond ?: 0.0
             val finalFirstTokenTime = firstTokenTime?.toDouble() ?: 0.0
-            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            telemetryScope.launch {
                 try {
                     telemetryService?.trackGenerationCompleted(
                         generationId = generationId,
@@ -411,7 +421,7 @@ class LLMComponent(
             val errorMsg = e.message ?: "Unknown error"
 
             // Track generation failed - fire and forget
-            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            telemetryScope.launch {
                 try {
                     telemetryService?.trackGenerationFailed(
                         generationId = generationId,

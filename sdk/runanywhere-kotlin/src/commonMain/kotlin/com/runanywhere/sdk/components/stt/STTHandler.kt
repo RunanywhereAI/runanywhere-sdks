@@ -16,15 +16,18 @@ import kotlinx.coroutines.launch
 
 /**
  * Handles Speech-to-Text processing in the voice pipeline (matches iOS STTHandler exactly)
+ *
+ * @param voiceAnalytics Voice analytics service (optional)
+ * @param sttAnalytics STT analytics service (optional)
+ * @param telemetryScope Coroutine scope for telemetry operations. Should be provided by parent
+ *                       component for proper lifecycle management. Defaults to a new scope if not provided.
  */
 class STTHandler(
     private val voiceAnalytics: Any? = null, // VoiceAnalyticsService - avoiding dependency for now
-    private val sttAnalytics: STTAnalyticsService? = null
+    private val sttAnalytics: STTAnalyticsService? = null,
+    private val telemetryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 ) {
     private val logger = SDKLogger("STTHandler")
-
-    // Coroutine scope for fire-and-forget telemetry operations (avoids GlobalScope)
-    private val telemetryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Get telemetry service from ServiceContainer (matches iOS pattern)
     private val telemetryService get() = ServiceContainer.shared.telemetryService

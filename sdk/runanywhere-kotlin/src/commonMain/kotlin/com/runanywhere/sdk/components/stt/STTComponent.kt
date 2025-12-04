@@ -13,6 +13,7 @@ import com.runanywhere.sdk.utils.PlatformUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -38,10 +39,12 @@ class STTComponent(
     private val telemetryService get() = ServiceContainer.shared.telemetryService
 
     // iOS parity - STT Handler for voice pipeline integration
+    // Pass telemetryScope to handler for proper lifecycle management
     private val sttHandler by lazy {
         STTHandler(
             voiceAnalytics = null, // Will be injected later
-            sttAnalytics = null // Will be injected later
+            sttAnalytics = null, // Will be injected later
+            telemetryScope = telemetryScope
         )
     }
 
@@ -76,6 +79,8 @@ class STTComponent(
     }
 
     override suspend fun cleanup() {
+        // Cancel any pending telemetry operations to prevent memory leaks
+        telemetryScope.cancel()
         service?.wrappedService?.cleanup()
         isModelLoaded = false
         modelPath = null

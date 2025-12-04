@@ -14,7 +14,10 @@ import kotlin.time.Duration.Companion.seconds
  * Matches Swift SDK's RemoteTelemetryDataSource actor
  *
  * Handles submission of telemetry batches to the production backend
- * with timeout, error handling, and retry logic.
+ * with timeout and error handling.
+ *
+ * Note: Retry logic should be implemented at the caller level (e.g., TelemetryRepository)
+ * to allow for custom backoff strategies and failure handling.
  */
 internal class RemoteTelemetryDataSource(
     private val analyticsNetworkService: AnalyticsNetworkService

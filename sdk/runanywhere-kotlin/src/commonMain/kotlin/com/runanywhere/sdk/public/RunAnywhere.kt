@@ -518,11 +518,10 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
      */
     protected open fun initializeLogging(environment: SDKEnvironment) {
         // Set log level based on environment
-        // TODO: Revert PRODUCTION to WARNING after debugging telemetry
         val logLevel = when (environment) {
             SDKEnvironment.DEVELOPMENT -> SDKLogger.Companion.LogLevel.DEBUG
             SDKEnvironment.STAGING -> SDKLogger.Companion.LogLevel.INFO
-            SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.DEBUG  // Temporarily DEBUG for telemetry debugging
+            SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.WARNING
         }
         SDKLogger.setLogLevel(logLevel)
     }
