@@ -1,47 +1,222 @@
-import '../../core/module_registry.dart' show ModuleRegistry, STTService;
-import '../../foundation/logging/sdk_logger.dart';
+/// Voice Capability Service
+///
+/// Main capability coordinator for voice processing using the component system.
+/// Matches iOS VoiceCapabilityService.swift from Capabilities/Voice/Services/
+library voice_capability_service;
 
-/// Voice capability service
+import 'dart:async';
+import 'dart:typed_data';
+
+import '../../core/module_registry.dart'
+    show ModuleRegistry, STTService, LLMService;
+import '../../components/tts/tts_service.dart' show TTSService;
+import '../../components/stt/stt_component.dart' show STTConfiguration;
+import '../../components/llm/llm_component.dart' show LLMConfiguration;
+import '../../components/tts/tts_component.dart' show TTSConfiguration;
+import '../../components/vad/vad_configuration.dart' show VADConfiguration;
+import '../../components/voice_agent/voice_agent_component.dart';
+import '../../foundation/logging/sdk_logger.dart';
+import '../../foundation/dependency_injection/service_container.dart';
+import 'services/voice_session_manager.dart';
+
+/// Voice audio chunk for streaming
+class VoiceAudioChunk {
+  final Uint8List data;
+  final Duration timestamp;
+
+  VoiceAudioChunk({required this.data, required this.timestamp});
+}
+
+/// Main capability coordinator for voice processing using the component system
+/// Matches iOS VoiceCapabilityService class from VoiceCapabilityService.swift
 class VoiceCapabilityService {
-  final SDKLogger logger = SDKLogger(category: 'VoiceCapabilityService');
+  final SDKLogger _logger = SDKLogger(category: 'VoiceCapabilityService');
+
+  // Services
+  final VoiceSessionManager _sessionManager;
+
+  // State
+  bool _isInitialized = false;
+
+  // Active voice agents
+  final Map<String, VoiceAgentComponent> _activeAgents = {};
+
+  VoiceCapabilityService() : _sessionManager = VoiceSessionManager();
+
+  /// Initialize the voice capability
+  Future<void> initialize() async {
+    if (_isInitialized) {
+      _logger.debug('Voice capability already initialized');
+      return;
+    }
+
+    _logger.info('Initializing voice capability');
+
+    // Initialize sub-services
+    await _sessionManager.initialize();
+
+    _isInitialized = true;
+    _logger.info('Voice capability initialized successfully');
+  }
+
+  /// Create a voice agent with the given parameters
+  Future<VoiceAgentComponent> createVoiceAgent({
+    VADConfiguration? vadParams,
+    STTConfiguration? sttParams,
+    LLMConfiguration? llmParams,
+    TTSConfiguration? ttsParams,
+  }) async {
+    _logger.debug('Creating voice agent with custom parameters');
+
+    // Create agent configuration (all components are required, use defaults if not provided)
+    final agentConfig = VoiceAgentConfiguration(
+      vadConfig: vadParams ?? const VADConfiguration(),
+      sttConfig: sttParams ?? STTConfiguration(),
+      llmConfig: llmParams ?? LLMConfiguration(),
+      ttsConfig: ttsParams ?? TTSConfiguration(),
+    );
+
+    // Create and initialize agent
+    final agent = VoiceAgentComponent(
+      configuration: agentConfig,
+      serviceContainer: ServiceContainer.shared,
+    );
+
+    await agent.initialize();
+
+    // Track agent
+    final agentId = DateTime.now().millisecondsSinceEpoch.toString();
+    _activeAgents[agentId] = agent;
+
+    return agent;
+  }
+
+  /// Create a full voice pipeline with all components
+  Future<VoiceAgentComponent> createFullPipeline({
+    String? sttModelId,
+    String? llmModelId,
+  }) async {
+    return await createVoiceAgent(
+      vadParams: const VADConfiguration(),
+      sttParams: STTConfiguration(modelId: sttModelId),
+      llmParams: LLMConfiguration(modelId: llmModelId),
+      ttsParams: TTSConfiguration(),
+    );
+  }
+
+  /// Process voice with a custom pipeline configuration
+  Stream<VoiceAgentEvent> processVoice({
+    required Stream<VoiceAudioChunk> audioStream,
+    VADConfiguration? vadParams,
+    STTConfiguration? sttParams,
+    LLMConfiguration? llmParams,
+    TTSConfiguration? ttsParams,
+  }) async* {
+    try {
+      // Create agent
+      final agent = await createVoiceAgent(
+        vadParams: vadParams,
+        sttParams: sttParams,
+        llmParams: llmParams,
+        ttsParams: ttsParams,
+      );
+
+      // Convert audio chunks to Data stream
+      final dataStream = audioStream.map((chunk) => chunk.data);
+
+      // Process through agent
+      await for (final event in agent.processStream(dataStream)) {
+        yield event;
+      }
+    } catch (e) {
+      yield VoiceAgentError(e);
+    }
+  }
 
   /// Find voice service for a specific model
-  Future<STTService?> findVoiceService({required String modelId}) async {
+  Future<STTService?> findVoiceService({String? modelId}) async {
+    // Check if any active agent has STT with the specified model
+    for (final agent in _activeAgents.values) {
+      final stt = agent.sttComponent?.getService();
+      if (stt != null) {
+        return stt;
+      }
+    }
+
+    // Fallback: try to create via provider
     final provider = ModuleRegistry.shared.sttProvider(modelId: modelId);
     if (provider == null) {
-      logger.warning('No STT provider available for model: $modelId');
+      _logger.warning('No STT provider available for model: $modelId');
       return null;
     }
 
     try {
-      // Create STT configuration
       final config = STTConfiguration(
         modelId: modelId,
         language: 'en',
         sampleRate: 16000,
       );
-
-      // Create service via provider
       final service = await provider.createSTTService(config);
       return service;
     } catch (e) {
-      logger.error('Failed to create STT service: $e');
+      _logger.error('Failed to create STT service: $e');
       return null;
     }
   }
+
+  /// Find LLM service for a specific model
+  Future<LLMService?> findLLMService({String? modelId}) async {
+    // Check if any active agent has LLM with the specified model
+    for (final agent in _activeAgents.values) {
+      final llm = agent.llmComponent?.getService();
+      if (llm != null) {
+        return llm;
+      }
+    }
+    return null;
+  }
+
+  /// Find TTS service
+  Future<TTSService?> findTTSService() async {
+    // Check if any active agent has TTS
+    for (final agent in _activeAgents.values) {
+      final tts = agent.ttsComponent?.getService();
+      if (tts != null) {
+        return tts;
+      }
+    }
+    return null;
+  }
+
+  /// Get the session manager
+  VoiceSessionManager get sessionManager => _sessionManager;
+
+  /// Clean up all active agents
+  Future<void> cleanup() async {
+    for (final agent in _activeAgents.values) {
+      await agent.cleanup();
+    }
+    _activeAgents.clear();
+    _isInitialized = false;
+  }
 }
 
-// Placeholder STT configuration
-class STTConfiguration {
-  final String? modelId;
-  final String language;
-  final int sampleRate;
-  final bool enablePunctuation;
+// MARK: - Backward Compatibility
 
-  STTConfiguration({
-    this.modelId,
-    this.language = 'en',
-    this.sampleRate = 16000,
-    this.enablePunctuation = true,
-  });
+extension VoiceCapabilityServiceBackwardCompat on VoiceCapabilityService {
+  /// Create a voice pipeline using the new architecture
+  Future<VoiceAgentComponent> createPipeline({
+    VADConfiguration? vadParams,
+    STTConfiguration? sttParams,
+    LLMConfiguration? llmParams,
+    TTSConfiguration? ttsParams,
+  }) async {
+    // Use the new VoiceAgent component which is the modern pipeline
+    return await createVoiceAgent(
+      vadParams: vadParams,
+      sttParams: sttParams,
+      llmParams: llmParams,
+      ttsParams: ttsParams,
+    );
+  }
 }

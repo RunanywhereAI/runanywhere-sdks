@@ -12,7 +12,12 @@ import '../llm/llm_component.dart';
 import '../tts/tts_component.dart';
 
 /// Voice Agent Component Configuration
+/// Matches iOS VoiceAgentConfiguration from VoiceAgentComponent.swift
 class VoiceAgentConfiguration implements ComponentConfiguration {
+  /// Voice agent doesn't have its own model - it orchestrates other components
+  String? get modelId => null;
+
+  /// Sub-component configurations
   final VADConfiguration vadConfig;
   final STTConfiguration sttConfig;
   final LLMConfiguration llmConfig;
@@ -23,7 +28,7 @@ class VoiceAgentConfiguration implements ComponentConfiguration {
     STTConfiguration? sttConfig,
     LLMConfiguration? llmConfig,
     TTSConfiguration? ttsConfig,
-  })  : vadConfig = vadConfig ?? VADConfiguration(),
+  })  : vadConfig = vadConfig ?? const VADConfiguration(),
         sttConfig = sttConfig ?? STTConfiguration(),
         llmConfig = llmConfig ?? LLMConfiguration(),
         ttsConfig = ttsConfig ?? TTSConfiguration();
@@ -45,11 +50,20 @@ class VoiceAgentService {
 /// Voice Agent Component
 /// Orchestrates VAD, STT, LLM, and TTS components into a complete voice pipeline
 /// Can be used as a complete pipeline or with individual components
+/// Matches iOS VoiceAgentComponent from VoiceAgentComponent.swift
 class VoiceAgentComponent extends BaseComponent<VoiceAgentService> {
   @override
   SDKComponent get componentType => SDKComponent.voiceAgent;
 
-  final VoiceAgentConfiguration agentParams;
+  /// Voice agent configuration (named to match iOS)
+  VoiceAgentConfiguration get voiceAgentConfiguration =>
+      configuration as VoiceAgentConfiguration;
+
+  /// Private processing flag to prevent concurrent operations (matches iOS isProcessing)
+  bool _isProcessing = false;
+
+  /// Check if currently processing audio
+  bool get isProcessing => _isProcessing;
 
   // Individual components (accessible for custom orchestration)
   VADComponent? vadComponent;
@@ -58,9 +72,9 @@ class VoiceAgentComponent extends BaseComponent<VoiceAgentService> {
   TTSComponent? ttsComponent;
 
   VoiceAgentComponent({
-    required this.agentParams,
+    required VoiceAgentConfiguration configuration,
     super.serviceContainer,
-  }) : super(configuration: agentParams);
+  }) : super(configuration: configuration);
 
   @override
   Future<VoiceAgentService> createService() async {
@@ -76,30 +90,32 @@ class VoiceAgentComponent extends BaseComponent<VoiceAgentService> {
   }
 
   Future<void> _initializeComponents() async {
+    final config = voiceAgentConfiguration;
+
     // Initialize VAD (required)
     vadComponent = VADComponent(
-      vadConfiguration: agentParams.vadConfig,
+      vadConfiguration: config.vadConfig,
       serviceContainer: serviceContainer,
     );
     await vadComponent!.initialize();
 
     // Initialize STT (required)
     sttComponent = STTComponent(
-      sttConfig: agentParams.sttConfig,
+      sttConfig: config.sttConfig,
       serviceContainer: serviceContainer,
     );
     await sttComponent!.initialize();
 
     // Initialize LLM (required)
     llmComponent = LLMComponent(
-      llmConfig: agentParams.llmConfig,
+      llmConfig: config.llmConfig,
       serviceContainer: serviceContainer,
     );
     await llmComponent!.initialize();
 
     // Initialize TTS (required)
     ttsComponent = TTSComponent(
-      ttsConfiguration: agentParams.ttsConfig,
+      ttsConfiguration: config.ttsConfig,
       serviceContainer: serviceContainer,
     );
     await ttsComponent!.initialize();
@@ -107,10 +123,14 @@ class VoiceAgentComponent extends BaseComponent<VoiceAgentService> {
 
   /// Process audio through the full pipeline
   /// Pipeline: Audio → VAD (detect speech) → STT (transcribe) → LLM (process) → TTS (synthesize)
+  /// Matches iOS processAudio from VoiceAgentComponent.swift
   Future<VoiceAgentResult> processAudio(Uint8List audioData) async {
     if (state != ComponentState.ready) {
       throw StateError('Voice agent is not ready. Current state: $state');
     }
+
+    // Prevent concurrent processing (matches iOS pattern)
+    _isProcessing = true;
 
     try {
       final result = VoiceAgentResult();
@@ -154,7 +174,8 @@ class VoiceAgentComponent extends BaseComponent<VoiceAgentService> {
 
       return result;
     } finally {
-      // Processing complete
+      // Always reset processing flag (matches iOS defer pattern)
+      _isProcessing = false;
     }
   }
 

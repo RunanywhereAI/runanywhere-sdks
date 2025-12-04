@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../foundation/logging/sdk_logger.dart';
 import '../../../foundation/dependency_injection/service_container.dart' show CostCalculator, ResourceChecker;
 import '../../../public/runanywhere.dart' show RunAnywhereGenerationOptions;

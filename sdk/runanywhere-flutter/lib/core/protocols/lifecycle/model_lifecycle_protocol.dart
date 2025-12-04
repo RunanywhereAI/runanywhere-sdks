@@ -1,3 +1,5 @@
+import 'dart:async';
+
 // Model lifecycle state and management protocols
 // Matches iOS ModelLifecycleProtocol from Core/Protocols/Lifecycle/ModelLifecycleProtocol.swift
 

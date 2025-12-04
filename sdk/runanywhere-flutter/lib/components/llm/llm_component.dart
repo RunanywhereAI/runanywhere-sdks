@@ -131,29 +131,9 @@ class LLMOutput implements ComponentOutput {
   int get latencyMs => (metadata.generationTime * 1000).round();
 }
 
-/// LLM Generation Options
-/// Matches iOS RunAnywhereGenerationOptions from GenerationOptions.swift
-class LLMGenerationOptions {
-  final int maxTokens;
-  final double temperature;
-  final double topP;
-  final bool enableRealTimeTracking;
-  final List<String> stopSequences;
-  final bool streamingEnabled;
-  final String? systemPrompt;
-  final LLMFramework? preferredFramework;
-
-  LLMGenerationOptions({
-    this.maxTokens = 100,
-    this.temperature = 0.7,
-    this.topP = 1.0,
-    this.enableRealTimeTracking = true,
-    this.stopSequences = const [],
-    this.streamingEnabled = false,
-    this.systemPrompt,
-    this.preferredFramework,
-  });
-}
+// LLMGenerationOptions is now defined in module_registry.dart (canonical location)
+// Re-export for convenient access from llm_component
+typedef LLMGenerationOptions = core.LLMGenerationOptions;
 
 /// Errors for LLM services
 /// Matches iOS LLMServiceError from LLMComponent.swift
@@ -279,10 +259,7 @@ class LLMComponent extends BaseComponent<core.LLMService> {
     // Generate response
     final result = await llmService.generate(
       prompt: prompt,
-      options: core.LLMGenerationOptions(
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-      ),
+      options: options,
     );
 
     final generationTime =
@@ -336,10 +313,7 @@ class LLMComponent extends BaseComponent<core.LLMService> {
 
     return llmService.generateStream(
       prompt: fullPrompt,
-      options: core.LLMGenerationOptions(
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-      ),
+      options: options,
     );
   }
 

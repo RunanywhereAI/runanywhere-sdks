@@ -122,7 +122,7 @@ class DownloadService {
       ));
 
       task.resultCompleter.complete(destinationPath);
-      task.progressController.close();
+      unawaited(task.progressController.close());
       _activeDownloads.remove(model.id);
 
       logger.info('Model ${model.id} downloaded successfully');
@@ -134,7 +134,7 @@ class DownloadService {
         error: e.toString(),
       ));
       task.resultCompleter.completeError(e);
-      task.progressController.close();
+      unawaited(task.progressController.close());
       _activeDownloads.remove(model.id);
       logger.error('Download failed for model ${model.id}: $e');
     }
@@ -162,11 +162,10 @@ class DownloadTask {
   DownloadTask({
     required this.id,
     required this.modelId,
-    required StreamController<DownloadProgress> progressController,
-    required Completer<String> resultCompleter,
+    required this.progressController,
+    required this.resultCompleter,
     this.onCancel,
-  })  : progressController = progressController,
-        resultCompleter = resultCompleter;
+  });
 
   Stream<DownloadProgress> get progress => progressController.stream;
   Future<String> get result => resultCompleter.future;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../models/configuration/configuration_data.dart';
 
 /// Protocol for configuration services.

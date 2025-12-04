@@ -1,6 +1,14 @@
 import 'dart:async';
 
+/// VAD detection result
+class VADResult {
+  final bool hasSpeech;
+  final double confidence;
+  VADResult({required this.hasSpeech, required this.confidence});
+}
+
 /// Base protocol for VAD (Voice Activity Detection) services
+/// Matches iOS VADService protocol from VADComponent.swift
 abstract class VADService {
   /// Energy threshold for voice detection
   double get energyThreshold;
@@ -15,6 +23,9 @@ abstract class VADService {
   /// Whether speech is currently active
   bool get isSpeechActive;
 
+  /// Whether the service is ready
+  bool get isReady;
+
   /// Speech activity callback
   void Function(SpeechActivityEvent)? get onSpeechActivity;
   set onSpeechActivity(void Function(SpeechActivityEvent)? callback);
@@ -24,7 +35,11 @@ abstract class VADService {
   set onAudioBuffer(void Function(List<int>)? callback);
 
   /// Initialize the service
-  Future<void> initialize();
+  Future<void> initialize({String? modelPath});
+
+  /// Detect speech in audio data and return result
+  /// This is a convenience method that wraps processAudioBuffer
+  Future<VADResult> detect({required List<int> audioData});
 
   /// Start processing
   void start();
@@ -47,6 +62,9 @@ abstract class VADService {
 
   /// Resume VAD processing (optional, not all implementations may support)
   void resume();
+
+  /// Cleanup resources
+  Future<void> cleanup();
 }
 
 /// Speech activity events
