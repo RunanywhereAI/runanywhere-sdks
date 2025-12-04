@@ -88,9 +88,10 @@ internal class TelemetryRepositoryImpl(
                 logger.info("✅ Marked ${eventIds.size} events as sent")
             } else {
                 // Fallback: Just mark as processed (development mode or no remote data source)
-                logger.debug("No remote telemetry data source available, marking events as processed locally")
+                logger.warn("⚠️ No remote telemetry data source available - events will NOT be sent to server!")
+                logger.warn("⚠️ This means SDK was initialized in DEVELOPMENT mode or baseURL was null")
                 eventIds.forEach { sentEventIds[it] = System.currentTimeMillis() }
-                logger.info("Marked ${eventIds.size} events as processed (local only)")
+                logger.warn("📦 Marked ${eventIds.size} events as processed (LOCAL ONLY - not sent to server)")
             }
         }.getOrElse { exception ->
             logger.error("Failed to send telemetry batch: ${exception.message}", exception)

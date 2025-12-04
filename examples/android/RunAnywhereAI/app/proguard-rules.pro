@@ -352,6 +352,24 @@
 # Keep debug information for crash reporting
 -keepattributes SourceFile,LineNumberTable
 
+# ========================================================================================
+# Logging - Keep Log statements for debugging release builds
+# ========================================================================================
+
+# Keep all android.util.Log methods (do NOT strip logs in release for debugging)
+-assumenosideeffects class android.util.Log {
+    # Comment out these lines to KEEP logs in release builds
+    # public static int v(...);
+    # public static int d(...);
+    # public static int i(...);
+    # public static int w(...);
+    # public static int e(...);
+}
+
+# Keep Timber logging if used
+-keep class timber.log.Timber { *; }
+-keep class timber.log.Timber$* { *; }
+
 # Print configuration for debugging (remove in final release)
 #-printconfiguration proguard-config.txt
 #-printusage proguard-usage.txt

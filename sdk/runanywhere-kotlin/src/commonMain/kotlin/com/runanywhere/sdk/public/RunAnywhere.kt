@@ -259,6 +259,12 @@ interface RunAnywhereSDK {
     // MARK: - Lifecycle
 
     suspend fun cleanup()
+
+    /**
+     * Flush all pending telemetry events immediately
+     * Call this on app pause/stop/background to ensure events are sent before app is killed
+     */
+    suspend fun flushTelemetry()
 }
 
 /**
@@ -512,10 +518,11 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
      */
     protected open fun initializeLogging(environment: SDKEnvironment) {
         // Set log level based on environment
+        // TODO: Revert PRODUCTION to WARNING after debugging telemetry
         val logLevel = when (environment) {
             SDKEnvironment.DEVELOPMENT -> SDKLogger.Companion.LogLevel.DEBUG
             SDKEnvironment.STAGING -> SDKLogger.Companion.LogLevel.INFO
-            SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.WARNING
+            SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.DEBUG  // Temporarily DEBUG for telemetry debugging
         }
         SDKLogger.setLogLevel(logLevel)
     }
@@ -542,6 +549,19 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
 
     override suspend fun cleanup() {
         shutdown()
+    }
+
+    /**
+     * Flush all pending telemetry events immediately
+     * Call this on app pause/stop/background to ensure events are sent before app is killed
+     */
+    override suspend fun flushTelemetry() {
+        try {
+            serviceContainer.telemetryService?.flush()
+            logger.info("✅ Telemetry flushed successfully")
+        } catch (e: Exception) {
+            logger.error("Failed to flush telemetry: ${e.message}")
+        }
     }
 
     /**

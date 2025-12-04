@@ -162,10 +162,11 @@ internal class TelemetryRepositoryImpl(
                 }
             } else {
                 // Fallback: Just mark as sent (development mode or no remote data source)
-                logger.debug("No remote telemetry data source available, marking events as sent locally")
+                logger.warn("⚠️ No remote telemetry data source available - events will NOT be sent to server!")
+                logger.warn("⚠️ This means SDK was initialized in DEVELOPMENT mode or baseURL was null")
                 val eventIds = batch.events.map { it.id }
                 markEventsSent(eventIds, System.currentTimeMillis())
-                logger.info("Marked ${eventIds.size} events as sent (local only)")
+                logger.warn("📦 Marked ${eventIds.size} events as sent (LOCAL ONLY - not sent to server)")
             }
         }.getOrElse { exception ->
             logger.error("Failed to send telemetry batch: ${exception.message}", exception)

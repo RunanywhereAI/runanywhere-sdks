@@ -62,8 +62,9 @@ class EventPersistence(
             _events.add(PersistedEvent(event))
 
             // Remove oldest events if we exceed the limit
+            // Using removeAt(0) instead of removeFirst() for Android 14 compatibility
             while (_events.size > maxEvents) {
-                _events.removeFirst()
+                _events.removeAt(0)
             }
         }
     }

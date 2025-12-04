@@ -1,6 +1,8 @@
 package com.runanywhere.runanywhereai
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.data.models.SDKEnvironment
@@ -12,6 +14,7 @@ import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.llm.llamacpp.LlamaCppAdapter
 import com.runanywhere.sdk.core.onnx.ONNXAdapter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -38,25 +41,45 @@ class RunAnywhereApplication : Application() {
 
         Log.i("RunAnywhereApp", "🏁 App launched, initializing SDK...")
 
-        // Initialize SDK asynchronously to match iOS pattern
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
-            initializeSDK()
-        }
+        // Post initialization to main thread's message queue to ensure system is ready
+        // This prevents crashes on devices where device-encrypted storage hasn't mounted yet
+        Handler(Looper.getMainLooper()).postDelayed({
+            // Initialize SDK asynchronously to match iOS pattern
+            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                try {
+                    // Additional small delay to ensure storage is mounted
+                    delay(200)
+                    initializeSDK()
+                } catch (e: Exception) {
+                    Log.e("RunAnywhereApp", "❌ Fatal error during SDK initialization: ${e.message}", e)
+                    // Don't crash the app - let it continue without SDK
+                }
+            }
+        }, 100) // 100ms delay to let system mount storage
     }
 
     private suspend fun initializeSDK() {
         initializationError = null
         Log.i("RunAnywhereApp", "🎯 Starting SDK initialization...")
+        Log.w("RunAnywhereApp", "=======================================================")
+        Log.w("RunAnywhereApp", "🔍 BUILD INFO - CHECK THIS FOR ANALYTICS DEBUGGING:")
+        Log.w("RunAnywhereApp", "   BuildConfig.DEBUG = ${BuildConfig.DEBUG}")
+        Log.w("RunAnywhereApp", "   BuildConfig.DEBUG_MODE = ${BuildConfig.DEBUG_MODE}")
+        Log.w("RunAnywhereApp", "   BuildConfig.BUILD_TYPE = ${BuildConfig.BUILD_TYPE}")
+        Log.w("RunAnywhereApp", "   Package name = ${applicationContext.packageName}")
+        Log.w("RunAnywhereApp", "=======================================================")
 
         val startTime = System.currentTimeMillis()
 
-        // Determine environment (matches iOS pattern)
-        val environment = if (BuildConfig.DEBUG) {
+        // Determine environment based on DEBUG_MODE (NOT BuildConfig.DEBUG!)
+        // BuildConfig.DEBUG is tied to isDebuggable flag, which we set to true for release builds
+        // to allow logging. BuildConfig.DEBUG_MODE correctly reflects debug vs release build type.
+        val environment = if (BuildConfig.DEBUG_MODE) {
             SDKEnvironment.DEVELOPMENT
         } else {
             SDKEnvironment.PRODUCTION
         }
-        Log.i("RunAnywhereApp", "🚀 Environment: $environment (DEBUG=${BuildConfig.DEBUG})")
+        Log.w("RunAnywhereApp", "🚀 SELECTED ENVIRONMENT: $environment (based on BuildConfig.DEBUG_MODE=${BuildConfig.DEBUG_MODE})")
 
         // Try to initialize SDK - log failures but continue regardless
         try {
@@ -72,13 +95,18 @@ class RunAnywhereApplication : Application() {
                 val apiKey = "talk_to_runanywhere_team"
                 val baseURL = "talk_to_runanywhere_team"
 
+                Log.w("RunAnywhereApp", "🔐 PRODUCTION INIT PARAMS:")
+                Log.w("RunAnywhereApp", "   apiKey = ${apiKey.take(20)}...")
+                Log.w("RunAnywhereApp", "   baseURL = $baseURL")
+                Log.w("RunAnywhereApp", "   environment = PRODUCTION")
+
                 RunAnywhere.initialize(
                     context = this@RunAnywhereApplication,
                     apiKey = apiKey,
                     baseURL = baseURL,
                     environment = SDKEnvironment.PRODUCTION
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode")
+                Log.w("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode - analytics SHOULD be enabled")
             }
         } catch (e: Exception) {
             // Log the failure but continue - we'll still register adapters for local model usage
@@ -102,7 +130,7 @@ class RunAnywhereApplication : Application() {
         // ALWAYS register adapters regardless of initialization success
         // This ensures local models are available even when backend is down
         try {
-            if (environment == SDKEnvironment.DEVELOPMENT) {
+            if (BuildConfig.DEBUG_MODE) {
                 registerAdaptersForDevelopment()
             } else {
                 registerAdaptersForProduction()
