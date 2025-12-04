@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'structured_output/generatable.dart';
 import 'runanywhere.dart';
-import '../capabilities/structured_output/structured_output_service.dart';
 
 /// Extension for structured output generation
 extension RunAnywhereStructuredOutput on RunAnywhere {
@@ -37,4 +35,3 @@ extension RunAnywhereStructuredOutput on RunAnywhere {
     }
   }
 }
-

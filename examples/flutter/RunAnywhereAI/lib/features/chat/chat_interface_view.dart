@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
 import '../../core/design_system/typography.dart';
-import '../../core/models/app_types.dart';
 import '../../core/services/conversation_store.dart';
 import '../../core/services/model_manager.dart';
 import '../../core/utilities/constants.dart';
@@ -203,6 +202,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     String prompt,
     RunAnywhereGenerationOptions options,
   ) async {
+    // Capture model name before async gap to avoid context issues
+    final modelName = context.read<ModelManager>().loadedModelName;
+
     try {
       final result = await RunAnywhere.generate(prompt, options: options);
 
@@ -213,7 +215,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
       final analytics = MessageAnalytics(
         messageId: DateTime.now().millisecondsSinceEpoch.toString(),
-        modelName: context.read<ModelManager>().loadedModelName,
+        modelName: modelName,
         totalGenerationTime: totalTime,
         // TODO: Extract token counts from result
       );
@@ -610,7 +612,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.lightbulb,
                   size: AppSpacing.iconRegular,
                   color: AppColors.primaryPurple,
@@ -676,7 +678,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
           ],
           if (analytics.wasThinkingMode) ...[
             const SizedBox(width: AppSpacing.smallMedium),
-            Icon(
+            const Icon(
               Icons.lightbulb,
               size: 12,
               color: AppColors.primaryPurple,

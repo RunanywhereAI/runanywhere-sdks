@@ -2,11 +2,10 @@ import 'dart:async';
 import 'models/loaded_model.dart';
 import '../registry/registry_service.dart';
 import '../memory/memory_service.dart';
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../foundation/error_types/sdk_error.dart';
-import '../../../foundation/dependency_injection/service_container.dart' show AdapterRegistry;
-import '../../../core/models/common.dart';
-import '../../../core/module_registry.dart';
+import '../../foundation/logging/sdk_logger.dart';
+import '../../foundation/error_types/sdk_error.dart';
+import '../../foundation/dependency_injection/service_container.dart' show AdapterRegistry;
+import '../../core/module_registry.dart';
 
 /// Service responsible for loading models
 /// Ensures thread-safe access and prevents concurrent duplicate loads
@@ -65,7 +64,7 @@ class ModelLoadingService {
     }
 
     // Get model info from registry
-    final modelInfo = await registry.getModel(by: modelId);
+    final modelInfo = registry.getModel(modelId);
     if (modelInfo == null) {
       logger.error('❌ Model not found in registry: $modelId');
       throw SDKError.modelNotFound(modelId);
@@ -78,9 +77,14 @@ class ModelLoadingService {
       throw SDKError.modelNotFound("Model '$modelId' not downloaded");
     }
 
-    // Check memory availability
-    final memoryRequired = modelInfo.memoryRequirement;
-    // TODO: Check memory availability with memoryService
+    // Check memory availability (memoryRequired is nullable now)
+    final memoryNeeded = modelInfo.memoryRequired;
+    if (memoryNeeded != null) {
+      final canAllocate = await memoryService.canAllocate(memoryNeeded);
+      if (!canAllocate) {
+        logger.warning('Memory might be insufficient: ${memoryNeeded ~/ (1024 * 1024)}MB required');
+      }
+    }
 
     // Find adapter that can handle this model
     logger.info('🚀 Finding adapter for model');
@@ -93,10 +97,10 @@ class ModelLoadingService {
     logger.info('✅ Found adapter: ${provider.name}');
 
     try {
-      // Create LLM configuration
+      // Create LLM configuration using model's context length if available
       final config = LLMConfiguration(
         modelId: modelId,
-        contextLength: 2048,
+        contextLength: modelInfo.contextLength ?? 2048,
         useGPUIfAvailable: true,
       );
 

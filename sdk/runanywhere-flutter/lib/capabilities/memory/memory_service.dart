@@ -1,6 +1,6 @@
 import 'dart:async';
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../core/models/common.dart';
+import '../../foundation/logging/sdk_logger.dart';
+import '../../core/models/common.dart';
 import '../model_loading/models/loaded_model.dart';
 import 'allocation_manager.dart';
 import 'pressure_handler.dart';
@@ -17,7 +17,7 @@ class MemoryService {
 
   // Memory thresholds
   int _memoryThreshold = 500 * 1024 * 1024; // 500MB
-  int _criticalThreshold = 200 * 1024 * 1024; // 200MB
+  final int _criticalThreshold = 200 * 1024 * 1024; // 200MB
 
   MemoryService({
     AllocationManager? allocationManager,
@@ -45,12 +45,17 @@ class MemoryService {
     dynamic service, {
     MemoryPriority priority = MemoryPriority.normal,
   }) async {
+    // Use preferredFramework or first compatible framework, or default to foundationModels
+    final framework = model.model.preferredFramework ??
+        model.model.compatibleFrameworks.firstOrNull ??
+        LLMFramework.foundationModels;
+
     allocationManager.registerModel(
       MemoryLoadedModel(
         id: model.model.id,
         name: model.model.name,
         size: size,
-        framework: _getFrameworkFromString(model.model.framework),
+        framework: framework,
       ),
       size: size,
       service: service,
@@ -59,28 +64,6 @@ class MemoryService {
 
     // Check for memory pressure after registration
     await checkMemoryConditions();
-  }
-
-  /// Convert framework string to enum
-  LLMFramework _getFrameworkFromString(String framework) {
-    switch (framework.toLowerCase()) {
-      case 'llama.cpp':
-      case 'llamacpp':
-        return LLMFramework.llamaCpp;
-      case 'whisperkit':
-        return LLMFramework.whisperKit;
-      case 'coreml':
-      case 'core ml':
-        return LLMFramework.coreML;
-      case 'mlx':
-        return LLMFramework.mlx;
-      case 'tensorflowlite':
-      case 'tensorflow lite':
-      case 'tflite':
-        return LLMFramework.tensorflowLite;
-      default:
-        return LLMFramework.foundationModels;
-    }
   }
 
   /// Unregister a model
@@ -112,7 +95,6 @@ class MemoryService {
 
   /// Calculate target memory to free up
   int _calculateTargetMemory(MemoryPressureLevel level) {
-    final currentUsage = getCurrentMemoryUsage();
     final available = getAvailableMemory();
 
     switch (level) {

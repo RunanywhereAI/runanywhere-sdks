@@ -38,7 +38,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       });
 
       // Determine environment based on build configuration
-      final environment =
+      const environment =
           kDebugMode ? SDKEnvironment.development : SDKEnvironment.production;
 
       if (kDebugMode) {
@@ -182,7 +182,7 @@ class _InitializationLoadingViewState
             // Animated brain icon (matching iOS)
             ScaleTransition(
               scale: _scaleAnimation,
-              child: Icon(
+              child: const Icon(
                 Icons.psychology,
                 size: AppSpacing.iconHuge,
                 color: AppColors.primaryPurple,
@@ -228,7 +228,7 @@ class _InitializationErrorView extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.error_outline,
                 size: AppSpacing.iconXLarge,
                 color: AppColors.primaryRed,

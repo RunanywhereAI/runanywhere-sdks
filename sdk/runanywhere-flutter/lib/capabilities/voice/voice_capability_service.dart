@@ -1,4 +1,4 @@
-import '../../core/module_registry.dart' show ModuleRegistry, STTService, STTServiceProvider, STTOptions, STTTranscriptionResult;
+import '../../core/module_registry.dart' show ModuleRegistry, STTService;
 import '../../foundation/logging/sdk_logger.dart';
 
 /// Voice capability service
@@ -45,4 +45,3 @@ class STTConfiguration {
     this.enablePunctuation = true,
   });
 }
-

@@ -290,7 +290,7 @@ class _ModelRowState extends State<ModelRow> {
       } else {
         return Row(
           children: [
-            Icon(
+            const Icon(
               Icons.check_circle,
               size: 12,
               color: AppColors.statusGreen,
@@ -352,7 +352,7 @@ class _ModelRowState extends State<ModelRow> {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.check_circle,
               color: AppColors.statusGreen,
               size: 16,
@@ -467,7 +467,7 @@ class NeuralEngineRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.psychology,
             size: AppSpacing.iconSmall,
             color: AppColors.primaryBlue,
@@ -478,7 +478,7 @@ class NeuralEngineRow extends StatelessWidget {
             style: AppTypography.body(context),
           ),
           const Spacer(),
-          Icon(
+          const Icon(
             Icons.check_circle,
             size: AppSpacing.iconSmall,
             color: AppColors.statusGreen,

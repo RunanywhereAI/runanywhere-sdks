@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../core/design_system/app_colors.dart';
 import '../features/chat/chat_interface_view.dart';
 import '../features/quiz/quiz_view.dart';
 import '../features/settings/combined_settings_view.dart';

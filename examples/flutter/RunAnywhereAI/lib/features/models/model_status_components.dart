@@ -113,7 +113,7 @@ class ModelStatusBanner extends StatelessWidget {
   Widget _buildNoModelState(BuildContext context) {
     return Row(
       children: [
-        Icon(
+        const Icon(
           Icons.warning,
           color: AppColors.statusOrange,
           size: AppSpacing.iconRegular,
@@ -129,7 +129,7 @@ class ModelStatusBanner extends StatelessWidget {
         ),
         FilledButton.icon(
           onPressed: onSelectModel,
-          icon: Icon(Icons.view_in_ar, size: AppSpacing.iconSmall),
+          icon: const Icon(Icons.view_in_ar, size: AppSpacing.iconSmall),
           label: const Text('Select Model'),
           style: FilledButton.styleFrom(
             padding: const EdgeInsets.symmetric(
@@ -334,7 +334,7 @@ class RecordingStatusBadge extends StatelessWidget {
     final Color bgColor;
     final Color textColor;
     final String text;
-    final Widget? leading;
+    final Widget leading;
 
     if (isRecording) {
       bgColor = AppColors.primaryRed.withValues(alpha: 0.1);
@@ -343,7 +343,7 @@ class RecordingStatusBadge extends StatelessWidget {
       leading = Container(
         width: 8,
         height: 8,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppColors.primaryRed,
           shape: BoxShape.circle,
         ),
@@ -374,10 +374,8 @@ class RecordingStatusBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (leading != null) ...[
-            leading,
-            const SizedBox(width: 6),
-          ],
+          leading,
+          const SizedBox(width: 6),
           Text(
             text,
             style: AppTypography.caption2(context).copyWith(
@@ -493,6 +491,104 @@ class _TypingIndicatorViewState extends State<TypingIndicatorView>
   }
 }
 
+/// CompactModelIndicator (mirroring iOS CompactModelIndicator)
+///
+/// A compact indicator showing current model status for use in navigation bars/headers.
+class CompactModelIndicator extends StatelessWidget {
+  final LLMFramework? framework;
+  final String? modelName;
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  const CompactModelIndicator({
+    super.key,
+    required this.framework,
+    required this.modelName,
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.mediumLarge,
+          vertical: AppSpacing.xSmall,
+        ),
+        decoration: BoxDecoration(
+          color: framework != null
+              ? AppColors.primaryBlue.withValues(alpha: 0.1)
+              : AppColors.statusOrange.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoading)
+              SizedBox(
+                width: AppSpacing.iconSmall,
+                height: AppSpacing.iconSmall,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.textSecondary(context),
+                ),
+              )
+            else if (framework != null) ...[
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: _frameworkColor(framework!),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xSmall),
+              Text(
+                modelName ?? framework!.displayName,
+                style: AppTypography.caption(context).copyWith(
+                  color: AppColors.primaryBlue,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ] else ...[
+              const Icon(
+                Icons.view_in_ar,
+                size: AppSpacing.iconSmall,
+                color: AppColors.statusOrange,
+              ),
+              const SizedBox(width: AppSpacing.xSmall),
+              Text(
+                'Select Model',
+                style: AppTypography.caption(context).copyWith(
+                  color: AppColors.statusOrange,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _frameworkColor(LLMFramework framework) {
+    switch (framework) {
+      case LLMFramework.llamaCpp:
+        return AppColors.primaryBlue;
+      case LLMFramework.whisperKit:
+        return AppColors.statusGreen;
+      case LLMFramework.onnxRuntime:
+        return AppColors.primaryPurple;
+      case LLMFramework.foundationModels:
+        return Colors.black;
+      default:
+        return AppColors.statusGray;
+    }
+  }
+}
+
 /// VoicePipelineSetupView (mirroring iOS VoicePipelineSetupView)
 ///
 /// A setup view specifically for Voice Assistant which requires 3 models.
@@ -538,7 +634,7 @@ class VoicePipelineSetupView extends StatelessWidget {
       children: [
         // Header
         const SizedBox(height: AppSpacing.xLarge),
-        Icon(
+        const Icon(
           Icons.mic,
           size: 48,
           color: AppColors.primaryBlue,
@@ -711,21 +807,21 @@ class ModelSetupCard extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: isLoading
-                  ? Padding(
-                      padding: const EdgeInsets.all(8),
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Colors.white,
                       ),
                     )
                   : isLoaded
-                      ? Icon(
+                      ? const Icon(
                           Icons.check_circle,
                           size: 20,
                           color: Colors.white,
                         )
                       : isConfigured
-                          ? Icon(
+                          ? const Icon(
                               Icons.check,
                               size: 16,
                               color: Colors.white,
@@ -768,7 +864,7 @@ class ModelSetupCard extends StatelessWidget {
                           ),
                         ),
                         if (isLoaded)
-                          Icon(
+                          const Icon(
                             Icons.check_circle,
                             size: 12,
                             color: AppColors.statusGreen,
@@ -795,7 +891,7 @@ class ModelSetupCard extends StatelessWidget {
 
             // Action / Status
             if (isLoading)
-              SizedBox(
+              const SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
@@ -804,7 +900,7 @@ class ModelSetupCard extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.check_circle,
                     size: 16,
                     color: AppColors.statusGreen,
@@ -835,7 +931,7 @@ class ModelSetupCard extends StatelessWidget {
                       color: AppColors.primaryBlue,
                     ),
                   ),
-                  Icon(
+                  const Icon(
                     Icons.chevron_right,
                     size: 16,
                     color: AppColors.primaryBlue,

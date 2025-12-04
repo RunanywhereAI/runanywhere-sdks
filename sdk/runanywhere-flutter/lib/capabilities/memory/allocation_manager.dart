@@ -1,6 +1,5 @@
-import 'dart:collection';
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../core/module_registry.dart';
+import 'dart:async';
+import '../../foundation/logging/sdk_logger.dart';
 import 'memory_service.dart';
 
 /// Manages memory allocation for loaded models
@@ -137,4 +136,3 @@ class _ModelAllocation {
     required this.lastAccess,
   });
 }
-

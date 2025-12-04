@@ -2,10 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import '../../core/models/common.dart';
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../foundation/error_types/sdk_error.dart';
-import '../registry/registry_service.dart';
+import '../../core/models/model/model_info.dart';
+import '../../core/protocols/registry/model_registry.dart';
+import '../../foundation/logging/sdk_logger.dart';
+import '../../foundation/error_types/sdk_error.dart';
+import '../registry/registry_service.dart' hide ModelRegistry;
 
 /// Service for downloading models with progress tracking
 class DownloadService {
@@ -18,9 +19,12 @@ class DownloadService {
   /// Download a model with progress tracking
   Future<DownloadTask> downloadModel(ModelInfo model) async {
     // Check if already downloaded
-    if (model.localPath != null && await File(model.localPath!).exists()) {
+    if (model.isDownloaded) {
       logger.info('Model ${model.id} is already downloaded');
-      return DownloadTask.completed(model.id, model.localPath!);
+      return DownloadTask.completed(
+        model.id,
+        model.localPath?.toFilePath() ?? '',
+      );
     }
 
     // Check if download is already in progress
@@ -30,7 +34,7 @@ class DownloadService {
     }
 
     // Check if download URL is available
-    if (model.downloadURL == null || model.downloadURL!.isEmpty) {
+    if (model.downloadURL == null) {
       throw SDKError.modelNotFound('Model ${model.id} has no download URL');
     }
 
@@ -64,7 +68,7 @@ class DownloadService {
   /// Perform the actual download
   Future<void> _performDownload(ModelInfo model, DownloadTask task) async {
     try {
-      final url = Uri.parse(model.downloadURL!);
+      final url = model.downloadURL!;
       final request = http.Request('GET', url);
       final response = await http.Client().send(request);
 
@@ -84,7 +88,7 @@ class DownloadService {
         await modelsDir.create(recursive: true);
       }
 
-      final fileExtension = model.format ?? 'bin';
+      final fileExtension = model.format.rawValue;
       final destinationPath = '${modelsDir.path}/${model.id}.$fileExtension';
       final file = File(destinationPath);
       final sink = file.openWrite();
@@ -92,7 +96,7 @@ class DownloadService {
       // Stream response and track progress
       await for (final chunk in response.stream) {
         sink.add(chunk);
-        bytesDownloaded += chunk.length;
+        bytesDownloaded = (bytesDownloaded + chunk.length).toInt();
 
         task.progressController.add(DownloadProgress(
           bytesDownloaded: bytesDownloaded,
@@ -104,15 +108,8 @@ class DownloadService {
       await sink.close();
 
       // Update model with local path
-      final updatedModel = ModelInfo(
-        id: model.id,
-        name: model.name,
-        framework: model.framework,
-        format: model.format,
-        size: model.size,
-        memoryRequirement: model.memoryRequirement,
-        localPath: destinationPath,
-        downloadURL: model.downloadURL,
+      final updatedModel = model.copyWith(
+        localPath: Uri.file(destinationPath),
       );
 
       (modelRegistry as RegistryService).updateModel(updatedModel);
@@ -128,7 +125,7 @@ class DownloadService {
       task.progressController.close();
       _activeDownloads.remove(model.id);
 
-      logger.info('✅ Model ${model.id} downloaded successfully');
+      logger.info('Model ${model.id} downloaded successfully');
     } catch (e) {
       task.progressController.add(DownloadProgress(
         bytesDownloaded: 0,
@@ -139,7 +136,7 @@ class DownloadService {
       task.resultCompleter.completeError(e);
       task.progressController.close();
       _activeDownloads.remove(model.id);
-      logger.error('❌ Download failed for model ${model.id}: $e');
+      logger.error('Download failed for model ${model.id}: $e');
     }
   }
 
@@ -223,5 +220,3 @@ enum DownloadState {
   failed,
   cancelled,
 }
-
-
