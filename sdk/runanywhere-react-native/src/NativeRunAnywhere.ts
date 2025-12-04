@@ -70,16 +70,16 @@ export interface Spec extends TurboModule {
   /**
    * Create a new backend instance.
    * @param name Backend name (e.g., "onnx", "llamacpp", "coreml")
-   * @returns true if backend was created successfully
+   * @returns Promise that resolves to true if backend was created successfully
    */
-  createBackend(name: string): boolean;
+  createBackend(name: string): Promise<boolean>;
 
   /**
    * Initialize the backend with optional configuration.
    * @param configJson Optional JSON configuration string
-   * @returns true if initialization succeeded
+   * @returns Promise that resolves to true if initialization succeeded
    */
-  initialize(configJson: string | null): boolean;
+  initialize(configJson: string | null): Promise<boolean>;
 
   /**
    * Destroy the backend and release all resources.
@@ -94,9 +94,9 @@ export interface Spec extends TurboModule {
 
   /**
    * Get backend information as JSON.
-   * @returns JSON string with backend info
+   * @returns Promise that resolves to JSON string with backend info
    */
-  getBackendInfo(): string;
+  getBackendInfo(): Promise<string>;
 
   // ============================================================================
   // Capability Query
@@ -105,27 +105,27 @@ export interface Spec extends TurboModule {
   /**
    * Check if the backend supports a specific capability.
    * @param capability Capability type (from CapabilityType enum)
-   * @returns true if supported
+   * @returns Promise that resolves to true if supported
    */
-  supportsCapability(capability: number): boolean;
+  supportsCapability(capability: number): Promise<boolean>;
 
   /**
    * Get all supported capabilities.
-   * @returns Array of capability type numbers
+   * @returns Promise that resolves to array of capability type numbers
    */
-  getCapabilities(): number[];
+  getCapabilities(): Promise<number[]>;
 
   /**
    * Get the device type being used for inference.
-   * @returns Device type number (from DeviceType enum)
+   * @returns Promise that resolves to device type number (from DeviceType enum)
    */
-  getDeviceType(): number;
+  getDeviceType(): Promise<number>;
 
   /**
    * Get current memory usage in bytes.
-   * @returns Memory usage in bytes
+   * @returns Promise that resolves to memory usage in bytes
    */
-  getMemoryUsage(): number;
+  getMemoryUsage(): Promise<number>;
 
   // ============================================================================
   // Text Generation (LLM)
@@ -135,21 +135,21 @@ export interface Spec extends TurboModule {
    * Load a text generation model.
    * @param path Path to the model file
    * @param configJson Optional JSON configuration
-   * @returns true if model loaded successfully
+   * @returns Promise that resolves to true if model loaded successfully
    */
-  loadTextModel(path: string, configJson: string | null): boolean;
+  loadTextModel(path: string, configJson: string | null): Promise<boolean>;
 
   /**
    * Check if a text model is loaded.
-   * @returns true if loaded
+   * @returns Promise that resolves to true if loaded
    */
-  isTextModelLoaded(): boolean;
+  isTextModelLoaded(): Promise<boolean>;
 
   /**
    * Unload the current text model.
-   * @returns true if unloaded successfully
+   * @returns Promise that resolves to true if unloaded successfully
    */
-  unloadTextModel(): boolean;
+  unloadTextModel(): Promise<boolean>;
 
   /**
    * Generate text synchronously.
@@ -157,14 +157,14 @@ export interface Spec extends TurboModule {
    * @param systemPrompt Optional system prompt
    * @param maxTokens Maximum tokens to generate
    * @param temperature Sampling temperature
-   * @returns JSON string with generation result
+   * @returns Promise that resolves to JSON string with generation result
    */
   generate(
     prompt: string,
     systemPrompt: string | null,
     maxTokens: number,
     temperature: number
-  ): string;
+  ): Promise<string>;
 
   /**
    * Start streaming text generation.
@@ -195,30 +195,30 @@ export interface Spec extends TurboModule {
    * @param path Path to the model directory
    * @param modelType Model type ("whisper", "zipformer", "paraformer")
    * @param configJson Optional JSON configuration
-   * @returns true if model loaded successfully
+   * @returns Promise that resolves to true if model loaded successfully
    */
-  loadSTTModel(path: string, modelType: string, configJson: string | null): boolean;
+  loadSTTModel(path: string, modelType: string, configJson: string | null): Promise<boolean>;
 
   /**
    * Check if an STT model is loaded.
-   * @returns true if loaded
+   * @returns Promise that resolves to true if loaded
    */
-  isSTTModelLoaded(): boolean;
+  isSTTModelLoaded(): Promise<boolean>;
 
   /**
    * Unload the current STT model.
-   * @returns true if unloaded successfully
+   * @returns Promise that resolves to true if unloaded successfully
    */
-  unloadSTTModel(): boolean;
+  unloadSTTModel(): Promise<boolean>;
 
   /**
    * Transcribe audio data (batch mode).
    * @param audioBase64 Base64-encoded float32 audio samples
    * @param sampleRate Audio sample rate (e.g., 16000)
    * @param language Optional language code (e.g., "en")
-   * @returns JSON string with transcription result
+   * @returns Promise that resolves to JSON string with transcription result
    */
-  transcribe(audioBase64: string, sampleRate: number, language: string | null): string;
+  transcribe(audioBase64: string, sampleRate: number, language: string | null): Promise<string>;
 
   /**
    * Transcribe audio from a file path.
@@ -226,52 +226,52 @@ export interface Spec extends TurboModule {
    * Supports various audio formats (M4A, AAC, WAV, CAF, etc.)
    * @param filePath Path to the audio file
    * @param language Optional language code (e.g., "en")
-   * @returns JSON string with transcription result
+   * @returns Promise that resolves to JSON string with transcription result
    */
-  transcribeFile(filePath: string, language: string | null): string;
+  transcribeFile(filePath: string, language: string | null): Promise<string>;
 
   /**
    * Check if STT supports streaming.
-   * @returns true if streaming is supported
+   * @returns Promise that resolves to true if streaming is supported
    */
-  supportsSTTStreaming(): boolean;
+  supportsSTTStreaming(): Promise<boolean>;
 
   /**
    * Create a new STT stream for real-time transcription.
    * @param configJson Optional JSON configuration
-   * @returns Stream handle ID (or -1 on error)
+   * @returns Promise that resolves to stream handle ID (or -1 on error)
    */
-  createSTTStream(configJson: string | null): number;
+  createSTTStream(configJson: string | null): Promise<number>;
 
   /**
    * Feed audio data to an STT stream.
    * @param streamHandle Stream handle from createSTTStream
    * @param audioBase64 Base64-encoded float32 audio samples
    * @param sampleRate Audio sample rate
-   * @returns true if audio was fed successfully
+   * @returns Promise that resolves to true if audio was fed successfully
    */
-  feedSTTAudio(streamHandle: number, audioBase64: string, sampleRate: number): boolean;
+  feedSTTAudio(streamHandle: number, audioBase64: string, sampleRate: number): Promise<boolean>;
 
   /**
    * Decode current STT stream state.
    * @param streamHandle Stream handle
-   * @returns JSON string with partial transcription
+   * @returns Promise that resolves to JSON string with partial transcription
    */
-  decodeSTT(streamHandle: number): string;
+  decodeSTT(streamHandle: number): Promise<string>;
 
   /**
    * Check if STT stream is ready to decode.
    * @param streamHandle Stream handle
-   * @returns true if ready
+   * @returns Promise that resolves to true if ready
    */
-  isSTTReady(streamHandle: number): boolean;
+  isSTTReady(streamHandle: number): Promise<boolean>;
 
   /**
    * Check if STT stream detected end of speech.
    * @param streamHandle Stream handle
-   * @returns true if endpoint detected
+   * @returns Promise that resolves to true if endpoint detected
    */
-  isSTTEndpoint(streamHandle: number): boolean;
+  isSTTEndpoint(streamHandle: number): Promise<boolean>;
 
   /**
    * Signal that audio input is finished.
@@ -300,21 +300,21 @@ export interface Spec extends TurboModule {
    * @param path Path to the model directory
    * @param modelType Model type ("piper", "coqui", "bark")
    * @param configJson Optional JSON configuration
-   * @returns true if model loaded successfully
+   * @returns Promise that resolves to true if model loaded successfully
    */
-  loadTTSModel(path: string, modelType: string, configJson: string | null): boolean;
+  loadTTSModel(path: string, modelType: string, configJson: string | null): Promise<boolean>;
 
   /**
    * Check if a TTS model is loaded.
-   * @returns true if loaded
+   * @returns Promise that resolves to true if loaded
    */
-  isTTSModelLoaded(): boolean;
+  isTTSModelLoaded(): Promise<boolean>;
 
   /**
    * Unload the current TTS model.
-   * @returns true if unloaded successfully
+   * @returns Promise that resolves to true if unloaded successfully
    */
-  unloadTTSModel(): boolean;
+  unloadTTSModel(): Promise<boolean>;
 
   /**
    * Synthesize speech from text.
@@ -322,20 +322,20 @@ export interface Spec extends TurboModule {
    * @param voiceId Optional voice ID
    * @param speedRate Speed rate (1.0 = normal)
    * @param pitchShift Pitch shift in semitones
-   * @returns JSON with base64 audio and metadata
+   * @returns Promise that resolves to JSON with base64 audio and metadata
    */
   synthesize(
     text: string,
     voiceId: string | null,
     speedRate: number,
     pitchShift: number
-  ): string;
+  ): Promise<string>;
 
   /**
    * Check if TTS supports streaming.
-   * @returns true if streaming is supported
+   * @returns Promise that resolves to true if streaming is supported
    */
-  supportsTTSStreaming(): boolean;
+  supportsTTSStreaming(): Promise<boolean>;
 
   /**
    * Start streaming TTS synthesis.
@@ -354,9 +354,9 @@ export interface Spec extends TurboModule {
 
   /**
    * Get available TTS voices.
-   * @returns JSON array of voice info objects
+   * @returns Promise that resolves to JSON array of voice info objects
    */
-  getTTSVoices(): string;
+  getTTSVoices(): Promise<string>;
 
   /**
    * Cancel ongoing TTS synthesis.
@@ -371,37 +371,37 @@ export interface Spec extends TurboModule {
    * Load a VAD model.
    * @param path Path to the model file
    * @param configJson Optional JSON configuration
-   * @returns true if model loaded successfully
+   * @returns Promise that resolves to true if model loaded successfully
    */
-  loadVADModel(path: string, configJson: string | null): boolean;
+  loadVADModel(path: string, configJson: string | null): Promise<boolean>;
 
   /**
    * Check if a VAD model is loaded.
-   * @returns true if loaded
+   * @returns Promise that resolves to true if loaded
    */
-  isVADModelLoaded(): boolean;
+  isVADModelLoaded(): Promise<boolean>;
 
   /**
    * Unload the current VAD model.
-   * @returns true if unloaded successfully
+   * @returns Promise that resolves to true if unloaded successfully
    */
-  unloadVADModel(): boolean;
+  unloadVADModel(): Promise<boolean>;
 
   /**
    * Process audio chunk for voice activity.
    * @param audioBase64 Base64-encoded float32 audio samples
    * @param sampleRate Audio sample rate
-   * @returns JSON with {isSpeech: boolean, probability: number}
+   * @returns Promise that resolves to JSON with {isSpeech: boolean, probability: number}
    */
-  processVAD(audioBase64: string, sampleRate: number): string;
+  processVAD(audioBase64: string, sampleRate: number): Promise<string>;
 
   /**
    * Detect speech segments in audio.
    * @param audioBase64 Base64-encoded float32 audio samples
    * @param sampleRate Audio sample rate
-   * @returns JSON array of {startMs, endMs} segments
+   * @returns Promise that resolves to JSON array of {startMs, endMs} segments
    */
-  detectVADSegments(audioBase64: string, sampleRate: number): string;
+  detectVADSegments(audioBase64: string, sampleRate: number): Promise<string>;
 
   /**
    * Reset VAD state.
@@ -416,41 +416,41 @@ export interface Spec extends TurboModule {
    * Load an embeddings model.
    * @param path Path to the model file
    * @param configJson Optional JSON configuration
-   * @returns true if model loaded successfully
+   * @returns Promise that resolves to true if model loaded successfully
    */
-  loadEmbeddingsModel(path: string, configJson: string | null): boolean;
+  loadEmbeddingsModel(path: string, configJson: string | null): Promise<boolean>;
 
   /**
    * Check if an embeddings model is loaded.
-   * @returns true if loaded
+   * @returns Promise that resolves to true if loaded
    */
-  isEmbeddingsModelLoaded(): boolean;
+  isEmbeddingsModelLoaded(): Promise<boolean>;
 
   /**
    * Unload the current embeddings model.
-   * @returns true if unloaded successfully
+   * @returns Promise that resolves to true if unloaded successfully
    */
-  unloadEmbeddingsModel(): boolean;
+  unloadEmbeddingsModel(): Promise<boolean>;
 
   /**
    * Generate embedding for a single text.
    * @param text Input text
-   * @returns JSON with embedding array
+   * @returns Promise that resolves to JSON with embedding array
    */
-  embedText(text: string): string;
+  embedText(text: string): Promise<string>;
 
   /**
    * Generate embeddings for multiple texts.
    * @param texts Array of input texts
-   * @returns JSON with array of embeddings
+   * @returns Promise that resolves to JSON with array of embeddings
    */
-  embedBatch(texts: string[]): string;
+  embedBatch(texts: string[]): Promise<string>;
 
   /**
    * Get the embedding dimension.
-   * @returns Number of dimensions
+   * @returns Promise that resolves to number of dimensions
    */
-  getEmbeddingDimensions(): number;
+  getEmbeddingDimensions(): Promise<number>;
 
   // ============================================================================
   // Speaker Diarization
@@ -460,21 +460,21 @@ export interface Spec extends TurboModule {
    * Load a diarization model.
    * @param path Path to the model file
    * @param configJson Optional JSON configuration
-   * @returns true if model loaded successfully
+   * @returns Promise that resolves to true if model loaded successfully
    */
-  loadDiarizationModel(path: string, configJson: string | null): boolean;
+  loadDiarizationModel(path: string, configJson: string | null): Promise<boolean>;
 
   /**
    * Check if a diarization model is loaded.
-   * @returns true if loaded
+   * @returns Promise that resolves to true if loaded
    */
-  isDiarizationModelLoaded(): boolean;
+  isDiarizationModelLoaded(): Promise<boolean>;
 
   /**
    * Unload the current diarization model.
-   * @returns true if unloaded successfully
+   * @returns Promise that resolves to true if unloaded successfully
    */
-  unloadDiarizationModel(): boolean;
+  unloadDiarizationModel(): Promise<boolean>;
 
   /**
    * Perform speaker diarization on audio.
@@ -482,14 +482,14 @@ export interface Spec extends TurboModule {
    * @param sampleRate Audio sample rate
    * @param minSpeakers Minimum expected speakers (0 for auto)
    * @param maxSpeakers Maximum expected speakers (0 for auto)
-   * @returns JSON with speaker segments
+   * @returns Promise that resolves to JSON with speaker segments
    */
   diarize(
     audioBase64: string,
     sampleRate: number,
     minSpeakers: number,
     maxSpeakers: number
-  ): string;
+  ): Promise<string>;
 
   /**
    * Cancel ongoing diarization.
@@ -502,23 +502,23 @@ export interface Spec extends TurboModule {
 
   /**
    * Get the last error message.
-   * @returns Error message string
+   * @returns Promise that resolves to error message string
    */
-  getLastError(): string;
+  getLastError(): Promise<string>;
 
   /**
    * Get the library version.
-   * @returns Version string
+   * @returns Promise that resolves to version string
    */
-  getVersion(): string;
+  getVersion(): Promise<string>;
 
   /**
    * Extract an archive to a directory.
    * @param archivePath Path to the archive file
    * @param destDir Destination directory
-   * @returns true if extraction succeeded
+   * @returns Promise that resolves to true if extraction succeeded
    */
-  extractArchive(archivePath: string, destDir: string): boolean;
+  extractArchive(archivePath: string, destDir: string): Promise<boolean>;
 
   // ============================================================================
   // Event Listener Registration (for New Architecture)
@@ -535,6 +535,21 @@ export interface Spec extends TurboModule {
    * Required for TurboModules that emit events.
    */
   removeListeners(count: number): void;
+
+  /**
+   * Poll for queued events from native.
+   * Returns a JSON array of pending events.
+   * This is called from JavaScript to retrieve events that were queued
+   * by native operations (e.g., streaming generation, STT streams).
+   * @returns Promise that resolves to JSON array string of events
+   */
+  pollEvents(): Promise<string>;
+
+  /**
+   * Clear all pending events in the queue.
+   * Useful for cleanup during component unmount or when switching operations.
+   */
+  clearEventQueue(): void;
 }
 
 // Export the native module with enforced type safety
