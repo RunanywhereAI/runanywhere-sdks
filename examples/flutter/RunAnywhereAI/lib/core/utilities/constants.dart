@@ -1,6 +1,6 @@
-/// Constants (mirroring iOS Constants.swift)
-///
-/// Application-wide constant values.
+// Constants (mirroring iOS Constants.swift)
+//
+// Application-wide constant values.
 
 class Constants {
   Constants._();

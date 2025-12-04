@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 // ignore: unused_import
-import 'package:runanywhere/runanywhere.dart' hide ModelInfo, LLMFramework, ModelCategory;
+import 'package:runanywhere/runanywhere.dart' hide ModelInfo, LLMFramework, ModelCategory, ModelFormat;
 
 import 'model_types.dart';
 
@@ -49,7 +49,7 @@ class ModelListViewModel extends ChangeNotifier {
 
       // Placeholder models for demo
       _availableModels = [
-        ModelInfo(
+        const ModelInfo(
           id: 'llama-3.2-1b',
           name: 'Llama 3.2 1B',
           category: ModelCategory.language,
@@ -59,7 +59,7 @@ class ModelListViewModel extends ChangeNotifier {
           compatibleFrameworks: [LLMFramework.llamaCpp],
           preferredFramework: LLMFramework.llamaCpp,
         ),
-        ModelInfo(
+        const ModelInfo(
           id: 'llama-3.2-3b',
           name: 'Llama 3.2 3B',
           category: ModelCategory.language,
@@ -69,7 +69,7 @@ class ModelListViewModel extends ChangeNotifier {
           compatibleFrameworks: [LLMFramework.llamaCpp],
           preferredFramework: LLMFramework.llamaCpp,
         ),
-        ModelInfo(
+        const ModelInfo(
           id: 'whisper-base',
           name: 'Whisper Base',
           category: ModelCategory.speechRecognition,
@@ -79,7 +79,7 @@ class ModelListViewModel extends ChangeNotifier {
           compatibleFrameworks: [LLMFramework.whisperKit],
           preferredFramework: LLMFramework.whisperKit,
         ),
-        ModelInfo(
+        const ModelInfo(
           id: 'whisper-small',
           name: 'Whisper Small',
           category: ModelCategory.speechRecognition,

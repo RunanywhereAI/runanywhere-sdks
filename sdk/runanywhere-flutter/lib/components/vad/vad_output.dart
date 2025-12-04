@@ -55,9 +55,6 @@ class VADOutput implements ComponentOutput {
     required this.energyLevel,
     DateTime? timestamp,
   }) : timestamp = timestamp ?? const _DefaultTimestamp();
-
-  // Helper for default timestamp
-  static DateTime _defaultTimestamp() => DateTime.now();
 }
 
 // Private class to provide default timestamp

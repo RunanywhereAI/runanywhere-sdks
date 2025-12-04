@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
 import '../../core/design_system/typography.dart';
 import '../../core/models/app_types.dart';
-import '../../core/services/device_info_service.dart';
-import '../../core/services/model_manager.dart';
 import '../../core/utilities/constants.dart';
 import '../../core/utilities/keychain_helper.dart';
 
@@ -30,8 +27,6 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   bool _analyticsLogToLocal = false;
   bool _showApiKeyEntry = false;
   String _apiKey = '';
-  bool _isStorageExpanded = true;
-  bool _isModelsExpanded = true;
 
   // Storage info
   int _totalStorageSize = 0;
@@ -499,11 +494,11 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         padding: const EdgeInsets.all(AppSpacing.large),
         child: Column(
           children: [
-            ListTile(
+            const ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.extension),
-              title: const Text('RunAnywhere SDK'),
-              subtitle: const Text('Version 0.1'),
+              leading: Icon(Icons.extension),
+              title: Text('RunAnywhere SDK'),
+              subtitle: Text('Version 0.1'),
             ),
             const Divider(),
             ListTile(
