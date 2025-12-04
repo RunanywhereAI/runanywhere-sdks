@@ -1,8 +1,11 @@
 package com.runanywhere.runanywhereai.presentation.settings
 
+import android.app.Application
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.data.SecureStorage
+import com.runanywhere.runanywhereai.data.SettingsDataStore
 import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.models.storage.StoredModel
@@ -14,6 +17,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -69,17 +73,21 @@ data class SettingsUiState(
  * iOS Reference: CombinedSettingsView state management and StorageViewModel
  *
  * This ViewModel manages:
- * - SDK configuration settings
- * - Generation parameters
- * - API key management
+ * - SDK configuration settings (persisted via DataStore)
+ * - Generation parameters (persisted via DataStore)
+ * - API key management (persisted via EncryptedSharedPreferences)
  * - Storage overview via RunAnywhere.getStorageInfo() (matching iOS exactly)
  * - Model management via RunAnywhere storage APIs
- * - Logging configuration
+ * - Logging configuration (persisted via DataStore)
  */
-class SettingsViewModel : ViewModel() {
+class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    // Persistence layers - matching iOS UserDefaults + Keychain
+    private val settingsDataStore = SettingsDataStore(application)
+    private val secureStorage = SecureStorage(application)
 
     companion object {
         private const val TAG = "SettingsViewModel"
@@ -89,6 +97,26 @@ class SettingsViewModel : ViewModel() {
         loadCurrentConfiguration()
         loadStorageData()
         subscribeToModelEvents()
+        observeSettingsChanges()
+    }
+
+    /**
+     * Observe DataStore settings changes and update UI state
+     * This ensures UI stays in sync with persisted settings
+     */
+    private fun observeSettingsChanges() {
+        viewModelScope.launch {
+            settingsDataStore.settingsFlow.collect { settings ->
+                _uiState.update {
+                    it.copy(
+                        routingPolicy = settings.routingPolicy,
+                        temperature = settings.temperature,
+                        maxTokens = settings.maxTokens,
+                        analyticsLogToLocal = settings.analyticsLogToLocal
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -118,26 +146,39 @@ class SettingsViewModel : ViewModel() {
     /**
      * Load current configuration from storage
      *
-     * TODO: Integrate with actual storage (SharedPreferences, DataStore)
      * iOS equivalent: loadCurrentConfiguration() in CombinedSettingsView
+     * - KeychainService.shared.retrieve(key: "runanywhere_api_key")
+     * - UserDefaults.standard.string(forKey: "routingPolicy")
+     * - UserDefaults.standard.double(forKey: "defaultTemperature")
+     * - UserDefaults.standard.integer(forKey: "defaultMaxTokens")
      */
     private fun loadCurrentConfiguration() {
         viewModelScope.launch {
-            // TODO: Load from SharedPreferences or DataStore
-            // iOS equivalent:
-            // - KeychainService.shared.retrieve(key: "runanywhere_api_key")
-            // - UserDefaults.standard.string(forKey: "routingPolicy")
-            // - UserDefaults.standard.double(forKey: "defaultTemperature")
-            // - UserDefaults.standard.integer(forKey: "defaultMaxTokens")
+            try {
+                // Load settings from DataStore (equivalent to UserDefaults)
+                val settings = settingsDataStore.settingsFlow.first()
 
-            _uiState.update {
-                it.copy(
-                    routingPolicy = RoutingPolicy.AUTOMATIC,
-                    temperature = 0.7f,
-                    maxTokens = 10000,
-                    isApiKeyConfigured = false,
-                    analyticsLogToLocal = false
-                )
+                // Load API key from secure storage (equivalent to Keychain)
+                val apiKey = secureStorage.getApiKey() ?: ""
+                val isApiKeyConfigured = apiKey.isNotEmpty()
+
+                _uiState.update {
+                    it.copy(
+                        routingPolicy = settings.routingPolicy,
+                        temperature = settings.temperature,
+                        maxTokens = settings.maxTokens,
+                        apiKey = apiKey,
+                        isApiKeyConfigured = isApiKeyConfigured,
+                        analyticsLogToLocal = settings.analyticsLogToLocal
+                    )
+                }
+
+                Log.d(TAG, "Configuration loaded - Policy: ${settings.routingPolicy}, " +
+                    "Temperature: ${settings.temperature}, MaxTokens: ${settings.maxTokens}, " +
+                    "API Key configured: $isApiKeyConfigured")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load configuration", e)
+                // Keep default values on error
             }
         }
     }
@@ -194,48 +235,56 @@ class SettingsViewModel : ViewModel() {
     /**
      * Update routing policy
      *
-     * TODO: Persist to storage
      * iOS equivalent: UserDefaults.standard.set(routingPolicy.rawValue, forKey: "routingPolicy")
      */
     fun updateRoutingPolicy(policy: RoutingPolicy) {
         _uiState.update { it.copy(routingPolicy = policy) }
-        saveConfiguration()
+        viewModelScope.launch {
+            settingsDataStore.saveRoutingPolicy(policy)
+            Log.d(TAG, "Routing policy updated: ${policy.rawValue}")
+        }
     }
 
     /**
      * Update temperature setting
      *
-     * TODO: Persist to storage
      * iOS equivalent: UserDefaults.standard.set(defaultTemperature, forKey: "defaultTemperature")
      */
     fun updateTemperature(temperature: Float) {
         _uiState.update { it.copy(temperature = temperature) }
-        saveConfiguration()
+        viewModelScope.launch {
+            settingsDataStore.saveTemperature(temperature)
+            Log.d(TAG, "Temperature updated: $temperature")
+        }
     }
 
     /**
      * Update max tokens setting
      *
-     * TODO: Persist to storage
      * iOS equivalent: UserDefaults.standard.set(defaultMaxTokens, forKey: "defaultMaxTokens")
      */
     fun updateMaxTokens(maxTokens: Int) {
         val clampedValue = maxTokens.coerceIn(500, 20000)
         _uiState.update { it.copy(maxTokens = clampedValue) }
-        saveConfiguration()
+        viewModelScope.launch {
+            settingsDataStore.saveMaxTokens(clampedValue)
+            Log.d(TAG, "Max tokens updated: $clampedValue")
+        }
     }
 
     /**
      * Update API key
      *
-     * TODO: Persist to secure storage (EncryptedSharedPreferences)
      * iOS equivalent: KeychainService.shared.save(key: "runanywhere_api_key", data: apiKeyData)
      */
     fun updateApiKey(apiKey: String) {
         viewModelScope.launch {
-            // TODO: Save to encrypted storage
-            // Android: EncryptedSharedPreferences
-            // iOS: KeychainService
+            // Save to encrypted storage (equivalent to Keychain)
+            if (apiKey.isNotEmpty()) {
+                secureStorage.saveApiKey(apiKey)
+            } else {
+                secureStorage.deleteApiKey()
+            }
 
             _uiState.update {
                 it.copy(
@@ -243,18 +292,21 @@ class SettingsViewModel : ViewModel() {
                     isApiKeyConfigured = apiKey.isNotEmpty()
                 )
             }
+            Log.d(TAG, "API key updated, configured: ${apiKey.isNotEmpty()}")
         }
     }
 
     /**
      * Update analytics logging preference
      *
-     * TODO: Persist to storage
      * iOS equivalent: KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
      */
     fun updateAnalyticsLogging(enabled: Boolean) {
         _uiState.update { it.copy(analyticsLogToLocal = enabled) }
-        // TODO: Persist setting
+        viewModelScope.launch {
+            settingsDataStore.saveAnalyticsLogToLocal(enabled)
+            Log.d(TAG, "Analytics logging updated: $enabled")
+        }
     }
 
     /**
@@ -348,22 +400,4 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Save configuration to storage
-     *
-     * TODO: Integrate with actual storage
-     * iOS equivalent: updateSDKConfiguration() in CombinedSettingsView
-     */
-    private fun saveConfiguration() {
-        viewModelScope.launch {
-            // TODO: Save to SharedPreferences or DataStore
-            // iOS equivalent:
-            // UserDefaults.standard.set(routingPolicy.rawValue, forKey: "routingPolicy")
-            // UserDefaults.standard.set(defaultTemperature, forKey: "defaultTemperature")
-            // UserDefaults.standard.set(defaultMaxTokens, forKey: "defaultMaxTokens")
-
-            val state = _uiState.value
-            println("Configuration saved - Temperature: ${state.temperature}, MaxTokens: ${state.maxTokens}")
-        }
-    }
 }

@@ -123,6 +123,11 @@ sqldelight = "2.0.1"
 securityCrypto = "1.1.0-alpha06"
 
 # ============================================================================
+# DataStore
+# ============================================================================
+datastore = "1.1.1"
+
+# ============================================================================
 # Play Services (Updated for targetSdk 34+)
 # ============================================================================
 playAppUpdate = "2.1.0"
@@ -291,6 +296,11 @@ sqldelight-native-driver = { group = "app.cash.sqldelight", name = "native-drive
 # Security
 # ----------------------------------------------------------------------------
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+
+# ----------------------------------------------------------------------------
+# DataStore
+# ----------------------------------------------------------------------------
+androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
 # ----------------------------------------------------------------------------
 # Play Services

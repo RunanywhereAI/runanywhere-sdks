@@ -794,6 +794,8 @@ class DefaultTTSService : TTSService {
  * Enhanced to exactly match iOS StreamingTTSHandler functionality and patterns
  */
 class StreamingTTSHandler(private val ttsService: TTSService) {
+    private val logger = SDKLogger("StreamingTTSHandler")
+
     // State tracking matching iOS implementation
     private var spokenText = ""
     private var pendingBuffer = ""

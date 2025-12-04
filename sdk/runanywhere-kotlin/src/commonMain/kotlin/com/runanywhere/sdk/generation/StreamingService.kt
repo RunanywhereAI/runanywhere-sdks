@@ -264,3 +264,17 @@ data class PartialCompletion(
     val confidence: Float,
     val isComplete: Boolean = false
 )
+
+/**
+ * Represents a streaming token with type information.
+ *
+ * Used for streaming text generation where tokens need to be
+ * classified as either thinking/reasoning or actual content.
+ */
+data class StreamingToken(
+    val text: String,
+    val tokenIndex: Int,
+    val isLast: Boolean,
+    val timestamp: Long = System.currentTimeMillis(),
+    val type: TokenType = TokenType.CONTENT
+)
