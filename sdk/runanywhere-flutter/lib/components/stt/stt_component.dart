@@ -4,7 +4,10 @@ import '../../core/types/sdk_component.dart';
 import '../../core/protocols/component/component_configuration.dart';
 import '../../core/models/audio_format.dart';
 import '../../core/module_registry.dart';
-import '../llm/llm_component.dart' show LLMFramework;
+import '../vad/vad_output.dart' show VADOutput;
+
+// Re-export STT types for external consumers
+export 'stt_types.dart';
 
 /// Transcription mode for speech-to-text
 /// Matches iOS STTMode from STTComponent.swift
@@ -67,58 +70,6 @@ class STTConfiguration implements ComponentConfiguration {
   }
 }
 
-/// Options for speech-to-text transcription
-/// Matches iOS STTOptions from STTComponent.swift
-class STTComponentOptions {
-  /// Language code for transcription
-  final String language;
-
-  /// Whether to auto-detect the spoken language
-  final bool detectLanguage;
-
-  /// Enable automatic punctuation
-  final bool enablePunctuation;
-
-  /// Enable speaker diarization
-  final bool enableDiarization;
-
-  /// Maximum number of speakers to identify
-  final int? maxSpeakers;
-
-  /// Enable word-level timestamps
-  final bool enableTimestamps;
-
-  /// Custom vocabulary words
-  final List<String> vocabularyFilter;
-
-  /// Audio format of input data
-  final AudioFormat audioFormat;
-
-  /// Sample rate of input audio
-  final int sampleRate;
-
-  /// Preferred framework for transcription
-  final LLMFramework? preferredFramework;
-
-  STTComponentOptions({
-    this.language = 'en',
-    this.detectLanguage = false,
-    this.enablePunctuation = true,
-    this.enableDiarization = false,
-    this.maxSpeakers,
-    this.enableTimestamps = true,
-    this.vocabularyFilter = const [],
-    this.audioFormat = AudioFormat.pcm,
-    this.sampleRate = 16000,
-    this.preferredFramework,
-  });
-
-  /// Create default options for a specific language
-  factory STTComponentOptions.defaultOptions({String language = 'en'}) {
-    return STTComponentOptions(language: language);
-  }
-}
-
 /// STT Component Input
 /// Matches iOS STTInput from STTComponent.swift
 class STTInput implements ComponentInput {
@@ -131,6 +82,9 @@ class STTInput implements ComponentInput {
   /// Language code override
   final String? language;
 
+  /// Optional VAD output for context
+  final VADOutput? vadOutput;
+
   /// Custom options override
   final STTOptions? options;
 
@@ -138,6 +92,7 @@ class STTInput implements ComponentInput {
     required this.audioData,
     this.format = AudioFormat.wav,
     this.language,
+    this.vadOutput,
     this.options,
   });
 
@@ -387,11 +342,11 @@ class STTComponent extends BaseComponent<STTService> {
   /// Transcribe audio data in batch mode
   Future<STTOutput> transcribe(
     List<int> audioData, {
-    STTComponentOptions? options,
+    STTOptions? options,
   }) async {
     ensureReady();
 
-    final opts = options ?? STTComponentOptions.defaultOptions();
+    final opts = options ?? STTOptions.defaultOptions();
     final input = STTInput(
       audioData: audioData,
       format: opts.audioFormat,
@@ -500,7 +455,7 @@ class STTComponent extends BaseComponent<STTService> {
   /// Live transcription with real-time partial results
   Stream<String> liveTranscribe(
     Stream<List<int>> audioStream, {
-    STTComponentOptions? options,
+    STTOptions? options,
   }) {
     return streamTranscribe(
       audioStream,

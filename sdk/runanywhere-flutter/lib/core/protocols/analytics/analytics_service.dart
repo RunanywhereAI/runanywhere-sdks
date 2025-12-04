@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'analytics_event.dart';
 import 'analytics_metrics.dart';
 import 'session_metadata.dart';

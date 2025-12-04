@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'download_progress.dart';
 
 /// Download task information

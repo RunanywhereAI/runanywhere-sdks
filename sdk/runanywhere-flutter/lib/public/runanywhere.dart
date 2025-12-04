@@ -11,7 +11,6 @@ import 'events/sdk_event.dart';
 import 'models/models.dart';
 import '../capabilities/text_generation/generation_service.dart';
 import '../capabilities/structured_output/structured_output_handler.dart';
-import '../core/module_registry.dart' show STTOptions;
 import '../components/stt/stt_component.dart';
 import '../components/tts/tts_component.dart';
 
@@ -21,7 +20,7 @@ export '../capabilities/text_generation/generation_service.dart'
 
 // Export component types for public use
 export '../components/stt/stt_component.dart'
-    show STTComponent, STTConfiguration, STTOutput, STTMode;
+    show STTComponent, STTConfiguration, STTOutput, STTMode, STTOptions;
 export '../components/tts/tts_component.dart' show TTSComponent, TTSConfiguration;
 export '../components/tts/tts_output.dart' show TTSOutput, SynthesisMetadata;
 export '../components/llm/llm_component.dart'
@@ -45,6 +44,9 @@ class RunAnywhere {
 
   /// Check if SDK is initialized
   static bool get isSDKInitialized => _isInitialized;
+
+  /// Get the initialization parameters (if initialized)
+  static SDKInitParams? get initParams => _initParams;
 
   /// Access to all SDK events for subscription-based patterns
   static EventBus get events => EventBus.shared;

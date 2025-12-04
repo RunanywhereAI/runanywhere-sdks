@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../models/model/model_info.dart';
 
 /// Protocol for custom download strategies provided by host app

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+
 import 'runanywhere.dart';
 
 /// Extension for structured output generation

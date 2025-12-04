@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../models/model/model_info.dart';
 import 'download_task.dart';
 
