@@ -111,14 +111,36 @@ class AuthenticationServiceImpl {
 
     try {
       const native = requireNativeModule();
-      const response = await native.authenticate(apiKey);
+      const success = await native.authenticate(apiKey);
+
+      if (!success) {
+        throw new Error('Authentication failed');
+      }
+
+      // Get authentication details after successful auth
+      const [userId, orgId, deviceId, accessToken] = await Promise.all([
+        native.getUserId(),
+        native.getOrganizationId(),
+        native.getDeviceId(),
+        native.getAccessToken(),
+      ]);
 
       this.state = {
         isAuthenticated: true,
         isAuthenticating: false,
-        userId: response.userId,
-        organizationId: response.organizationId,
-        deviceId: response.deviceId,
+        userId: userId ?? undefined,
+        organizationId: orgId ?? undefined,
+        deviceId: deviceId ?? undefined,
+      };
+
+      // Build response from fetched data
+      const response: AuthenticationResponse = {
+        accessToken: accessToken ?? '',
+        refreshToken: '', // Not exposed by native module
+        expiresIn: 3600, // Default expiration
+        deviceId: deviceId ?? '',
+        userId: userId ?? undefined,
+        organizationId: orgId ?? '',
       };
 
       return response;
@@ -137,7 +159,8 @@ class AuthenticationServiceImpl {
    */
   async getAccessToken(): Promise<string> {
     const native = requireNativeModule();
-    return native.getAccessToken();
+    const token = await native.getAccessToken();
+    return token ?? '';
   }
 
   /**
@@ -147,7 +170,8 @@ class AuthenticationServiceImpl {
    */
   async refreshAccessToken(): Promise<string> {
     const native = requireNativeModule();
-    return native.refreshAccessToken();
+    const token = await native.refreshAccessToken();
+    return token ?? '';
   }
 
   /**
@@ -196,52 +220,52 @@ class AuthenticationServiceImpl {
 
     if (userId || orgId) {
       this.state.isAuthenticated = true;
-      this.state.userId = userId;
-      this.state.organizationId = orgId;
-      this.state.deviceId = deviceId;
+      this.state.userId = userId ?? undefined;
+      this.state.organizationId = orgId ?? undefined;
+      this.state.deviceId = deviceId ?? undefined;
     }
   }
 
   /**
    * Get current user ID
    */
-  async getUserId(): Promise<string | null> {
+  async getUserId(): Promise<string | undefined> {
     if (this.state.userId) {
       return this.state.userId;
     }
 
     const native = requireNativeModule();
     const userId = await native.getUserId();
-    this.state.userId = userId;
-    return userId;
+    this.state.userId = userId ?? undefined;
+    return userId ?? undefined;
   }
 
   /**
    * Get current organization ID
    */
-  async getOrganizationId(): Promise<string | null> {
+  async getOrganizationId(): Promise<string | undefined> {
     if (this.state.organizationId) {
       return this.state.organizationId;
     }
 
     const native = requireNativeModule();
     const orgId = await native.getOrganizationId();
-    this.state.organizationId = orgId;
-    return orgId;
+    this.state.organizationId = orgId ?? undefined;
+    return orgId ?? undefined;
   }
 
   /**
    * Get current device ID
    */
-  async getDeviceId(): Promise<string | null> {
+  async getDeviceId(): Promise<string | undefined> {
     if (this.state.deviceId) {
       return this.state.deviceId;
     }
 
     const native = requireNativeModule();
     const deviceId = await native.getDeviceId();
-    this.state.deviceId = deviceId;
-    return deviceId;
+    this.state.deviceId = deviceId ?? undefined;
+    return deviceId ?? undefined;
   }
 
   /**
@@ -253,7 +277,17 @@ class AuthenticationServiceImpl {
    */
   async registerDevice(): Promise<{ deviceId: string }> {
     const native = requireNativeModule();
-    return native.registerDevice();
+    // Native module expects deviceInfo JSON and returns boolean
+    const deviceInfoJson = JSON.stringify({});
+    const success = await native.registerDevice(deviceInfoJson);
+
+    if (!success) {
+      throw new Error('Device registration failed');
+    }
+
+    // Get device ID after registration
+    const deviceId = await native.getDeviceId();
+    return { deviceId: deviceId ?? '' };
   }
 
   /**
@@ -263,7 +297,11 @@ class AuthenticationServiceImpl {
    */
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
     const native = requireNativeModule();
-    return native.healthCheck();
+    const success = await native.healthCheck();
+    return {
+      status: success ? 'healthy' : 'unhealthy',
+      timestamp: new Date().toISOString(),
+    };
   }
 
   /**

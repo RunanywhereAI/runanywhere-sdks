@@ -14,11 +14,15 @@ export * from './voice';
 // Settings types
 export * from './settings';
 
+// Quiz types
+export * from './quiz';
+
 // Navigation types
 export type RootTabParamList = {
   Chat: undefined;
   STT: undefined;
   TTS: undefined;
+  Quiz: undefined;
   VoiceAssistant: undefined;
   Settings: undefined;
 };

@@ -6,10 +6,10 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Memory/Services/CacheEviction.swift
  */
 
-import type {
-  MemoryLoadedModelInfo,
+import {
+  type MemoryLoadedModelInfo,
   MemoryPriority,
-  EvictionStatistics,
+  type EvictionStatistics,
 } from '../../../Core/Protocols/Memory/MemoryModels';
 import type { AllocationManager } from './AllocationManager';
 
@@ -49,7 +49,7 @@ export class CacheEviction {
   /**
    * Select models to evict by count
    */
-  public selectModelsToEvict(count: number): string[] {
+  public selectModelsToEvictByCount(count: number): string[] {
     const models = this.getCurrentModels();
     const sortedModels = this.sortModelsByEvictionPriority(models, false);
     return sortedModels.slice(0, count).map((m) => m.model.id);
@@ -276,4 +276,3 @@ export class CacheEviction {
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   }
 }
-

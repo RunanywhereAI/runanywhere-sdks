@@ -6,10 +6,10 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Memory/Monitors/MemoryMonitor.swift
  */
 
-import type {
-  MemoryMonitoringStats,
+import {
+  type MemoryMonitoringStats,
   MemoryPressureLevel,
-  MemoryUsageTrend,
+  type MemoryUsageTrend,
   TrendDirection,
 } from '../../../Core/Protocols/Memory/MemoryModels';
 
@@ -112,8 +112,8 @@ export class MemoryMonitor {
       return null;
     }
 
-    const firstEntry = recentHistory[0];
-    const lastEntry = recentHistory[recentHistory.length - 1];
+    const firstEntry = recentHistory[0]!;
+    const lastEntry = recentHistory[recentHistory.length - 1]!;
 
     const memoryDelta = lastEntry.availableMemory - firstEntry.availableMemory;
     const timeDelta =
@@ -184,11 +184,12 @@ export class MemoryMonitor {
     let total = 0;
 
     for (let i = 1; i < entries.length; i++) {
-      const delta =
-        entries[i].availableMemory - entries[i - 1].availableMemory;
+      const currentEntry = entries[i]!;
+      const prevEntry = entries[i - 1]!;
+      const delta = currentEntry.availableMemory - prevEntry.availableMemory;
       const previousDelta =
         i > 1
-          ? entries[i - 1].availableMemory - entries[i - 2].availableMemory
+          ? prevEntry.availableMemory - entries[i - 2]!.availableMemory
           : delta;
 
       if (
@@ -219,4 +220,3 @@ export class MemoryMonitor {
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   }
 }
-

@@ -128,7 +128,7 @@ Remember: Output ONLY the JSON object, nothing else.`;
     const startIndex = trimmed.indexOf('{');
     if (startIndex !== -1) {
       const endIndex = this.findMatchingBrace(trimmed, startIndex);
-      if (endIndex !== -1) {
+      if (endIndex !== null) {
         return trimmed.substring(startIndex, endIndex + 1);
       }
     }
@@ -137,7 +137,7 @@ Remember: Output ONLY the JSON object, nothing else.`;
     const arrayStartIndex = trimmed.indexOf('[');
     if (arrayStartIndex !== -1) {
       const arrayEndIndex = this.findMatchingBracket(trimmed, arrayStartIndex);
-      if (arrayEndIndex !== -1) {
+      if (arrayEndIndex !== null) {
         return trimmed.substring(arrayStartIndex, arrayEndIndex + 1);
       }
     }
@@ -304,4 +304,3 @@ Remember: Output ONLY the JSON object, nothing else.`;
     }
   }
 }
-

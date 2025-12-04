@@ -14,8 +14,8 @@ import type { ComponentInput, ComponentOutput } from '../../Core/Components/Base
 export interface WakeWordInput extends ComponentInput {
   /** Audio buffer to process */
   readonly audioBuffer: number[]; // Float array
-  /** Optional timestamp */
-  readonly timestamp: number | null; // seconds
+  /** Optional audio timestamp in seconds (distinct from ComponentInput.timestamp) */
+  readonly audioTimestamp?: number;
 }
 
 /**
@@ -40,4 +40,3 @@ export interface WakeWordMetadata {
   readonly bufferSize: number;
   readonly sampleRate: number;
 }
-

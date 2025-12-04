@@ -156,12 +156,19 @@ export class STTComponent extends BaseComponent<STTServiceWrapper> {
     // Convert audio data to ArrayBuffer if needed
     let audioData: string | ArrayBuffer;
     if (Buffer.isBuffer(input.audioData)) {
+      // Use slice to get a proper ArrayBuffer (Uint8Array.buffer returns ArrayBufferLike)
       audioData = input.audioData.buffer.slice(
         input.audioData.byteOffset,
         input.audioData.byteOffset + input.audioData.byteLength
-      );
+      ) as ArrayBuffer;
+    } else if (input.audioData instanceof Uint8Array) {
+      // For Uint8Array, we need to slice to get ArrayBuffer
+      audioData = input.audioData.buffer.slice(
+        input.audioData.byteOffset,
+        input.audioData.byteOffset + input.audioData.byteLength
+      ) as ArrayBuffer;
     } else {
-      audioData = input.audioData;
+      audioData = input.audioData as ArrayBuffer;
     }
 
     // Transcribe
@@ -230,9 +237,11 @@ export class STTComponent extends BaseComponent<STTServiceWrapper> {
     const convertedStream: AsyncIterable<string | ArrayBuffer> = (async function* () {
       for await (const chunk of audioStream) {
         if (Buffer.isBuffer(chunk)) {
-          yield chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength);
+          yield chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer;
+        } else if (chunk instanceof Uint8Array) {
+          yield chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer;
         } else {
-          yield chunk;
+          yield chunk as ArrayBuffer;
         }
       }
     })();
@@ -257,7 +266,7 @@ export class STTComponent extends BaseComponent<STTServiceWrapper> {
       // Fallback to batch mode - collect all chunks first
       const allChunks: ArrayBuffer[] = [];
       for await (const chunk of convertedStream) {
-        allChunks.push(chunk instanceof ArrayBuffer ? chunk : new TextEncoder().encode(chunk).buffer);
+        allChunks.push(chunk instanceof ArrayBuffer ? chunk : new TextEncoder().encode(chunk as string).buffer as ArrayBuffer);
       }
       // Combine chunks
       const totalLength = allChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);

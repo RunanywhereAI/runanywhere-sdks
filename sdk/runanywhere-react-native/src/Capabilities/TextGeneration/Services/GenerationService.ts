@@ -143,7 +143,8 @@ export class GenerationService {
     // Generate text using the actual loaded model's service
     let generatedText: string;
     try {
-      generatedText = await loadedModel.service.generate(prompt, options);
+      const result = await loadedModel.service.generate(prompt, options);
+      generatedText = result.text;
     } catch (error) {
       throw error;
     }
@@ -273,7 +274,8 @@ export class GenerationService {
     const loadedModel = this.currentLoadedModel;
 
     // For now, use on-device generation entirely
-    const generatedText = await loadedModel.service.generate(prompt, options);
+    const generationResult = await loadedModel.service.generate(prompt, options);
+    const generatedText = generationResult.text;
 
     // Calculate metrics
     const latency = Date.now() - startTime;
@@ -342,4 +344,3 @@ export class GenerationService {
     };
   }
 }
-

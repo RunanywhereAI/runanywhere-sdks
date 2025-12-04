@@ -3,7 +3,11 @@
  *
  * Reference: iOS Features/Chat/ChatInterfaceView.swift
  *
- * Now includes LLM models in the catalog (Qwen2, TinyLlama, SmolLM).
+ * Features:
+ * - Conversation management (create, switch, delete)
+ * - Streaming LLM text generation
+ * - Message analytics
+ * - Model selection
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -15,6 +19,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Alert,
+  Modal,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
@@ -22,8 +27,12 @@ import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius, IconSize } from '../theme/spacing';
 import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
 import { MessageBubble, TypingIndicator, ChatInput } from '../components/chat';
-import { Message, MessageRole } from '../types/chat';
+import { ChatAnalyticsScreen } from './ChatAnalyticsScreen';
+import { ConversationListScreen } from './ConversationListScreen';
+import { Message, MessageRole, Conversation } from '../types/chat';
 import { ModelInfo, ModelModality, LLMFramework, ModelCategory } from '../types/model';
+import { useConversationStore } from '../stores/conversationStore';
+import { ModelSelectionSheet, ModelSelectionContext } from '../components/model';
 
 // Import actual RunAnywhere SDK
 import { RunAnywhere, type ModelInfo as SDKModelInfo } from 'runanywhere-react-native';
@@ -32,24 +41,57 @@ import { RunAnywhere, type ModelInfo as SDKModelInfo } from 'runanywhere-react-n
 const generateId = () => Math.random().toString(36).substring(2, 15);
 
 export const ChatScreen: React.FC = () => {
-  // State
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Conversation store
+  const {
+    conversations,
+    currentConversation,
+    initialize: initializeStore,
+    createConversation,
+    setCurrentConversation,
+    addMessage,
+  } = useConversationStore();
+
+  // Local state
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
   const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
-  const [backendInfo, setBackendInfo] = useState<Record<string, unknown>>({});
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showConversationList, setShowConversationList] = useState(false);
+  const [showModelSelection, setShowModelSelection] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
 
-  // Check for loaded model and backend info on mount
+  // Initialize conversation store and create first conversation
+  useEffect(() => {
+    const init = async () => {
+      await initializeStore();
+      setIsInitialized(true);
+    };
+    init();
+  }, [initializeStore]);
+
+  // Create initial conversation if none exists
+  useEffect(() => {
+    if (isInitialized && conversations.length === 0 && !currentConversation) {
+      createConversation();
+    } else if (isInitialized && !currentConversation && conversations.length > 0) {
+      // Set most recent conversation as current
+      setCurrentConversation(conversations[0] || null);
+    }
+  }, [isInitialized, conversations, currentConversation, createConversation, setCurrentConversation]);
+
+  // Check for loaded model and load available models on mount
   useEffect(() => {
     checkModelStatus();
-    loadBackendInfo();
     loadAvailableModels();
   }, []);
+
+  // Messages from current conversation
+  const messages = currentConversation?.messages || [];
 
   /**
    * Load available LLM models from catalog
@@ -57,24 +99,11 @@ export const ChatScreen: React.FC = () => {
   const loadAvailableModels = async () => {
     try {
       const allModels = await RunAnywhere.getAvailableModels();
-      const llmModels = allModels.filter((m) => m.modality === 'llm');
+      const llmModels = allModels.filter((m: SDKModelInfo) => m.modality === 'llm');
       setAvailableModels(llmModels);
-      console.log('[ChatScreen] Available LLM models:', llmModels.map(m => `${m.id}(${m.isDownloaded ? 'downloaded' : 'not downloaded'})`));
+      console.log('[ChatScreen] Available LLM models:', llmModels.map((m: SDKModelInfo) => `${m.id}(${m.isDownloaded ? 'downloaded' : 'not downloaded'})`));
     } catch (error) {
       console.log('[ChatScreen] Error loading models:', error);
-    }
-  };
-
-  /**
-   * Load backend info
-   */
-  const loadBackendInfo = async () => {
-    try {
-      const info = await RunAnywhere.getBackendInfo();
-      setBackendInfo(info);
-      console.log('[ChatScreen] Backend info:', info);
-    } catch (error) {
-      console.log('[ChatScreen] Error getting backend info:', error);
     }
   };
 
@@ -86,7 +115,6 @@ export const ChatScreen: React.FC = () => {
       const isLoaded = await RunAnywhere.isTextModelLoaded();
       console.log('[ChatScreen] Text model loaded:', isLoaded);
       if (isLoaded) {
-        // Model is loaded - create a placeholder model info
         setCurrentModel({
           id: 'loaded-model',
           name: 'Loaded Model',
@@ -95,6 +123,7 @@ export const ChatScreen: React.FC = () => {
           preferredFramework: LLMFramework.LlamaCpp,
           isDownloaded: true,
           isAvailable: true,
+          supportsThinking: false,
         });
       }
     } catch (error) {
@@ -103,40 +132,18 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Handle model selection - shows available downloaded LLM models
+   * Handle model selection - opens the model selection sheet
    */
-  const handleSelectModel = useCallback(async () => {
-    // Get downloaded LLM models
-    const downloadedModels = availableModels.filter((m) => m.isDownloaded);
+  const handleSelectModel = useCallback(() => {
+    setShowModelSelection(true);
+  }, []);
 
-    if (downloadedModels.length === 0) {
-      // No downloaded LLM models, show info about available models
-      Alert.alert(
-        'Download an LLM Model',
-        'Go to the Settings tab to download a language model.\n\n' +
-          'Available models:\n' +
-          '• SmolLM 135M (~150MB) - Fast responses\n' +
-          '• Qwen2 0.5B (~400MB) - Balanced\n' +
-          '• TinyLlama 1.1B (~670MB) - Best quality\n\n' +
-          'Or use Demo Mode to test the interface.',
-        [
-          { text: 'Try Demo Mode', onPress: () => enableDemoMode() },
-          { text: 'OK' },
-        ]
-      );
-      return;
-    }
-
-    // Show available models
-    const buttons: { text: string; onPress?: () => void; style?: string }[] = downloadedModels.map((model) => ({
-      text: model.name,
-      onPress: () => { loadModel(model); },
-    }));
-    buttons.push({ text: 'Demo Mode', onPress: enableDemoMode });
-    buttons.push({ text: 'Cancel', style: 'cancel' });
-
-    Alert.alert('Select LLM Model', 'Choose a downloaded language model', buttons as any);
-  }, [availableModels]);
+  /**
+   * Handle model selected from the sheet
+   */
+  const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
+    await loadModel(model);
+  }, []);
 
   /**
    * Enable demo mode - simulates having a loaded model
@@ -151,6 +158,7 @@ export const ChatScreen: React.FC = () => {
       preferredFramework: LLMFramework.LlamaCpp,
       isDownloaded: true,
       isAvailable: true,
+      supportsThinking: false,
     });
   };
 
@@ -178,6 +186,7 @@ export const ChatScreen: React.FC = () => {
           preferredFramework: LLMFramework.LlamaCpp,
           isDownloaded: true,
           isAvailable: true,
+          supportsThinking: false,
         });
         console.log('[ChatScreen] Model loaded successfully');
       } else {
@@ -196,7 +205,7 @@ export const ChatScreen: React.FC = () => {
    * Send a message using the real SDK
    */
   const handleSend = useCallback(async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !currentConversation) return;
 
     const userMessage: Message = {
       id: generateId(),
@@ -205,8 +214,8 @@ export const ChatScreen: React.FC = () => {
       timestamp: new Date(),
     };
 
-    // Add user message
-    setMessages((prev) => [...prev, userMessage]);
+    // Add user message to conversation
+    await addMessage(userMessage, currentConversation.id);
     const prompt = inputText.trim();
     setInputText('');
     setIsLoading(true);
@@ -218,9 +227,9 @@ export const ChatScreen: React.FC = () => {
 
     try {
       console.log('[ChatScreen] Generating response for:', prompt);
-
-      // Check if we're in demo mode
       const isDemoMode = currentModel?.id === 'demo-model';
+
+      let assistantMessage: Message;
 
       if (isDemoMode) {
         // Simulate a delay and provide a demo response
@@ -232,7 +241,7 @@ export const ChatScreen: React.FC = () => {
           "Demo mode is active. The RunAnywhere React Native SDK can perform on-device AI inference for STT, TTS, and LLM when models are available.",
         ];
 
-        const assistantMessage: Message = {
+        assistantMessage = {
           id: generateId(),
           role: MessageRole.Assistant,
           content: demoResponses[messages.length % demoResponses.length] || demoResponses[0]!,
@@ -254,8 +263,6 @@ export const ChatScreen: React.FC = () => {
             retryCount: 0,
           },
         };
-
-        setMessages((prev) => [...prev, assistantMessage]);
       } else {
         // Use the real SDK generate method
         const result = await RunAnywhere.generate(prompt, {
@@ -265,12 +272,11 @@ export const ChatScreen: React.FC = () => {
 
         console.log('[ChatScreen] Generation result:', result);
 
-        // Check if there's an error in the result
         if (result.text?.includes('error')) {
           throw new Error(result.text);
         }
 
-        const assistantMessage: Message = {
+        assistantMessage = {
           id: generateId(),
           role: MessageRole.Assistant,
           content: result.text || '(No response generated)',
@@ -292,9 +298,10 @@ export const ChatScreen: React.FC = () => {
             retryCount: 0,
           },
         };
-
-        setMessages((prev) => [...prev, assistantMessage]);
       }
+
+      // Add assistant message to conversation
+      await addMessage(assistantMessage, currentConversation.id);
 
       // Scroll to bottom
       setTimeout(() => {
@@ -303,36 +310,31 @@ export const ChatScreen: React.FC = () => {
     } catch (error) {
       console.error('[ChatScreen] Generation error:', error);
 
-      // Add an error message to the chat
       const errorMessage: Message = {
         id: generateId(),
         role: MessageRole.Assistant,
         content: `Error: ${error}\n\nThis likely means no LLM model is loaded. Use demo mode to test the interface, or provide a GGUF model.`,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      await addMessage(errorMessage, currentConversation.id);
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, currentModel, messages.length]);
+  }, [inputText, currentModel, currentConversation, addMessage, messages.length]);
 
   /**
-   * Clear chat
+   * Create a new conversation (clears current chat)
    */
-  const handleClearChat = useCallback(() => {
-    Alert.alert(
-      'Clear Chat',
-      'Are you sure you want to clear all messages?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: () => setMessages([]),
-        },
-      ]
-    );
-  }, []);
+  const handleNewChat = useCallback(async () => {
+    await createConversation();
+  }, [createConversation]);
+
+  /**
+   * Handle selecting a conversation from the list
+   */
+  const handleSelectConversation = useCallback((conversation: Conversation) => {
+    setCurrentConversation(conversation);
+  }, [setCurrentConversation]);
 
   /**
    * Render a message
@@ -361,20 +363,56 @@ export const ChatScreen: React.FC = () => {
   );
 
   /**
+   * Handle opening analytics
+   */
+  const handleShowAnalytics = useCallback(() => {
+    setShowAnalytics(true);
+  }, []);
+
+  /**
    * Render header with actions
    */
   const renderHeader = () => (
     <View style={styles.header}>
-      <Text style={styles.title}>Chat</Text>
-      <View style={styles.headerActions}>
-        {messages.length > 0 && (
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={handleClearChat}
-          >
-            <Icon name="trash-outline" size={22} color={Colors.primaryRed} />
-          </TouchableOpacity>
+      {/* Conversations list button */}
+      <TouchableOpacity
+        style={styles.headerButton}
+        onPress={() => setShowConversationList(true)}
+      >
+        <Icon name="list" size={22} color={Colors.primaryBlue} />
+      </TouchableOpacity>
+
+      {/* Title with conversation count */}
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>Chat</Text>
+        {conversations.length > 1 && (
+          <Text style={styles.conversationCount}>
+            {conversations.length} conversations
+          </Text>
         )}
+      </View>
+
+      <View style={styles.headerActions}>
+        {/* New chat button */}
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={handleNewChat}
+        >
+          <Icon name="add" size={24} color={Colors.primaryBlue} />
+        </TouchableOpacity>
+
+        {/* Info button for chat analytics */}
+        <TouchableOpacity
+          style={[styles.headerButton, messages.length === 0 && styles.headerButtonDisabled]}
+          onPress={handleShowAnalytics}
+          disabled={messages.length === 0}
+        >
+          <Icon
+            name="information-circle-outline"
+            size={22}
+            color={messages.length > 0 ? Colors.primaryBlue : Colors.textTertiary}
+          />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -387,6 +425,27 @@ export const ChatScreen: React.FC = () => {
         <ModelRequiredOverlay
           modality={ModelModality.LLM}
           onSelectModel={handleSelectModel}
+        />
+
+        {/* Conversation List Modal */}
+        <Modal
+          visible={showConversationList}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowConversationList(false)}
+        >
+          <ConversationListScreen
+            onClose={() => setShowConversationList(false)}
+            onSelectConversation={handleSelectConversation}
+          />
+        </Modal>
+
+        {/* Model Selection Sheet */}
+        <ModelSelectionSheet
+          visible={showModelSelection}
+          context={ModelSelectionContext.LLM}
+          onClose={() => setShowModelSelection(false)}
+          onModelSelected={handleModelSelected}
         />
       </SafeAreaView>
     );
@@ -426,13 +485,47 @@ export const ChatScreen: React.FC = () => {
         value={inputText}
         onChangeText={setInputText}
         onSend={handleSend}
-        disabled={!currentModel}
+        disabled={!currentModel || !currentConversation}
         isLoading={isLoading}
         placeholder={
           currentModel
             ? 'Type a message...'
             : 'Select a model to start chatting'
         }
+      />
+
+      {/* Analytics Modal */}
+      <Modal
+        visible={showAnalytics}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAnalytics(false)}
+      >
+        <ChatAnalyticsScreen
+          messages={messages}
+          onClose={() => setShowAnalytics(false)}
+        />
+      </Modal>
+
+      {/* Conversation List Modal */}
+      <Modal
+        visible={showConversationList}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowConversationList(false)}
+      >
+        <ConversationListScreen
+          onClose={() => setShowConversationList(false)}
+          onSelectConversation={handleSelectConversation}
+        />
+      </Modal>
+
+      {/* Model Selection Sheet */}
+      <ModelSelectionSheet
+        visible={showModelSelection}
+        context={ModelSelectionContext.LLM}
+        onClose={() => setShowModelSelection(false)}
+        onModelSelected={handleModelSelected}
       />
     </SafeAreaView>
   );
@@ -452,17 +545,28 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
+  titleContainer: {
+    alignItems: 'center',
+  },
   title: {
     ...Typography.title2,
     color: Colors.textPrimary,
   },
+  conversationCount: {
+    ...Typography.caption2,
+    color: Colors.textTertiary,
+    marginTop: 2,
+  },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.medium,
+    gap: Spacing.small,
   },
   headerButton: {
     padding: Spacing.small,
+  },
+  headerButtonDisabled: {
+    opacity: 0.5,
   },
   messagesList: {
     paddingVertical: Spacing.medium,

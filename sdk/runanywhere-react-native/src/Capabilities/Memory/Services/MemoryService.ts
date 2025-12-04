@@ -6,16 +6,16 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Memory/Services/MemoryService.swift
  */
 
-import type {
-  MemoryLoadedModel,
+import {
+  type MemoryLoadedModel,
   MemoryPriority,
   MemoryPressureLevel,
-  MemoryStatistics,
-  MemoryLoadedModelInfo,
+  type MemoryStatistics,
+  type MemoryLoadedModelInfo,
 } from '../../../Core/Protocols/Memory/MemoryModels';
 import type { MemoryManager } from '../../../Core/Protocols/Memory/MemoryManager';
-import type { LoadedModel } from '../../ModelLoading/Models/LoadedModel';
 import type { LLMService } from '../../../Core/Protocols/LLM/LLMService';
+import type { LoadedModel } from '../../ModelLoading/Models/LoadedModel';
 import { AllocationManager } from './AllocationManager';
 import { PressureHandler } from './PressureHandler';
 import { CacheEviction } from './CacheEviction';
@@ -146,7 +146,7 @@ export class MemoryService implements MemoryManager {
   /**
    * Check if enough memory is available
    */
-  public hasAvailableMemory(for size: number): boolean {
+  public hasAvailableMemory(size: number): boolean {
     return this.getAvailableMemory() >= size;
   }
 
@@ -158,9 +158,9 @@ export class MemoryService implements MemoryManager {
   }
 
   /**
-   * Handle memory pressure (MemoryManager protocol)
+   * Handle memory pressure with default level (MemoryManager protocol)
    */
-  public async handleMemoryPressure(): Promise<void> {
+  public async handleDefaultMemoryPressure(): Promise<void> {
     await this.handleMemoryPressure(MemoryPressureLevel.Warning);
   }
 
@@ -174,21 +174,9 @@ export class MemoryService implements MemoryManager {
   /**
    * Get loaded models (MemoryManager protocol)
    */
-  public getLoadedModels(): LoadedModel[] {
+  public getLoadedModels(): MemoryLoadedModel[] {
     const memoryModels = this.allocationManager.getLoadedModels();
-    return memoryModels
-      .map((memModelInfo) => {
-        const service = memModelInfo.service;
-        if (!service) {
-          return null;
-        }
-
-        // Create a ModelInfo from the MemoryLoadedModel
-        // This is a simplified version - in production, we'd need to reconstruct ModelInfo
-        // For now, return null as we don't have full ModelInfo reconstruction
-        return null;
-      })
-      .filter((model): model is LoadedModel => model !== null);
+    return memoryModels.map((memModelInfo) => memModelInfo.model);
   }
 
   /**
@@ -287,4 +275,3 @@ export class MemoryService implements MemoryManager {
     }
   }
 }
-
