@@ -12,6 +12,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.Clock
 import kotlin.collections.mutableListOf
 import com.runanywhere.sdk.foundation.currentTimeMillis
+import com.runanywhere.sdk.foundation.SDKLogger
 
 /**
  * Event persistence for debugging and analytics
@@ -219,6 +220,8 @@ object GlobalEventPersistence {
  */
 object EventDebugUtils {
 
+    private val logger = SDKLogger("EventDebugUtils")
+
     /**
      * Print event statistics to console
      */
@@ -226,13 +229,16 @@ object EventDebugUtils {
         val counts = persistence.getEventCountByType()
         val total = persistence.getEventCount()
 
-        println("=== SDK Event Statistics ===")
-        println("Total Events: $total")
-        counts.forEach { (type, count) ->
-            val percentage = if (total > 0) (count * 100.0 / total) else 0.0
-            println("$type: $count (${String.format("%.1f", percentage)}%)")
+        val stats = buildString {
+            appendLine("=== SDK Event Statistics ===")
+            appendLine("Total Events: $total")
+            counts.forEach { (type, count) ->
+                val percentage = if (total > 0) (count * 100.0 / total) else 0.0
+                appendLine("$type: $count (${String.format("%.1f", percentage)}%)")
+            }
+            append("============================")
         }
-        println("============================")
+        logger.debug(stats)
     }
 
     /**
@@ -244,10 +250,13 @@ object EventDebugUtils {
     ) {
         val events = persistence.getAllEvents().takeLast(count)
 
-        println("=== Recent SDK Events (Last $count) ===")
-        events.forEach { persistedEvent ->
-            println("${persistedEvent.event.timestamp} [${persistedEvent.event.eventType}] ${persistedEvent.event}")
+        val recentEvents = buildString {
+            appendLine("=== Recent SDK Events (Last $count) ===")
+            events.forEach { persistedEvent ->
+                appendLine("${persistedEvent.event.timestamp} [${persistedEvent.event.eventType}] ${persistedEvent.event}")
+            }
+            append("=====================================")
         }
-        println("=====================================")
+        logger.debug(recentEvents)
     }
 }

@@ -11,6 +11,7 @@ import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.core.TTSServiceProvider
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
+import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
 
@@ -28,6 +29,8 @@ import kotlinx.serialization.Serializable
 class TTSComponent(
     private val ttsConfiguration: TTSConfiguration
 ) : BaseComponent<TTSService>(ttsConfiguration) {
+
+    private val logger = SDKLogger("TTSComponent")
 
     override val componentType: SDKComponent = SDKComponent.TTS
 
@@ -947,7 +950,7 @@ class StreamingTTSHandler(private val ttsService: TTSService) {
             ttsService.synthesize(sentence, options)
         } catch (e: Exception) {
             // Log error but continue with other sentences
-            println("TTS failed for sentence: $e")
+            logger.error("TTS failed for sentence", e)
         }
     }
 }

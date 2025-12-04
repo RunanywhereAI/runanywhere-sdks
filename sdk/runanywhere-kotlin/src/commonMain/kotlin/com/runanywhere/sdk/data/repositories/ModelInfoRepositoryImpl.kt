@@ -42,7 +42,7 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
 
             models.values.forEach { model ->
                 // Skip if already has valid localPath that exists
-                if (model.localPath != null && com.runanywhere.sdk.data.models.fileExists(model.localPath!!)) {
+                if (model.localPath != null && fileSystem.existsSync(model.localPath!!)) {
                     logger.debug("Model ${model.id} already has valid localPath: ${model.localPath}")
                     return@forEach
                 }

@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,8 +104,6 @@ typedef void* ra_stream_handle;
 // =============================================================================
 // CALLBACKS
 // =============================================================================
-
-#include <stdbool.h>
 
 // Text generation streaming callback
 // Returns: true to continue, false to cancel
