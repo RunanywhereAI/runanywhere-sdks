@@ -51,7 +51,6 @@ class TTSComponent(
     // MARK: - Progressive Streaming Support
 
     private var streamingTTSHandler: StreamingTTSHandler? = null
-    private val ssmlProcessor = DefaultSSMLProcessor()
 
     override suspend fun createService(): TTSService {
         // Create service from registry or default implementation
@@ -92,7 +91,7 @@ class TTSComponent(
     }
 
     /**
-     * Main synthesis method with structured input (iOS-style)
+     * Main synthesis method with structured input - aligned with iOS process() method
      */
     suspend fun synthesize(input: TTSInput): TTSOutput {
         ensureReady()
@@ -102,35 +101,50 @@ class TTSComponent(
         _isSynthesizing.value = true
 
         return try {
-            // Create synthesis options from input
-            val options = createTTSOptions(input)
+            // Get text to synthesize - SSML takes priority (iOS pattern)
+            val textToSynthesize = input.ssml ?: input.text
+
+            // Create options from input or use defaults (iOS pattern)
+            val options = input.options ?: TTSOptions(
+                voice = input.voiceId ?: ttsConfiguration.voice,
+                language = input.language ?: ttsConfiguration.language,
+                rate = ttsConfiguration.speakingRate,
+                pitch = ttsConfiguration.pitch,
+                volume = ttsConfiguration.volume,
+                audioFormat = ttsConfiguration.audioFormat,
+                sampleRate = if (ttsConfiguration.audioFormat == AudioFormat.PCM) 16000 else 44100,
+                useSSML = input.ssml != null
+            )
             _currentOptions.value = options
 
-            // Perform synthesis using iOS-compatible interface
+            // Perform synthesis
             val audioData = service?.synthesize(
-                text = input.textToSynthesize,
+                text = textToSynthesize,
                 options = options
             ) ?: throw SDKError.ComponentFailure("TTS service not initialized")
 
-            // Calculate processing metrics
-            val processingTime = getCurrentTimeMillis() - startTime
-            val estimatedDuration = estimateAudioDuration(audioData, options.audioFormat)
+            // Calculate processing time (iOS pattern - in seconds)
+            val processingTimeMs = getCurrentTimeMillis() - startTime
+            val processingTime = processingTimeMs / 1000.0
 
-            // Create comprehensive output with metadata (iOS compatible with AudioFormat)
+            // Estimate audio duration
+            val duration = estimateAudioDuration(audioData, ttsConfiguration.audioFormat)
+
+            // Create metadata (iOS pattern)
+            val metadata = SynthesisMetadata(
+                voice = options.voice ?: ttsConfiguration.voice,
+                language = options.language,
+                processingTime = processingTime,
+                characterCount = textToSynthesize.length
+            )
+
+            // Create output (iOS pattern)
             TTSOutput(
                 audioData = audioData,
-                format = options.audioFormat, // iOS-compatible AudioFormat
-                duration = estimatedDuration,
-                metadata = SynthesisMetadata(
-                    voice = options.effectiveVoice,
-                    language = options.language,
-                    processingTimeMs = processingTime,
-                    audioFormat = options.audioFormat, // iOS-compatible AudioFormat
-                    sampleRate = options.sampleRate,
-                    originalText = input.text,
-                    processedText = input.textToSynthesize,
-                    synthesizedAt = getCurrentTimeMillis()
-                )
+                format = ttsConfiguration.audioFormat,
+                duration = duration,
+                phonemeTimestamps = null,  // Would be extracted from service if available
+                metadata = metadata
             )
         } finally {
             _isSynthesizing.value = false
@@ -185,33 +199,21 @@ class TTSComponent(
     }
 
     /**
-     * Synthesize with SSML markup (enhanced processing)
+     * Synthesize with SSML markup - aligned with iOS synthesizeSSML()
      */
     suspend fun synthesizeSSML(
         ssml: String,
-        options: TTSOptions = TTSOptions()
+        voice: String? = null,
+        language: String? = null
     ): TTSOutput {
         ensureReady()
 
-        if (!ttsConfiguration.enableSSML) {
-            throw SDKError.ConfigurationError("SSML is not enabled in configuration")
-        }
-
-        // Parse and validate SSML
-        val parsedSSML = ssmlProcessor.parse(ssml)
-        val validationResult = ssmlProcessor.validate(ssml)
-
-        if (!validationResult.isValid) {
-            throw SDKError.InvalidInput("Invalid SSML: ${validationResult.errors.joinToString(", ")}")
-        }
-
-        // Create input with processed text
+        // Create input with SSML - iOS pattern: text is empty, ssml contains markup
         val input = TTSInput(
-            text = ssml,
-            textToSynthesize = parsedSSML.plainText,
-            isSSML = true,
-            voiceId = options.voice.id,
-            language = options.language
+            text = "",
+            ssml = ssml,
+            voiceId = voice,
+            language = language
         )
 
         return synthesize(input)
@@ -299,75 +301,57 @@ class TTSComponent(
     // MARK: - Private Helper Methods
 
     /**
-     * Create TTSOptions from TTSInput (iOS-style options creation)
-     * Note: The voiceId is set to the model path (ttsConfiguration.modelId) for ONNX models,
-     * similar to iOS where the voice field in TTSConfiguration contains the model path.
-     */
-    private fun createTTSOptions(input: TTSInput): TTSOptions {
-        val voice = if (input.voiceId != null) {
-            getAllVoices().find { it.id == input.voiceId } ?: TTSVoice.DEFAULT
-        } else {
-            ttsConfiguration.defaultVoice
-        }
-
-        // Use model ID from configuration as the voice ID for ONNX model path resolution
-        // This matches iOS behavior where configuration.voice contains the model path
-        val effectiveVoiceId = ttsConfiguration.modelId ?: input.voiceId
-
-        return TTSOptions(
-            voiceId = effectiveVoiceId,
-            voice = voice,
-            language = input.language ?: voice.language,
-            rate = ttsConfiguration.defaultRate,
-            pitch = ttsConfiguration.defaultPitch,
-            volume = ttsConfiguration.defaultVolume,
-            audioFormat = ttsConfiguration.audioFormat, // iOS-compatible AudioFormat
-            sampleRate = ttsConfiguration.sampleRate,
-            useSSML = input.isSSML
-        )
-    }
-
-    /**
-     * Estimate audio duration from byte array - iOS-compatible using AudioFormat
+     * Estimate audio duration from byte array - aligned with iOS estimateAudioDuration()
      */
     private fun estimateAudioDuration(audioData: ByteArray, format: AudioFormat): Double {
-        return when (format) {
-            AudioFormat.PCM, AudioFormat.WAV -> audioData.size.toDouble() / (16000 * 2) // 16-bit samples
-            AudioFormat.MP3, AudioFormat.AAC -> audioData.size.toDouble() / (16000 * 2) // Estimate for compressed
-            AudioFormat.FLAC, AudioFormat.OPUS -> audioData.size.toDouble() / (16000 * 2)
+        // iOS pattern: rough estimation based on format and typical bitrates
+        val bytesPerSecond = when (format) {
+            AudioFormat.PCM, AudioFormat.WAV -> 32000  // 16-bit PCM at 16kHz
+            AudioFormat.MP3 -> 16000                   // 128kbps MP3
+            else -> 32000
         }
+        return audioData.size.toDouble() / bytesPerSecond
     }
 }
 
 // MARK: - Structured I/O Models (iOS-style)
 
 /**
- * TTS Input model matching iOS TTSInput
+ * TTS Input model - aligned with iOS TTSInput
+ * iOS has: text, ssml, voiceId, language, options
  */
 @Serializable
 data class TTSInput(
-    val text: String,
-    val textToSynthesize: String = text,
-    val isSSML: Boolean = false,
-    val voiceId: String? = null,
-    val language: String? = null
+    val text: String,                      // iOS: text
+    val ssml: String? = null,              // iOS: ssml (optional SSML markup, overrides text)
+    val voiceId: String? = null,           // iOS: voiceId
+    val language: String? = null,          // iOS: language
+    val options: TTSOptions? = null        // iOS: options (custom options override)
 ) : ComponentInput {
     override fun validate() {
-        require(text.isNotBlank()) { "Text cannot be blank" }
-        require(textToSynthesize.isNotBlank()) { "Text to synthesize cannot be blank" }
+        // iOS: if text.isEmpty && ssml == nil, throw error
+        require(text.isNotEmpty() || ssml != null) { "TTSInput must contain either text or SSML" }
     }
+
+    /**
+     * Get the text to synthesize - SSML takes priority over text (iOS pattern)
+     */
+    val textToSynthesize: String
+        get() = ssml ?: text
 }
 
 /**
- * TTS Output model matching iOS TTSOutput with comprehensive metadata
+ * TTS Output model - aligned with iOS TTSOutput
+ * iOS has: audioData, format, duration, phonemeTimestamps, metadata, timestamp
  */
 @Serializable
 data class TTSOutput(
-    val audioData: ByteArray,
-    val format: AudioFormat, // iOS-compatible AudioFormat
-    val duration: Double,
-    val metadata: SynthesisMetadata,
-    override val timestamp: Long = getCurrentTimeMillis()
+    val audioData: ByteArray,                           // iOS: audioData as Data
+    val format: AudioFormat,                            // iOS: format as AudioFormat
+    val duration: Double,                               // iOS: duration as TimeInterval (seconds)
+    val phonemeTimestamps: List<PhonemeTimestamp>? = null, // iOS: phonemeTimestamps
+    val metadata: SynthesisMetadata,                    // iOS: metadata
+    override val timestamp: Long = getCurrentTimeMillis() // iOS: timestamp as Date
 ) : ComponentOutput {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -378,6 +362,7 @@ data class TTSOutput(
         if (!audioData.contentEquals(other.audioData)) return false
         if (format != other.format) return false
         if (duration != other.duration) return false
+        if (phonemeTimestamps != other.phonemeTimestamps) return false
         if (metadata != other.metadata) return false
         if (timestamp != other.timestamp) return false
 
@@ -388,6 +373,7 @@ data class TTSOutput(
         var result = audioData.contentHashCode()
         result = 31 * result + format.hashCode()
         result = 31 * result + duration.hashCode()
+        result = 31 * result + (phonemeTimestamps?.hashCode() ?: 0)
         result = 31 * result + metadata.hashCode()
         result = 31 * result + timestamp.hashCode()
         return result
@@ -395,144 +381,79 @@ data class TTSOutput(
 }
 
 /**
- * Synthesis metadata (iOS-style comprehensive tracking)
+ * Synthesis metadata - aligned with iOS SynthesisMetadata
+ * iOS has: voice (String), language, processingTime, characterCount, charactersPerSecond (computed)
  */
 @Serializable
 data class SynthesisMetadata(
-    val voice: TTSVoice,
+    val voice: String,                    // iOS: voice as String identifier
     val language: String,
-    val processingTimeMs: Long,
-    val audioFormat: AudioFormat, // iOS-compatible AudioFormat
-    val sampleRate: Int,
-    val originalText: String,
-    val processedText: String,
-    val synthesizedAt: Long,
-    val phonemeTimestamps: List<PhonemeTimestamp>? = null
-)
+    val processingTime: Double,           // iOS: processingTime as TimeInterval (seconds)
+    val characterCount: Int               // iOS: characterCount
+) {
+    /**
+     * Characters per second - computed from characterCount / processingTime (iOS pattern)
+     */
+    val charactersPerSecond: Double
+        get() = if (processingTime > 0) characterCount.toDouble() / processingTime else 0.0
+}
 
 /**
- * Phoneme timestamp for advanced TTS features
+ * Phoneme timestamp information - aligned with iOS PhonemeTimestamp
+ * iOS has: phoneme, startTime, endTime
  */
 @Serializable
 data class PhonemeTimestamp(
     val phoneme: String,
-    val startTime: Double,
-    val duration: Double
+    val startTime: Double,    // iOS: startTime as TimeInterval
+    val endTime: Double       // iOS: endTime as TimeInterval
 )
 
 /**
- * TTS Options matching iOS TTSOptions structure for full parity
- * Supports both string-based voice selection (iOS style) and rich TTSVoice objects (KMP style)
+ * TTS Options - aligned exactly with iOS TTSOptions
+ * iOS has: voice, language, rate, pitch, volume, audioFormat, sampleRate, useSSML
  */
 @Serializable
 data class TTSOptions(
-    // iOS-compatible voice selection - can be voice identifier string
-    val voiceId: String? = null,
-
-    // Rich voice object for KMP-style usage
-    val voice: TTSVoice = TTSVoice.DEFAULT,
-
-    // Core parameters matching iOS exactly
-    val language: String = "en-US",
-    val rate: Float = 1.0f,     // Speech rate (0.0 to 2.0, 1.0 is normal) - iOS compatible
-    val pitch: Float = 1.0f,    // Speech pitch (0.0 to 2.0, 1.0 is normal) - iOS compatible
-    val volume: Float = 1.0f,   // Speech volume (0.0 to 1.0) - iOS compatible
-
-    // Audio format - iOS compatible
-    val audioFormat: AudioFormat = AudioFormat.PCM,
-    val sampleRate: Int = 16000,
-
-    // SSML support - iOS compatible
-    val useSSML: Boolean = false
-) {
-    /**
-     * Get effective voice - prioritizes voiceId (iOS style) over voice object
-     */
-    val effectiveVoice: TTSVoice
-        get() = if (voiceId != null) {
-            TTSVoice(
-                id = voiceId,
-                name = voiceId,
-                language = language,
-                gender = TTSGender.NEUTRAL
-            )
-        } else {
-            voice
-        }
-
-    /**
-     * iOS-style constructor for string-based voice selection
-     */
-    constructor(
-        voice: String? = null,
-        language: String = "en-US",
-        rate: Float = 1.0f,
-        pitch: Float = 1.0f,
-        volume: Float = 1.0f,
-        audioFormat: AudioFormat = AudioFormat.PCM,
-        sampleRate: Int = 16000,
-        useSSML: Boolean = false
-    ) : this(
-        voiceId = voice,
-        voice = TTSVoice.DEFAULT,
-        language = language,
-        rate = rate,
-        pitch = pitch,
-        volume = volume,
-        audioFormat = audioFormat,
-        sampleRate = sampleRate,
-        useSSML = useSSML
-    )
-}
+    val voice: String? = null,             // iOS: voice (optional voice identifier)
+    val language: String = "en-US",        // iOS: language
+    val rate: Float = 1.0f,                // iOS: rate (0.0 to 2.0, 1.0 is normal)
+    val pitch: Float = 1.0f,               // iOS: pitch (0.0 to 2.0, 1.0 is normal)
+    val volume: Float = 1.0f,              // iOS: volume (0.0 to 1.0)
+    val audioFormat: AudioFormat = AudioFormat.PCM,  // iOS: audioFormat
+    val sampleRate: Int = 16000,           // iOS: sampleRate
+    val useSSML: Boolean = false           // iOS: useSSML
+)
 
 /**
- * TTS Voice configuration
+ * TTS Voice configuration - KMP extension for rich voice information
+ * Note: iOS only uses simple string voice identifiers, this is a KMP enhancement
  */
 @Serializable
 data class TTSVoice(
     val id: String,
     val name: String,
     val language: String,
-    val gender: TTSGender,
-    val style: TTSStyle = TTSStyle.NEUTRAL
+    val gender: TTSGender = TTSGender.NEUTRAL
 ) {
     companion object {
         val DEFAULT = TTSVoice(
             id = "default",
             name = "Default Voice",
             language = "en-US",
-            gender = TTSGender.NEUTRAL,
-            style = TTSStyle.NEUTRAL
+            gender = TTSGender.NEUTRAL
         )
     }
 }
 
 /**
- * TTS Gender types
+ * TTS Gender types - KMP extension for voice metadata
  */
 @Serializable
 enum class TTSGender {
     MALE,
     FEMALE,
     NEUTRAL
-}
-
-/**
- * TTS Style types
- */
-@Serializable
-enum class TTSStyle {
-    NEUTRAL,
-    CHEERFUL,
-    SAD,
-    ANGRY,
-    FEARFUL,
-    FRIENDLY,
-    HOPEFUL,
-    SHOUTING,
-    WHISPERING,
-    NEWSCAST,
-    CUSTOMER_SERVICE
 }
 
 /**
@@ -557,23 +478,24 @@ enum class AudioFormat {
 }
 
 /**
- * TTS Configuration
+ * TTS Configuration - aligned with iOS TTSConfiguration
+ * iOS has: voice, language, speakingRate, pitch, volume, audioFormat, useNeuralVoice, enableSSML
  */
 data class TTSConfiguration(
-    val modelId: String? = null,
-    val defaultVoice: TTSVoice = TTSVoice.DEFAULT,
-    val defaultRate: Float = 1.0f,
-    val defaultPitch: Float = 1.0f,
-    val defaultVolume: Float = 1.0f,
-    val audioFormat: AudioFormat = AudioFormat.PCM, // iOS-compatible AudioFormat
-    val sampleRate: Int = 16000, // Sample rate (iOS typically uses this)
-    val enableSSML: Boolean = true
+    val modelId: String? = null,                                    // Model path for ONNX models
+    val voice: String = "default",                                  // iOS: voice identifier string
+    val language: String = "en-US",                                 // iOS: language
+    val speakingRate: Float = 1.0f,                                 // iOS: speakingRate (0.5 to 2.0)
+    val pitch: Float = 1.0f,                                        // iOS: pitch (0.5 to 2.0)
+    val volume: Float = 1.0f,                                       // iOS: volume (0.0 to 1.0)
+    val audioFormat: AudioFormat = AudioFormat.PCM,                 // iOS: audioFormat
+    val useNeuralVoice: Boolean = true,                             // iOS: useNeuralVoice
+    val enableSSML: Boolean = false                                 // iOS: enableSSML (default false in iOS)
 ) : ComponentConfiguration {
     override fun validate() {
-        require(defaultRate > 0f && defaultRate <= 3f) { "Rate must be between 0 and 3" }
-        require(defaultPitch > 0f && defaultPitch <= 2f) { "Pitch must be between 0 and 2" }
-        require(defaultVolume >= 0f && defaultVolume <= 1f) { "Volume must be between 0 and 1" }
-        require(sampleRate > 0) { "Sample rate must be positive" }
+        require(speakingRate >= 0.5f && speakingRate <= 2.0f) { "Speaking rate must be between 0.5 and 2.0" }
+        require(pitch >= 0.5f && pitch <= 2.0f) { "Pitch must be between 0.5 and 2.0" }
+        require(volume >= 0f && volume <= 1f) { "Volume must be between 0.0 and 1.0" }
     }
 }
 
@@ -893,11 +815,11 @@ class StreamingTTSHandler(private val ttsService: TTSService) {
         config: TTSConfiguration?
     ): Boolean {
         val options = TTSOptions(
-            voiceId = config?.defaultVoice?.id,
-            language = config?.defaultVoice?.language ?: "en-US",
-            rate = config?.defaultRate ?: 1.0f,
-            pitch = config?.defaultPitch ?: 1.0f,
-            volume = config?.defaultVolume ?: 1.0f
+            voice = config?.voice,
+            language = config?.language ?: "en-US",
+            rate = config?.speakingRate ?: 1.0f,
+            pitch = config?.pitch ?: 1.0f,
+            volume = config?.volume ?: 1.0f
         )
 
         return processToken(text, options)
@@ -957,101 +879,5 @@ class StreamingTTSHandler(private val ttsService: TTSService) {
     }
 }
 
-// MARK: - SSML Processing (Enhanced from basic regex)
-
-/**
- * SSML Processor interface - comprehensive SSML support
- */
-interface SSMLProcessor {
-    fun parse(ssml: String): ParsedSSML
-    fun validate(ssml: String): ValidationResult
-    fun extractPlainText(ssml: String): String
-}
-
-/**
- * Default SSML processor implementation
- */
-class DefaultSSMLProcessor : SSMLProcessor {
-    override fun parse(ssml: String): ParsedSSML {
-        // Enhanced SSML parsing - for now, basic implementation
-        val plainText = extractPlainText(ssml)
-        return ParsedSSML(
-            plainText = plainText,
-            prosodyTags = extractProsodyTags(ssml),
-            voiceTags = extractVoiceTags(ssml)
-        )
-    }
-
-    override fun validate(ssml: String): ValidationResult {
-        val errors = mutableListOf<String>()
-
-        // Basic validation - check for balanced tags
-        if (!areTagsBalanced(ssml)) {
-            errors.add("Unbalanced SSML tags")
-        }
-
-        return ValidationResult(
-            isValid = errors.isEmpty(),
-            errors = errors
-        )
-    }
-
-    override fun extractPlainText(ssml: String): String {
-        return ssml.replace(Regex("<[^>]*>"), "").trim()
-    }
-
-    private fun extractProsodyTags(ssml: String): List<ProsodyTag> {
-        // Implementation for extracting prosody information
-        return emptyList()
-    }
-
-    private fun extractVoiceTags(ssml: String): List<VoiceTag> {
-        // Implementation for extracting voice information
-        return emptyList()
-    }
-
-    private fun areTagsBalanced(ssml: String): Boolean {
-        // Basic implementation - count opening and closing tags
-        val openTags = Regex("<[^/][^>]*>").findAll(ssml).count()
-        val closeTags = Regex("</[^>]*>").findAll(ssml).count()
-        return openTags == closeTags
-    }
-}
-
-/**
- * Parsed SSML structure
- */
-@Serializable
-data class ParsedSSML(
-    val plainText: String,
-    val prosodyTags: List<ProsodyTag>,
-    val voiceTags: List<VoiceTag>
-)
-
-/**
- * SSML Validation result
- */
-data class ValidationResult(
-    val isValid: Boolean,
-    val errors: List<String>
-)
-
-/**
- * SSML Prosody tag information
- */
-@Serializable
-data class ProsodyTag(
-    val rate: String?,
-    val pitch: String?,
-    val volume: String?
-)
-
-/**
- * SSML Voice tag information
- */
-@Serializable
-data class VoiceTag(
-    val name: String?,
-    val gender: String?,
-    val age: String?
-)
+// Note: SSML processing is handled by the underlying TTS service
+// iOS simply passes SSML markup to the service via useSSML flag in TTSOptions

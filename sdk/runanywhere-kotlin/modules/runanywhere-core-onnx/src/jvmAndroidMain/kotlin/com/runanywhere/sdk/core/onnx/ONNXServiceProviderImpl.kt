@@ -374,7 +374,8 @@ private class ONNXSTTServiceWrapper(
     override val supportsStreaming: Boolean
         get() = coreService.supportsSTTStreaming
 
-    override val supportedLanguages: List<String> = listOf("en", "es", "fr", "de", "it", "pt", "zh", "ja", "ko")
+    // Kotlin-specific: supported languages for this implementation
+    val supportedLanguages: List<String> = listOf("en", "es", "fr", "de", "it", "pt", "zh", "ja", "ko")
 
     override suspend fun initialize(modelPath: String?) {
         modelPath?.let { path ->
@@ -470,7 +471,8 @@ private class ONNXSTTServiceWrapper(
         return finalResult
     }
 
-    override fun transcribeStream(
+    // Kotlin-specific: Enhanced streaming with typed events
+    fun transcribeStream(
         audioStream: Flow<ByteArray>,
         options: STTStreamingOptions
     ): Flow<STTStreamEvent> {
@@ -533,12 +535,14 @@ private class ONNXSTTServiceWrapper(
         }
     }
 
-    override suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
+    // Kotlin-specific: Language detection
+    suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
         // ONNX doesn't support standalone language detection - return default
         return mapOf("en" to 1.0f)
     }
 
-    override fun supportsLanguage(languageCode: String): Boolean {
+    // Kotlin-specific: Language support check
+    fun supportsLanguage(languageCode: String): Boolean {
         return supportedLanguages.contains(languageCode.lowercase().take(2))
     }
 

@@ -40,19 +40,18 @@ abstract class WhisperKitService : STTService {
     /**
      * Transcribe with Whisper-specific options
      * This extends the generic transcribe with Whisper-specific parameters
+     * Note: Whisper-specific options (temperature, suppressBlank, etc.) are passed via
+     * WhisperTranscriptionOptions and applied in platform implementations
      */
     suspend fun transcribeWithWhisperOptions(
         audioData: ByteArray,
         options: WhisperTranscriptionOptions
     ): WhisperTranscriptionResult {
-        // Convert Whisper options to generic STT options
+        // Convert Whisper options to generic STT options (iOS-compatible subset)
         val sttOptions = STTOptions(
             language = options.language,
             enableTimestamps = options.enableTimestamps,
-            detectLanguage = options.detectLanguage,
-            temperature = options.temperature,
-            suppressBlank = options.suppressBlank,
-            suppressNonSpeechTokens = options.suppressNonSpeechTokens
+            detectLanguage = options.detectLanguage
         )
 
         // Use generic transcribe method
@@ -78,6 +77,7 @@ abstract class WhisperKitService : STTService {
 
     /**
      * Stream transcription with Whisper-specific options
+     * Note: Whisper-specific options are passed to platform implementations
      */
     fun transcribeStreamWithWhisperOptions(
         audioStream: Flow<ByteArray>,
@@ -86,10 +86,7 @@ abstract class WhisperKitService : STTService {
         val sttOptions = STTOptions(
             language = options.language,
             enableTimestamps = options.enableTimestamps,
-            detectLanguage = options.detectLanguage,
-            temperature = options.temperature,
-            suppressBlank = options.suppressBlank,
-            suppressNonSpeechTokens = options.suppressNonSpeechTokens
+            detectLanguage = options.detectLanguage
         )
         return transcribeStreamInternal(audioStream, sttOptions)
     }

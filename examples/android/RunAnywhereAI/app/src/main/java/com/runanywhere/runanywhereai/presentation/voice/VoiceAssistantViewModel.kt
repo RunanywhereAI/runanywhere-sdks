@@ -515,6 +515,11 @@ class VoiceAssistantViewModel(
      */
     private fun handlePipelineEvent(event: ModularPipelineEvent) {
         when (event) {
+            // VAD Audio Level - iOS Reference: case .vadAudioLevel(let level):
+            is ModularPipelineEvent.vadAudioLevel -> {
+                Log.d(TAG, "Audio level: ${event.level}")
+                _uiState.update { it.copy(audioLevel = event.level) }
+            }
             ModularPipelineEvent.vadSpeechStart -> {
                 Log.i(TAG, "Speech started")
                 _uiState.update {
@@ -529,6 +534,9 @@ class VoiceAssistantViewModel(
                 Log.i(TAG, "Speech ended")
                 _uiState.update { it.copy(isSpeechDetected = false) }
             }
+            // TODO: Audio Control Events - not yet implemented in Kotlin SDK
+            // iOS Reference: case .audioControlPauseRecording / .audioControlResumeRecording
+            // When SDK adds these events, add handlers to pause/resume microphone during TTS
             is ModularPipelineEvent.sttPartialTranscript -> {
                 Log.d(TAG, "Partial transcript: ${event.partial}")
                 _uiState.update { it.copy(currentTranscript = event.partial) }

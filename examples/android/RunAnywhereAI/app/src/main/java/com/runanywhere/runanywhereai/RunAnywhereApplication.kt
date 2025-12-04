@@ -15,6 +15,9 @@ import com.runanywhere.sdk.llm.llamacpp.LlamaCppAdapter
 import com.runanywhere.sdk.core.onnx.ONNXAdapter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -28,7 +31,30 @@ import kotlinx.coroutines.withContext
  * - ModelFormat enum for format specification
  * - ModelRegistration data class for model registration
  */
+/**
+ * Represents the SDK initialization state.
+ * Matches iOS pattern: isSDKInitialized + initializationError conditional rendering.
+ */
+sealed class SDKInitializationState {
+    /** SDK is currently initializing */
+    data object Loading : SDKInitializationState()
+
+    /** SDK initialized successfully */
+    data object Ready : SDKInitializationState()
+
+    /** SDK initialization failed */
+    data class Error(val error: Throwable) : SDKInitializationState()
+}
+
 class RunAnywhereApplication : Application() {
+
+    companion object {
+        private var instance: RunAnywhereApplication? = null
+
+        /** Get the application instance */
+        fun getInstance(): RunAnywhereApplication =
+            instance ?: throw IllegalStateException("Application not initialized")
+    }
 
     @Volatile
     private var isSDKInitialized = false
@@ -36,7 +62,12 @@ class RunAnywhereApplication : Application() {
     @Volatile
     private var initializationError: Throwable? = null
 
+    /** Observable SDK initialization state for Compose UI - matches iOS pattern */
+    private val _initializationState = MutableStateFlow<SDKInitializationState>(SDKInitializationState.Loading)
+    val initializationState: StateFlow<SDKInitializationState> = _initializationState.asStateFlow()
+
     override fun onCreate() {
+        instance = this
         super.onCreate()
 
         Log.i("RunAnywhereApp", "🏁 App launched, initializing SDK...")
@@ -146,6 +177,18 @@ class RunAnywhereApplication : Application() {
         Log.i("RunAnywhereApp", "🎯 SDK Status: Active=${RunAnywhere.isInitialized}")
 
         isSDKInitialized = RunAnywhere.isInitialized
+
+        // Update observable state for Compose UI - matches iOS conditional rendering
+        if (isSDKInitialized) {
+            _initializationState.value = SDKInitializationState.Ready
+            Log.i("RunAnywhereApp", "🎉 App is ready to use!")
+        } else if (initializationError != null) {
+            _initializationState.value = SDKInitializationState.Error(initializationError!!)
+        } else {
+            // SDK reported not initialized but no error - treat as ready for offline mode
+            _initializationState.value = SDKInitializationState.Ready
+            Log.i("RunAnywhereApp", "🎉 App is ready to use (offline mode)!")
+        }
     }
 
     /**
@@ -419,9 +462,10 @@ class RunAnywhereApplication : Application() {
     fun getInitializationError(): Throwable? = initializationError
 
     /**
-     * Retry SDK initialization
+     * Retry SDK initialization - matches iOS retryInitialization() pattern
      */
     suspend fun retryInitialization() {
+        _initializationState.value = SDKInitializationState.Loading
         withContext(Dispatchers.IO) {
             initializeSDK()
         }

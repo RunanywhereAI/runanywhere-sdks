@@ -105,6 +105,9 @@ object AppColors {
     val statusGray = Color.Gray
     val statusBlue = primaryBlue
 
+    // Warning color - matches iOS orange for error states
+    val warningOrange = primaryOrange
+
     // ====================
     // SHADOW COLORS
     // ====================
