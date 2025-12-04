@@ -13,7 +13,6 @@ import com.runanywhere.sdk.components.stt.AudioFormat
 import com.runanywhere.sdk.components.stt.STTComponent
 import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.stt.STTOptions
-import com.runanywhere.sdk.components.stt.STTStreamEvent
 import com.runanywhere.sdk.models.lifecycle.Modality
 import com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker
 import com.runanywhere.sdk.foundation.ServiceContainer
@@ -388,11 +387,12 @@ class SpeechToTextViewModel : ViewModel() {
                 }
 
                 // Use SDK's streaming transcription
+                // SDK now returns Flow<String> (matching iOS simplified API)
                 component.streamTranscribe(
                     audioStream = audioFlow,
                     language = _uiState.value.language
-                ).collect { event ->
-                    handleSTTStreamEvent(event)
+                ).collect { text ->
+                    handleSTTStreamText(text)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 // Expected when stopping recording - not an error
@@ -411,53 +411,24 @@ class SpeechToTextViewModel : ViewModel() {
     }
 
     /**
-     * Handle STT stream events during live transcription
-     * iOS Reference: Event handling in streaming task
+     * Handle STT stream text during live transcription
+     * SDK now returns Flow<String> (matching iOS simplified API)
      */
-    private fun handleSTTStreamEvent(event: STTStreamEvent) {
-        when (event) {
-            is STTStreamEvent.PartialTranscription -> {
-                // Filter out placeholder "..." - only update UI with actual transcription text
-                // This matches iOS behavior where partials are only emitted with real text
-                if (event.text.isNotBlank() && event.text != "...") {
-                    val wordCount = event.text.trim().split("\\s+".toRegex()).size
-                    _uiState.update {
-                        it.copy(
-                            transcription = event.text,
-                            metrics = TranscriptionMetrics(
-                                confidence = event.confidence,
-                                wordCount = wordCount
-                            )
-                        )
-                    }
-                    Log.d(TAG, "Partial transcription: ${event.text}")
-                }
-            }
-            is STTStreamEvent.FinalTranscription -> {
-                val result = event.result
-                val wordCount = result.transcript.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
-                _uiState.update {
-                    it.copy(
-                        transcription = result.transcript,
-                        metrics = TranscriptionMetrics(
-                            confidence = result.confidence ?: 0f,
-                            audioDurationMs = 0.0, // Not available in stream result
-                            inferenceTimeMs = 0.0,
-                            detectedLanguage = result.language ?: "",
-                            wordCount = wordCount
-                        )
+    private fun handleSTTStreamText(text: String) {
+        // Filter out placeholder "..." - only update UI with actual transcription text
+        // This matches iOS behavior where partials are only emitted with real text
+        if (text.isNotBlank() && text != "...") {
+            val wordCount = text.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+            _uiState.update {
+                it.copy(
+                    transcription = text,
+                    metrics = TranscriptionMetrics(
+                        confidence = 0f, // Not available in simplified API
+                        wordCount = wordCount
                     )
-                }
-                Log.i(TAG, "Final: ${result.transcript}")
+                )
             }
-            is STTStreamEvent.AudioLevelChanged -> {
-                _uiState.update { it.copy(audioLevel = event.level) }
-            }
-            is STTStreamEvent.Error -> {
-                _uiState.update { it.copy(errorMessage = event.error.message) }
-                Log.e(TAG, "STT Error: ${event.error}")
-            }
-            else -> { /* Ignore other events */ }
+            Log.d(TAG, "Stream transcription: $text")
         }
     }
 

@@ -215,7 +215,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
     actual override val currentModel: String?
         get() = modelPath?.split("/")?.lastOrNull()
 
-    actual override suspend fun process(input: LLMInput): LLMOutput {
+    actual suspend fun process(input: LLMInput): LLMOutput {
         if (!isServiceInitialized) {
             throw IllegalStateException("LlamaCppService not initialized")
         }
@@ -275,7 +275,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         )
     }
 
-    actual override fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
+    actual fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
         if (!isServiceInitialized) {
             throw IllegalStateException("LlamaCppService not initialized")
         }
@@ -318,23 +318,23 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         }
     }
 
-    actual override suspend fun loadModel(modelInfo: ModelInfo) {
+    actual suspend fun loadModel(modelInfo: ModelInfo) {
         val localPath = modelInfo.localPath ?: throw IllegalArgumentException("Model has no local path")
         initialize(localPath)
     }
 
-    actual override fun cancelCurrent() {
+    actual fun cancelCurrent() {
         if (isServiceInitialized) {
             coreService.cancel()
             logger.info("Cancellation requested")
         }
     }
 
-    actual override fun getTokenCount(text: String): Int {
+    actual fun getTokenCount(text: String): Int {
         return estimateTokenCount(text)
     }
 
-    actual override fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
+    actual fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
         val promptTokens = estimateTokenCount(prompt)
         val totalTokens = promptTokens + maxTokens
         return totalTokens <= configuration.contextLength

@@ -40,13 +40,6 @@ class JvmWhisperSTTService : STTService {
     override val currentModel: String?
         get() = currentModelPath
 
-    override val supportedLanguages: List<String>
-        get() = listOf(
-            "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr",
-            "pl", "ca", "nl", "ar", "sv", "it", "id", "hi", "fi", "vi",
-            "he", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no"
-        )
-
     override suspend fun initialize(modelPath: String?) {
         withContext(Dispatchers.IO) {
             try {
@@ -276,42 +269,6 @@ class JvmWhisperSTTService : STTService {
         }
 
         return lastResult
-    }
-
-    override fun transcribeStream(
-        audioStream: Flow<ByteArray>,
-        options: STTStreamingOptions
-    ): Flow<STTStreamEvent> = flow {
-        // For now, convert STTOptions to our internal streaming
-        val sttOptions = STTOptions(
-            language = options.language ?: "auto",
-            enableTimestamps = false // Simplified for streaming
-        )
-
-        emit(STTStreamEvent.SpeechStarted)
-
-        try {
-            transcribeStreamInternal(audioStream, sttOptions).collect { result ->
-                emit(STTStreamEvent.PartialTranscription(
-                    text = result.transcript,
-                    confidence = result.confidence ?: 0.9f,
-                    isFinal = false
-                ))
-            }
-
-            emit(STTStreamEvent.SpeechEnded)
-        } catch (e: Exception) {
-            emit(STTStreamEvent.Error(STTError.transcriptionFailed(e)))
-        }
-    }
-
-    override suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
-        // Basic implementation - in production this would use language detection
-        return mapOf("en" to 0.8f, "es" to 0.1f, "fr" to 0.1f)
-    }
-
-    override fun supportsLanguage(languageCode: String): Boolean {
-        return supportedLanguages.contains(languageCode.lowercase())
     }
 
     override suspend fun cleanup() {

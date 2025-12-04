@@ -291,14 +291,9 @@ class AndroidTTSService(private val context: Context) : TTSService {
                 logger.warn("Failed to set language: ${options.language}")
             }
 
-            // Set voice if specified
-            options.voiceId?.let { voiceId ->
+            // Set voice if specified (iOS pattern: voice is optional string ID)
+            options.voice?.let { voiceId ->
                 setVoiceById(voiceId)
-            } ?: run {
-                // Try to set voice from the TTSVoice object
-                if (options.voice.id != "default") {
-                    setVoiceById(options.voice.id)
-                }
             }
         }
     }

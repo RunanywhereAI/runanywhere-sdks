@@ -372,8 +372,8 @@ class VoiceAgentComponent(
         return try {
             val ttsOutput = tts.synthesize(
                 text = text,
-                voice = agentConfiguration.ttsConfig.defaultVoice.id,
-                language = agentConfiguration.ttsConfig.defaultVoice.language
+                voice = agentConfiguration.ttsConfig.voice,
+                language = agentConfiguration.ttsConfig.language
             )
             ttsOutput.audioData.takeIf { it.isNotEmpty() }
         } catch (e: Exception) {
