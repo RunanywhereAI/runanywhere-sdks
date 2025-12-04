@@ -2,6 +2,8 @@
 
 On-device AI with intelligent routing between on-device and cloud execution for optimal cost and privacy.
 
+> **📖 Complete Documentation**: See [STATUS.md](./STATUS.md) for comprehensive status, architecture, Swift SDK alignment, and implementation details.
+
 ## Installation
 
 ```bash

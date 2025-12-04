@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <optional>
 #include <vector>
+#include <mutex>
 
 #include <jsi/jsi.h>
 #include <ReactCommon/TurboModule.h>
@@ -250,6 +251,34 @@ private:
 
     /// Number of active event listeners
     int listenerCount_ = 0;
+
+    // ============================================================================
+    // Event Queue System (Thread-Safe)
+    // ============================================================================
+
+    /// Represents a pending event to emit to JavaScript
+    struct PendingEvent {
+        std::string eventName;
+        std::string eventData;
+    };
+
+    /// Queue of events pending emission to JS (protected by mutex)
+    std::vector<PendingEvent> eventQueue_;
+
+    /// Mutex for thread-safe access to eventQueue_
+    std::mutex eventQueueMutex_;
+
+    /**
+     * Poll and drain all pending events.
+     * Called from JavaScript to retrieve queued events.
+     * @return JSON array string of pending events
+     */
+    std::string pollEvents();
+
+    /**
+     * Clear all pending events (for cleanup)
+     */
+    void clearEventQueue();
 };
 
 } // namespace facebook::react

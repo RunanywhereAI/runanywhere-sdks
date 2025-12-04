@@ -329,6 +329,48 @@ jsi::Value RunAnywhereModule::get(jsi::Runtime& rt, const jsi::PropNameID& name)
             });
     }
 
+    if (propName == "supportsSTTStreaming") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(supportsSTTStreaming(rt));
+            });
+    }
+
+    if (propName == "isSTTReady") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 1,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                return jsi::Value(isSTTReady(rt, static_cast<int>(args[0].asNumber())));
+            });
+    }
+
+    if (propName == "isSTTEndpoint") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 1,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                return jsi::Value(isSTTEndpoint(rt, static_cast<int>(args[0].asNumber())));
+            });
+    }
+
+    if (propName == "finishSTTInput") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 1,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                finishSTTInput(rt, static_cast<int>(args[0].asNumber()));
+                return jsi::Value::undefined();
+            });
+    }
+
+    if (propName == "resetSTTStream") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 1,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                resetSTTStream(rt, static_cast<int>(args[0].asNumber()));
+                return jsi::Value::undefined();
+            });
+    }
+
     // TTS Methods
     if (propName == "loadTTSModel") {
         return jsi::Function::createFromHostFunction(
@@ -357,6 +399,61 @@ jsi::Value RunAnywhereModule::get(jsi::Runtime& rt, const jsi::PropNameID& name)
             });
     }
 
+    if (propName == "isTTSModelLoaded") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(isTTSModelLoaded(rt));
+            });
+    }
+
+    if (propName == "unloadTTSModel") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(unloadTTSModel(rt));
+            });
+    }
+
+    if (propName == "supportsTTSStreaming") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(supportsTTSStreaming(rt));
+            });
+    }
+
+    if (propName == "synthesizeStream") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 4,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                std::optional<std::string> voiceId;
+                if (!args[1].isNull() && !args[1].isUndefined()) {
+                    voiceId = args[1].asString(rt).utf8(rt);
+                }
+                synthesizeStream(rt, args[0].asString(rt).utf8(rt), voiceId,
+                                args[2].asNumber(), args[3].asNumber());
+                return jsi::Value::undefined();
+            });
+    }
+
+    if (propName == "getTTSVoices") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::String::createFromUtf8(rt, getTTSVoices(rt));
+            });
+    }
+
+    if (propName == "cancelTTS") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                cancelTTS(rt);
+                return jsi::Value::undefined();
+            });
+    }
+
     // VAD Methods
     if (propName == "loadVADModel") {
         return jsi::Function::createFromHostFunction(
@@ -380,6 +477,152 @@ jsi::Value RunAnywhereModule::get(jsi::Runtime& rt, const jsi::PropNameID& name)
             });
     }
 
+    if (propName == "isVADModelLoaded") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(isVADModelLoaded(rt));
+            });
+    }
+
+    if (propName == "unloadVADModel") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(unloadVADModel(rt));
+            });
+    }
+
+    if (propName == "detectVADSegments") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 2,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                return jsi::String::createFromUtf8(
+                    rt, detectVADSegments(rt, args[0].asString(rt).utf8(rt),
+                                         static_cast<int>(args[1].asNumber())));
+            });
+    }
+
+    if (propName == "resetVAD") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                resetVAD(rt);
+                return jsi::Value::undefined();
+            });
+    }
+
+    // Embeddings Methods
+    if (propName == "loadEmbeddingsModel") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 2,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                std::optional<std::string> config;
+                if (!args[1].isNull() && !args[1].isUndefined()) {
+                    config = args[1].asString(rt).utf8(rt);
+                }
+                return jsi::Value(loadEmbeddingsModel(rt, args[0].asString(rt).utf8(rt), config));
+            });
+    }
+
+    if (propName == "isEmbeddingsModelLoaded") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(isEmbeddingsModelLoaded(rt));
+            });
+    }
+
+    if (propName == "unloadEmbeddingsModel") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(unloadEmbeddingsModel(rt));
+            });
+    }
+
+    if (propName == "embedText") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 1,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                return jsi::String::createFromUtf8(
+                    rt, embedText(rt, args[0].asString(rt).utf8(rt)));
+            });
+    }
+
+    if (propName == "embedBatch") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 1,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                std::vector<std::string> texts;
+                if (args[0].isObject()) {
+                    auto arr = args[0].asObject(rt).asArray(rt);
+                    for (size_t i = 0; i < arr.length(rt); i++) {
+                        texts.push_back(arr.getValueAtIndex(rt, i).asString(rt).utf8(rt));
+                    }
+                }
+                return jsi::String::createFromUtf8(rt, embedBatch(rt, texts));
+            });
+    }
+
+    if (propName == "getEmbeddingDimensions") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(getEmbeddingDimensions(rt));
+            });
+    }
+
+    // Diarization Methods
+    if (propName == "loadDiarizationModel") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 2,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                std::optional<std::string> config;
+                if (!args[1].isNull() && !args[1].isUndefined()) {
+                    config = args[1].asString(rt).utf8(rt);
+                }
+                return jsi::Value(loadDiarizationModel(rt, args[0].asString(rt).utf8(rt), config));
+            });
+    }
+
+    if (propName == "isDiarizationModelLoaded") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(isDiarizationModelLoaded(rt));
+            });
+    }
+
+    if (propName == "unloadDiarizationModel") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::Value(unloadDiarizationModel(rt));
+            });
+    }
+
+    if (propName == "diarize") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 4,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                return jsi::String::createFromUtf8(
+                    rt, diarize(rt, args[0].asString(rt).utf8(rt),
+                               static_cast<int>(args[1].asNumber()),
+                               static_cast<int>(args[2].asNumber()),
+                               static_cast<int>(args[3].asNumber())));
+            });
+    }
+
+    if (propName == "cancelDiarization") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                cancelDiarization(rt);
+                return jsi::Value::undefined();
+            });
+    }
+
     // Utilities
     if (propName == "getLastError") {
         return jsi::Function::createFromHostFunction(
@@ -394,6 +637,15 @@ jsi::Value RunAnywhereModule::get(jsi::Runtime& rt, const jsi::PropNameID& name)
             rt, name, 0,
             [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
                 return jsi::String::createFromUtf8(rt, getVersion(rt));
+            });
+    }
+
+    if (propName == "extractArchive") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 2,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
+                return jsi::Value(extractArchive(rt, args[0].asString(rt).utf8(rt),
+                                               args[1].asString(rt).utf8(rt)));
             });
     }
 
@@ -416,12 +668,29 @@ jsi::Value RunAnywhereModule::get(jsi::Runtime& rt, const jsi::PropNameID& name)
             });
     }
 
+    if (propName == "pollEvents") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                return jsi::String::createFromUtf8(rt, pollEvents());
+            });
+    }
+
+    if (propName == "clearEventQueue") {
+        return jsi::Function::createFromHostFunction(
+            rt, name, 0,
+            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
+                clearEventQueue();
+                return jsi::Value::undefined();
+            });
+    }
+
     return jsi::Value::undefined();
 }
 
 std::vector<jsi::PropNameID> RunAnywhereModule::getPropertyNames(jsi::Runtime& rt) {
     std::vector<jsi::PropNameID> props;
-    props.reserve(35);
+    props.reserve(62);
 
     // Backend Lifecycle
     props.push_back(jsi::PropNameID::forUtf8(rt, "createBackend"));
@@ -441,27 +710,64 @@ std::vector<jsi::PropNameID> RunAnywhereModule::getPropertyNames(jsi::Runtime& r
     props.push_back(jsi::PropNameID::forUtf8(rt, "generate"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "generateStream"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "cancelGeneration"));
-    // STT
+    // STT (13 methods)
     props.push_back(jsi::PropNameID::forUtf8(rt, "loadSTTModel"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "isSTTModelLoaded"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "unloadSTTModel"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "transcribe"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "supportsSTTStreaming"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "createSTTStream"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "feedSTTAudio"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "decodeSTT"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "isSTTReady"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "isSTTEndpoint"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "finishSTTInput"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "resetSTTStream"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "destroySTTStream"));
-    // TTS
+
+    // TTS (8 methods)
     props.push_back(jsi::PropNameID::forUtf8(rt, "loadTTSModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "isTTSModelLoaded"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadTTSModel"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "synthesize"));
-    // VAD
+    props.push_back(jsi::PropNameID::forUtf8(rt, "supportsTTSStreaming"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "synthesizeStream"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "getTTSVoices"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "cancelTTS"));
+
+    // VAD (6 methods)
     props.push_back(jsi::PropNameID::forUtf8(rt, "loadVADModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "isVADModelLoaded"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadVADModel"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "processVAD"));
-    // Utilities
+    props.push_back(jsi::PropNameID::forUtf8(rt, "detectVADSegments"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "resetVAD"));
+
+    // Embeddings (6 methods)
+    props.push_back(jsi::PropNameID::forUtf8(rt, "loadEmbeddingsModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "isEmbeddingsModelLoaded"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadEmbeddingsModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "embedText"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "embedBatch"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "getEmbeddingDimensions"));
+
+    // Diarization (5 methods)
+    props.push_back(jsi::PropNameID::forUtf8(rt, "loadDiarizationModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "isDiarizationModelLoaded"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadDiarizationModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "diarize"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "cancelDiarization"));
+
+    // Utilities (3 methods)
     props.push_back(jsi::PropNameID::forUtf8(rt, "getLastError"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "getVersion"));
-    // Events
+    props.push_back(jsi::PropNameID::forUtf8(rt, "extractArchive"));
+
+    // Events (4 methods)
     props.push_back(jsi::PropNameID::forUtf8(rt, "addListener"));
     props.push_back(jsi::PropNameID::forUtf8(rt, "removeListeners"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "pollEvents"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "clearEventQueue"));
 
     return props;
 }
@@ -1024,8 +1330,50 @@ std::string RunAnywhereModule::embedText(jsi::Runtime& rt, const std::string& te
 
 std::string RunAnywhereModule::embedBatch(jsi::Runtime& rt,
                                            const std::vector<std::string>& texts) {
-    // TODO: Implement batch embeddings
-    return "{\"error\": \"Batch embedding not yet implemented\"}";
+    if (!backend_) {
+        return "{\"error\": \"Backend not initialized\"}";
+    }
+
+    if (texts.empty()) {
+        return "{\"error\": \"No texts provided for embedding\"}";
+    }
+
+    // Convert std::vector<std::string> to const char** array
+    std::vector<const char*> textPtrs;
+    textPtrs.reserve(texts.size());
+    for (const auto& text : texts) {
+        textPtrs.push_back(text.c_str());
+    }
+
+    float** embeddings = nullptr;
+    int dimensions = 0;
+
+    ra_result_code result = ra_embed_batch(backend_, textPtrs.data(), texts.size(), &embeddings, &dimensions);
+
+    if (result != RA_SUCCESS || !embeddings) {
+        return std::string("{\"error\": \"") + (ra_get_last_error() ? ra_get_last_error() : "Batch embedding failed") + "\"}";
+    }
+
+    // Build JSON array of embeddings
+    std::ostringstream json;
+    json << "{\"embeddings\": [";
+
+    for (int i = 0; i < static_cast<int>(texts.size()); i++) {
+        json << "[";
+        for (int j = 0; j < dimensions; j++) {
+            json << embeddings[i][j];
+            if (j < dimensions - 1) json << ",";
+        }
+        json << "]";
+        if (i < static_cast<int>(texts.size()) - 1) json << ",";
+    }
+
+    json << "], \"dimensions\": " << dimensions << "}";
+
+    // Free memory
+    ra_free_embeddings(embeddings, texts.size());
+
+    return json.str();
 }
 
 int RunAnywhereModule::getEmbeddingDimensions(jsi::Runtime& rt) {
@@ -1121,13 +1469,42 @@ void RunAnywhereModule::emitEvent(jsi::Runtime& rt, const std::string& eventName
                                    const std::string& eventData) {
     if (listenerCount_ <= 0) return;
 
-    // Use jsInvoker to safely call into JavaScript
-    if (jsInvoker_) {
-        jsInvoker_->invokeAsync([this, &rt, eventName, eventData]() {
-            // This will be called on the JS thread
-            // In a full implementation, we'd use RCTDeviceEventEmitter here
-        });
+    // FIXED: Thread-safe event queuing pattern
+    // Instead of capturing jsi::Runtime& by reference (which causes use-after-free),
+    // we queue the event and let JS poll for it on its own thread.
+    // This avoids any issues with RT lifetime and async callbacks.
+    {
+        std::lock_guard<std::mutex> lock(eventQueueMutex_);
+        eventQueue_.push_back(PendingEvent{eventName, eventData});
     }
+}
+
+std::string RunAnywhereModule::pollEvents() {
+    std::lock_guard<std::mutex> lock(eventQueueMutex_);
+
+    // Build JSON array of queued events
+    std::ostringstream oss;
+    oss << "[";
+
+    for (size_t i = 0; i < eventQueue_.size(); i++) {
+        if (i > 0) oss << ",";
+        const auto& event = eventQueue_[i];
+
+        // Escape event name for JSON
+        oss << "{\"eventName\":\"" << event.eventName << "\",\"eventData\":" << event.eventData << "}";
+    }
+
+    oss << "]";
+
+    // Clear the queue after draining
+    eventQueue_.clear();
+
+    return oss.str();
+}
+
+void RunAnywhereModule::clearEventQueue() {
+    std::lock_guard<std::mutex> lock(eventQueueMutex_);
+    eventQueue_.clear();
 }
 
 // ============================================================================
