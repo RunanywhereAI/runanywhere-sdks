@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -122,12 +124,12 @@ actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTSer
     return wrapper
 }
 
-// Cached ONNX TTS service for reuse (thread-safe access via synchronized blocks)
+// Cached ONNX TTS service for reuse (thread-safe access via Mutex)
 @Volatile
 private var cachedTTSCoreService: ONNXCoreService? = null
 @Volatile
 private var cachedTTSModelPath: String? = null
-private val ttsCacheLock = Any()  // Lock object for thread-safe cache access
+private val ttsCacheMutex = Mutex()  // Mutex for thread-safe cache access with suspend support
 
 /**
  * JVM/Android implementation of ONNX TTS synthesis
@@ -221,7 +223,8 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
     logger.info("Starting ONNX TTS synthesis...")
 
     // Thread-safe access to cached service to prevent race conditions
-    val service: ONNXCoreService = synchronized(ttsCacheLock) {
+    // Using Mutex.withLock instead of synchronized to support suspend functions
+    val service: ONNXCoreService = ttsCacheMutex.withLock {
         val cached = cachedTTSCoreService
         if (cached != null && cachedTTSModelPath == modelPath) {
             logger.debug("Reusing cached TTS service")
