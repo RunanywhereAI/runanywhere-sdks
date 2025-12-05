@@ -1,5 +1,5 @@
 /// RunAnywhere Flutter SDK
-/// 
+///
 /// Privacy-first, on-device AI SDK for Flutter that brings powerful language
 /// models directly to your applications.
 library runanywhere;
@@ -23,3 +23,9 @@ export 'capabilities/download/download_service.dart';
 export 'capabilities/text_generation/generation_service.dart';
 export 'capabilities/analytics/analytics_service.dart';
 
+// Native FFI bindings for on-device AI capabilities
+// Use: import 'package:runanywhere/native/native.dart';
+// Or access via: NativeBackend, PlatformLoader, NativeProviderRegistration
+export 'native/platform_loader.dart' show PlatformLoader;
+export 'native/native_backend.dart' show NativeBackend, NativeBackendException;
+export 'native/native_provider_registration.dart' show NativeProviderRegistration;
