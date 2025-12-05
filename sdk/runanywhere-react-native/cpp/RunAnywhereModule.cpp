@@ -67,8 +67,17 @@ namespace facebook::react {
 // ============================================================================
 
 RunAnywhereModule::RunAnywhereModule(std::shared_ptr<CallInvoker> jsInvoker)
-    : TurboModule("RunAnywhere", jsInvoker), jsInvoker_(std::move(jsInvoker)) {
-    // Constructor - backend is created lazily via createBackend()
+    : TurboModule("RunAnywhere", jsInvoker)
+    , jsInvoker_(std::move(jsInvoker)) {
+    // NOTE: Backend registration is handled internally by the XCFramework
+    // The XCFramework auto-registers backends during static initialization
+    // The registration symbols are NOT exported from the XCFramework, so we cannot
+    // manually call register_*_backend() functions
+
+    // If backends are not appearing, the XCFramework was built without proper
+    // backend registration. Check that the XCFramework build includes:
+    // - RA_ONNX_ENABLED=1
+    // - RA_LLAMACPP_ENABLED=1
 }
 
 RunAnywhereModule::~RunAnywhereModule() {
@@ -88,7 +97,7 @@ RunAnywhereModule::~RunAnywhereModule() {
 }
 
 // ============================================================================
-// TurboModule Interface
+// TurboModule Interface - Manual JSI Binding
 // ============================================================================
 
 jsi::Value RunAnywhereModule::get(jsi::Runtime& rt, const jsi::PropNameID& name) {

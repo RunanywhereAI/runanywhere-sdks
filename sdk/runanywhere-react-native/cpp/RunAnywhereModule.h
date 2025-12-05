@@ -39,6 +39,7 @@ namespace facebook::react {
  * - Direct C API access (no Swift/Kotlin wrappers)
  * - Synchronous JSI calls for low latency
  * - Event emission for streaming operations
+ * - React Native New Architecture only (TurboModules)
  */
 class RunAnywhereModule : public TurboModule {
 public:
