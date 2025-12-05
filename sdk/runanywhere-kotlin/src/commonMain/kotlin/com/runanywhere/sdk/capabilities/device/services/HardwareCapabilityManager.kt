@@ -35,9 +35,12 @@ class HardwareCapabilityManager private constructor() {
     // MARK: - Properties
 
     private val logger = SDKLogger("HardwareCapabilityManager")
-    private val capabilityAnalyzer: CapabilityAnalyzer = CapabilityAnalyzer()
-    private val batteryMonitorService: BatteryMonitorService = createBatteryMonitorService()
-    private val thermalMonitorService: ThermalMonitorService = createThermalMonitorService()
+
+    // Use lazy initialization to avoid memory pressure and allow garbage collection
+    // Per SDK guidelines: service dependencies should use lazy initialization
+    private val capabilityAnalyzer: CapabilityAnalyzer by lazy { CapabilityAnalyzer() }
+    private val batteryMonitorService: BatteryMonitorService by lazy { createBatteryMonitorService() }
+    private val thermalMonitorService: ThermalMonitorService by lazy { createThermalMonitorService() }
 
     private var cachedCapabilities: DeviceCapabilities? = null
     private var cacheTimestamp: Long = 0

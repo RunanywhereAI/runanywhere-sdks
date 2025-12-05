@@ -298,5 +298,4 @@ let quiz = try await RunAnywhere.generateStructured(
 ## Related Documentation
 
 - [RunAnywhere Swift SDK](../../../sdk/runanywhere-swift/README.md)
-- [runanywhere-core C++ Library](../../../../runanywhere-core/README.md)
 - [SDK CLAUDE.md](../../../CLAUDE.md)

@@ -127,7 +127,6 @@ class ModelSelectionViewModel(
 
             } catch (e: Exception) {
                 android.util.Log.e("ModelSelectionVM", "❌ Failed to load models: ${e.message}", e)
-                e.printStackTrace()
                 _uiState.update {
                     it.copy(
                         isLoading = false,

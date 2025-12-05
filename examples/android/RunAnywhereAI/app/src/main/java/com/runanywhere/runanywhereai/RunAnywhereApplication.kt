@@ -13,7 +13,10 @@ import com.runanywhere.sdk.models.enums.FrameworkModality
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.llm.llamacpp.LlamaCppAdapter
 import com.runanywhere.sdk.core.onnx.ONNXAdapter
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,6 +59,13 @@ class RunAnywhereApplication : Application() {
             instance ?: throw IllegalStateException("Application not initialized")
     }
 
+    /**
+     * Application-scoped CoroutineScope for SDK initialization and background work.
+     * Uses SupervisorJob to prevent failures in one coroutine from affecting others.
+     * This replaces GlobalScope to ensure proper lifecycle management.
+     */
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
     @Volatile
     private var isSDKInitialized = false
 
@@ -67,16 +77,16 @@ class RunAnywhereApplication : Application() {
     val initializationState: StateFlow<SDKInitializationState> = _initializationState.asStateFlow()
 
     override fun onCreate() {
-        instance = this
         super.onCreate()
+        instance = this
 
         Log.i("RunAnywhereApp", "🏁 App launched, initializing SDK...")
 
         // Post initialization to main thread's message queue to ensure system is ready
         // This prevents crashes on devices where device-encrypted storage hasn't mounted yet
         Handler(Looper.getMainLooper()).postDelayed({
-            // Initialize SDK asynchronously to match iOS pattern
-            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            // Initialize SDK asynchronously using application-scoped coroutine
+            applicationScope.launch(Dispatchers.IO) {
                 try {
                     // Additional small delay to ensure storage is mounted
                     delay(200)
@@ -87,6 +97,12 @@ class RunAnywhereApplication : Application() {
                 }
             }
         }, 100) // 100ms delay to let system mount storage
+    }
+
+    override fun onTerminate() {
+        // Cancel all coroutines when app terminates
+        applicationScope.cancel()
+        super.onTerminate()
     }
 
     private suspend fun initializeSDK() {
@@ -127,7 +143,7 @@ class RunAnywhereApplication : Application() {
                 val baseURL = "talk_to_runanywhere_team"
 
                 Log.w("RunAnywhereApp", "🔐 PRODUCTION INIT PARAMS:")
-                Log.w("RunAnywhereApp", "   apiKey = ${apiKey.take(20)}...")
+                Log.w("RunAnywhereApp", "   apiKey = [REDACTED]")
                 Log.w("RunAnywhereApp", "   baseURL = $baseURL")
                 Log.w("RunAnywhereApp", "   environment = PRODUCTION")
 
@@ -168,8 +184,7 @@ class RunAnywhereApplication : Application() {
             }
             Log.i("RunAnywhereApp", "✅ Adapters registered successfully")
         } catch (e: Exception) {
-            Log.e("RunAnywhereApp", "❌ Failed to register adapters: ${e.message}")
-            e.printStackTrace()
+            Log.e("RunAnywhereApp", "❌ Failed to register adapters: ${e.message}", e)
         }
 
         val initTime = System.currentTimeMillis() - startTime
