@@ -28,4 +28,10 @@ export 'capabilities/analytics/analytics_service.dart';
 // Or access via: NativeBackend, PlatformLoader, NativeProviderRegistration
 export 'native/platform_loader.dart' show PlatformLoader;
 export 'native/native_backend.dart' show NativeBackend, NativeBackendException;
-export 'native/native_provider_registration.dart' show NativeProviderRegistration;
+export 'native/native_provider_registration.dart'
+    show NativeProviderRegistration;
+
+// Backend modules (modular architecture - import specific backends as needed)
+// Use: import 'package:runanywhere/backends/onnx/onnx.dart';
+// Or for all: import 'package:runanywhere/backends/backends.dart';
+// See ARCHITECTURE.md for details on the modular backend system.

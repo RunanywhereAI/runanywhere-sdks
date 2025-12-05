@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart';
+// Import the backend modules for modular AI capabilities
+import 'package:runanywhere/backends/onnx/onnx.dart';
+import 'package:runanywhere/backends/llamacpp/llamacpp.dart';
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
 import '../../core/design_system/typography.dart';
@@ -96,7 +99,8 @@ class _SimplifiedSettingsViewState extends State<SimplifiedSettingsView> {
             children: [
               Builder(
                 builder: (context) {
-                  final stats = RunAnywhere.serviceContainer.memoryService.getMemoryStatistics();
+                  final stats = RunAnywhere.serviceContainer.memoryService
+                      .getMemoryStatistics();
                   return Column(
                     children: [
                       _buildInfoRow(
@@ -145,7 +149,8 @@ class _SimplifiedSettingsViewState extends State<SimplifiedSettingsView> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.science),
-                label: Text(_nativeLoading ? 'Testing...' : 'Test Native Library'),
+                label:
+                    Text(_nativeLoading ? 'Testing...' : 'Test Native Library'),
               ),
             ],
           ),
@@ -163,31 +168,61 @@ class _SimplifiedSettingsViewState extends State<SimplifiedSettingsView> {
     });
 
     try {
-      // Try to load the native library
-      final backend = NativeBackend();
+      // Check if native library is available
+      if (!OnnxBackend.isAvailable) {
+        setState(() {
+          _nativeStatus = '✗ Native library not available on this platform';
+        });
+        return;
+      }
 
+      // Initialize ONNX backend (STT, TTS, VAD)
       setState(() {
-        _nativeStatus = 'Library loaded! Getting info...';
+        _nativeStatus = 'Initializing ONNX backend...';
       });
 
-      // Get available backends
-      final backends = backend.getAvailableBackends();
+      final onnxSuccess = await OnnxBackend.initialize(priority: 100);
+      if (!onnxSuccess) {
+        setState(() {
+          _nativeStatus = '✗ Failed to initialize ONNX backend';
+        });
+        return;
+      }
+
+      // Initialize LlamaCpp backend (LLM)
       setState(() {
-        _nativeBackends = backends.join(', ');
+        _nativeStatus = 'Initializing LlamaCpp backend...';
       });
 
-      // Try to create an ONNX backend
-      backend.create('onnx');
+      final llamaSuccess = await LlamaCppBackend.initialize(priority: 90);
+      // LlamaCpp init failure is non-fatal - ONNX provides LLM fallback
 
-      // Get backend info
-      final info = backend.getBackendInfo();
       setState(() {
-        _nativeVersion = info['name']?.toString() ?? 'Unknown';
-        _nativeStatus = '✓ Native bindings working!';
+        _nativeStatus = 'Backends initialized! Getting info...';
       });
 
-      // Clean up
-      backend.dispose();
+      // Get available backends from native library
+      final backends = OnnxBackend.availableBackends;
+
+      // Get backend info and version
+      final info = OnnxBackend.getBackendInfo();
+      final infoName = info['name']?.toString() ?? 'ONNX';
+      setState(() {
+        _nativeVersion = '${OnnxBackend.version} ($infoName)';
+      });
+
+      // Show registered modules
+      final modules = ModuleRegistry.shared.registeredModules;
+      final backendsStr = backends.isEmpty ? 'onnx' : backends.join(', ');
+      final llamaStatus = llamaSuccess ? '✓ LlamaCpp' : '○ LlamaCpp (fallback)';
+
+      setState(() {
+        _nativeBackends = 'Native: $backendsStr\n'
+            '✓ ONNX (STT, TTS, VAD)\n'
+            '$llamaStatus (LLM)\n'
+            'Modules: ${modules.join(", ")}';
+        _nativeStatus = '✓ All backends initialized!';
+      });
     } catch (e) {
       setState(() {
         _nativeStatus = '✗ Error: $e';
@@ -208,7 +243,7 @@ class _SimplifiedSettingsViewState extends State<SimplifiedSettingsView> {
       children: [
         Text(
           title,
-         // style: AppTypography.headlineSemibold,
+          // style: AppTypography.headlineSemibold,
         ),
         const SizedBox(height: AppSpacing.padding16),
         ...children,
@@ -228,18 +263,18 @@ class _SimplifiedSettingsViewState extends State<SimplifiedSettingsView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(title, style: AppTypography.body(context)),
-                Text(
-                  formatValue(value),
-                  style: AppTypography.body(context).copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: AppTypography.body(context)),
+            Text(
+              formatValue(value),
+              style: AppTypography.body(context).copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
+          ],
+        ),
         Slider(
           value: value,
           min: min,
@@ -257,16 +292,16 @@ class _SimplifiedSettingsViewState extends State<SimplifiedSettingsView> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-                  Text(
-                    label,
-                    style: AppTypography.body(context).copyWith(
-                      color: AppColors.textSecondary(context),
-                    ),
-                  ),
-                  Text(
-                    value,
-                    style: AppTypography.body(context),
-                  ),
+          Text(
+            label,
+            style: AppTypography.body(context).copyWith(
+              color: AppColors.textSecondary(context),
+            ),
+          ),
+          Text(
+            value,
+            style: AppTypography.body(context),
+          ),
         ],
       ),
     );
