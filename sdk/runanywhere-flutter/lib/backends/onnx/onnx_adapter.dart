@@ -221,7 +221,12 @@ class OnnxAdapter
 
   @override
   void dispose() {
-    // Cleanup cached services
+    // Cleanup cached services before nulling them to release backend resources
+    _cachedSTTService?.cleanup();
+    _cachedTTSService?.cleanup();
+    _cachedVADService?.cleanup();
+    _cachedLLMService?.cleanup();
+
     _cachedSTTService = null;
     _cachedTTSService = null;
     _cachedVADService = null;
