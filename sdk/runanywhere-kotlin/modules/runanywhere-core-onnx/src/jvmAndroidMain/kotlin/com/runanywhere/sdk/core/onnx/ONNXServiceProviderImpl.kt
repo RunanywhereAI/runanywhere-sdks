@@ -134,8 +134,31 @@ private var cachedTTSModelPath: String? = null
 actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteArray {
     logger.info("Synthesizing with ONNX: ${text.take(50)}...")
 
-    // Get the model path from options.voice (which contains the model path)
-    val modelPath = options.voice
+    // Resolve model path from options.voice
+    // options.voice may contain either:
+    // 1. A full filesystem path (e.g., /data/user/0/.../model.onnx)
+    // 2. A model ID that needs to be resolved to a path (e.g., "piper-en-us-lessac-medium")
+    val voice = options.voice
+    val modelPath: String? = when {
+        voice.isNullOrEmpty() -> null
+        voice.contains("/") -> {
+            // Already a full path
+            logger.debug("Using voice as direct path: $voice")
+            voice
+        }
+        else -> {
+            // Model ID - look up the full path from the model registry
+            logger.info("Resolving model ID to path: $voice")
+            val modelInfo = ServiceContainer.shared.modelRegistry.getModel(voice)
+            val resolvedPath = modelInfo?.localPath
+            if (resolvedPath != null) {
+                logger.info("Resolved model path: $resolvedPath")
+            } else {
+                logger.warn("Could not resolve model ID '$voice' to a path - model may not be downloaded")
+            }
+            resolvedPath ?: voice
+        }
+    }
 
     if (modelPath.isNullOrEmpty()) {
         logger.error("No TTS model path provided in options.voice")
