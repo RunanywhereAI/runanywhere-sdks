@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart';
 import '../../core/design_system/app_colors.dart';
@@ -16,6 +17,12 @@ class _SimplifiedSettingsViewState extends State<SimplifiedSettingsView> {
   int _maxTokens = 500;
   double _temperature = 0.7;
   bool _streamEnabled = true;
+
+  // Native bindings test state
+  String _nativeStatus = 'Not tested';
+  String _nativeBackends = '';
+  String _nativeVersion = '';
+  bool _nativeLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -118,9 +125,78 @@ class _SimplifiedSettingsViewState extends State<SimplifiedSettingsView> {
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.padding32),
+          _buildSection(
+            title: 'Native FFI Bindings',
+            children: [
+              _buildInfoRow('Platform', Platform.operatingSystem),
+              _buildInfoRow('Status', _nativeStatus),
+              if (_nativeVersion.isNotEmpty)
+                _buildInfoRow('Native Version', _nativeVersion),
+              if (_nativeBackends.isNotEmpty)
+                _buildInfoRow('Available Backends', _nativeBackends),
+              const SizedBox(height: AppSpacing.padding16),
+              FilledButton.icon(
+                onPressed: _nativeLoading ? null : _testNativeBindings,
+                icon: _nativeLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.science),
+                label: Text(_nativeLoading ? 'Testing...' : 'Test Native Library'),
+              ),
+            ],
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _testNativeBindings() async {
+    setState(() {
+      _nativeLoading = true;
+      _nativeStatus = 'Loading native library...';
+      _nativeBackends = '';
+      _nativeVersion = '';
+    });
+
+    try {
+      // Try to load the native library
+      final backend = NativeBackend();
+
+      setState(() {
+        _nativeStatus = 'Library loaded! Getting info...';
+      });
+
+      // Get available backends
+      final backends = backend.getAvailableBackends();
+      setState(() {
+        _nativeBackends = backends.join(', ');
+      });
+
+      // Try to create an ONNX backend
+      backend.create('onnx');
+
+      // Get backend info
+      final info = backend.getBackendInfo();
+      setState(() {
+        _nativeVersion = info['name']?.toString() ?? 'Unknown';
+        _nativeStatus = '✓ Native bindings working!';
+      });
+
+      // Clean up
+      backend.dispose();
+    } catch (e) {
+      setState(() {
+        _nativeStatus = '✗ Error: $e';
+      });
+    } finally {
+      setState(() {
+        _nativeLoading = false;
+      });
+    }
   }
 
   Widget _buildSection({
