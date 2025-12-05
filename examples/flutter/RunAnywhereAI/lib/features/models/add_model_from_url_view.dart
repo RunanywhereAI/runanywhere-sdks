@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
 import '../../core/design_system/typography.dart';
-import 'model_list_view_model.dart';
 import 'model_types.dart';
 
 /// AddModelFromURLView (mirroring iOS AddModelFromURLView.swift)
@@ -183,7 +182,7 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
         ),
         const SizedBox(height: AppSpacing.mediumLarge),
         DropdownButtonFormField<LLMFramework>(
-          value: _selectedFramework,
+          initialValue: _selectedFramework,
           decoration: const InputDecoration(
             labelText: 'Target Framework',
             border: OutlineInputBorder(),
@@ -314,7 +313,7 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
       ),
       child: Row(
         children: [
-          Icon(Icons.error, color: AppColors.statusRed),
+          const Icon(Icons.error, color: AppColors.statusRed),
           const SizedBox(width: AppSpacing.smallMedium),
           Expanded(
             child: Text(

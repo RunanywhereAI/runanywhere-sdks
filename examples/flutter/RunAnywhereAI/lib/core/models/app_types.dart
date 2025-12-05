@@ -1,6 +1,6 @@
-/// App Types (mirroring iOS AppTypes.swift)
-///
-/// Contains core data models used throughout the app.
+// App Types (mirroring iOS AppTypes.swift)
+//
+// Contains core data models used throughout the app.
 
 /// System device information for displaying hardware capabilities
 class SystemDeviceInfo {

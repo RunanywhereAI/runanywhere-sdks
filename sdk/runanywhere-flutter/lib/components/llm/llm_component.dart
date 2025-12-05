@@ -4,34 +4,11 @@ import '../../core/types/sdk_component.dart';
 import '../../core/protocols/component/component_configuration.dart';
 import '../../core/module_registry.dart' as core
     show ModuleRegistry, LLMService, LLMGenerationOptions;
-import '../../core/models/common.dart' show LLMFramework;
+import '../../core/models/common.dart' show LLMFramework, QuantizationLevel;
 import '../../public/models/conversation.dart';
 
 export '../../public/models/conversation.dart';
-export '../../core/models/common.dart' show LLMFramework;
-
-/// Quantization level for LLM models
-/// Matches iOS QuantizationLevel from LLMComponent.swift
-enum QuantizationLevel {
-  q4v0('Q4_0'),
-  q4KM('Q4_K_M'),
-  q5KM('Q5_K_M'),
-  q6K('Q6_K'),
-  q8v0('Q8_0'),
-  f16('F16'),
-  f32('F32');
-
-  final String value;
-  const QuantizationLevel(this.value);
-
-  static QuantizationLevel? fromString(String? value) {
-    if (value == null) return null;
-    return QuantizationLevel.values.cast<QuantizationLevel?>().firstWhere(
-          (e) => e?.value == value,
-          orElse: () => null,
-        );
-  }
-}
+export '../../core/models/common.dart' show LLMFramework, QuantizationLevel;
 
 /// LLM (Language Model) Component Configuration
 /// Matches iOS LLMConfiguration from LLMComponent.swift
@@ -154,29 +131,9 @@ class LLMOutput implements ComponentOutput {
   int get latencyMs => (metadata.generationTime * 1000).round();
 }
 
-/// LLM Generation Options
-/// Matches iOS RunAnywhereGenerationOptions from GenerationOptions.swift
-class LLMGenerationOptions {
-  final int maxTokens;
-  final double temperature;
-  final double topP;
-  final bool enableRealTimeTracking;
-  final List<String> stopSequences;
-  final bool streamingEnabled;
-  final String? systemPrompt;
-  final LLMFramework? preferredFramework;
-
-  LLMGenerationOptions({
-    this.maxTokens = 100,
-    this.temperature = 0.7,
-    this.topP = 1.0,
-    this.enableRealTimeTracking = true,
-    this.stopSequences = const [],
-    this.streamingEnabled = false,
-    this.systemPrompt,
-    this.preferredFramework,
-  });
-}
+// LLMGenerationOptions is now defined in module_registry.dart (canonical location)
+// Re-export for convenient access from llm_component
+typedef LLMGenerationOptions = core.LLMGenerationOptions;
 
 /// Errors for LLM services
 /// Matches iOS LLMServiceError from LLMComponent.swift
@@ -302,10 +259,7 @@ class LLMComponent extends BaseComponent<core.LLMService> {
     // Generate response
     final result = await llmService.generate(
       prompt: prompt,
-      options: core.LLMGenerationOptions(
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-      ),
+      options: options,
     );
 
     final generationTime =
@@ -359,10 +313,7 @@ class LLMComponent extends BaseComponent<core.LLMService> {
 
     return llmService.generateStream(
       prompt: fullPrompt,
-      options: core.LLMGenerationOptions(
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-      ),
+      options: options,
     );
   }
 

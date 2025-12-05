@@ -1,6 +1,6 @@
-/// Model Types (mirroring iOS model types)
-///
-/// Contains model-related enums and data classes.
+// Model Types (mirroring iOS model types)
+//
+// Contains model-related enums and data classes.
 
 /// LLM Framework enumeration
 enum LLMFramework {

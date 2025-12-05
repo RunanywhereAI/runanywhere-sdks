@@ -299,7 +299,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
                 const SizedBox(height: AppSpacing.xSmall),
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.check_circle,
                       size: 12,
                       color: AppColors.statusGreen,
@@ -333,7 +333,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       ),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.info,
             size: 14,
             color: AppColors.statusBlue,
@@ -487,7 +487,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     });
 
     // Create pseudo ModelInfo for System TTS
-    final systemTTSModel = ModelInfo(
+    const systemTTSModel = ModelInfo(
       id: 'system-tts',
       name: 'System TTS',
       category: ModelCategory.speechSynthesis,
@@ -576,10 +576,12 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => AddModelFromURLView(
+      builder: (sheetContext) => AddModelFromURLView(
         onModelAdded: (model) async {
+          // Capture navigator before async gap
+          final navigator = Navigator.of(sheetContext);
           await _viewModel.addImportedModel(model);
-          if (mounted) Navigator.pop(context);
+          if (mounted) navigator.pop();
         },
       ),
     );
@@ -700,7 +702,7 @@ class _SelectableModelRowState extends State<_SelectableModelRow> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.psychology,
+                const Icon(Icons.psychology,
                     size: 10, color: AppColors.primaryPurple),
                 const SizedBox(width: 2),
                 Text(
@@ -720,7 +722,7 @@ class _SelectableModelRowState extends State<_SelectableModelRow> {
     if (widget.model.preferredFramework == LLMFramework.foundationModels) {
       return Row(
         children: [
-          Icon(
+          const Icon(
             Icons.check_circle,
             size: 12,
             color: AppColors.statusGreen,
@@ -763,7 +765,7 @@ class _SelectableModelRowState extends State<_SelectableModelRow> {
       }
       return Row(
         children: [
-          Icon(
+          const Icon(
             Icons.check_circle,
             size: 12,
             color: AppColors.statusGreen,

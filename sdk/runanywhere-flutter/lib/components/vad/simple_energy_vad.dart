@@ -1,22 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
+// VADService and SpeechActivityEvent are exported from module_registry (sourced from vad_service.dart)
 import '../../core/module_registry.dart';
 import '../../foundation/logging/sdk_logger.dart';
-
-/// Speech activity events
-enum SpeechActivityEvent {
-  started,
-  ended;
-
-  String get value {
-    switch (this) {
-      case SpeechActivityEvent.started:
-        return 'started';
-      case SpeechActivityEvent.ended:
-        return 'ended';
-    }
-  }
-}
 
 /// Simple energy-based Voice Activity Detection
 /// Based on iOS WhisperKit's EnergyVAD implementation but simplified for real-time audio processing
@@ -25,6 +11,7 @@ class SimpleEnergyVAD implements VADService {
 
   /// Energy threshold for voice activity detection (0.0 to 1.0)
   /// Values above this threshold indicate voice activity
+  @override
   double energyThreshold = 0.005; // Even lower threshold for better short phrase detection
 
   /// Base threshold before any adjustments
@@ -34,18 +21,22 @@ class SimpleEnergyVAD implements VADService {
   double _ttsThresholdMultiplier = 3.0;
 
   /// Sample rate of the audio (typically 16000 Hz)
+  @override
   final int sampleRate;
 
   /// Length of each analysis frame in samples
   final int frameLengthSamples;
 
   /// Frame length in seconds
+  @override
   double get frameLength => frameLengthSamples / sampleRate;
 
   /// Speech activity callback
+  @override
   void Function(SpeechActivityEvent)? onSpeechActivity;
 
   /// Optional callback for processed audio buffers
+  @override
   void Function(List<int>)? onAudioBuffer;
 
   // State tracking
@@ -81,9 +72,8 @@ class SimpleEnergyVAD implements VADService {
   SimpleEnergyVAD({
     this.sampleRate = 16000,
     double frameLength = 0.1,
-    double energyThreshold = 0.005,
-  })  : frameLengthSamples = (frameLength * sampleRate).toInt(),
-        energyThreshold = energyThreshold {
+    this.energyThreshold = 0.005,
+  }) : frameLengthSamples = (frameLength * sampleRate).toInt() {
     _logger.info(
       'SimpleEnergyVAD initialized - sampleRate: $sampleRate, frameLength: $frameLengthSamples samples, threshold: $energyThreshold',
     );
@@ -117,9 +107,11 @@ class SimpleEnergyVAD implements VADService {
   }
 
   /// Current speech activity state
+  @override
   bool get isSpeechActive => _isCurrentlySpeaking;
 
   /// Reset the VAD state
+  @override
   void reset() {
     stop();
     _isCurrentlySpeaking = false;
@@ -128,6 +120,7 @@ class SimpleEnergyVAD implements VADService {
   }
 
   /// Start voice activity detection
+  @override
   void start() {
     if (_isActive) return;
 
@@ -140,6 +133,7 @@ class SimpleEnergyVAD implements VADService {
   }
 
   /// Stop voice activity detection
+  @override
   void stop() {
     if (!_isActive) return;
 
@@ -158,6 +152,7 @@ class SimpleEnergyVAD implements VADService {
   }
 
   /// Process an audio buffer for voice activity detection
+  @override
   void processAudioBuffer(List<int> buffer) {
     if (!_isActive) return;
 
@@ -225,6 +220,7 @@ class SimpleEnergyVAD implements VADService {
   }
 
   /// Process a raw audio array for voice activity detection
+  @override
   bool processAudioData(List<double> audioData) {
     if (!_isActive) return false;
 
@@ -453,6 +449,7 @@ class SimpleEnergyVAD implements VADService {
   // MARK: - Pause and Resume
 
   /// Pause VAD processing
+  @override
   void pause() {
     if (_isPaused) return;
     _isPaused = true;
@@ -471,6 +468,7 @@ class SimpleEnergyVAD implements VADService {
   }
 
   /// Resume VAD processing
+  @override
   void resume() {
     if (!_isPaused) return;
 

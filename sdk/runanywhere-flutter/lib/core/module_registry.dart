@@ -1,4 +1,14 @@
 import 'dart:async';
+import 'models/framework/llm_framework.dart';
+// VADService is imported for use in VADServiceProvider return type
+import '../components/vad/vad_service.dart' show VADService;
+// STT types are imported from centralized location to avoid duplication
+import '../components/stt/stt_types.dart';
+// Export all VAD types for external consumers
+export '../components/vad/vad_service.dart'
+    show VADService, VADResult, SpeechActivityEvent;
+// Export STT types for external consumers
+export '../components/stt/stt_types.dart';
 
 /// Central registry for external AI module implementations
 ///
@@ -348,13 +358,7 @@ abstract class TTSService {
   Future<void> cleanup();
 }
 
-/// Protocol for voice activity detection services
-abstract class VADService {
-  Future<void> initialize({String? modelPath});
-  Future<VADResult> detect({required List<int> audioData});
-  bool get isReady;
-  Future<void> cleanup();
-}
+// VADService is exported from components/vad/vad_service.dart (see top of file)
 
 abstract class SpeakerDiarizationService {
   Future<void> initialize({String? modelPath});
@@ -380,73 +384,31 @@ abstract class WakeWordService {
   Future<void> cleanup();
 }
 
-// Placeholder types (to be properly defined later)
-class STTOptions {
-  final String language;
-  final bool detectLanguage;
-  final bool enablePunctuation;
-  final bool enableDiarization;
-  final int? maxSpeakers;
-  final bool enableTimestamps;
-  final List<String> vocabularyFilter;
-  final int sampleRate;
+// STTOptions, STTTranscriptionResult, TimestampInfo, and AlternativeTranscription
+// are imported from ../components/stt/stt_types.dart (see imports above)
 
-  STTOptions({
-    this.language = 'en',
-    this.detectLanguage = false,
-    this.enablePunctuation = true,
-    this.enableDiarization = false,
-    this.maxSpeakers,
-    this.enableTimestamps = true,
-    this.vocabularyFilter = const [],
-    this.sampleRate = 16000,
-  });
-}
-
-class STTTranscriptionResult {
-  final String transcript;
-  final double? confidence;
-  final List<TimestampInfo>? timestamps;
-  final String? language;
-  final List<AlternativeTranscription>? alternatives;
-
-  STTTranscriptionResult({
-    required this.transcript,
-    this.confidence,
-    this.timestamps,
-    this.language,
-    this.alternatives,
-  });
-}
-
-class TimestampInfo {
-  final String word;
-  final double startTime;
-  final double endTime;
-  final double? confidence;
-
-  TimestampInfo({
-    required this.word,
-    required this.startTime,
-    required this.endTime,
-    this.confidence,
-  });
-}
-
-class AlternativeTranscription {
-  final String transcript;
-  final double confidence;
-
-  AlternativeTranscription({
-    required this.transcript,
-    required this.confidence,
-  });
-}
-
+/// LLM Generation Options
+/// Matches iOS RunAnywhereGenerationOptions from GenerationOptions.swift
 class LLMGenerationOptions {
   final int maxTokens;
   final double temperature;
-  LLMGenerationOptions({required this.maxTokens, required this.temperature});
+  final double topP;
+  final bool enableRealTimeTracking;
+  final List<String> stopSequences;
+  final bool streamingEnabled;
+  final String? systemPrompt;
+  final LLMFramework? preferredFramework;
+
+  LLMGenerationOptions({
+    this.maxTokens = 100,
+    this.temperature = 0.7,
+    this.topP = 1.0,
+    this.enableRealTimeTracking = true,
+    this.stopSequences = const [],
+    this.streamingEnabled = false,
+    this.systemPrompt,
+    this.preferredFramework,
+  });
 }
 
 class LLMGenerationResult {
@@ -475,11 +437,7 @@ class TTSOptions {
   });
 }
 
-class VADResult {
-  final bool hasSpeech;
-  final double confidence;
-  VADResult({required this.hasSpeech, required this.confidence});
-}
+// VADResult is exported from components/vad/vad_service.dart (see top of file)
 
 class SpeakerDiarizationResult {}
 class VLMResult {}

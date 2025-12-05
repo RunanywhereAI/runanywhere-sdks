@@ -1,0 +1,85 @@
+// RunAnywhere Flutter SDK - Android Plugin
+//
+// This plugin provides native library integration for RunAnywhere on Android.
+// The native libraries (.so files) are loaded via FFI from jniLibs.
+//
+// Setup:
+//   1. Download binaries: cd ../scripts && ./setup_native.sh --platform android
+//   2. Or download manually from: https://github.com/RunanywhereAI/runanywhere-binaries/releases
+//   3. Extract to: android/src/main/jniLibs/
+//
+// Expected structure:
+//   android/src/main/jniLibs/
+//     arm64-v8a/
+//       librunanywhere_bridge.so
+//       libonnxruntime.so
+//       ...
+//     armeabi-v7a/
+//       ...
+//     x86_64/
+//       ...
+
+group 'ai.runanywhere.flutter'
+version '0.15.8'
+
+buildscript {
+    ext.kotlin_version = '1.9.10'
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'ai.runanywhere.flutter'
+    compileSdk 34
+
+    // Use NDK for native library support
+    ndkVersion "25.2.9519653"
+
+    defaultConfig {
+        minSdk 24
+        targetSdk 34
+
+        // ABI filters for native libraries
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+
+        // Consumer proguard rules
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    sourceSets {
+        main {
+            // Native libraries location
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+}

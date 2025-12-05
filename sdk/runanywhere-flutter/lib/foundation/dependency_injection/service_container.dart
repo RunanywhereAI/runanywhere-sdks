@@ -22,7 +22,7 @@ class ServiceContainer {
   ServiceContainer._();
 
   // Core services (lazy initialization)
-  ModelRegistry? _modelRegistry;
+  RegistryService? _modelRegistry;
   ModelLoadingService? _modelLoadingService;
   GenerationService? _generationService;
   StreamingService? _streamingService;
@@ -41,7 +41,7 @@ class ServiceContainer {
   SDKInitParams? _initParams;
 
   /// Model registry
-  ModelRegistry get modelRegistry {
+  RegistryService get modelRegistry {
     return _modelRegistry ??= RegistryService();
   }
 
@@ -170,4 +170,3 @@ class ResourceChecker {
   final HardwareCapabilityManager hardwareManager;
   ResourceChecker({required this.hardwareManager});
 }
-

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
@@ -251,10 +250,12 @@ class _ModelsViewState extends State<ModelsView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => AddModelFromURLView(
+      builder: (sheetContext) => AddModelFromURLView(
         onModelAdded: (model) async {
+          // Capture navigator before async gap
+          final navigator = Navigator.of(sheetContext);
           await _viewModel.addImportedModel(model);
-          if (mounted) Navigator.pop(context);
+          if (mounted) navigator.pop();
         },
       ),
     );
