@@ -1,32 +1,21 @@
 //
 // RunAnywhere.mm
-// Pure C++ TurboModule - iOS Adapter
+// iOS Adapter for RunAnywhere C++ TurboModule
 //
-// Minimal iOS adapter that connects the C++ TurboModule to React Native.
+// This is a thin adapter that instantiates the C++ TurboModule.
 // All business logic is in cpp/RunAnywhereModule.cpp.
 //
-// REQUIRES: React Native New Architecture (TurboModules)
-//
 
-#import <React/RCTBridgeModule.h>
-#import <ReactCommon/RCTTurboModule.h>
+#import "RunAnywhere.h"
+#import <Foundation/Foundation.h>
+#import <React/RCTBridge+Private.h>
+#import <jsi/jsi.h>
 #import "../cpp/RunAnywhereModule.h"
-
-#ifdef RCT_NEW_ARCH_ENABLED
-#import <RunAnywhereSpec/RunAnywhereSpec.h>
-#endif
 
 using namespace facebook::react;
 
-#ifdef RCT_NEW_ARCH_ENABLED
-@interface RunAnywhere : NSObject <NativeRunAnywhereSpec>
-#else
-@interface RunAnywhere : NSObject <RCTBridgeModule, RCTTurboModule>
-#endif
-@end
-
 @implementation RunAnywhere {
-    std::shared_ptr<RunAnywhereModule> _nativeModule;
+    std::shared_ptr<facebook::react::RunAnywhereModule> _nativeModule;
 }
 
 RCT_EXPORT_MODULE()
@@ -35,12 +24,40 @@ RCT_EXPORT_MODULE()
     return NO;
 }
 
-// Return the C++ TurboModule instance
-- (std::shared_ptr<TurboModule>)getTurboModule:(const ObjCTurboModule::InitParams &)params {
-    if (!_nativeModule) {
-        _nativeModule = std::make_shared<RunAnywhereModule>(params.jsInvoker);
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        NSLog(@"[RunAnywhere] Initialized with New Architecture (C++ TurboModule)");
     }
+    return self;
+}
+
+// TurboModule protocol - return C++ module
+- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+    (const facebook::react::ObjCTurboModule::InitParams &)params {
+
+    if (!_nativeModule) {
+        NSLog(@"[RunAnywhere] Creating C++ TurboModule instance");
+        _nativeModule = std::make_shared<facebook::react::RunAnywhereModule>(params.jsInvoker);
+        NSLog(@"[RunAnywhere] C++ TurboModule created successfully");
+    }
+
     return _nativeModule;
+}
+
+// Supported events for event emitter
+- (NSArray<NSString *> *)supportedEvents {
+    return @[
+        @"onToken",
+        @"onGenerationComplete",
+        @"onGenerationError",
+        @"onSTTPartial",
+        @"onSTTFinal",
+        @"onSTTError",
+        @"onTTSAudio",
+        @"onTTSComplete",
+        @"onTTSError"
+    ];
 }
 
 @end

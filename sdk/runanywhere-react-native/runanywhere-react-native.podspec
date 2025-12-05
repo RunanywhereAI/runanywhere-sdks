@@ -121,7 +121,18 @@ Pod::Spec.new do |s|
     echo "XCFramework installed successfully!"
   CMD
 
-  s.vendored_frameworks = "ios/Frameworks/#{XCFRAMEWORK_NAME}.xcframework"
+  # Note: We're NOT using vendored_frameworks because it causes duplicate symbols.
+  # CocoaPods extracts XCFrameworks to XCFrameworkIntermediates, and with vendored_frameworks
+  # + our manual linking, the library gets linked twice. Instead, we directly link it.
+  # s.vendored_frameworks = "ios/Frameworks/#{XCFRAMEWORK_NAME}.xcframework"
+
+  # Direct linking of the XCFramework static library
+  # This ensures all symbols are loaded via -force_load
+  # Using PODS_ROOT to get the correct absolute path to the node_modules directory
+  s.xcconfig = {
+    "OTHER_LDFLAGS" => "$(inherited) -force_load \"$(PODS_ROOT)/../../node_modules/runanywhere-react-native/ios/Frameworks/#{XCFRAMEWORK_NAME}.xcframework/ios-arm64/lib#{XCFRAMEWORK_NAME}.a\"",
+    "HEADER_SEARCH_PATHS" => "$(inherited) \"$(PODS_ROOT)/../../node_modules/runanywhere-react-native/ios/Frameworks/#{XCFRAMEWORK_NAME}.xcframework/ios-arm64/Headers\""
+  }
 
   # =============================================================================
   # OPTIONAL: LlamaCpp Subspec for LLM Support
