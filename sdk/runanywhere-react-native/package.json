@@ -153,5 +153,13 @@
       "commonjs",
       "module"
     ]
+  },
+  "codegenConfig": {
+    "name": "RunAnywhereSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.runanywhere.reactnative"
+    }
   }
 }
