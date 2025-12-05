@@ -436,8 +436,7 @@ class VoiceAssistantViewModel(
 
                 // Start audio capture and get audio stream as Flow<VoiceAudioChunk>
                 // Note: We need a Flow<VoiceAudioChunk> for the pipeline
-                val audioFlow = com.runanywhere.sdk.audio.AndroidAudioCapture(context, AudioCaptureOptions.SPEECH_RECOGNITION)
-                    .startContinuousCapture()
+                val audioFlow = audioCapture.startCapture()
 
                 _uiState.update {
                     it.copy(

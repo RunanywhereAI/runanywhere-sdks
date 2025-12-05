@@ -10,6 +10,9 @@ import com.runanywhere.sdk.capabilities.device.ThermalState
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.ModelInfo
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Manager for hardware capability detection and configuration
@@ -38,6 +41,7 @@ class HardwareCapabilityManager private constructor() {
 
     private var cachedCapabilities: DeviceCapabilities? = null
     private var cacheTimestamp: Long = 0
+    private val cacheMutex = Mutex()
 
     /**
      * Device identifier for compilation cache
@@ -51,26 +55,29 @@ class HardwareCapabilityManager private constructor() {
      * Get current device capabilities
      *
      * Capabilities are cached for 1 minute to avoid expensive recalculation.
+     * Thread-safe implementation using mutex to prevent race conditions.
      */
     val capabilities: DeviceCapabilities
-        get() {
-            val now = currentTimeMillis()
-            val elapsedTime = now - cacheTimestamp
+        get() = runBlocking {
+            cacheMutex.withLock {
+                val now = currentTimeMillis()
+                val elapsedTime = now - cacheTimestamp
 
-            // Check cache validity
-            val cached = cachedCapabilities
-            if (cached != null && elapsedTime < CACHE_VALIDITY_MS) {
-                return cached
+                // Check cache validity
+                val cached = cachedCapabilities
+                if (cached != null && elapsedTime < CACHE_VALIDITY_MS) {
+                    return@runBlocking cached
+                }
+
+                // Compute new capabilities
+                val computed = capabilityAnalyzer.analyzeCapabilities()
+
+                // Update cache
+                cachedCapabilities = computed
+                cacheTimestamp = now
+
+                return@runBlocking computed
             }
-
-            // Compute new capabilities
-            val computed = capabilityAnalyzer.analyzeCapabilities()
-
-            // Update cache
-            cachedCapabilities = computed
-            cacheTimestamp = now
-
-            return computed
         }
 
     /**
@@ -100,10 +107,13 @@ class HardwareCapabilityManager private constructor() {
 
     /**
      * Refresh cached capabilities
+     * Thread-safe implementation using the same mutex as capabilities getter.
      */
-    fun refreshCapabilities() {
-        cachedCapabilities = null
-        cacheTimestamp = 0
+    fun refreshCapabilities() = runBlocking {
+        cacheMutex.withLock {
+            cachedCapabilities = null
+            cacheTimestamp = 0
+        }
     }
 
     /**
