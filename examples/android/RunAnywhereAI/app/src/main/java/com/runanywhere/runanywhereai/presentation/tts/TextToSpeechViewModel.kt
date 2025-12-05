@@ -219,11 +219,10 @@ class TextToSpeechViewModel : ViewModel() {
                     // Create TTS configuration (matches iOS TTSConfiguration)
                     val config = TTSConfiguration(
                         modelId = effectiveModelId,
-                        defaultRate = _uiState.value.speed,
-                        defaultPitch = _uiState.value.pitch,
-                        defaultVolume = 1.0f,
-                        audioFormat = SDKAudioFormat.WAV,
-                        sampleRate = 22050
+                        speakingRate = _uiState.value.speed,
+                        pitch = _uiState.value.pitch,
+                        volume = 1.0f,
+                        audioFormat = SDKAudioFormat.WAV
                     )
 
                     val component = TTSComponent(config)
@@ -361,7 +360,7 @@ class TextToSpeechViewModel : ViewModel() {
                             hasGeneratedAudio = true,
                             audioDuration = output.duration,
                             audioSize = output.audioData.size,
-                            sampleRate = output.metadata.sampleRate,
+                            sampleRate = null,  // SynthesisMetadata doesn't include sampleRate
                             processingTimeMs = processingTime
                         )
                     }

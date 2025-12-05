@@ -134,11 +134,11 @@ private var cachedTTSModelPath: String? = null
 actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteArray {
     logger.info("Synthesizing with ONNX: ${text.take(50)}...")
 
-    // Get the model path from options.voiceId (which contains the model path)
-    val modelPath = options.voiceId
+    // Get the model path from options.voice (which contains the model path)
+    val modelPath = options.voice
 
     if (modelPath.isNullOrEmpty()) {
-        logger.error("No TTS model path provided in options.voiceId")
+        logger.error("No TTS model path provided in options.voice")
         throw IllegalStateException("TTS model not loaded. Please select a TTS model first.")
     }
 
@@ -563,7 +563,7 @@ private class ONNXTTSServiceWrapper(
     suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
         val result = coreService.synthesize(
             text = text,
-            voiceId = options.voiceId,
+            voiceId = options.voice ?: "0",
             speedRate = options.rate,
             pitchShift = options.pitch
         )
