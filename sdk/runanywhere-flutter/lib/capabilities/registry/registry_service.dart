@@ -1,6 +1,10 @@
 import 'dart:async';
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../core/models/common.dart';
+import '../../foundation/logging/sdk_logger.dart';
+import '../../core/models/common.dart';
+import '../../core/protocols/registry/model_registry.dart';
+
+// Re-export for backward compatibility
+export '../../core/protocols/registry/model_registry.dart';
 
 /// Implementation of model registry
 class RegistryService implements ModelRegistry {
@@ -33,11 +37,16 @@ class RegistryService implements ModelRegistry {
   }
 
   @override
-  Future<ModelInfo?> getModel({required String by}) async {
+  ModelInfo? getModel(String id) {
+    return _models[id];
+  }
+
+  /// Get model (async for backward compatibility)
+  Future<ModelInfo?> getModelAsync({required String by}) async {
     return _models[by];
   }
 
-  /// Register a model
+  @override
   void registerModel(ModelInfo model) {
     // Validate model before registering
     if (model.id.isEmpty) {
@@ -56,7 +65,7 @@ class RegistryService implements ModelRegistry {
     // TODO: Save to database
   }
 
-  /// Update an existing model
+  @override
   void updateModel(ModelInfo model) {
     if (_models.containsKey(model.id)) {
       _models[model.id] = model;
@@ -64,17 +73,56 @@ class RegistryService implements ModelRegistry {
     }
   }
 
-  /// Remove a model from registry
-  void removeModel(String modelId) {
-    _models.remove(modelId);
-    logger.info('Removed model: $modelId');
+  @override
+  void removeModel(String id) {
+    _models.remove(id);
+    logger.info('Removed model: $id');
+  }
+
+  @override
+  List<ModelInfo> filterModels(ModelCriteria criteria) {
+    if (!criteria.hasFilters) {
+      return List.from(_models.values);
+    }
+
+    return _models.values.where((model) {
+      // Framework filter
+      if (criteria.framework != null &&
+          !model.compatibleFrameworks.contains(criteria.framework)) {
+        return false;
+      }
+
+      // Format filter
+      if (criteria.format != null && model.format != criteria.format) {
+        return false;
+      }
+
+      // Size filter
+      if (criteria.maxSize != null &&
+          model.downloadSize != null &&
+          model.downloadSize! > criteria.maxSize!) {
+        return false;
+      }
+
+      // Context length filters
+      if (criteria.minContextLength != null &&
+          model.contextLength != null &&
+          model.contextLength! < criteria.minContextLength!) {
+        return false;
+      }
+      if (criteria.maxContextLength != null &&
+          model.contextLength != null &&
+          model.contextLength! > criteria.maxContextLength!) {
+        return false;
+      }
+
+      // Search filter (name contains search term)
+      if (criteria.search != null &&
+          !model.name.toLowerCase().contains(criteria.search!.toLowerCase())) {
+        return false;
+      }
+
+      return true;
+    }).toList();
   }
 }
-
-/// Model registry interface
-abstract class ModelRegistry {
-  Future<void> initialize({String? apiKey});
-  Future<List<ModelInfo>> discoverModels();
-  Future<ModelInfo?> getModel({required String by});
-}
-

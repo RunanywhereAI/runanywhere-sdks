@@ -1,5 +1,4 @@
 import '../../core/protocols/component/component_configuration.dart';
-import '../../core/types/sdk_component.dart';
 import '../../foundation/error_types/sdk_error.dart';
 
 /// Configuration for VAD component

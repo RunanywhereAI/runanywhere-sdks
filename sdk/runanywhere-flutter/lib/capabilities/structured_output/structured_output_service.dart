@@ -1,6 +1,5 @@
 import 'dart:convert';
 import '../../../foundation/logging/sdk_logger.dart';
-import '../../../foundation/error_types/sdk_error.dart';
 
 /// Service for structured output generation with JSON schema validation
 class StructuredOutputService {
@@ -81,4 +80,3 @@ abstract class Generatable {
   /// Generation hints
   static Map<String, dynamic>? get generationHints => null;
 }
-

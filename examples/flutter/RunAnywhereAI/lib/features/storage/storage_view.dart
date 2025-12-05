@@ -120,7 +120,7 @@ class _StorageViewState extends State<StorageView> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.storage,
                             size: AppSpacing.iconXXLarge,
                             color: AppColors.primaryBlue,
@@ -224,14 +224,14 @@ class _ModelCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.padding4),
             Text(
-              'Framework: ${model.framework}',
+              'Framework: ${model.preferredFramework?.displayName ?? "Unknown"}',
               style: AppTypography.footnote(context).copyWith(
                 color: AppColors.textSecondary(context),
               ),
             ),
             const SizedBox(height: AppSpacing.padding4),
             Text(
-              'Size: ${_formatBytes(model.size)}',
+              'Size: ${_formatBytes(model.memoryRequired ?? 0)}',
               style: AppTypography.footnote(context).copyWith(
                 color: AppColors.textSecondary(context),
               ),
@@ -254,8 +254,8 @@ class _ModelCard extends StatelessWidget {
                   ),
                 ],
                 if (isDownloaded)
-                  Padding(
-                    padding: const EdgeInsets.only(left: AppSpacing.padding8),
+                  const Padding(
+                    padding: EdgeInsets.only(left: AppSpacing.padding8),
                     child: Icon(
                       Icons.check_circle,
                       color: AppColors.primaryGreen,

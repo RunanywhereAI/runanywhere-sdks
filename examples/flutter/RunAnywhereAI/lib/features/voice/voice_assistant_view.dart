@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:provider/provider.dart';
 import 'package:runanywhere/runanywhere.dart';
 
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
 import '../../core/design_system/typography.dart';
 import '../../core/models/app_types.dart';
-import '../../core/services/model_manager.dart';
 
 /// VoiceAssistantView (mirroring iOS VoiceAssistantView.swift)
 ///
@@ -23,16 +21,12 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     with SingleTickerProviderStateMixin {
   // Session state
   VoiceSessionState _sessionState = VoiceSessionState.disconnected;
-  bool _isSpeechDetected = false;
 
   // Conversation
   final List<_ConversationTurn> _conversation = [];
   String _currentTranscription = '';
 
-  // Model state
-  String? _sttModel;
-  String? _llmModel;
-  String? _ttsModel;
+  // Model state - tracks which models are configured for the voice pipeline
   ModelLoadState _sttModelState = ModelLoadState.notLoaded;
   ModelLoadState _llmModelState = ModelLoadState.notLoaded;
   ModelLoadState _ttsModelState = ModelLoadState.notLoaded;
@@ -140,6 +134,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     }
   }
 
+  // TODO: Call this method when STT transcription completes in voice pipeline
+  // ignore: unused_element
   Future<void> _processTurn() async {
     if (_currentTranscription.isEmpty) return;
 

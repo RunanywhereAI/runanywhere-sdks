@@ -166,7 +166,7 @@ Each question should have 4 options and one correct answer.
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.quiz,
                           size: AppSpacing.iconXXLarge,
                           color: AppColors.primaryBlue,
@@ -299,9 +299,9 @@ class _QuizQuestionCardState extends State<_QuizQuestionCard> {
                           ),
                         ),
                         if (_showAnswer && isCorrect)
-                          Icon(Icons.check_circle, color: AppColors.primaryGreen),
+                          const Icon(Icons.check_circle, color: AppColors.primaryGreen),
                         if (_showAnswer && isSelected && !isCorrect)
-                          Icon(Icons.cancel, color: AppColors.primaryRed),
+                          const Icon(Icons.cancel, color: AppColors.primaryRed),
                       ],
                     ),
                   ),
