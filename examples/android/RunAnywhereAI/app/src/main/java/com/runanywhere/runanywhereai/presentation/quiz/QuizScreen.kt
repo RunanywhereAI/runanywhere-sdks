@@ -2,14 +2,18 @@ package com.runanywhere.runanywhereai.presentation.quiz
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,6 +25,8 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -80,7 +86,9 @@ fun QuizScreen(
                             }
                         },
                         isModelLoaded = uiState.isModelLoaded,
-                        canGenerate = uiState.canGenerateQuiz
+                        canGenerate = uiState.canGenerateQuiz,
+                        loadedModelName = uiState.loadedModelName,
+                        estimatedQuestionCount = uiState.estimatedQuestionCount
                     )
                 }
 
@@ -95,7 +103,10 @@ fun QuizScreen(
                         dragOffset = uiState.dragOffset,
                         swipeDirection = uiState.swipeDirection,
                         onSwipe = viewModel::handleSwipe,
-                        onSwipeComplete = viewModel::completeSwipe
+                        onSwipeComplete = viewModel::completeSwipe,
+                        onAnswerFalse = { viewModel.answerWithButton(false) },
+                        onAnswerTrue = { viewModel.answerWithButton(true) },
+                        onExit = viewModel::resetQuiz
                     )
                 }
 
@@ -150,6 +161,7 @@ fun QuizScreen(
 
 /**
  * Quiz input view for entering content to generate quiz from
+ * Aligned with iOS QuizInputView
  */
 @Composable
 fun QuizInputView(
@@ -157,7 +169,9 @@ fun QuizInputView(
     onInputChange: (String) -> Unit,
     onGenerateClick: () -> Unit,
     isModelLoaded: Boolean,
-    canGenerate: Boolean
+    canGenerate: Boolean,
+    loadedModelName: String? = null,
+    estimatedQuestionCount: Int = 3
 ) {
     Column(
         modifier = Modifier
@@ -166,94 +180,252 @@ fun QuizInputView(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Instructions card
-        Card(
+        // Header - matching iOS QuizInputView
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
+            verticalAlignment = Alignment.Top
         ) {
+            Icon(
+                Icons.Default.Psychology,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(Modifier.width(12.dp))
+
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.weight(1f)
             ) {
-                Icon(
-                    Icons.Default.Quiz,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
                 Text(
-                    "Create an AI Quiz",
-                    style = MaterialTheme.typography.headlineSmall,
+                    "Create a Quiz",
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Enter any text or topic below and AI will generate an interactive quiz for you!",
-                    style = MaterialTheme.typography.bodyMedium
+                    "Paste educational content to generate questions",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
 
-        // Input field
-        OutlinedTextField(
-            value = inputText,
-            onValueChange = onInputChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 200.dp),
-            label = { Text("Enter content or topic") },
-            placeholder = {
-                Text("Paste an article, enter a topic, or describe what you want to learn...")
-            },
-            supportingText = {
-                Text("${inputText.length} / 12000 characters")
-            },
-            maxLines = 15
-        )
-
-        // Model status
-        if (!isModelLoaded) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
+            // Experimental badge - matching iOS
+            Column(
+                horizontalAlignment = Alignment.End
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .background(
+                            Color(0xFFFF9800).copy(alpha = 0.15f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(
                         Icons.Default.Warning,
                         contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = Color(0xFFFF9800)
+                    )
+                    Text(
+                        "EXPERIMENTAL",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFFF9800)
+                    )
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "🚧 In Development",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+            }
+        }
+
+        // Input Section - matching iOS layout
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Header with character count
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    "Educational Content",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Column(
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        "${inputText.length} / 12000",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (inputText.length > 12000)
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "~$estimatedQuestionCount questions",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Input field
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = onInputChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 200.dp),
+                placeholder = {
+                    Text("Paste your lesson, article, or educational content here...")
+                },
+                maxLines = 15,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            // Character limit warning
+            if (inputText.length > 12000) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.error
                     )
                     Text(
-                        "No model loaded. Please load a model first.",
-                        style = MaterialTheme.typography.bodyMedium
+                        "Content is too long. Please reduce to under 12,000 characters.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
             }
         }
 
-        // Generate button
+        // Model status - matching iOS layout
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    if (isModelLoaded) Icons.Default.CheckCircle else Icons.Default.Info,
+                    contentDescription = null,
+                    tint = if (isModelLoaded) Color(0xFF4CAF50) else Color(0xFFFF9800),
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    if (isModelLoaded) "Using: ${loadedModelName ?: "Unknown"}"
+                    else "Please load a model from the Models tab",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // Generate button - matching iOS styling
         Button(
             onClick = onGenerateClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
-            enabled = canGenerate
+                .height(52.dp),
+            enabled = canGenerate,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                disabledContainerColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
         ) {
             Icon(
                 Icons.Default.AutoAwesome,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             )
             Spacer(Modifier.width(8.dp))
-            Text("Generate Quiz", fontSize = 18.sp)
+            Text(
+                "Generate Quiz",
+                fontWeight = FontWeight.SemiBold
+            )
         }
+
+        // Tips section - matching iOS
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Lightbulb,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        "Tips for better results:",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                BulletPointItem("Use educational content like lessons or articles")
+                BulletPointItem("Longer content generates more questions (up to 10)")
+                BulletPointItem("Questions test understanding, not memorization")
+                BulletPointItem("Each question includes an explanation")
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+/**
+ * Bullet point item matching iOS BulletPoint view
+ */
+@Composable
+private fun BulletPointItem(text: String) {
+    Row(
+        modifier = Modifier.padding(start = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            "•",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -318,7 +490,7 @@ fun QuizGeneratingView() {
 }
 
 /**
- * Swipeable quiz cards view
+ * Swipeable quiz cards view - aligned with iOS QuizSwipeView
  */
 @Composable
 fun QuizSwipeView(
@@ -327,59 +499,258 @@ fun QuizSwipeView(
     dragOffset: Float,
     swipeDirection: SwipeDirection,
     onSwipe: (Float) -> Unit,
-    onSwipeComplete: () -> Unit
+    onSwipeComplete: () -> Unit,
+    onAnswerFalse: () -> Unit = {},
+    onAnswerTrue: () -> Unit = {},
+    onExit: () -> Unit = {}
 ) {
-    val currentQuestion = session.questions.getOrNull(currentQuestionIndex)
-    val density = LocalDensity.current
+    var showInstructions by remember { mutableStateOf(true) }
+    val progressPercentage = if (session.questions.isNotEmpty()) {
+        currentQuestionIndex.toFloat() / session.questions.size
+    } else 0f
+
+    // Get visible questions (up to 3 stacked)
+    val visibleQuestions = session.questions.drop(currentQuestionIndex).take(3)
 
     Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Progress indicator
-        LinearProgressIndicator(
-            progress = (currentQuestionIndex + 1).toFloat() / session.questions.size,
+        // Progress Header - matching iOS
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "${currentQuestionIndex + 1} of ${session.questions.size}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            IconButton(onClick = onExit) {
+                Icon(
+                    Icons.Default.Cancel,
+                    contentDescription = "Exit Quiz",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+
+        // Progress Bar - matching iOS
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(4.dp)
-        )
-
-        Text(
-            "${currentQuestionIndex + 1} of ${session.questions.size}",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(8.dp)
-        )
-
-        // Quiz card
-        currentQuestion?.let { question ->
+                .padding(horizontal = 16.dp)
+        ) {
+            // Background
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                QuizCard(
-                    question = question,
-                    offset = dragOffset,
-                    swipeDirection = swipeDirection,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(0.7f)
-                        .offset { IntOffset(dragOffset.roundToInt(), 0) }
-                        .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragEnd = { onSwipeComplete() }
-                            ) { _, dragAmount ->
-                                onSwipe(dragOffset + dragAmount.x)
-                            }
-                        }
-                )
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant,
+                        RoundedCornerShape(2.dp)
+                    )
+            )
+            // Progress
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progressPercentage)
+                    .background(
+                        MaterialTheme.colorScheme.primary,
+                        RoundedCornerShape(2.dp)
+                    )
+            )
+        }
 
-                // Swipe indicators
-                SwipeIndicators(
-                    dragOffset = dragOffset,
-                    swipeThreshold = 100f
+        // Cards Area - stacked cards matching iOS
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Instructions overlay - matching iOS InstructionsOverlay
+            if (showInstructions) {
+                InstructionsOverlay(
+                    onDismiss = { showInstructions = false }
                 )
+            } else {
+                // Stacked cards (back to front)
+                visibleQuestions.asReversed().forEachIndexed { reversedIndex, question ->
+                    val index = visibleQuestions.size - 1 - reversedIndex
+                    val cardScale = 1f - (index * 0.05f)
+                    val cardOffsetY = (index * 10).dp
+                    val cardOpacity = if (index == 0) 1f else 0.8f
+
+                    QuizCard(
+                        question = question,
+                        offset = if (index == 0) dragOffset else 0f,
+                        swipeDirection = if (index == 0) swipeDirection else SwipeDirection.NONE,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.7f)
+                            .offset(y = cardOffsetY)
+                            .scale(cardScale)
+                            .alpha(cardOpacity)
+                            .then(
+                                if (index == 0) {
+                                    Modifier
+                                        .offset { IntOffset(dragOffset.roundToInt(), 0) }
+                                        .rotate(dragOffset / 20f)
+                                        .pointerInput(Unit) {
+                                            detectDragGestures(
+                                                onDragEnd = { onSwipeComplete() }
+                                            ) { _, dragAmount ->
+                                                onSwipe(dragOffset + dragAmount.x)
+                                            }
+                                        }
+                                } else Modifier
+                            )
+                    )
+                }
+            }
+        }
+
+        // Bottom Controls - matching iOS with False/True buttons
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 30.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // False button
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                IconButton(
+                    onClick = onAnswerFalse,
+                    modifier = Modifier
+                        .size(60.dp)
+                        .alpha(if (swipeDirection == SwipeDirection.LEFT) 1f else 0.6f)
+                        .scale(if (swipeDirection == SwipeDirection.LEFT) 1.1f else 1f)
+                ) {
+                    Icon(
+                        Icons.Default.Cancel,
+                        contentDescription = "False",
+                        modifier = Modifier.size(50.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+                Text(
+                    "False",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            // True button
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                IconButton(
+                    onClick = onAnswerTrue,
+                    modifier = Modifier
+                        .size(60.dp)
+                        .alpha(if (swipeDirection == SwipeDirection.RIGHT) 1f else 0.6f)
+                        .scale(if (swipeDirection == SwipeDirection.RIGHT) 1.1f else 1f)
+                ) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = "True",
+                        modifier = Modifier.size(50.dp),
+                        tint = Color(0xFF4CAF50)
+                    )
+                }
+                Text(
+                    "True",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Instructions overlay - matching iOS InstructionsOverlay
+ */
+@Composable
+fun InstructionsOverlay(
+    onDismiss: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth(0.85f)
+            .padding(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 20.dp),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Text(
+                "How to Play",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                                CircleShape
+                            )
+                            .padding(4.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Text("Swipe left or tap ✗ for False")
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                Color(0xFF4CAF50).copy(alpha = 0.1f),
+                                CircleShape
+                            )
+                            .padding(4.dp),
+                        tint = Color(0xFF4CAF50)
+                    )
+                    Text("Swipe right or tap ✓ for True")
+                }
+            }
+
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Got it!")
             }
         }
     }
@@ -514,7 +885,7 @@ fun SwipeIndicators(
 }
 
 /**
- * Quiz results view
+ * Quiz results view - aligned with iOS QuizResultsView
  */
 @Composable
 fun QuizResultsView(
@@ -522,123 +893,343 @@ fun QuizResultsView(
     onNewQuiz: () -> Unit,
     onRetry: () -> Unit
 ) {
+    var showingIncorrectAnswers by remember { mutableStateOf(false) }
+    val percentage = results.session.percentage
+    val scoreColor = when {
+        percentage >= 80 -> Color(0xFF4CAF50) // Green
+        percentage >= 60 -> Color(0xFFFF9800) // Orange
+        else -> MaterialTheme.colorScheme.error // Red
+    }
+    val performanceMessage = when {
+        percentage == 100.0 -> "Perfect Score! 🎉"
+        percentage >= 80 -> "Great Job! 👏"
+        percentage >= 60 -> "Good Effort! 💪"
+        else -> "Keep Practicing! 📚"
+    }
+    val avgTimePerQuestion = if (results.session.questions.isNotEmpty()) {
+        results.totalTimeSpent / results.session.questions.size
+    } else 0.0
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // Score card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
+        Spacer(Modifier.height(24.dp))
+
+        // Circular Score - matching iOS
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(200.dp)
         ) {
+            // Background circle
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawArc(
+                    color = Color.Gray.copy(alpha = 0.2f),
+                    startAngle = 0f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    style = Stroke(width = 20.dp.toPx(), cap = StrokeCap.Round)
+                )
+            }
+            // Progress circle
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawArc(
+                    color = scoreColor,
+                    startAngle = -90f,
+                    sweepAngle = (percentage / 100f * 360f).toFloat(),
+                    useCenter = false,
+                    style = Stroke(width = 20.dp.toPx(), cap = StrokeCap.Round)
+                )
+            }
+            // Score text
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "Quiz Complete!",
-                    style = MaterialTheme.typography.headlineMedium,
+                    "${results.session.score}",
+                    style = MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Bold
                 )
-
-                Spacer(Modifier.height(16.dp))
-
                 Text(
-                    "${results.session.score} / ${results.session.questions.size}",
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    "out of ${results.session.questions.size}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    "${results.session.percentage.toInt()}%",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                Text(
-                    "Time: ${formatTime(results.totalTimeSpent)}",
-                    style = MaterialTheme.typography.bodyMedium
+                    "${percentage.toInt()}%",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = scoreColor
                 )
             }
         }
 
-        // Incorrect questions
+        // Performance Message - matching iOS
+        Text(
+            performanceMessage,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+
+        // Statistics - matching iOS StatRow pattern
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatRow(
+                    icon = Icons.Default.Timer,
+                    label = "Time Spent",
+                    value = formatTime(results.totalTimeSpent),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                StatRow(
+                    icon = Icons.Default.CheckCircle,
+                    label = "Correct Answers",
+                    value = "${results.session.score}",
+                    color = Color(0xFF4CAF50)
+                )
+                StatRow(
+                    icon = Icons.Default.Cancel,
+                    label = "Incorrect Answers",
+                    value = "${results.incorrectQuestions.size}",
+                    color = MaterialTheme.colorScheme.error
+                )
+                StatRow(
+                    icon = Icons.Default.Schedule,
+                    label = "Avg. Time per Question",
+                    value = formatTime(avgTimePerQuestion),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        // Collapsible Review Section - matching iOS
         if (results.incorrectQuestions.isNotEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth()
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    Text(
-                        "Review Incorrect Answers",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    results.incorrectQuestions.forEach { question ->
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)
+                    // Collapsible header
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .pointerInput(Unit) {
+                                detectTapGestures {
+                                    showingIncorrectAnswers = !showingIncorrectAnswers
+                                }
+                            },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFFF9800)
+                            )
                             Text(
-                                question.question,
-                                style = MaterialTheme.typography.bodyMedium,
+                                "Review Incorrect Answers",
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Medium
                             )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                "Correct: ${if (question.correctAnswer) "True" else "False"}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                question.explanation,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Divider(modifier = Modifier.padding(top = 8.dp))
+                        }
+                        Icon(
+                            if (showingIncorrectAnswers) Icons.Default.KeyboardArrowUp
+                            else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Toggle"
+                        )
+                    }
+
+                    // Expandable content
+                    AnimatedVisibility(visible = showingIncorrectAnswers) {
+                        Column(
+                            modifier = Modifier.padding(top = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            results.incorrectQuestions.forEach { question ->
+                                IncorrectAnswerCard(
+                                    question = question,
+                                    userAnswer = getUserAnswer(results, question.id)
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Action buttons
-        Row(
+        // Action buttons - matching iOS styling
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedButton(
+            Button(
                 onClick = onRetry,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Retry Quiz")
             }
 
-            Button(
+            OutlinedButton(
                 onClick = onNewQuiz,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
+                Icon(Icons.Default.AddCircle, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("New Quiz")
             }
+        }
+
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * Get user answer for a question - matching iOS helper
+ */
+private fun getUserAnswer(results: QuizResults, questionId: String): Boolean {
+    return results.session.answers.find { it.questionId == questionId }?.userAnswer ?: false
+}
+
+/**
+ * Stat row component - matching iOS StatRow
+ */
+@Composable
+private fun StatRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    color: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+/**
+ * Incorrect answer card - matching iOS IncorrectAnswerCard
+ */
+@Composable
+private fun IncorrectAnswerCard(
+    question: QuizQuestion,
+    userAnswer: Boolean
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                question.question,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Cancel,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        "Your answer: ${if (userAnswer) "True" else "False"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFF4CAF50)
+                    )
+                    Text(
+                        "Correct: ${if (question.correctAnswer) "True" else "False"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF4CAF50)
+                    )
+                }
+            }
+
+            Text(
+                "Explanation:",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                question.explanation,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

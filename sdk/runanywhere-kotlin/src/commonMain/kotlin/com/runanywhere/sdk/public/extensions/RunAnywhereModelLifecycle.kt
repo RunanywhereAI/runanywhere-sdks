@@ -7,8 +7,11 @@ import com.runanywhere.sdk.models.lifecycle.ModelLifecycleEvent
 import com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker
 import com.runanywhere.sdk.models.lifecycle.ModelLoadState
 import com.runanywhere.sdk.public.RunAnywhereSDK
+import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+
+private val logger = SDKLogger("ModelLifecycle")
 
 /**
  * RunAnywhere Model Lifecycle Extensions
@@ -152,6 +155,7 @@ suspend fun RunAnywhereSDK.unloadModelForModality(modality: Modality) {
         }
     } catch (e: Exception) {
         // Log but continue with lifecycle update
+        logger.warning("Error during model unload for modality $modality: ${e.message}")
     }
 
     ModelLifecycleTracker.modelDidUnload(state.modelId, modality)

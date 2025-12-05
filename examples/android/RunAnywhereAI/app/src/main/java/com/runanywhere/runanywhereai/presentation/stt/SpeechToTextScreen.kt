@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
  * Features:
  * - Batch mode: Record full audio then transcribe
  * - Live mode: Real-time streaming transcription
- * - Recording button with GREEN color when recording (matching iOS)
+ * - Recording button with RED color when recording (matching iOS exactly)
  * - Audio level visualization with GREEN bars
  * - Model status banner
  * - Transcription display
@@ -647,7 +647,7 @@ private fun ControlsSection(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Recording button - GREEN when recording (matching iOS)
+        // Recording button - RED when recording (matching iOS exactly)
         RecordingButton(
             recordingState = recordingState,
             audioLevel = audioLevel,
@@ -805,8 +805,9 @@ private fun STTModeSelector(
 }
 
 /**
- * Recording Button - GREEN when recording (matching iOS exactly)
- * iOS Reference: Recording button in SpeechToTextView with mic color change
+ * Recording Button - RED when recording (matching iOS exactly)
+ * iOS Reference: Recording button in SpeechToTextView
+ * iOS Color States: Blue (idle) → Red (recording) → Orange (transcribing)
  */
 @Composable
 private fun RecordingButton(
@@ -826,13 +827,12 @@ private fun RecordingButton(
         label = "pulse_scale"
     )
 
-    // iOS Reference: Blue when idle, GREEN when recording (matching iOS green mic indicator)
-    // iOS shows green mic.circle icon when ready, and the button turns red only on stop.fill
-    // For active recording, iOS shows a pulsing effect - we match with GREEN to indicate active capture
+    // iOS Reference: Blue when idle, RED when recording, Orange when transcribing
+    // iOS code: viewModel.isRecording ? Color.red : (viewModel.isTranscribing ? Color.orange : Color.blue)
     val buttonColor by animateColorAsState(
         targetValue = when (recordingState) {
             RecordingState.IDLE -> AppColors.primaryBlue
-            RecordingState.RECORDING -> AppColors.primaryGreen // GREEN when recording - matching iOS
+            RecordingState.RECORDING -> AppColors.primaryRed // RED when recording - matching iOS exactly
             RecordingState.PROCESSING -> AppColors.primaryOrange
         },
         animationSpec = tween(300),
@@ -845,30 +845,31 @@ private fun RecordingButton(
         RecordingState.PROCESSING -> Icons.Filled.Sync
     }
 
+    // iOS button is 72pt - use 72dp to match
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(120.dp)
+            .size(88.dp) // Container for button + pulse ring
             .scale(if (recordingState == RecordingState.RECORDING) scale else 1f)
     ) {
-        // Pulsing ring when recording - GREEN to match iOS
+        // Pulsing ring when recording - RED to match iOS
         if (recordingState == RecordingState.RECORDING) {
             Box(
                 modifier = Modifier
-                    .size(120.dp)
+                    .size(84.dp) // Slightly larger than button for pulse effect
                     .border(
-                        width = 3.dp,
-                        color = AppColors.primaryGreen.copy(alpha = 0.3f), // GREEN ring
+                        width = 2.dp,
+                        color = AppColors.primaryRed.copy(alpha = 0.3f), // RED ring - matching iOS
                         shape = CircleShape
                     )
                     .scale(scale * 1.1f)
             )
         }
 
-        // Main button
+        // Main button - 72dp to match iOS 72pt
         Surface(
             modifier = Modifier
-                .size(100.dp)
+                .size(72.dp)
                 .clickable(
                     enabled = enabled,
                     onClick = onToggleRecording
@@ -882,7 +883,7 @@ private fun RecordingButton(
             ) {
                 if (recordingState == RecordingState.PROCESSING) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(32.dp), // Match iOS icon size
                         color = Color.White,
                         strokeWidth = 3.dp
                     )
@@ -895,7 +896,7 @@ private fun RecordingButton(
                             RecordingState.PROCESSING -> "Processing"
                         },
                         tint = Color.White,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(32.dp) // Match iOS 32pt icon
                     )
                 }
             }

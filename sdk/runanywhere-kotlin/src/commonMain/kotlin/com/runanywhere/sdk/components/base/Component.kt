@@ -72,7 +72,8 @@ enum class SDKComponent {
     LLM,
     VLM,
     WAKEWORD,
-    SPEAKER_DIARIZATION
+    SPEAKER_DIARIZATION,
+    VOICE_AGENT
 }
 
 // MARK: - Component Health and Status

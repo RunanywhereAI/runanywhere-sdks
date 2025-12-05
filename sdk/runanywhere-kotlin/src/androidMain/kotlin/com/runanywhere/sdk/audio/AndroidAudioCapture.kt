@@ -56,6 +56,7 @@ class AndroidAudioCapture(
     private val bufferSizeFrames = minBufferSize / frameSize
 
     private var audioRecord: AudioRecord? = null
+    @Volatile
     private var isRecording = false
     private var sequenceNumber = 0
 

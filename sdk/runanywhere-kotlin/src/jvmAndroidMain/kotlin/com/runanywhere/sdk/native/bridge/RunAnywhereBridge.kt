@@ -1,11 +1,8 @@
 package com.runanywhere.sdk.native.bridge
 
-private const val TAG = "RunAnywhereBridge"
+import com.runanywhere.sdk.foundation.SDKLogger
 
-// Simple logging that works on both JVM and Android (println shows in logcat on Android)
-private fun logI(tag: String, msg: String) = println("I/$tag: $msg")
-private fun logD(tag: String, msg: String) = println("D/$tag: $msg")
-private fun logE(tag: String, msg: String) = println("E/$tag: $msg")
+private val logger = SDKLogger("RunAnywhereBridge")
 
 /**
  * Unified RunAnywhere Native Bridge
@@ -48,12 +45,12 @@ object RunAnywhereBridge {
         if (isLibraryLoaded) return
 
         try {
-            logI(TAG, "Loading unified RunAnywhere JNI library...")
+            logger.info("Loading unified RunAnywhere JNI library...")
             System.loadLibrary("runanywhere_jni")
             isLibraryLoaded = true
-            logI(TAG, "Successfully loaded librunanywhere_jni.so")
+            logger.info("Successfully loaded librunanywhere_jni.so")
         } catch (e: UnsatisfiedLinkError) {
-            logE(TAG, "Failed to load RunAnywhere JNI native library: ${e.message}")
+            logger.error("Failed to load RunAnywhere JNI native library: ${e.message}", e)
             throw RuntimeException("Failed to load RunAnywhere JNI native library", e)
         }
     }

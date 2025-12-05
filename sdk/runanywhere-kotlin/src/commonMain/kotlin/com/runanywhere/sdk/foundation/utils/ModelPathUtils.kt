@@ -101,7 +101,7 @@ object ModelPathUtils {
      */
     fun getModelFilePath(modelId: String, framework: LLMFramework, format: ModelFormat): String {
         val folder = getModelFolder(modelId, framework)
-        val extension = format.name.lowercase()
+        val extension = format.value
         return "$folder/$modelId.$extension"
     }
 
@@ -115,7 +115,7 @@ object ModelPathUtils {
      */
     fun getModelFilePath(modelId: String, format: ModelFormat): String {
         val folder = getModelFolder(modelId)
-        val extension = format.name.lowercase()
+        val extension = format.value
         return "$folder/$modelId.$extension"
     }
 

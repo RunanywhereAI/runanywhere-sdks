@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.Flow
  * ```
  */
 expect class LlamaCppService(configuration: LLMConfiguration) : LLMService {
+    // Core LLMService interface methods (from iOS LLMService protocol)
     override suspend fun initialize(modelPath: String?)
     override suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions): String
     override suspend fun streamGenerate(
@@ -41,11 +42,11 @@ expect class LlamaCppService(configuration: LLMConfiguration) : LLMService {
     override val isReady: Boolean
     override val currentModel: String?
 
-    // EnhancedLLMService
-    override suspend fun process(input: LLMInput): LLMOutput
-    override fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk>
-    override suspend fun loadModel(modelInfo: ModelInfo)
-    override fun cancelCurrent()
-    override fun getTokenCount(text: String): Int
-    override fun fitsInContext(prompt: String, maxTokens: Int): Boolean
+    // Additional utility methods (not part of LLMService interface, but useful for direct service access)
+    suspend fun process(input: LLMInput): LLMOutput
+    fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk>
+    suspend fun loadModel(modelInfo: ModelInfo)
+    fun cancelCurrent()
+    fun getTokenCount(text: String): Int
+    fun fitsInContext(prompt: String, maxTokens: Int): Boolean
 }

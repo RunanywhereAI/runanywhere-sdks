@@ -208,13 +208,10 @@ class STTHandler(
         options: STTOptions
     ): STTResult {
 
-        // Convert based on service's preferred format (matching iOS pattern)
-        logger.debug("Converting ${samples.size} float samples based on service preference")
+        // Convert float samples to PCM bytes (matching iOS pattern)
+        logger.debug("Converting ${samples.size} float samples to PCM bytes")
 
-        val audioData = when (service.preferredAudioFormat) {
-            STTServiceAudioFormat.FLOAT_ARRAY -> convertFloatArrayToBytes(samples) // Service can handle floats internally
-            STTServiceAudioFormat.DATA -> convertFloatArrayToBytes(samples)
-        }
+        val audioData = convertFloatArrayToBytes(samples)
 
         logger.debug("Calling STT.transcribe with ${audioData.size} bytes")
 
@@ -251,14 +248,15 @@ class STTHandler(
     }
 
     private fun convertFloatArrayToBytes(samples: FloatArray): ByteArray {
-        // Convert float samples to byte array (matching iOS conversion pattern)
-        val byteArray = ByteArray(samples.size * 4) // 4 bytes per float
+        // Convert float samples to 16-bit signed PCM (matches STTComponent pattern)
+        // This is what JvmWhisperSTTService.convertPCMBytesToFloat expects to decode
+        val byteArray = ByteArray(samples.size * 2) // 2 bytes per sample (16-bit PCM)
         for (i in samples.indices) {
-            val bits = samples[i].toBits()
-            byteArray[i * 4] = (bits and 0xFF).toByte()
-            byteArray[i * 4 + 1] = ((bits shr 8) and 0xFF).toByte()
-            byteArray[i * 4 + 2] = ((bits shr 16) and 0xFF).toByte()
-            byteArray[i * 4 + 3] = ((bits shr 24) and 0xFF).toByte()
+            // Scale float [-1.0, 1.0] to 16-bit signed integer range
+            val sample = (samples[i] * 32767).toInt().coerceIn(-32768, 32767)
+            // Little-endian format
+            byteArray[i * 2] = (sample and 0xFF).toByte()
+            byteArray[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
         }
         return byteArray
     }
@@ -298,38 +296,7 @@ class STTHandler(
     }
 }
 
-// MARK: - Supporting Classes (matching iOS patterns)
-
-/**
- * STT Result data class (matches iOS STTResult)
- */
-data class STTResult(
-    val text: String,
-    val segments: List<STTSegment>,
-    val language: String?,
-    val confidence: Float,
-    val duration: Double,
-    val alternatives: List<STTAlternative>
-)
-
-/**
- * STT Segment data class (matches iOS STTSegment)
- */
-data class STTSegment(
-    val text: String,
-    val startTime: Double,
-    val endTime: Double,
-    val confidence: Float,
-    val speaker: Int? = null
-)
-
-/**
- * STT Alternative data class (matches iOS STTAlternative)
- */
-data class STTAlternative(
-    val text: String,
-    val confidence: Float
-)
+// MARK: - Supporting Interfaces
 
 /**
  * Speaker Diarization Service interface (matches iOS pattern)

@@ -304,7 +304,6 @@ class LLMComponent(
     /**
      * Process LLM input
      */
-    @OptIn(DelicateCoroutinesApi::class)
     suspend fun process(input: LLMInput): LLMOutput {
         ensureReady()
 
@@ -486,6 +485,7 @@ class LLMComponent(
 
     /**
      * Stream generation with structured input/output
+     * Component-level method that builds the prompt and delegates to streamGenerate
      */
     fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
         ensureReady()
@@ -495,10 +495,49 @@ class LLMComponent(
         // Validate input
         input.validate()
 
-        // Use the service's streaming capability
-        service.streamProcess(input).collect { chunk ->
-            emit(chunk)
+        // Use provided options or create from configuration
+        val options = input.options ?: RunAnywhereGenerationOptions(
+            maxTokens = llmConfiguration.maxTokens,
+            temperature = llmConfiguration.temperature.toFloat(),
+            streamingEnabled = true
+        )
+
+        // Build prompt from messages
+        val prompt = buildPrompt(input.messages, input.systemPrompt ?: llmConfiguration.effectiveSystemPrompt)
+
+        // Track chunks for structured output
+        var chunkIndex = 0
+        val sessionId = generateUUID()
+
+        // Collect tokens from streaming service
+        val tokens = mutableListOf<String>()
+        service.streamGenerate(prompt, options) { token ->
+            tokens.add(token)
         }
+
+        // Emit collected tokens as chunks
+        for (token in tokens) {
+            emit(LLMGenerationChunk(
+                text = token,
+                isComplete = false,
+                tokenCount = 1,
+                timestamp = currentTimeMillis(),
+                chunkIndex = chunkIndex++,
+                sessionId = sessionId,
+                finishReason = null
+            ))
+        }
+
+        // Emit final chunk
+        emit(LLMGenerationChunk(
+            text = "",
+            isComplete = true,
+            tokenCount = 0,
+            timestamp = currentTimeMillis(),
+            chunkIndex = chunkIndex,
+            sessionId = sessionId,
+            finishReason = FinishReason.COMPLETED
+        ))
     }
 
     /**
@@ -510,38 +549,55 @@ class LLMComponent(
 
     /**
      * Load a specific model
+     * Note: In iOS architecture, model loading is handled during service creation via configuration.
+     * This method re-initializes the service with the new model path.
      */
     suspend fun loadModel(modelInfo: ModelInfo) {
         val service = llmService ?: throw SDKError.ComponentNotReady("LLM service not available")
-        service.loadModel(modelInfo)
+
+        // Update model path and re-initialize service
+        modelPath = modelInfo.localPath ?: modelInfo.id
+        service.initialize(modelPath)
+        _isModelLoaded = true
+
+        logger.info("Model loaded: ${modelInfo.name}")
     }
 
     /**
      * Cancel current generation
+     * Note: This is a component-level utility not part of iOS LLMService protocol.
+     * Individual service implementations may support cancellation through their own mechanisms.
      */
     fun cancelCurrent() {
-        llmService?.cancelCurrent()
+        // Component-level cancellation tracking could be added here
+        // For now, this is a placeholder as iOS doesn't expose this on the service interface
+        logger.debug("Cancel requested - individual service implementations may handle differently")
     }
 
     /**
      * Get token count for text
      *
-     * NOTE: If the LLM service doesn't provide accurate tokenization, falls back to rough estimation
-     * of ~4 characters per token. See line 322 for detailed limitations of this approximation.
+     * Uses rough estimation of ~4 characters per token.
+     * LIMITATION: This is a very rough approximation. Actual token counts vary significantly based on:
+     * - Tokenizer type (BPE, WordPiece, SentencePiece, etc.)
+     * - Language and character encoding (ASCII vs Unicode)
+     * - Vocabulary and token boundaries
+     * For precise token counts, use the model's actual tokenizer.
+     *
+     * Note: This is a component-level utility not part of iOS LLMService protocol.
      */
     fun getTokenCount(text: String): Int {
-        return llmService?.getTokenCount(text) ?: (text.length / 4) // Fallback estimation
+        return text.length / 4 // Rough estimation: ~4 characters per token
     }
 
     /**
      * Check if prompt fits within context window
+     * Note: This is a component-level utility not part of iOS LLMService protocol.
      */
     fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
-        return llmService?.fitsInContext(prompt, maxTokens) ?: run {
-            val promptTokens = getTokenCount(prompt)
-            val totalTokens = promptTokens + maxTokens
-            totalTokens <= llmConfiguration.contextLength
-        }
+        val promptTokens = getTokenCount(prompt)
+        val totalTokens = promptTokens + maxTokens
+        return totalTokens <= llmConfiguration.contextLength
     }
 
     /**
@@ -579,22 +635,28 @@ class LLMComponent(
 
     // MARK: - Private Helpers
 
+    /**
+     * Build prompt from messages - matches iOS buildPrompt() exactly
+     *
+     * iOS Pattern: For LLM services, we should NOT add role markers as they handle their own templating.
+     * Just concatenate the messages with newlines. Don't add trailing "Assistant: " - LLM service handles this.
+     *
+     * Source: iOS LLMComponent.swift lines 520-536
+     */
     private fun buildPrompt(messages: List<Message>, systemPrompt: String?): String {
         var prompt = ""
 
+        // Add system prompt first if available
         systemPrompt?.let { system ->
-            prompt += "System: $system\n\n"
+            prompt += "$system\n\n"
         }
 
+        // Add messages without role markers - let LLM service handle formatting
         for (message in messages) {
-            when (message.role) {
-                MessageRole.USER -> prompt += "User: ${message.content}\n"
-                MessageRole.ASSISTANT -> prompt += "Assistant: ${message.content}\n"
-                MessageRole.SYSTEM -> prompt += "System: ${message.content}\n"
-            }
+            prompt += "${message.content}\n"
         }
 
-        prompt += "Assistant: "
-        return prompt
+        // Don't add trailing "Assistant: " - LLM service handles this
+        return prompt.trim()
     }
 }

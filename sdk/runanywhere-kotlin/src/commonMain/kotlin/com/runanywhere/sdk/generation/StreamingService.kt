@@ -3,6 +3,7 @@ package com.runanywhere.sdk.generation
 import com.runanywhere.sdk.components.llm.LLMService
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.LoadedModelWithService
 import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
 import com.runanywhere.sdk.services.analytics.PerformanceMetrics
@@ -51,8 +52,8 @@ class StreamingService {
         logger.info("📝 User prompt: $prompt")
 
         // Track analytics
-        val generationId = "gen_${System.currentTimeMillis()}_${(0..9999).random()}"
-        val startTime = System.currentTimeMillis()
+        val generationId = "gen_${currentTimeMillis()}_${(0..9999).random()}"
+        val startTime = currentTimeMillis()
         var timeToFirstTokenMs: Double? = null
 
         // Convert to RunAnywhereGenerationOptions
@@ -77,14 +78,14 @@ class StreamingService {
             llmService.streamGenerate(prompt, llmOptions) { token ->
                 // Track time to first token (matches iOS analytics)
                 if (!firstTokenReceived) {
-                    timeToFirstTokenMs = (System.currentTimeMillis() - startTime).toDouble()
+                    timeToFirstTokenMs = (currentTimeMillis() - startTime).toDouble()
                     firstTokenReceived = true
                 }
                 fullText.append(token)
             }
 
             val generatedText = fullText.toString()
-            val latencyMs = System.currentTimeMillis() - startTime
+            val latencyMs = currentTimeMillis() - startTime
 
             emit(GenerationChunk(
                 text = generatedText,
@@ -103,7 +104,7 @@ class StreamingService {
                 success = true
             )
         } catch (e: Exception) {
-            val latencyMs = System.currentTimeMillis() - startTime
+            val latencyMs = currentTimeMillis() - startTime
 
             // Submit analytics for failure (non-blocking)
             submitAnalytics(
@@ -263,4 +264,18 @@ data class PartialCompletion(
     val text: String,
     val confidence: Float,
     val isComplete: Boolean = false
+)
+
+/**
+ * Represents a streaming token with type information.
+ *
+ * Used for streaming text generation where tokens need to be
+ * classified as either thinking/reasoning or actual content.
+ */
+data class StreamingToken(
+    val text: String,
+    val tokenIndex: Int,
+    val isLast: Boolean,
+    val timestamp: Long = currentTimeMillis(),
+    val type: TokenType = TokenType.CONTENT
 )
