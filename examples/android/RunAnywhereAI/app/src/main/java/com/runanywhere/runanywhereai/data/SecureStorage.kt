@@ -24,17 +24,42 @@ class SecureStorage(context: Context) {
         private const val KEY_API_KEY = "runanywhere_api_key"
     }
 
-    private val masterKey: MasterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
+    // Fallback to regular SharedPreferences if encryption fails
+    private var isEncryptionAvailable = true
 
-    private val securePrefs: SharedPreferences = EncryptedSharedPreferences.create(
-        context,
-        PREFS_NAME,
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val masterKey: MasterKey? = try {
+        MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to create MasterKey, falling back to unencrypted storage: ${e.message}")
+        isEncryptionAvailable = false
+        null
+    }
+
+    private val securePrefs: SharedPreferences = try {
+        if (masterKey != null) {
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } else {
+            // Fallback to regular SharedPreferences
+            context.getSharedPreferences(PREFS_NAME + "_fallback", Context.MODE_PRIVATE)
+        }
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to create EncryptedSharedPreferences, falling back: ${e.message}")
+        isEncryptionAvailable = false
+        context.getSharedPreferences(PREFS_NAME + "_fallback", Context.MODE_PRIVATE)
+    }
+
+    /**
+     * Check if encrypted storage is being used
+     */
+    fun isUsingEncryptedStorage(): Boolean = isEncryptionAvailable
 
     /**
      * Save API key securely
@@ -42,7 +67,9 @@ class SecureStorage(context: Context) {
      */
     fun saveApiKey(apiKey: String) {
         securePrefs.edit().putString(KEY_API_KEY, apiKey).apply()
-        Log.d(TAG, "API key saved securely")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "API key saved${if (isEncryptionAvailable) " securely" else " (fallback storage)"}")
+        }
     }
 
     /**
@@ -59,7 +86,9 @@ class SecureStorage(context: Context) {
      */
     fun deleteApiKey() {
         securePrefs.edit().remove(KEY_API_KEY).apply()
-        Log.d(TAG, "API key deleted")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "API key deleted")
+        }
     }
 
     /**
@@ -75,7 +104,9 @@ class SecureStorage(context: Context) {
      */
     fun saveSecureString(key: String, value: String) {
         securePrefs.edit().putString(key, value).apply()
-        Log.d(TAG, "Secure string saved for key: $key")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "Secure string saved")
+        }
     }
 
     /**
@@ -90,6 +121,8 @@ class SecureStorage(context: Context) {
      */
     fun deleteSecureString(key: String) {
         securePrefs.edit().remove(key).apply()
-        Log.d(TAG, "Secure string deleted for key: $key")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "Secure string deleted")
+        }
     }
 }

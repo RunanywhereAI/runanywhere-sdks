@@ -11,8 +11,10 @@ import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.*
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.data.models.generateUUID
-import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
@@ -33,6 +35,13 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
     private val coreService = LlamaCppCoreService()
     private var modelPath: String? = null
     private var isServiceInitialized = false
+
+    /**
+     * Service-scoped CoroutineScope for fire-and-forget telemetry operations.
+     * Uses SupervisorJob to prevent failures from affecting other telemetry operations.
+     * Cancelled when the service is cleaned up to prevent resource leaks.
+     */
+    private val telemetryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     actual override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
         val actualModelPath = modelPath ?: configuration.modelId
@@ -80,7 +89,6 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         )
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
     actual override suspend fun streamGenerate(
         prompt: String,
         options: RunAnywhereGenerationOptions,
@@ -110,7 +118,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         logger.info("Starting LLM generation with model: $modelId")
 
         // Track generation started - fire and forget to avoid blocking generation
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        telemetryScope.launch {
             try {
                 telemetryService?.trackGenerationStarted(
                     generationId = generationId,
@@ -151,7 +159,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             } else 0.0
 
             // Track generation completed - fire and forget
-            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            telemetryScope.launch {
                 try {
                     telemetryService?.trackGenerationCompleted(
                         generationId = generationId,
@@ -177,7 +185,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             val errorMsg = e.message ?: "Unknown error"
 
             // Track generation failed - fire and forget
-            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            telemetryScope.launch {
                 try {
                     telemetryService?.trackGenerationFailed(
                         generationId = generationId,
@@ -202,6 +210,8 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
     actual override suspend fun cleanup() {
         if (isServiceInitialized) {
             logger.info("Cleaning up LlamaCpp (RunAnywhere Core)")
+            // Cancel telemetry scope to prevent resource leaks
+            telemetryScope.cancel()
             coreService.destroy() // suspend fun, handles its own dispatcher and mutex
             isServiceInitialized = false
             modelPath = null

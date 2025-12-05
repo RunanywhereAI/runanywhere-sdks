@@ -122,9 +122,12 @@ actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTSer
     return wrapper
 }
 
-// Cached ONNX TTS service for reuse
+// Cached ONNX TTS service for reuse (thread-safe access via synchronized blocks)
+@Volatile
 private var cachedTTSCoreService: ONNXCoreService? = null
+@Volatile
 private var cachedTTSModelPath: String? = null
+private val ttsCacheLock = Any()  // Lock object for thread-safe cache access
 
 /**
  * JVM/Android implementation of ONNX TTS synthesis
@@ -217,25 +220,28 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
 
     logger.info("Starting ONNX TTS synthesis...")
 
-    // Check if we can reuse the cached service
-    val service: ONNXCoreService
-    if (cachedTTSCoreService != null && cachedTTSModelPath == modelPath) {
-        logger.debug("Reusing cached TTS service")
-        service = cachedTTSCoreService!!
-    } else {
-        // Create and initialize new service
-        logger.info("Creating new ONNX TTS service...")
-        service = ONNXCoreService()
-        service.initialize()
+    // Thread-safe access to cached service to prevent race conditions
+    val service: ONNXCoreService = synchronized(ttsCacheLock) {
+        val cached = cachedTTSCoreService
+        if (cached != null && cachedTTSModelPath == modelPath) {
+            logger.debug("Reusing cached TTS service")
+            cached
+        } else {
+            // Create and initialize new service
+            logger.info("Creating new ONNX TTS service...")
+            val newService = ONNXCoreService()
+            newService.initialize()
 
-        // Load the TTS model
-        logger.info("Loading TTS model from: $modelPath")
-        service.loadTTSModel(modelPath, "vits")
-        logger.info("TTS model loaded successfully")
+            // Load the TTS model
+            logger.info("Loading TTS model from: $modelPath")
+            newService.loadTTSModel(modelPath, "vits")
+            logger.info("TTS model loaded successfully")
 
-        // Cache for reuse
-        cachedTTSCoreService = service
-        cachedTTSModelPath = modelPath
+            // Cache for reuse
+            cachedTTSCoreService = newService
+            cachedTTSModelPath = modelPath
+            newService
+        }
     }
 
     // Synthesize

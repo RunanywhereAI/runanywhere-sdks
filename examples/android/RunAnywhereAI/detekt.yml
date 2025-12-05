@@ -121,7 +121,7 @@ exceptions:
   ObjectExtendsThrowable:
     active: true
   PrintStackTrace:
-    active: false
+    active: true
   RethrowCaughtException:
     active: true
   ReturnFromFinally:
