@@ -60,9 +60,8 @@ enum class ProcessorType {
             M1, M1_PRO, M1_MAX, M1_ULTRA,
             M2, M2_PRO, M2_MAX, M2_ULTRA,
             M3, M3_PRO, M3_MAX,
-            M4, M4_PRO, M4_MAX,
-            ARM -> true
-            INTEL, UNKNOWN -> false
+            M4, M4_PRO, M4_MAX -> true
+            ARM, INTEL, UNKNOWN -> false
         }
 }
 

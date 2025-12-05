@@ -17,6 +17,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Mutex
 
 /**
  * Voice Agent Component - Orchestrates the complete voice AI pipeline
@@ -58,9 +59,8 @@ class VoiceAgentComponent(
 
     // MARK: - State Management
 
-    /** Whether the pipeline is currently processing */
-    @Volatile
-    private var isProcessing = false
+    /** Mutex to ensure atomic access to pipeline processing */
+    private val processingMutex = Mutex()
 
     /** Current pipeline state */
     @Volatile
@@ -107,6 +107,9 @@ class VoiceAgentComponent(
             logger.info("STT component initialized successfully")
         } catch (e: Exception) {
             logger.error("Failed to initialize STT component", e)
+            // Cleanup VAD before throwing
+            vadComponent?.cleanup()
+            vadComponent = null
             throw VoiceAgentError.ComponentInitializationFailed("STT", e)
         }
 
@@ -118,6 +121,11 @@ class VoiceAgentComponent(
             logger.info("LLM component initialized successfully")
         } catch (e: Exception) {
             logger.error("Failed to initialize LLM component", e)
+            // Cleanup STT and VAD before throwing
+            sttComponent?.cleanup()
+            sttComponent = null
+            vadComponent?.cleanup()
+            vadComponent = null
             throw VoiceAgentError.ComponentInitializationFailed("LLM", e)
         }
 
@@ -129,6 +137,13 @@ class VoiceAgentComponent(
             logger.info("TTS component initialized successfully")
         } catch (e: Exception) {
             logger.error("Failed to initialize TTS component", e)
+            // Cleanup LLM, STT, and VAD before throwing
+            llmComponent?.cleanup()
+            llmComponent = null
+            sttComponent?.cleanup()
+            sttComponent = null
+            vadComponent?.cleanup()
+            vadComponent = null
             throw VoiceAgentError.ComponentInitializationFailed("TTS", e)
         }
 
@@ -136,7 +151,6 @@ class VoiceAgentComponent(
     }
 
     override suspend fun performCleanup() {
-        isProcessing = false
         pipelineState = VoiceAgentPipelineState.IDLE
 
         // Cleanup all sub-components in order
@@ -183,14 +197,12 @@ class VoiceAgentComponent(
     suspend fun processAudio(audioData: ByteArray): VoiceAgentResult {
         ensureReady()
 
-        if (isProcessing) {
+        if (!processingMutex.tryLock()) {
             throw SDKError.InvalidState("Pipeline is already processing")
         }
 
-        isProcessing = true
-        pipelineState = VoiceAgentPipelineState.VAD_PROCESSING
-
         try {
+            pipelineState = VoiceAgentPipelineState.VAD_PROCESSING
             var result = VoiceAgentResult()
 
             // Step 1: VAD - Voice Activity Detection
@@ -254,7 +266,7 @@ class VoiceAgentComponent(
             EventBus.publish(SDKVoiceEvent.PipelineError(e))
             throw e
         } finally {
-            isProcessing = false
+            processingMutex.unlock()
         }
     }
 
@@ -392,7 +404,7 @@ class VoiceAgentComponent(
     /**
      * Check if pipeline is currently processing
      */
-    fun isProcessing(): Boolean = isProcessing
+    fun isProcessing(): Boolean = processingMutex.isLocked
 
     /**
      * Check if all sub-components are ready
