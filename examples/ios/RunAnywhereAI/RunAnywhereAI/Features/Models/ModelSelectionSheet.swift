@@ -498,8 +498,20 @@ struct ModelSelectionSheet: View {
             // Wait a moment to show success message
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
-            // Update the shared view model first to ensure state consistency
-            await viewModel.selectModel(model)
+            // Only update ModelListViewModel for LLM models
+            // STT and TTS models are tracked separately via ModelLifecycleTracker
+            if context == .llm || (context == .voice && (model.category == .language || model.category == .multimodal)) {
+                // LLM models use ModelListViewModel to track current model
+                await viewModel.setCurrentModel(model)
+
+                // Post notification that model was loaded successfully
+                await MainActor.run {
+                    NotificationCenter.default.post(
+                        name: Notification.Name("ModelLoaded"),
+                        object: model
+                    )
+                }
+            }
 
             // Call the callback with the loaded model
             await onModelSelected(model)

@@ -3,6 +3,7 @@ package com.runanywhere.runanywhereai.presentation.voice
 import android.Manifest
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.animation.core.EaseInOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -717,6 +718,19 @@ private fun MainVoiceAssistantUI(
                 )
             }
 
+            // Audio level indicator (shown during listening)
+            // iOS Reference: VoiceAssistantView.swift lines 377-406
+            AnimatedVisibility(
+                visible = uiState.sessionState == SessionState.LISTENING || uiState.isListening,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                AudioLevelIndicator(
+                    audioLevel = uiState.audioLevel,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+            }
+
             // Main mic button
             MicrophoneButton(
                 isListening = uiState.isListening,
@@ -863,6 +877,86 @@ private fun ConversationBubble(
                 .padding(12.dp)
                 .fillMaxWidth()
         )
+    }
+}
+
+/**
+ * Audio Level Indicator with RECORDING badge and animated bars
+ *
+ * iOS Reference: VoiceAssistantView.swift lines 377-406
+ * Shows 10 animated audio level bars during recording
+ */
+@Composable
+private fun AudioLevelIndicator(
+    audioLevel: Float,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Recording status badge
+        // iOS Reference: HStack with red circle + "RECORDING" text
+        Row(
+            modifier = Modifier
+                .background(
+                    Color.Red.copy(alpha = 0.1f),
+                    RoundedCornerShape(4.dp)
+                )
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Pulsing red dot
+            val infiniteTransition = rememberInfiniteTransition(label = "recording_pulse")
+            val pulseAlpha by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = 0.5f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(500),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "recordingDotPulse"
+            )
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Color.Red.copy(alpha = pulseAlpha))
+            )
+            Text(
+                text = "RECORDING",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                color = Color.Red
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Audio level bars (10 bars matching iOS)
+        // iOS Reference: HStack with 10 RoundedRectangles
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            repeat(10) { index ->
+                val isActive = index < (audioLevel * 10).toInt()
+                Box(
+                    modifier = Modifier
+                        .width(25.dp)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(
+                            if (isActive) Color(0xFF4CAF50) // Green
+                            else Color.Gray.copy(alpha = 0.3f)
+                        )
+                        .animateContentSize(
+                            animationSpec = tween(200, easing = EaseInOut)
+                        )
+                )
+            }
+        }
     }
 }
 
@@ -1030,12 +1124,16 @@ private fun getStatusText(sessionState: SessionState): String {
     }
 }
 
+/**
+ * Get instruction text matching iOS
+ * iOS Reference: instructionText computed property in VoiceAssistantView.swift
+ */
 private fun getInstructionText(sessionState: SessionState): String {
     return when (sessionState) {
-        SessionState.LISTENING -> "Listening... Tap to stop"
-        SessionState.PROCESSING -> "Processing..."
-        SessionState.SPEAKING -> "Speaking..."
-        SessionState.CONNECTING -> "Connecting..."
-        else -> "Tap to speak"
+        SessionState.LISTENING -> "Listening... Pause to send"  // iOS: "Listening... Pause to send"
+        SessionState.PROCESSING -> "Processing your message..." // iOS: "Processing your message..."
+        SessionState.SPEAKING -> "Speaking..."                   // iOS: "Speaking..."
+        SessionState.CONNECTING -> "Connecting..."               // iOS: "Connecting..."
+        else -> "Tap to start conversation"                      // iOS: "Tap to start conversation"
     }
 }

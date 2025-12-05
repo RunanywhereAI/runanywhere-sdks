@@ -14,6 +14,7 @@ import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.models.ModelDownloader
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.ModelStorage
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -100,6 +101,10 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT
     ) {
         androidContext = context.applicationContext
+
+        // Load unified native library
+        RunAnywhereBridge.loadLibrary()
+
         initialize(apiKey, baseURL, environment)
     }
 
@@ -143,17 +148,25 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         ServiceContainer.shared.initialize(platformContext, currentEnvironment, apiKey, baseURL)
 
         androidLogger.info("ServiceContainer initialized with environment: $currentEnvironment")
+
+        // Register Android System TTS provider (matches iOS SystemTTSServiceProvider)
+        // This enables "System TTS" option in the TTS model selection
+        val androidTTSProvider = com.runanywhere.sdk.components.tts.AndroidTTSServiceProvider(context)
+        com.runanywhere.sdk.core.ModuleRegistry.registerTTS(androidTTSProvider)
+        androidLogger.info("📢 Registered Android System TTS provider")
     }
 
     /**
      * Scan file system for downloaded models and restore their localPath
      * Should be called after models are registered
+     *
+     * Uses centralized ModelPathUtils for path consistency
      */
     suspend fun scanForDownloadedModels() {
-        val context = androidContext ?: throw IllegalStateException("Android context not provided")
-
         try {
-            val modelsPath = context.filesDir.absolutePath + "/models"
+            // Use centralized ModelPathUtils for path consistency
+            // Path: {baseDir}/models/{framework}/{modelId}
+            val modelsPath = com.runanywhere.sdk.foundation.utils.ModelPathUtils.getModelsDirectory()
             val repository = ServiceContainer.shared.modelInfoRepository
             if (repository is com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl) {
                 repository.scanAndUpdateDownloadedModels(modelsPath, ServiceContainer.shared.fileSystem)
@@ -221,6 +234,16 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         val model = serviceContainer.modelInfoService.getModel(modelId)
             ?: throw IllegalArgumentException("Model not found: $modelId")
 
+        val framework = model.preferredFramework ?: com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP
+
+        // Notify lifecycle: model will load
+        com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelWillLoad(
+            modelId = modelId,
+            modelName = model.name,
+            framework = framework,
+            modality = com.runanywhere.sdk.models.lifecycle.Modality.LLM
+        )
+
         // Ensure model file is available (download if needed)
         return try {
             serviceContainer.modelManager.loadModel(model)
@@ -233,9 +256,24 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             // Set the loaded model in the generation service
             serviceContainer.generationService.setCurrentModel(loadedModel)
 
+            // Notify lifecycle: model loaded successfully
+            com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelDidLoad(
+                modelId = modelId,
+                modelName = model.name,
+                framework = framework,
+                modality = com.runanywhere.sdk.models.lifecycle.Modality.LLM,
+                memoryUsage = model.memoryRequired
+            )
+
             androidLogger.info("Model $modelId loaded successfully into LLM service")
             true
         } catch (e: Exception) {
+            // Notify lifecycle: model load failed
+            com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelLoadFailed(
+                modelId = modelId,
+                modality = com.runanywhere.sdk.models.lifecycle.Modality.LLM,
+                error = e.message ?: "Unknown error"
+            )
             androidLogger.error("Failed to load model $modelId: ${e.message}", e)
             false
         }

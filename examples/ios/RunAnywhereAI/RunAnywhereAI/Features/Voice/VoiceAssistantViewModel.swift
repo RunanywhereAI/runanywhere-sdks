@@ -20,6 +20,7 @@ class VoiceAssistantViewModel: ObservableObject {
     @Published var currentLLMModel: String = ""
     @Published var whisperModel: String = "Whisper Base"
     @Published var isListening: Bool = false
+    @Published var audioLevel: Float = 0.0  // For audio level visualization
 
     // MARK: - Model Selection State (for Voice Pipeline Setup)
     @Published var sttModel: (framework: LLMFramework, name: String)?
@@ -73,7 +74,21 @@ class VoiceAssistantViewModel: ObservableObject {
     // MARK: - Pipeline State
     private var voicePipeline: ModularVoicePipeline?
     private var pipelineTask: Task<Void, Never>?
-    private let whisperModelName: String = "whisper-base"
+
+    /// Get the currently loaded STT model ID from the SDK lifecycle tracker
+    private var currentSTTModelId: String? {
+        ModelLifecycleTracker.shared.modelsByModality[.stt]?.modelId
+    }
+
+    /// Get the currently loaded LLM model ID from the SDK lifecycle tracker
+    private var currentLLMModelId: String? {
+        ModelLifecycleTracker.shared.modelsByModality[.llm]?.modelId
+    }
+
+    /// Get the currently loaded TTS model ID from the SDK lifecycle tracker
+    private var currentTTSModelId: String? {
+        ModelLifecycleTracker.shared.modelsByModality[.tts]?.modelId
+    }
 
     // MARK: - Initialization
 
@@ -96,9 +111,6 @@ class VoiceAssistantViewModel: ObservableObject {
 
         // Get current LLM model info
         updateModelInfo()
-
-        // Set the Whisper model display name
-        updateWhisperModelName()
 
         // Listen for model changes (legacy support)
         NotificationCenter.default.addObserver(
@@ -206,24 +218,6 @@ class VoiceAssistantViewModel: ObservableObject {
         }
     }
 
-    private func updateWhisperModelName() {
-        switch whisperModelName {
-        case "whisper-base":
-            whisperModel = "Whisper Base"
-        case "whisper-small":
-            whisperModel = "Whisper Small"
-        case "whisper-medium":
-            whisperModel = "Whisper Medium"
-        case "whisper-large":
-            whisperModel = "Whisper Large"
-        case "whisper-large-v3":
-            whisperModel = "Whisper Large v3"
-        default:
-            whisperModel = whisperModelName.replacingOccurrences(of: "-", with: " ").capitalized
-        }
-        logger.info("Using Whisper model: \(self.whisperModel)")
-    }
-
     // MARK: - Model Selection for Voice Pipeline
 
     /// Set the STT model for voice pipeline
@@ -252,22 +246,49 @@ class VoiceAssistantViewModel: ObservableObject {
     func startConversation() async {
         logger.info("Starting conversation with modular pipeline...")
 
+        // Verify all required models are loaded before starting
+        guard allModelsLoaded else {
+            sessionState = .error("All models must be loaded before starting")
+            currentStatus = "Error"
+            errorMessage = "Please load all required models (STT, LLM, TTS) before starting the voice assistant"
+            logger.error("Cannot start conversation: not all models are loaded")
+            return
+        }
+
+        // Get the currently loaded model IDs from the SDK lifecycle tracker
+        guard let sttModelId = currentSTTModelId else {
+            sessionState = .error("No STT model loaded")
+            errorMessage = "Please load a speech-to-text model first"
+            logger.error("Cannot start conversation: no STT model loaded")
+            return
+        }
+
+        guard let llmModelId = currentLLMModelId else {
+            sessionState = .error("No LLM model loaded")
+            errorMessage = "Please load a language model first"
+            logger.error("Cannot start conversation: no LLM model loaded")
+            return
+        }
+
+        // TTS is optional - use "system" as fallback
+        let ttsModelId = currentTTSModelId ?? "system"
+
+        logger.info("Starting voice pipeline with STT: \(sttModelId), LLM: \(llmModelId), TTS: \(ttsModelId)")
+
         sessionState = .connecting
         currentStatus = "Initializing components..."
 
-        // Create pipeline configuration with balanced VAD threshold
-        // Always include LLM component for complete pipeline flow
+        // Create pipeline configuration using the actually loaded models
+        // NOTE: VAD removed for manual control mode - user taps to start/stop recording
         let config = ModularPipelineConfig(
-            components: [.vad, .stt, .llm, .tts],
-            vad: VADConfig(energyThreshold: 0.005), // Lower threshold for better short phrase detection
-            stt: VoiceSTTConfig(modelId: whisperModelName),
+            components: [.stt, .llm, .tts],  // No VAD - manual mode
+            stt: VoiceSTTConfig(modelId: sttModelId),
             llm: VoiceLLMConfig(
-                modelId: "default",
+                modelId: llmModelId,
                 systemPrompt: "You are a helpful voice assistant. Keep responses concise and conversational.",
                 maxTokens: 100  // Limit response to 100 tokens for concise voice interactions
             ),
-            // llm: VoiceLLMConfig(modelId: "default", systemPrompt: "INSTRUCTION: Give a direct answer. Do not write dialogue. Do not write User: or Assistant:. Just answer."),
-            tts: VoiceTTSConfig(voice: "system")
+            tts: VoiceTTSConfig(voice: ttsModelId)
         )
 
         // Create the pipeline
@@ -394,15 +415,22 @@ class VoiceAssistantViewModel: ObservableObject {
     private func handlePipelineEvent(_ event: ModularPipelineEvent) async {
         await MainActor.run {
             switch event {
+            case .vadAudioLevel(let level):
+                // Update audio level for visualization
+                audioLevel = level
+
             case .vadSpeechStart:
                 sessionState = .listening
                 currentStatus = "Listening..."
                 isSpeechDetected = true
-                logger.info("Speech detected")
+                isListening = true  // Ensure isListening is set for audio bars
+                logger.info("Recording started")
 
             case .vadSpeechEnd:
                 isSpeechDetected = false
-                logger.info("Speech ended")
+                // Don't reset audioLevel immediately - let the UI fade out naturally
+                // audioLevel = 0.0
+                logger.info("Recording ended")
 
             case .sttPartialTranscript(let text):
                 currentTranscript = text
@@ -439,6 +467,19 @@ class VoiceAssistantViewModel: ObservableObject {
                 isProcessing = false
                 // Clear transcript for next interaction
                 currentTranscript = ""
+
+            case .audioControlPauseRecording:
+                // Pause microphone to prevent TTS audio feedback loop
+                logger.info("⏸️ Pausing microphone for TTS playback")
+                audioCapture.pauseCapture()
+                isListening = false
+                audioLevel = 0.0
+
+            case .audioControlResumeRecording:
+                // Resume microphone after TTS playback completes
+                logger.info("▶️ Resuming microphone after TTS")
+                audioCapture.resumeCapture()
+                isListening = true
 
             case .pipelineError(let error):
                 errorMessage = error.localizedDescription

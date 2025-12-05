@@ -3,6 +3,7 @@ package com.runanywhere.sdk.models
 import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.utils.ModelPathUtils
 import com.runanywhere.sdk.storage.FileSystem
 import com.runanywhere.sdk.services.download.DownloadService
 import kotlinx.coroutines.Dispatchers
@@ -105,54 +106,32 @@ class ModelManager(
 
     /**
      * Get the expected path for a model based on its info
+     * Uses centralized ModelPathUtils for consistency
      */
     private fun getModelPath(modelInfo: ModelInfo): String {
-        val modelsDir = "${fileSystem.getDataDirectory()}/models"
-
-        // Use framework-specific folder if available
-        val frameworkDir = if (modelInfo.preferredFramework != null) {
-            "$modelsDir/${modelInfo.preferredFramework!!.name.lowercase()}"
-        } else if (modelInfo.compatibleFrameworks.isNotEmpty()) {
-            "$modelsDir/${modelInfo.compatibleFrameworks.first().name.lowercase()}"
-        } else {
-            modelsDir
-        }
-
-        val fileName = "${modelInfo.id}.${modelInfo.format.name.lowercase()}"
-        return "$frameworkDir/$modelInfo.id/$fileName"
+        return ModelPathUtils.getModelPath(modelInfo)
     }
 
     /**
      * Check if a model is available locally
+     * Uses centralized ModelPathUtils for path discovery
      */
     fun isModelAvailable(modelId: String): Boolean {
-        // For this to work properly, we need a ModelInfo to determine the path
-        // This is a simplified check that looks in common locations
-        val modelsDir = "${fileSystem.getDataDirectory()}/models"
-        val commonPaths = listOf(
-            "$modelsDir/$modelId/$modelId.gguf",
-            "$modelsDir/$modelId/$modelId.bin",
-            "$modelsDir/llamacpp/$modelId/$modelId.gguf",
-            "$modelsDir/whisperkit/$modelId/$modelId.bin"
-        )
-
-        return commonPaths.any { fileSystem.existsSync(it) }
+        // Use centralized path utility for model discovery
+        val possiblePaths = ModelPathUtils.getPossibleModelPaths(modelId)
+        return possiblePaths.any { fileSystem.existsSync(it) }
     }
 
     /**
      * Delete a model from local storage
+     * Uses centralized ModelPathUtils for path discovery
      */
     suspend fun deleteModel(modelId: String) = withContext(Dispatchers.IO) {
         logger.info("🗑️ Deleting model: $modelId")
 
         try {
-            // Look for the model in common locations and delete
-            val modelsDir = "${fileSystem.getDataDirectory()}/models"
-            val possibleDirs = listOf(
-                "$modelsDir/$modelId",
-                "$modelsDir/llamacpp/$modelId",
-                "$modelsDir/whisperkit/$modelId"
-            )
+            // Use centralized path utility to find model locations
+            val possibleDirs = ModelPathUtils.getPossibleModelPaths(modelId)
 
             var deletedAny = false
             for (dir in possibleDirs) {
@@ -178,9 +157,10 @@ class ModelManager(
 
     /**
      * Get total storage used by all models
+     * Uses centralized ModelPathUtils for path
      */
     suspend fun getTotalModelsSize(): Long = withContext(Dispatchers.IO) {
-        val modelsDir = "${fileSystem.getDataDirectory()}/models"
+        val modelsDir = ModelPathUtils.getModelsDirectory()
         return@withContext if (fileSystem.exists(modelsDir)) {
             calculateDirectorySize(modelsDir)
         } else {
@@ -190,12 +170,13 @@ class ModelManager(
 
     /**
      * Clear all models from storage
+     * Uses centralized ModelPathUtils for path
      */
     suspend fun clearAllModels() = withContext(Dispatchers.IO) {
         logger.info("🗑️ Clearing all models")
 
         try {
-            val modelsDir = "${fileSystem.getDataDirectory()}/models"
+            val modelsDir = ModelPathUtils.getModelsDirectory()
             if (fileSystem.exists(modelsDir)) {
                 fileSystem.deleteRecursively(modelsDir)
                 logger.info("✅ All models cleared")

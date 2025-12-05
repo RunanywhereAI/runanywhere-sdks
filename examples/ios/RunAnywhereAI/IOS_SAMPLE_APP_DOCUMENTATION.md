@@ -1866,9 +1866,6 @@ RunAnywhereAI/
 │   │   │   └── AudioCapture.swift (290 lines)
 │   │   └── Foundation/
 │   │       └── FoundationModelsAdapter.swift (299 lines)
-│   │
-│   └── Utilities/
-│       └── Constants.swift (40 lines)
 │
 ├── Features/
 │   ├── Chat/

@@ -6,7 +6,9 @@ import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import com.runanywhere.sdk.audio.AndroidAudioCapture
 import com.runanywhere.sdk.audio.AudioCaptureOptions
+import com.runanywhere.sdk.audio.VoiceAudioChunk
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -54,13 +56,19 @@ class AudioCaptureService(
      */
     fun startCapture(): Flow<ByteArray> {
         // Convert VoiceAudioChunk to ByteArray for backward compatibility
-        return kotlinx.coroutines.flow.flow {
-            sdkAudioCapture.startContinuousCapture().collect { chunk ->
-                // Convert float samples back to 16-bit PCM bytes
-                val bytes = floatsToBytes(chunk.samples)
-                emit(bytes)
-            }
+        // Using map operator to transform the flow without context issues
+        return sdkAudioCapture.startContinuousCapture().map { chunk ->
+            // Convert float samples back to 16-bit PCM bytes
+            floatsToBytes(chunk.samples)
         }
+    }
+
+    /**
+     * Start capturing audio and emit VoiceAudioChunk directly
+     * Use this for pipeline processing that requires VoiceAudioChunk
+     */
+    fun startCaptureChunks(): Flow<VoiceAudioChunk> {
+        return sdkAudioCapture.startContinuousCapture()
     }
 
     /**

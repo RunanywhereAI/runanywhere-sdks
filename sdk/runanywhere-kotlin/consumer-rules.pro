@@ -1,21 +1,64 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ========================================================================================
+# RunAnywhere SDK - Consumer ProGuard Rules
+# ========================================================================================
+# These rules are automatically applied to any app that depends on the RunAnywhere SDK.
+# They ensure the SDK works correctly in release builds with R8/ProGuard enabled.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# ========================================================================================
+# MASTER RULE: Keep ALL SDK classes
+# ========================================================================================
+# The SDK uses dynamic registration, reflection-like patterns, and JNI callbacks.
+# We must keep ALL classes, interfaces, enums, and their members.
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keep class com.runanywhere.sdk.** { *; }
+-keep interface com.runanywhere.sdk.** { *; }
+-keep enum com.runanywhere.sdk.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep all constructors (critical for JNI object creation like NativeTTSSynthesisResult)
+-keepclassmembers class com.runanywhere.sdk.** {
+    <init>(...);
+}
+
+# Keep companion objects and their members (Kotlin singletons like LlamaCppAdapter.shared)
+-keepclassmembers class com.runanywhere.sdk.** {
+    public static ** Companion;
+    public static ** INSTANCE;
+    public static ** shared;
+}
+
+# Prevent obfuscation of class names (important for JNI, logging, and debugging)
+-keepnames class com.runanywhere.sdk.** { *; }
+-keepnames interface com.runanywhere.sdk.** { *; }
+-keepnames enum com.runanywhere.sdk.** { *; }
+
+# Keep Kotlin metadata for reflection
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
+-keep class kotlin.Metadata { *; }
+
+# ========================================================================================
+# Native Methods (JNI)
+# ========================================================================================
+
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# ========================================================================================
+# Third-party Dependencies Used by SDK
+# ========================================================================================
+
+# Whisper JNI
+-keep class io.github.givimad.whisperjni.** { *; }
+-dontwarn io.github.givimad.whisperjni.**
+
+# VAD classes
+-keep class com.konovalov.vad.** { *; }
+-dontwarn com.konovalov.vad.**
+
+# ONNX Runtime
+-keep class ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**
+
+# Suppress warnings for optional dependencies
+-dontwarn org.slf4j.**
+-dontwarn ch.qos.logback.**

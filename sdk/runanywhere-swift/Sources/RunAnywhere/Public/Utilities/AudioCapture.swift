@@ -44,9 +44,48 @@ public class AudioCapture: NSObject {
     /// Whether audio is currently being captured
     public var isCurrentlyRecording: Bool { isRecording }
 
+    /// Whether audio capture is currently paused (to prevent feedback during TTS)
+    private var isPaused = false
+
+    /// Whether audio capture is paused
+    public var isCurrentlyPaused: Bool { isPaused }
+
     public override init() {
         super.init()
         logger.info("AudioCapture initialized")
+    }
+
+    /// Pause audio capture temporarily (to prevent feedback during TTS playback)
+    ///
+    /// This stops the audio engine but keeps the stream alive. Audio capture
+    /// can be resumed by calling `resumeCapture()`.
+    public func pauseCapture() {
+        guard isRecording, !isPaused else { return }
+
+        logger.info("Pausing audio capture to prevent TTS feedback")
+        isPaused = true
+        audioEngine?.inputNode.removeTap(onBus: 0)
+        audioEngine?.stop()
+        audioBuffer.removeAll() // Clear any buffered audio
+    }
+
+    /// Resume audio capture after pause
+    ///
+    /// Restarts the audio engine after it was paused. This should be called
+    /// after TTS playback completes.
+    public func resumeCapture() {
+        guard isRecording, isPaused else { return }
+
+        logger.info("Resuming audio capture after TTS")
+        isPaused = false
+        audioBuffer.removeAll() // Clear any stale audio
+
+        do {
+            try startAudioEngine()
+            logger.info("Audio capture resumed successfully")
+        } catch {
+            logger.error("Failed to resume audio capture: \(error)")
+        }
     }
 
     /// Start continuous audio capture

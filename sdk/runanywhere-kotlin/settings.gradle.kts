@@ -40,18 +40,26 @@ include(":modules:runanywhere-whisperkit")
 // MLC-LLM module - temporarily disabled
 // include(":modules:runanywhere-llm-mlc")
 
-// RunAnywhere Core JNI module - shared Kotlin JNI bridge code (RunAnywhereBridge.kt)
-// Provides JNI declarations used by all backend modules
-include(":modules:runanywhere-core-jni")
+// =============================================================================
+// RunAnywhere Core Modules (mirrors iOS XCFramework architecture)
+// =============================================================================
 
-// RunAnywhere Core LlamaCPP module - SELF-CONTAINED LLM backend
-// Includes ALL native libs: JNI bridge + LlamaCPP
-// Use: implementation(":modules:runanywhere-core-llamacpp")
+// RunAnywhere Core Native module - UNIFIED native library package
+// Contains ALL native libraries (JNI bridge + LlamaCpp + ONNX + dependencies)
+// Similar to iOS RunAnywhereCoreBinary.xcframework - single binary with everything
+include(":modules:runanywhere-core-native")
+
+// NOTE: JNI bridge code (RunAnywhereBridge.kt, RunAnywhereLoader.kt) is now in the main SDK
+// at src/jvmAndroidMain/kotlin/com/runanywhere/sdk/native/bridge/
+
+// RunAnywhere Core LlamaCPP module - LLM backend adapter (pure Kotlin)
+// Depends on main SDK (which includes native libs transitively)
+// Provides: LlamaCppAdapter, LlamaCppService
 include(":modules:runanywhere-core-llamacpp")
 
-// RunAnywhere Core ONNX module - SELF-CONTAINED STT/TTS/VAD backend
-// Includes ALL native libs: JNI bridge + ONNX Runtime + Sherpa-ONNX
-// Use: implementation(":modules:runanywhere-core-onnx")
+// RunAnywhere Core ONNX module - STT/TTS/VAD backend adapter (pure Kotlin)
+// Depends on main SDK (which includes native libs transitively)
+// Provides: ONNXAdapter, ONNXService
 include(":modules:runanywhere-core-onnx")
 
 // Other modules temporarily disabled due to build issues

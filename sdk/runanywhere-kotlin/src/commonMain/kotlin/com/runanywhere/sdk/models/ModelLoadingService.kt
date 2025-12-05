@@ -95,14 +95,14 @@ class ModelLoadingService(
             throw SDKError.LoadingFailed("Failed to create LLM service: ${e.message}")
         }
 
-        // Initialize the LLM service with the model
+        // Initialize the LLM service with the model path
+        // iOS pattern: service is initialized via initialize(modelPath), not loadModel
         try {
-            // All LLM services now support loadModel method
-            llmService.loadModel(modelInfo)
+            llmService.initialize(modelInfo.localPath)
             logger.info("✅ LLM service initialized with model: $modelId")
         } catch (e: Exception) {
-            logger.error("❌ Failed to load model into LLM service: ${e.message}")
-            throw SDKError.LoadingFailed("Failed to load model: ${e.message}")
+            logger.error("❌ Failed to initialize LLM service: ${e.message}")
+            throw SDKError.LoadingFailed("Failed to initialize model: ${e.message}")
         }
 
         // Create loaded model

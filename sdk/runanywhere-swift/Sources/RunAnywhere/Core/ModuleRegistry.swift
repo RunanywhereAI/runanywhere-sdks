@@ -1,4 +1,52 @@
 import Foundation
+import os
+
+// MARK: - Thread-Safe Model Info Cache
+
+/// Thread-safe cache for model information that can be accessed from any isolation context
+/// This allows providers to check model metadata without requiring MainActor isolation
+/// Uses OSAllocatedUnfairLock (Swift 6 pattern) for efficient synchronization
+public final class ModelInfoCache: Sendable {
+    public static let shared = ModelInfoCache()
+
+    private let state: OSAllocatedUnfairLock<[String: ModelInfo]>
+
+    private init() {
+        state = OSAllocatedUnfairLock(initialState: [:])
+    }
+
+    /// Cache model information for synchronous lookup by providers
+    /// This should be called whenever models are loaded/updated
+    public func cacheModels(_ models: [ModelInfo]) {
+        state.withLock { cache in
+            for model in models {
+                cache[model.id] = model
+            }
+        }
+    }
+
+    /// Get cached model info for a given model ID
+    /// Providers can use this to determine framework compatibility without async calls
+    public func modelInfo(for modelId: String) -> ModelInfo? {
+        state.withLock { cache in
+            cache[modelId]
+        }
+    }
+
+    /// Clear the model info cache
+    public func clear() {
+        state.withLock { cache in
+            cache.removeAll()
+        }
+    }
+
+    /// Check if a model exists in the cache
+    public func contains(_ modelId: String) -> Bool {
+        state.withLock { cache in
+            cache[modelId] != nil
+        }
+    }
+}
 
 // MARK: - Module Registration System
 

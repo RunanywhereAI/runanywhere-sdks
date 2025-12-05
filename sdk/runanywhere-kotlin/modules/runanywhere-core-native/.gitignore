@@ -1,0 +1,5 @@
+# Downloaded native libraries (fetched from GitHub releases)
+src/main/jniLibs/
+
+# Build artifacts
+build/

@@ -123,10 +123,15 @@ sqldelight = "2.0.1"
 securityCrypto = "1.1.0-alpha06"
 
 # ============================================================================
-# Play Services
+# DataStore
 # ============================================================================
-playCore = "1.10.3"
-playCoreKtx = "1.8.1"
+datastore = "1.1.7"
+
+# ============================================================================
+# Play Services (Updated for targetSdk 34+)
+# ============================================================================
+playAppUpdate = "2.1.0"
+playAppUpdateKtx = "2.1.0"
 
 # ============================================================================
 # UI Components - Accompanist
@@ -293,10 +298,15 @@ sqldelight-native-driver = { group = "app.cash.sqldelight", name = "native-drive
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 
 # ----------------------------------------------------------------------------
+# DataStore
+# ----------------------------------------------------------------------------
+androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+# ----------------------------------------------------------------------------
 # Play Services
 # ----------------------------------------------------------------------------
-google-play-core = { group = "com.google.android.play", name = "core", version.ref = "playCore" }
-google-play-core-ktx = { group = "com.google.android.play", name = "core-ktx", version.ref = "playCoreKtx" }
+google-play-app-update = { group = "com.google.android.play", name = "app-update", version.ref = "playAppUpdate" }
+google-play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdateKtx" }
 
 # ----------------------------------------------------------------------------
 # UI Components - Accompanist

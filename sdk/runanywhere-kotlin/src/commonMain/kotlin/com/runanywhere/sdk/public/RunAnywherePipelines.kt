@@ -82,12 +82,8 @@ data class ModularPipelineConfig(
                 },
                 ttsConfig = tts?.let {
                     TTSConfiguration(
-                        defaultVoice = TTSVoice(
-                            id = it.voice,
-                            name = it.voice,
-                            language = "en-US",
-                            gender = TTSGender.NEUTRAL
-                        )
+                        voice = it.voice,
+                        language = "en-US"
                     )
                 }
             )

@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.models
 
+import com.runanywhere.sdk.data.models.fileExists
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
@@ -62,9 +63,14 @@ data class ModelInfo(
     val isDownloaded: Boolean
         get() {
             val path = localPath ?: return false
-            // Platform-specific file existence check would go here
-            // For now, we trust that localPath is only set when file exists
-            return true
+
+            // Built-in models are always available (like iOS)
+            if (path.startsWith("builtin://") || path.startsWith("builtin:")) {
+                return true
+            }
+
+            // Check if file/directory actually exists on disk (matches iOS behavior)
+            return fileExists(path)
         }
 
     /**
