@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.runanywhere.runanywhereai.BuildConfig
 
 /**
  * Secure storage for sensitive data using EncryptedSharedPreferences
