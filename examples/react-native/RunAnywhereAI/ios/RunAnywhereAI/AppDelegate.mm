@@ -21,10 +21,21 @@
 
 - (NSURL *)bundleURL
 {
+  // Always check for bundled JS file first (even in Debug mode)
+  // This allows testing without Metro bundler running
+  NSURL *jsBundleURL = [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+
+  if (jsBundleURL != nil) {
+    NSLog(@"[AppDelegate] Loading from bundled main.jsbundle");
+    return jsBundleURL;
+  }
+
 #if DEBUG
+  NSLog(@"[AppDelegate] No bundle found, connecting to Metro bundler");
   return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index"];
 #else
-  return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+  NSLog(@"[AppDelegate] ERROR: No bundle found in Release mode!");
+  return nil;
 #endif
 }
 

@@ -70,16 +70,16 @@ export interface Spec extends TurboModule {
   /**
    * Create a new backend instance.
    * @param name Backend name (e.g., "onnx", "llamacpp", "coreml")
-   * @returns Promise that resolves to true if backend was created successfully
+   * @returns true if backend was created successfully
    */
-  createBackend(name: string): Promise<boolean>;
+  createBackend(name: string): boolean;
 
   /**
    * Initialize the backend with optional configuration.
    * @param configJson Optional JSON configuration string
-   * @returns Promise that resolves to true if initialization succeeded
+   * @returns true if initialization succeeded
    */
-  initialize(configJson: string | null): Promise<boolean>;
+  initialize(configJson: string | null): boolean;
 
   /**
    * Destroy the backend and release all resources.

@@ -9,7 +9,8 @@
  * - cpp/RunAnywhereModule.cpp (TurboModule get() method)
  */
 
-import { NativeModules, Platform, TurboModuleRegistry } from 'react-native';
+// No longer needed - using codegen-generated module directly
+// import { NativeModules, Platform, TurboModuleRegistry } from 'react-native';
 
 /**
  * Native module interface
@@ -713,48 +714,31 @@ export interface NativeRunAnywhereModule {
   availableModels(): Promise<string>;
 }
 
-/**
- * Get the native module with proper typing
- */
-function getNativeModule(): NativeRunAnywhereModule | null {
-  // Try TurboModuleRegistry first (New Architecture with codegen)
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const turboModule = TurboModuleRegistry.get<any>('RunAnywhere');
-    if (turboModule) {
-      return turboModule as NativeRunAnywhereModule;
-    }
-  } catch {
-    // TurboModuleRegistry not available or module not found
-  }
-
-  // Try NativeModules (New Architecture without codegen or Old Architecture)
-  const nativeModule = NativeModules.RunAnywhere;
-  if (nativeModule) {
-    return nativeModule as NativeRunAnywhereModule;
-  }
-
-  // Fallback to alternative module name
-  const altModule = NativeModules.RunAnywhereModule;
-  if (altModule) {
-    return altModule as NativeRunAnywhereModule;
-  }
-
-  if (__DEV__) {
-    console.warn(
-      '[RunAnywhere] Native module not found. ' +
-        'Make sure the native module is properly linked. ' +
-        `Platform: ${Platform.OS}`
-    );
-  }
-  return null;
-}
+// Import the codegen-generated TurboModule
+import CodegenNativeModule from '../NativeRunAnywhere';
 
 /**
  * Native module instance
- * May be null if native module is not available (e.g., in web or testing)
+ * Uses the codegen-generated TurboModule for React Native New Architecture
  */
-export const NativeRunAnywhere = getNativeModule();
+let nativeModule: NativeRunAnywhereModule | null = null;
+
+try {
+  nativeModule = CodegenNativeModule as unknown as NativeRunAnywhereModule;
+  console.log('[NativeRunAnywhere] Successfully loaded codegen module:', nativeModule ? 'YES' : 'NO');
+
+  // Debug: Log what methods are available
+  if (nativeModule) {
+    console.log('[NativeRunAnywhere] Module has createBackend?', typeof nativeModule.createBackend);
+    console.log('[NativeRunAnywhere] Module has initialize?', typeof nativeModule.initialize);
+    console.log('[NativeRunAnywhere] Available methods:', Object.keys(nativeModule).filter(k => typeof nativeModule[k as keyof typeof nativeModule] === 'function'));
+  }
+} catch (error) {
+  console.error('[NativeRunAnywhere] Failed to load codegen module:', error);
+  nativeModule = null;
+}
+
+export const NativeRunAnywhere = nativeModule;
 
 /**
  * Check if native module is available

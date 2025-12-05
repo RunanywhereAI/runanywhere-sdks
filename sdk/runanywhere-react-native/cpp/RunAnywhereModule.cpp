@@ -7,6 +7,13 @@
 
 #include "RunAnywhereModule.h"
 
+// Compile-time debug: check if codegen header was included
+#if __has_include("RunAnywhereSpecJSI.h")
+#pragma message("✅ RunAnywhereSpecJSI.h IS included - using codegen base class")
+#else
+#pragma message("❌ RunAnywhereSpecJSI.h NOT included - using TurboModule directly")
+#endif
+
 #include <sstream>
 #include <cstring>
 #include <algorithm>
@@ -67,17 +74,24 @@ namespace facebook::react {
 // ============================================================================
 
 RunAnywhereModule::RunAnywhereModule(std::shared_ptr<CallInvoker> jsInvoker)
+#if __has_include("RunAnywhereSpecJSI.h")
+    : NativeRunAnywhereCxxSpec<RunAnywhereModule>(jsInvoker)
+#else
     : TurboModule("RunAnywhere", jsInvoker)
+#endif
     , jsInvoker_(std::move(jsInvoker)) {
-    // NOTE: Backend registration is handled internally by the XCFramework
-    // The XCFramework auto-registers backends during static initialization
-    // The registration symbols are NOT exported from the XCFramework, so we cannot
-    // manually call register_*_backend() functions
+    // Check which backends are available
+    int count = 0;
+    const char** backends = ra_get_available_backends(&count);
 
-    // If backends are not appearing, the XCFramework was built without proper
-    // backend registration. Check that the XCFramework build includes:
-    // - RA_ONNX_ENABLED=1
-    // - RA_LLAMACPP_ENABLED=1
+    printf("[RunAnywhere C++] Constructor - Found %d available backends:\n", count);
+    for (int i = 0; i < count; i++) {
+        printf("[RunAnywhere C++]   - %s\n", backends[i]);
+    }
+
+    if (count == 0) {
+        printf("[RunAnywhere C++] WARNING: No backends registered! XCFramework may not have proper backend registration.\n");
+    }
 }
 
 RunAnywhereModule::~RunAnywhereModule() {
@@ -97,702 +111,37 @@ RunAnywhereModule::~RunAnywhereModule() {
 }
 
 // ============================================================================
-// TurboModule Interface - Manual JSI Binding
-// ============================================================================
-
-jsi::Value RunAnywhereModule::get(jsi::Runtime& rt, const jsi::PropNameID& name) {
-    std::string propName = name.utf8(rt);
-
-    // Backend Lifecycle
-    if (propName == "createBackend") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::Value(createBackend(rt, args[0].asString(rt).utf8(rt)));
-            });
-    }
-
-    if (propName == "initialize") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> config;
-                if (!args[0].isNull() && !args[0].isUndefined()) {
-                    config = args[0].asString(rt).utf8(rt);
-                }
-                return jsi::Value(initialize(rt, config));
-            });
-    }
-
-    if (propName == "destroy") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                destroy(rt);
-                return jsi::Value::undefined();
-            });
-    }
-
-    if (propName == "isInitialized") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(isInitialized(rt));
-            });
-    }
-
-    if (propName == "getBackendInfo") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::String::createFromUtf8(rt, getBackendInfo(rt));
-            });
-    }
-
-    // Capability Query
-    if (propName == "supportsCapability") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::Value(supportsCapability(rt, static_cast<int>(args[0].asNumber())));
-            });
-    }
-
-    if (propName == "getCapabilities") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                auto caps = getCapabilities(rt);
-                jsi::Array result(rt, caps.size());
-                for (size_t i = 0; i < caps.size(); i++) {
-                    result.setValueAtIndex(rt, i, jsi::Value(caps[i]));
-                }
-                return result;
-            });
-    }
-
-    if (propName == "getDeviceType") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(getDeviceType(rt));
-            });
-    }
-
-    if (propName == "getMemoryUsage") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(getMemoryUsage(rt));
-            });
-    }
-
-    // Text Generation
-    if (propName == "loadTextModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 2,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> config;
-                if (!args[1].isNull() && !args[1].isUndefined()) {
-                    config = args[1].asString(rt).utf8(rt);
-                }
-                return jsi::Value(loadTextModel(rt, args[0].asString(rt).utf8(rt), config));
-            });
-    }
-
-    if (propName == "isTextModelLoaded") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(isTextModelLoaded(rt));
-            });
-    }
-
-    if (propName == "unloadTextModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(unloadTextModel(rt));
-            });
-    }
-
-    if (propName == "generate") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 4,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> systemPrompt;
-                if (!args[1].isNull() && !args[1].isUndefined()) {
-                    systemPrompt = args[1].asString(rt).utf8(rt);
-                }
-                return jsi::String::createFromUtf8(
-                    rt,
-                    generate(rt, args[0].asString(rt).utf8(rt), systemPrompt,
-                             static_cast<int>(args[2].asNumber()), args[3].asNumber()));
-            });
-    }
-
-    if (propName == "generateStream") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 4,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> systemPrompt;
-                if (!args[1].isNull() && !args[1].isUndefined()) {
-                    systemPrompt = args[1].asString(rt).utf8(rt);
-                }
-                generateStream(rt, args[0].asString(rt).utf8(rt), systemPrompt,
-                               static_cast<int>(args[2].asNumber()), args[3].asNumber());
-                return jsi::Value::undefined();
-            });
-    }
-
-    if (propName == "cancelGeneration") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                cancelGeneration(rt);
-                return jsi::Value::undefined();
-            });
-    }
-
-    // STT Methods
-    if (propName == "loadSTTModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 3,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> config;
-                if (!args[2].isNull() && !args[2].isUndefined()) {
-                    config = args[2].asString(rt).utf8(rt);
-                }
-                return jsi::Value(loadSTTModel(rt, args[0].asString(rt).utf8(rt),
-                                               args[1].asString(rt).utf8(rt), config));
-            });
-    }
-
-    if (propName == "isSTTModelLoaded") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(isSTTModelLoaded(rt));
-            });
-    }
-
-    if (propName == "unloadSTTModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(unloadSTTModel(rt));
-            });
-    }
-
-    if (propName == "transcribe") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 3,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> language;
-                if (!args[2].isNull() && !args[2].isUndefined()) {
-                    language = args[2].asString(rt).utf8(rt);
-                }
-                return jsi::String::createFromUtf8(
-                    rt, transcribe(rt, args[0].asString(rt).utf8(rt),
-                                   static_cast<int>(args[1].asNumber()), language));
-            });
-    }
-
-    if (propName == "createSTTStream") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> config;
-                if (!args[0].isNull() && !args[0].isUndefined()) {
-                    config = args[0].asString(rt).utf8(rt);
-                }
-                return jsi::Value(createSTTStream(rt, config));
-            });
-    }
-
-    if (propName == "feedSTTAudio") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 3,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::Value(feedSTTAudio(rt, static_cast<int>(args[0].asNumber()),
-                                               args[1].asString(rt).utf8(rt),
-                                               static_cast<int>(args[2].asNumber())));
-            });
-    }
-
-    if (propName == "decodeSTT") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::String::createFromUtf8(
-                    rt, decodeSTT(rt, static_cast<int>(args[0].asNumber())));
-            });
-    }
-
-    if (propName == "destroySTTStream") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                destroySTTStream(rt, static_cast<int>(args[0].asNumber()));
-                return jsi::Value::undefined();
-            });
-    }
-
-    if (propName == "supportsSTTStreaming") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(supportsSTTStreaming(rt));
-            });
-    }
-
-    if (propName == "isSTTReady") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::Value(isSTTReady(rt, static_cast<int>(args[0].asNumber())));
-            });
-    }
-
-    if (propName == "isSTTEndpoint") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::Value(isSTTEndpoint(rt, static_cast<int>(args[0].asNumber())));
-            });
-    }
-
-    if (propName == "finishSTTInput") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                finishSTTInput(rt, static_cast<int>(args[0].asNumber()));
-                return jsi::Value::undefined();
-            });
-    }
-
-    if (propName == "resetSTTStream") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                resetSTTStream(rt, static_cast<int>(args[0].asNumber()));
-                return jsi::Value::undefined();
-            });
-    }
-
-    // TTS Methods
-    if (propName == "loadTTSModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 3,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> config;
-                if (!args[2].isNull() && !args[2].isUndefined()) {
-                    config = args[2].asString(rt).utf8(rt);
-                }
-                return jsi::Value(loadTTSModel(rt, args[0].asString(rt).utf8(rt),
-                                               args[1].asString(rt).utf8(rt), config));
-            });
-    }
-
-    if (propName == "synthesize") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 4,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> voiceId;
-                if (!args[1].isNull() && !args[1].isUndefined()) {
-                    voiceId = args[1].asString(rt).utf8(rt);
-                }
-                return jsi::String::createFromUtf8(
-                    rt, synthesize(rt, args[0].asString(rt).utf8(rt), voiceId,
-                                   args[2].asNumber(), args[3].asNumber()));
-            });
-    }
-
-    if (propName == "isTTSModelLoaded") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(isTTSModelLoaded(rt));
-            });
-    }
-
-    if (propName == "unloadTTSModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(unloadTTSModel(rt));
-            });
-    }
-
-    if (propName == "supportsTTSStreaming") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(supportsTTSStreaming(rt));
-            });
-    }
-
-    if (propName == "synthesizeStream") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 4,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> voiceId;
-                if (!args[1].isNull() && !args[1].isUndefined()) {
-                    voiceId = args[1].asString(rt).utf8(rt);
-                }
-                synthesizeStream(rt, args[0].asString(rt).utf8(rt), voiceId,
-                                args[2].asNumber(), args[3].asNumber());
-                return jsi::Value::undefined();
-            });
-    }
-
-    if (propName == "getTTSVoices") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::String::createFromUtf8(rt, getTTSVoices(rt));
-            });
-    }
-
-    if (propName == "cancelTTS") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                cancelTTS(rt);
-                return jsi::Value::undefined();
-            });
-    }
-
-    // VAD Methods
-    if (propName == "loadVADModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 2,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> config;
-                if (!args[1].isNull() && !args[1].isUndefined()) {
-                    config = args[1].asString(rt).utf8(rt);
-                }
-                return jsi::Value(loadVADModel(rt, args[0].asString(rt).utf8(rt), config));
-            });
-    }
-
-    if (propName == "processVAD") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 2,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::String::createFromUtf8(
-                    rt, processVAD(rt, args[0].asString(rt).utf8(rt),
-                                   static_cast<int>(args[1].asNumber())));
-            });
-    }
-
-    if (propName == "isVADModelLoaded") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(isVADModelLoaded(rt));
-            });
-    }
-
-    if (propName == "unloadVADModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(unloadVADModel(rt));
-            });
-    }
-
-    if (propName == "detectVADSegments") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 2,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::String::createFromUtf8(
-                    rt, detectVADSegments(rt, args[0].asString(rt).utf8(rt),
-                                         static_cast<int>(args[1].asNumber())));
-            });
-    }
-
-    if (propName == "resetVAD") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                resetVAD(rt);
-                return jsi::Value::undefined();
-            });
-    }
-
-    // Embeddings Methods
-    if (propName == "loadEmbeddingsModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 2,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> config;
-                if (!args[1].isNull() && !args[1].isUndefined()) {
-                    config = args[1].asString(rt).utf8(rt);
-                }
-                return jsi::Value(loadEmbeddingsModel(rt, args[0].asString(rt).utf8(rt), config));
-            });
-    }
-
-    if (propName == "isEmbeddingsModelLoaded") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(isEmbeddingsModelLoaded(rt));
-            });
-    }
-
-    if (propName == "unloadEmbeddingsModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(unloadEmbeddingsModel(rt));
-            });
-    }
-
-    if (propName == "embedText") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::String::createFromUtf8(
-                    rt, embedText(rt, args[0].asString(rt).utf8(rt)));
-            });
-    }
-
-    if (propName == "embedBatch") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::vector<std::string> texts;
-                if (args[0].isObject()) {
-                    auto arr = args[0].asObject(rt).asArray(rt);
-                    for (size_t i = 0; i < arr.length(rt); i++) {
-                        texts.push_back(arr.getValueAtIndex(rt, i).asString(rt).utf8(rt));
-                    }
-                }
-                return jsi::String::createFromUtf8(rt, embedBatch(rt, texts));
-            });
-    }
-
-    if (propName == "getEmbeddingDimensions") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(getEmbeddingDimensions(rt));
-            });
-    }
-
-    // Diarization Methods
-    if (propName == "loadDiarizationModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 2,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                std::optional<std::string> config;
-                if (!args[1].isNull() && !args[1].isUndefined()) {
-                    config = args[1].asString(rt).utf8(rt);
-                }
-                return jsi::Value(loadDiarizationModel(rt, args[0].asString(rt).utf8(rt), config));
-            });
-    }
-
-    if (propName == "isDiarizationModelLoaded") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(isDiarizationModelLoaded(rt));
-            });
-    }
-
-    if (propName == "unloadDiarizationModel") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::Value(unloadDiarizationModel(rt));
-            });
-    }
-
-    if (propName == "diarize") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 4,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::String::createFromUtf8(
-                    rt, diarize(rt, args[0].asString(rt).utf8(rt),
-                               static_cast<int>(args[1].asNumber()),
-                               static_cast<int>(args[2].asNumber()),
-                               static_cast<int>(args[3].asNumber())));
-            });
-    }
-
-    if (propName == "cancelDiarization") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                cancelDiarization(rt);
-                return jsi::Value::undefined();
-            });
-    }
-
-    // Utilities
-    if (propName == "getLastError") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::String::createFromUtf8(rt, getLastError(rt));
-            });
-    }
-
-    if (propName == "getVersion") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::String::createFromUtf8(rt, getVersion(rt));
-            });
-    }
-
-    if (propName == "extractArchive") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 2,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                return jsi::Value(extractArchive(rt, args[0].asString(rt).utf8(rt),
-                                               args[1].asString(rt).utf8(rt)));
-            });
-    }
-
-    // Event Listeners
-    if (propName == "addListener") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                addListener(rt, args[0].asString(rt).utf8(rt));
-                return jsi::Value::undefined();
-            });
-    }
-
-    if (propName == "removeListeners") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 1,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {
-                removeListeners(rt, static_cast<int>(args[0].asNumber()));
-                return jsi::Value::undefined();
-            });
-    }
-
-    if (propName == "pollEvents") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                return jsi::String::createFromUtf8(rt, pollEvents());
-            });
-    }
-
-    if (propName == "clearEventQueue") {
-        return jsi::Function::createFromHostFunction(
-            rt, name, 0,
-            [this](jsi::Runtime& rt, const jsi::Value&, const jsi::Value*, size_t) {
-                clearEventQueue();
-                return jsi::Value::undefined();
-            });
-    }
-
-    return jsi::Value::undefined();
-}
-
-std::vector<jsi::PropNameID> RunAnywhereModule::getPropertyNames(jsi::Runtime& rt) {
-    std::vector<jsi::PropNameID> props;
-    props.reserve(62);
-
-    // Backend Lifecycle
-    props.push_back(jsi::PropNameID::forUtf8(rt, "createBackend"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "initialize"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "destroy"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "isInitialized"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "getBackendInfo"));
-    // Capability Query
-    props.push_back(jsi::PropNameID::forUtf8(rt, "supportsCapability"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "getCapabilities"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "getDeviceType"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "getMemoryUsage"));
-    // Text Generation
-    props.push_back(jsi::PropNameID::forUtf8(rt, "loadTextModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "isTextModelLoaded"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadTextModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "generate"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "generateStream"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "cancelGeneration"));
-    // STT (13 methods)
-    props.push_back(jsi::PropNameID::forUtf8(rt, "loadSTTModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "isSTTModelLoaded"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadSTTModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "transcribe"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "supportsSTTStreaming"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "createSTTStream"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "feedSTTAudio"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "decodeSTT"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "isSTTReady"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "isSTTEndpoint"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "finishSTTInput"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "resetSTTStream"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "destroySTTStream"));
-
-    // TTS (8 methods)
-    props.push_back(jsi::PropNameID::forUtf8(rt, "loadTTSModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "isTTSModelLoaded"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadTTSModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "synthesize"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "supportsTTSStreaming"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "synthesizeStream"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "getTTSVoices"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "cancelTTS"));
-
-    // VAD (6 methods)
-    props.push_back(jsi::PropNameID::forUtf8(rt, "loadVADModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "isVADModelLoaded"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadVADModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "processVAD"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "detectVADSegments"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "resetVAD"));
-
-    // Embeddings (6 methods)
-    props.push_back(jsi::PropNameID::forUtf8(rt, "loadEmbeddingsModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "isEmbeddingsModelLoaded"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadEmbeddingsModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "embedText"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "embedBatch"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "getEmbeddingDimensions"));
-
-    // Diarization (5 methods)
-    props.push_back(jsi::PropNameID::forUtf8(rt, "loadDiarizationModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "isDiarizationModelLoaded"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadDiarizationModel"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "diarize"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "cancelDiarization"));
-
-    // Utilities (3 methods)
-    props.push_back(jsi::PropNameID::forUtf8(rt, "getLastError"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "getVersion"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "extractArchive"));
-
-    // Events (4 methods)
-    props.push_back(jsi::PropNameID::forUtf8(rt, "addListener"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "removeListeners"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "pollEvents"));
-    props.push_back(jsi::PropNameID::forUtf8(rt, "clearEventQueue"));
-
-    return props;
-}
-
-// ============================================================================
 // Backend Lifecycle Implementation
 // ============================================================================
+// NOTE: The base class NativeRunAnywhereCxxSpec<RunAnywhereModule> handles get()
+// automatically by forwarding to its internal delegate
+
+std::vector<std::string> RunAnywhereModule::getAvailableBackends(jsi::Runtime& rt) {
+    std::vector<std::string> result;
+
+    int count = 0;
+    const char** backends = ra_get_available_backends(&count);
+
+    for (int i = 0; i < count; i++) {
+        result.push_back(backends[i]);
+    }
+
+    return result;
+}
 
 bool RunAnywhereModule::createBackend(jsi::Runtime& rt, const std::string& name) {
+    printf("[RunAnywhere C++] createBackend called with name: %s\n", name.c_str());
+
     if (backend_) {
+        printf("[RunAnywhere C++] Destroying existing backend\n");
         ra_destroy(backend_);
         backend_ = nullptr;
     }
 
     backend_ = ra_create_backend(name.c_str());
-    return backend_ != nullptr;
+    bool success = backend_ != nullptr;
+    printf("[RunAnywhere C++] createBackend result: %s\n", success ? "SUCCESS" : "FAILED");
+    return success;
 }
 
 bool RunAnywhereModule::initialize(jsi::Runtime& rt,
@@ -1025,6 +374,12 @@ std::string RunAnywhereModule::transcribe(jsi::Runtime& rt, const std::string& a
     std::string resultStr(resultJson);
     ra_free_string(resultJson);
     return resultStr;
+}
+
+std::string RunAnywhereModule::transcribeFile(jsi::Runtime& rt, const std::string& filePath,
+                                               const std::optional<std::string>& language) {
+    // TODO: Implement file-based transcription
+    throw std::runtime_error("transcribeFile not yet implemented");
 }
 
 bool RunAnywhereModule::supportsSTTStreaming(jsi::Runtime& rt) {
@@ -1488,7 +843,7 @@ void RunAnywhereModule::emitEvent(jsi::Runtime& rt, const std::string& eventName
     }
 }
 
-std::string RunAnywhereModule::pollEvents() {
+std::string RunAnywhereModule::pollEvents(jsi::Runtime& rt) {
     std::lock_guard<std::mutex> lock(eventQueueMutex_);
 
     // Build JSON array of queued events
@@ -1511,7 +866,7 @@ std::string RunAnywhereModule::pollEvents() {
     return oss.str();
 }
 
-void RunAnywhereModule::clearEventQueue() {
+void RunAnywhereModule::clearEventQueue(jsi::Runtime& rt) {
     std::lock_guard<std::mutex> lock(eventQueueMutex_);
     eventQueue_.clear();
 }

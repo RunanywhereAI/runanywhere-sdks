@@ -185,7 +185,7 @@ export const RunAnywhere = {
     // Use llamacpp for LLM text generation (GGUF models), which also supports other capabilities
     const backendName = 'llamacpp';
     try {
-      const backendCreated = await native.createBackend(backendName);
+      const backendCreated = native.createBackend(backendName);
       if (!backendCreated) {
         if (__DEV__ || environment === SDKEnvironment.Development) {
           console.warn('[RunAnywhere] Failed to create backend, running in limited mode');
@@ -217,7 +217,7 @@ export const RunAnywhere = {
         environment: environment,
       });
 
-      const result = await native.initialize(configJson);
+      const result = native.initialize(configJson);
       if (!result) {
         if (__DEV__ || environment === SDKEnvironment.Development) {
           console.warn('[RunAnywhere] Native initialize returned false, continuing in dev mode');

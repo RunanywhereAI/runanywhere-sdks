@@ -26,6 +26,12 @@ extern "C" {
 #include "runanywhere_bridge.h"
 }
 
+// Include codegen-generated spec
+// This is generated in ios/build/generated/ios/RunAnywhereSpecJSI.h
+#if __has_include("RunAnywhereSpecJSI.h")
+#include "RunAnywhereSpecJSI.h"
+#endif
+
 namespace facebook::react {
 
 /**
@@ -40,8 +46,15 @@ namespace facebook::react {
  * - Synchronous JSI calls for low latency
  * - Event emission for streaming operations
  * - React Native New Architecture only (TurboModules)
+ *
+ * Inherits from NativeRunAnywhereCxxSpec<RunAnywhereModule> which is the
+ * codegen-generated base class using CRTP (Curiously Recurring Template Pattern).
  */
+#if __has_include("RunAnywhereSpecJSI.h")
+class RunAnywhereModule : public NativeRunAnywhereCxxSpec<RunAnywhereModule> {
+#else
 class RunAnywhereModule : public TurboModule {
+#endif
 public:
     /**
      * Constructor
@@ -57,23 +70,15 @@ public:
     // ============================================================================
     // TurboModule interface
     // ============================================================================
+    // NOTE: The base class NativeRunAnywhereCxxSpec<RunAnywhereModule> already implements
+    // get() to forward to the delegate, so we don't need to override it
 
-    /**
-     * Get a property or method from the module.
-     * Called by JSI when JavaScript accesses module properties.
-     */
-    jsi::Value get(jsi::Runtime& rt, const jsi::PropNameID& name) override;
-
-    /**
-     * Get all property names exposed by this module.
-     */
-    std::vector<jsi::PropNameID> getPropertyNames(jsi::Runtime& rt) override;
-
-private:
     // ============================================================================
     // Backend Lifecycle
     // ============================================================================
+    // NOTE: These methods must be public for codegen delegate to call them via CRTP
 
+    std::vector<std::string> getAvailableBackends(jsi::Runtime& rt);
     bool createBackend(jsi::Runtime& rt, const std::string& name);
     bool initialize(jsi::Runtime& rt, const std::optional<std::string>& configJson);
     void destroy(jsi::Runtime& rt);
@@ -116,6 +121,8 @@ private:
     bool unloadSTTModel(jsi::Runtime& rt);
     std::string transcribe(jsi::Runtime& rt, const std::string& audioBase64,
                            int sampleRate, const std::optional<std::string>& language);
+    std::string transcribeFile(jsi::Runtime& rt, const std::string& filePath,
+                              const std::optional<std::string>& language);
     bool supportsSTTStreaming(jsi::Runtime& rt);
     int createSTTStream(jsi::Runtime& rt, const std::optional<std::string>& configJson);
     bool feedSTTAudio(jsi::Runtime& rt, int streamHandle,
@@ -199,6 +206,10 @@ private:
 
     void addListener(jsi::Runtime& rt, const std::string& eventName);
     void removeListeners(jsi::Runtime& rt, int count);
+    std::string pollEvents(jsi::Runtime& rt);
+    void clearEventQueue(jsi::Runtime& rt);
+
+private:
 
     /**
      * Emit an event to JavaScript.
@@ -268,18 +279,6 @@ private:
 
     /// Mutex for thread-safe access to eventQueue_
     std::mutex eventQueueMutex_;
-
-    /**
-     * Poll and drain all pending events.
-     * Called from JavaScript to retrieve queued events.
-     * @return JSON array string of pending events
-     */
-    std::string pollEvents();
-
-    /**
-     * Clear all pending events (for cleanup)
-     */
-    void clearEventQueue();
 };
 
 } // namespace facebook::react
