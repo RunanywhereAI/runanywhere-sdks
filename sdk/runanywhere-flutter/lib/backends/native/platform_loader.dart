@@ -256,8 +256,8 @@ class PlatformLoader {
       }
     }
 
-    // Fallback: assume a common workspace structure
-    return '/Users/sanchitmonga/development/ODLM/runanywhere-all/runanywhere-core';
+    // Fallback: use environment variable or return empty string
+    return Platform.environment['RUNANYWHERE_CORE_ROOT'] ?? '';
   }
 
   /// Check if the native library is loaded.

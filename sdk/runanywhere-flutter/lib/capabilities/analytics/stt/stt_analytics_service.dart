@@ -188,7 +188,9 @@ class STTAnalyticsService implements AnalyticsService<STTEvent, STTMetrics> {
       confidence: confidence,
       durationMs: duration.inMilliseconds.toDouble(),
       audioLengthMs: audioLength.inMilliseconds.toDouble(),
-      realTimeFactor: duration.inMilliseconds / audioLength.inMilliseconds,
+      realTimeFactor: audioLength.inMilliseconds > 0
+          ? duration.inMilliseconds / audioLength.inMilliseconds
+          : 0.0,
       speakerId: speaker ?? 'unknown',
     );
 

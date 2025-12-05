@@ -267,8 +267,10 @@ class VoiceAnalyticsService
     required int wordCount,
     required Duration audioLength,
   }) async {
-    final realTimeFactor =
-        duration.inMilliseconds / audioLength.inMilliseconds;
+    // Guard against division by zero when audioLength is zero
+    final realTimeFactor = audioLength.inMilliseconds > 0
+        ? duration.inMilliseconds / audioLength.inMilliseconds
+        : 0.0;
 
     _totalTranscriptions += 1;
     _totalTranscriptionDuration += duration;
