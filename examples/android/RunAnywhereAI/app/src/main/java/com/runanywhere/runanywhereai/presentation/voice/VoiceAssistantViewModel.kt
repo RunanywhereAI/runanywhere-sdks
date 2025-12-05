@@ -436,7 +436,7 @@ class VoiceAssistantViewModel(
 
                 // Start audio capture and get audio stream as Flow<VoiceAudioChunk>
                 // Note: We need a Flow<VoiceAudioChunk> for the pipeline
-                val audioFlow = audioCapture.startCapture()
+                val audioFlow = audioCapture.startCaptureChunks()
 
                 _uiState.update {
                     it.copy(
