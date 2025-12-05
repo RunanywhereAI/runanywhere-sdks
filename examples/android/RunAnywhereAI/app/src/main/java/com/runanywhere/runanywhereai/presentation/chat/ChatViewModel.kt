@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.RunAnywhereApplication
 import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.*
+import com.runanywhere.sdk.models.MessageModelInfo as SDKMessageModelInfo
 import com.runanywhere.sdk.models.lifecycle.Modality
 import com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker
 import com.runanywhere.sdk.public.RunAnywhere
@@ -156,9 +157,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Create assistant message that will be updated with streaming tokens
+        // Include ModelInfo matching iOS pattern for message attribution
+        val currentModelInfo = createCurrentModelInfo()
         val assistantMessage = ChatMessage(
             role = MessageRole.ASSISTANT,
-            content = ""
+            content = "",
+            modelInfo = currentModelInfo
         )
 
         _uiState.value = _uiState.value.copy(
@@ -493,6 +497,24 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun estimateTokenCount(text: String): Int {
         return ceil(text.length / 4.0).toInt()
+    }
+
+    /**
+     * Create MessageModelInfo for the current loaded model
+     * Matches iOS pattern for attaching model info to messages
+     */
+    private fun createCurrentModelInfo(): MessageModelInfo? {
+        val modelName = _uiState.value.loadedModelName ?: return null
+
+        // Get framework from lifecycle tracker
+        val llmState = ModelLifecycleTracker.loadedModel(Modality.LLM)
+        val framework = llmState?.framework ?: com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP
+
+        return SDKMessageModelInfo(
+            modelId = llmState?.modelId ?: modelName,
+            modelName = modelName,
+            framework = framework
+        )
     }
 
     /**

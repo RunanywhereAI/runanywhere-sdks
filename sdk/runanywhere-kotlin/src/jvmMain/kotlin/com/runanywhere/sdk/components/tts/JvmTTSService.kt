@@ -91,7 +91,10 @@ class JvmTTSService : TTSService {
         _isSynthesizing = true
         return try {
             withContext(Dispatchers.IO) {
-                val voice = options.effectiveVoice
+                // Find voice by ID or use default
+                val voice = options.voice?.let { voiceId ->
+                    availableTTSVoices.find { it.id == voiceId }
+                } ?: availableTTSVoices.firstOrNull() ?: TTSVoice.DEFAULT
                 logger.debug("Synthesizing text: '${text.take(50)}...' with voice: ${voice.name}")
 
                 when {

@@ -34,7 +34,8 @@ class JvmWhisperKitService : WhisperKitService() {
     override val currentModel: String?
         get() = currentWhisperModel.value?.modelName
 
-    override val supportedLanguages: List<String>
+    // Kotlin-specific: supported languages for this implementation
+    val supportedLanguages: List<String>
         get() = listOf(
             "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr",
             "pl", "ca", "nl", "ar", "sv", "it", "id", "hi", "fi", "vi",
@@ -42,8 +43,12 @@ class JvmWhisperKitService : WhisperKitService() {
         )
 
     override val supportsStreaming: Boolean get() = true
-    override val supportsLanguageDetection: Boolean get() = true
-    override val supportsSpeakerDiarization: Boolean get() = false
+
+    // Kotlin-specific: language detection capability
+    val supportsLanguageDetection: Boolean get() = true
+
+    // Kotlin-specific: speaker diarization capability
+    val supportsSpeakerDiarization: Boolean get() = false
 
     override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
         try {
@@ -298,9 +303,9 @@ class JvmWhisperKitService : WhisperKitService() {
     }.flowOn(Dispatchers.Default)
 
     /**
-     * Enhanced streaming transcription implementation matching iOS patterns
+     * Kotlin-specific: Enhanced streaming transcription with typed events
      */
-    override fun transcribeStream(
+    fun transcribeStream(
         audioStream: Flow<ByteArray>,
         options: com.runanywhere.sdk.components.stt.STTStreamingOptions
     ): Flow<com.runanywhere.sdk.components.stt.STTStreamEvent> = flow {
@@ -400,9 +405,9 @@ class JvmWhisperKitService : WhisperKitService() {
     }.flowOn(Dispatchers.Default)
 
     /**
-     * Language detection implementation
+     * Kotlin-specific: Language detection from audio
      */
-    override suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
+    suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
         val context = whisperContext ?: throw WhisperError.ServiceNotReady()
 
         return withContext(Dispatchers.Default) {
@@ -434,9 +439,9 @@ class JvmWhisperKitService : WhisperKitService() {
     }
 
     /**
-     * Check if language is supported
+     * Kotlin-specific: Check if service supports specific language
      */
-    override fun supportsLanguage(languageCode: String): Boolean {
+    fun supportsLanguage(languageCode: String): Boolean {
         return supportedLanguages.contains(languageCode.lowercase())
     }
 
@@ -447,12 +452,8 @@ class JvmWhisperKitService : WhisperKitService() {
     }
 
     private fun createWhisperParams(options: STTOptions): WhisperFullParams {
-        // Create params with appropriate strategy based on sensitivity
-        val strategy = when (options.sensitivityMode) {
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.NORMAL -> WhisperSamplingStrategy.GREEDY
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.HIGH,
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.MAXIMUM -> WhisperSamplingStrategy.GREEDY // WhisperJNI only supports GREEDY
-        }
+        // Create params with greedy strategy (most reliable for production)
+        val strategy = WhisperSamplingStrategy.GREEDY
         val params = WhisperFullParams(strategy)
 
         // Set language
@@ -461,25 +462,11 @@ class JvmWhisperKitService : WhisperKitService() {
             else -> options.language.take(2) // Use ISO 639-1 code
         }
 
-        // Set other parameters based on STTOptions
+        // Set parameters (using Whisper defaults for removed STTOptions fields)
         params.printTimestamps = options.enableTimestamps
-        params.suppressBlank = options.suppressBlank
-        params.suppressNonSpeechTokens = options.suppressNonSpeechTokens
-
-        // Set temperature and beam size based on sensitivity mode
-        when (options.sensitivityMode) {
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.NORMAL -> {
-                params.temperature = 0.0f
-            }
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.HIGH -> {
-                params.temperature = 0.3f
-                params.beamSearchBeamSize = 5
-            }
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.MAXIMUM -> {
-                params.temperature = 0.5f
-                params.beamSearchBeamSize = 10
-            }
-        }
+        params.suppressBlank = true // Whisper default
+        params.suppressNonSpeechTokens = true // Whisper default
+        params.temperature = 0.0f // Deterministic output
 
         return params
     }

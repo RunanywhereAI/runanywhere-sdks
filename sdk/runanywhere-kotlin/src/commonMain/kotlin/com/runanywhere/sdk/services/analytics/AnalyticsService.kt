@@ -314,7 +314,6 @@ class AnalyticsService internal constructor(
             } catch (e: Exception) {
                 // Fail silently - analytics should never break the SDK
                 logger.warning("📊 [ANALYTICS] ❌ Analytics submission failed (non-critical): ${e.message}")
-                e.printStackTrace()
             }
         }
     }

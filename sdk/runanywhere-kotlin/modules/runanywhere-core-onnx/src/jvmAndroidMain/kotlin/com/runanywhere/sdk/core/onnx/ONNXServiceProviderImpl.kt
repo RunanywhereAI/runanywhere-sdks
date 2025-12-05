@@ -16,6 +16,7 @@ import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
@@ -133,11 +134,34 @@ private var cachedTTSModelPath: String? = null
 actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteArray {
     logger.info("Synthesizing with ONNX: ${text.take(50)}...")
 
-    // Get the model path from options.voiceId (which contains the model path)
-    val modelPath = options.voiceId
+    // Resolve model path from options.voice
+    // options.voice may contain either:
+    // 1. A full filesystem path (e.g., /data/user/0/.../model.onnx)
+    // 2. A model ID that needs to be resolved to a path (e.g., "piper-en-us-lessac-medium")
+    val voice = options.voice
+    val modelPath: String? = when {
+        voice.isNullOrEmpty() -> null
+        voice.contains("/") -> {
+            // Already a full path
+            logger.debug("Using voice as direct path: $voice")
+            voice
+        }
+        else -> {
+            // Model ID - look up the full path from the model registry
+            logger.info("Resolving model ID to path: $voice")
+            val modelInfo = ServiceContainer.shared.modelRegistry.getModel(voice)
+            val resolvedPath = modelInfo?.localPath
+            if (resolvedPath != null) {
+                logger.info("Resolved model path: $resolvedPath")
+            } else {
+                logger.warn("Could not resolve model ID '$voice' to a path - model may not be downloaded")
+            }
+            resolvedPath ?: voice
+        }
+    }
 
     if (modelPath.isNullOrEmpty()) {
-        logger.error("No TTS model path provided in options.voiceId")
+        logger.error("No TTS model path provided in options.voice")
         throw IllegalStateException("TTS model not loaded. Please select a TTS model first.")
     }
 
@@ -373,7 +397,8 @@ private class ONNXSTTServiceWrapper(
     override val supportsStreaming: Boolean
         get() = coreService.supportsSTTStreaming
 
-    override val supportedLanguages: List<String> = listOf("en", "es", "fr", "de", "it", "pt", "zh", "ja", "ko")
+    // Kotlin-specific: supported languages for this implementation
+    val supportedLanguages: List<String> = listOf("en", "es", "fr", "de", "it", "pt", "zh", "ja", "ko")
 
     override suspend fun initialize(modelPath: String?) {
         modelPath?.let { path ->
@@ -469,7 +494,8 @@ private class ONNXSTTServiceWrapper(
         return finalResult
     }
 
-    override fun transcribeStream(
+    // Kotlin-specific: Enhanced streaming with typed events
+    fun transcribeStream(
         audioStream: Flow<ByteArray>,
         options: STTStreamingOptions
     ): Flow<STTStreamEvent> {
@@ -532,12 +558,14 @@ private class ONNXSTTServiceWrapper(
         }
     }
 
-    override suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
+    // Kotlin-specific: Language detection
+    suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
         // ONNX doesn't support standalone language detection - return default
         return mapOf("en" to 1.0f)
     }
 
-    override fun supportsLanguage(languageCode: String): Boolean {
+    // Kotlin-specific: Language support check
+    fun supportsLanguage(languageCode: String): Boolean {
         return supportedLanguages.contains(languageCode.lowercase().take(2))
     }
 
@@ -558,7 +586,7 @@ private class ONNXTTSServiceWrapper(
     suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
         val result = coreService.synthesize(
             text = text,
-            voiceId = options.voiceId,
+            voiceId = options.voice ?: "0",
             speedRate = options.rate,
             pitchShift = options.pitch
         )

@@ -319,162 +319,66 @@ class STTComponent(
     }
 
     /**
-     * Enhanced stream transcription with Speaker Diarization support (matches iOS architecture)
-     * Uses callbackFlow for thread-safe emissions from any coroutine context
+     * Live transcription with real-time partial results (matches iOS liveTranscribe)
+     * - Parameters:
+     *   - audioStream: Flow of audio data chunks
+     *   - options: Transcription options
+     * - Returns: Flow of transcription text (partial and final results)
+     * - Note: If the service doesn't support streaming, this will collect all audio
+     *         and return a single result when the stream completes
+     */
+    fun liveTranscribe(
+        audioStream: Flow<ByteArray>,
+        options: STTOptions = STTOptions.default()
+    ): Flow<String> = streamTranscribe(audioStream, options.language)
+
+    /**
+     * Stream transcription (matches iOS streamTranscribe)
+     * Returns Flow<String> equivalent to iOS AsyncThrowingStream<String, Error>
      */
     fun streamTranscribe(
         audioStream: Flow<ByteArray>,
-        language: String? = null,
-        enableSpeakerDiarization: Boolean = sttConfiguration.enableDiarization
-    ): Flow<STTStreamEvent> = callbackFlow {
+        language: String? = null
+    ): Flow<String> = callbackFlow {
         requireReady()
 
         val service = service?.wrappedService
             ?: throw SDKError.ComponentNotReady("STT service not available")
 
-        val streamingOptions = STTStreamingOptions(
+        val options = STTOptions(
             language = language ?: sttConfiguration.language,
             detectLanguage = language == null,
-            enablePartialResults = true,
-            enableSpeakerDiarization = enableSpeakerDiarization,
-            enableAudioLevelMonitoring = true
+            enablePunctuation = sttConfiguration.enablePunctuation,
+            enableDiarization = sttConfiguration.enableDiarization,
+            enableTimestamps = false,
+            vocabularyFilter = sttConfiguration.vocabularyList,
+            audioFormat = AudioFormat.PCM
         )
 
         // Launch transcription in a coroutine
         val transcriptionJob = launch {
             try {
-                // Use enhanced streaming if available, otherwise fall back to basic streaming
-                if (service.supportsStreaming) {
-                    service.transcribeStream(audioStream, streamingOptions).collect { event ->
-                        trySend(event)
-                    }
-                } else {
-                    // Fallback to basic streaming
-                    trySend(STTStreamEvent.SpeechStarted)
-
-                    val basicOptions = STTOptions(
-                        language = streamingOptions.language ?: "en",
-                        detectLanguage = streamingOptions.detectLanguage,
-                        enablePunctuation = sttConfiguration.enablePunctuation,
-                        enableDiarization = streamingOptions.enableSpeakerDiarization,
-                        enableTimestamps = false,
-                        vocabularyFilter = sttConfiguration.vocabularyList,
-                        audioFormat = AudioFormat.PCM
-                    )
-
-                    val result = service.streamTranscribe(
-                        audioStream = audioStream,
-                        options = basicOptions
-                    ) { partial ->
-                        trySend(STTStreamEvent.PartialTranscription(partial))
-                    }
-
-                    // Emit final result
-                    trySend(STTStreamEvent.FinalTranscription(result))
-                    trySend(STTStreamEvent.SpeechEnded)
+                val result = service.streamTranscribe(
+                    audioStream = audioStream,
+                    options = options
+                ) { partial ->
+                    // Yield partial result
+                    trySend(partial)
                 }
+
+                // Yield final result
+                trySend(result.transcript)
             } catch (error: Exception) {
-                // Wrap exception in STTError if needed
-                val sttError = when (error) {
-                    is STTError -> error
-                    else -> STTError.transcriptionFailed(error)
-                }
-
-                // Send error event to flow
-                trySend(STTStreamEvent.Error(sttError))
-
-                // Log the error for debugging
-                logger.error("STT streaming error: ${sttError.message}", sttError)
-            } finally {
-                // Ensure cleanup happens regardless of success or failure
-                try {
-                    // Perform any necessary cleanup
-                    logger.debug("STT streaming transcription job completed")
-                } catch (cleanupError: Exception) {
-                    logger.error("Error during streaming cleanup: ${cleanupError.message}", cleanupError)
-                }
+                logger.error("STT streaming error: ${error.message}", error)
+                throw error
             }
         }
 
         // Wait for flow to be closed
         awaitClose {
-            // Cancel the transcription job on flow cancellation
             transcriptionJob.cancel()
-            logger.debug("STT streaming flow closed, transcription job cancelled")
+            logger.debug("STT streaming flow closed")
         }
-    }
-
-    /**
-     * Detect language from audio sample (matches iOS architecture)
-     */
-    suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
-        requireReady()
-
-        val service = service?.wrappedService
-            ?: throw SDKError.ComponentNotReady("STT service not available")
-
-        return if (service.supportsLanguageDetection) {
-            service.detectLanguage(audioData)
-        } else {
-            // Fallback: use transcription with language detection
-            val options = STTOptions(
-                language = "auto",
-                detectLanguage = true,
-                enablePunctuation = false,
-                enableTimestamps = false
-            )
-
-            val result = service.transcribe(audioData, options)
-            result.language?.let { detectedLang ->
-                mapOf(detectedLang to 1.0f)
-            } ?: emptyMap()
-        }
-    }
-
-    /**
-     * Get supported languages for current service
-     */
-    fun getSupportedLanguages(): List<String> {
-        return service?.wrappedService?.supportedLanguages ?: emptyList()
-    }
-
-    /**
-     * Check if specific language is supported
-     */
-    fun supportsLanguage(languageCode: String): Boolean {
-        return service?.wrappedService?.supportsLanguage(languageCode) ?: false
-    }
-
-    /**
-     * Transcribe with automatic language switching based on confidence
-     */
-    suspend fun transcribeWithAutoLanguage(
-        audioData: ByteArray,
-        candidateLanguages: List<String> = emptyList(),
-        confidenceThreshold: Float = 0.7f
-    ): STTOutput {
-        requireReady()
-
-        // Step 1: Detect language if not specified
-        val detectedLanguages = detectLanguage(audioData)
-        val bestLanguage = detectedLanguages.maxByOrNull { it.value }
-
-        val targetLanguage = if (bestLanguage != null && bestLanguage.value >= confidenceThreshold) {
-            // Use detected language if confidence is high enough
-            bestLanguage.key
-        } else if (candidateLanguages.isNotEmpty()) {
-            // Try candidate languages
-            candidateLanguages.firstOrNull { supportsLanguage(it) }
-        } else {
-            // Fall back to configuration default
-            sttConfiguration.language
-        }
-
-        // Step 2: Transcribe with selected language
-        return transcribe(
-            audioData = audioData,
-            language = targetLanguage
-        )
     }
 
     /**

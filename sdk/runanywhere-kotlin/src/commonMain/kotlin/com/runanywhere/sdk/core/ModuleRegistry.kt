@@ -550,8 +550,8 @@ interface VLMServiceProvider {
  * Provider for Wake Word Detection services
  */
 interface WakeWordServiceProvider {
-    suspend fun createWakeWordService(configuration: Any): Any // TODO: Add WakeWordConfiguration
-    fun canHandle(modelId: String): Boolean
+    suspend fun createWakeWordService(configuration: com.runanywhere.sdk.components.wakeword.WakeWordConfiguration): com.runanywhere.sdk.components.wakeword.WakeWordService
+    fun canHandle(modelId: String?): Boolean
     val name: String
 }
 

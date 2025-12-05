@@ -42,8 +42,8 @@ class ONNXAdapter : UnifiedFrameworkAdapter {
 
     override val supportedModalities: Set<FrameworkModality> = setOf(
         FrameworkModality.VOICE_TO_TEXT,
-        FrameworkModality.TEXT_TO_VOICE,
-        FrameworkModality.TEXT_TO_TEXT
+        FrameworkModality.TEXT_TO_VOICE
+        // Note: TEXT_TO_TEXT not yet implemented - removed to avoid contract violation
     )
 
     override val supportedFormats: List<ModelFormat> = listOf(

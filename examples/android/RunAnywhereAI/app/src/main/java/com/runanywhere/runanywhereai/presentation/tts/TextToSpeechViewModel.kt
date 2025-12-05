@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 private const val TAG = "TTSViewModel"
@@ -134,6 +136,7 @@ class TextToSpeechViewModel : ViewModel() {
     // SDK Components - matches iOS TTSComponent pattern
     private var ttsComponent: TTSComponent? = null
     private var currentComponentModelId: String? = null  // Track which model the component is configured for
+    private val restorationMutex = Mutex()  // Synchronize component restoration to prevent race conditions
 
     // Audio playback
     private var audioTrack: AudioTrack? = null
@@ -186,50 +189,51 @@ class TextToSpeechViewModel : ViewModel() {
      */
     private fun restoreTTSComponent(modelId: String) {
         viewModelScope.launch {
-            // Check if we already have a component for this exact model
-            if (ttsComponent != null && currentComponentModelId == modelId) {
-                Log.d(TAG, "TTS component already configured for model: $modelId")
-                return@launch
-            }
-
-            // Clean up existing component if switching to a different model
-            if (ttsComponent != null && currentComponentModelId != modelId) {
-                Log.i(TAG, "Switching TTS model from $currentComponentModelId to $modelId - cleaning up old component")
-                try {
-                    ttsComponent?.cleanup()
-                } catch (e: Exception) {
-                    Log.w(TAG, "Error cleaning up old TTS component: ${e.message}")
+            restorationMutex.withLock {
+                // Check if we already have a component for this exact model
+                if (ttsComponent != null && currentComponentModelId == modelId) {
+                    Log.d(TAG, "TTS component already configured for model: $modelId")
+                    return@withLock
                 }
-                ttsComponent = null
-                currentComponentModelId = null
-            }
 
-            Log.i(TAG, "Restoring TTS component for model: $modelId")
-            try {
-                // Get the model info to find the local path
-                val modelInfo = ServiceContainer.shared.modelRegistry.getModel(modelId)
-                val effectiveModelId = modelInfo?.localPath ?: modelId
+                // Clean up existing component if switching to a different model
+                if (ttsComponent != null && currentComponentModelId != modelId) {
+                    Log.i(TAG, "Switching TTS model from $currentComponentModelId to $modelId - cleaning up old component")
+                    try {
+                        ttsComponent?.cleanup()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error cleaning up old TTS component: ${e.message}")
+                    }
+                    ttsComponent = null
+                    currentComponentModelId = null
+                }
 
-                Log.i(TAG, "Using effective model path: $effectiveModelId")
+                Log.i(TAG, "Restoring TTS component for model: $modelId")
+                try {
+                    // Get the model info to find the local path
+                    val modelInfo = ServiceContainer.shared.modelRegistry.getModel(modelId)
+                    val effectiveModelId = modelInfo?.localPath ?: modelId
 
-                // Create TTS configuration (matches iOS TTSConfiguration)
-                val config = TTSConfiguration(
-                    modelId = effectiveModelId,
-                    defaultRate = _uiState.value.speed,
-                    defaultPitch = _uiState.value.pitch,
-                    defaultVolume = 1.0f,
-                    audioFormat = SDKAudioFormat.WAV,
-                    sampleRate = 22050
-                )
+                    Log.i(TAG, "Using effective model path: $effectiveModelId")
 
-                val component = TTSComponent(config)
-                component.initialize()
-                ttsComponent = component
-                currentComponentModelId = modelId  // Track which model this component is for
+                    // Create TTS configuration (matches iOS TTSConfiguration)
+                    val config = TTSConfiguration(
+                        modelId = effectiveModelId,
+                        speakingRate = _uiState.value.speed,
+                        pitch = _uiState.value.pitch,
+                        volume = 1.0f,
+                        audioFormat = SDKAudioFormat.WAV
+                    )
 
-                Log.i(TAG, "✅ TTS component restored successfully for model: $modelId")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to restore TTS component: ${e.message}", e)
+                    val component = TTSComponent(config)
+                    component.initialize()
+                    ttsComponent = component
+                    currentComponentModelId = modelId  // Track which model this component is for
+
+                    Log.i(TAG, "✅ TTS component restored successfully for model: $modelId")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to restore TTS component: ${e.message}", e)
+                }
             }
         }
     }
@@ -356,7 +360,7 @@ class TextToSpeechViewModel : ViewModel() {
                             hasGeneratedAudio = true,
                             audioDuration = output.duration,
                             audioSize = output.audioData.size,
-                            sampleRate = output.metadata.sampleRate,
+                            sampleRate = null,  // SynthesisMetadata doesn't include sampleRate
                             processingTimeMs = processingTime
                         )
                     }
