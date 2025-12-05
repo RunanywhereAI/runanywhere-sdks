@@ -21,7 +21,8 @@ enum class LLMFramework(val value: String, val displayName: String) {
     MEDIA_PIPE("MediaPipe", "MediaPipe"),
     WHISPER_KIT("WhisperKit", "WhisperKit"),
     WHISPER_CPP("WhisperCpp", "Whisper.cpp"),
-    OPEN_AI_WHISPER("OpenAIWhisper", "OpenAI Whisper");
+    OPEN_AI_WHISPER("OpenAIWhisper", "OpenAI Whisper"),
+    SYSTEM_TTS("SystemTTS", "System TTS"); // System text-to-speech
 
     companion object {
         fun fromValue(value: String): LLMFramework? {

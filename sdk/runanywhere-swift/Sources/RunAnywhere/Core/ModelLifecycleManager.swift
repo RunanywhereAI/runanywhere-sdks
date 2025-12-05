@@ -42,8 +42,8 @@ public enum ModelLoadState: Equatable, Sendable {
 
 // MARK: - Loaded Model Info
 
-/// Information about a currently loaded model
-public struct LoadedModelState: Sendable {
+/// Information about a currently loaded model (non-Sendable due to service references)
+public struct LoadedModelState {
     public let modelId: String
     public let modelName: String
     public let framework: LLMFramework
@@ -52,6 +52,11 @@ public struct LoadedModelState: Sendable {
     public let loadedAt: Date?
     public let memoryUsage: Int64?
 
+    // Service instances - stored alongside state for unified lifecycle management
+    public let llmService: (any LLMService)?
+    public let sttService: (any STTService)?
+    public let ttsService: (any TTSService)?
+
     public init(
         modelId: String,
         modelName: String,
@@ -59,7 +64,10 @@ public struct LoadedModelState: Sendable {
         modality: Modality,
         state: ModelLoadState,
         loadedAt: Date? = nil,
-        memoryUsage: Int64? = nil
+        memoryUsage: Int64? = nil,
+        llmService: (any LLMService)? = nil,
+        sttService: (any STTService)? = nil,
+        ttsService: (any TTSService)? = nil
     ) {
         self.modelId = modelId
         self.modelName = modelName
@@ -68,6 +76,9 @@ public struct LoadedModelState: Sendable {
         self.state = state
         self.loadedAt = loadedAt
         self.memoryUsage = memoryUsage
+        self.llmService = llmService
+        self.sttService = sttService
+        self.ttsService = ttsService
     }
 }
 
@@ -202,12 +213,16 @@ public final class ModelLifecycleTracker: ObservableObject {
     }
 
     /// Called when a model finishes loading successfully
+    /// Pass the service instance to store it for reuse
     public func modelDidLoad(
         modelId: String,
         modelName: String,
         framework: LLMFramework,
         modality: Modality,
-        memoryUsage: Int64? = nil
+        memoryUsage: Int64? = nil,
+        llmService: (any LLMService)? = nil,
+        sttService: (any STTService)? = nil,
+        ttsService: (any TTSService)? = nil
     ) {
         logger.info("Model loaded: \(modelName) [\(modality.rawValue)] with \(framework.rawValue)")
 
@@ -218,11 +233,55 @@ public final class ModelLifecycleTracker: ObservableObject {
             modality: modality,
             state: .loaded,
             loadedAt: Date(),
-            memoryUsage: memoryUsage
+            memoryUsage: memoryUsage,
+            llmService: llmService,
+            sttService: sttService,
+            ttsService: ttsService
         )
 
         modelsByModality[modality] = state
         lifecycleEvents.send(.didLoad(modelId: modelId, modality: modality, framework: framework))
+    }
+
+    // MARK: - Service Access
+
+    /// Get cached LLM service for a model ID
+    public func llmService(for modelId: String) -> (any LLMService)? {
+        guard let state = modelsByModality[.llm],
+              state.modelId == modelId,
+              state.state.isLoaded else {
+            return nil
+        }
+        if state.llmService != nil {
+            logger.info("✅ Found cached LLM service for model: \(modelId)")
+        }
+        return state.llmService
+    }
+
+    /// Get cached STT service for a model ID
+    public func sttService(for modelId: String) -> (any STTService)? {
+        guard let state = modelsByModality[.stt],
+              state.modelId == modelId,
+              state.state.isLoaded else {
+            return nil
+        }
+        if state.sttService != nil {
+            logger.info("✅ Found cached STT service for model: \(modelId)")
+        }
+        return state.sttService
+    }
+
+    /// Get cached TTS service for a model ID
+    public func ttsService(for modelId: String) -> (any TTSService)? {
+        guard let state = modelsByModality[.tts],
+              state.modelId == modelId,
+              state.state.isLoaded else {
+            return nil
+        }
+        if state.ttsService != nil {
+            logger.info("✅ Found cached TTS service for model: \(modelId)")
+        }
+        return state.ttsService
     }
 
     /// Called when a model fails to load

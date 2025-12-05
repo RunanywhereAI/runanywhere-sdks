@@ -37,32 +37,51 @@ public struct ONNXSTTServiceProvider: STTServiceProvider {
     }
 
     public func canHandle(modelId: String?) -> Bool {
-        // Check if model ID indicates ONNX format
         guard let modelId = modelId else { return false }
 
+        Self.logger.debug("Checking if can handle STT model: \(modelId)")
+
+        // PRIMARY CHECK: Use cached model info from the registry (most reliable)
+        if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
+            // Check if ONNX is the preferred framework for STT
+            if modelInfo.preferredFramework == .onnx && modelInfo.category == .speechRecognition {
+                Self.logger.debug("Model \(modelId) has ONNX as preferred framework for STT")
+                return true
+            }
+
+            // Check if ONNX is in compatible frameworks for speech models
+            if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechRecognition {
+                Self.logger.debug("Model \(modelId) has ONNX in compatible frameworks for STT")
+                return true
+            }
+
+            // Check if format is ONNX
+            if modelInfo.format == .onnx && modelInfo.category == .speechRecognition {
+                Self.logger.debug("Model \(modelId) has ONNX format for STT")
+                return true
+            }
+
+            // Model info exists but doesn't indicate ONNX STT compatibility
+            Self.logger.debug("Model \(modelId) found in cache but not ONNX STT compatible")
+            return false
+        }
+
+        // FALLBACK: Pattern-based matching for models not yet in cache
         let lowercased = modelId.lowercased()
 
-        Self.logger.debug("Checking if can handle model: \(modelId)")
-
-        // Explicitly handle ONNX models (Glados/Distil-Whisper for STT)
+        // Explicitly handle ONNX models
         if lowercased.contains("onnx") || lowercased.hasSuffix(".onnx") {
-            Self.logger.debug("Model \(modelId) matches ONNX pattern")
+            Self.logger.debug("Model \(modelId) matches ONNX pattern (fallback)")
             return true
         }
 
         // Handle Sherpa-ONNX models (zipformer, sherpa-whisper)
         if lowercased.contains("zipformer") || lowercased.contains("sherpa") {
-            Self.logger.debug("Model \(modelId) matches Sherpa-ONNX pattern")
+            Self.logger.debug("Model \(modelId) matches Sherpa-ONNX pattern (fallback)")
             return true
         }
 
-        // Handle Glados/Distil-Whisper models (these are ONNX-based)
-        if lowercased.contains("glados") || lowercased.contains("distil") {
-            Self.logger.debug("Model \(modelId) matches Glados/Distil pattern")
-            return true
-        }
-
-        Self.logger.debug("Model \(modelId) does not match any ONNX patterns")
+        Self.logger.debug("Model \(modelId) does not match any ONNX STT patterns")
         return false
     }
 

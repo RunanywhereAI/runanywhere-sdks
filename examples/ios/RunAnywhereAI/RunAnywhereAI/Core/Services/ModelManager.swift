@@ -58,29 +58,4 @@ class ModelManager: ObservableObject {
         // Use the SDK's public method to get the current model
         return RunAnywhere.currentModel
     }
-
-    func isModelLoaded(_ modelId: String) -> Bool {
-        // Since SDK properties are private, return false for now
-        // In a real implementation, this would use public SDK methods
-        return false
-    }
-
-    func isModelDownloaded(_ modelName: String, framework: LLMFramework) -> Bool {
-        // Check if model exists locally
-        // For now, return false unless it's Foundation Models which are built-in
-        return framework == .foundationModels
-    }
-}
-
-// MARK: - ModelInfo Extension
-
-extension ModelInfo {
-    var isLocal: Bool {
-        return localPath != nil
-    }
-
-    var downloadProgress: Double {
-        // Stub implementation - return 0 or 1
-        return isLocal ? 1.0 : 0.0
-    }
 }

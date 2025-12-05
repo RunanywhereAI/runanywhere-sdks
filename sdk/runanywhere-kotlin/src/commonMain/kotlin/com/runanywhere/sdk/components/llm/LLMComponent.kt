@@ -11,8 +11,17 @@ import com.runanywhere.sdk.models.*
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.utils.PlatformUtils
+import com.runanywhere.sdk.data.models.generateUUID
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+
+// Note: DelicateCoroutinesApi removed - now using component-scoped telemetryScope instead of GlobalScope
 
 /**
  * LLM Service Wrapper to allow protocol-based LLM service to work with BaseComponent
@@ -38,6 +47,9 @@ class LLMComponent(
 
     private val logger = SDKLogger("LLMComponent")
     private val serviceContainer: ServiceContainer? = ServiceContainer.shared
+
+    // Coroutine scope for fire-and-forget telemetry operations (avoids GlobalScope)
+    private val telemetryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // MARK: - Properties
 
@@ -126,6 +138,8 @@ class LLMComponent(
     }
 
     override suspend fun performCleanup() {
+        // Cancel any pending telemetry operations to prevent memory leaks
+        telemetryScope.cancel()
         service?.wrappedService?.cleanup()
         _isModelLoaded = false
         modelPath = null
@@ -308,37 +322,124 @@ class LLMComponent(
         // Build prompt
         val prompt = buildPrompt(input.messages, input.systemPrompt ?: llmConfiguration.effectiveSystemPrompt)
 
-        // Track generation time
+        // Get telemetry service for tracking
+        val telemetryService = serviceContainer?.telemetryService
+
+        // Generate generation ID for telemetry tracking
+        val generationId = generateUUID()
+        val modelId = llmConfiguration.modelId ?: service.currentModel ?: "unknown"
+        val modelName = modelId
+        val framework = "llama.cpp" // TODO: Get from service provider
+
+        // Rough token estimation: ~4 characters per token average
+        // LIMITATION: This is a very rough approximation. Actual token counts vary significantly based on:
+        // - Tokenizer type (BPE, WordPiece, SentencePiece, etc.)
+        // - Language and character encoding (ASCII vs Unicode)
+        // - Vocabulary and token boundaries
+        // For precise token counts, use the model's actual tokenizer.
+        val promptTokens = prompt.length / 4
+
+        // Track generation time - start before telemetry to avoid blocking
         val startTime = currentTimeMillis()
 
-        // Generate response
-        val response = service.generate(prompt, options)
+        logger.info("Starting LLM generation with model: $modelId")
 
-        val generationTime = currentTimeMillis() - startTime
+        // Track generation started - fire and forget to avoid blocking generation
+        telemetryScope.launch {
+            try {
+                telemetryService?.trackGenerationStarted(
+                    generationId = generationId,
+                    modelId = modelId,
+                    modelName = modelName,
+                    framework = framework,
+                    promptTokens = promptTokens,
+                    maxTokens = options.maxTokens,
+                    device = PlatformUtils.getDeviceModel(),
+                    osVersion = PlatformUtils.getOSVersion()
+                )
+            } catch (e: Exception) {
+                logger.debug("Failed to track generation started: ${e.message}")
+            }
+        }
+        var firstTokenTime: Long? = null
 
-        // Calculate tokens (rough estimate - real implementation would get from service)
-        val promptTokens = prompt.length / 4
-        val completionTokens = response.length / 4
-        val tokensPerSecond = if (generationTime > 0) {
-            (completionTokens.toDouble() * 1000.0) / generationTime
-        } else null
+        try {
+            // Generate response
+            val response = service.generate(prompt, options)
 
-        // Create output
-        return LLMOutput(
-            text = response,
-            tokenUsage = TokenUsage(
-                promptTokens = promptTokens,
-                completionTokens = completionTokens
-            ),
-            metadata = GenerationMetadata(
-                modelId = service.currentModel ?: "unknown",
-                temperature = options.temperature,
-                generationTime = generationTime,
-                tokensPerSecond = tokensPerSecond
-            ),
-            finishReason = FinishReason.COMPLETED,
-            timestamp = currentTimeMillis()
-        )
+            val generationTime = currentTimeMillis() - startTime
+
+            // Calculate completion tokens using same rough estimation (~4 chars per token)
+            val completionTokens = response.length / 4
+            val totalTokens = promptTokens + completionTokens
+            val tokensPerSecond = if (generationTime > 0) {
+                (completionTokens.toDouble() * 1000.0) / generationTime
+            } else null
+
+            // Track generation completed - fire and forget
+            val finalTokensPerSecond = tokensPerSecond ?: 0.0
+            val finalFirstTokenTime = firstTokenTime?.toDouble() ?: 0.0
+            telemetryScope.launch {
+                try {
+                    telemetryService?.trackGenerationCompleted(
+                        generationId = generationId,
+                        modelId = modelId,
+                        modelName = modelName,
+                        framework = framework,
+                        inputTokens = promptTokens,
+                        outputTokens = completionTokens,
+                        totalTimeMs = generationTime.toDouble(),
+                        timeToFirstTokenMs = finalFirstTokenTime,
+                        tokensPerSecond = finalTokensPerSecond,
+                        device = PlatformUtils.getDeviceModel(),
+                        osVersion = PlatformUtils.getOSVersion()
+                    )
+                } catch (e: Exception) {
+                    logger.debug("Failed to track generation completed: ${e.message}")
+                }
+            }
+
+            // Create output
+            return LLMOutput(
+                text = response,
+                tokenUsage = TokenUsage(
+                    promptTokens = promptTokens,
+                    completionTokens = completionTokens
+                ),
+                metadata = GenerationMetadata(
+                    modelId = service.currentModel ?: "unknown",
+                    temperature = options.temperature,
+                    generationTime = generationTime,
+                    tokensPerSecond = tokensPerSecond
+                ),
+                finishReason = FinishReason.COMPLETED,
+                timestamp = currentTimeMillis()
+            )
+        } catch (e: Exception) {
+            val generationTime = currentTimeMillis() - startTime
+            val errorMsg = e.message ?: "Unknown error"
+
+            // Track generation failed - fire and forget
+            telemetryScope.launch {
+                try {
+                    telemetryService?.trackGenerationFailed(
+                        generationId = generationId,
+                        modelId = modelId,
+                        modelName = modelName,
+                        framework = framework,
+                        inputTokens = promptTokens,
+                        totalTimeMs = generationTime.toDouble(),
+                        errorMessage = errorMsg,
+                        device = PlatformUtils.getDeviceModel(),
+                        osVersion = PlatformUtils.getOSVersion()
+                    )
+                } catch (telemetryError: Exception) {
+                    logger.debug("Failed to track generation failed: ${telemetryError.message}")
+                }
+            }
+
+            throw e
+        }
     }
 
     /**
@@ -384,6 +485,7 @@ class LLMComponent(
 
     /**
      * Stream generation with structured input/output
+     * Component-level method that builds the prompt and delegates to streamGenerate
      */
     fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
         ensureReady()
@@ -393,10 +495,49 @@ class LLMComponent(
         // Validate input
         input.validate()
 
-        // Use the service's streaming capability
-        service.streamProcess(input).collect { chunk ->
-            emit(chunk)
+        // Use provided options or create from configuration
+        val options = input.options ?: RunAnywhereGenerationOptions(
+            maxTokens = llmConfiguration.maxTokens,
+            temperature = llmConfiguration.temperature.toFloat(),
+            streamingEnabled = true
+        )
+
+        // Build prompt from messages
+        val prompt = buildPrompt(input.messages, input.systemPrompt ?: llmConfiguration.effectiveSystemPrompt)
+
+        // Track chunks for structured output
+        var chunkIndex = 0
+        val sessionId = generateUUID()
+
+        // Collect tokens from streaming service
+        val tokens = mutableListOf<String>()
+        service.streamGenerate(prompt, options) { token ->
+            tokens.add(token)
         }
+
+        // Emit collected tokens as chunks
+        for (token in tokens) {
+            emit(LLMGenerationChunk(
+                text = token,
+                isComplete = false,
+                tokenCount = 1,
+                timestamp = currentTimeMillis(),
+                chunkIndex = chunkIndex++,
+                sessionId = sessionId,
+                finishReason = null
+            ))
+        }
+
+        // Emit final chunk
+        emit(LLMGenerationChunk(
+            text = "",
+            isComplete = true,
+            tokenCount = 0,
+            timestamp = currentTimeMillis(),
+            chunkIndex = chunkIndex,
+            sessionId = sessionId,
+            finishReason = FinishReason.COMPLETED
+        ))
     }
 
     /**
@@ -408,35 +549,55 @@ class LLMComponent(
 
     /**
      * Load a specific model
+     * Note: In iOS architecture, model loading is handled during service creation via configuration.
+     * This method re-initializes the service with the new model path.
      */
     suspend fun loadModel(modelInfo: ModelInfo) {
         val service = llmService ?: throw SDKError.ComponentNotReady("LLM service not available")
-        service.loadModel(modelInfo)
+
+        // Update model path and re-initialize service
+        modelPath = modelInfo.localPath ?: modelInfo.id
+        service.initialize(modelPath)
+        _isModelLoaded = true
+
+        logger.info("Model loaded: ${modelInfo.name}")
     }
 
     /**
      * Cancel current generation
+     * Note: This is a component-level utility not part of iOS LLMService protocol.
+     * Individual service implementations may support cancellation through their own mechanisms.
      */
     fun cancelCurrent() {
-        llmService?.cancelCurrent()
+        // Component-level cancellation tracking could be added here
+        // For now, this is a placeholder as iOS doesn't expose this on the service interface
+        logger.debug("Cancel requested - individual service implementations may handle differently")
     }
 
     /**
      * Get token count for text
+     *
+     * Uses rough estimation of ~4 characters per token.
+     * LIMITATION: This is a very rough approximation. Actual token counts vary significantly based on:
+     * - Tokenizer type (BPE, WordPiece, SentencePiece, etc.)
+     * - Language and character encoding (ASCII vs Unicode)
+     * - Vocabulary and token boundaries
+     * For precise token counts, use the model's actual tokenizer.
+     *
+     * Note: This is a component-level utility not part of iOS LLMService protocol.
      */
     fun getTokenCount(text: String): Int {
-        return llmService?.getTokenCount(text) ?: (text.length / 4) // Fallback estimation
+        return text.length / 4 // Rough estimation: ~4 characters per token
     }
 
     /**
      * Check if prompt fits within context window
+     * Note: This is a component-level utility not part of iOS LLMService protocol.
      */
     fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
-        return llmService?.fitsInContext(prompt, maxTokens) ?: run {
-            val promptTokens = getTokenCount(prompt)
-            val totalTokens = promptTokens + maxTokens
-            totalTokens <= llmConfiguration.contextLength
-        }
+        val promptTokens = getTokenCount(prompt)
+        val totalTokens = promptTokens + maxTokens
+        return totalTokens <= llmConfiguration.contextLength
     }
 
     /**
@@ -474,22 +635,28 @@ class LLMComponent(
 
     // MARK: - Private Helpers
 
+    /**
+     * Build prompt from messages - matches iOS buildPrompt() exactly
+     *
+     * iOS Pattern: For LLM services, we should NOT add role markers as they handle their own templating.
+     * Just concatenate the messages with newlines. Don't add trailing "Assistant: " - LLM service handles this.
+     *
+     * Source: iOS LLMComponent.swift lines 520-536
+     */
     private fun buildPrompt(messages: List<Message>, systemPrompt: String?): String {
         var prompt = ""
 
+        // Add system prompt first if available
         systemPrompt?.let { system ->
-            prompt += "System: $system\n\n"
+            prompt += "$system\n\n"
         }
 
+        // Add messages without role markers - let LLM service handle formatting
         for (message in messages) {
-            when (message.role) {
-                MessageRole.USER -> prompt += "User: ${message.content}\n"
-                MessageRole.ASSISTANT -> prompt += "Assistant: ${message.content}\n"
-                MessageRole.SYSTEM -> prompt += "System: ${message.content}\n"
-            }
+            prompt += "${message.content}\n"
         }
 
-        prompt += "Assistant: "
-        return prompt
+        // Don't add trailing "Assistant: " - LLM service handles this
+        return prompt.trim()
     }
 }

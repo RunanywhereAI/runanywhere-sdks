@@ -179,6 +179,24 @@ class MockNetworkService : NetworkService {
                 )
                 json.encodeToString(preferences).toByteArray()
             }
+
+            APIEndpoint.devDeviceRegistration -> {
+                // Mock dev device registration response
+                val response = mapOf(
+                    "deviceId" to "mock-device-${System.currentTimeMillis()}",
+                    "registered" to true
+                )
+                json.encodeToString(response).toByteArray()
+            }
+
+            APIEndpoint.devAnalytics -> {
+                // Mock dev analytics submission response
+                val response = mapOf(
+                    "success" to true,
+                    "message" to "Analytics received"
+                )
+                json.encodeToString(response).toByteArray()
+            }
         }
     }
 

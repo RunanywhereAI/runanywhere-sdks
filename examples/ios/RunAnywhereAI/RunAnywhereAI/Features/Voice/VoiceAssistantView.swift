@@ -374,6 +374,37 @@ struct VoiceAssistantView: View {
                                 .padding(.horizontal, 20)
                         }
 
+                        // Audio level indicator (visible when recording/listening)
+                        if viewModel.sessionState == .listening || viewModel.isListening {
+                            VStack(spacing: 8) {
+                                // Recording status badge
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 8, height: 8)
+                                    Text("RECORDING")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.red)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(4)
+
+                                // Audio level bars
+                                HStack(spacing: 4) {
+                                    ForEach(0..<10, id: \.self) { index in
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(index < Int(viewModel.audioLevel * 10) ? Color.green : Color.gray.opacity(0.3))
+                                            .frame(width: 25, height: 8)
+                                    }
+                                }
+                            }
+                            .padding(.bottom, 8)
+                            .animation(.easeInOut(duration: 0.2), value: viewModel.audioLevel)
+                        }
+
                         // Main mic button
                         HStack {
                             Spacer()
@@ -445,9 +476,66 @@ struct VoiceAssistantView: View {
             #endif
         }
         .sheet(isPresented: $showModelSelection) {
-            ModelSelectionSheet(context: .voice) { model in
-                // Model selected - the voice assistant will use this
-                // For now, just close the sheet. Voice pipeline has its own model management.
+            // Use the same VoicePipelineSetupView UI for changing models
+            NavigationView {
+                VoicePipelineSetupView(
+                    sttModel: Binding(
+                        get: { viewModel.sttModel },
+                        set: { viewModel.sttModel = $0 }
+                    ),
+                    llmModel: Binding(
+                        get: { viewModel.llmModel },
+                        set: { viewModel.llmModel = $0 }
+                    ),
+                    ttsModel: Binding(
+                        get: { viewModel.ttsModel },
+                        set: { viewModel.ttsModel = $0 }
+                    ),
+                    sttLoadState: viewModel.sttModelState,
+                    llmLoadState: viewModel.llmModelState,
+                    ttsLoadState: viewModel.ttsModelState,
+                    onSelectSTT: {
+                        showModelSelection = false
+                        // Delay to allow sheet dismiss animation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showSTTModelSelection = true
+                        }
+                    },
+                    onSelectLLM: {
+                        showModelSelection = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showLLMModelSelection = true
+                        }
+                    },
+                    onSelectTTS: {
+                        showModelSelection = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showTTSModelSelection = true
+                        }
+                    },
+                    onStartVoice: {
+                        showModelSelection = false
+                    }
+                )
+                .navigationTitle("Voice Models")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            showModelSelection = false
+                        }
+                    }
+                }
+                #else
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            showModelSelection = false
+                        }
+                    }
+                }
+                #endif
             }
         }
         .sheet(isPresented: $showSTTModelSelection) {
@@ -519,15 +607,15 @@ struct VoiceAssistantView: View {
     private var instructionText: String {
         switch viewModel.sessionState {
         case .listening:
-            return "Listening... Tap to stop"
+            return "Listening... Pause to send"
         case .processing:
-            return "Processing..."
+            return "Processing your message..."
         case .speaking:
             return "Speaking..."
         case .connecting:
             return "Connecting..."
         default:
-            return "Tap to speak"
+            return "Tap to start conversation"
         }
     }
 }

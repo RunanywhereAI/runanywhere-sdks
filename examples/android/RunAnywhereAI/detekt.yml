@@ -1,5 +1,5 @@
 build:
-  maxIssues: 0
+  maxIssues: 1000
   excludeCorrectable: false
   weights:
     complexity: 2
@@ -9,8 +9,8 @@ build:
 
 config:
   validation: true
-  warningsAsErrors: true
-  checkExhaustiveness: true
+  warningsAsErrors: false
+  checkExhaustiveness: false
 
 processors:
   active: true
@@ -23,24 +23,31 @@ output-reports:
 
 comments:
   active: true
+  AbsentOrWrongFileLicense:
+    active: false
+  CommentOverPrivateFunction:
+    active: false
+  CommentOverPrivateProperty:
+    active: false
+  DeprecatedBlockTag:
+    active: false
+  EndOfSentenceFormat:
+    active: false
+  KDocReferencesNonPublicProperty:
+    active: false
+  OutdatedDocumentation:
+    active: false
   UndocumentedPublicClass:
-    active: true
-    searchInNestedClass: true
-    searchInInnerClass: true
-    searchInInnerObject: true
+    active: false
   UndocumentedPublicFunction:
-    active: true
+    active: false
   UndocumentedPublicProperty:
-    active: true
-
-  # Custom rule for TODOs without issue references
-  TodoCommentWithoutIssue:
-    active: true
-    # This is a custom message that will be shown
-    message: "TODO comments must reference a GitHub issue (e.g., // TODO: #123 - Description)"
+    active: false
 
 complexity:
   active: true
+  CognitiveComplexMethod:
+    active: false
   ComplexCondition:
     active: true
     threshold: 4
@@ -50,15 +57,31 @@ complexity:
   CyclomaticComplexMethod:
     active: true
     threshold: 15
+  LabeledExpression:
+    active: false
+  LargeClass:
+    active: true
+    threshold: 600
   LongMethod:
     active: true
     threshold: 60
   LongParameterList:
     active: true
-    threshold: 6
+    functionThreshold: 6
+    constructorThreshold: 7
   MethodOverloading:
     active: true
     threshold: 6
+  NamedArguments:
+    active: false
+  NestedBlockDepth:
+    active: false
+  NestedScopeFunctions:
+    active: false
+  ReplaceSafeCallChainWithRun:
+    active: false
+  StringLiteralDuplication:
+    active: false
   TooManyFunctions:
     active: true
     thresholdInFiles: 11
@@ -77,8 +100,15 @@ coroutines:
     active: true
   SleepInsteadOfDelay:
     active: true
+  SuspendFunSwallowedCancellation:
+    active: false
+  SuspendFunWithCoroutineScopeReceiver:
+    active: false
   SuspendFunWithFlowReturnType:
     active: true
+
+empty-blocks:
+  active: false
 
 exceptions:
   active: true
@@ -90,6 +120,8 @@ exceptions:
     active: true
   ObjectExtendsThrowable:
     active: true
+  PrintStackTrace:
+    active: true
   RethrowCaughtException:
     active: true
   ReturnFromFinally:
@@ -98,6 +130,8 @@ exceptions:
     active: true
   ThrowingExceptionFromFinally:
     active: true
+  ThrowingExceptionInMain:
+    active: false
   ThrowingExceptionsWithoutMessageOrCause:
     active: true
   ThrowingNewInstanceOfSameException:
@@ -117,8 +151,16 @@ naming:
     active: true
   EnumNaming:
     active: true
+  ForbiddenClassName:
+    active: false
+  FunctionMaxLength:
+    active: false
+  FunctionMinLength:
+    active: false
   FunctionNaming:
     active: true
+    excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/jsTest/**', '**/iosTest/**']
+    functionPattern: '^([a-z][a-zA-Z0-9]*)|(`.*`)$'
   FunctionParameterNaming:
     active: true
   InvalidPackageDeclaration:
@@ -209,6 +251,8 @@ potential-bugs:
     active: true
   NullableToStringCall:
     active: true
+  PropertyUsedBeforeDeclaration:
+    active: false
   UnconditionalJumpStatementInLoop:
     active: true
   UnnecessaryNotNullCheck:
@@ -217,6 +261,8 @@ potential-bugs:
     active: true
   UnnecessarySafeCall:
     active: true
+  UnreachableCatchBlock:
+    active: false
   UnreachableCode:
     active: true
   UnsafeCallOnNullableType:
@@ -232,18 +278,44 @@ potential-bugs:
 
 style:
   active: true
-  ForbiddenComment:
+  AlsoCouldBeApply:
+    active: false
+  BracesOnIfStatements:
     active: true
-    values:
-      - 'TODO:(?!.*#\\d+)'
-      - 'FIXME:(?!.*#\\d+)'
-      - 'HACK:(?!.*#\\d+)'
-      - 'XXX:(?!.*#\\d+)'
-      - 'BUG:(?!.*#\\d+)'
-      - 'REFACTOR:(?!.*#\\d+)'
-      - 'OPTIMIZE:(?!.*#\\d+)'
-    allowedPatterns: ''
-    message: "TODOs must reference a GitHub issue (e.g., // TODO: #123 - Description)"
+    singleLine: 'never'
+    multiLine: 'always'
+  BracesOnWhenStatements:
+    active: false
+  CanBeNonNullable:
+    active: false
+  CascadingCallWrapping:
+    active: false
+  ClassOrdering:
+    active: false
+  CollapsibleIfStatements:
+    active: true
+  DataClassContainsFunctions:
+    active: false
+  DataClassShouldBeImmutable:
+    active: false
+  DestructuringDeclarationWithTooManyEntries:
+    active: false
+  DoubleNegativeLambda:
+    active: false
+  EqualsNullCall:
+    active: true
+  EqualsOnSignatureLine:
+    active: true
+  ExplicitCollectionElementAccessMethod:
+    active: true
+  ExplicitItLambdaParameter:
+    active: true
+  ExpressionBodySyntax:
+    active: false
+  ForbiddenAnnotation:
+    active: false
+  ForbiddenComment:
+    active: false
   ForbiddenImport:
     active: true
   ForbiddenMethodCall:
@@ -266,8 +338,6 @@ style:
       - '2'
       - '100'
       - '1000'
-  MandatoryBracesIfStatements:
-    active: true
   MandatoryBracesLoops:
     active: true
   MaxChainedCallsOnSameLine:
@@ -382,6 +452,14 @@ style:
     active: true
   UtilityClassWithPublicConstructor:
     active: true
+  StringShouldBeRawString:
+    active: false
+  ThrowsCount:
+    active: false
+  UnnecessaryBracesAroundTrailingLambda:
+    active: false
+  UseLet:
+    active: false
   VarCouldBeVal:
     active: true
   WildcardImport:

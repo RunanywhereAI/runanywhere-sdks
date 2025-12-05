@@ -536,6 +536,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     private var isModelLoaded = false
     private var modelPath: String?
     private var providerName: String = "Unknown"  // Store the provider name for telemetry
+    private let logger = SDKLogger(category: "STTComponent")
 
     // MARK: - Initialization
 
@@ -548,20 +549,26 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
 
     public override func createService() async throws -> STTServiceWrapper {
         let modelId = sttConfiguration.modelId ?? "unknown"
-        let modelName = modelId  // Could be enhanced to look up display name
+        let modelName = modelId
+
+        // Check if we already have a cached service via the lifecycle tracker
+        if let cachedService = await ModelLifecycleTracker.shared.sttService(for: modelId) {
+            logger.info("✅ Reusing cached STT service for model: \(modelId)")
+            isModelLoaded = true
+            return STTServiceWrapper(cachedService)
+        }
 
         // Notify lifecycle manager
         await MainActor.run {
             ModelLifecycleTracker.shared.modelWillLoad(
                 modelId: modelId,
                 modelName: modelName,
-                framework: .whisperKit,  // Default, could be determined from provider
+                framework: .whisperKit,
                 modality: .stt
             )
         }
 
         // Try to get a registered STT provider from central registry
-        // Need to access ModuleRegistry on MainActor since it's @MainActor isolated
         let provider = await MainActor.run {
             ModuleRegistry.shared.sttProvider(for: sttConfiguration.modelId)
         }
@@ -579,11 +586,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             )
         }
 
-        // Check if model needs downloading
-        if let modelId = sttConfiguration.modelId {
-            modelPath = modelId
-            // Provider should handle model management
-        }
+        modelPath = modelId
 
         do {
             // Create service through provider
@@ -598,14 +601,14 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             // Service is already initialized by the provider
             isModelLoaded = true
 
-            // Notify lifecycle manager of successful load
+            // Store service in lifecycle tracker for reuse
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelDidLoad(
                     modelId: modelId,
                     modelName: modelName,
                     framework: .whisperKit,
                     modality: .stt,
-                    memoryUsage: nil
+                    sttService: sttService
                 )
             }
 

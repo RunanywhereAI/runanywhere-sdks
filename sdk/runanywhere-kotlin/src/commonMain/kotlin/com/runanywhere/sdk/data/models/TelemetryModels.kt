@@ -34,6 +34,7 @@ enum class TelemetryEventType {
     MODEL_LOAD_COMPLETED,
     MODEL_LOAD_FAILED,
     MODEL_UNLOAD,
+    MODEL_LOADED, // Alias for MODEL_LOAD_COMPLETED
 
     // Generation events
     GENERATION_STARTED,
@@ -44,14 +45,18 @@ enum class TelemetryEventType {
     // STT-specific events
     STT_INITIALIZATION,
     STT_MODEL_LOADED,
+    STT_MODEL_LOAD_FAILED,
     STT_TRANSCRIPTION_STARTED,
     STT_TRANSCRIPTION_COMPLETED,
     STT_TRANSCRIPTION_FAILED,
+    STT_STREAMING_UPDATE,
     STT_VAD_DETECTED,
     STT_AUDIO_PROCESSED,
     STT_EVENT,  // Generic STT event
 
     // TTS events
+    TTS_MODEL_LOADED,
+    TTS_MODEL_LOAD_FAILED,
     TTS_SYNTHESIS_STARTED,
     TTS_SYNTHESIS_COMPLETED,
     TTS_SYNTHESIS_FAILED,
@@ -384,3 +389,120 @@ data class TelemetryBatch(
     val timeSpan: Long
         get() = if (events.isEmpty()) 0 else events.maxOf { it.timestamp } - events.minOf { it.timestamp }
 }
+
+/**
+ * Typed telemetry event payload for API transmission (matches iOS TelemetryEventPayload)
+ * Maps to backend SDKTelemetryEvent schema with strongly typed fields.
+ * NO JSON properties dictionary - all fields are strongly typed.
+ */
+@Serializable
+data class TelemetryEventPayload(
+    // MARK: - Required Fields
+    val id: String,
+    @SerialName("event_type")
+    val eventType: String,
+    val timestamp: Long,
+    @SerialName("created_at")
+    val createdAt: Long,
+
+    // MARK: - Session Tracking
+    @SerialName("session_id")
+    val sessionId: String? = null,
+
+    // MARK: - Model Info
+    @SerialName("model_id")
+    val modelId: String? = null,
+    @SerialName("model_name")
+    val modelName: String? = null,
+    val framework: String? = null,
+    val modality: String? = null,  // "stt", "tts", "llm", etc.
+
+    // MARK: - Device Info
+    val device: String? = null,
+    @SerialName("os_version")
+    val osVersion: String? = null,
+    val platform: String? = null,
+    @SerialName("sdk_version")
+    val sdkVersion: String? = null,
+
+    // MARK: - Common Performance Metrics
+    @SerialName("processing_time_ms")
+    val processingTimeMs: Double? = null,
+    val success: Boolean? = null,
+    @SerialName("error_message")
+    val errorMessage: String? = null,
+    @SerialName("error_code")
+    val errorCode: String? = null,
+
+    // MARK: - LLM-specific Fields
+    @SerialName("input_tokens")
+    val inputTokens: Int? = null,
+    @SerialName("output_tokens")
+    val outputTokens: Int? = null,
+    @SerialName("total_tokens")
+    val totalTokens: Int? = null,
+    @SerialName("tokens_per_second")
+    val tokensPerSecond: Double? = null,
+    @SerialName("time_to_first_token_ms")
+    val timeToFirstTokenMs: Double? = null,
+    @SerialName("prompt_eval_time_ms")
+    val promptEvalTimeMs: Double? = null,
+    @SerialName("generation_time_ms")
+    val generationTimeMs: Double? = null,
+    @SerialName("context_length")
+    val contextLength: Int? = null,
+    val temperature: Double? = null,
+    @SerialName("max_tokens")
+    val maxTokens: Int? = null,
+
+    // MARK: - STT-specific Fields
+    @SerialName("audio_duration_ms")
+    val audioDurationMs: Double? = null,
+    @SerialName("real_time_factor")
+    val realTimeFactor: Double? = null,
+    @SerialName("word_count")
+    val wordCount: Int? = null,
+    val confidence: Double? = null,
+    val language: String? = null,
+    @SerialName("is_streaming")
+    val isStreaming: Boolean? = null,
+    @SerialName("segment_index")
+    val segmentIndex: Int? = null,
+
+    // MARK: - TTS-specific Fields
+    @SerialName("character_count")
+    val characterCount: Int? = null,
+    @SerialName("characters_per_second")
+    val charactersPerSecond: Double? = null,
+    @SerialName("audio_size_bytes")
+    val audioSizeBytes: Int? = null,
+    @SerialName("sample_rate")
+    val sampleRate: Int? = null,
+    val voice: String? = null,
+    @SerialName("output_duration_ms")
+    val outputDurationMs: Double? = null
+)
+
+/**
+ * Batch telemetry request for API (matches iOS TelemetryBatchRequest)
+ */
+@Serializable
+data class TelemetryBatchRequest(
+    val events: List<TelemetryEventPayload>,
+    @SerialName("device_id")
+    val deviceId: String,
+    val timestamp: Long = getCurrentTimeMillis()
+)
+
+/**
+ * Batch telemetry response from API (matches iOS TelemetryBatchResponse)
+ */
+@Serializable
+data class TelemetryBatchResponse(
+    val success: Boolean,
+    @SerialName("events_received")
+    val eventsReceived: Int,
+    @SerialName("events_stored")
+    val eventsStored: Int,
+    val errors: List<String>? = null
+)

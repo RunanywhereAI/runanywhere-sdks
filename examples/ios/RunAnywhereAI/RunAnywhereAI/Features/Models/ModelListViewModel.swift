@@ -24,8 +24,46 @@ class ModelListViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
+        // Subscribe to model lifecycle changes from SDK
+        subscribeToModelLifecycle()
+
         Task {
             await loadModelsFromRegistry()
+        }
+    }
+
+    /// Subscribe to SDK's model lifecycle tracker for real-time model state updates
+    private func subscribeToModelLifecycle() {
+        // Observe changes to loaded models via the SDK's lifecycle tracker
+        ModelLifecycleTracker.shared.$modelsByModality
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] modelsByModality in
+                guard let self = self else { return }
+
+                // Check if LLM is loaded and sync currentModel
+                if let llmState = modelsByModality[.llm], llmState.state.isLoaded {
+                    // Find the matching model in availableModels
+                    if let matchingModel = self.availableModels.first(where: { $0.id == llmState.modelId }) {
+                        if self.currentModel?.id != matchingModel.id {
+                            self.currentModel = matchingModel
+                            print("✅ ModelListViewModel: Synced currentModel from SDK lifecycle: \(matchingModel.name)")
+                        }
+                    } else {
+                        // Model not in list yet, create a placeholder
+                        print("⚠️ ModelListViewModel: LLM loaded but not in availableModels: \(llmState.modelName)")
+                    }
+                } else if modelsByModality[.llm] == nil && self.currentModel != nil {
+                    // LLM was unloaded
+                    print("ℹ️ ModelListViewModel: LLM unloaded, clearing currentModel")
+                    self.currentModel = nil
+                }
+            }
+            .store(in: &cancellables)
+
+        // Check initial state
+        if let llmState = ModelLifecycleTracker.shared.modelsByModality[.llm], llmState.state.isLoaded {
+            // We'll sync after availableModels is loaded
+            print("📊 ModelListViewModel: Initial LLM state found: \(llmState.modelName)")
         }
     }
 
@@ -60,13 +98,21 @@ class ModelListViewModel: ObservableObject {
             for model in availableModels {
                 print("  - \(model.name) (\(model.preferredFramework?.displayName ?? "Unknown"))")
             }
+
+            // After loading models, sync currentModel with SDK's lifecycle tracker
+            // Don't clear currentModel - let the lifecycle subscription handle it
+            if let llmState = ModelLifecycleTracker.shared.modelsByModality[.llm], llmState.state.isLoaded {
+                if let matchingModel = availableModels.first(where: { $0.id == llmState.modelId }) {
+                    currentModel = matchingModel
+                    print("✅ ModelListViewModel: Restored currentModel after reload: \(matchingModel.name)")
+                }
+            }
         } catch {
             print("Failed to load models from SDK: \(error)")
             errorMessage = "Failed to load models: \(error.localizedDescription)"
             availableModels = []
         }
 
-        currentModel = nil
         isLoading = false
     }
 

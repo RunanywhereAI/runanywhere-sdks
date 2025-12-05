@@ -28,8 +28,6 @@ RunAnywhereAI/
 │   │   ├── ModelURLRegistry.swift
 │   │   ├── Foundation/         # Foundation Models adapter
 │   │   └── LlamaCPP/          # LlamaCPP adapter
-│   └── Utilities/              # Constants and helpers
-│       └── Constants.swift
 ├── Features/                    # Feature modules
 │   ├── AnalyticsView.swift    # Analytics dashboard
 │   ├── Chat/                   # Chat functionality

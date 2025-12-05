@@ -7,54 +7,36 @@ import com.runanywhere.sdk.models.enums.LLMFramework
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Protocol for Language Model services - unified interface matching iOS LLMService protocol
- * This interface combines simple text generation with structured message-based chat support
+ * Protocol for Language Model services - matches iOS LLMService protocol exactly
+ *
+ * iOS Source: Components/LLM/LLMComponent.swift
+ *
+ * This interface defines the core LLM service operations. Utility methods like
+ * process(), streamProcess(), cancelCurrent(), getTokenCount(), and fitsInContext()
+ * are provided by LLMComponent, not the service interface, matching iOS architecture.
  */
 interface LLMService {
-    // Core initialization and lifecycle
     /** Initialize the LLM service with optional model path */
     suspend fun initialize(modelPath: String?)
 
-    /** Load a specific model */
-    suspend fun loadModel(modelInfo: ModelInfo)
-
-    /** Cleanup resources */
-    suspend fun cleanup()
-
-    // Simple text generation (for backward compatibility and simple use cases)
-    /** Generate text from prompt - automatically applies chat templates */
+    /** Generate text from prompt */
     suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions): String
 
-    /** Stream generation token by token - automatically applies chat templates */
+    /** Stream generation token by token */
     suspend fun streamGenerate(
         prompt: String,
         options: RunAnywhereGenerationOptions,
         onToken: (String) -> Unit
     )
 
-    // Structured message-based generation (for proper chat applications)
-    /** Process structured LLM input with messages and roles */
-    suspend fun process(input: LLMInput): LLMOutput
-
-    /** Stream generation with structured input/output */
-    fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk>
-
-    // Utility methods
-    /** Cancel current generation */
-    fun cancelCurrent()
-
-    /** Get token count for text */
-    fun getTokenCount(text: String): Int
-
-    /** Check if prompt fits within context window */
-    fun fitsInContext(prompt: String, maxTokens: Int): Boolean
-
-    // State properties
     /** Check if service is ready */
     val isReady: Boolean
 
     /** Get current model identifier */
     val currentModel: String?
+
+    /** Cleanup resources */
+    suspend fun cleanup()
 }
 
 /**
