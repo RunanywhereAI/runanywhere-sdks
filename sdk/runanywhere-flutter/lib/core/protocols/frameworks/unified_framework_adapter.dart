@@ -1,100 +1,102 @@
-import 'dart:async';
-
-import '../../models/framework/llm_framework.dart';
 import '../../models/framework/framework_modality.dart';
+import '../../models/framework/llm_framework.dart';
 import '../../models/framework/model_format.dart';
-import '../../models/hardware/hardware_configuration.dart';
 import '../../models/model/model_info.dart';
-import '../component/component_configuration.dart';
-import '../downloading/download_strategy.dart';
+import '../../models/hardware/hardware_configuration.dart';
 
-export '../downloading/download_strategy.dart';
-
-/// Unified protocol for all framework adapters (LLM, Voice, Image, etc.)
-/// Matches iOS UnifiedFrameworkAdapter from Core/Protocols/Frameworks/UnifiedFrameworkAdapter.swift
+/// Unified adapter interface for multi-modal AI framework backends.
+///
+/// This is the Flutter equivalent of Swift's `UnifiedFrameworkAdapter`.
+/// Each backend (ONNX, llama.cpp, etc.) implements this interface to provide
+/// pluggable AI capabilities.
+///
+/// ## Example Implementation
+///
+/// ```dart
+/// class OnnxAdapter implements UnifiedFrameworkAdapter {
+///   @override
+///   LLMFramework get framework => LLMFramework.onnx;
+///
+///   @override
+///   Set<FrameworkModality> get supportedModalities => {
+///     FrameworkModality.voiceToText,
+///     FrameworkModality.textToVoice,
+///   };
+///
+///   @override
+///   void onRegistration({int priority = 100}) {
+///     ModuleRegistry.shared.registerSTT(OnnxSTTProvider(), priority: priority);
+///   }
+/// }
+/// ```
 abstract class UnifiedFrameworkAdapter {
-  /// The framework this adapter handles
+  /// The framework this adapter provides.
   LLMFramework get framework;
 
-  /// The modalities this adapter supports
+  /// Supported modalities (STT, TTS, LLM, etc.).
   Set<FrameworkModality> get supportedModalities;
 
-  /// Supported model formats
+  /// Supported model formats (e.g., .onnx, .gguf).
   List<ModelFormat> get supportedFormats;
 
-  /// Check if this adapter can handle a specific model
-  /// - Parameter model: The model information
-  /// - Returns: Whether this adapter can handle the model
+  /// Check if this adapter can handle a specific model.
   bool canHandle(ModelInfo model);
 
-  /// Create a service instance based on the modality
-  /// - Parameter modality: The modality to create a service for
-  /// - Returns: A service instance (LLMService, VoiceService, etc.)
-  Object? createService(FrameworkModality modality);
+  /// Create a service for the given modality.
+  ///
+  /// Returns the appropriate service instance or null if not supported.
+  dynamic createService(FrameworkModality modality);
 
-  /// Load a model using this adapter
-  /// - Parameters:
-  ///   - model: The model to load
-  ///   - modality: The modality to use
-  /// - Returns: A service instance with the loaded model
-  Future<Object> loadModel(ModelInfo model, FrameworkModality modality);
+  /// Load a model for the given modality.
+  ///
+  /// Returns the initialized service with the model loaded.
+  Future<dynamic> loadModel(ModelInfo model, FrameworkModality modality);
 
-  /// Configure the adapter with hardware settings
-  /// - Parameter hardware: Hardware configuration
+  /// Configure the adapter with hardware settings.
   Future<void> configure(HardwareConfiguration hardware);
 
-  /// Estimate memory usage for a model
-  /// - Parameter model: The model to estimate
-  /// - Returns: Estimated memory in bytes
+  /// Estimate memory usage for a model.
   int estimateMemoryUsage(ModelInfo model);
 
-  /// Get optimal hardware configuration for a model
-  /// - Parameter model: The model to configure for
-  /// - Returns: Optimal hardware configuration
+  /// Get optimal hardware configuration for a model.
   HardwareConfiguration optimalConfiguration(ModelInfo model);
 
-  /// Called when the adapter is registered with the SDK
-  /// Adapters should register their service providers with ModuleRegistry here
-  void onRegistration();
+  /// Called when adapter is registered with the SDK.
+  ///
+  /// This should register all service providers with ModuleRegistry.
+  void onRegistration({int priority = 100});
 
-  /// Get models provided by this adapter
-  /// - Returns: Array of models this adapter provides
+  /// Get any pre-bundled models this adapter provides.
   List<ModelInfo> getProvidedModels();
 
-  /// Get download strategy provided by this adapter (if any)
-  /// - Returns: Download strategy or null if none
-  DownloadStrategy? getDownloadStrategy();
-
-  /// Initialize adapter with component parameters
-  /// - Parameters:
-  ///   - parameters: Component initialization parameters
-  ///   - modality: The modality to initialize for
-  /// - Returns: Initialized service ready for use
-  Future<Object?> initializeComponent(
-    ComponentInitParameters parameters,
-    FrameworkModality modality,
-  );
+  /// Cleanup and dispose of adapter resources.
+  void dispose();
 }
 
-/// Mixin providing default implementations for UnifiedFrameworkAdapter
-/// Use this with `with` keyword on concrete adapter classes
-mixin UnifiedFrameworkAdapterDefaults on UnifiedFrameworkAdapter {
-  /// Default implementation that returns the framework's supported modalities
+/// Mixin providing default implementations for optional adapter methods.
+mixin UnifiedFrameworkAdapterDefaults implements UnifiedFrameworkAdapter {
   @override
-  Set<FrameworkModality> get supportedModalities =>
-      framework.supportedModalities;
-
-  /// Default implementation - does nothing
-  @override
-  void onRegistration() {
-    // Default: no-op - adapters should override to register their service providers
+  Future<void> configure(HardwareConfiguration hardware) async {
+    // Default: no-op
   }
 
-  /// Default implementation - returns empty list
   @override
-  List<ModelInfo> getProvidedModels() => [];
+  int estimateMemoryUsage(ModelInfo model) {
+    return model.memoryRequired ?? 0;
+  }
 
-  /// Default implementation - returns null
   @override
-  DownloadStrategy? getDownloadStrategy() => null;
+  HardwareConfiguration optimalConfiguration(ModelInfo model) {
+    return HardwareConfiguration();
+  }
+
+  @override
+  List<ModelInfo> getProvidedModels() {
+    return [];
+  }
+
+  @override
+  void dispose() {
+    // Default: no-op
+  }
 }

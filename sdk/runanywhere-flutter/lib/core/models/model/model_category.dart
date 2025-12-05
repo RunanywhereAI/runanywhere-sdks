@@ -9,7 +9,8 @@ enum ModelCategory {
   speechRecognition('speech-recognition', 'Speech Recognition', 'mic'),
   speechSynthesis('speech-synthesis', 'Text-to-Speech', 'volume_up'),
   vision('vision', 'Vision Model', 'image'),
-  imageGeneration('image-generation', 'Image Generation', 'add_photo_alternate'),
+  imageGeneration(
+      'image-generation', 'Image Generation', 'add_photo_alternate'),
   multimodal('multimodal', 'Multimodal', 'auto_awesome'),
   audio('audio', 'Audio Processing', 'graphic_eq');
 
@@ -56,12 +57,18 @@ enum ModelCategory {
         return ModelCategory.speechRecognition;
       case FrameworkModality.textToVoice:
         return ModelCategory.speechSynthesis;
+      case FrameworkModality.visionToText:
       case FrameworkModality.imageToText:
         return ModelCategory.vision;
       case FrameworkModality.textToImage:
         return ModelCategory.imageGeneration;
       case FrameworkModality.multimodal:
         return ModelCategory.multimodal;
+      case FrameworkModality.voiceActivityDetection:
+      case FrameworkModality.speakerDiarization:
+      case FrameworkModality.wakeWord:
+      case FrameworkModality.textEmbedding:
+        return ModelCategory.audio;
     }
   }
 
