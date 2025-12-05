@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
@@ -168,11 +170,40 @@ object AppColors {
     )
 
     /**
-     * Assistant message bubble gradient (gray)
+     * Assistant message bubble gradient (gray) - non-composable version for legacy use
      */
     fun assistantBubbleGradient() = Brush.linearGradient(
         colors = listOf(messageBubbleAssistantGradientStart, messageBubbleAssistantGradientEnd)
     )
+
+    /**
+     * Theme-aware assistant message bubble gradient
+     * Uses dark gray in dark mode, light gray in light mode
+     */
+    @Composable
+    fun assistantBubbleGradientThemed(): Brush {
+        val isDark = isSystemInDarkTheme()
+        return Brush.linearGradient(
+            colors = if (isDark) {
+                listOf(backgroundGray5Dark, backgroundGray6Dark)
+            } else {
+                listOf(messageBubbleAssistantGradientStart, messageBubbleAssistantGradientEnd)
+            }
+        )
+    }
+
+    /**
+     * Theme-aware text color for assistant message bubbles
+     * Returns white in dark mode, dark text in light mode
+     */
+    @Composable
+    fun assistantBubbleTextColor(): Color {
+        return if (isSystemInDarkTheme()) {
+            Color.White
+        } else {
+            textPrimary
+        }
+    }
 
     /**
      * Thinking section background gradient (purple)

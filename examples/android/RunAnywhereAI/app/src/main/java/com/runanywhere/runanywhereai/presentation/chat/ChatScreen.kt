@@ -505,7 +505,7 @@ fun MessageBubbleView(
                             brush = if (isUserMessage) {
                                 AppColors.userBubbleGradient()
                             } else {
-                                AppColors.assistantBubbleGradient()
+                                AppColors.assistantBubbleGradientThemed()
                             }
                         )
                         .border(
@@ -524,7 +524,7 @@ fun MessageBubbleView(
                         color = if (isUserMessage) {
                             AppColors.textWhite
                         } else {
-                            MaterialTheme.colorScheme.onSurface
+                            AppColors.assistantBubbleTextColor()
                         },
                         modifier = Modifier.padding(
                             horizontal = Dimensions.messageBubblePaddingHorizontal,
