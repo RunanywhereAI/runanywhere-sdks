@@ -60,5 +60,12 @@ target 'RunAnywhereAI' do
       :mac_catalyst_enabled => false
       # :ccache_enabled => true
     )
+    
+    # Force all pods to use iOS 15.1 (required for react-native-audio-api)
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+      end
+    end
   end
 end
