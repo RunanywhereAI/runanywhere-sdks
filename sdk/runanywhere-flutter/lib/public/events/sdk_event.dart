@@ -119,6 +119,14 @@ abstract class SDKModelEvent implements SDKEvent {
   }) {
     return SDKModelLoadFailed(modelId: modelId, error: error);
   }
+
+  static SDKModelUnloadStarted unloadStarted({required String modelId}) {
+    return SDKModelUnloadStarted(modelId: modelId);
+  }
+
+  static SDKModelUnloadCompleted unloadCompleted({required String modelId}) {
+    return SDKModelUnloadCompleted(modelId: modelId);
+  }
 }
 
 class SDKModelLoadStarted implements SDKModelEvent {
@@ -146,6 +154,22 @@ class SDKModelLoadFailed implements SDKModelEvent {
   SDKModelLoadFailed({required this.modelId, required this.error});
 }
 
+class SDKModelUnloadStarted implements SDKModelEvent {
+  final String modelId;
+  @override
+  final DateTime timestamp = DateTime.now();
+
+  SDKModelUnloadStarted({required this.modelId});
+}
+
+class SDKModelUnloadCompleted implements SDKModelEvent {
+  final String modelId;
+  @override
+  final DateTime timestamp = DateTime.now();
+
+  SDKModelUnloadCompleted({required this.modelId});
+}
+
 /// SDK voice events
 abstract class SDKVoiceEvent implements SDKEvent {
   static SDKVoiceListeningStarted listeningStarted() {
@@ -164,7 +188,8 @@ abstract class SDKVoiceEvent implements SDKEvent {
     return SDKVoiceTranscriptionStarted();
   }
 
-  static SDKVoiceTranscriptionPartial transcriptionPartial({required String text}) {
+  static SDKVoiceTranscriptionPartial transcriptionPartial(
+      {required String text}) {
     return SDKVoiceTranscriptionPartial(text: text);
   }
 

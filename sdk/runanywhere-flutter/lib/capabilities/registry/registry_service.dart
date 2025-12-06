@@ -1,12 +1,16 @@
 import 'dart:async';
+import 'dart:io';
+
 import '../../foundation/logging/sdk_logger.dart';
 import '../../core/models/common.dart';
 import '../../core/protocols/registry/model_registry.dart';
+import '../../foundation/file_operations/model_path_utils.dart';
 
 // Re-export for backward compatibility
 export '../../core/protocols/registry/model_registry.dart';
 
 /// Implementation of model registry
+/// Matches iOS RegistryService pattern with local file detection
 class RegistryService implements ModelRegistry {
   final Map<String, ModelInfo> _models = {};
   final SDKLogger logger = SDKLogger(category: 'RegistryService');
@@ -23,6 +27,12 @@ class RegistryService implements ModelRegistry {
     await loadPreconfiguredModels();
 
     logger.info('Registry initialization complete');
+  }
+
+  /// Refresh all models to detect downloaded files
+  /// Should be called after all framework adapters are registered
+  Future<void> refreshDownloadedModels() async {
+    await refreshAllModelsLocalPaths();
   }
 
   /// Load pre-configured models
@@ -54,9 +64,62 @@ class RegistryService implements ModelRegistry {
       return;
     }
 
-    logger.debug('Registering model: ${model.id} - ${model.name}');
-    _models[model.id] = model;
-    logger.info('Successfully registered model: ${model.id}');
+    // Check if model file exists locally and update localPath
+    // Matches iOS RegistryService.registerModel pattern
+    _checkAndUpdateLocalPath(model).then((updatedModel) {
+      logger.debug(
+          'Registering model: ${updatedModel.id} - ${updatedModel.name}');
+      _models[updatedModel.id] = updatedModel;
+      logger.info('Successfully registered model: ${updatedModel.id}');
+      if (updatedModel.localPath != null) {
+        logger.info(
+            'Found local file for model ${updatedModel.id}: ${updatedModel.localPath}');
+      }
+    });
+  }
+
+  /// Check if model file exists locally and update localPath
+  /// Simple check: framework/modelId/modelId.format
+  Future<ModelInfo> _checkAndUpdateLocalPath(ModelInfo model) async {
+    // Need framework and format to check
+    final framework =
+        model.preferredFramework ?? model.compatibleFrameworks.firstOrNull;
+    if (framework == null) {
+      return model;
+    }
+
+    // If localPath is already set, verify it still exists
+    if (model.localPath != null) {
+      final path = model.localPath!.toFilePath();
+      final file = File(path);
+      final dir = Directory(path);
+
+      if (await file.exists() ||
+          (await dir.exists() && (await dir.list().toList()).isNotEmpty)) {
+        // File still exists, keep the localPath
+        return model;
+      } else {
+        // File no longer exists, clear localPath
+        logger.debug(
+            'Model file no longer exists for ${model.id}, clearing localPath');
+        return model.copyWith(localPath: null);
+      }
+    }
+
+    // Check expected path: framework/modelId/modelId.format
+    final modelFile = await ModelPathUtils.findModelFile(
+      modelId: model.id,
+      framework: framework,
+      format: model.format,
+    );
+
+    if (modelFile != null) {
+      logger.info(
+          'Found local file for model ${model.id}: ${modelFile.toFilePath()}');
+      return model.copyWith(localPath: modelFile);
+    }
+
+    return model;
   }
 
   /// Register model and save to database for persistence
@@ -68,9 +131,41 @@ class RegistryService implements ModelRegistry {
   @override
   void updateModel(ModelInfo model) {
     if (_models.containsKey(model.id)) {
-      _models[model.id] = model;
-      logger.info('Updated model: ${model.id}');
+      // Check and update localPath when updating model
+      _checkAndUpdateLocalPath(model).then((updatedModel) {
+        _models[updatedModel.id] = updatedModel;
+        logger.info('Updated model: ${updatedModel.id}');
+        if (updatedModel.localPath != null) {
+          logger.debug(
+              'Model ${updatedModel.id} has localPath: ${updatedModel.localPath}');
+        }
+      });
     }
+  }
+
+  /// Refresh all registered models to check for downloaded files
+  /// This should be called on SDK initialization to detect models downloaded in previous sessions
+  /// Matches iOS pattern for detecting local models on launch
+  Future<void> refreshAllModelsLocalPaths() async {
+    logger.info('Refreshing local paths for all registered models...');
+    final modelsToUpdate = <String, ModelInfo>{};
+
+    for (final model in _models.values) {
+      final updatedModel = await _checkAndUpdateLocalPath(model);
+      if (updatedModel.localPath != model.localPath) {
+        modelsToUpdate[updatedModel.id] = updatedModel;
+      }
+    }
+
+    // Update all models that changed
+    for (final entry in modelsToUpdate.entries) {
+      _models[entry.key] = entry.value;
+      logger.info(
+          'Updated localPath for model ${entry.key}: ${entry.value.localPath?.toFilePath() ?? "none"}');
+    }
+
+    logger.info(
+        'Refreshed ${modelsToUpdate.length} models with local file detection');
   }
 
   @override
