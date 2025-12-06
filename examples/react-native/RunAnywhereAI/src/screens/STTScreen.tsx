@@ -119,7 +119,8 @@ export const STTScreen: React.FC = () => {
     try {
       // Get available STT models from catalog
       const allModels = await RunAnywhere.getAvailableModels();
-      const sttModels = allModels.filter((m) => m.modality === 'stt');
+      // Filter by category (speech-recognition) matching SDK's ModelCategory
+      const sttModels = allModels.filter((m: any) => m.category === 'speech-recognition');
       setAvailableModels(sttModels);
 
       // Log downloaded status for debugging
