@@ -27,6 +27,7 @@ import AudioRecorderPlayer, {
   AudioSourceAndroidType,
   AVEncoderAudioQualityIOSType,
   AVEncodingOption,
+  OutputFormatAndroidType,
 } from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
@@ -297,11 +298,11 @@ export const STTScreen: React.FC = () => {
       }
 
       // Let the library choose its own default path - this avoids file creation issues
-      // On iOS, passing undefined lets AVAudioRecorder choose a working path
-      // Our native transcribeFile method handles conversion to 16kHz mono PCM
-      console.log('[STTScreen] Starting recorder with default path...');
-
-      // Start recording with default path (undefined) and default settings
+      // Record audio with default settings - native module handles format conversion
+      // iOS will record to M4A, which our native AudioDecoder can convert to PCM
+      console.log('[STTScreen] Starting recorder with default settings...');
+      
+      // Use default path and settings - most reliable across platforms
       const uri = await audioRecorderPlayer.startRecorder(undefined, undefined, true);
 
       // Store the returned URI as the recording path
@@ -327,6 +328,7 @@ export const STTScreen: React.FC = () => {
 
   /**
    * Stop recording and transcribe
+   * Native module handles audio format conversion using iOS AudioToolbox
    */
   const stopRecordingAndTranscribe = async () => {
     try {
@@ -340,14 +342,13 @@ export const STTScreen: React.FC = () => {
 
       console.log('[STTScreen] Recording stopped, file at:', uri);
 
-      // Use the URI returned by stopRecorder (may differ from what startRecorder returned)
-      // Remove file:// prefix if present for RNFS operations
+      // Use the URI returned by stopRecorder
       let filePath = uri || recordingPath.current;
       if (!filePath) {
         throw new Error('Recording path not found');
       }
 
-      // Normalize path - remove file:// prefix for RNFS
+      // Normalize path - remove file:// prefix for RNFS and native module
       const normalizedPath = filePath.startsWith('file://')
         ? filePath.substring(7)
         : filePath;
@@ -372,10 +373,10 @@ export const STTScreen: React.FC = () => {
         throw new Error('STT model not loaded');
       }
 
-      // Transcribe the audio file - pass the path with file:// prefix for native code
+      // Transcribe the audio file - native module handles format conversion
+      // iOS AudioToolbox converts M4A/CAF/WAV to 16kHz mono float32 PCM
       console.log('[STTScreen] Starting transcription...');
-      const transcribePath = filePath.startsWith('file://') ? filePath : `file://${normalizedPath}`;
-      const result = await RunAnywhere.transcribeFile(transcribePath, { language: 'en' });
+      const result = await RunAnywhere.transcribeFile(normalizedPath, { language: 'en' });
 
       console.log('[STTScreen] Transcription result:', result);
 
@@ -386,7 +387,7 @@ export const STTScreen: React.FC = () => {
         setTranscript('(No speech detected)');
       }
 
-      // Clean up the recording file
+      // Clean up temp file
       await RNFS.unlink(normalizedPath).catch(() => {});
       recordingPath.current = null;
 

@@ -542,10 +542,125 @@ std::string RunAnywhereModule::transcribe(jsi::Runtime& rt, const std::string& a
     return resultStr;
 }
 
+// Forward declaration of iOS audio decoder (defined in AudioDecoder.m)
+#if defined(__APPLE__)
+extern "C" {
+    int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSamples, int* sampleRate);
+    void ra_free_audio_samples(float* samples);
+}
+#endif
+
 std::string RunAnywhereModule::transcribeFile(jsi::Runtime& rt, const std::string& filePath,
                                                const std::optional<std::string>& language) {
-    // TODO: Implement file-based transcription
-    throw std::runtime_error("transcribeFile not yet implemented");
+    printf("[RA_STT] transcribeFile called with path: %s\n", filePath.c_str());
+    
+    if (!onnxBackend_) {
+        printf("[RA_STT] ONNX backend not initialized\n");
+        return "{\"error\": \"ONNX backend not initialized\", \"text\": \"\"}";
+    }
+    
+    if (!ra_stt_is_model_loaded(onnxBackend_)) {
+        printf("[RA_STT] STT model not loaded\n");
+        return "{\"error\": \"STT model not loaded\", \"text\": \"\"}";
+    }
+    
+    // Remove file:// prefix if present
+    std::string actualPath = filePath;
+    if (actualPath.find("file://") == 0) {
+        actualPath = actualPath.substr(7);
+    }
+    
+    printf("[RA_STT] Actual file path: %s\n", actualPath.c_str());
+    
+    // Check if file exists
+    struct stat path_stat;
+    if (stat(actualPath.c_str(), &path_stat) != 0) {
+        printf("[RA_STT] File not found: %s\n", actualPath.c_str());
+        return "{\"error\": \"File not found\", \"text\": \"\"}";
+    }
+    
+    float* samples = nullptr;
+    size_t numSamples = 0;
+    int sampleRate = 16000;
+    
+#if defined(__APPLE__)
+    // Use iOS AudioToolbox to decode any audio format to 16kHz mono float32 PCM
+    printf("[RA_STT] Using iOS AudioDecoder to convert audio...\n");
+    
+    int success = ra_decode_audio_file(actualPath.c_str(), &samples, &numSamples, &sampleRate);
+    if (!success || !samples || numSamples == 0) {
+        printf("[RA_STT] Failed to decode audio file\n");
+        if (samples) ra_free_audio_samples(samples);
+        return "{\"error\": \"Failed to decode audio file\", \"text\": \"\"}";
+    }
+    
+    printf("[RA_STT] Decoded %zu samples at %d Hz\n", numSamples, sampleRate);
+#else
+    // Android/other platforms - try to read as WAV
+    printf("[RA_STT] Non-iOS platform - attempting WAV parsing\n");
+    
+    FILE* file = fopen(actualPath.c_str(), "rb");
+    if (!file) {
+        printf("[RA_STT] Failed to open file\n");
+        return "{\"error\": \"Failed to open file\", \"text\": \"\"}";
+    }
+    
+    fseek(file, 0, SEEK_END);
+    long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    
+    std::vector<unsigned char> fileData(fileSize);
+    size_t bytesRead = fread(fileData.data(), 1, fileSize, file);
+    fclose(file);
+    
+    if (bytesRead != (size_t)fileSize) {
+        return "{\"error\": \"Failed to read file\", \"text\": \"\"}";
+    }
+    
+    // Check for WAV header
+    if (fileSize < 44 || fileData[0] != 'R' || fileData[1] != 'I' || 
+        fileData[2] != 'F' || fileData[3] != 'F') {
+        return "{\"error\": \"Unsupported audio format. Please use WAV format.\", \"text\": \"\"}";
+    }
+    
+    // Simple WAV parsing (for Android fallback)
+    std::vector<float> sampleVec;
+    // ... (WAV parsing code would go here for Android)
+    return "{\"error\": \"Android WAV parsing not yet implemented\", \"text\": \"\"}";
+#endif
+    
+    printf("[RA_STT] Transcribing %zu samples at %d Hz\n", numSamples, sampleRate);
+    
+    // Call the transcription API
+    char* resultJson = nullptr;
+    ra_result_code result = ra_stt_transcribe(
+        onnxBackend_,
+        samples,
+        numSamples,
+        sampleRate,
+        language.has_value() ? language->c_str() : nullptr,
+        &resultJson);
+    
+    // Free the samples
+#if defined(__APPLE__)
+    ra_free_audio_samples(samples);
+#endif
+    
+    if (result != RA_SUCCESS) {
+        printf("[RA_STT] Transcription failed with code: %d\n", result);
+        return "{\"error\": \"Transcription failed\", \"text\": \"\"}";
+    }
+    
+    if (!resultJson) {
+        printf("[RA_STT] No result returned\n");
+        return "{\"error\": \"No result returned\", \"text\": \"\"}";
+    }
+    
+    std::string resultStr(resultJson);
+    ra_free_string(resultJson);
+    
+    printf("[RA_STT] Transcription result: %s\n", resultStr.c_str());
+    return resultStr;
 }
 
 bool RunAnywhereModule::supportsSTTStreaming(jsi::Runtime& rt) {
@@ -559,7 +674,7 @@ int RunAnywhereModule::createSTTStream(jsi::Runtime& rt,
     if (!onnxBackend_) return -1;
 
     ra_stream_handle stream = ra_stt_create_stream(
-        backend_,
+        onnxBackend_,  // Use ONNX backend for STT streams
         configJson.has_value() ? configJson->c_str() : nullptr);
 
     if (!stream) return -1;
@@ -580,7 +695,7 @@ bool RunAnywhereModule::feedSTTAudio(jsi::Runtime& rt, int streamHandle,
     if (samples.empty()) return false;
 
     ra_result_code result = ra_stt_feed_audio(
-        backend_, it->second, samples.data(), samples.size(), sampleRate);
+        onnxBackend_, it->second, samples.data(), samples.size(), sampleRate);
 
     return result == RA_SUCCESS;
 }
