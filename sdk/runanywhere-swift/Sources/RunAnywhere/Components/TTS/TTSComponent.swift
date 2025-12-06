@@ -444,26 +444,24 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
 
         logger.info("Creating TTS service for modelId: \(modelId)")
 
+        // Check if we already have a cached service via the lifecycle tracker
+        if let cachedService = await ModelLifecycleTracker.shared.ttsService(for: modelId) {
+            logger.info("✅ Reusing cached TTS service for model: \(modelId)")
+            return TTSServiceWrapper(cachedService)
+        }
+
         // Try to get a registered TTS provider from central registry
-        // Need to access ModuleRegistry on MainActor since it's @MainActor isolated
         let provider = await MainActor.run {
             let p = ModuleRegistry.shared.ttsProvider(for: modelId)
             if let p = p {
                 logger.info("Found TTS provider: \(p.name) for modelId: \(modelId)")
             } else {
                 logger.info("No TTS provider found for modelId: \(modelId), will use system TTS fallback")
-                // Log all registered TTS providers for debugging
-                let allProviders = ModuleRegistry.shared.allTTSProviders()
-                logger.info("Registered TTS providers count: \(allProviders.count)")
-                for provider in allProviders {
-                    logger.info("  - \(provider.name), canHandle(\(modelId)): \(provider.canHandle(modelId: modelId))")
-                }
             }
             return p
         }
 
         // Determine framework based on provider availability
-        // If a provider handles it, it's likely ONNX; otherwise it's system TTS
         let framework: LLMFramework = provider != nil ? .onnx : .systemTTS
         logger.info("Determined framework: \(framework.displayName)")
 
@@ -477,22 +475,14 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
             )
         }
 
-        // Emit checking event
-        eventBus.publish(ComponentInitializationEvent.componentChecking(
-            component: Self.componentType,
-            modelId: modelId
-        ))
-
         do {
             let ttsService: any TTSService
 
             if let provider = provider {
-                // Use registered provider (e.g., ONNXTTSServiceProvider)
                 logger.info("Creating TTS service via provider: \(provider.name)")
                 ttsService = try await provider.createTTSService(configuration: ttsConfiguration)
                 logger.info("TTS service created successfully via provider")
             } else {
-                // Fallback to default adapter (system TTS)
                 logger.info("Creating TTS service via DefaultTTSAdapter (system TTS)")
                 let defaultAdapter = DefaultTTSAdapter()
                 ttsService = try await defaultAdapter.createTTSService(configuration: ttsConfiguration)
@@ -502,14 +492,14 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
             // Wrap the service
             let wrapper = TTSServiceWrapper(ttsService)
 
-            // Notify lifecycle manager of successful load
+            // Store service in lifecycle tracker for reuse
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelDidLoad(
                     modelId: modelId,
                     modelName: modelName,
                     framework: framework,
                     modality: .tts,
-                    memoryUsage: nil
+                    ttsService: ttsService
                 )
             }
 
@@ -517,7 +507,6 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
             return wrapper
         } catch {
             logger.error("TTS service creation failed: \(error)")
-            logger.error("Error type: \(type(of: error))")
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelLoadFailed(
                     modelId: modelId,

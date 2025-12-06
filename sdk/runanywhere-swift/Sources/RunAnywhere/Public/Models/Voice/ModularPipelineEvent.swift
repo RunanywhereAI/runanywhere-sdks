@@ -38,6 +38,11 @@ public enum ModularPipelineEvent {
     case ttsAudioChunk(Data)
     case ttsCompleted
 
+    // Audio control events - Used to prevent feedback loop
+    // ViewModel should pause/resume microphone based on these events
+    case audioControlPauseRecording   // Stop microphone before TTS starts
+    case audioControlResumeRecording  // Resume microphone after TTS completes + cooldown
+
     // Initialization events
     case componentInitializing(String) // Component name being initialized
     case componentInitialized(String)  // Component name that completed initialization

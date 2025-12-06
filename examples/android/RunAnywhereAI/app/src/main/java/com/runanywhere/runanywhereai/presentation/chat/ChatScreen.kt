@@ -21,8 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import com.runanywhere.runanywhereai.ui.theme.AppColors
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -476,37 +478,53 @@ fun MessageBubbleView(
                 Spacer(modifier = Modifier.height(Dimensions.small))
             }
 
+            // Thinking progress indicator - matching iOS pattern
+            // Shows "Thinking..." when message is empty but thinking content exists during generation
+            if (message.role == MessageRole.ASSISTANT &&
+                message.content.isEmpty() &&
+                message.thinkingContent != null &&
+                isGenerating
+            ) {
+                ThinkingProgressIndicator()
+            }
+
             // Main message bubble - only show if there's content (matching iOS)
             if (message.content.isNotEmpty()) {
-                Surface(
-                    color = if (message.role == MessageRole.USER) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    shape = RoundedCornerShape(Dimensions.messageBubbleCornerRadius),
+                // Use gradient backgrounds matching iOS exactly
+                val bubbleShape = RoundedCornerShape(Dimensions.messageBubbleCornerRadius)
+                val isUserMessage = message.role == MessageRole.USER
+
+                Box(
                     modifier = Modifier
                         .shadow(
                             elevation = Dimensions.messageBubbleShadowRadius,
-                            shape = RoundedCornerShape(Dimensions.messageBubbleCornerRadius)
+                            shape = bubbleShape
+                        )
+                        .clip(bubbleShape)
+                        .background(
+                            brush = if (isUserMessage) {
+                                AppColors.userBubbleGradient()
+                            } else {
+                                AppColors.assistantBubbleGradientThemed()
+                            }
                         )
                         .border(
                             width = Dimensions.strokeThin,
-                            color = if (message.role == MessageRole.USER) {
-                                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)
+                            color = if (isUserMessage) {
+                                AppColors.borderLight
                             } else {
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                AppColors.borderMedium
                             },
-                            shape = RoundedCornerShape(Dimensions.messageBubbleCornerRadius)
+                            shape = bubbleShape
                         )
                 ) {
                     Text(
                         text = message.content,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (message.role == MessageRole.USER) {
-                            MaterialTheme.colorScheme.onPrimary
+                        color = if (isUserMessage) {
+                            AppColors.textWhite
                         } else {
-                            MaterialTheme.colorScheme.onSurface
+                            AppColors.assistantBubbleTextColor()
                         },
                         modifier = Modifier.padding(
                             horizontal = Dimensions.messageBubblePaddingHorizontal,
@@ -609,6 +627,103 @@ fun ModelBadge(
 // THINKING SECTION
 // ====================
 
+/**
+ * Extract intelligent thinking summary - matching iOS thinkingSummary computed property
+ * Extracts first meaningful sentence from thinking content instead of showing raw text
+ */
+private fun extractThinkingSummary(thinking: String): String {
+    val trimmed = thinking.trim()
+    if (trimmed.isEmpty()) return "Show reasoning..."
+
+    // Extract first meaningful sentence
+    val sentences = trimmed.split(Regex("[.!?]"))
+        .map { it.trim() }
+        .filter { it.length > 20 }
+
+    // If we have at least 2 sentences and first is meaningful, use it
+    if (sentences.size >= 2 && sentences[0].length > 20) {
+        return sentences[0] + "..."
+    }
+
+    // Fallback to truncated version
+    if (trimmed.length > 80) {
+        val truncated = trimmed.take(80)
+        val lastSpace = truncated.lastIndexOf(' ')
+        return if (lastSpace > 0) {
+            truncated.substring(0, lastSpace) + "..."
+        } else {
+            truncated + "..."
+        }
+    }
+
+    return trimmed
+}
+
+/**
+ * Thinking Progress Indicator - matching iOS pattern
+ * Shows "Thinking..." with animated dots when message is empty but thinking content exists
+ */
+@Composable
+fun ThinkingProgressIndicator() {
+    val thinkingShape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
+
+    Box(
+        modifier = Modifier
+            .clip(thinkingShape)
+            .background(brush = AppColors.thinkingProgressGradient())
+            .border(
+                width = Dimensions.strokeThin,
+                color = AppColors.thinkingBorder,
+                shape = thinkingShape
+            )
+            .padding(
+                horizontal = Dimensions.thinkingSectionPaddingHorizontal,
+                vertical = Dimensions.thinkingSectionPaddingVertical
+            )
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Animated dots (matching iOS)
+            repeat(3) { index ->
+                val infiniteTransition = rememberInfiniteTransition(label = "thinking_progress")
+                val scale by infiniteTransition.animateFloat(
+                    initialValue = 0.5f,
+                    targetValue = 1.0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(600),
+                        repeatMode = RepeatMode.Reverse,
+                        initialStartOffset = StartOffset(index * 200)
+                    ),
+                    label = "thinking_dot_$index"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(Dimensions.small)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .background(
+                            color = AppColors.primaryPurple,
+                            shape = CircleShape
+                        )
+                )
+            }
+
+            Spacer(modifier = Modifier.width(Dimensions.smallMedium))
+
+            Text(
+                text = "Thinking...",
+                style = AppTypography.caption,
+                color = AppColors.primaryPurple.copy(alpha = 0.8f)
+            )
+        }
+    }
+}
+
 @Composable
 fun ThinkingToggle(
     thinkingContent: String,
@@ -616,27 +731,30 @@ fun ThinkingToggle(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
+    // Extract intelligent summary like iOS
+    val thinkingSummary = remember(thinkingContent) {
+        extractThinkingSummary(thinkingContent)
+    }
+
     Column {
-        // Toggle button
-        Surface(
-            color = Color.Transparent,
-            shape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius),
+        // Toggle button with gradient background matching iOS
+        val toggleShape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
+
+        Box(
             modifier = Modifier
                 .clickable { isExpanded = !isExpanded }
                 .shadow(
                     elevation = Dimensions.shadowSmall,
-                    shape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius),
-                    ambientColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                    spotColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
+                    shape = toggleShape,
+                    ambientColor = AppColors.shadowThinking,
+                    spotColor = AppColors.shadowThinking
                 )
-                .background(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
-                )
+                .clip(toggleShape)
+                .background(brush = AppColors.thinkingBackgroundGradient())
                 .border(
                     width = Dimensions.strokeThin,
-                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
+                    color = AppColors.thinkingBorder,
+                    shape = toggleShape
                 )
         ) {
             Row(
@@ -651,19 +769,21 @@ fun ThinkingToggle(
                     imageVector = Icons.Default.Lightbulb,
                     contentDescription = null,
                     modifier = Modifier.size(AppTypography.caption.fontSize.value.dp),
-                    tint = MaterialTheme.colorScheme.secondary
+                    tint = AppColors.primaryPurple
                 )
                 Text(
-                    text = if (isExpanded) "Hide reasoning" else "Show reasoning...",
+                    text = if (isExpanded) "Hide reasoning" else thinkingSummary,
                     style = AppTypography.caption,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.weight(1f)
+                    color = AppColors.primaryPurple,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowRight,
                     contentDescription = null,
                     modifier = Modifier.size(AppTypography.caption2.fontSize.value.dp),
-                    tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
+                    tint = AppColors.primaryPurple.copy(alpha = 0.6f)
                 )
             }
         }
@@ -677,7 +797,7 @@ fun ThinkingToggle(
             Column {
                 Spacer(modifier = Modifier.height(Dimensions.small))
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = AppColors.thinkingContentBackground,
                     shape = RoundedCornerShape(Dimensions.thinkingContentCornerRadius)
                 ) {
                     Box(

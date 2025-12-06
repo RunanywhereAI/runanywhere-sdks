@@ -1,5 +1,11 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.runanywhere.runanywhereai.presentation.settings
 
+import android.text.format.Formatter
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -20,6 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.sdk.models.storage.StoredModel
+import kotlinx.datetime.Instant
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Combined Settings & Storage Screen - Matching iOS CombinedSettingsView.swift exactly
@@ -42,8 +54,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var showApiKeyDialog by remember { mutableStateOf(false) }
-    var showDeleteConfirmDialog by remember { mutableStateOf<StoredModelInfo?>(null) }
+    var showDeleteConfirmDialog by remember { mutableStateOf<StoredModel?>(null) }
 
     Column(
         modifier = Modifier
@@ -171,7 +184,7 @@ fun SettingsScreen(
         }
 
         // Storage Overview Section
-        // iOS Reference: Section with storage stats
+        // iOS Reference: Section with storage stats from RunAnywhere.getStorageInfo()
         SettingsSection(
             title = "Storage Overview",
             trailing = {
@@ -183,20 +196,20 @@ fun SettingsScreen(
             StorageOverviewRow(
                 icon = Icons.Outlined.Storage,
                 label = "Total Usage",
-                value = formatBytes(uiState.totalStorageSize)
+                value = Formatter.formatFileSize(context, uiState.totalStorageSize)
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageOverviewRow(
                 icon = Icons.Outlined.CloudQueue,
                 label = "Available Space",
-                value = formatBytes(uiState.availableSpace),
+                value = Formatter.formatFileSize(context, uiState.availableSpace),
                 valueColor = AppColors.primaryGreen
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageOverviewRow(
                 icon = Icons.Outlined.Memory,
                 label = "Models Storage",
-                value = formatBytes(uiState.modelStorageSize),
+                value = Formatter.formatFileSize(context, uiState.modelStorageSize),
                 valueColor = AppColors.primaryBlue
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -497,78 +510,255 @@ private fun StorageOverviewRow(
 }
 
 /**
- * Stored Model Row
- * iOS Reference: StoredModelRow in CombinedSettingsView
+ * Stored Model Row with expandable details
+ * iOS Reference: StoredModelRow in CombinedSettingsView (lines 620-765)
+ * Uses SDK's StoredModel type directly
+ *
+ * Features:
+ * - Model name and badges (format, framework)
+ * - File size display
+ * - "Details"/"Hide" toggle button (matching iOS)
+ * - Expandable details section showing: format, framework, context length, path, created date, last used
+ * - Delete button with confirmation
  */
 @Composable
 private fun StoredModelRow(
-    model: StoredModelInfo,
+    model: StoredModel,
     onDelete: () -> Unit
 ) {
-    Row(
+    val context = LocalContext.current
+    var showingDetails by remember { mutableStateOf(false) }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 8.dp)
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = model.name,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(top = 4.dp)
-            ) {
-                // Format badge
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = AppColors.badgeBlue
+        // Main row with model info and actions
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            // Left: Model name and badges
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = model.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 4.dp)
                 ) {
-                    Text(
-                        text = model.format.uppercase(),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppColors.primaryBlue
-                    )
-                }
-                // Framework badge if available
-                model.framework?.let { framework ->
+                    // Format badge
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = AppColors.badgeGreen
+                        color = AppColors.badgeBlue
                     ) {
                         Text(
-                            text = framework,
+                            text = model.format.uppercase(),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = AppColors.primaryGreen
+                            color = AppColors.primaryBlue
+                        )
+                    }
+                    // Framework badge if available
+                    model.framework?.let { framework ->
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = AppColors.badgeGreen
+                        ) {
+                            Text(
+                                text = framework,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppColors.primaryGreen
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Right: Size and action buttons
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = Formatter.formatFileSize(context, model.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium
+                )
+                // Action buttons row (matching iOS HStack)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    // Details/Hide button (matching iOS Button with .bordered style)
+                    OutlinedButton(
+                        onClick = { showingDetails = !showingDetails },
+                        modifier = Modifier.height(28.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = if (showingDetails) "Hide" else "Details",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    // Delete button
+                    OutlinedButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(28.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = AppColors.primaryRed
+                        )
+                    ) {
+                        Icon(
+                            Icons.Outlined.Delete,
+                            contentDescription = "Delete",
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
             }
         }
 
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = formatBytes(model.size),
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium
+        // Expandable details section (matching iOS modelDetailsView)
+        AnimatedVisibility(
+            visible = showingDetails,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            ModelDetailsView(model = model)
+        }
+    }
+}
+
+/**
+ * Model Details View - Expandable details section
+ * iOS Reference: modelDetailsView in StoredModelRow (lines 702-764)
+ *
+ * Shows: format, framework, context length, path, created date, last used
+ */
+@Composable
+private fun ModelDetailsView(model: StoredModel) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Format
+            ModelDetailRow(label = "Format:", value = model.format.uppercase())
+
+            // Framework
+            model.framework?.let { framework ->
+                ModelDetailRow(label = "Framework:", value = framework)
+            }
+
+            // Context Length
+            model.contextLength?.let { contextLength ->
+                ModelDetailRow(label = "Context Length:", value = "$contextLength tokens")
+            }
+
+            // Path
+            Column {
+                Text(
+                    text = "Path:",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = model.path,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            // Created date
+            ModelDetailRow(
+                label = "Created:",
+                value = formatDate(model.createdDate)
             )
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = "Delete",
-                    tint = AppColors.primaryRed,
-                    modifier = Modifier.size(18.dp)
+
+            // Last used (relative time like iOS)
+            model.lastUsed?.let { lastUsed ->
+                ModelDetailRow(
+                    label = "Last used:",
+                    value = formatRelativeTime(lastUsed)
                 )
             }
         }
+    }
+}
+
+/**
+ * Model Detail Row - Single label/value pair
+ */
+@Composable
+private fun ModelDetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/**
+ * Format date for display (matching iOS Text(date, style: .date))
+ */
+private fun formatDate(instant: Instant): String {
+    return try {
+        val dateFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+        dateFormat.format(Date(instant.toEpochMilliseconds()))
+    } catch (e: Exception) {
+        "Unknown"
+    }
+}
+
+/**
+ * Format relative time for display (matching iOS Text(date, style: .relative))
+ */
+private fun formatRelativeTime(instant: Instant): String {
+    return try {
+        val now = System.currentTimeMillis()
+        val then = instant.toEpochMilliseconds()
+        val diff = now - then
+
+        val seconds = diff / 1000
+        val minutes = seconds / 60
+        val hours = minutes / 60
+        val days = hours / 24
+        val weeks = days / 7
+        val months = days / 30
+        val years = days / 365
+
+        when {
+            years > 0 -> if (years == 1L) "1 year ago" else "$years years ago"
+            months > 0 -> if (months == 1L) "1 month ago" else "$months months ago"
+            weeks > 0 -> if (weeks == 1L) "1 week ago" else "$weeks weeks ago"
+            days > 0 -> if (days == 1L) "1 day ago" else "$days days ago"
+            hours > 0 -> if (hours == 1L) "1 hour ago" else "$hours hours ago"
+            minutes > 0 -> if (minutes == 1L) "1 minute ago" else "$minutes minutes ago"
+            else -> "Just now"
+        }
+    } catch (e: Exception) {
+        "Unknown"
     }
 }
 
@@ -667,12 +857,5 @@ private fun ApiKeyDialog(
     )
 }
 
-// Helper function to format bytes
-private fun formatBytes(bytes: Long): String {
-    return when {
-        bytes < 1024 -> "$bytes B"
-        bytes < 1024 * 1024 -> String.format("%.1f KB", bytes / 1024.0)
-        bytes < 1024 * 1024 * 1024 -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
-        else -> String.format("%.1f GB", bytes / (1024.0 * 1024.0 * 1024.0))
-    }
-}
+// Note: Using android.text.format.Formatter.formatFileSize() for consistent byte formatting
+// This matches iOS ByteCountFormatter behavior

@@ -257,6 +257,25 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Answer current question via button tap (matching iOS button behavior)
+     */
+    fun answerWithButton(answer: Boolean) {
+        answerCurrentQuestion(answer)
+    }
+
+    /**
+     * Reset quiz to initial state (public for exit button)
+     */
+    fun resetQuiz() {
+        generationJob?.cancel()
+        currentSession = null
+        questionStartTime = null
+
+        _uiState.value = QuizUiState()
+        checkModelStatus()
+    }
+
+    /**
      * Answer current question
      */
     private fun answerCurrentQuestion(answer: Boolean) {
@@ -363,18 +382,6 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
-    }
-
-    /**
-     * Reset quiz to initial state
-     */
-    private fun resetQuiz() {
-        generationJob?.cancel()
-        currentSession = null
-        questionStartTime = null
-
-        _uiState.value = QuizUiState()
-        checkModelStatus()
     }
 
     /**

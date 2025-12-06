@@ -26,5 +26,12 @@ actual fun createTelemetryRepository(): TelemetryRepository {
         environment = SDKEnvironment.DEVELOPMENT // Use DEVELOPMENT to avoid base URL requirement
     )
 
-    return TelemetryRepositoryImpl(database, networkService)
+    // Get RemoteTelemetryDataSource from ServiceContainer if available (production mode)
+    val remoteTelemetryDataSource = try {
+        com.runanywhere.sdk.foundation.ServiceContainer.shared.remoteTelemetryDataSource
+    } catch (e: UninitializedPropertyAccessException) {
+        null // Not available yet or not in production mode
+    }
+
+    return TelemetryRepositoryImpl(database, networkService, remoteTelemetryDataSource)
 }

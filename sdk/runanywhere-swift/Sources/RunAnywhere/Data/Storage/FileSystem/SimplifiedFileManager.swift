@@ -38,15 +38,26 @@ public class SimplifiedFileManager {
 
     /// Get or create folder for a specific model
     public func getModelFolder(for modelId: String) throws -> Folder {
-        let modelsFolder = try baseFolder.subfolder(named: "Models")
-        return try modelsFolder.createSubfolderIfNeeded(withName: modelId)
+        let modelFolderURL = try ModelPathUtils.getModelFolder(modelId: modelId)
+        return try createFolderIfNeeded(at: modelFolderURL)
     }
 
     /// Get or create folder for a specific model with framework
     public func getModelFolder(for modelId: String, framework: LLMFramework) throws -> Folder {
-        let modelsFolder = try baseFolder.subfolder(named: "Models")
-        let frameworkFolder = try modelsFolder.createSubfolderIfNeeded(withName: framework.rawValue)
-        return try frameworkFolder.createSubfolderIfNeeded(withName: modelId)
+        let modelFolderURL = try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
+        return try createFolderIfNeeded(at: modelFolderURL)
+    }
+
+    /// Helper to create folder at URL if needed
+    private func createFolderIfNeeded(at url: URL) throws -> Folder {
+        let path = url.path
+        if FileManager.default.fileExists(atPath: path) {
+            return try Folder(path: path)
+        } else {
+            // Create the folder with intermediate directories
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
+            return try Folder(path: path)
+        }
     }
 
     /// Store model file
@@ -93,7 +104,8 @@ public class SimplifiedFileManager {
 
     /// Delete model
     public func deleteModel(modelId: String) throws {
-        let modelsFolder = try baseFolder.subfolder(named: "Models")
+        let modelsFolderURL = try ModelPathUtils.getModelsDirectory()
+        let modelsFolder = try Folder(path: modelsFolderURL.path)
 
         // Check framework-specific folders
         for frameworkFolder in modelsFolder.subfolders {
@@ -217,7 +229,8 @@ public class SimplifiedFileManager {
 
     /// Get model storage size
     public func getModelStorageSize() -> Int64 {
-        guard let modelsFolder = try? baseFolder.subfolder(named: "Models") else { return 0 }
+        guard let modelsFolderURL = try? ModelPathUtils.getModelsDirectory(),
+              let modelsFolder = try? Folder(path: modelsFolderURL.path) else { return 0 }
 
         var totalSize: Int64 = 0
         for file in modelsFolder.files.recursive {
@@ -232,7 +245,8 @@ public class SimplifiedFileManager {
 
     /// Get all stored models
     public func getAllStoredModels() -> [(modelId: String, format: ModelFormat, size: Int64, framework: LLMFramework?)] {
-        guard let modelsFolder = try? baseFolder.subfolder(named: "Models") else { return [] }
+        guard let modelsFolderURL = try? ModelPathUtils.getModelsDirectory(),
+              let modelsFolder = try? Folder(path: modelsFolderURL.path) else { return [] }
 
         var models: [(String, ModelFormat, Int64, LLMFramework?)] = []
 
@@ -396,7 +410,8 @@ public class SimplifiedFileManager {
             return URL(fileURLWithPath: expectedPath)
         }
 
-        guard let modelsFolder = try? baseFolder.subfolder(named: "Models") else { return nil }
+        guard let modelsFolderURL = try? ModelPathUtils.getModelsDirectory(),
+              let modelsFolder = try? Folder(path: modelsFolderURL.path) else { return nil }
 
         // Search in framework-specific folders first
         for frameworkFolder in modelsFolder.subfolders {

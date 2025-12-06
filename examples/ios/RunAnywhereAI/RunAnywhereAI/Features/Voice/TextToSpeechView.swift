@@ -1,13 +1,62 @@
 import SwiftUI
 import RunAnywhere
 import AVFoundation
+import Combine
 import os
+
+/// Collection of funny sample texts for TTS demo
+private let funnyTTSSampleTexts: [String] = [
+    "I'm not saying I'm Batman, but have you ever seen me and Batman in the same room?",
+    "According to my calculations, I should have been a millionaire by now. My calculations were wrong.",
+    "I told my computer I needed a break, and now it won't stop sending me vacation ads.",
+    "Why do programmers prefer dark mode? Because light attracts bugs!",
+    "I speak fluent sarcasm. Unfortunately, my phone's voice assistant doesn't.",
+    "I'm on a seafood diet. I see food and I eat it. Then I feel regret.",
+    "My brain has too many tabs open and I can't find the one playing music.",
+    "I put my phone on airplane mode but it didn't fly. Worst paper airplane ever.",
+    "I'm not lazy, I'm just on energy-saving mode. Like a responsible gadget.",
+    "If Monday had a face, I would politely ask it to reconsider its life choices.",
+    "I tried to be normal once. Worst two minutes of my life.",
+    "My favorite exercise is a cross between a lunge and a crunch. I call it lunch.",
+    "I don't need anger management. I need people to stop irritating me.",
+    "I'm not arguing, I'm just explaining why I'm right. There's a difference.",
+    "Coffee: because adulting is hard and mornings are a cruel joke.",
+    "I finally found my spirit animal. It's a sloth having a bad hair day.",
+    "My wallet is like an onion. When I open it, I cry.",
+    "I'm not short, I'm concentrated awesome in a compact package.",
+    "Life update: currently holding it all together with one bobby pin.",
+    "I would lose weight, but I hate losing.",
+    "Behind every great person is a cat judging them silently.",
+    "I'm on the whiskey diet. I've lost three days already.",
+    "My houseplants are thriving! Just kidding, they're plastic.",
+    "I don't sweat, I sparkle. Aggressively. With visible discomfort.",
+    "Plot twist: the hokey pokey really IS what it's all about.",
+    // RunAnywhere SDK promotional texts
+    "RunAnywhere: because your AI should work even when your WiFi doesn't.",
+    "We're a Y Combinator company now. Our moms are finally proud of us.",
+    "On-device AI means your voice data stays on your phone. Unlike your ex, we respect privacy.",
+    "RunAnywhere: Making cloud APIs jealous since 2024.",
+    "Our SDK is so fast, it finished processing before you finished reading this sentence.",
+    "Why pay per API call when you can run AI locally? Your wallet called, it says thank you.",
+    "RunAnywhere: We put the 'smart' in smartphone, and the 'savings' in your bank account.",
+    "Backed by Y Combinator. Powered by caffeine. Fueled by the dream of affordable AI.",
+    "Our on-device models are like introverts. They do great work without needing the cloud.",
+    "RunAnywhere SDK: Because latency is just a fancy word for 'too slow'.",
+    "Voice AI that runs offline? That's not magic, that's just good engineering. Okay, maybe a little magic.",
+    "We optimized our models so hard, they now run faster than your excuses for not exercising.",
+    "RunAnywhere: Where 'it works offline' isn't a bug, it's the whole feature.",
+    "Y Combinator believed in us. Your device believes in us. Now it's your turn.",
+    "On-device AI: All the intelligence, none of the monthly subscription fees.",
+    "Our SDK is like a good friend: fast, reliable, and doesn't share your secrets with big tech.",
+    "RunAnywhere makes voice AI accessible. Like, actually accessible. Not 'enterprise pricing' accessible."
+]
 
 /// Dedicated Text-to-Speech view with text input and playback
 struct TextToSpeechView: View {
     @StateObject private var viewModel = TTSViewModel()
     @State private var showModelPicker = false
-    @State private var inputText: String = "Hello! This is a text to speech test."
+    @State private var inputText: String = funnyTTSSampleTexts.randomElement()
+        ?? "Hello! This is a text to speech test."
 
     private var hasModelSelected: Bool {
         viewModel.selectedModelName != nil
@@ -62,9 +111,26 @@ struct TextToSpeechView: View {
                                     .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                             )
 
-                        Text("\(inputText.count) characters")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Text("\(inputText.count) characters")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+
+                            Spacer()
+
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    inputText = funnyTTSSampleTexts.randomElement() ?? inputText
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "dice.fill")
+                                    Text("Surprise me!")
+                                }
+                                .font(.caption)
+                                .foregroundColor(.purple)
+                            }
+                        }
                     }
 
                     // Voice settings
@@ -246,6 +312,12 @@ struct TextToSpeechView: View {
                 await viewModel.initialize()
             }
         }
+        .onChange(of: viewModel.selectedModelName) { oldValue, newValue in
+            // Set a new random funny text when a model is loaded
+            if oldValue == nil && newValue != nil {
+                inputText = funnyTTSSampleTexts.randomElement() ?? inputText
+            }
+        }
     }
 
     private var statusColor: Color {
@@ -325,6 +397,7 @@ class TTSViewModel: ObservableObject {
     private var ttsComponent: TTSComponent?
     private var audioPlayer: AVAudioPlayer?
     private var playbackTimer: Timer?
+    private var cancellables = Set<AnyCancellable>()
 
     deinit {
         playbackTimer?.invalidate()
@@ -341,18 +414,67 @@ class TTSViewModel: ObservableObject {
         } catch {
             logger.error("Failed to configure audio session: \(error.localizedDescription)")
         }
+
+        // Subscribe to model lifecycle changes from SDK
+        subscribeToModelLifecycle()
     }
 
-    func loadModel(_ modelInfo: (name: String, id: String)) async {
-        self.logger.info("Loading TTS model: \(modelInfo.name) (id: \(modelInfo.id))")
-        isGenerating = true
-        errorMessage = nil
+    /// Subscribe to SDK's model lifecycle tracker for real-time model state updates
+    private func subscribeToModelLifecycle() {
+        // Observe changes to loaded models via the SDK's lifecycle tracker
+        ModelLifecycleTracker.shared.$modelsByModality
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] modelsByModality in
+                guard let self = self else { return }
 
+                // Update TTS model state from SDK
+                if let ttsState = modelsByModality[.tts] {
+                    if ttsState.state.isLoaded {
+                        self.selectedFramework = ttsState.framework
+                        self.selectedModelName = ttsState.modelName
+                        self.selectedModelId = ttsState.modelId
+                        self.isSystemTTS = ttsState.framework == .systemTTS
+                        self.logger.info("✅ TTS model restored from SDK: \(ttsState.modelName)")
+                    }
+                } else {
+                    // Only clear if no model is loaded in SDK
+                    if self.selectedModelId != nil {
+                        self.logger.info("TTS model unloaded from SDK")
+                        self.selectedFramework = nil
+                        self.selectedModelName = nil
+                        self.selectedModelId = nil
+                        self.isSystemTTS = false
+                        self.ttsComponent = nil
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        // Check initial state immediately
+        let modelsByModality = ModelLifecycleTracker.shared.modelsByModality
+        if let ttsState = modelsByModality[.tts], ttsState.state.isLoaded {
+            selectedFramework = ttsState.framework
+            selectedModelName = ttsState.modelName
+            selectedModelId = ttsState.modelId
+            isSystemTTS = ttsState.framework == .systemTTS
+            logger.info("✅ TTS model found on init: \(ttsState.modelName)")
+
+            // Recreate component from existing SDK state if needed
+            Task {
+                await restoreComponentIfNeeded(modelId: ttsState.modelId)
+            }
+        }
+    }
+
+    /// Restore the TTS component if a model is already loaded in the SDK
+    private func restoreComponentIfNeeded(modelId: String) async {
+        // Only restore if we don't already have a component
+        guard ttsComponent == nil else { return }
+
+        logger.info("Restoring TTS component for model: \(modelId)")
         do {
-            // Create TTS component with the selected Piper model
-            // Use the model ID as the voice identifier for Piper models
             let config = TTSConfiguration(
-                voice: modelInfo.id,  // Piper model ID
+                voice: modelId,
                 language: "en-US",
                 speakingRate: Float(speechRate),
                 pitch: Float(pitch),
@@ -361,17 +483,11 @@ class TTSViewModel: ObservableObject {
 
             let component = TTSComponent(configuration: config)
             try await component.initialize()
-
             ttsComponent = component
-            selectedModelName = modelInfo.name
-            selectedModelId = modelInfo.id
-            self.logger.info("TTS model loaded successfully: \(modelInfo.name)")
+            logger.info("TTS component restored successfully")
         } catch {
-            self.logger.error("Failed to load TTS model: \(error.localizedDescription)")
-            errorMessage = "Failed to load model: \(error.localizedDescription)"
+            logger.error("Failed to restore TTS component: \(error.localizedDescription)")
         }
-
-        isGenerating = false
     }
 
     /// Load a model from the unified model selection sheet
@@ -513,198 +629,4 @@ struct TTSMetadata {
     let durationMs: Double
     let audioSize: Int
     let sampleRate: Int
-}
-
-// MARK: - TTS Model Picker
-
-struct TTSModelPickerView: View {
-    @Binding var selectedModelId: String?
-    let onSelect: ((name: String, id: String)) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var availableModels: [ModelInfo] = []
-    @State private var isLoading = true
-    @State private var downloadingModels: Set<String> = []
-    @State private var errorMessage: String?
-
-    var body: some View {
-        NavigationView {
-            Group {
-                if isLoading {
-                    ProgressView("Loading models...")
-                } else if availableModels.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary)
-                        Text("No TTS models available")
-                            .font(.headline)
-                        Text("No models registered in SDK")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    List {
-                        if let error = errorMessage {
-                            Section {
-                                Text(error)
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-                        }
-
-                        Section {
-                            ForEach(availableModels, id: \.id) { model in
-                                TTSModelRow(
-                                    model: model,
-                                    isSelected: selectedModelId == model.id,
-                                    isDownloading: downloadingModels.contains(model.id),
-                                    onTap: {
-                                        if model.isDownloaded {
-                                            onSelect((name: model.name, id: model.id))
-                                            dismiss()
-                                        } else {
-                                            Task {
-                                                await downloadModel(model)
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                        } header: {
-                            Text("Available Models")
-                        } footer: {
-                            Text("Tap to download. Once downloaded, tap again to select.")
-                                .font(.caption)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Select TTS Model")
-            .navigationBarItems(trailing: Button("Cancel") { dismiss() })
-        }
-        .onAppear {
-            Task {
-                await loadModels()
-            }
-        }
-    }
-
-    private func downloadModel(_ model: ModelInfo) async {
-        downloadingModels.insert(model.id)
-        errorMessage = nil
-
-        do {
-            try await RunAnywhere.downloadModel(model.id)
-            // Refresh models list after download
-            await loadModels()
-            downloadingModels.remove(model.id)
-        } catch {
-            errorMessage = "Download failed: \(error.localizedDescription)"
-            downloadingModels.remove(model.id)
-        }
-    }
-
-    private func loadModels() async {
-        // Load downloadable Piper TTS models from SDK registry
-        do {
-            let allModels = try await RunAnywhere.availableModels()
-            // Filter for TTS models (Piper ONNX models)
-            availableModels = allModels.filter { $0.category == .speechSynthesis }
-            print("Loaded \(availableModels.count) TTS models")
-        } catch {
-            print("Failed to load TTS models: \(error)")
-            availableModels = []
-        }
-        isLoading = false
-    }
-}
-
-// MARK: - TTS Model Row Component
-
-private struct TTSModelRow: View {
-    let model: ModelInfo
-    let isSelected: Bool
-    let isDownloading: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(model.name)
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-
-                    HStack(spacing: 8) {
-                        if let size = model.downloadSize {
-                            Label(
-                                ByteCountFormatter.string(fromByteCount: size, countStyle: .file),
-                                systemImage: "arrow.down.circle"
-                            )
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        }
-
-                        // Status badge
-                        statusBadge
-                    }
-                }
-
-                Spacer()
-
-                if isSelected && model.isDownloaded {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.purple)
-                        .font(.title3)
-                }
-            }
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(isDownloading)
-    }
-
-    @ViewBuilder
-    private var statusBadge: some View {
-        if model.isDownloaded {
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.caption)
-                Text("Downloaded")
-            }
-            .font(.caption)
-            .foregroundColor(.green)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.green.opacity(0.1))
-            .cornerRadius(8)
-        } else if isDownloading {
-            HStack(spacing: 6) {
-                ProgressView()
-                    .scaleEffect(0.7)
-                Text("Downloading...")
-            }
-            .font(.caption)
-            .foregroundColor(.orange)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.orange.opacity(0.1))
-            .cornerRadius(8)
-        } else {
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.down.circle")
-                    .font(.caption)
-                Text("Tap to Download")
-            }
-            .font(.caption)
-            .foregroundColor(.purple)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.purple.opacity(0.1))
-            .cornerRadius(8)
-        }
-    }
 }

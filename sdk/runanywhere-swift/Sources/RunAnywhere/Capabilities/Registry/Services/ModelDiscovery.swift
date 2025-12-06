@@ -111,17 +111,18 @@ class ModelDiscovery {
     private func getDefaultModelDirectories() -> [URL] {
         var directories: [URL] = []
 
-        if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let modelsURL = documentsURL.appendingPathComponent("RunAnywhere", isDirectory: true).appendingPathComponent("Models", isDirectory: true)
-
+        do {
             // Add the base Models directory
+            let modelsURL = try ModelPathUtils.getModelsDirectory()
             directories.append(modelsURL)
 
             // Add framework-specific subdirectories
             for framework in LLMFramework.allCases {
-                let frameworkURL = modelsURL.appendingPathComponent(framework.rawValue, isDirectory: true)
+                let frameworkURL = try ModelPathUtils.getFrameworkDirectory(framework: framework)
                 directories.append(frameworkURL)
             }
+        } catch {
+            logger.error("Failed to get default model directories: \(error)")
         }
 
         return directories
@@ -172,28 +173,10 @@ class ModelDiscovery {
     }
 
     private func generateModelId(from url: URL) -> String {
-        // For models in our storage structure, use the parent folder name as ID
-        // This ensures consistency with how models are stored
-        let pathComponents = url.pathComponents
-
-        // Check if this is a model in our framework structure
-        if let modelsIndex = pathComponents.firstIndex(of: "Models"),
-           modelsIndex + 3 < pathComponents.count {  // Need at least Models/Framework/ModelId/file.gguf
-            // Path is like: .../Models/frameworkName/modelId/file.gguf
-            // or: .../Models/modelId/file.gguf
-            let nextComponent = pathComponents[modelsIndex + 1]
-
-            // Check if next component is a framework name
-            if LLMFramework.allCases.contains(where: { $0.rawValue == nextComponent }) {
-                // Framework structure: use the model folder name
-                let modelId = pathComponents[modelsIndex + 2]
-                logger.debug("Generated model ID from framework structure: '\(modelId)' from path: \(url.path)")
-                return modelId
-            } else if modelsIndex + 2 < pathComponents.count {
-                // Direct model folder structure
-                logger.debug("Generated model ID from direct structure: '\(nextComponent)' from path: \(url.path)")
-                return nextComponent
-            }
+        // Use centralized path utility to extract model ID
+        if let modelId = ModelPathUtils.extractModelId(from: url) {
+            logger.debug("Generated model ID from path structure: '\(modelId)' from path: \(url.path)")
+            return modelId
         }
 
         // Fallback to filename-based ID for other cases

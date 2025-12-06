@@ -40,13 +40,18 @@ class JvmAndroidWhisperKitService : WhisperKitService() {
     override val currentModel: String?
         get() = currentWhisperModel.value?.modelName
 
-    override val supportedLanguages: List<String> = listOf(
+    // Kotlin-specific: supported languages for this implementation
+    val supportedLanguages: List<String> = listOf(
         "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"
     )
 
     override val supportsStreaming: Boolean = true
-    override val supportsLanguageDetection: Boolean = true
-    override val supportsSpeakerDiarization: Boolean = false
+
+    // Kotlin-specific: language detection capability
+    val supportsLanguageDetection: Boolean = true
+
+    // Kotlin-specific: speaker diarization capability
+    val supportsSpeakerDiarization: Boolean = false
 
     override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
         try {
@@ -307,8 +312,7 @@ class JvmAndroidWhisperKitService : WhisperKitService() {
     }.flowOn(Dispatchers.Default)
 
     private fun createWhisperParams(options: STTOptions): WhisperFullParams {
-        // Create params with appropriate strategy based on sensitivity
-        // Use default greedy strategy for now due to enum compatibility issues
+        // Create params with greedy strategy (most reliable for production)
         val strategy = WhisperSamplingStrategy.GREEDY
         val params = WhisperFullParams(strategy)
 
@@ -318,25 +322,11 @@ class JvmAndroidWhisperKitService : WhisperKitService() {
             else -> options.language.take(2) // Use ISO 639-1 code
         }
 
-        // Set other parameters based on STTOptions
+        // Set parameters (using Whisper defaults for removed STTOptions fields)
         params.printTimestamps = options.enableTimestamps
-        params.suppressBlank = options.suppressBlank
-        params.suppressNonSpeechTokens = options.suppressNonSpeechTokens
-
-        // Set temperature and beam size based on sensitivity mode
-        when (options.sensitivityMode) {
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.NORMAL -> {
-                params.temperature = 0.0f
-            }
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.HIGH -> {
-                params.temperature = 0.3f
-                params.beamSearchBeamSize = 5
-            }
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.MAXIMUM -> {
-                params.temperature = 0.5f
-                params.beamSearchBeamSize = 10
-            }
-        }
+        params.suppressBlank = true // Whisper default
+        params.suppressNonSpeechTokens = true // Whisper default
+        params.temperature = 0.0f // Deterministic output
 
         return params
     }
@@ -354,9 +344,9 @@ class JvmAndroidWhisperKitService : WhisperKitService() {
     }
 
     /**
-     * Enhanced streaming transcription (matches iOS AsyncThrowingStream patterns)
+     * Kotlin-specific: Enhanced streaming transcription with typed events
      */
-    override fun transcribeStream(
+    fun transcribeStream(
         audioStream: Flow<ByteArray>,
         options: STTStreamingOptions
     ): Flow<STTStreamEvent> = flow {
@@ -392,9 +382,9 @@ class JvmAndroidWhisperKitService : WhisperKitService() {
     }.flowOn(Dispatchers.Default)
 
     /**
-     * Language detection from audio (matches iOS signature)
+     * Kotlin-specific: Language detection from audio
      */
-    override suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
+    suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
         val context = whisperContext ?: return mapOf("en" to 1.0f)
 
         return try {
@@ -414,9 +404,9 @@ class JvmAndroidWhisperKitService : WhisperKitService() {
     }
 
     /**
-     * Check if service supports specific language (matches iOS)
+     * Kotlin-specific: Check if service supports specific language
      */
-    override fun supportsLanguage(languageCode: String): Boolean {
+    fun supportsLanguage(languageCode: String): Boolean {
         return supportedLanguages.contains(languageCode.take(2))
     }
 }
