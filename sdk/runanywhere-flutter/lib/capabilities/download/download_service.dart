@@ -4,17 +4,37 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import '../../core/models/model/model_info.dart';
 import '../../core/protocols/registry/model_registry.dart';
+import '../../core/protocols/downloading/download_strategy.dart';
 import '../../foundation/logging/sdk_logger.dart';
 import '../../foundation/error_types/sdk_error.dart';
 import '../registry/registry_service.dart' hide ModelRegistry;
 
 /// Service for downloading models with progress tracking
+/// Matches iOS AlamofireDownloadService pattern
 class DownloadService {
   final ModelRegistry modelRegistry;
   final SDKLogger logger = SDKLogger(category: 'DownloadService');
   final Map<String, DownloadTask> _activeDownloads = {};
+  final List<DownloadStrategy> _customStrategies = [];
 
   DownloadService({required this.modelRegistry});
+
+  /// Register a custom download strategy
+  /// Matches iOS pattern for registering custom strategies
+  void registerStrategy(DownloadStrategy strategy) {
+    _customStrategies.add(strategy);
+    logger.info('Registered custom download strategy');
+  }
+
+  /// Find a strategy that can handle this model
+  DownloadStrategy? _findStrategy(ModelInfo model) {
+    for (final strategy in _customStrategies) {
+      if (strategy.canHandle(model)) {
+        return strategy;
+      }
+    }
+    return null;
+  }
 
   /// Download a model with progress tracking
   Future<DownloadTask> downloadModel(ModelInfo model) async {
@@ -38,7 +58,14 @@ class DownloadService {
       throw SDKError.modelNotFound('Model ${model.id} has no download URL');
     }
 
-    // Create download task
+    // Try to find a custom strategy for this model
+    final strategy = _findStrategy(model);
+    if (strategy != null) {
+      logger.info('Using custom download strategy for model: ${model.id}');
+      return _downloadWithStrategy(model, strategy);
+    }
+
+    // Create download task using default strategy
     final task = _createDownloadTask(model);
     _activeDownloads[model.id] = task;
 
@@ -46,6 +73,76 @@ class DownloadService {
     unawaited(_performDownload(model, task));
 
     return task;
+  }
+
+  /// Download using a custom strategy
+  Future<DownloadTask> _downloadWithStrategy(
+    ModelInfo model,
+    DownloadStrategy strategy,
+  ) async {
+    final controller = StreamController<DownloadProgress>();
+    final completer = Completer<String>();
+
+    final task = DownloadTask(
+      id: model.id,
+      modelId: model.id,
+      progressController: controller,
+      resultCompleter: completer,
+    );
+
+    _activeDownloads[model.id] = task;
+
+    try {
+      // Get destination directory
+      final appDir = await getApplicationDocumentsDirectory();
+      final modelsDir = Directory('${appDir.path}/models/${model.id}');
+      if (!await modelsDir.exists()) {
+        await modelsDir.create(recursive: true);
+      }
+
+      // Download using strategy
+      final destinationUri = await strategy.download(
+        model: model,
+        destinationFolder: modelsDir.uri,
+        progressHandler: (progress) {
+          controller.add(DownloadProgress(
+            bytesDownloaded: (progress * 100).toInt(),
+            totalBytes: 100,
+            state: DownloadState.downloading,
+          ));
+        },
+      );
+
+      // Update model with local path
+      final updatedModel = model.copyWith(localPath: destinationUri);
+      (modelRegistry as RegistryService).updateModel(updatedModel);
+
+      // Complete task
+      controller.add(DownloadProgress(
+        bytesDownloaded: 100,
+        totalBytes: 100,
+        state: DownloadState.completed,
+      ));
+
+      completer.complete(destinationUri.toFilePath());
+      unawaited(controller.close());
+      _activeDownloads.remove(model.id);
+
+      logger.info('Model ${model.id} downloaded successfully via strategy');
+      return task;
+    } catch (e) {
+      controller.add(DownloadProgress(
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        state: DownloadState.failed,
+        error: e.toString(),
+      ));
+      completer.completeError(e);
+      unawaited(controller.close());
+      _activeDownloads.remove(model.id);
+      logger.error('Strategy download failed for model ${model.id}: $e');
+      return task;
+    }
   }
 
   /// Create a download task
@@ -65,7 +162,7 @@ class DownloadService {
     );
   }
 
-  /// Perform the actual download
+  /// Perform the actual download (default strategy)
   Future<void> _performDownload(ModelInfo model, DownloadTask task) async {
     try {
       final url = model.downloadURL!;
@@ -148,6 +245,16 @@ class DownloadService {
       _activeDownloads.remove(modelId);
       logger.info('Download cancelled for model: $modelId');
     }
+  }
+
+  /// Get active download task
+  DownloadTask? getActiveDownload(String modelId) {
+    return _activeDownloads[modelId];
+  }
+
+  /// Check if a download is in progress
+  bool isDownloading(String modelId) {
+    return _activeDownloads.containsKey(modelId);
   }
 }
 

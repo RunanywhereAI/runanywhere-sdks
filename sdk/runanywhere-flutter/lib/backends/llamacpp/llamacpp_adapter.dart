@@ -1,8 +1,10 @@
 import '../../core/models/framework/framework_modality.dart';
 import '../../core/models/framework/llm_framework.dart';
 import '../../core/models/framework/model_format.dart';
+import '../../core/models/hardware/hardware_configuration.dart';
 import '../../core/models/model/model_info.dart';
 import '../../core/module_registry.dart';
+import '../../core/protocols/downloading/download_strategy.dart';
 import '../../core/protocols/frameworks/unified_framework_adapter.dart';
 import '../native/native_backend.dart';
 import 'providers/llamacpp_llm_provider.dart';
@@ -162,6 +164,48 @@ class LlamaCppAdapter
   }
 
   @override
+  Future<void> configure(HardwareConfiguration hardware) async {
+    // LlamaCpp adapter can use hardware configuration for Metal/GPU settings
+    // For now, this is a no-op
+  }
+
+  @override
+  HardwareConfiguration optimalConfiguration(ModelInfo model) {
+    // Return default configuration optimized for LlamaCpp
+    return HardwareConfiguration.defaultConfig;
+  }
+
+  @override
+  List<ModelInfo> getProvidedModels() {
+    // LlamaCpp adapter doesn't provide built-in models
+    return [];
+  }
+
+  @override
+  DownloadStrategy? getDownloadStrategy() {
+    // LlamaCpp uses default download strategy (direct file download)
+    return null;
+  }
+
+  @override
+  Future<dynamic> initializeComponent({
+    required AdapterInitParameters parameters,
+    required FrameworkModality modality,
+  }) async {
+    _ensureInitialized();
+
+    if (modality != FrameworkModality.textToText) {
+      return null;
+    }
+
+    final service = createService(modality);
+    if (parameters.modelId != null) {
+      await (service as LlamaCppLLMService).initialize(modelPath: parameters.modelId);
+    }
+    return service;
+  }
+
+  @override
   void onRegistration({int priority = 90}) {
     // Initialize the native backend with llamacpp
     _backend = NativeBackend();
@@ -183,7 +227,7 @@ class LlamaCppAdapter
     );
   }
 
-  @override
+  /// Dispose of resources
   void dispose() {
     // Cleanup cached service
     _cachedLLMService = null;

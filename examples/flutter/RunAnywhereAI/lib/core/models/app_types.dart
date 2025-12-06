@@ -89,8 +89,10 @@ enum RoutingPolicy {
   preferCloud,
 }
 
-/// Model load state for tracking model lifecycle
-enum ModelLoadState {
+// ModelLoadState is now provided by the RunAnywhere SDK
+// import 'package:runanywhere/runanywhere.dart' show ModelLoadState;
+// Use AppModelLoadState for app-specific states to avoid conflict
+enum AppModelLoadState {
   notLoaded,
   loading,
   loaded,

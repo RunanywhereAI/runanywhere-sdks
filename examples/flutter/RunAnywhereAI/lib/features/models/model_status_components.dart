@@ -597,9 +597,9 @@ class VoicePipelineSetupView extends StatelessWidget {
   final (LLMFramework, String)? llmModel;
   final (LLMFramework, String)? ttsModel;
 
-  final ModelLoadState sttLoadState;
-  final ModelLoadState llmLoadState;
-  final ModelLoadState ttsLoadState;
+  final AppModelLoadState sttLoadState;
+  final AppModelLoadState llmLoadState;
+  final AppModelLoadState ttsLoadState;
 
   final VoidCallback onSelectSTT;
   final VoidCallback onSelectLLM;
@@ -624,9 +624,9 @@ class VoicePipelineSetupView extends StatelessWidget {
       sttModel != null && llmModel != null && ttsModel != null;
 
   bool get allModelsLoaded =>
-      sttLoadState == ModelLoadState.loaded &&
-      llmLoadState == ModelLoadState.loaded &&
-      ttsLoadState == ModelLoadState.loaded;
+      sttLoadState == AppModelLoadState.loaded &&
+      llmLoadState == AppModelLoadState.loaded &&
+      ttsLoadState == AppModelLoadState.loaded;
 
   @override
   Widget build(BuildContext context) {
@@ -761,7 +761,7 @@ class ModelSetupCard extends StatelessWidget {
   final Color color;
   final LLMFramework? selectedFramework;
   final String? selectedModel;
-  final ModelLoadState loadState;
+  final AppModelLoadState loadState;
   final VoidCallback onSelect;
 
   const ModelSetupCard({
@@ -778,8 +778,8 @@ class ModelSetupCard extends StatelessWidget {
   });
 
   bool get isConfigured => selectedFramework != null && selectedModel != null;
-  bool get isLoaded => loadState == ModelLoadState.loaded;
-  bool get isLoading => loadState == ModelLoadState.loading;
+  bool get isLoaded => loadState == AppModelLoadState.loaded;
+  bool get isLoading => loadState == AppModelLoadState.loading;
 
   @override
   Widget build(BuildContext context) {

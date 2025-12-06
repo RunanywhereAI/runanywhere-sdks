@@ -27,9 +27,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   String _currentTranscription = '';
 
   // Model state - tracks which models are configured for the voice pipeline
-  ModelLoadState _sttModelState = ModelLoadState.notLoaded;
-  ModelLoadState _llmModelState = ModelLoadState.notLoaded;
-  ModelLoadState _ttsModelState = ModelLoadState.notLoaded;
+  AppModelLoadState _sttModelState = AppModelLoadState.notLoaded;
+  AppModelLoadState _llmModelState = AppModelLoadState.notLoaded;
+  AppModelLoadState _ttsModelState = AppModelLoadState.notLoaded;
 
   // Error state
   String? _errorMessage;
@@ -70,9 +70,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
     setState(() {
       // Placeholder - in production, get actual model states
-      _sttModelState = ModelLoadState.notLoaded;
-      _llmModelState = ModelLoadState.notLoaded;
-      _ttsModelState = ModelLoadState.notLoaded;
+      _sttModelState = AppModelLoadState.notLoaded;
+      _llmModelState = AppModelLoadState.notLoaded;
+      _ttsModelState = AppModelLoadState.notLoaded;
     });
   }
 
@@ -224,9 +224,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   }
 
   Widget _buildModelInfoBanner() {
-    final allLoaded = _sttModelState == ModelLoadState.loaded &&
-        _llmModelState == ModelLoadState.loaded &&
-        _ttsModelState == ModelLoadState.loaded;
+    final allLoaded = _sttModelState == AppModelLoadState.loaded &&
+        _llmModelState == AppModelLoadState.loaded &&
+        _ttsModelState == AppModelLoadState.loaded;
 
     return Container(
       width: double.infinity,

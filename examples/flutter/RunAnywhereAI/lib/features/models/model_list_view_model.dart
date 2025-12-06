@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
-// ignore: unused_import
-import 'package:runanywhere/runanywhere.dart' hide ModelInfo, LLMFramework, ModelCategory, ModelFormat;
+import 'package:runanywhere/runanywhere.dart' as sdk;
 
 import 'model_types.dart';
 
 /// ModelListViewModel (mirroring iOS ModelListViewModel.swift)
 ///
 /// Manages model loading, selection, and state.
+/// Now properly fetches models from the SDK registry.
 class ModelListViewModel extends ChangeNotifier {
   static final ModelListViewModel shared = ModelListViewModel._();
 
@@ -33,71 +33,28 @@ class ModelListViewModel extends ChangeNotifier {
   }
 
   /// Load models from SDK registry
+  /// Fetches all registered models from the RunAnywhere SDK
   Future<void> loadModelsFromRegistry() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      // TODO: Get all models from SDK registry
-      // This should include:
-      // 1. Models from remote configuration
-      // 2. Models from framework adapters
-      // 3. Models from local storage
-      // 4. User-added models
-      // final allModels = await RunAnywhere.availableModels();
+      // Get all models from SDK registry
+      final sdkModels = await sdk.RunAnywhere.availableModels();
 
-      // Placeholder models for demo
-      _availableModels = [
-        const ModelInfo(
-          id: 'llama-3.2-1b',
-          name: 'Llama 3.2 1B',
-          category: ModelCategory.language,
-          format: ModelFormat.gguf,
-          downloadURL: 'https://example.com/llama-3.2-1b.gguf',
-          memoryRequired: 1000000000,
-          compatibleFrameworks: [LLMFramework.llamaCpp],
-          preferredFramework: LLMFramework.llamaCpp,
-        ),
-        const ModelInfo(
-          id: 'llama-3.2-3b',
-          name: 'Llama 3.2 3B',
-          category: ModelCategory.language,
-          format: ModelFormat.gguf,
-          downloadURL: 'https://example.com/llama-3.2-3b.gguf',
-          memoryRequired: 3000000000,
-          compatibleFrameworks: [LLMFramework.llamaCpp],
-          preferredFramework: LLMFramework.llamaCpp,
-        ),
-        const ModelInfo(
-          id: 'whisper-base',
-          name: 'Whisper Base',
-          category: ModelCategory.speechRecognition,
-          format: ModelFormat.coreml,
-          downloadURL: 'https://example.com/whisper-base.zip',
-          memoryRequired: 150000000,
-          compatibleFrameworks: [LLMFramework.whisperKit],
-          preferredFramework: LLMFramework.whisperKit,
-        ),
-        const ModelInfo(
-          id: 'whisper-small',
-          name: 'Whisper Small',
-          category: ModelCategory.speechRecognition,
-          format: ModelFormat.coreml,
-          downloadURL: 'https://example.com/whisper-small.zip',
-          memoryRequired: 500000000,
-          compatibleFrameworks: [LLMFramework.whisperKit],
-          preferredFramework: LLMFramework.whisperKit,
-        ),
-      ];
+      // Convert SDK ModelInfo to app ModelInfo
+      _availableModels =
+          sdkModels.map((sdkModel) => _convertSDKModel(sdkModel)).toList();
 
-      debugPrint('Loaded ${_availableModels.length} models from registry');
+      debugPrint(
+          '✅ Loaded ${_availableModels.length} models from SDK registry');
       for (final model in _availableModels) {
         debugPrint(
-            '  - ${model.name} (${model.preferredFramework?.displayName ?? "Unknown"})');
+            '  - ${model.name} (${model.category.displayName}) [${model.preferredFramework?.displayName ?? "Unknown"}]');
       }
     } catch (e) {
-      debugPrint('Failed to load models from SDK: $e');
+      debugPrint('❌ Failed to load models from SDK: $e');
       _errorMessage = 'Failed to load models: $e';
       _availableModels = [];
     }
@@ -107,19 +64,107 @@ class ModelListViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Get available frameworks
+  /// Convert SDK ModelInfo to app ModelInfo
+  ModelInfo _convertSDKModel(sdk.ModelInfo sdkModel) {
+    return ModelInfo(
+      id: sdkModel.id,
+      name: sdkModel.name,
+      category: _convertCategory(sdkModel.category),
+      format: _convertFormat(sdkModel.format),
+      downloadURL: sdkModel.downloadURL?.toString(),
+      localPath: sdkModel.localPath?.toFilePath(),
+      memoryRequired: sdkModel.memoryRequired,
+      compatibleFrameworks: sdkModel.compatibleFrameworks
+          .map((f) => _convertFramework(f))
+          .toList(),
+      preferredFramework: sdkModel.preferredFramework != null
+          ? _convertFramework(sdkModel.preferredFramework!)
+          : null,
+      supportsThinking: sdkModel.supportsThinking,
+    );
+  }
+
+  /// Convert SDK ModelCategory to app ModelCategory
+  ModelCategory _convertCategory(sdk.ModelCategory sdkCategory) {
+    switch (sdkCategory) {
+      case sdk.ModelCategory.language:
+        return ModelCategory.language;
+      case sdk.ModelCategory.multimodal:
+        return ModelCategory.multimodal;
+      case sdk.ModelCategory.speechRecognition:
+        return ModelCategory.speechRecognition;
+      case sdk.ModelCategory.speechSynthesis:
+        return ModelCategory.speechSynthesis;
+      case sdk.ModelCategory.vision:
+        return ModelCategory.vision;
+      case sdk.ModelCategory.imageGeneration:
+        return ModelCategory.imageGeneration;
+      case sdk.ModelCategory.audio:
+        return ModelCategory.audio;
+      case sdk.ModelCategory.embedding:
+        return ModelCategory.embedding;
+    }
+  }
+
+  /// Convert SDK ModelFormat to app ModelFormat
+  ModelFormat _convertFormat(sdk.ModelFormat sdkFormat) {
+    switch (sdkFormat) {
+      case sdk.ModelFormat.gguf:
+        return ModelFormat.gguf;
+      case sdk.ModelFormat.ggml:
+        return ModelFormat.ggml;
+      case sdk.ModelFormat.mlmodel:
+      case sdk.ModelFormat.mlpackage:
+        return ModelFormat.coreml;
+      case sdk.ModelFormat.onnx:
+      case sdk.ModelFormat.ort:
+        return ModelFormat.onnx;
+      case sdk.ModelFormat.tflite:
+        return ModelFormat.tflite;
+      case sdk.ModelFormat.bin:
+        return ModelFormat.bin;
+      default:
+        return ModelFormat.unknown;
+    }
+  }
+
+  /// Convert SDK LLMFramework to app LLMFramework
+  LLMFramework _convertFramework(sdk.LLMFramework sdkFramework) {
+    switch (sdkFramework) {
+      case sdk.LLMFramework.llamaCpp:
+        return LLMFramework.llamaCpp;
+      case sdk.LLMFramework.foundationModels:
+        return LLMFramework.foundationModels;
+      case sdk.LLMFramework.mediaPipe:
+        return LLMFramework.mediaPipe;
+      case sdk.LLMFramework.onnx:
+        return LLMFramework.onnxRuntime;
+      case sdk.LLMFramework.systemTTS:
+        return LLMFramework.systemTTS;
+      case sdk.LLMFramework.whisperKit:
+        return LLMFramework.whisperKit;
+      default:
+        return LLMFramework.unknown;
+    }
+  }
+
+  /// Get available frameworks based on registered models
   Future<void> loadAvailableFrameworks() async {
     try {
-      // TODO: Get from SDK
-      // final frameworks = RunAnywhere.getAvailableFrameworks();
-      _availableFrameworks = [
-        LLMFramework.llamaCpp,
-        LLMFramework.whisperKit,
-        LLMFramework.mediaPipe,
-      ];
+      // Extract unique frameworks from available models
+      final frameworks = <LLMFramework>{};
+      for (final model in _availableModels) {
+        if (model.preferredFramework != null) {
+          frameworks.add(model.preferredFramework!);
+        }
+        frameworks.addAll(model.compatibleFrameworks);
+      }
+      _availableFrameworks = frameworks.toList();
+      debugPrint(
+          '✅ Available frameworks: ${_availableFrameworks.map((f) => f.displayName).join(", ")}');
       notifyListeners();
     } catch (e) {
-      debugPrint('Failed to load frameworks: $e');
+      debugPrint('❌ Failed to load frameworks: $e');
       _availableFrameworks = [];
       notifyListeners();
     }
