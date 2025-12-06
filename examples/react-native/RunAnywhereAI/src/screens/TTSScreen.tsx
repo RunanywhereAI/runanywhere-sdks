@@ -20,6 +20,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
+import Tts from 'react-native-tts';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius, IconSize, ButtonHeight, Layout } from '../theme/spacing';
@@ -65,6 +66,8 @@ export const TTSScreen: React.FC = () => {
     return () => {
       audioRecorderPlayer.stopPlayer().catch(() => {});
       audioRecorderPlayer.removePlayBackListener();
+      // Also stop System TTS
+      Tts.stop();
       // Clean up temp audio file
       if (audioFilePath) {
         RNFS.unlink(audioFilePath).catch(() => {});
@@ -282,6 +285,56 @@ export const TTSScreen: React.FC = () => {
   };
 
   /**
+   * Generate speech using System TTS (AVSpeechSynthesizer on iOS)
+   * This uses react-native-tts which wraps the native platform TTS
+   */
+  const handleSystemTTSGenerate = useCallback(async () => {
+    console.log('[TTSScreen] Using System TTS (native AVSpeechSynthesizer)');
+
+    try {
+      // Listen for finish event first
+      const finishListener = Tts.addListener('tts-finish', () => {
+        console.log('[TTSScreen] System TTS finished');
+        setIsPlaying(false);
+        finishListener.remove();
+      });
+
+      // Listen for cancel event
+      const cancelListener = Tts.addListener('tts-cancel', () => {
+        console.log('[TTSScreen] System TTS cancelled');
+        setIsPlaying(false);
+        cancelListener.remove();
+      });
+
+      // Speak the text with options
+      // iOS rate: 0.0-1.0, Android rate: 0.01-0.99
+      const iosRate = Math.min(0.99, Math.max(0.01, speed * 0.5));
+      
+      console.log('[TTSScreen] System TTS speaking with rate:', iosRate, 'pitch:', pitch);
+      
+      // Just speak with default settings - avoid setDefaultRate issue
+      // The speak function itself should work
+      Tts.speak(text, {
+        iosVoiceId: '', // Use default voice
+        rate: iosRate,
+        pitch: pitch,
+      });
+
+      // Estimate duration based on text length and speed
+      const estimatedDuration = (text.length * 0.06) / speed;
+      setDuration(estimatedDuration);
+      setSampleRate(0); // System TTS doesn't expose sample rate
+      setAudioGenerated(false); // No audio file for System TTS
+      setIsPlaying(true);
+
+    } catch (error) {
+      console.error('[TTSScreen] System TTS error:', error);
+      Alert.alert('Error', `System TTS failed: ${error}`);
+      setIsPlaying(false);
+    }
+  }, [text, speed, pitch]);
+
+  /**
    * Generate speech
    */
   const handleGenerate = useCallback(async () => {
@@ -294,6 +347,7 @@ export const TTSScreen: React.FC = () => {
     try {
       await audioRecorderPlayer.stopPlayer();
       audioRecorderPlayer.removePlayBackListener();
+      Tts.stop(); // Also stop any System TTS
     } catch {
       // Ignore errors if not playing
     }
@@ -303,25 +357,31 @@ export const TTSScreen: React.FC = () => {
                         currentModel.preferredFramework === LLMFramework.SystemTTS;
 
     try {
+      // For System TTS, use native AVSpeechSynthesizer
+      if (isSystemTTS) {
+        console.log('[TTSScreen] Synthesizing with System TTS (native)');
+        await handleSystemTTSGenerate();
+        setIsGenerating(false);
+        return;
+      }
+
       // For ONNX models, check if model is loaded
-      if (!isSystemTTS) {
-        const isLoaded = await RunAnywhere.isTTSModelLoaded();
-        if (!isLoaded) {
-          Alert.alert('Model Not Loaded', 'Please load a TTS model first.');
-          setIsGenerating(false);
-          return;
-        }
+      const isLoaded = await RunAnywhere.isTTSModelLoaded();
+      if (!isLoaded) {
+        Alert.alert('Model Not Loaded', 'Please load a TTS model first.');
+        setIsGenerating(false);
+        return;
       }
 
       // SDK uses simple TTSConfiguration with rate/pitch/volume
       const sdkConfig = {
-        voice: isSystemTTS ? 'system' : 'default',
+        voice: 'default',
         rate: speed,
         pitch: pitch,
         volume: volume,
       };
 
-      console.log('[TTSScreen] Synthesizing text:', text.substring(0, 50) + '...', isSystemTTS ? '(System TTS)' : '');
+      console.log('[TTSScreen] Synthesizing text with ONNX:', text.substring(0, 50) + '...');
 
       // SDK returns TTSResult with audio, sampleRate, numSamples, duration
       const result = await RunAnywhere.synthesize(text, sdkConfig);
@@ -374,7 +434,7 @@ export const TTSScreen: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
-  }, [text, speed, pitch, volume, currentModel, audioFilePath]);
+  }, [text, speed, pitch, volume, currentModel, audioFilePath, handleSystemTTSGenerate]);
 
   /**
    * Format time for display (MM:SS)
@@ -484,8 +544,11 @@ export const TTSScreen: React.FC = () => {
    */
   const handleStop = useCallback(async () => {
     try {
+      // Stop ONNX audio playback
       await audioRecorderPlayer.stopPlayer();
       audioRecorderPlayer.removePlayBackListener();
+      // Also stop System TTS if playing
+      Tts.stop();
       setIsPlaying(false);
       setCurrentTime(0);
       setPlaybackProgress(0);

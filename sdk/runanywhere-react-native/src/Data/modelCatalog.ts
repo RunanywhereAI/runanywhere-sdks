@@ -358,11 +358,11 @@ export const MODEL_CATALOG: ModelInfo[] = [
 
   // Sherpa-ONNX VITS Piper - English (US) - Amy
   {
-    id: 'vits-piper-en-us-amy',
-    name: 'Piper Amy (US English)',
+    id: 'vits-piper-en-us-libritts',
+    name: 'Piper LibriTTS (US English)',
     category: ModelCategory.SpeechSynthesis,
     format: ModelFormat.ONNX,
-    downloadURL: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-medium.tar.bz2',
+    downloadURL: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-libritts_r-medium.tar.bz2',
     localPath: undefined,
     downloadSize: 63_000_000,
     memoryRequired: 100_000_000,
@@ -371,7 +371,7 @@ export const MODEL_CATALOG: ModelInfo[] = [
     contextLength: 0,
     supportsThinking: false,
     metadata: {
-      description: 'Sherpa-ONNX VITS Piper voice - Amy (American English)',
+      description: 'Sherpa-ONNX VITS Piper voice - LibriTTS (American English)',
       author: 'Piper/k2-fsa',
       license: 'MIT',
       tags: ['tts', 'piper', 'vits', 'neural', 'english', 'female', 'sherpa-onnx'],

@@ -250,8 +250,11 @@ private:
     // Member Variables
     // ============================================================================
 
-    /// runanywhere-core backend handle
+    /// runanywhere-core backend handle (for LlamaCpp/text generation)
     ra_backend_handle backend_ = nullptr;
+
+    /// Separate ONNX backend for TTS/STT operations
+    ra_backend_handle onnxBackend_ = nullptr;
 
     /// CallInvoker for thread-safe JS calls
     std::shared_ptr<CallInvoker> jsInvoker_;

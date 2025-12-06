@@ -17,6 +17,9 @@
 #include <sstream>
 #include <cstring>
 #include <algorithm>
+#include <cctype>
+#include <sys/stat.h>
+#include <dirent.h>
 
 // Base64 encoding/decoding utilities
 namespace {
@@ -116,7 +119,7 @@ RunAnywhereModule::~RunAnywhereModule() {
     // Clean up all STT streams
     for (auto& [id, stream] : sttStreams_) {
         if (backend_ && stream) {
-            ra_stt_destroy_stream(backend_, stream);
+            ra_stt_destroy_stream(onnxBackend_, stream);
         }
     }
     sttStreams_.clear();
@@ -174,14 +177,21 @@ bool RunAnywhereModule::initialize(jsi::Runtime& rt,
 }
 
 void RunAnywhereModule::destroy(jsi::Runtime& rt) {
-    // Clean up streams first
+    // Clean up STT streams first (they use ONNX backend)
     for (auto& [id, stream] : sttStreams_) {
-        if (backend_ && stream) {
-            ra_stt_destroy_stream(backend_, stream);
+        if (onnxBackend_ && stream) {
+            ra_stt_destroy_stream(onnxBackend_, stream);
         }
     }
     sttStreams_.clear();
 
+    // Destroy ONNX backend (for STT/TTS)
+    if (onnxBackend_) {
+        ra_destroy(onnxBackend_);
+        onnxBackend_ = nullptr;
+    }
+
+    // Destroy main backend (for text generation)
     if (backend_) {
         ra_destroy(backend_);
         backend_ = nullptr;
@@ -338,31 +348,169 @@ void RunAnywhereModule::cancelGeneration(jsi::Runtime& rt) {
 }
 
 // ============================================================================
+// Archive Extraction Helper
+// ============================================================================
+
+// Helper function to check if path ends with a suffix (case-insensitive)
+static bool endsWith(const std::string& str, const std::string& suffix) {
+    if (suffix.size() > str.size()) return false;
+    return std::equal(suffix.rbegin(), suffix.rend(), str.rbegin(),
+                      [](char a, char b) { return std::tolower(a) == std::tolower(b); });
+}
+
+// Helper function to find model directory, checking for single subdirectory
+static std::string findModelDirectory(const std::string& extractDir) {
+    struct stat st;
+    
+    // Check if there's a single subdirectory (common in tar archives)
+    // If so, return that subdirectory as it contains the actual model files
+    DIR* dir = opendir(extractDir.c_str());
+    if (dir) {
+        struct dirent* entry;
+        std::string subdirName;
+        int count = 0;
+        while ((entry = readdir(dir)) != nullptr) {
+            if (entry->d_name[0] != '.') { // Skip hidden files
+                subdirName = entry->d_name;
+                count++;
+            }
+        }
+        closedir(dir);
+        
+        if (count == 1) {
+            std::string subdirPath = extractDir + "/" + subdirName;
+            if (stat(subdirPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                printf("[RA_MODEL] Model files in subdirectory: %s\n", subdirPath.c_str());
+                return subdirPath;
+            }
+        }
+    }
+    
+    return extractDir;
+}
+
+// Helper function to get extracted model directory from archive path
+// Returns the extraction directory path, extracting the archive if needed
+static std::string extractArchiveIfNeeded(const std::string& archivePath) {
+    // Check if it's an archive file
+    bool isTarBz2 = endsWith(archivePath, ".tar.bz2") || endsWith(archivePath, ".bz2");
+    bool isTarGz = endsWith(archivePath, ".tar.gz") || endsWith(archivePath, ".tgz");
+    
+    if (!isTarBz2 && !isTarGz) {
+        // Not an archive, return as-is
+        printf("[RA_MODEL] Not an archive, using path as-is: %s\n", archivePath.c_str());
+        return archivePath;
+    }
+    
+    printf("[RA_MODEL] Processing archive: %s\n", archivePath.c_str());
+    
+    // Get the documents directory for extraction
+    // Extract to sherpa-models/<model-name> directory
+    std::string modelName;
+    size_t lastSlash = archivePath.rfind('/');
+    if (lastSlash != std::string::npos) {
+        modelName = archivePath.substr(lastSlash + 1);
+    } else {
+        modelName = archivePath;
+    }
+    
+    // Remove extensions to get base name
+    // e.g., "vits-piper-en-us-lessac.tar.bz2" -> "vits-piper-en-us-lessac"
+    size_t dotPos = modelName.find('.');
+    if (dotPos != std::string::npos) {
+        modelName = modelName.substr(0, dotPos);
+    }
+    
+    // Get documents directory
+    // On iOS, the archive is already in Documents/runanywhere-models/
+    // We'll extract to Documents/sherpa-models/<model-name>/
+    std::string docsPath;
+    size_t modelsPos = archivePath.find("/Documents/");
+    if (modelsPos != std::string::npos) {
+        docsPath = archivePath.substr(0, modelsPos + 11); // Include "/Documents/"
+    } else {
+        // Fallback - use parent directory of archive
+        if (lastSlash != std::string::npos) {
+            docsPath = archivePath.substr(0, lastSlash + 1);
+        } else {
+            return archivePath; // Can't determine path
+        }
+    }
+    
+    std::string extractDir = docsPath + "sherpa-models/" + modelName;
+    
+    // Check if already extracted
+    struct stat st;
+    if (stat(extractDir.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+        // Already extracted - find the actual model directory
+        printf("[RA_MODEL] Already extracted to: %s\n", extractDir.c_str());
+        return findModelDirectory(extractDir);
+    }
+    
+    // Extract the archive
+    printf("[RA_MODEL] Extracting to: %s\n", extractDir.c_str());
+    ra_result_code result = ra_extract_archive(archivePath.c_str(), extractDir.c_str());
+    if (result != RA_SUCCESS) {
+        // Extraction failed, return original path (will likely fail to load)
+        printf("[RA_MODEL] Extraction failed!\n");
+        return archivePath;
+    }
+    
+    printf("[RA_MODEL] Extraction successful, finding model directory...\n");
+    return findModelDirectory(extractDir);
+}
+
+// ============================================================================
 // Speech-to-Text Implementation
 // ============================================================================
 
 bool RunAnywhereModule::loadSTTModel(jsi::Runtime& rt, const std::string& path,
                                       const std::string& modelType,
                                       const std::optional<std::string>& configJson) {
-    if (!backend_) return false;
+    printf("[RA_STT] loadSTTModel called with path: %s, type: %s\n", path.c_str(), modelType.c_str());
+
+    // STT requires the ONNX backend, create it if not exists
+    if (!onnxBackend_) {
+        printf("[RA_STT] Creating ONNX backend for STT...\n");
+        onnxBackend_ = ra_create_backend("onnx");
+        if (!onnxBackend_) {
+            printf("[RA_STT] Failed to create ONNX backend!\n");
+            return false;
+        }
+        
+        // Initialize the ONNX backend
+        ra_result_code initResult = ra_initialize(onnxBackend_, nullptr);
+        if (initResult != RA_SUCCESS) {
+            printf("[RA_STT] Failed to initialize ONNX backend: %d\n", initResult);
+            ra_destroy(onnxBackend_);
+            onnxBackend_ = nullptr;
+            return false;
+        }
+        printf("[RA_STT] ONNX backend created and initialized successfully\n");
+    }
+
+    // Handle archive extraction if needed (like Swift SDK does)
+    std::string modelPath = extractArchiveIfNeeded(path);
+    printf("[RA_STT] Using model path: %s\n", modelPath.c_str());
 
     ra_result_code result = ra_stt_load_model(
-        backend_,
-        path.c_str(),
+        onnxBackend_,  // Use ONNX backend for STT
+        modelPath.c_str(),
         modelType.c_str(),
         configJson.has_value() ? configJson->c_str() : nullptr);
 
+    printf("[RA_STT] ra_stt_load_model result: %d\n", result);
     return result == RA_SUCCESS;
 }
 
 bool RunAnywhereModule::isSTTModelLoaded(jsi::Runtime& rt) {
-    if (!backend_) return false;
-    return ra_stt_is_model_loaded(backend_);
+    if (!onnxBackend_) return false;
+    return ra_stt_is_model_loaded(onnxBackend_);
 }
 
 bool RunAnywhereModule::unloadSTTModel(jsi::Runtime& rt) {
-    if (!backend_) return false;
-    return ra_stt_unload_model(backend_) == RA_SUCCESS;
+    if (!onnxBackend_) return false;
+    return ra_stt_unload_model(onnxBackend_) == RA_SUCCESS;
 }
 
 std::string RunAnywhereModule::transcribe(jsi::Runtime& rt, const std::string& audioBase64,
@@ -401,13 +549,14 @@ std::string RunAnywhereModule::transcribeFile(jsi::Runtime& rt, const std::strin
 }
 
 bool RunAnywhereModule::supportsSTTStreaming(jsi::Runtime& rt) {
-    if (!backend_) return false;
-    return ra_stt_supports_streaming(backend_);
+    // STT uses ONNX backend
+    if (!onnxBackend_) return false;
+    return ra_stt_supports_streaming(onnxBackend_);
 }
 
 int RunAnywhereModule::createSTTStream(jsi::Runtime& rt,
                                         const std::optional<std::string>& configJson) {
-    if (!backend_) return -1;
+    if (!onnxBackend_) return -1;
 
     ra_stream_handle stream = ra_stt_create_stream(
         backend_,
@@ -422,7 +571,7 @@ int RunAnywhereModule::createSTTStream(jsi::Runtime& rt,
 
 bool RunAnywhereModule::feedSTTAudio(jsi::Runtime& rt, int streamHandle,
                                       const std::string& audioBase64, int sampleRate) {
-    if (!backend_) return false;
+    if (!onnxBackend_) return false;
 
     auto it = sttStreams_.find(streamHandle);
     if (it == sttStreams_.end()) return false;
@@ -437,13 +586,13 @@ bool RunAnywhereModule::feedSTTAudio(jsi::Runtime& rt, int streamHandle,
 }
 
 std::string RunAnywhereModule::decodeSTT(jsi::Runtime& rt, int streamHandle) {
-    if (!backend_) return "{}";
+    if (!onnxBackend_) return "{}";
 
     auto it = sttStreams_.find(streamHandle);
     if (it == sttStreams_.end()) return "{}";
 
     char* resultJson = nullptr;
-    ra_result_code result = ra_stt_decode(backend_, it->second, &resultJson);
+    ra_result_code result = ra_stt_decode(onnxBackend_, it->second, &resultJson);
 
     if (result != RA_SUCCESS || !resultJson) return "{}";
 
@@ -453,39 +602,39 @@ std::string RunAnywhereModule::decodeSTT(jsi::Runtime& rt, int streamHandle) {
 }
 
 bool RunAnywhereModule::isSTTReady(jsi::Runtime& rt, int streamHandle) {
-    if (!backend_) return false;
+    if (!onnxBackend_) return false;
     auto it = sttStreams_.find(streamHandle);
     if (it == sttStreams_.end()) return false;
-    return ra_stt_is_ready(backend_, it->second);
+    return ra_stt_is_ready(onnxBackend_, it->second);
 }
 
 bool RunAnywhereModule::isSTTEndpoint(jsi::Runtime& rt, int streamHandle) {
-    if (!backend_) return false;
+    if (!onnxBackend_) return false;
     auto it = sttStreams_.find(streamHandle);
     if (it == sttStreams_.end()) return false;
-    return ra_stt_is_endpoint(backend_, it->second);
+    return ra_stt_is_endpoint(onnxBackend_, it->second);
 }
 
 void RunAnywhereModule::finishSTTInput(jsi::Runtime& rt, int streamHandle) {
-    if (!backend_) return;
+    if (!onnxBackend_) return;
     auto it = sttStreams_.find(streamHandle);
     if (it == sttStreams_.end()) return;
-    ra_stt_input_finished(backend_, it->second);
+    ra_stt_input_finished(onnxBackend_, it->second);
 }
 
 void RunAnywhereModule::resetSTTStream(jsi::Runtime& rt, int streamHandle) {
-    if (!backend_) return;
+    if (!onnxBackend_) return;
     auto it = sttStreams_.find(streamHandle);
     if (it == sttStreams_.end()) return;
-    ra_stt_reset_stream(backend_, it->second);
+    ra_stt_reset_stream(onnxBackend_, it->second);
 }
 
 void RunAnywhereModule::destroySTTStream(jsi::Runtime& rt, int streamHandle) {
-    if (!backend_) return;
+    if (!onnxBackend_) return;
     auto it = sttStreams_.find(streamHandle);
     if (it == sttStreams_.end()) return;
 
-    ra_stt_destroy_stream(backend_, it->second);
+    ra_stt_destroy_stream(onnxBackend_, it->second);
     sttStreams_.erase(it);
 }
 
@@ -496,38 +645,63 @@ void RunAnywhereModule::destroySTTStream(jsi::Runtime& rt, int streamHandle) {
 bool RunAnywhereModule::loadTTSModel(jsi::Runtime& rt, const std::string& path,
                                       const std::string& modelType,
                                       const std::optional<std::string>& configJson) {
-    if (!backend_) return false;
+    printf("[RA_TTS] loadTTSModel called with path: %s, type: %s\n", path.c_str(), modelType.c_str());
+
+    // TTS requires the ONNX backend, create it if not exists
+    if (!onnxBackend_) {
+        printf("[RA_TTS] Creating ONNX backend for TTS...\n");
+        onnxBackend_ = ra_create_backend("onnx");
+        if (!onnxBackend_) {
+            printf("[RA_TTS] Failed to create ONNX backend!\n");
+            return false;
+        }
+        
+        // Initialize the ONNX backend
+        ra_result_code initResult = ra_initialize(onnxBackend_, nullptr);
+        if (initResult != RA_SUCCESS) {
+            printf("[RA_TTS] Failed to initialize ONNX backend: %d\n", initResult);
+            ra_destroy(onnxBackend_);
+            onnxBackend_ = nullptr;
+            return false;
+        }
+        printf("[RA_TTS] ONNX backend created and initialized successfully\n");
+    }
+
+    // Handle archive extraction if needed (like Swift SDK does)
+    std::string modelPath = extractArchiveIfNeeded(path);
+    printf("[RA_TTS] Using model path: %s\n", modelPath.c_str());
 
     ra_result_code result = ra_tts_load_model(
-        backend_,
-        path.c_str(),
+        onnxBackend_,  // Use ONNX backend for TTS
+        modelPath.c_str(),
         modelType.c_str(),
         configJson.has_value() ? configJson->c_str() : nullptr);
 
+    printf("[RA_TTS] ra_tts_load_model result: %d\n", result);
     return result == RA_SUCCESS;
 }
 
 bool RunAnywhereModule::isTTSModelLoaded(jsi::Runtime& rt) {
-    if (!backend_) return false;
-    return ra_tts_is_model_loaded(backend_);
+    if (!onnxBackend_) return false;
+    return ra_tts_is_model_loaded(onnxBackend_);
 }
 
 bool RunAnywhereModule::unloadTTSModel(jsi::Runtime& rt) {
-    if (!backend_) return false;
-    return ra_tts_unload_model(backend_) == RA_SUCCESS;
+    if (!onnxBackend_) return false;
+    return ra_tts_unload_model(onnxBackend_) == RA_SUCCESS;
 }
 
 std::string RunAnywhereModule::synthesize(jsi::Runtime& rt, const std::string& text,
                                            const std::optional<std::string>& voiceId,
                                            double speedRate, double pitchShift) {
-    if (!backend_) return "{\"error\": \"Backend not initialized\"}";
+    if (!onnxBackend_) return "{\"error\": \"ONNX Backend not initialized for TTS\"}";
 
     float* audioSamples = nullptr;
     size_t numSamples = 0;
     int sampleRate = 0;
 
     ra_result_code result = ra_tts_synthesize(
-        backend_,
+        onnxBackend_,
         text.c_str(),
         voiceId.has_value() ? voiceId->c_str() : nullptr,
         static_cast<float>(speedRate),
@@ -551,8 +725,8 @@ std::string RunAnywhereModule::synthesize(jsi::Runtime& rt, const std::string& t
 }
 
 bool RunAnywhereModule::supportsTTSStreaming(jsi::Runtime& rt) {
-    if (!backend_) return false;
-    return ra_tts_supports_streaming(backend_);
+    if (!onnxBackend_) return false;
+    return ra_tts_supports_streaming(onnxBackend_);
 }
 
 void RunAnywhereModule::synthesizeStream(jsi::Runtime& rt, const std::string& text,
@@ -565,7 +739,7 @@ void RunAnywhereModule::synthesizeStream(jsi::Runtime& rt, const std::string& te
 std::string RunAnywhereModule::getTTSVoices(jsi::Runtime& rt) {
     if (!backend_) return "[]";
 
-    char* voices = ra_tts_get_voices(backend_);
+    char* voices = ra_tts_get_voices(onnxBackend_);
     if (!voices) return "[]";
 
     std::string result(voices);
@@ -575,7 +749,7 @@ std::string RunAnywhereModule::getTTSVoices(jsi::Runtime& rt) {
 
 void RunAnywhereModule::cancelTTS(jsi::Runtime& rt) {
     if (backend_) {
-        ra_tts_cancel(backend_);
+        ra_tts_cancel(onnxBackend_);
     }
 }
 
