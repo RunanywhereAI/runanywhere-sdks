@@ -1,5 +1,8 @@
 /**
  * Type Exports
+ *
+ * Reference: Swift sample app structure
+ * Tabs: Chat, STT, TTS, Voice (VoiceAssistant), Settings
  */
 
 // Chat types
@@ -14,17 +17,17 @@ export * from './voice';
 // Settings types
 export * from './settings';
 
-// Quiz types
-export * from './quiz';
-
-// Navigation types
+// Navigation types - matching Swift sample app (ContentView.swift)
+// Tab 0: Chat (LLM)
+// Tab 1: Speech-to-Text
+// Tab 2: Text-to-Speech
+// Tab 3: Voice Assistant (STT + LLM + TTS)
+// Tab 4: Settings
 export type RootTabParamList = {
   Chat: undefined;
-  Models: undefined;
   STT: undefined;
   TTS: undefined;
-  Quiz: undefined;
-  VoiceAssistant: undefined;
+  Voice: undefined;
   Settings: undefined;
 };
 
