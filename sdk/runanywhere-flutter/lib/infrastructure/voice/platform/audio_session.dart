@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../platform_channels/platform_channel_manager.dart';
 
 /// Audio session management for voice processing
@@ -36,4 +38,3 @@ class AudioSession {
     return await PlatformChannelManager.hasMicrophonePermission();
   }
 }
-

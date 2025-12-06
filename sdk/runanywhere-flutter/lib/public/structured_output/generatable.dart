@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+
 import '../runanywhere.dart' show RunAnywhereGenerationOptions, RunAnywhere;
 
 /// Protocol for types that can be generated as structured output from LLMs
@@ -55,5 +57,3 @@ Future<T> generateStructuredOutput<T extends Generatable>({
     throw FormatException('Failed to parse structured output: $e');
   }
 }
-
-

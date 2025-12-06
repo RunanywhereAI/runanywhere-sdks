@@ -1,0 +1,39 @@
+/// Backend modules for RunAnywhere Flutter SDK.
+///
+/// This library exports all available backend modules. Each backend provides
+/// specific AI capabilities through the native runanywhere-core library.
+///
+/// ## Available Backends
+///
+/// - **ONNX Runtime**: STT, TTS, VAD capabilities via Sherpa-ONNX
+/// - **LlamaCpp**: LLM capabilities via llama.cpp
+///
+/// ## Usage
+///
+/// Import the specific backend you need:
+///
+/// ```dart
+/// // For ONNX capabilities (STT, TTS, VAD)
+/// import 'package:runanywhere/backends/onnx/onnx.dart';
+/// await OnnxBackend.initialize();
+///
+/// // For LLM capabilities
+/// import 'package:runanywhere/backends/llamacpp/llamacpp.dart';
+/// await LlamaCppBackend.initialize();
+/// ```
+///
+/// Or import all backends:
+///
+/// ```dart
+/// import 'package:runanywhere/backends/backends.dart';
+/// ```
+library runanywhere_backends;
+
+// ONNX Runtime backend (STT, TTS, VAD)
+export 'onnx/onnx.dart';
+
+// LlamaCpp backend (LLM)
+export 'llamacpp/llamacpp.dart';
+
+// Native utilities (for advanced usage)
+export 'native/native.dart';

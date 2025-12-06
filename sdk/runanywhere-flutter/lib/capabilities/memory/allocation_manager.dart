@@ -1,140 +1,224 @@
-import 'dart:collection';
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../core/module_registry.dart';
-import 'memory_service.dart';
+import 'dart:async';
+import '../../foundation/logging/sdk_logger.dart';
+import 'models/memory_models.dart';
 
-/// Manages memory allocation for loaded models
+/// Manages memory allocation and model registration
+/// Matches iOS AllocationManager
 class AllocationManager {
-  final SDKLogger logger = SDKLogger(category: 'AllocationManager');
-  final Map<String, _ModelAllocation> _allocations = {};
-  int _totalAllocated = 0;
+  final SDKLogger _logger = SDKLogger(category: 'AllocationManager');
+  final Map<String, MemoryLoadedModelInfo> _loadedModels = {};
+  void Function()? _pressureCallback;
 
-  /// Register a model allocation
+  void setPressureCallback(void Function() callback) {
+    _pressureCallback = callback;
+  }
+
+  // MARK: - Model Registration
+
+  /// Register a model with memory tracking
   void registerModel(
     MemoryLoadedModel model, {
     required int size,
     required dynamic service,
     MemoryPriority priority = MemoryPriority.normal,
   }) {
-    _allocations[model.id] = _ModelAllocation(
+    final modelInfo = MemoryLoadedModelInfo(
       model: model,
       size: size,
       service: service,
       priority: priority,
-      lastAccess: DateTime.now(),
     );
 
-    _totalAllocated += size;
-    logger.info('Registered model ${model.id} with ${size / (1024 * 1024)}MB');
+    _loadedModels[model.id] = modelInfo;
+
+    final sizeString = _formatBytes(size);
+    _logger.info("Registered model '${model.name}' with $sizeString");
+
+    // Trigger pressure callback outside of registration to prevent deadlock
+    _pressureCallback?.call();
   }
 
-  /// Unregister a model allocation
+  /// Unregister a model
   void unregisterModel(String modelId) {
-    final allocation = _allocations.remove(modelId);
-    if (allocation != null) {
-      _totalAllocated -= allocation.size;
-      logger.info('Unregistered model $modelId');
+    final modelInfo = _loadedModels.remove(modelId);
+    if (modelInfo != null) {
+      _logger.info("Unregistered model '${modelInfo.model.name}'");
     }
   }
 
-  /// Touch a model (update last access time)
+  /// Update last used time for a model
   void touchModel(String modelId) {
-    final allocation = _allocations[modelId];
-    if (allocation != null) {
-      allocation.lastAccess = DateTime.now();
+    final modelInfo = _loadedModels[modelId];
+    if (modelInfo != null) {
+      modelInfo.lastUsed = DateTime.now();
     }
   }
+
+  // MARK: - Memory Requests
 
   /// Request memory allocation
   Future<bool> requestMemory({
     required int size,
     MemoryPriority priority = MemoryPriority.normal,
   }) async {
-    // Check if we can allocate
-    // In a real implementation, this would check system memory
-    // For now, we'll use a simple threshold
-    const maxMemory = 2 * 1024 * 1024 * 1024; // 2GB
-    if (_totalAllocated + size > maxMemory) {
-      // Try to evict low priority models
-      final evictable = _getEvictableModels(size);
-      if (evictable.isNotEmpty) {
-        // Evict models
-        for (final modelId in evictable) {
-          unregisterModel(modelId);
-        }
-      } else {
-        return false;
-      }
+    final availableMemory = _getCurrentAvailableMemory();
+
+    if (availableMemory >= size) {
+      _logger.debug('Memory request granted: ${_formatBytes(size)}');
+      return true;
     }
 
-    return true;
+    _logger.info('Insufficient memory, attempting to free space for ${_formatBytes(size)}');
+
+    // Try to free memory based on priority
+    final needed = size - availableMemory;
+    final freed = await _freeMemory(needed: needed, requesterPriority: priority);
+
+    final newAvailable = _getCurrentAvailableMemory();
+    final success = newAvailable >= size;
+
+    if (success) {
+      _logger.info('Memory request successful after freeing ${_formatBytes(freed)}');
+    } else {
+      _logger.warning('Memory request failed, insufficient memory available');
+    }
+
+    return success;
   }
 
   /// Release memory
   Future<void> releaseMemory(int size) async {
-    // Memory is released when models are unregistered
-    // This is a placeholder for explicit memory release
+    // Memory is automatically released when models are unloaded
+    // This tracks explicit memory releases for accounting
+    _logger.debug('Released ${_formatBytes(size)}');
   }
 
-  /// Get total model memory
+  // MARK: - Memory Information
+
+  /// Get total memory used by all models
   int getTotalModelMemory() {
-    return _totalAllocated;
+    return _loadedModels.values.fold<int>(0, (sum, info) => sum + info.size);
   }
 
-  /// Get loaded model count
+  /// Get count of loaded models
   int getLoadedModelCount() {
-    return _allocations.length;
+    return _loadedModels.length;
   }
 
-  /// Get loaded models
+  /// Get list of loaded models
   List<MemoryLoadedModel> getLoadedModels() {
-    return _allocations.values.map((a) => a.model).toList();
+    return _loadedModels.values.map((info) => info.model).toList();
   }
 
-  /// Get allocations (for cache eviction)
-  Map<String, _ModelAllocation> getAllocations() {
-    return Map.from(_allocations);
+  /// Get list of loaded model infos (for cache eviction)
+  List<MemoryLoadedModelInfo> getLoadedModelInfos() {
+    return _loadedModels.values.toList();
   }
 
-  /// Get evictable models (low priority, least recently used)
-  List<String> _getEvictableModels(int requiredSize) {
-    final sorted = _allocations.entries.toList()
-      ..sort((a, b) {
-        // Sort by priority first, then by last access
-        final priorityCompare = a.value.priority.index.compareTo(b.value.priority.index);
-        if (priorityCompare != 0) return priorityCompare;
-        return a.value.lastAccess.compareTo(b.value.lastAccess);
-      });
+  /// Check if a model is loaded
+  bool isModelLoaded(String modelId) {
+    return _loadedModels.containsKey(modelId);
+  }
 
-    final evictable = <String>[];
-    int freed = 0;
+  /// Get memory usage for a specific model
+  int? getModelMemoryUsage(String modelId) {
+    return _loadedModels[modelId]?.size;
+  }
 
-    for (final entry in sorted) {
-      if (entry.value.priority == MemoryPriority.low) {
-        evictable.add(entry.key);
-        freed += entry.value.size;
-        if (freed >= requiredSize) break;
+  /// Get models for eviction consideration
+  List<MemoryLoadedModelInfo> getModelsForEviction() {
+    return _loadedModels.values.toList();
+  }
+
+  // MARK: - Model Unloading
+
+  /// Unload a single model and return freed memory
+  Future<int> unloadModel(String modelId) async {
+    final modelInfo = _loadedModels.remove(modelId);
+    if (modelInfo == null) {
+      return 0;
+    }
+
+    final size = modelInfo.size;
+    final sizeString = _formatBytes(size);
+    _logger.info("Unloading model '${modelInfo.model.name}' to free $sizeString");
+
+    // Notify service to cleanup
+    try {
+      await modelInfo.service?.cleanup();
+    } catch (e) {
+      _logger.error('Error cleaning up model service: $e');
+    }
+
+    return size;
+  }
+
+  /// Unload multiple models and return total freed memory
+  Future<int> unloadModels(List<String> modelIds) async {
+    int totalFreed = 0;
+
+    for (final modelId in modelIds) {
+      totalFreed += await unloadModel(modelId);
+    }
+
+    return totalFreed;
+  }
+
+  // MARK: - Private Implementation
+
+  int _getCurrentAvailableMemory() {
+    // Placeholder - in production, use platform channels to get actual memory
+    // For now, return a conservative estimate based on total physical memory
+    const int totalMemory = 4 * 1024 * 1024 * 1024; // 4GB default
+    final usedByModels = getTotalModelMemory();
+    const systemOverhead = totalMemory ~/ 2; // Assume 50% used by system
+    return totalMemory - systemOverhead - usedByModels;
+  }
+
+  Future<int> _freeMemory({
+    required int needed,
+    required MemoryPriority requesterPriority,
+  }) async {
+    final models = _loadedModels.values.toList();
+
+    // Sort models by eviction priority
+    models.sort((a, b) {
+      // Higher priority models are less likely to be evicted
+      if (a.priority != b.priority) {
+        return a.priority.value.compareTo(b.priority.value);
+      }
+      // If same priority, evict least recently used first
+      return a.lastUsed.compareTo(b.lastUsed);
+    });
+
+    int freedMemory = 0;
+    final modelsToUnload = <String>[];
+
+    for (final model in models) {
+      // Don't evict models with higher or equal priority unless absolutely necessary
+      if (model.priority.value >= requesterPriority.value && freedMemory > 0) {
+        continue;
+      }
+
+      modelsToUnload.add(model.model.id);
+      freedMemory += model.size;
+
+      if (freedMemory >= needed) {
+        break;
       }
     }
 
-    return evictable;
+    // Unload selected models
+    final actualFreed = await unloadModels(modelsToUnload);
+    return actualFreed;
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }
-
-/// Internal model allocation tracking
-class _ModelAllocation {
-  final MemoryLoadedModel model;
-  final int size;
-  final dynamic service;
-  final MemoryPriority priority;
-  DateTime lastAccess;
-
-  _ModelAllocation({
-    required this.model,
-    required this.size,
-    required this.service,
-    required this.priority,
-    required this.lastAccess,
-  });
-}
-

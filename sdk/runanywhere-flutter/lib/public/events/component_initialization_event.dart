@@ -43,6 +43,45 @@ abstract class ComponentInitializationEvent implements SDKEvent {
       newState: newState,
     );
   }
+
+  // Download events - matching iOS SDK patterns
+  static ComponentInitializationEvent componentDownloadRequired({
+    required SDKComponent component,
+    required String modelId,
+    required int sizeBytes,
+  }) {
+    return ComponentDownloadRequired(
+      component: component,
+      modelId: modelId,
+      sizeBytes: sizeBytes,
+    );
+  }
+
+  static ComponentInitializationEvent componentDownloadStarted({
+    required SDKComponent component,
+    required String modelId,
+  }) {
+    return ComponentDownloadStarted(component: component, modelId: modelId);
+  }
+
+  static ComponentInitializationEvent componentDownloadProgress({
+    required SDKComponent component,
+    required String modelId,
+    required double progress,
+  }) {
+    return ComponentDownloadProgress(
+      component: component,
+      modelId: modelId,
+      progress: progress,
+    );
+  }
+
+  static ComponentInitializationEvent componentDownloadCompleted({
+    required SDKComponent component,
+    required String modelId,
+  }) {
+    return ComponentDownloadCompleted(component: component, modelId: modelId);
+  }
 }
 
 class ComponentChecking implements ComponentInitializationEvent {
@@ -95,3 +134,50 @@ class ComponentStateChanged implements ComponentInitializationEvent {
   });
 }
 
+// Download event classes - matching iOS SDK patterns
+
+class ComponentDownloadRequired implements ComponentInitializationEvent {
+  final SDKComponent component;
+  final String modelId;
+  final int sizeBytes;
+  @override
+  final DateTime timestamp = DateTime.now();
+
+  ComponentDownloadRequired({
+    required this.component,
+    required this.modelId,
+    required this.sizeBytes,
+  });
+}
+
+class ComponentDownloadStarted implements ComponentInitializationEvent {
+  final SDKComponent component;
+  final String modelId;
+  @override
+  final DateTime timestamp = DateTime.now();
+
+  ComponentDownloadStarted({required this.component, required this.modelId});
+}
+
+class ComponentDownloadProgress implements ComponentInitializationEvent {
+  final SDKComponent component;
+  final String modelId;
+  final double progress;
+  @override
+  final DateTime timestamp = DateTime.now();
+
+  ComponentDownloadProgress({
+    required this.component,
+    required this.modelId,
+    required this.progress,
+  });
+}
+
+class ComponentDownloadCompleted implements ComponentInitializationEvent {
+  final SDKComponent component;
+  final String modelId;
+  @override
+  final DateTime timestamp = DateTime.now();
+
+  ComponentDownloadCompleted({required this.component, required this.modelId});
+}

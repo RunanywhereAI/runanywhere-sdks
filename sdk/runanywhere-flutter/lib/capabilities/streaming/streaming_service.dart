@@ -1,10 +1,9 @@
 import 'dart:async';
-import '../text_generation/generation_service.dart';
 import '../model_loading/model_loading_service.dart';
-import '../text_generation/generation_service.dart' as gen;
+import '../text_generation/generation_service.dart';
 import '../../../foundation/logging/sdk_logger.dart';
 import '../../../foundation/error_types/sdk_error.dart';
-import '../../../public/runanywhere.dart' show unawaited;
+import '../../../public/runanywhere.dart' show unawaited, RunAnywhereGenerationOptions;
 import '../../../core/module_registry.dart' show LLMGenerationOptions;
 
 /// Service for streaming text generation
@@ -28,7 +27,7 @@ class StreamingService {
     final controller = StreamController<String>();
 
     // Start generation in background
-    Future<void> _generateInBackground() async {
+    Future<void> generateInBackground() async {
       try {
         final loadedModel = generationService.getCurrentModel();
         if (loadedModel == null) {
@@ -60,8 +59,8 @@ class StreamingService {
         await controller.close();
       }
     }
-    
-    unawaited(_generateInBackground());
+
+    unawaited(generateInBackground());
 
     return controller.stream;
   }

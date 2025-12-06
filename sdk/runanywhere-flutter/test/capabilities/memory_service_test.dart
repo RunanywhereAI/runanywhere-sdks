@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/capabilities/memory/memory_service.dart';
 import 'package:runanywhere/capabilities/memory/allocation_manager.dart';
-import 'package:runanywhere/core/models/common.dart';
 
 void main() {
   group('MemoryService Tests', () {
@@ -47,18 +46,9 @@ void main() {
     });
 
     test('Register and unregister model', () {
-      final model = MemoryLoadedModel(
-        id: 'test-model',
-        name: 'Test Model',
-        size: 100 * 1024 * 1024, // 100MB
-        framework: LLMFramework.llamaCpp,
-      );
-
-      // Note: This requires a mock LLMService
-      // allocationManager.registerModel(model, 100 * 1024 * 1024, mockService);
-
+      // Note: Full registration test requires a mock LLMService
+      // For now, just verify the manager starts with zero models
       expect(allocationManager.getLoadedModelCount(), equals(0));
     });
   });
 }
-

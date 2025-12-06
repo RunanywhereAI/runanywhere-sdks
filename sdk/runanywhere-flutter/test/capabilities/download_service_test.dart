@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/capabilities/download/download_service.dart';
 import 'package:runanywhere/capabilities/registry/registry_service.dart';
-import 'package:runanywhere/core/models/common.dart';
 
 void main() {
   group('DownloadService Tests', () {
@@ -37,4 +36,3 @@ void main() {
     });
   });
 }
-

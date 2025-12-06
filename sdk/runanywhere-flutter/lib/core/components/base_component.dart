@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../protocols/component/component.dart';
 import '../protocols/component/component_configuration.dart';
 import '../types/component_state.dart';
@@ -122,6 +124,17 @@ abstract class BaseComponent<T> implements Component {
   @override
   bool get isReady => _state == ComponentState.ready;
 
+  @override
+  ComponentInitParameters? get parameters {
+    // Default implementation returns null.
+    // Subclasses should override if configuration implements ComponentInitParameters.
+    final config = configuration;
+    if (config is ComponentInitParameters) {
+      return config as ComponentInitParameters;
+    }
+    return null;
+  }
+
   /// Ensure component is ready for processing
   void ensureReady() {
     if (_state != ComponentState.ready) {
@@ -150,4 +163,3 @@ abstract class BaseComponent<T> implements Component {
   /// Get component type (must be overridden in subclasses)
   SDKComponent get componentType;
 }
-
