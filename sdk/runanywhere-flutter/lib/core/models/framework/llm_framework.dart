@@ -1,3 +1,5 @@
+import 'framework_modality.dart';
+
 /// Supported LLM frameworks
 /// Matches iOS LLMFramework from Core/Models/Framework/LLMFramework.swift
 enum LLMFramework {
@@ -14,7 +16,8 @@ enum LLMFramework {
   mediaPipe('MediaPipe', 'MediaPipe'),
   whisperKit('WhisperKit', 'WhisperKit'),
   openAIWhisper('OpenAIWhisper', 'OpenAI Whisper'),
-  systemTTS('SystemTTS', 'System TTS');
+  systemTTS('SystemTTS', 'System TTS'),
+  simpleEnergyVAD('SimpleEnergyVAD', 'Simple Energy VAD');
 
   final String rawValue;
   final String displayName;
@@ -27,5 +30,59 @@ enum LLMFramework {
           (f) => f?.rawValue == value,
           orElse: () => null,
         );
+  }
+
+  /// Supported modalities for this framework
+  /// Matches iOS LLMFramework+Modalities extension
+  Set<FrameworkModality> get supportedModalities {
+    switch (this) {
+      // LLM frameworks
+      case LLMFramework.llamaCpp:
+      case LLMFramework.mlx:
+      case LLMFramework.foundationModels:
+      case LLMFramework.coreML:
+      case LLMFramework.picoLLM:
+      case LLMFramework.mlc:
+        return {FrameworkModality.textToText};
+
+      // STT frameworks
+      case LLMFramework.whisperKit:
+      case LLMFramework.openAIWhisper:
+        return {FrameworkModality.voiceToText};
+
+      // TTS frameworks
+      case LLMFramework.systemTTS:
+        return {FrameworkModality.textToVoice};
+
+      // VAD frameworks
+      case LLMFramework.simpleEnergyVAD:
+        return {FrameworkModality.voiceActivityDetection};
+
+      // Multi-modal frameworks
+      case LLMFramework.onnx:
+        return {
+          FrameworkModality.textToText,
+          FrameworkModality.voiceToText,
+          FrameworkModality.textToVoice,
+          FrameworkModality.voiceActivityDetection,
+        };
+
+      case LLMFramework.tensorFlowLite:
+      case LLMFramework.execuTorch:
+        return {
+          FrameworkModality.textToText,
+          FrameworkModality.visionToText,
+        };
+
+      case LLMFramework.mediaPipe:
+        return {
+          FrameworkModality.textToText,
+          FrameworkModality.visionToText,
+          FrameworkModality.voiceToText,
+        };
+
+      case LLMFramework.swiftTransformers:
+        return {FrameworkModality.textToText, FrameworkModality.visionToText};
+    }
   }
 }

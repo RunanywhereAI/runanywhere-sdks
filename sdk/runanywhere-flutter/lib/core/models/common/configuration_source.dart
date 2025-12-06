@@ -3,7 +3,8 @@
 enum ConfigurationSource {
   remote('remote'),
   consumer('consumer'),
-  defaults('defaults');
+  defaults('defaults'),
+  embedded('embedded'); // Models registered via adapter registration
 
   final String rawValue;
 

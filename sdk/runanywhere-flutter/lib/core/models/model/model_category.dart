@@ -12,7 +12,8 @@ enum ModelCategory {
   imageGeneration(
       'image-generation', 'Image Generation', 'add_photo_alternate'),
   multimodal('multimodal', 'Multimodal', 'auto_awesome'),
-  audio('audio', 'Audio Processing', 'graphic_eq');
+  audio('audio', 'Audio Processing', 'graphic_eq'),
+  embedding('embedding', 'Text Embedding', 'data_array');
 
   final String rawValue;
   final String displayName;
@@ -45,6 +46,8 @@ enum ModelCategory {
         return FrameworkModality.multimodal;
       case ModelCategory.audio:
         return FrameworkModality.voiceToText;
+      case ModelCategory.embedding:
+        return FrameworkModality.textEmbedding;
     }
   }
 
@@ -111,6 +114,8 @@ enum ModelCategory {
         return true; // Multimodal models can work with any modality
       case ModelCategory.audio:
         return modality == FrameworkModality.voiceToText;
+      case ModelCategory.embedding:
+        return modality == FrameworkModality.textEmbedding;
     }
   }
 
@@ -135,6 +140,8 @@ enum ModelCategory {
         return ModelCategory.multimodal;
       case LLMFramework.systemTTS:
         return ModelCategory.speechSynthesis;
+      case LLMFramework.simpleEnergyVAD:
+        return ModelCategory.audio;
     }
   }
 

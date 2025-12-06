@@ -52,12 +52,15 @@ enum LLMFramework {
 }
 
 /// Model category enumeration
+/// Matches SDK ModelCategory for proper conversion
 enum ModelCategory {
   language,
   multimodal,
   speechRecognition,
   speechSynthesis,
   vision,
+  imageGeneration,
+  audio,
   embedding,
   unknown;
 
@@ -73,6 +76,10 @@ enum ModelCategory {
         return 'Speech Synthesis';
       case ModelCategory.vision:
         return 'Vision';
+      case ModelCategory.imageGeneration:
+        return 'Image Generation';
+      case ModelCategory.audio:
+        return 'Audio';
       case ModelCategory.embedding:
         return 'Embedding';
       case ModelCategory.unknown:

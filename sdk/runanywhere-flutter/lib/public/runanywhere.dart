@@ -5,6 +5,8 @@ import '../foundation/logging/sdk_logger.dart';
 import '../foundation/security/keychain_manager.dart';
 import '../foundation/device_identity/device_manager.dart';
 import '../foundation/configuration/sdk_constants.dart';
+import '../core/protocols/frameworks/unified_framework_adapter.dart';
+import '../core/models/model/model_registration.dart';
 import 'configuration/sdk_environment.dart';
 import 'events/event_bus.dart';
 import 'events/sdk_event.dart';
@@ -25,6 +27,17 @@ export '../components/tts/tts_component.dart' show TTSComponent, TTSConfiguratio
 export '../components/tts/tts_output.dart' show TTSOutput, SynthesisMetadata;
 export '../components/llm/llm_component.dart'
     show LLMComponent, LLMConfiguration, LLMOutput, Message, MessageRole, Context;
+
+// Export framework adapter types for registration
+export '../core/protocols/frameworks/unified_framework_adapter.dart';
+export '../core/models/model/model_registration.dart';
+export '../core/model_lifecycle_manager.dart';
+
+// Export core types for public use
+export '../core/models/framework/llm_framework.dart';
+export '../core/models/framework/framework_modality.dart';
+export '../core/models/framework/model_format.dart';
+export '../core/models/model/model_category.dart';
 
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
@@ -411,6 +424,67 @@ class RunAnywhere {
     // Get the current model from the generation service
     final loadedModel = serviceContainer.generationService.getCurrentModel();
     return loadedModel?.model;
+  }
+
+  /// Unload the currently loaded model
+  /// Matches iOS RunAnywhere.unloadModel pattern
+  static Future<void> unloadModel() async {
+    if (!_isInitialized) {
+      return;
+    }
+
+    final currentModelInfo = currentModel;
+    if (currentModelInfo != null) {
+      await serviceContainer.modelLoadingService.unloadModel(currentModelInfo.id);
+      serviceContainer.generationService.setCurrentModel(null);
+    }
+  }
+
+  /// List available models (alias for availableModels)
+  /// Matches iOS RunAnywhere.listAvailableModels pattern
+  static Future<List<ModelInfo>> listAvailableModels() async {
+    return availableModels();
+  }
+
+  // MARK: - Multi-Adapter Support (NEW)
+
+  /// Register a framework adapter with optional priority
+  /// Higher priority adapters are preferred when multiple can handle the same model
+  /// Matches iOS RunAnywhere.registerFrameworkAdapter pattern
+  static void registerFrameworkAdapter(
+    UnifiedFrameworkAdapter adapter, {
+    int priority = 100,
+  }) {
+    // Note: Adapter registration can happen before SDK initialization
+    // This allows registering adapters during app setup
+    serviceContainer.registerFrameworkAdapter(adapter, priority: priority);
+  }
+
+  /// Register a framework adapter with models
+  /// This is the primary method for registering adapters with pre-configured models
+  /// Matches iOS RunAnywhere.registerFramework pattern
+  static Future<void> registerFramework(
+    UnifiedFrameworkAdapter adapter, {
+    List<ModelRegistration>? models,
+    int priority = 100,
+  }) async {
+    await serviceContainer.registerFramework(
+      adapter,
+      models: models,
+      priority: priority,
+    );
+  }
+
+  /// Check if SDK has been initialized
+  /// Returns true if SDK has been initialized
+  static bool hasBeenInitialized() {
+    return isSDKInitialized;
+  }
+
+  /// Check if SDK is active and ready for use
+  /// Returns true if SDK is initialized and has valid configuration
+  static bool isActive() {
+    return hasBeenInitialized() && _initParams != null;
   }
 
   // MARK: - SDK State Management
