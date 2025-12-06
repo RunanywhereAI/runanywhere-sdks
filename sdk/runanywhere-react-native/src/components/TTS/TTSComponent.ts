@@ -17,6 +17,7 @@ import type { TTSServiceProvider } from '../../Core/Protocols/Voice/TTSServicePr
 import type { TTSResult } from '../../Core/Models/TTS/TTSResult';
 import type { TTSConfiguration as CoreTTSConfiguration } from '../../Core/Models/Configuration/TTSConfiguration';
 import { AnyServiceWrapper } from '../../Core/Components/BaseComponent';
+import NativeRunAnywhere from '../../NativeRunAnywhere';
 
 /**
  * TTS Service Wrapper
@@ -63,12 +64,10 @@ export class TTSComponent extends BaseComponent<TTSServiceWrapper> {
         // Use registered provider (e.g., ONNXTTSServiceProvider)
         ttsService = await provider.createTTSService(this.ttsConfiguration);
       } else {
-        // Fallback to default adapter (system TTS)
-        // For React Native, we'll need to implement a default TTS service
-        throw new SDKError(
-          SDKErrorCode.ComponentNotInitialized,
-          'No TTS service provider registered. Please register a TTS provider with ModuleRegistry.shared.registerTTS(provider).'
-        );
+        // Fallback to system TTS service
+        const { SystemTTSService } = await import('../../services/SystemTTSService');
+        ttsService = new SystemTTSService();
+        await ttsService.initialize();
       }
 
       // Wrap the service
@@ -202,12 +201,48 @@ export class TTSComponent extends BaseComponent<TTSServiceWrapper> {
       throw new SDKError(SDKErrorCode.ComponentNotReady, 'TTS service not available');
     }
 
-    // For now, TTS services typically don't support streaming
-    // So we just synthesize the full text and call onChunk once
-    const output = await this.synthesize(text, options);
-    if (onChunk) {
-      onChunk(output.audioData);
+    // Check if native streaming is supported
+    const supportsStreaming = await NativeRunAnywhere.supportsTTSStreaming();
+
+    if (supportsStreaming && onChunk) {
+      // Use native streaming if available
+      const voiceId = options?.voice ?? this.ttsConfiguration.voice;
+      const speedRate = options?.rate ?? this.ttsConfiguration.speakingRate;
+      const pitchShift = options?.pitch ?? this.ttsConfiguration.pitch;
+
+      // Start streaming synthesis
+      NativeRunAnywhere.synthesizeStream(text, voiceId, speedRate, pitchShift);
+
+      // Note: Audio chunks would be emitted via event emitter
+      // This is a placeholder for the streaming implementation
+      // The actual chunk delivery would need to be handled via React Native's EventEmitter
+    } else {
+      // Fallback to batch mode
+      const output = await this.synthesize(text, options);
+      if (onChunk) {
+        onChunk(output.audioData);
+      }
     }
+  }
+
+  /**
+   * Stream synthesis as AsyncGenerator
+   * Provides a modern async iteration interface for streaming TTS
+   */
+  public async *synthesizeStreamGenerator(
+    text: string,
+    options?: Partial<TTSOptions>
+  ): AsyncGenerator<Buffer | Uint8Array> {
+    this.ensureReady();
+
+    if (!this.service?.wrappedService) {
+      throw new SDKError(SDKErrorCode.ComponentNotReady, 'TTS service not available');
+    }
+
+    // For now, yield the complete synthesis result
+    // True streaming would yield chunks as they become available
+    const output = await this.synthesize(text, options);
+    yield output.audioData;
   }
 
   /**
@@ -225,5 +260,73 @@ export class TTSComponent extends BaseComponent<TTSServiceWrapper> {
     }
 
     return await this.service.wrappedService.getAvailableVoices();
+  }
+
+  /**
+   * Get detailed voice information
+   * Returns structured voice metadata including language, gender, quality, etc.
+   */
+  public async getVoiceInfo(): Promise<import('../../Core/Protocols/Voice/TTSService').VoiceInfo[]> {
+    this.ensureReady();
+
+    if (!this.service?.wrappedService) {
+      throw new SDKError(SDKErrorCode.ComponentNotReady, 'TTS service not available');
+    }
+
+    if (!this.service.wrappedService.getVoiceInfo) {
+      return [];
+    }
+
+    return await this.service.wrappedService.getVoiceInfo();
+  }
+
+  /**
+   * Get voices filtered by language
+   * @param language - Language code (e.g., 'en-US', 'es-ES')
+   */
+  public async getVoicesByLanguage(language: string): Promise<string[]> {
+    const allVoices = await this.getAvailableVoices();
+
+    // Filter voices that match the language
+    return allVoices.filter(voice => {
+      if (!voice) return false;
+      const voiceLower = voice.toLowerCase();
+      const languageLower = language.toLowerCase();
+      const langPrefix = language.split('-')[0]?.toLowerCase() || '';
+      return voiceLower.includes(languageLower) || voiceLower.startsWith(langPrefix);
+    });
+  }
+
+  /**
+   * Set the current voice for synthesis
+   * @param voiceId - Voice identifier to use
+   */
+  public setVoice(voiceId: string): void {
+    this.currentVoice = voiceId;
+  }
+
+  /**
+   * Get the current voice setting
+   */
+  public getVoice(): string | null {
+    return this.currentVoice;
+  }
+
+  /**
+   * Stop current synthesis playback
+   */
+  public async stopSynthesis(): Promise<void> {
+    if (this.service?.wrappedService) {
+      await NativeRunAnywhere.cancelTTS();
+    }
+  }
+
+  /**
+   * Check if TTS is currently playing/synthesizing
+   */
+  public async isSynthesizing(): Promise<boolean> {
+    // This would need native state tracking
+    // For now, return false as a placeholder
+    return false;
   }
 }

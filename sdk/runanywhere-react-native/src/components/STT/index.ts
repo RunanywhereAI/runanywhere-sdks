@@ -23,6 +23,7 @@ export {
   type STTTranscriptionResult,
   type TimestampInfo,
   type AlternativeTranscription,
+  type STTStreamResult,
 } from './STTModels';
 
 // Export STTService from Core protocols

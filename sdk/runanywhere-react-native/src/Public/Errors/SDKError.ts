@@ -90,6 +90,7 @@ export enum SDKErrorCode {
   GenerationFailed = 'generationFailed',
   GenerationTimeout = 'generationTimeout',
   FrameworkNotAvailable = 'frameworkNotAvailable',
+  FeatureNotAvailable = 'featureNotAvailable',
   DownloadFailed = 'downloadFailed',
   ValidationFailed = 'validationFailed',
   RoutingFailed = 'routingFailed',

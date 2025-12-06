@@ -121,3 +121,18 @@ export interface AlternativeTranscription {
   readonly confidence: number;
 }
 
+/**
+ * Streaming transcription result
+ * Represents partial or final transcription results during streaming
+ */
+export interface STTStreamResult {
+  /** Transcribed text (partial or final) */
+  readonly text: string;
+  /** Whether this is the final result */
+  readonly isFinal: boolean;
+  /** Confidence score (0.0 to 1.0) */
+  readonly confidence?: number;
+  /** Timestamp when this result was generated */
+  readonly timestamp: Date;
+}
+

@@ -34,8 +34,13 @@ import {
   DeviceInfo,
 } from '../../types/model';
 
-// Import SDK types
-import { RunAnywhere, type ModelInfo as SDKModelInfo } from 'runanywhere-react-native';
+// Import SDK types and values
+import {
+  RunAnywhere,
+  type ModelInfo as SDKModelInfo,
+  LLMFramework as SDKLLMFramework,
+  ModelCategory as SDKModelCategory,
+} from 'runanywhere-react-native';
 
 /**
  * Context for filtering frameworks and models based on the current experience/modality
@@ -85,16 +90,16 @@ const getRelevantCategories = (context: ModelSelectionContext): Set<ModelCategor
 };
 
 /**
- * Get modality string for SDK filtering
+ * Get category string for SDK filtering (uses SDK's ModelCategory enum values)
  */
-const getModalityForContext = (context: ModelSelectionContext): string | null => {
+const getCategoryForContext = (context: ModelSelectionContext): string | null => {
   switch (context) {
     case ModelSelectionContext.LLM:
-      return 'llm';
+      return SDKModelCategory.Language; // 'language'
     case ModelSelectionContext.STT:
-      return 'stt';
+      return SDKModelCategory.SpeechRecognition; // 'speech-recognition'
     case ModelSelectionContext.TTS:
-      return 'tts';
+      return SDKModelCategory.SpeechSynthesis; // 'speech-synthesis'
     case ModelSelectionContext.Voice:
       return null; // Show all
   }
@@ -203,12 +208,46 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     try {
       // Load models from SDK
       const allModels = await RunAnywhere.getAvailableModels();
-      const modality = getModalityForContext(context);
+      const categoryFilter = getCategoryForContext(context);
 
-      // Filter models based on context
-      const filteredModels = modality
-        ? allModels.filter((m: SDKModelInfo) => m.modality === modality)
+      console.log('[ModelSelectionSheet] All models count:', allModels.length);
+      console.log('[ModelSelectionSheet] Category filter:', categoryFilter);
+      if (allModels.length > 0) {
+        console.log('[ModelSelectionSheet] First model:', JSON.stringify(allModels[0], null, 2));
+      }
+
+      // Filter models based on context (using category field)
+      // Check both enum string value and direct comparison
+      let filteredModels = categoryFilter
+        ? allModels.filter((m: any) => {
+            const modelCategory = m.category;
+            const matches = modelCategory === categoryFilter ||
+                           String(modelCategory).toLowerCase() === String(categoryFilter).toLowerCase();
+            return matches;
+          })
         : allModels;
+
+      console.log('[ModelSelectionSheet] Filtered models count:', filteredModels.length);
+
+      // Fallback: if no models found after filtering for LLM, show models with LlamaCpp framework
+      if (filteredModels.length === 0 && context === ModelSelectionContext.LLM) {
+        console.log('[ModelSelectionSheet] No category matches, trying framework fallback');
+        filteredModels = allModels.filter((m: any) => {
+          const hasLlamaFramework =
+            m.preferredFramework === SDKLLMFramework.LlamaCpp ||
+            m.preferredFramework === 'LlamaCpp' ||
+            m.compatibleFrameworks?.includes(SDKLLMFramework.LlamaCpp) ||
+            m.compatibleFrameworks?.includes('LlamaCpp');
+          return hasLlamaFramework;
+        });
+        console.log('[ModelSelectionSheet] Framework fallback models:', filteredModels.length);
+      }
+
+      // Ultimate fallback: just show all models for LLM context if nothing else works
+      if (filteredModels.length === 0 && context === ModelSelectionContext.LLM && allModels.length > 0) {
+        console.log('[ModelSelectionSheet] Using all models as final fallback');
+        filteredModels = allModels;
+      }
 
       setAvailableModels(filteredModels);
 
@@ -242,9 +281,28 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const getFrameworks = useCallback((): FrameworkDisplayInfo[] => {
     const frameworkCounts = new Map<LLMFramework, number>();
 
-    availableModels.forEach((model) => {
-      // Determine framework from model
-      const framework = model.framework as LLMFramework || LLMFramework.LlamaCpp;
+    console.log('[ModelSelectionSheet] getFrameworks called, availableModels count:', availableModels.length);
+
+    availableModels.forEach((model: any, index: number) => {
+      // Determine framework from model - use preferredFramework or first compatibleFramework
+      let frameworkValue = model.preferredFramework
+        || model.compatibleFrameworks?.[0]
+        || model.framework;
+
+      if (index < 3) {
+        console.log(`[ModelSelectionSheet] Model ${index}: preferredFramework=${model.preferredFramework}, compatibleFrameworks=${JSON.stringify(model.compatibleFrameworks)}`);
+      }
+
+      // Map string to enum if needed
+      let framework: LLMFramework;
+      if (typeof frameworkValue === 'string' && frameworkValue in LLMFramework) {
+        framework = LLMFramework[frameworkValue as keyof typeof LLMFramework];
+      } else if (Object.values(LLMFramework).includes(frameworkValue)) {
+        framework = frameworkValue as LLMFramework;
+      } else {
+        framework = LLMFramework.LlamaCpp; // Default
+      }
+
       const count = frameworkCounts.get(framework) || 0;
       frameworkCounts.set(framework, count + 1);
     });
@@ -253,6 +311,8 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     if (context === ModelSelectionContext.TTS) {
       frameworkCounts.set(LLMFramework.SystemTTS, 1);
     }
+
+    console.log('[ModelSelectionSheet] Framework counts:', Array.from(frameworkCounts.entries()));
 
     return Array.from(frameworkCounts.entries())
       .map(([framework, count]) => getFrameworkInfo(framework, count))
@@ -263,9 +323,17 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Get models for a specific framework
    */
   const getModelsForFramework = useCallback((framework: LLMFramework): SDKModelInfo[] => {
-    return availableModels.filter((model) => {
-      const modelFramework = model.framework as LLMFramework || LLMFramework.LlamaCpp;
-      return modelFramework === framework;
+    return availableModels.filter((model: any) => {
+      // Check preferredFramework first, then compatibleFrameworks, then fallback
+      const modelFramework = model.preferredFramework as LLMFramework
+        || (model.compatibleFrameworks?.[0] as LLMFramework)
+        || model.framework as LLMFramework
+        || LLMFramework.LlamaCpp;
+
+      // Also check if this framework is in compatibleFrameworks
+      const isCompatible = model.compatibleFrameworks?.includes(framework);
+
+      return modelFramework === framework || isCompatible;
     });
   }, [availableModels]);
 
@@ -331,14 +399,18 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
     try {
       // Create a pseudo model for System TTS
-      const systemTTSModel: SDKModelInfo = {
+      const systemTTSModel = {
         id: 'system-tts',
         name: 'System TTS',
-        modality: 'tts',
-        framework: 'SystemTTS',
+        category: ModelCategory.SpeechSynthesis,
+        preferredFramework: LLMFramework.SystemTTS,
+        compatibleFrameworks: [LLMFramework.SystemTTS],
         isDownloaded: true,
         isAvailable: true,
-      } as SDKModelInfo;
+        downloadSize: 0,
+        memoryRequired: 0,
+        format: 'system',
+      } as unknown as SDKModelInfo;
 
       await onModelSelected(systemTTSModel);
       onClose();
@@ -509,10 +581,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           </Text>
 
           <View style={styles.modelMeta}>
-            {model.sizeBytes && (
+            {(model as any).downloadSize && (
               <View style={styles.sizeTag}>
                 <Icon name="server-outline" size={12} color={Colors.textSecondary} />
-                <Text style={styles.sizeText}>{formatBytes(model.sizeBytes)}</Text>
+                <Text style={styles.sizeText}>{formatBytes((model as any).downloadSize)}</Text>
               </View>
             )}
 

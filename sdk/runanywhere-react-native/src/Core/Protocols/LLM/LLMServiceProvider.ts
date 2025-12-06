@@ -8,6 +8,7 @@
 
 import type { LLMConfiguration } from '../../Models/Configuration/LLMConfiguration';
 import type { LLMService } from './LLMService';
+import type { ModelInfo } from '../../../types';
 
 /**
  * Protocol for registering external LLM implementations
@@ -27,5 +28,21 @@ export interface LLMServiceProvider {
    * Provider name for identification
    */
   readonly name: string;
+
+  /**
+   * Get models provided by this provider (optional)
+   *
+   * Called during provider registration to populate ModelRegistry.
+   * Providers can expose their supported models.
+   */
+  getProvidedModels?(): ModelInfo[];
+
+  /**
+   * Lifecycle hook called when provider is registered (optional)
+   *
+   * Called by ModuleRegistry after provider registration.
+   * Use this to register models, configure dependencies, etc.
+   */
+  onRegistration?(): void;
 }
 
