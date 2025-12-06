@@ -8,13 +8,13 @@ import '../llamacpp_template_resolver.dart';
 /// LlamaCpp-based Language Model service.
 ///
 /// This is the Flutter equivalent of Swift's `LLMSwiftService`.
-/// It uses the native runanywhere-core library for LLM inference.
+/// It uses the native runanywhere-core library (llamacpp backend) for LLM inference.
 ///
 /// ## Usage
 ///
 /// ```dart
 /// final backend = NativeBackend();
-/// backend.create('onnx'); // or 'llamacpp' when available
+/// backend.create('llamacpp'); // Use llamacpp backend from runanywhere-core
 ///
 /// final llm = LlamaCppLLMService(backend);
 /// await llm.initialize(modelPath: '/path/to/model.gguf');

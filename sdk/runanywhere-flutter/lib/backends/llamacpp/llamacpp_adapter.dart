@@ -200,7 +200,8 @@ class LlamaCppAdapter
 
     final service = createService(modality);
     if (parameters.modelId != null) {
-      await (service as LlamaCppLLMService).initialize(modelPath: parameters.modelId);
+      await (service as LlamaCppLLMService)
+          .initialize(modelPath: parameters.modelId);
     }
     return service;
   }
@@ -210,11 +211,10 @@ class LlamaCppAdapter
     // Initialize the native backend with llamacpp
     _backend = NativeBackend();
 
-    // Note: For llamacpp, we might need a different backend name
-    // or the same 'onnx' backend with different configuration
-    // For now, we use the same backend but the service will handle
-    // loading GGUF models through the native API
-    _backend!.create('onnx'); // Uses the same native backend
+    // Use the llamacpp backend from runanywhere-core
+    // This backend is registered as 'llamacpp' and provides TEXT_GENERATION capability
+    // via llama.cpp for GGUF/GGML model inference
+    _backend!.create('llamacpp');
 
     _isInitialized = true;
 
