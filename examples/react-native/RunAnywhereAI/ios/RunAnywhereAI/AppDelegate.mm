@@ -2,6 +2,9 @@
 
 #import <React/RCTBundleURLProvider.h>
 
+// Import the RunAnywhere TurboModule C++ header
+#import "RunAnywhereModule.h"
+
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
@@ -38,5 +41,8 @@
   return nil;
 #endif
 }
+
+// TurboModule provider registration happens automatically via RCT_NEW_ARCH_ENABLED
+// The RunAnywhereModule is registered through the codegen system
 
 @end

@@ -158,6 +158,9 @@
     "name": "RunAnywhereSpec",
     "type": "modules",
     "jsSrcsDir": "src",
+    "ios": {
+      "mode": "cxx"
+    },
     "android": {
       "javaPackageName": "com.runanywhere.reactnative"
     }

@@ -1,63 +1,98 @@
 //
 // RunAnywhere.mm
-// iOS Adapter for RunAnywhere C++ TurboModule
+// RunAnywhere React Native SDK - Objective-C++ Implementation
 //
-// This is a thin adapter that instantiates the C++ TurboModule.
-// All business logic is in cpp/RunAnywhereModule.cpp.
+// This file provides the ObjC wrapper and TurboModule provider for the C++ TurboModule.
+// All method implementations are in cpp/RunAnywhereModule.cpp.
 //
 
 #import "RunAnywhere.h"
-#import <Foundation/Foundation.h>
-#import <React/RCTBridge+Private.h>
-#import <jsi/jsi.h>
-#import "../cpp/RunAnywhereModule.h"
+#import <React/RCTLog.h>
+
+#ifdef RCT_NEW_ARCH_ENABLED
+
+// Import the C++ TurboModule class and React Native headers
+#import "RunAnywhereModule.h"
+#import <ReactCommon/RCTTurboModule.h>
 
 using namespace facebook::react;
 
+// Forward declare the C++ spec (no Objective-C protocol conformance needed)
+@interface RunAnywhere ()
+@end
+
 @implementation RunAnywhere {
-    std::shared_ptr<facebook::react::RunAnywhereModule> _nativeModule;
+    std::shared_ptr<RunAnywhereModule> _module;
 }
 
-RCT_EXPORT_MODULE()
+// Provide the module name for React Native's TurboModule system
++ (NSString *)moduleName {
+    return @"RunAnywhere";
+}
+
+- (instancetype)init {
+    NSLog(@"[RunAnywhere.mm] *** init called ***");
+    if (self = [super init]) {
+        NSLog(@"[RunAnywhere.mm] *** Initialized successfully ***");
+    }
+    return self;
+}
+
+// ============================================================================
+// TurboModule Provider (NEW ARCHITECTURE)
+// ============================================================================
+
+/**
+ * Returns the C++ TurboModule instance.
+ * This is called by React Native's TurboModule system to get our C++ module.
+ */
+- (std::shared_ptr<TurboModule>)getTurboModule:
+    (const ObjCTurboModule::InitParams &)params {
+    NSLog(@"[RunAnywhere.mm] *** getTurboModule called - creating C++ RunAnywhereModule ***");
+    if (!_module) {
+        _module = std::make_shared<RunAnywhereModule>(params.jsInvoker);
+        NSLog(@"[RunAnywhere.mm] *** Created C++ module: %p ***", _module.get());
+    }
+    return _module;
+}
+
+// ============================================================================
+// RCTEventEmitter Overrides
+// ============================================================================
+
+- (NSArray<NSString *> *)supportedEvents {
+    return @[
+        @"onGenerationToken",
+        @"onGenerationComplete",
+        @"onTTSAudioChunk",
+        @"onTTSComplete",
+        @"onTranscriptionUpdate",
+        @"onVADResult",
+        @"onError"
+    ];
+}
 
 + (BOOL)requiresMainQueueSetup {
     return NO;
 }
 
-- (instancetype)init {
-    self = [super init];
-    if (self) {
-        NSLog(@"[RunAnywhere] Initialized with New Architecture (C++ TurboModule)");
-    }
-    return self;
-}
+@end
 
-// TurboModule protocol - return C++ module
-- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
-    (const facebook::react::ObjCTurboModule::InitParams &)params {
+#else // !RCT_NEW_ARCH_ENABLED
 
-    if (!_nativeModule) {
-        NSLog(@"[RunAnywhere] Creating C++ TurboModule instance");
-        _nativeModule = std::make_shared<facebook::react::RunAnywhereModule>(params.jsInvoker);
-        NSLog(@"[RunAnywhere] C++ TurboModule created successfully");
-    }
+// Old architecture fallback - not implemented
+@implementation RunAnywhere
 
-    return _nativeModule;
-}
+RCT_EXPORT_MODULE()
 
-// Supported events for event emitter
 - (NSArray<NSString *> *)supportedEvents {
-    return @[
-        @"onToken",
-        @"onGenerationComplete",
-        @"onGenerationError",
-        @"onSTTPartial",
-        @"onSTTFinal",
-        @"onSTTError",
-        @"onTTSAudio",
-        @"onTTSComplete",
-        @"onTTSError"
-    ];
+    return @[];
+}
+
++ (BOOL)requiresMainQueueSetup {
+    return NO;
 }
 
 @end
+
+#endif // RCT_NEW_ARCH_ENABLED

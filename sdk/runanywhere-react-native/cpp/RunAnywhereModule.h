@@ -19,11 +19,12 @@
 #include <jsi/jsi.h>
 #include <ReactCommon/TurboModule.h>
 #include <ReactCommon/CallInvoker.h>
+#include <ReactCommon/CxxTurboModuleUtils.h>
 
 // Include runanywhere-core C API
 // The header path is configured in CMake/Xcode build settings
 extern "C" {
-#include "runanywhere_bridge.h"
+#include "RunAnywhereCore/ra_core.h"
 }
 
 // Include codegen-generated spec
