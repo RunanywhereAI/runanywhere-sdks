@@ -303,6 +303,7 @@ class ModelPathUtils {
 
   /// Find model file at expected path: framework/modelId/modelId.format
   /// Simple structure: Models/{framework}/{modelId}/{modelId}.{format}
+  /// For ONNX, also searches nested directories (sherpa-onnx structure)
   static Future<Uri?> findModelFile({
     required String modelId,
     required LLMFramework framework,
@@ -319,16 +320,59 @@ class ModelPathUtils {
         }
       }
     } else {
-      final modelFile = await getModelFilePath(
-        modelId: modelId,
-        framework: framework,
-        format: format,
-      );
-      if (await modelFile.exists()) {
-        return Uri.file(modelFile.path);
+      // For ONNX, check nested directories (sherpa-onnx tar.bz2 structure)
+      if (framework == LLMFramework.onnx && format == ModelFormat.onnx) {
+        final modelFolder =
+            await getModelFolder(modelId: modelId, framework: framework);
+        if (await modelFolder.exists()) {
+          // First check for direct .onnx file
+          final directFile = await _findOnnxFileInDirectory(modelFolder);
+          if (directFile != null) {
+            return Uri.file(directFile.path);
+          }
+
+          // Check nested subdirectories (sherpa-onnx structure)
+          final contents = await modelFolder.list().toList();
+          for (final item in contents) {
+            if (item is Directory) {
+              final nestedFile = await _findOnnxFileInDirectory(item);
+              if (nestedFile != null) {
+                return Uri.file(nestedFile.path);
+              }
+            }
+          }
+        }
+      } else {
+        // Standard single-file model
+        final modelFile = await getModelFilePath(
+          modelId: modelId,
+          framework: framework,
+          format: format,
+        );
+        if (await modelFile.exists()) {
+          return Uri.file(modelFile.path);
+        }
       }
     }
 
+    return null;
+  }
+
+  /// Find .onnx file in a directory (non-recursive)
+  static Future<File?> _findOnnxFileInDirectory(Directory directory) async {
+    try {
+      final contents = await directory.list().toList();
+      for (final item in contents) {
+        if (item is File) {
+          final extension = item.path.split('.').last.toLowerCase();
+          if (extension == 'onnx') {
+            return item;
+          }
+        }
+      }
+    } catch (e) {
+      // Directory might not be readable
+    }
     return null;
   }
 }

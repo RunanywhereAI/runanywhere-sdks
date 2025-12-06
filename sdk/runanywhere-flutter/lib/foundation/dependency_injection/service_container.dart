@@ -160,6 +160,14 @@ class ServiceContainer {
     // Call adapter's onRegistration callback
     adapter.onRegistration();
 
+    // Register download strategy if adapter provides one
+    final downloadStrategy = adapter.getDownloadStrategy();
+    if (downloadStrategy != null) {
+      downloadService.registerStrategy(downloadStrategy);
+      logger.info(
+          'Registered download strategy for ${adapter.framework.displayName}');
+    }
+
     // Register any models provided by the adapter
     final providedModels = adapter.getProvidedModels();
     for (final model in providedModels) {

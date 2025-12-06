@@ -127,6 +127,10 @@ class DownloadService implements DownloadManager {
       _activeDownloads.remove(model.id);
 
       logger.info('Model ${model.id} downloaded successfully via strategy');
+      print(
+          '📁 [DownloadService] Downloaded to: ${destinationUri.toFilePath()}');
+      print(
+          '📁 [DownloadService] Updated model localPath: ${updatedModel.localPath?.toFilePath()}');
       return task.toProtocolTask();
     } catch (e) {
       controller.add(proto.DownloadProgress.failed(e));
@@ -260,6 +264,9 @@ class DownloadService implements DownloadManager {
 
       logger.info(
           'Model ${model.id} downloaded successfully to ${modelFile.path}');
+      print('📁 [DownloadService] Downloaded to: ${modelFile.path}');
+      print(
+          '📁 [DownloadService] Updated model localPath: ${updatedModel.localPath?.toFilePath()}');
     } catch (e) {
       task.progressController.add(proto.DownloadProgress.failed(
         e,

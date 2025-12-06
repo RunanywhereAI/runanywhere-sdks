@@ -21,6 +21,24 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// =============================================================================
+// EXPORT MACROS - For shared library symbol visibility (Flutter FFI)
+// =============================================================================
+
+#ifndef RA_API
+  #if defined(_WIN32) || defined(__CYGWIN__)
+    #ifdef RA_BUILD_SHARED
+      #define RA_API __declspec(dllexport)
+    #else
+      #define RA_API __declspec(dllimport)
+    #endif
+  #elif defined(__GNUC__) && __GNUC__ >= 4
+    #define RA_API __attribute__((visibility("default")))
+  #else
+    #define RA_API
+  #endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -50,14 +68,14 @@ extern "C" {
  * @param count Output: number of backends
  * @return Array of backend names (caller must NOT free)
  */
-const char** ra_get_available_backends(int* count);
+RA_API const char** ra_get_available_backends(int* count);
 
 /**
  * Create a backend instance by name
  * @param backend_name Name of backend ("onnx", "llamacpp", "coreml", etc.)
  * @return Handle or NULL on failure
  */
-ra_backend_handle ra_create_backend(const char* backend_name);
+RA_API ra_backend_handle ra_create_backend(const char* backend_name);
 
 /**
  * Initialize a backend with JSON configuration
@@ -65,29 +83,29 @@ ra_backend_handle ra_create_backend(const char* backend_name);
  * @param config_json JSON configuration string (can be NULL for defaults)
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_initialize(ra_backend_handle handle, const char* config_json);
+RA_API ra_result_code ra_initialize(ra_backend_handle handle, const char* config_json);
 
 /**
  * Check if backend is initialized
  */
-bool ra_is_initialized(ra_backend_handle handle);
+RA_API bool ra_is_initialized(ra_backend_handle handle);
 
 /**
  * Cleanup and destroy a backend
  */
-void ra_destroy(ra_backend_handle handle);
+RA_API void ra_destroy(ra_backend_handle handle);
 
 /**
  * Get backend info as JSON
  * @param handle Backend handle
  * @return JSON string (caller must free with ra_free_string)
  */
-char* ra_get_backend_info(ra_backend_handle handle);
+RA_API char* ra_get_backend_info(ra_backend_handle handle);
 
 /**
  * Check if backend supports a capability
  */
-bool ra_supports_capability(ra_backend_handle handle, ra_capability_type capability);
+RA_API bool ra_supports_capability(ra_backend_handle handle, ra_capability_type capability);
 
 /**
  * Get all supported capabilities
@@ -96,17 +114,17 @@ bool ra_supports_capability(ra_backend_handle handle, ra_capability_type capabil
  * @param max_count Size of capabilities array
  * @return Number of capabilities written
  */
-int ra_get_capabilities(ra_backend_handle handle, ra_capability_type* capabilities, int max_count);
+RA_API int ra_get_capabilities(ra_backend_handle handle, ra_capability_type* capabilities, int max_count);
 
 /**
  * Get device type being used
  */
-ra_device_type ra_get_device(ra_backend_handle handle);
+RA_API ra_device_type ra_get_device(ra_backend_handle handle);
 
 /**
  * Get memory usage in bytes
  */
-size_t ra_get_memory_usage(ra_backend_handle handle);
+RA_API size_t ra_get_memory_usage(ra_backend_handle handle);
 
 // =============================================================================
 // TEXT GENERATION
@@ -119,17 +137,17 @@ size_t ra_get_memory_usage(ra_backend_handle handle);
  * @param config_json Optional JSON config (can be NULL)
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_text_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
+RA_API ra_result_code ra_text_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
 
 /**
  * Check if text generation model is loaded
  */
-bool ra_text_is_model_loaded(ra_backend_handle handle);
+RA_API bool ra_text_is_model_loaded(ra_backend_handle handle);
 
 /**
  * Unload text generation model
  */
-ra_result_code ra_text_unload_model(ra_backend_handle handle);
+RA_API ra_result_code ra_text_unload_model(ra_backend_handle handle);
 
 /**
  * Generate text (synchronous)
@@ -141,7 +159,7 @@ ra_result_code ra_text_unload_model(ra_backend_handle handle);
  * @param result_json Output: JSON result (caller must free with ra_free_string)
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_text_generate(
+RA_API ra_result_code ra_text_generate(
     ra_backend_handle handle,
     const char* prompt,
     const char* system_prompt,
@@ -161,7 +179,7 @@ ra_result_code ra_text_generate(
  * @param user_data User data passed to callback
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_text_generate_stream(
+RA_API ra_result_code ra_text_generate_stream(
     ra_backend_handle handle,
     const char* prompt,
     const char* system_prompt,
@@ -174,7 +192,7 @@ ra_result_code ra_text_generate_stream(
 /**
  * Cancel ongoing text generation
  */
-void ra_text_cancel(ra_backend_handle handle);
+RA_API void ra_text_cancel(ra_backend_handle handle);
 
 // =============================================================================
 // EMBEDDINGS
@@ -183,17 +201,17 @@ void ra_text_cancel(ra_backend_handle handle);
 /**
  * Load an embedding model
  */
-ra_result_code ra_embed_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
+RA_API ra_result_code ra_embed_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
 
 /**
  * Check if embedding model is loaded
  */
-bool ra_embed_is_model_loaded(ra_backend_handle handle);
+RA_API bool ra_embed_is_model_loaded(ra_backend_handle handle);
 
 /**
  * Unload embedding model
  */
-ra_result_code ra_embed_unload_model(ra_backend_handle handle);
+RA_API ra_result_code ra_embed_unload_model(ra_backend_handle handle);
 
 /**
  * Generate embedding for text
@@ -203,7 +221,7 @@ ra_result_code ra_embed_unload_model(ra_backend_handle handle);
  * @param dimensions Output: embedding dimensions
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_embed_text(
+RA_API ra_result_code ra_embed_text(
     ra_backend_handle handle,
     const char* text,
     float** embedding,
@@ -219,7 +237,7 @@ ra_result_code ra_embed_text(
  * @param dimensions Output: embedding dimensions
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_embed_batch(
+RA_API ra_result_code ra_embed_batch(
     ra_backend_handle handle,
     const char** texts,
     int num_texts,
@@ -230,17 +248,17 @@ ra_result_code ra_embed_batch(
 /**
  * Get embedding dimensions
  */
-int ra_embed_get_dimensions(ra_backend_handle handle);
+RA_API int ra_embed_get_dimensions(ra_backend_handle handle);
 
 /**
  * Free embedding memory
  */
-void ra_free_embedding(float* embedding);
+RA_API void ra_free_embedding(float* embedding);
 
 /**
  * Free batch embeddings
  */
-void ra_free_embeddings(float** embeddings, int count);
+RA_API void ra_free_embeddings(float** embeddings, int count);
 
 // =============================================================================
 // SPEECH-TO-TEXT (STT)
@@ -254,7 +272,7 @@ void ra_free_embeddings(float** embeddings, int count);
  * @param config_json Optional JSON config
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_stt_load_model(
+RA_API ra_result_code ra_stt_load_model(
     ra_backend_handle handle,
     const char* model_path,
     const char* model_type,
@@ -264,12 +282,12 @@ ra_result_code ra_stt_load_model(
 /**
  * Check if STT model is loaded
  */
-bool ra_stt_is_model_loaded(ra_backend_handle handle);
+RA_API bool ra_stt_is_model_loaded(ra_backend_handle handle);
 
 /**
  * Unload STT model
  */
-ra_result_code ra_stt_unload_model(ra_backend_handle handle);
+RA_API ra_result_code ra_stt_unload_model(ra_backend_handle handle);
 
 /**
  * Transcribe audio (batch mode)
@@ -281,7 +299,7 @@ ra_result_code ra_stt_unload_model(ra_backend_handle handle);
  * @param result_json Output: JSON result (caller must free with ra_free_string)
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_stt_transcribe(
+RA_API ra_result_code ra_stt_transcribe(
     ra_backend_handle handle,
     const float* audio_samples,
     size_t num_samples,
@@ -293,7 +311,7 @@ ra_result_code ra_stt_transcribe(
 /**
  * Check if STT supports streaming
  */
-bool ra_stt_supports_streaming(ra_backend_handle handle);
+RA_API bool ra_stt_supports_streaming(ra_backend_handle handle);
 
 /**
  * Create STT streaming session
@@ -301,7 +319,7 @@ bool ra_stt_supports_streaming(ra_backend_handle handle);
  * @param config_json Optional JSON config
  * @return Stream handle or NULL on failure
  */
-ra_stream_handle ra_stt_create_stream(ra_backend_handle handle, const char* config_json);
+RA_API ra_stream_handle ra_stt_create_stream(ra_backend_handle handle, const char* config_json);
 
 /**
  * Feed audio to STT stream
@@ -312,7 +330,7 @@ ra_stream_handle ra_stt_create_stream(ra_backend_handle handle, const char* conf
  * @param sample_rate Sample rate
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_stt_feed_audio(
+RA_API ra_result_code ra_stt_feed_audio(
     ra_backend_handle handle,
     ra_stream_handle stream,
     const float* samples,
@@ -323,7 +341,7 @@ ra_result_code ra_stt_feed_audio(
 /**
  * Check if STT decoder is ready
  */
-bool ra_stt_is_ready(ra_backend_handle handle, ra_stream_handle stream);
+RA_API bool ra_stt_is_ready(ra_backend_handle handle, ra_stream_handle stream);
 
 /**
  * Decode and get current result
@@ -332,32 +350,32 @@ bool ra_stt_is_ready(ra_backend_handle handle, ra_stream_handle stream);
  * @param result_json Output: JSON result (caller must free)
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_stt_decode(ra_backend_handle handle, ra_stream_handle stream, char** result_json);
+RA_API ra_result_code ra_stt_decode(ra_backend_handle handle, ra_stream_handle stream, char** result_json);
 
 /**
  * Check for end-of-speech (endpoint detection)
  */
-bool ra_stt_is_endpoint(ra_backend_handle handle, ra_stream_handle stream);
+RA_API bool ra_stt_is_endpoint(ra_backend_handle handle, ra_stream_handle stream);
 
 /**
  * Signal end of audio input
  */
-void ra_stt_input_finished(ra_backend_handle handle, ra_stream_handle stream);
+RA_API void ra_stt_input_finished(ra_backend_handle handle, ra_stream_handle stream);
 
 /**
  * Reset stream for new utterance
  */
-void ra_stt_reset_stream(ra_backend_handle handle, ra_stream_handle stream);
+RA_API void ra_stt_reset_stream(ra_backend_handle handle, ra_stream_handle stream);
 
 /**
  * Destroy STT stream
  */
-void ra_stt_destroy_stream(ra_backend_handle handle, ra_stream_handle stream);
+RA_API void ra_stt_destroy_stream(ra_backend_handle handle, ra_stream_handle stream);
 
 /**
  * Cancel ongoing transcription
  */
-void ra_stt_cancel(ra_backend_handle handle);
+RA_API void ra_stt_cancel(ra_backend_handle handle);
 
 // =============================================================================
 // TEXT-TO-SPEECH (TTS)
@@ -371,7 +389,7 @@ void ra_stt_cancel(ra_backend_handle handle);
  * @param config_json Optional JSON config
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_tts_load_model(
+RA_API ra_result_code ra_tts_load_model(
     ra_backend_handle handle,
     const char* model_path,
     const char* model_type,
@@ -381,12 +399,12 @@ ra_result_code ra_tts_load_model(
 /**
  * Check if TTS model is loaded
  */
-bool ra_tts_is_model_loaded(ra_backend_handle handle);
+RA_API bool ra_tts_is_model_loaded(ra_backend_handle handle);
 
 /**
  * Unload TTS model
  */
-ra_result_code ra_tts_unload_model(ra_backend_handle handle);
+RA_API ra_result_code ra_tts_unload_model(ra_backend_handle handle);
 
 /**
  * Synthesize speech (batch mode)
@@ -400,7 +418,7 @@ ra_result_code ra_tts_unload_model(ra_backend_handle handle);
  * @param sample_rate Output: sample rate
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_tts_synthesize(
+RA_API ra_result_code ra_tts_synthesize(
     ra_backend_handle handle,
     const char* text,
     const char* voice_id,
@@ -414,7 +432,7 @@ ra_result_code ra_tts_synthesize(
 /**
  * Synthesize speech with streaming
  */
-ra_result_code ra_tts_synthesize_stream(
+RA_API ra_result_code ra_tts_synthesize_stream(
     ra_backend_handle handle,
     const char* text,
     const char* voice_id,
@@ -427,24 +445,24 @@ ra_result_code ra_tts_synthesize_stream(
 /**
  * Check if TTS supports streaming
  */
-bool ra_tts_supports_streaming(ra_backend_handle handle);
+RA_API bool ra_tts_supports_streaming(ra_backend_handle handle);
 
 /**
  * Get available voices as JSON array
  * @param handle Backend handle
  * @return JSON string (caller must free with ra_free_string)
  */
-char* ra_tts_get_voices(ra_backend_handle handle);
+RA_API char* ra_tts_get_voices(ra_backend_handle handle);
 
 /**
  * Cancel ongoing synthesis
  */
-void ra_tts_cancel(ra_backend_handle handle);
+RA_API void ra_tts_cancel(ra_backend_handle handle);
 
 /**
  * Free audio samples
  */
-void ra_free_audio(float* audio_samples);
+RA_API void ra_free_audio(float* audio_samples);
 
 // =============================================================================
 // VOICE ACTIVITY DETECTION (VAD)
@@ -457,17 +475,17 @@ void ra_free_audio(float* audio_samples);
  * @param config_json Optional JSON config
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_vad_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
+RA_API ra_result_code ra_vad_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
 
 /**
  * Check if VAD model is loaded
  */
-bool ra_vad_is_model_loaded(ra_backend_handle handle);
+RA_API bool ra_vad_is_model_loaded(ra_backend_handle handle);
 
 /**
  * Unload VAD model
  */
-ra_result_code ra_vad_unload_model(ra_backend_handle handle);
+RA_API ra_result_code ra_vad_unload_model(ra_backend_handle handle);
 
 /**
  * Process audio chunk and get speech probability
@@ -479,7 +497,7 @@ ra_result_code ra_vad_unload_model(ra_backend_handle handle);
  * @param probability Output: speech probability [0.0, 1.0]
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_vad_process(
+RA_API ra_result_code ra_vad_process(
     ra_backend_handle handle,
     const float* samples,
     size_t num_samples,
@@ -497,7 +515,7 @@ ra_result_code ra_vad_process(
  * @param result_json Output: JSON array of segments (caller must free)
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_vad_detect_segments(
+RA_API ra_result_code ra_vad_detect_segments(
     ra_backend_handle handle,
     const float* samples,
     size_t num_samples,
@@ -508,12 +526,12 @@ ra_result_code ra_vad_detect_segments(
 /**
  * Create VAD streaming session
  */
-ra_stream_handle ra_vad_create_stream(ra_backend_handle handle, const char* config_json);
+RA_API ra_stream_handle ra_vad_create_stream(ra_backend_handle handle, const char* config_json);
 
 /**
  * Feed audio to VAD stream
  */
-ra_result_code ra_vad_feed_stream(
+RA_API ra_result_code ra_vad_feed_stream(
     ra_backend_handle handle,
     ra_stream_handle stream,
     const float* samples,
@@ -526,12 +544,12 @@ ra_result_code ra_vad_feed_stream(
 /**
  * Destroy VAD stream
  */
-void ra_vad_destroy_stream(ra_backend_handle handle, ra_stream_handle stream);
+RA_API void ra_vad_destroy_stream(ra_backend_handle handle, ra_stream_handle stream);
 
 /**
  * Reset VAD state
  */
-void ra_vad_reset(ra_backend_handle handle);
+RA_API void ra_vad_reset(ra_backend_handle handle);
 
 // =============================================================================
 // SPEAKER DIARIZATION
@@ -540,17 +558,17 @@ void ra_vad_reset(ra_backend_handle handle);
 /**
  * Load a diarization model
  */
-ra_result_code ra_diarize_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
+RA_API ra_result_code ra_diarize_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
 
 /**
  * Check if diarization model is loaded
  */
-bool ra_diarize_is_model_loaded(ra_backend_handle handle);
+RA_API bool ra_diarize_is_model_loaded(ra_backend_handle handle);
 
 /**
  * Unload diarization model
  */
-ra_result_code ra_diarize_unload_model(ra_backend_handle handle);
+RA_API ra_result_code ra_diarize_unload_model(ra_backend_handle handle);
 
 /**
  * Perform speaker diarization on audio
@@ -563,7 +581,7 @@ ra_result_code ra_diarize_unload_model(ra_backend_handle handle);
  * @param result_json Output: JSON result (caller must free)
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_diarize(
+RA_API ra_result_code ra_diarize(
     ra_backend_handle handle,
     const float* samples,
     size_t num_samples,
@@ -576,7 +594,7 @@ ra_result_code ra_diarize(
 /**
  * Cancel ongoing diarization
  */
-void ra_diarize_cancel(ra_backend_handle handle);
+RA_API void ra_diarize_cancel(ra_backend_handle handle);
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -585,18 +603,18 @@ void ra_diarize_cancel(ra_backend_handle handle);
 /**
  * Free a string allocated by the bridge
  */
-void ra_free_string(char* str);
+RA_API void ra_free_string(char* str);
 
 /**
  * Get last error message
  * @return Error message (do NOT free, valid until next call)
  */
-const char* ra_get_last_error(void);
+RA_API const char* ra_get_last_error(void);
 
 /**
  * Get bridge version
  */
-const char* ra_get_version(void);
+RA_API const char* ra_get_version(void);
 
 /**
  * Extract an archive (tar.bz2, tar.gz, zip) to a destination directory
@@ -604,7 +622,7 @@ const char* ra_get_version(void);
  * @param dest_dir Destination directory path
  * @return RA_SUCCESS or error code
  */
-ra_result_code ra_extract_archive(const char* archive_path, const char* dest_dir);
+RA_API ra_result_code ra_extract_archive(const char* archive_path, const char* dest_dir);
 
 #ifdef __cplusplus
 }

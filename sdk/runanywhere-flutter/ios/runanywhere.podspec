@@ -4,10 +4,20 @@
 # This podspec integrates the RunAnywhere native library (RunAnywhereCore.xcframework)
 # into Flutter iOS apps.
 #
-# Setup:
-#   1. Download binaries: cd ../scripts && ./setup_native.sh --platform ios
-#   2. Or use remote: The xcframework will be downloaded from runanywhere-binaries
+# Configuration:
+#   Edit ../binary_config.rb to toggle between local and remote binaries:
+#   - TEST_LOCAL = true:  Use local xcframework from ios/Frameworks/ (for development)
+#   - TEST_LOCAL = false: Download from GitHub releases (for production)
 #
+# Local mode setup:
+#   1. Build locally: cd ../../runanywhere-core/scripts/ios && ./build.sh --all
+#   2. Copy: cp -R ../dist/RunAnywhereCore.xcframework path/to/flutter-sdk/ios/Frameworks/
+#
+# Remote mode: Binaries are automatically downloaded from runanywhere-binaries releases
+#
+
+# Load binary configuration
+require_relative '../binary_config.rb'
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere'
@@ -36,12 +46,18 @@ https://github.com/RunanywhereAI/runanywhere-binaries
   s.dependency 'Flutter'
 
   # Link to RunAnywhereCore XCFramework
-  # Downloaded via: ./scripts/setup_native.sh --platform ios
-  # Or from: https://github.com/RunanywhereAI/runanywhere-binaries/releases
-  s.vendored_frameworks = 'Frameworks/RunAnywhereCore.xcframework'
-
-  # Preserve framework paths
-  s.preserve_paths = 'Frameworks/**/*'
+  # Mode is controlled by binary_config.rb (testLocal flag)
+  if RunAnywhereBinaryConfig.test_local?
+    # Local mode: Use xcframework from Frameworks/ directory
+    s.vendored_frameworks = 'Frameworks/RunAnywhereCore.xcframework'
+    s.preserve_paths = 'Frameworks/**/*'
+  else
+    # Remote mode: Download from GitHub releases
+    # Note: CocoaPods doesn't support remote binary downloads in podspecs directly
+    # So we download in prepare_command and then use it locally
+    s.vendored_frameworks = 'Frameworks/RunAnywhereCore.xcframework'
+    s.preserve_paths = 'Frameworks/**/*'
+  end
 
   # Required frameworks
   s.frameworks = [
@@ -72,20 +88,47 @@ https://github.com/RunanywhereAI/runanywhere-binaries
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386'
   }
 
-  # Prepare command to check for xcframework
+  # Prepare command to download xcframework if in remote mode
   s.prepare_command = <<-CMD
-    if [ ! -d "Frameworks/RunAnywhereCore.xcframework" ]; then
-      echo "⚠️  RunAnywhereCore.xcframework not found!"
-      echo ""
-      echo "Please download binaries using one of these methods:"
-      echo ""
-      echo "  Option 1 - Using setup script:"
-      echo "    cd .. && ./scripts/setup_native.sh --platform ios"
-      echo ""
-      echo "  Option 2 - Manual download:"
-      echo "    curl -L https://github.com/RunanywhereAI/runanywhere-binaries/releases/latest/download/RunAnywhereCore.xcframework.zip -o Frameworks/xcframework.zip"
-      echo "    unzip Frameworks/xcframework.zip -d Frameworks/"
-      echo ""
+    # Load configuration to check mode
+    TEST_LOCAL=#{RunAnywhereBinaryConfig.test_local?}
+
+    if [ "$TEST_LOCAL" = "false" ]; then
+      echo "📦 Remote mode: Downloading RunAnywhereCore.xcframework..."
+
+      if [ ! -d "Frameworks/RunAnywhereCore.xcframework" ]; then
+        mkdir -p Frameworks
+        cd Frameworks
+
+        # Download from GitHub releases
+        DOWNLOAD_URL="#{RunAnywhereBinaryConfig::IOS_XCFRAMEWORK_URL}"
+        echo "Downloading from: $DOWNLOAD_URL"
+
+        curl -L "$DOWNLOAD_URL" -o RunAnywhereCore.xcframework.zip
+        unzip -q RunAnywhereCore.xcframework.zip
+        rm RunAnywhereCore.xcframework.zip
+
+        echo "✅ XCFramework downloaded successfully"
+      else
+        echo "✅ XCFramework already exists"
+      fi
+    else
+      echo "🔧 Local mode: Using xcframework from Frameworks/ directory"
+
+      if [ ! -d "Frameworks/RunAnywhereCore.xcframework" ]; then
+        echo "⚠️  RunAnywhereCore.xcframework not found!"
+        echo ""
+        echo "For local mode, please build and copy the xcframework:"
+        echo "  1. cd ../../runanywhere-core/scripts/ios && ./build.sh --all"
+        echo "  2. cp -R ../dist/RunAnywhereCore.xcframework path/to/flutter-sdk/ios/Frameworks/"
+        echo ""
+        echo "Or switch to remote mode by editing binary_config.rb:"
+        echo "  TEST_LOCAL = false"
+        echo ""
+        exit 1
+      else
+        echo "✅ Using local xcframework"
+      fi
     fi
   CMD
 end
