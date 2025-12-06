@@ -14,6 +14,8 @@ export default _RunAnywhere;
 
 // Types
 export * from './types';
+// Export commonly used enums for easy access
+export { LLMFramework, ModelCategory, ModelFormat } from './types/enums';
 
 // Errors
 export { SDKError, SDKErrorCode } from './Public/Errors/SDKError';
@@ -73,3 +75,7 @@ export {
   MessageRole,
   FinishReason,
 } from './components';
+
+// Core Registry & Providers
+export { ModuleRegistry } from './Core/ModuleRegistry';
+export { LlamaCppProvider } from './Providers';

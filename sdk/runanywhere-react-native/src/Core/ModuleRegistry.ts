@@ -97,6 +97,12 @@ export class ModuleRegistry {
     console.log(
       `[ModuleRegistry] Registered LLM provider: ${provider.name} with priority: ${priority}`
     );
+
+    // Call provider's onRegistration lifecycle hook (if implemented)
+    if (provider.onRegistration && typeof provider.onRegistration === 'function') {
+      console.log(`[ModuleRegistry] Calling onRegistration() for provider: ${provider.name}`);
+      provider.onRegistration();
+    }
   }
 
   /**

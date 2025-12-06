@@ -112,3 +112,41 @@ export enum FinishReason {
   Error = 'error',
 }
 
+/**
+ * Token emitted during streaming generation
+ */
+export interface LLMStreamToken {
+  /** The token text */
+  readonly token: string;
+  /** Whether this is the last token */
+  readonly isLast: boolean;
+  /** Index of this token in the sequence */
+  readonly tokenIndex: number;
+  /** Timestamp when this token was generated */
+  readonly timestamp: Date;
+}
+
+/**
+ * Performance metrics for streaming generation
+ */
+export interface LLMStreamMetrics {
+  /** Time to first token in milliseconds */
+  readonly timeToFirstTokenMs: number;
+  /** Tokens generated per second */
+  readonly tokensPerSecond: number;
+  /** Total number of tokens generated */
+  readonly totalTokens: number;
+  /** Total generation time in milliseconds */
+  readonly totalTimeMs: number;
+}
+
+/**
+ * Result of streaming generation with both tokens and final output
+ */
+export interface LLMStreamResult {
+  /** Async generator yielding tokens */
+  readonly stream: AsyncGenerator<LLMStreamToken, void, unknown>;
+  /** Promise that resolves to final output with metrics */
+  readonly result: Promise<LLMOutput>;
+}
+

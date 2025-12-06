@@ -10,6 +10,7 @@
 import { EventBus } from './Events';
 import { requireNativeModule, isNativeModuleAvailable, NativeRunAnywhere } from '../native';
 import { SDKEnvironment, ExecutionTarget, HardwareAcceleration } from '../types';
+import { ModelRegistry } from '../services/ModelRegistry';
 import type {
   GenerationOptions,
   GenerationResult,
@@ -18,6 +19,7 @@ import type {
   STTResult,
   TTSConfiguration,
   TTSResult,
+  ModelInfo,
 } from '../types';
 
 // ============================================================================
@@ -237,6 +239,29 @@ export const RunAnywhere = {
         return;
       }
       throw error;
+    }
+
+    // Register framework providers (same pattern as Swift SDK)
+    // This must happen BEFORE ModelRegistry.initialize() so models can be registered
+    console.log('[RunAnywhere] Registering framework providers...');
+    try {
+      // Register LlamaCPP provider for GGUF models
+      const { LlamaCppProvider } = require('../Providers/LlamaCppProvider');
+      LlamaCppProvider.register();
+      console.log('[RunAnywhere] LlamaCPP provider registered');
+    } catch (error) {
+      console.warn('[RunAnywhere] Failed to register LlamaCPP provider:', error);
+    }
+
+    // Initialize the Model Registry (same pattern as Swift SDK)
+    // This loads the catalog models AND models provided by registered providers
+    try {
+      await ModelRegistry.initialize();
+      console.log('[RunAnywhere] Model Registry initialized successfully');
+    } catch (error) {
+      console.warn('[RunAnywhere] Model Registry initialization failed (non-critical):', error);
+      // Don't fail SDK initialization if model registry fails
+      // Models can still be added manually via addModelFromURL
     }
 
     state.initialized = true;
@@ -948,6 +973,9 @@ export const RunAnywhere = {
   /**
    * Get available models from the catalog
    *
+   * This uses the JavaScript ModelRegistry service (same pattern as Swift SDK)
+   * and does not require native module calls.
+   *
    * @returns Array of model info objects
    *
    * @example
@@ -957,16 +985,70 @@ export const RunAnywhere = {
    * ```
    */
   async getAvailableModels(): Promise<ModelInfo[]> {
-    if (!isNativeModuleAvailable()) {
-      return [];
+    return ModelRegistry.getAvailableModels();
+  },
+
+  /**
+   * Get available frameworks
+   *
+   * Returns an array of frameworks that have registered providers.
+   * This matches the Swift SDK's getAvailableFrameworks() API.
+   *
+   * @returns Array of available frameworks
+   *
+   * @example
+   * ```typescript
+   * const frameworks = RunAnywhere.getAvailableFrameworks();
+   * console.log('Available frameworks:', frameworks);
+   * ```
+   */
+  getAvailableFrameworks(): import('../types').LLMFramework[] {
+    const { ModuleRegistry } = require('../Core/ModuleRegistry');
+
+    // Get all registered LLM providers
+    const llmProviders = ModuleRegistry.shared.allLLMProviders();
+
+    // Extract unique frameworks from models provided by each provider
+    const frameworksSet = new Set<import('../types').LLMFramework>();
+
+    for (const provider of llmProviders) {
+      if (provider.getProvidedModels) {
+        const models = provider.getProvidedModels();
+        for (const model of models) {
+          // Add all compatible frameworks
+          for (const framework of model.compatibleFrameworks) {
+            frameworksSet.add(framework);
+          }
+          // Also add preferred framework if specified
+          if (model.preferredFramework) {
+            frameworksSet.add(model.preferredFramework);
+          }
+        }
+      }
     }
-    const native = requireNativeModule();
-    const modelsJson = await native.getAvailableModels();
-    try {
-      return JSON.parse(modelsJson);
-    } catch {
-      return [];
-    }
+
+    return Array.from(frameworksSet);
+  },
+
+  /**
+   * Get models for a specific framework
+   *
+   * This matches the Swift SDK's getModelsForFramework() API.
+   *
+   * @param framework - The framework to query
+   * @returns Array of models compatible with the framework
+   *
+   * @example
+   * ```typescript
+   * const llamaCppModels = RunAnywhere.getModelsForFramework(LLMFramework.LlamaCpp);
+   * ```
+   */
+  async getModelsForFramework(framework: import('../types').LLMFramework): Promise<ModelInfo[]> {
+    const allModels = await ModelRegistry.getAvailableModels();
+    return allModels.filter(model =>
+      model.compatibleFrameworks.includes(framework) ||
+      model.preferredFramework === framework
+    );
   },
 
   /**
@@ -995,11 +1077,8 @@ export const RunAnywhere = {
    * @param modelId - Model ID
    */
   async isModelDownloaded(modelId: string): Promise<boolean> {
-    if (!isNativeModuleAvailable()) {
-      return false;
-    }
-    const native = requireNativeModule();
-    return native.isModelDownloaded(modelId);
+    const { JSDownloadService } = require('../services/JSDownloadService');
+    return JSDownloadService.isModelDownloaded(modelId);
   },
 
   /**
@@ -1009,11 +1088,8 @@ export const RunAnywhere = {
    * @returns Path or null if not downloaded
    */
   async getModelPath(modelId: string): Promise<string | null> {
-    if (!isNativeModuleAvailable()) {
-      return null;
-    }
-    const native = requireNativeModule();
-    return native.getModelPath(modelId);
+    const { JSDownloadService } = require('../services/JSDownloadService');
+    return JSDownloadService.getModelPath(modelId);
   },
 
   /**
@@ -1041,53 +1117,36 @@ export const RunAnywhere = {
   /**
    * Download a model
    *
-   * Progress is delivered via events (onModelDownloadProgress).
-   * Completion via onModelDownloadComplete or onModelDownloadError.
+   * Uses JavaScript-based download with react-native-fs for reliable model downloads.
+   * Progress is delivered via the callback and events.
    *
    * @param modelId - Model ID to download
    * @param onProgress - Optional progress callback
-   * @returns Promise that resolves when download starts
+   * @returns Promise that resolves to local file path when complete
    *
    * @example
    * ```typescript
-   * await RunAnywhere.downloadModel('whisper-tiny-en', (progress) => {
+   * const localPath = await RunAnywhere.downloadModel('smollm2-360m-q8-0', (progress) => {
    *   console.log(`Progress: ${(progress.progress * 100).toFixed(1)}%`);
    * });
+   * console.log('Model downloaded to:', localPath);
    * ```
    */
   async downloadModel(
     modelId: string,
     onProgress?: (progress: DownloadProgress) => void
   ): Promise<string> {
-    if (!isNativeModuleAvailable()) {
-      throw new Error('Native module not available');
-    }
-    const native = requireNativeModule();
+    // Use JavaScript-based download service (uses react-native-fs)
+    // This is more reliable than native module and matches Swift SDK pattern
+    const { JSDownloadService } = require('../services/JSDownloadService');
 
-    // Subscribe to progress events if callback provided
-    let unsubscribe: (() => void) | null = null;
-    if (onProgress) {
-      unsubscribe = EventBus.onModel((event) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const evt = event as any;
-        if (evt.type === 'downloadProgress' && evt.modelId === modelId) {
-          onProgress({
-            modelId: evt.modelId,
-            bytesDownloaded: evt.bytesDownloaded ?? 0,
-            totalBytes: evt.totalBytes ?? 0,
-            progress: evt.progress ?? 0,
-          });
-        }
-        if (
-          (evt.type === 'downloadCompleted' || evt.type === 'downloadFailed') &&
-          evt.modelId === modelId
-        ) {
-          if (unsubscribe) unsubscribe();
-        }
-      });
+    if (!JSDownloadService.isAvailable()) {
+      throw new Error(
+        'Download functionality requires react-native-fs. Please install it: npm install react-native-fs'
+      );
     }
 
-    return native.downloadModel(modelId);
+    return JSDownloadService.downloadModel(modelId, onProgress);
   },
 
   /**
@@ -1096,11 +1155,8 @@ export const RunAnywhere = {
    * @param modelId - Model ID being downloaded
    */
   async cancelDownload(modelId: string): Promise<boolean> {
-    if (!isNativeModuleAvailable()) {
-      return false;
-    }
-    const native = requireNativeModule();
-    return native.cancelDownload(modelId);
+    const { JSDownloadService } = require('../services/JSDownloadService');
+    return JSDownloadService.cancelDownload(modelId);
   },
 
   /**
@@ -1109,11 +1165,8 @@ export const RunAnywhere = {
    * @param modelId - Model ID to delete
    */
   async deleteModel(modelId: string): Promise<boolean> {
-    if (!isNativeModuleAvailable()) {
-      return false;
-    }
-    const native = requireNativeModule();
-    return native.deleteModel(modelId);
+    const { JSDownloadService } = require('../services/JSDownloadService');
+    return JSDownloadService.deleteModel(modelId);
   },
 
   // ============================================================================
@@ -1143,20 +1196,9 @@ export const RunAnywhere = {
 
 /**
  * Model information from the catalog
+ * Re-exported from types/models.ts
  */
-export interface ModelInfo {
-  id: string;
-  name: string;
-  description?: string;
-  category: string;
-  modality: string;
-  size: number;
-  downloadUrl?: string;
-  format: string;
-  modelType: string;
-  isDownloaded: boolean;
-  localPath?: string;
-}
+export type { ModelInfo } from '../types/models';
 
 /**
  * Download progress information

@@ -70,3 +70,41 @@ export type {
   SDKVoiceEvent,
   UnsubscribeFunction,
 } from './events';
+
+// Analytics
+export {
+  AnalyticsContext,
+  GenerationEventType,
+  STTEventType,
+  TTSEventType,
+} from './analytics';
+
+export type {
+  AnalyticsEvent,
+  AnalyticsEventData,
+  AnalyticsMetrics,
+  DeviceInfo,
+  ErrorEventData,
+  FinalTranscriptData,
+  FirstTokenData,
+  GenerationCompletionData,
+  GenerationMetrics,
+  GenerationStartData,
+  LanguageDetectionData,
+  ModelLoadingData,
+  ModelUnloadingData,
+  PartialTranscriptData,
+  SessionEndedData,
+  SessionMetadata,
+  SessionStartedData,
+  SpeakerChangeData,
+  SpeakerDetectionData,
+  STTMetrics,
+  STTTranscriptionData,
+  StreamingUpdateData,
+  TelemetryData,
+  TranscriptionStartData,
+  TTSMetrics,
+  TTSSynthesisCompletionData,
+  TTSSynthesisStartData,
+} from './analytics';

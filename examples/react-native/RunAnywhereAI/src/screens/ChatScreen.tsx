@@ -99,9 +99,9 @@ export const ChatScreen: React.FC = () => {
   const loadAvailableModels = async () => {
     try {
       const allModels = await RunAnywhere.getAvailableModels();
-      const llmModels = allModels.filter((m: SDKModelInfo) => m.modality === 'llm');
+      const llmModels = allModels.filter((m: SDKModelInfo) => m.category === ModelCategory.Language);
       setAvailableModels(llmModels);
-      console.log('[ChatScreen] Available LLM models:', llmModels.map((m: SDKModelInfo) => `${m.id}(${m.isDownloaded ? 'downloaded' : 'not downloaded'})`));
+      console.log('[ChatScreen] Available LLM models:', llmModels.map((m: SDKModelInfo) => `${m.id} (${m.isDownloaded ? 'downloaded' : 'not downloaded'})`));
     } catch (error) {
       console.log('[ChatScreen] Error loading models:', error);
     }

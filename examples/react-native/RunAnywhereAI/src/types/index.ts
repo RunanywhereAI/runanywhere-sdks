@@ -20,6 +20,7 @@ export * from './quiz';
 // Navigation types
 export type RootTabParamList = {
   Chat: undefined;
+  Models: undefined;
   STT: undefined;
   TTS: undefined;
   Quiz: undefined;

@@ -9,6 +9,7 @@
 
 import { requireNativeModule } from '../native';
 import type { LLMFramework, ModelCategory, ModelFormat, ModelInfo } from '../types';
+import { getAllCatalogModels } from '../Data/modelCatalog';
 
 /**
  * Criteria for filtering models
@@ -63,14 +64,23 @@ class ModelRegistryImpl {
 
   /**
    * Initialize the registry
+   *
+   * Following Swift SDK pattern - loads pre-configured models from catalog.
+   * This ensures users see available models before downloading.
    */
   async initialize(): Promise<void> {
-    const native = requireNativeModule();
-    await native.initializeRegistry();
-    this.initialized = true;
+    console.log('[ModelRegistry] Initializing registry...');
 
-    // Load initial models into cache
-    await this.refreshCache();
+    // Load pre-configured models from catalog
+    const catalogModels = getAllCatalogModels();
+
+    // Populate the cache with catalog models
+    for (const model of catalogModels) {
+      this.modelsCache.set(model.id, model);
+    }
+
+    this.initialized = true;
+    console.log(`[ModelRegistry] Registry initialized with ${catalogModels.length} catalog models`);
   }
 
   /**
@@ -94,12 +104,14 @@ class ModelRegistryImpl {
   /**
    * Register a model
    *
+   * Updates the model in the local cache. This is used by the download service
+   * to update model info after download completes.
+   *
    * @param model - Model information to register
    */
   async registerModel(model: ModelInfo): Promise<void> {
-    const native = requireNativeModule();
-    await native.registerModel(JSON.stringify(model));
     this.modelsCache.set(model.id, model);
+    console.log(`[ModelRegistry] Registered/updated model: ${model.id}`);
   }
 
   /**
@@ -108,9 +120,10 @@ class ModelRegistryImpl {
    * @param model - Model information to register and persist
    */
   async registerModelPersistently(model: ModelInfo): Promise<void> {
-    const native = requireNativeModule();
-    await native.registerModelPersistently(JSON.stringify(model));
+    // For now, just update the cache
+    // TODO: Persist to AsyncStorage for cross-session persistence
     this.modelsCache.set(model.id, model);
+    console.log(`[ModelRegistry] Registered model persistently: ${model.id}`);
   }
 
   /**
@@ -146,9 +159,24 @@ class ModelRegistryImpl {
    * @returns Filtered models
    */
   async filterModels(criteria: ModelCriteria): Promise<ModelInfo[]> {
-    const native = requireNativeModule();
-    const modelsJson = await native.filterModels(JSON.stringify(criteria));
-    return JSON.parse(modelsJson) as ModelInfo[];
+    // Work with local cache (same as Swift SDK)
+    let models = Array.from(this.modelsCache.values());
+
+    // Apply filters
+    if (criteria.framework) {
+      models = models.filter(m => m.compatibleFrameworks.includes(criteria.framework!));
+    }
+    if (criteria.category) {
+      models = models.filter(m => m.category === criteria.category);
+    }
+    if (criteria.downloadedOnly) {
+      models = models.filter(m => m.localPath != null);
+    }
+    if (criteria.availableOnly) {
+      models = models.filter(m => m.localPath != null || m.downloadURL != null);
+    }
+
+    return models;
   }
 
   /**

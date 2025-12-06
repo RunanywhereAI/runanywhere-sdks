@@ -13,6 +13,7 @@ import { RootTabParamList } from '../types';
 
 // Screens
 import ChatScreen from '../screens/ChatScreen';
+import { ModelsScreen } from '../screens/ModelsScreen';
 import STTScreen from '../screens/STTScreen';
 import TTSScreen from '../screens/TTSScreen';
 import QuizScreen from '../screens/QuizScreen';
@@ -26,6 +27,7 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
  */
 const tabIcons: Record<keyof RootTabParamList, { focused: string; unfocused: string }> = {
   Chat: { focused: 'chatbubble', unfocused: 'chatbubble-outline' },
+  Models: { focused: 'cube', unfocused: 'cube-outline' },
   STT: { focused: 'mic', unfocused: 'mic-outline' },
   TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' },
   Quiz: { focused: 'school', unfocused: 'school-outline' },
@@ -38,6 +40,7 @@ const tabIcons: Record<keyof RootTabParamList, { focused: string; unfocused: str
  */
 const tabLabels: Record<keyof RootTabParamList, string> = {
   Chat: 'Chat',
+  Models: 'Models',
   STT: 'Speech',
   TTS: 'Voice',
   Quiz: 'Quiz',
@@ -71,6 +74,11 @@ export const TabNavigator: React.FC = () => {
         name="Chat"
         component={ChatScreen}
         options={{ tabBarLabel: tabLabels.Chat }}
+      />
+      <Tab.Screen
+        name="Models"
+        component={ModelsScreen}
+        options={{ tabBarLabel: tabLabels.Models }}
       />
       <Tab.Screen
         name="STT"
