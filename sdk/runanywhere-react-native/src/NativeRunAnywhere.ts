@@ -68,6 +68,12 @@ export interface Spec extends TurboModule {
   // ============================================================================
 
   /**
+   * Get list of available backends that are registered.
+   * @returns Promise that resolves to array of backend names
+   */
+  getAvailableBackends(): Promise<string[]>;
+
+  /**
    * Create a new backend instance.
    * @param name Backend name (e.g., "onnx", "llamacpp", "coreml")
    * @returns true if backend was created successfully

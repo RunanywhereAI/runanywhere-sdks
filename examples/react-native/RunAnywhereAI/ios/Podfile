@@ -1,3 +1,6 @@
+# CRITICAL: Enable React Native New Architecture (required for RunAnywhere SDK)
+ENV['RCT_NEW_ARCH_ENABLED'] = '1'
+
 # Resolve react_native_pods.rb with node to allow for hoisting
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
@@ -6,7 +9,7 @@ require Pod::Executable.execute_command('node', ['-p',
   )', __dir__]).strip
 
 # RunAnywhere SDK requires iOS 14.0 minimum
-platform :ios, '14.0'
+platform :ios, '15.1'
 prepare_react_native_project!
 
 # react-native-permissions setup
@@ -38,7 +41,10 @@ target 'RunAnywhereAI' do
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/.."
+    :app_path => "#{Pod::Config.instance.installation_root}/..",
+    # Enable New Architecture (TurboModules + Fabric)
+    :hermes_enabled => true,
+    :fabric_enabled => true
   )
 
   target 'RunAnywhereAITests' do
@@ -51,7 +57,7 @@ target 'RunAnywhereAI' do
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => false,
+      :mac_catalyst_enabled => false
       # :ccache_enabled => true
     )
   end

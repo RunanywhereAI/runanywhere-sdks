@@ -28,24 +28,27 @@ Pod::Spec.new do |s|
   s.exclude_files = "cpp/include/**/*.h"
 
   # Public headers
-  s.public_header_files = "ios/**/*.h"
+  s.public_header_files = "ios/**/*.h", "cpp/RunAnywhereModule.h"
 
-  # Header search paths
+  # Pod target xcconfig - Settings applied to the pod target itself
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
     "HEADER_SEARCH_PATHS" => [
       "$(PODS_TARGET_SRCROOT)/cpp",
-      "$(PODS_TARGET_SRCROOT)/cpp/include"
+      "$(PODS_TARGET_SRCROOT)/cpp/include",
+      "$(PODS_ROOT)/Headers/Public",
+      "$(PODS_ROOT)/Headers/Private"
     ].join(" "),
     "OTHER_LDFLAGS" => "-ObjC -all_load",
-    "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) RCT_NEW_ARCH_ENABLED=1"
+    "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) RCT_NEW_ARCH_ENABLED=1",
+    "DEFINES_MODULE" => "YES"
   }
 
-  # User target xcconfig
+  # User target xcconfig - Settings applied to the app target that uses this pod
+  # NOTE: user_target_xcconfig does NOT actually set build settings on the app target
+  # Users must enable New Architecture in their Podfile with: ENV['RCT_NEW_ARCH_ENABLED'] = '1'
   s.user_target_xcconfig = {
-    "HEADER_SEARCH_PATHS" => [
-      "$(PODS_ROOT)/runanywhere-react-native/cpp/include"
-    ].join(" ")
+    "CLANG_CXX_LANGUAGE_STANDARD" => "c++20"
   }
 
   # Required system libraries and frameworks
@@ -73,66 +76,57 @@ Pod::Spec.new do |s|
 
   # Option 1: Local XCFramework (for development)
   # Uncomment this and comment out Option 2 if you have the framework locally
-  # s.vendored_frameworks = "ios/Frameworks/RunAnywhereONNX.xcframework"
+  s.vendored_frameworks = "ios/Frameworks/RunAnywhereCore.xcframework"
 
   # Option 2: Remote XCFramework via prepare_command
   # This downloads the XCFramework during pod install
-  s.prepare_command = <<-CMD
-    echo "Downloading #{XCFRAMEWORK_NAME}.xcframework..."
+  # s.prepare_command = <<-CMD
+  #   echo "Downloading #{XCFRAMEWORK_NAME}.xcframework..."
 
-    FRAMEWORK_DIR="#{__dir__}/ios/Frameworks"
-    FRAMEWORK_PATH="$FRAMEWORK_DIR/#{XCFRAMEWORK_NAME}.xcframework"
+  #   FRAMEWORK_DIR="#{__dir__}/ios/Frameworks"
+  #   FRAMEWORK_PATH="$FRAMEWORK_DIR/#{XCFRAMEWORK_NAME}.xcframework"
 
-    # Skip if already exists
-    if [ -d "$FRAMEWORK_PATH" ]; then
-      echo "XCFramework already exists, skipping download."
-      exit 0
-    fi
+  #   # Skip if already exists
+  #   if [ -d "$FRAMEWORK_PATH" ]; then
+  #     echo "XCFramework already exists, skipping download."
+  #     exit 0
+  #   fi
 
-    mkdir -p "$FRAMEWORK_DIR"
+  #   mkdir -p "$FRAMEWORK_DIR"
 
-    DOWNLOAD_URL="https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v#{XCFRAMEWORK_VERSION}/#{XCFRAMEWORK_NAME}.xcframework.zip"
-    ZIP_PATH="$FRAMEWORK_DIR/#{XCFRAMEWORK_NAME}.xcframework.zip"
+  #   DOWNLOAD_URL="https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v#{XCFRAMEWORK_VERSION}/#{XCFRAMEWORK_NAME}.xcframework.zip"
+  #   ZIP_PATH="$FRAMEWORK_DIR/#{XCFRAMEWORK_NAME}.xcframework.zip"
 
-    echo "Downloading from: $DOWNLOAD_URL"
-    curl -L -o "$ZIP_PATH" "$DOWNLOAD_URL"
+  #   echo "Downloading from: $DOWNLOAD_URL"
+  #   curl -L -o "$ZIP_PATH" "$DOWNLOAD_URL"
 
-    if [ $? -ne 0 ]; then
-      echo "ERROR: Failed to download XCFramework"
-      exit 1
-    fi
+  #   if [ $? -ne 0 ]; then
+  #     echo "ERROR: Failed to download XCFramework"
+  #     exit 1
+  #   fi
 
-    # Verify checksum
-    ACTUAL_CHECKSUM=$(shasum -a 256 "$ZIP_PATH" | cut -d ' ' -f 1)
-    EXPECTED_CHECKSUM="#{XCFRAMEWORK_CHECKSUM}"
+  #   # Verify checksum
+  #   ACTUAL_CHECKSUM=$(shasum -a 256 "$ZIP_PATH" | cut -d ' ' -f 1)
+  #   EXPECTED_CHECKSUM="#{XCFRAMEWORK_CHECKSUM}"
 
-    if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
-      echo "ERROR: Checksum mismatch!"
-      echo "  Expected: $EXPECTED_CHECKSUM"
-      echo "  Actual:   $ACTUAL_CHECKSUM"
-      rm -f "$ZIP_PATH"
-      exit 1
-    fi
+  #   if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+  #     echo "ERROR: Checksum mismatch!"
+  #     echo "  Expected: $EXPECTED_CHECKSUM"
+  #     echo "  Actual:   $ACTUAL_CHECKSUM"
+  #     rm -f "$ZIP_PATH"
+  #     exit 1
+  #   fi
 
-    echo "Checksum verified, extracting..."
-    unzip -q -o "$ZIP_PATH" -d "$FRAMEWORK_DIR"
-    rm -f "$ZIP_PATH"
+  #   echo "Checksum verified, extracting..."
+  #   unzip -q -o "$ZIP_PATH" -d "$FRAMEWORK_DIR"
+  #   rm -f "$ZIP_PATH"
 
-    echo "XCFramework installed successfully!"
-  CMD
+  #   echo "XCFramework installed successfully!"
+  # CMD
 
-  # Note: We're NOT using vendored_frameworks because it causes duplicate symbols.
-  # CocoaPods extracts XCFrameworks to XCFrameworkIntermediates, and with vendored_frameworks
-  # + our manual linking, the library gets linked twice. Instead, we directly link it.
-  # s.vendored_frameworks = "ios/Frameworks/#{XCFRAMEWORK_NAME}.xcframework"
-
-  # Direct linking of the XCFramework static library
-  # This ensures all symbols are loaded via -force_load
-  # Using PODS_ROOT to get the correct absolute path to the node_modules directory
-  s.xcconfig = {
-    "OTHER_LDFLAGS" => "$(inherited) -force_load \"$(PODS_ROOT)/../../node_modules/runanywhere-react-native/ios/Frameworks/#{XCFRAMEWORK_NAME}.xcframework/ios-arm64/lib#{XCFRAMEWORK_NAME}.a\"",
-    "HEADER_SEARCH_PATHS" => "$(inherited) \"$(PODS_ROOT)/../../node_modules/runanywhere-react-native/ios/Frameworks/#{XCFRAMEWORK_NAME}.xcframework/ios-arm64/Headers\""
-  }
+  # Using vendored_frameworks to let CocoaPods handle XCFramework slicing automatically
+  # CocoaPods extracts the correct slice (device or simulator) to XCFrameworkIntermediates
+  s.vendored_frameworks = "ios/Frameworks/#{XCFRAMEWORK_NAME}.xcframework"
 
   # =============================================================================
   # OPTIONAL: LlamaCpp Subspec for LLM Support

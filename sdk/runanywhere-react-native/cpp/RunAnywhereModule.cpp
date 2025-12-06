@@ -80,18 +80,36 @@ RunAnywhereModule::RunAnywhereModule(std::shared_ptr<CallInvoker> jsInvoker)
     : TurboModule("RunAnywhere", jsInvoker)
 #endif
     , jsInvoker_(std::move(jsInvoker)) {
+    printf("\n");
+    printf("═══════════════════════════════════════════════════════════\n");
+    printf("  RunAnywhereModule Constructor - START\n");
+    printf("═══════════════════════════════════════════════════════════\n");
+    printf("[RunAnywhere C++] this pointer: %p\n", (void*)this);
+    printf("[RunAnywhere C++] CallInvoker valid: %s\n", jsInvoker_ ? "YES" : "NO");
+
+#if __has_include("RunAnywhereSpecJSI.h")
+    printf("[RunAnywhere C++] Base class: NativeRunAnywhereCxxSpec<RunAnywhereModule> (CODEGEN)\n");
+#else
+    printf("[RunAnywhere C++] Base class: TurboModule (FALLBACK)\n");
+#endif
+
     // Check which backends are available
     int count = 0;
     const char** backends = ra_get_available_backends(&count);
 
-    printf("[RunAnywhere C++] Constructor - Found %d available backends:\n", count);
+    printf("[RunAnywhere C++] Found %d available backends:\n", count);
     for (int i = 0; i < count; i++) {
         printf("[RunAnywhere C++]   - %s\n", backends[i]);
     }
 
     if (count == 0) {
-        printf("[RunAnywhere C++] WARNING: No backends registered! XCFramework may not have proper backend registration.\n");
+        printf("[RunAnywhere C++] ⚠️  WARNING: No backends registered!\n");
     }
+
+    printf("═══════════════════════════════════════════════════════════\n");
+    printf("  RunAnywhereModule Constructor - END\n");
+    printf("═══════════════════════════════════════════════════════════\n");
+    printf("\n");
 }
 
 RunAnywhereModule::~RunAnywhereModule() {
@@ -897,3 +915,6 @@ ra_stream_handle RunAnywhereModule::getStreamHandle(int id) {
 }
 
 } // namespace facebook::react
+
+// NOTE: C++ TurboModule registration is done in RunAnywhereTurboModuleProvider.mm
+// via ObjC +load method, which is guaranteed to run before main().
