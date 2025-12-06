@@ -335,16 +335,11 @@ public class AlamofireDownloadService: DownloadManager, @unchecked Sendable {
 
     /// Helper to get destination folder for a model
     private func getDestinationFolder(for modelId: String, framework: LLMFramework? = nil) throws -> URL {
-        let fileManager = ServiceContainer.shared.fileManager
-        let modelFolder: Folder
-
         if let framework = framework {
-            modelFolder = try fileManager.getModelFolder(for: modelId, framework: framework)
+            return try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
         } else {
-            modelFolder = try fileManager.getModelFolder(for: modelId)
+            return try ModelPathUtils.getModelFolder(modelId: modelId)
         }
-
-        return URL(fileURLWithPath: modelFolder.path)
     }
 
     // MARK: - Helper Methods

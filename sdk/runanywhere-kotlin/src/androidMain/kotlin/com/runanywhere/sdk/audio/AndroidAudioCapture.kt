@@ -9,10 +9,11 @@ import android.media.MediaRecorder
 import androidx.core.app.ActivityCompat
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -55,14 +56,17 @@ class AndroidAudioCapture(
     private val bufferSizeFrames = minBufferSize / frameSize
 
     private var audioRecord: AudioRecord? = null
+    @Volatile
     private var isRecording = false
     private var sequenceNumber = 0
 
     /**
      * Start continuous audio capture
      * Returns a Flow of VoiceAudioChunk similar to iOS AudioCapture
+     *
+     * Uses callbackFlow to allow thread-safe emissions from the IO dispatcher
      */
-    fun startContinuousCapture(): Flow<VoiceAudioChunk> = flow {
+    fun startContinuousCapture(): Flow<VoiceAudioChunk> = callbackFlow {
         if (!hasRecordPermission()) {
             throw AudioCaptureException("Microphone permission not granted")
         }
@@ -81,7 +85,7 @@ class AndroidAudioCapture(
 
         val bufferSize = minBufSize * options.bufferSizeMultiplier
 
-        audioRecord = AudioRecord(
+        val record = AudioRecord(
             audioSource,
             sampleRate,
             channelConfig,
@@ -93,16 +97,18 @@ class AndroidAudioCapture(
             }
         }
 
+        audioRecord = record
         val buffer = ByteArray(bufferSize)
 
-        withContext(Dispatchers.IO) {
-            audioRecord?.startRecording()
+        // Launch audio capture on IO dispatcher
+        val captureJob = launch(Dispatchers.IO) {
+            record.startRecording()
             isRecording = true
             logger.info("Started audio capture: $sampleRate Hz, $channels ch, buffer=$bufferSize bytes")
 
             try {
-                while (isRecording && coroutineContext.isActive) {
-                    val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                while (isRecording && isActive) {
+                    val bytesRead = record.read(buffer, 0, buffer.size)
 
                     if (bytesRead > 0) {
                         // Convert to Float samples for processing
@@ -118,33 +124,42 @@ class AndroidAudioCapture(
                             isFinal = false
                         )
 
-                        // Send chunk to flow
-                        emit(chunk)
+                        // Send chunk to flow (thread-safe with callbackFlow)
+                        trySend(chunk)
                     } else if (bytesRead < 0) {
                         // Handle error codes
                         logger.warn("AudioRecord read error: $bytesRead")
                     }
                 }
-            } finally {
-                // Ensure AudioRecord is always released, even on cancellation or error
-                logger.info("Cleaning up audio capture resources")
-                isRecording = false
-                audioRecord?.let { record ->
+            } catch (e: Exception) {
+                logger.error("Error during audio capture", e)
+                close(e)
+            }
+        }
+
+        // Cleanup when flow is cancelled or closed
+        awaitClose {
+            logger.info("Cleaning up audio capture resources")
+            isRecording = false
+            captureJob.cancel()
+
+            synchronized(this@AndroidAudioCapture) {
+                audioRecord?.let { rec ->
                     try {
-                        if (record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-                            record.stop()
+                        if (rec.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                            rec.stop()
                         }
-                        record.release()
-                        logger.info("AudioRecord stopped and released in finally block")
+                        rec.release()
+                        logger.info("AudioRecord stopped and released")
                     } catch (e: Exception) {
-                        logger.error("Error releasing AudioRecord in finally block", e)
+                        logger.error("Error releasing AudioRecord", e)
                     }
+                    audioRecord = null
                 }
-                audioRecord = null
                 sequenceNumber = 0
             }
         }
-    }.flowOn(Dispatchers.IO)
+    }
 
     /**
      * Record audio for a specific duration and return as ByteArray

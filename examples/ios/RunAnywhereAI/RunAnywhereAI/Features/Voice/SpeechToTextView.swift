@@ -1,6 +1,7 @@
 import SwiftUI
 import RunAnywhere
 import AVFoundation
+import Combine
 import os
 
 // Using STTMode from RunAnywhere SDK
@@ -152,20 +153,6 @@ struct SpeechToTextView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(Color(.secondarySystemBackground))
                                 .cornerRadius(12)
-
-                            // Metadata - TODO: Re-enable when metadata is available
-                            // if let metadata = viewModel.metadata {
-                            //     VStack(alignment: .leading, spacing: 4) {
-                            //         metadataRow(icon: "clock", label: "Processing", value: String(format: "%.0fms", metadata.processingTimeMs))
-                            //         metadataRow(icon: "waveform", label: "Audio Duration", value: String(format: "%.1fs", metadata.audioDurationMs / 1000))
-                            //         metadataRow(icon: "speedometer", label: "Real-time Factor", value: String(format: "%.2fx", metadata.realTimeFactor))
-                            //     }
-                            //     .font(.caption)
-                            //     .foregroundColor(.secondary)
-                            //     .padding()
-                            //     .background(Color(.tertiarySystemBackground))
-                            //     .cornerRadius(8)
-                            // }
                         }
                     }
                 }
@@ -322,7 +309,8 @@ class STTViewModel: ObservableObject {
     private var audioBuffer = Data()
     private var streamingTask: Task<Void, Never>?
     private var audioContinuation: AsyncStream<Data>.Continuation?
-    private var recordedSampleRate: Double = 48000
+    private var audioConverter: AVAudioConverter?
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
 
@@ -333,6 +321,76 @@ class STTViewModel: ObservableObject {
         let status = AVAudioApplication.shared.recordPermission
         if status != .granted {
             await AVAudioApplication.requestRecordPermission()
+        }
+
+        // Subscribe to model lifecycle changes from SDK
+        subscribeToModelLifecycle()
+    }
+
+    /// Subscribe to SDK's model lifecycle tracker for real-time model state updates
+    private func subscribeToModelLifecycle() {
+        // Observe changes to loaded models via the SDK's lifecycle tracker
+        ModelLifecycleTracker.shared.$modelsByModality
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] modelsByModality in
+                guard let self = self else { return }
+
+                // Update STT model state from SDK
+                if let sttState = modelsByModality[.stt] {
+                    if sttState.state.isLoaded {
+                        self.selectedFramework = sttState.framework
+                        self.selectedModelName = sttState.modelName
+                        self.selectedModelId = sttState.modelId
+                        self.logger.info("✅ STT model restored from SDK: \(sttState.modelName)")
+                    }
+                } else {
+                    // Only clear if no model is loaded in SDK
+                    if self.selectedModelId != nil {
+                        self.logger.info("STT model unloaded from SDK")
+                        self.selectedFramework = nil
+                        self.selectedModelName = nil
+                        self.selectedModelId = nil
+                        self.sttComponent = nil
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        // Check initial state immediately
+        let modelsByModality = ModelLifecycleTracker.shared.modelsByModality
+        if let sttState = modelsByModality[.stt], sttState.state.isLoaded {
+            selectedFramework = sttState.framework
+            selectedModelName = sttState.modelName
+            selectedModelId = sttState.modelId
+            logger.info("✅ STT model found on init: \(sttState.modelName)")
+
+            // Recreate component from existing SDK state if needed
+            Task {
+                await restoreComponentIfNeeded(modelId: sttState.modelId)
+            }
+        }
+    }
+
+    /// Restore the STT component if a model is already loaded in the SDK
+    private func restoreComponentIfNeeded(modelId: String) async {
+        // Only restore if we don't already have a component
+        guard sttComponent == nil else { return }
+
+        logger.info("Restoring STT component for model: \(modelId)")
+        do {
+            let config = STTConfiguration(
+                modelId: modelId,
+                language: "en",
+                enablePunctuation: true,
+                enableDiarization: false
+            )
+
+            let component = STTComponent(configuration: config)
+            try await component.initialize()
+            sttComponent = component
+            logger.info("STT component restored successfully")
+        } catch {
+            logger.error("Failed to restore STT component: \(error.localizedDescription)")
         }
     }
 
@@ -361,35 +419,6 @@ class STTViewModel: ObservableObject {
             selectedModelName = model.name
             selectedModelId = model.id
             logger.info("STT model loaded successfully: \(model.name)")
-        } catch {
-            logger.error("Failed to load STT model: \(error.localizedDescription)")
-            errorMessage = "Failed to load model: \(error.localizedDescription)"
-        }
-
-        isProcessing = false
-    }
-
-    /// Legacy method for STTModelPickerView compatibility
-    func loadModel(_ modelInfo: (name: String, id: String)) async {
-        logger.info("Loading STT model: \(modelInfo.name) (id: \(modelInfo.id))")
-        isProcessing = true
-        errorMessage = nil
-
-        do {
-            let config = STTConfiguration(
-                modelId: modelInfo.id,
-                language: "en",
-                enablePunctuation: true,
-                enableDiarization: false
-            )
-
-            let component = STTComponent(configuration: config)
-            try await component.initialize()
-
-            sttComponent = component
-            selectedModelName = modelInfo.name
-            selectedModelId = modelInfo.id
-            logger.info("STT model loaded successfully")
         } catch {
             logger.error("Failed to load STT model: \(error.localizedDescription)")
             errorMessage = "Failed to load model: \(error.localizedDescription)"
@@ -429,7 +458,27 @@ class STTViewModel: ObservableObject {
             let engine = AVAudioEngine()
             let inputNode = engine.inputNode
             let inputFormat = inputNode.outputFormat(forBus: 0)
-            recordedSampleRate = inputFormat.sampleRate
+
+            // Create 16kHz mono output format (required by STT models)
+            guard let outputFormat = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: 16000,
+                channels: 1,
+                interleaved: false
+            ) else {
+                errorMessage = "Failed to create audio format"
+                return
+            }
+
+            // Create audio converter if sample rate or channel count differs
+            let needsConversion = inputFormat.sampleRate != outputFormat.sampleRate ||
+                                inputFormat.channelCount != outputFormat.channelCount
+            if needsConversion {
+                audioConverter = AVAudioConverter(from: inputFormat, to: outputFormat)
+                logger.info("Audio converter created: \(inputFormat.sampleRate)Hz -> 16000Hz")
+            } else {
+                audioConverter = nil
+            }
 
             if selectedMode == .live {
                 // Live mode: Create audio stream for real-time transcription
@@ -437,10 +486,10 @@ class STTViewModel: ObservableObject {
                     self.audioContinuation = continuation
                 }
 
-                // Install tap for live streaming
+                // Install tap for live streaming with proper resampling
                 inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
                     guard let self = self else { return }
-                    if let audioData = self.convertBufferToData(buffer) {
+                    if let audioData = self.convertBufferToData(buffer, outputFormat: outputFormat) {
                         Task { @MainActor in
                             self.audioContinuation?.yield(audioData)
                             self.updateAudioLevel(buffer)
@@ -473,10 +522,10 @@ class STTViewModel: ObservableObject {
                     }
                 }
             } else {
-                // Batch mode: Just collect audio data
+                // Batch mode: Collect audio data with proper resampling
                 inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
                     guard let self = self else { return }
-                    if let audioData = self.convertBufferToData(buffer) {
+                    if let audioData = self.convertBufferToData(buffer, outputFormat: outputFormat) {
                         Task { @MainActor in
                             self.audioBuffer.append(audioData)
                             self.updateAudioLevel(buffer)
@@ -498,11 +547,48 @@ class STTViewModel: ObservableObject {
         }
     }
 
-    /// Convert AVAudioPCMBuffer to Data (Int16 PCM)
-    private func convertBufferToData(_ buffer: AVAudioPCMBuffer) -> Data? {
-        guard let floatData = buffer.floatChannelData else { return nil }
+    /// Convert AVAudioPCMBuffer to Data (Int16 PCM at 16kHz)
+    /// - Parameters:
+    ///   - buffer: Input audio buffer (may be at 48kHz or other sample rate)
+    ///   - outputFormat: Target format (16kHz mono)
+    /// - Returns: Int16 PCM data at 16kHz
+    private func convertBufferToData(_ buffer: AVAudioPCMBuffer, outputFormat: AVAudioFormat) -> Data? {
+        var processedBuffer = buffer
 
-        let frameCount = Int(buffer.frameLength)
+        // Resample to 16kHz if converter is available
+        if let converter = audioConverter {
+            let inputFormat = buffer.format
+            let capacity = outputFormat.sampleRate * Double(buffer.frameLength) / inputFormat.sampleRate
+            guard let convertedBuffer = AVAudioPCMBuffer(
+                pcmFormat: outputFormat,
+                frameCapacity: AVAudioFrameCount(capacity)
+            ) else {
+                return nil
+            }
+
+            var error: NSError?
+            var inputBufferUsed = false
+            let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
+                if inputBufferUsed {
+                    outStatus.pointee = .noDataNow
+                    return nil
+                }
+                inputBufferUsed = true
+                outStatus.pointee = .haveData
+                return buffer
+            }
+
+            converter.convert(to: convertedBuffer, error: &error, withInputFrom: inputBlock)
+            if error == nil && convertedBuffer.frameLength > 0 {
+                processedBuffer = convertedBuffer
+            } else {
+                return nil
+            }
+        }
+
+        guard let floatData = processedBuffer.floatChannelData else { return nil }
+
+        let frameCount = Int(processedBuffer.frameLength)
         var samples: [Int16] = []
         samples.reserveCapacity(frameCount)
 
@@ -538,6 +624,7 @@ class STTViewModel: ObservableObject {
         audioEngine?.stop()
         audioEngine = nil
         inputNode = nil
+        audioConverter = nil
 
         isRecording = false
         audioLevel = 0.0
@@ -596,220 +683,5 @@ class STTViewModel: ObservableObject {
         }
 
         isTranscribing = false
-    }
-}
-
-// MARK: - Model Picker
-
-struct STTModelPickerView: View {
-    @Binding var selectedModelId: String?
-    let onSelect: ((name: String, id: String)) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var availableModels: [ModelInfo] = []
-    @State private var isLoading = true
-    @State private var downloadingModels: Set<String> = []
-    @State private var errorMessage: String?
-    @State private var selectedFramework: LLMFramework = .whisperKit  // Default to WhisperKit (working)
-
-    var filteredModels: [ModelInfo] {
-        availableModels.filter { $0.preferredFramework == selectedFramework }
-    }
-
-    var body: some View {
-        NavigationView {
-            Group {
-                if isLoading {
-                    ProgressView("Loading models...")
-                } else if availableModels.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary)
-                        Text("No STT models available")
-                            .font(.headline)
-                        Text("No models registered in SDK")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    List {
-                        // Framework selector
-                        Section {
-                            Picker("Framework", selection: $selectedFramework) {
-                                Text("ONNX Runtime").tag(LLMFramework.onnx)
-                                Text("WhisperKit").tag(LLMFramework.whisperKit)
-                            }
-                            .pickerStyle(.segmented)
-
-                            if selectedFramework == .onnx {
-                                Text("⚠️ ONNX STT requires sherpa-onnx integration (coming soon). Use WhisperKit for now.")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                            }
-                        } header: {
-                            Text("Select Framework")
-                        }
-
-                        if let error = errorMessage {
-                            Section {
-                                Text(error)
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-                        }
-
-                        Section {
-                            ForEach(filteredModels, id: \.id) { model in
-                                STTModelRow(
-                                    model: model,
-                                    isSelected: selectedModelId == model.id,
-                                    isDownloading: downloadingModels.contains(model.id),
-                                    onTap: {
-                                        if model.isDownloaded {
-                                            onSelect((name: model.name, id: model.id))
-                                            dismiss()
-                                        } else {
-                                            Task {
-                                                await downloadModel(model)
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                        } header: {
-                            Text("Available Models")
-                        } footer: {
-                            Text("Tap to download. Once downloaded, tap again to select.")
-                                .font(.caption)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Select STT Model")
-            .navigationBarItems(trailing: Button("Cancel") { dismiss() })
-        }
-        .onAppear {
-            Task {
-                await loadModels()
-            }
-        }
-    }
-
-    private func downloadModel(_ model: ModelInfo) async {
-        downloadingModels.insert(model.id)
-        errorMessage = nil
-
-        do {
-            try await RunAnywhere.downloadModel(model.id)
-            // Refresh models list after download
-            await loadModels()
-            downloadingModels.remove(model.id)
-        } catch {
-            errorMessage = "Download failed: \(error.localizedDescription)"
-            downloadingModels.remove(model.id)
-        }
-    }
-
-    private func loadModels() async {
-        do {
-            // Query ALL models from SDK registry filtered by speech recognition category
-            // Show both downloaded and available-to-download models
-            let allModels = try await RunAnywhere.availableModels()
-            availableModels = allModels.filter { $0.category == .speechRecognition }
-            isLoading = false
-        } catch {
-            availableModels = []
-            isLoading = false
-        }
-    }
-}
-
-// MARK: - Model Row Component
-
-private struct STTModelRow: View {
-    let model: ModelInfo
-    let isSelected: Bool
-    let isDownloading: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(model.name)
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-
-                    HStack(spacing: 8) {
-                        if let size = model.downloadSize {
-                            Label(
-                                ByteCountFormatter.string(fromByteCount: size, countStyle: .file),
-                                systemImage: "arrow.down.circle"
-                            )
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        }
-
-                        // Status badge
-                        statusBadge
-                    }
-                }
-
-                Spacer()
-
-                if isSelected && model.isDownloaded {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.blue)
-                        .font(.title3)
-                }
-            }
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(isDownloading)
-    }
-
-    @ViewBuilder
-    private var statusBadge: some View {
-        if model.isDownloaded {
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.caption)
-                Text("Downloaded")
-            }
-            .font(.caption)
-            .foregroundColor(.green)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.green.opacity(0.1))
-            .cornerRadius(8)
-        } else if isDownloading {
-            HStack(spacing: 6) {
-                ProgressView()
-                    .scaleEffect(0.7)
-                Text("Downloading...")
-            }
-            .font(.caption)
-            .foregroundColor(.orange)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.orange.opacity(0.1))
-            .cornerRadius(8)
-        } else {
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.down.circle")
-                    .font(.caption)
-                Text("Tap to Download")
-            }
-            .font(.caption)
-            .foregroundColor(.blue)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.blue.opacity(0.1))
-            .cornerRadius(8)
-        }
     }
 }

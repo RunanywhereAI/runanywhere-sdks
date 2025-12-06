@@ -27,6 +27,7 @@ fun LLMFramework.getIcon(): ImageVector {
         LLMFramework.EXECU_TORCH -> Icons.Default.Computer
         LLMFramework.PICO_LLM -> Icons.Default.Computer
         LLMFramework.MEDIA_PIPE -> Icons.Default.Extension
+        LLMFramework.SYSTEM_TTS -> Icons.Default.VolumeUp
     }
 }
 
@@ -46,6 +47,7 @@ val LLMFramework.description: String
         LLMFramework.EXECU_TORCH -> "PyTorch mobile runtime"
         LLMFramework.PICO_LLM -> "Lightweight LLM framework"
         LLMFramework.MEDIA_PIPE -> "Google MediaPipe"
+        LLMFramework.SYSTEM_TTS -> "System text-to-speech"
     }
 
 // ModelFormat extensions

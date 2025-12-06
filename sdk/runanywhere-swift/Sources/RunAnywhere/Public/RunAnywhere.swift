@@ -946,14 +946,15 @@ public enum RunAnywhere {
             // Calculate load time
             let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
 
-            // Notify lifecycle manager of successful load
+            // Notify lifecycle manager of successful load with the service for caching
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelDidLoad(
                     modelId: modelId,
                     modelName: modelName,
                     framework: framework,
                     modality: .llm,
-                    memoryUsage: modelInfo?.memoryRequired
+                    memoryUsage: modelInfo?.memoryRequired,
+                    llmService: loadedModel.service
                 )
             }
 
@@ -1390,6 +1391,11 @@ public enum RunAnywhere {
 
         // Use model registry to get available models
         let models = await serviceContainer.modelRegistry.discoverModels()
+
+        // Cache models for synchronous lookup by providers
+        // This allows providers to check framework compatibility without async calls
+        ModelInfoCache.shared.cacheModels(models)
+
         return models
     }
 

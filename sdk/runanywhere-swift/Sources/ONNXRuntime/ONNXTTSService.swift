@@ -337,7 +337,14 @@ public struct ONNXTTSServiceProvider: TTSServiceProvider {
         var modelPath: String? = nil
 
         // Query all available models and find the one we need
-        let allModels = try await RunAnywhere.availableModels()
+        let allModels: [ModelInfo]
+        do {
+            allModels = try await RunAnywhere.availableModels()
+        } catch {
+            Self.logger.error("Failed to fetch available models: \(error)")
+            throw SDKError.modelNotFound("Failed to query available models: \(error.localizedDescription)")
+        }
+
         let modelInfo = allModels.first { $0.id == modelId }
 
         // Check if model is downloaded and has a local path
@@ -371,25 +378,51 @@ public struct ONNXTTSServiceProvider: TTSServiceProvider {
     public func canHandle(modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
 
-        let lowercased = modelId.lowercased()
-
         Self.logger.debug("Checking if can handle TTS model: \(modelId)")
+
+        // PRIMARY CHECK: Use cached model info from the registry (most reliable)
+        if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
+            // Check if ONNX is the preferred framework for TTS
+            if modelInfo.preferredFramework == .onnx && modelInfo.category == .speechSynthesis {
+                Self.logger.debug("Model \(modelId) has ONNX as preferred framework for TTS")
+                return true
+            }
+
+            // Check if ONNX is in compatible frameworks for TTS models
+            if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechSynthesis {
+                Self.logger.debug("Model \(modelId) has ONNX in compatible frameworks for TTS")
+                return true
+            }
+
+            // Check if format is ONNX for TTS category
+            if modelInfo.format == .onnx && modelInfo.category == .speechSynthesis {
+                Self.logger.debug("Model \(modelId) has ONNX format for TTS")
+                return true
+            }
+
+            // Model info exists but doesn't indicate ONNX TTS compatibility
+            Self.logger.debug("Model \(modelId) found in cache but not ONNX TTS compatible")
+            return false
+        }
+
+        // FALLBACK: Pattern-based matching for models not yet in cache
+        let lowercased = modelId.lowercased()
 
         // Handle Piper TTS models
         if lowercased.contains("piper") {
-            Self.logger.debug("Model \(modelId) matches Piper TTS pattern")
+            Self.logger.debug("Model \(modelId) matches Piper TTS pattern (fallback)")
             return true
         }
 
         // Handle VITS models
         if lowercased.contains("vits") {
-            Self.logger.debug("Model \(modelId) matches VITS pattern")
+            Self.logger.debug("Model \(modelId) matches VITS pattern (fallback)")
             return true
         }
 
         // Handle generic ONNX TTS models
         if lowercased.contains("tts") && lowercased.contains("onnx") {
-            Self.logger.debug("Model \(modelId) matches ONNX TTS pattern")
+            Self.logger.debug("Model \(modelId) matches ONNX TTS pattern (fallback)")
             return true
         }
 

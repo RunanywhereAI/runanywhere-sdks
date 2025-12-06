@@ -2,6 +2,7 @@ package com.runanywhere.sdk.services.download
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.foundation.utils.ModelPathUtils
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.storage.FileSystem
@@ -188,9 +189,15 @@ class KtorDownloadService(
     // MARK: - DownloadManager Protocol (EXACT copy of iOS)
 
     override suspend fun downloadModel(model: ModelInfo): DownloadTask {
+        // Refresh strategies if none are registered (adapters might have been registered after init)
+        if (customStrategies.isEmpty()) {
+            refreshStrategies()
+        }
+
         // Check if any custom strategy can handle this model
         for (strategy in customStrategies) {
             if (strategy.canHandle(model)) {
+                logger.info("Using custom strategy ${strategy::class.simpleName} for model: ${model.id}")
                 return downloadModelWithCustomStrategy(model, strategy)
             }
         }
@@ -328,13 +335,62 @@ class KtorDownloadService(
         logger.info("Registered custom download strategy")
     }
 
+    // Track which frameworks have had their strategies registered to avoid duplicates
+    private val registeredFrameworks = mutableSetOf<com.runanywhere.sdk.models.enums.LLMFramework>()
+
     /// Auto-discover and register strategies from framework adapters
     private fun autoRegisterStrategies() {
-        // Simplified version - in full implementation this would query adapter registry
+        // Query ModuleRegistry for registered framework adapters and get their download strategies
         var registeredCount = 0
+
+        try {
+            val adapters = com.runanywhere.sdk.core.ModuleRegistry.allFrameworkAdapters
+            for (adapter in adapters) {
+                // Skip if already registered
+                if (registeredFrameworks.contains(adapter.framework)) {
+                    continue
+                }
+
+                adapter.getDownloadStrategy()?.let { frameworkStrategy ->
+                    // Wrap framework strategy to match local DownloadStrategy interface
+                    val wrappedStrategy = object : DownloadStrategy {
+                        override fun canHandle(model: ModelInfo): Boolean {
+                            return frameworkStrategy.canHandle(model)
+                        }
+
+                        override suspend fun download(
+                            model: ModelInfo,
+                            to: String,
+                            progressHandler: ((Double) -> Unit)?
+                        ): String {
+                            return frameworkStrategy.download(model, to, progressHandler)
+                        }
+                    }
+
+                    customStrategies.add(wrappedStrategy)
+                    registeredFrameworks.add(adapter.framework)
+                    registeredCount++
+                    logger.debug("Registered download strategy from ${adapter.framework} adapter")
+                }
+            }
+        } catch (e: Exception) {
+            logger.debug("Could not auto-register strategies: ${e.message}")
+        }
 
         if (registeredCount > 0) {
             logger.info("Auto-registered $registeredCount download strategies from adapters")
+        }
+    }
+
+    /**
+     * Re-discover and register strategies (called when adapters are registered after init)
+     */
+    fun refreshStrategies() {
+        val previousCount = customStrategies.size
+        autoRegisterStrategies()
+        val newCount = customStrategies.size - previousCount
+        if (newCount > 0) {
+            logger.info("Refreshed strategies: $newCount new strategies registered")
         }
     }
 
@@ -376,6 +432,26 @@ class KtorDownloadService(
 
                 logger.info(
                     "Custom strategy download completed - modelId: ${model.id}, localPath: $resultPath"
+                )
+
+                // Update model with local path in BOTH registry AND repository
+                val updatedModel = model.copy(localPath = resultPath, updatedAt = com.runanywhere.sdk.utils.SimpleInstant.now())
+
+                // 1. Update in-memory registry
+                ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                // 2. Save to persistent repository (database)
+                try {
+                    ServiceContainer.shared.modelInfoService.saveModel(updatedModel)
+                    logger.info(
+                        "Model saved to repository - modelId: ${model.id}, localPath: $resultPath, isDownloaded: ${updatedModel.isDownloaded}"
+                    )
+                } catch (e: Exception) {
+                    logger.error("Failed to save model to repository: ${e.message}", e)
+                }
+
+                logger.info(
+                    "Model updated in registry - modelId: ${model.id}, localPath: $resultPath, isDownloaded: ${updatedModel.isDownloaded}"
                 )
 
                 resultPath
@@ -427,15 +503,13 @@ class KtorDownloadService(
         }
     }
 
-    // Model folder helpers that work with existing FileSystem
+    // Model folder helpers - Use centralized ModelPathUtils
     private fun getModelFolder(modelId: String, framework: LLMFramework): String {
-        val modelsDir = "${fileSystem.getDataDirectory()}/models"
-        return "$modelsDir/${framework.name.lowercase()}/$modelId"
+        return ModelPathUtils.getModelFolder(modelId, framework)
     }
 
     private fun getModelFolder(modelId: String): String {
-        val modelsDir = "${fileSystem.getDataDirectory()}/models"
-        return "$modelsDir/$modelId"
+        return ModelPathUtils.getModelFolder(modelId)
     }
 
     // MARK: - Helper Methods (EXACT copy of iOS)
@@ -643,14 +717,13 @@ suspend fun KtorDownloadService.downloadModelWithResume(model: ModelInfo, resume
     )
 }
 
+// Extension functions using centralized ModelPathUtils
 private fun KtorDownloadService.getModelFolder(modelId: String, framework: LLMFramework): String {
-    val modelsDir = "${fileSystem.getDataDirectory()}/models"
-    return "$modelsDir/${framework.name.lowercase()}/$modelId"
+    return ModelPathUtils.getModelFolder(modelId, framework)
 }
 
 private fun KtorDownloadService.getModelFolder(modelId: String): String {
-    val modelsDir = "${fileSystem.getDataDirectory()}/models"
-    return "$modelsDir/$modelId"
+    return ModelPathUtils.getModelFolder(modelId)
 }
 
 private fun mapKtorError(error: Throwable): DownloadError {
