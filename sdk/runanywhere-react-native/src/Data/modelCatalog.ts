@@ -27,7 +27,7 @@ export const MODEL_CATALOG: ModelInfo[] = [
     id: 'foundation-models-default',
     name: 'Apple Foundation Model',
     category: ModelCategory.Language,
-    format: ModelFormat.MLModel,
+    format: ModelFormat.ONNX,
     downloadURL: undefined, // Built-in, no download needed
     localPath: undefined,
     downloadSize: 0, // Built-in
@@ -267,17 +267,17 @@ export const MODEL_CATALOG: ModelInfo[] = [
 
   // Whisper Tiny
   {
-    id: 'whisper-tiny',
-    name: 'Whisper Tiny',
+    id: 'sherpa-onnx-whisper-tiny-en',
+    name: 'Whisper Tiny (English)',
     category: ModelCategory.SpeechRecognition,
-    format: ModelFormat.MLModel,
+    format: ModelFormat.ONNX,
     downloadURL:
-      'https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-tiny.en',
+      'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2',
     localPath: undefined,
     downloadSize: 39_000_000, // ~39MB
     memoryRequired: 39_000_000, // 39MB
-    compatibleFrameworks: [LLMFramework.WhisperKit],
-    preferredFramework: LLMFramework.WhisperKit,
+    compatibleFrameworks: [LLMFramework.ONNX],
+    preferredFramework: LLMFramework.ONNX,
     contextLength: 0,
     supportsThinking: false,
     metadata: {
@@ -297,17 +297,17 @@ export const MODEL_CATALOG: ModelInfo[] = [
 
   // Whisper Base
   {
-    id: 'whisper-base',
-    name: 'Whisper Base',
+    id: 'sherpa-onnx-whisper-base-en',
+    name: 'Whisper Base (English)',
     category: ModelCategory.SpeechRecognition,
-    format: ModelFormat.MLModel,
+    format: ModelFormat.ONNX,
     downloadURL:
-      'https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base',
+      'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-base.en.tar.bz2',
     localPath: undefined,
     downloadSize: 74_000_000, // ~74MB
     memoryRequired: 74_000_000, // 74MB
-    compatibleFrameworks: [LLMFramework.WhisperKit],
-    preferredFramework: LLMFramework.WhisperKit,
+    compatibleFrameworks: [LLMFramework.ONNX],
+    preferredFramework: LLMFramework.ONNX,
     contextLength: 0,
     supportsThinking: false,
     metadata: {
@@ -315,6 +315,95 @@ export const MODEL_CATALOG: ModelInfo[] = [
       author: 'OpenAI',
       license: 'MIT',
       tags: ['whisper', 'stt', 'base'],
+    },
+    source: ConfigurationSource.Remote,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    syncPending: false,
+    usageCount: 0,
+    isDownloaded: false,
+    isAvailable: true,
+  },
+
+  // MARK: - Text-to-Speech Models - Sherpa-ONNX Compatible
+
+  // System TTS (Built-in, always available)
+  {
+    id: 'system-tts',
+    name: 'System TTS',
+    category: ModelCategory.SpeechSynthesis,
+    format: ModelFormat.Proprietary,
+    downloadURL: 'builtin://system-tts',
+    localPath: 'builtin://system-tts',
+    downloadSize: 0,
+    memoryRequired: 0,
+    compatibleFrameworks: [LLMFramework.SystemTTS],
+    preferredFramework: LLMFramework.SystemTTS,
+    contextLength: 0,
+    supportsThinking: false,
+    metadata: {
+      description: 'Built-in system text-to-speech using AVSpeechSynthesizer',
+      author: 'Apple',
+      license: 'Proprietary',
+      tags: ['tts', 'system', 'built-in', 'offline'],
+    },
+    source: ConfigurationSource.Builtin,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    syncPending: false,
+    usageCount: 0,
+    isDownloaded: true,
+    isAvailable: true,
+  },
+
+  // Sherpa-ONNX VITS Piper - English (US) - Amy
+  {
+    id: 'vits-piper-en-us-amy',
+    name: 'Piper Amy (US English)',
+    category: ModelCategory.SpeechSynthesis,
+    format: ModelFormat.ONNX,
+    downloadURL: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-medium.tar.bz2',
+    localPath: undefined,
+    downloadSize: 63_000_000,
+    memoryRequired: 100_000_000,
+    compatibleFrameworks: [LLMFramework.ONNX],
+    preferredFramework: LLMFramework.ONNX,
+    contextLength: 0,
+    supportsThinking: false,
+    metadata: {
+      description: 'Sherpa-ONNX VITS Piper voice - Amy (American English)',
+      author: 'Piper/k2-fsa',
+      license: 'MIT',
+      tags: ['tts', 'piper', 'vits', 'neural', 'english', 'female', 'sherpa-onnx'],
+    },
+    source: ConfigurationSource.Remote,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    syncPending: false,
+    usageCount: 0,
+    isDownloaded: false,
+    isAvailable: true,
+  },
+
+  // Sherpa-ONNX VITS Piper - English (US) - Lessac
+  {
+    id: 'vits-piper-en-us-lessac',
+    name: 'Piper Lessac (US English)',
+    category: ModelCategory.SpeechSynthesis,
+    format: ModelFormat.ONNX,
+    downloadURL: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2',
+    localPath: undefined,
+    downloadSize: 63_000_000,
+    memoryRequired: 100_000_000,
+    compatibleFrameworks: [LLMFramework.ONNX],
+    preferredFramework: LLMFramework.ONNX,
+    contextLength: 0,
+    supportsThinking: false,
+    metadata: {
+      description: 'Sherpa-ONNX VITS Piper voice - Lessac (American English)',
+      author: 'Piper/k2-fsa',
+      license: 'MIT',
+      tags: ['tts', 'piper', 'vits', 'neural', 'english', 'male', 'sherpa-onnx'],
     },
     source: ConfigurationSource.Remote,
     createdAt: new Date().toISOString(),

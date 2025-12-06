@@ -253,6 +253,15 @@ export const RunAnywhere = {
       console.warn('[RunAnywhere] Failed to register LlamaCPP provider:', error);
     }
 
+    try {
+      // Register ONNX providers for STT/TTS models (mirrors Swift SDK's ONNXAdapter.register())
+      const { registerONNXProviders } = require('../Providers/ONNXProvider');
+      registerONNXProviders();
+      console.log('[RunAnywhere] ONNX providers registered');
+    } catch (error) {
+      console.warn('[RunAnywhere] Failed to register ONNX providers:', error);
+    }
+
     // Initialize the Model Registry (same pattern as Swift SDK)
     // This loads the catalog models AND models provided by registered providers
     try {

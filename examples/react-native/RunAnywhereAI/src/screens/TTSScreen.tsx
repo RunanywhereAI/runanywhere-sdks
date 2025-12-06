@@ -80,7 +80,8 @@ export const TTSScreen: React.FC = () => {
     try {
       // Get available TTS models from catalog
       const allModels = await RunAnywhere.getAvailableModels();
-      const ttsModels = allModels.filter((m) => m.modality === 'tts');
+      // Filter by category (speech-synthesis) matching SDK's ModelCategory
+      const ttsModels = allModels.filter((m: any) => m.category === 'speech-synthesis');
       setAvailableModels(ttsModels);
 
       // Log downloaded status for debugging
@@ -147,12 +148,28 @@ export const TTSScreen: React.FC = () => {
       setIsModelLoading(true);
       console.log(`[TTSScreen] Loading model: ${model.id} from ${model.localPath}`);
 
-      if (!model.localPath) {
-        Alert.alert('Error', 'Model path not found. Please re-download the model.');
+      // Handle System TTS specially - it's always available, no download needed
+      const isSystemTTS = model.id === 'system-tts' ||
+                          (model as any).preferredFramework === 'SystemTTS' ||
+                          model.localPath?.startsWith('builtin://');
+
+      if (isSystemTTS) {
+        console.log(`[TTSScreen] Using System TTS - no model loading required`);
+        // System TTS doesn't need to load a model, just mark it as ready
+        setCurrentModel({
+          id: 'system-tts',
+          name: 'System TTS',
+          preferredFramework: LLMFramework.SystemTTS,
+        } as ModelInfo);
         return;
       }
 
-      // Load using the actual local path
+      if (!model.localPath) {
+        Alert.alert('Error', 'Model path not found. Please download the model first.');
+        return;
+      }
+
+      // Load using the actual local path for ONNX models
       const success = await RunAnywhere.loadTTSModel(model.localPath, model.modelType || 'piper');
 
       if (success) {
@@ -281,24 +298,30 @@ export const TTSScreen: React.FC = () => {
       // Ignore errors if not playing
     }
 
+    // Check if using System TTS
+    const isSystemTTS = currentModel.id === 'system-tts' ||
+                        currentModel.preferredFramework === LLMFramework.SystemTTS;
+
     try {
-      // Check if model is loaded
-      const isLoaded = await RunAnywhere.isTTSModelLoaded();
-      if (!isLoaded) {
-        Alert.alert('Model Not Loaded', 'Please load a TTS model first.');
-        setIsGenerating(false);
-        return;
+      // For ONNX models, check if model is loaded
+      if (!isSystemTTS) {
+        const isLoaded = await RunAnywhere.isTTSModelLoaded();
+        if (!isLoaded) {
+          Alert.alert('Model Not Loaded', 'Please load a TTS model first.');
+          setIsGenerating(false);
+          return;
+        }
       }
 
       // SDK uses simple TTSConfiguration with rate/pitch/volume
       const sdkConfig = {
-        voice: 'default',
+        voice: isSystemTTS ? 'system' : 'default',
         rate: speed,
         pitch: pitch,
         volume: volume,
       };
 
-      console.log('[TTSScreen] Synthesizing text:', text.substring(0, 50) + '...');
+      console.log('[TTSScreen] Synthesizing text:', text.substring(0, 50) + '...', isSystemTTS ? '(System TTS)' : '');
 
       // SDK returns TTSResult with audio, sampleRate, numSamples, duration
       const result = await RunAnywhere.synthesize(text, sdkConfig);

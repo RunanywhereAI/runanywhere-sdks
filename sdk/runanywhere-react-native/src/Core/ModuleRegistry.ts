@@ -77,6 +77,12 @@ export class ModuleRegistry {
     console.log(
       `[ModuleRegistry] Registered STT provider: ${provider.name} with priority: ${priority}`
     );
+
+    // Call provider's onRegistration lifecycle hook (if implemented)
+    if ((provider as any).onRegistration && typeof (provider as any).onRegistration === 'function') {
+      console.log(`[ModuleRegistry] Calling onRegistration() for STT provider: ${provider.name}`);
+      (provider as any).onRegistration();
+    }
   }
 
   /**
@@ -123,6 +129,12 @@ export class ModuleRegistry {
     console.log(
       `[ModuleRegistry] Registered TTS provider: ${provider.name} with priority: ${priority}`
     );
+
+    // Call provider's onRegistration lifecycle hook (if implemented)
+    if ((provider as any).onRegistration && typeof (provider as any).onRegistration === 'function') {
+      console.log(`[ModuleRegistry] Calling onRegistration() for TTS provider: ${provider.name}`);
+      (provider as any).onRegistration();
+    }
   }
 
   /**
