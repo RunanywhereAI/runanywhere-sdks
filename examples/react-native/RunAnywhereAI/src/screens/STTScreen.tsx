@@ -4,6 +4,7 @@
  * Reference: iOS Features/Voice/SpeechToTextView.swift
  *
  * Uses RunAnywhere SDK for on-device speech recognition.
+ * Native module handles audio decoding via iOS AudioToolbox.
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -22,13 +23,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
-import AudioRecorderPlayer, {
-  AudioEncoderAndroidType,
-  AudioSourceAndroidType,
-  AVEncoderAudioQualityIOSType,
-  AVEncodingOption,
-  OutputFormatAndroidType,
-} from 'react-native-audio-recorder-player';
+import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Colors } from '../theme/colors';
@@ -70,6 +65,11 @@ export const STTScreen: React.FC = () => {
   // Live mode accumulated transcript ref
   const accumulatedTranscriptRef = useRef('');
 
+  // Live mode interval-based recording refs
+  const liveRecordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isLiveRecordingRef = useRef(false);
+  const liveChunkCountRef = useRef(0);
+
   // Animation for recording indicator
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -100,6 +100,12 @@ export const STTScreen: React.FC = () => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      // Stop live recording if active
+      isLiveRecordingRef.current = false;
+      if (liveRecordingIntervalRef.current) {
+        clearTimeout(liveRecordingIntervalRef.current);
+        liveRecordingIntervalRef.current = null;
+      }
       // Stop SDK streaming if active
       RunAnywhere.stopStreamingSTT().catch(() => {});
       // Stop batch mode recorder
@@ -403,12 +409,15 @@ export const STTScreen: React.FC = () => {
   };
 
   /**
-   * Start live transcription mode using SDK streaming (AVAudioEngine-based)
-   * This uses the native SDK's real-time audio capture, matching Swift SDK pattern
+   * Start live transcription mode
+   * 
+   * Implements pseudo-streaming for Whisper models (which are batch-only):
+   * Records audio in intervals (3 seconds), transcribes each chunk, and
+   * accumulates results for a live-like experience matching Swift SDK.
    */
   const startLiveTranscription = async () => {
     try {
-      console.log('[STTScreen] Starting SDK streaming transcription...');
+      console.log('[STTScreen] Starting live transcription (pseudo-streaming)...');
 
       // Request microphone permission first
       const hasPermission = await requestMicrophonePermission();
@@ -417,74 +426,222 @@ export const STTScreen: React.FC = () => {
         return;
       }
 
+      // Check if model is loaded
+      const isLoaded = await RunAnywhere.isSTTModelLoaded();
+      if (!isLoaded) {
+        Alert.alert('Model Not Loaded', 'Please load an STT model first.');
+        return;
+      }
+
       // Reset state
       accumulatedTranscriptRef.current = '';
       setTranscript('');
-      setPartialTranscript('');
+      setPartialTranscript('Listening...');
       setConfidence(null);
+      setRecordingDuration(0);
+      isLiveRecordingRef.current = true;
+      liveChunkCountRef.current = 0;
 
-      // Start SDK streaming with callbacks
-      const success = await RunAnywhere.startStreamingSTT(
-        'en',
-        // onPartial callback - show partial results as they come in
-        (text: string, conf: number) => {
-          console.log('[STTScreen] Partial result:', text, 'confidence:', conf);
-          setPartialTranscript(text);
-        },
-        // onFinal callback - append final results to accumulated transcript
-        (text: string, conf: number) => {
-          console.log('[STTScreen] Final result:', text, 'confidence:', conf);
-          if (text && text.trim()) {
-            const newText = text.trim();
-            if (accumulatedTranscriptRef.current) {
-              accumulatedTranscriptRef.current += ' ' + newText;
-            } else {
-              accumulatedTranscriptRef.current = newText;
-            }
-            setTranscript(accumulatedTranscriptRef.current);
-            setPartialTranscript('');
-            setConfidence(conf);
-          }
-        },
-        // onError callback
-        (error: string) => {
-          console.error('[STTScreen] Streaming STT error:', error);
-          Alert.alert('Transcription Error', error);
+      // Start initial recording chunk
+      await startLiveChunk();
+      setIsRecording(true);
+
+      console.log('[STTScreen] Live transcription started');
+
+    } catch (error) {
+      console.error('[STTScreen] Error starting live transcription:', error);
+      Alert.alert('Recording Error', `Failed to start live transcription: ${error}`);
+      isLiveRecordingRef.current = false;
+    }
+  };
+
+  /**
+   * Start recording a live chunk (called repeatedly for pseudo-streaming)
+   */
+  const startLiveChunk = async () => {
+    if (!isLiveRecordingRef.current) {
+      console.log('[STTScreen] Live recording stopped, not starting new chunk');
+      return;
+    }
+
+    try {
+      liveChunkCountRef.current++;
+      const chunkNum = liveChunkCountRef.current;
+      console.log(`[STTScreen] Starting live chunk #${chunkNum}...`);
+
+      // Record with default settings
+      const path = await audioRecorderPlayer.startRecorder(undefined, undefined, true);
+      recordingPath.current = path;
+      console.log(`[STTScreen] Live chunk #${chunkNum} recording at:`, path);
+
+      // Set up metering callback
+      audioRecorderPlayer.addRecordBackListener((e) => {
+        const duration = Math.floor(e.currentPosition / 1000);
+        setRecordingDuration(duration);
+        // Update audio level from metering
+        if (e.currentMetering !== undefined) {
+          const normalized = Math.max(0, Math.min(1, (e.currentMetering + 60) / 60));
+          setAudioLevel(normalized);
         }
-      );
+      });
 
-      if (success) {
-        setIsRecording(true);
-        console.log('[STTScreen] SDK streaming started successfully');
-      } else {
-        const error = await RunAnywhere.getLastError();
-        Alert.alert('Error', `Failed to start streaming: ${error || 'Unknown error'}`);
+      // Schedule transcription after interval (3 seconds for each chunk)
+      liveRecordingIntervalRef.current = setTimeout(async () => {
+        if (isLiveRecordingRef.current) {
+          await transcribeLiveChunk();
+        }
+      }, 3000);
+
+    } catch (error) {
+      console.error('[STTScreen] Error starting live chunk:', error);
+    }
+  };
+
+  /**
+   * Transcribe the current live chunk and start the next one
+   * Uses react-native-audio-api for audio decoding
+   */
+  const transcribeLiveChunk = async () => {
+    if (!isLiveRecordingRef.current) {
+      return;
+    }
+
+    try {
+      console.log('[STTScreen] Transcribing live chunk...');
+      setPartialTranscript('Processing...');
+
+      // Stop current recording
+      const resultPath = await audioRecorderPlayer.stopRecorder();
+      audioRecorderPlayer.removeRecordBackListener();
+
+      // Get the path
+      let audioPath = resultPath;
+      if (audioPath.startsWith('file://')) {
+        audioPath = audioPath.replace('file://', '');
+      }
+
+      // Check file exists
+      const exists = await RNFS.exists(audioPath);
+      if (!exists) {
+        console.warn('[STTScreen] Live chunk file not found');
+        setPartialTranscript('Listening...');
+        if (isLiveRecordingRef.current) {
+          await startLiveChunk();
+        }
+        return;
+      }
+
+      // Check file size (skip very small files)
+      const stat = await RNFS.stat(audioPath);
+      if (stat.size < 5000) {
+        console.log('[STTScreen] Chunk too small, skipping transcription');
+        setPartialTranscript('Listening...');
+        if (isLiveRecordingRef.current) {
+          await startLiveChunk();
+        }
+        return;
+      }
+
+      // Transcribe using native module (handles audio decoding)
+      const result = await RunAnywhere.transcribeFile(audioPath, { language: 'en' });
+      console.log('[STTScreen] Live chunk transcription:', result.text);
+
+      // Append to accumulated transcript if we got text
+      if (result.text && result.text.trim() && result.text.trim() !== '') {
+        const newText = result.text.trim();
+        if (accumulatedTranscriptRef.current) {
+          accumulatedTranscriptRef.current += ' ' + newText;
+        } else {
+          accumulatedTranscriptRef.current = newText;
+        }
+        setTranscript(accumulatedTranscriptRef.current);
+        setConfidence(result.confidence || null);
+      }
+
+      // Clean up chunk file
+      await RNFS.unlink(audioPath).catch(() => {});
+
+      // Update partial transcript for next chunk
+      setPartialTranscript('Listening...');
+
+      // Start next chunk if still recording
+      if (isLiveRecordingRef.current) {
+        await startLiveChunk();
       }
 
     } catch (error) {
-      console.error('[STTScreen] Error starting SDK streaming:', error);
-      Alert.alert('Recording Error', `Failed to start live transcription: ${error}`);
+      console.error('[STTScreen] Error transcribing live chunk:', error);
+      setPartialTranscript('Listening...');
+      // Try to continue with next chunk
+      if (isLiveRecordingRef.current) {
+        await startLiveChunk();
+      }
     }
   };
 
   /**
    * Stop live transcription
+   * Uses react-native-audio-api for final chunk decoding
    */
   const stopLiveTranscription = async () => {
-    console.log('[STTScreen] Stopping SDK streaming transcription...');
+    console.log('[STTScreen] Stopping live transcription...');
+    isLiveRecordingRef.current = false;
+
+    // Clear any pending interval
+    if (liveRecordingIntervalRef.current) {
+      clearTimeout(liveRecordingIntervalRef.current);
+      liveRecordingIntervalRef.current = null;
+    }
 
     try {
       setIsProcessing(true);
-      await RunAnywhere.stopStreamingSTT();
-      console.log('[STTScreen] SDK streaming stopped');
+      setPartialTranscript('Processing final chunk...');
+
+      // Stop current recording
+      const resultPath = await audioRecorderPlayer.stopRecorder().catch(() => '');
+      audioRecorderPlayer.removeRecordBackListener();
+
+      // Transcribe final chunk if there's audio
+      if (resultPath && recordingPath.current) {
+        let audioPath = resultPath;
+        if (audioPath.startsWith('file://')) {
+          audioPath = audioPath.replace('file://', '');
+        }
+
+        const exists = await RNFS.exists(audioPath);
+        if (exists) {
+          const stat = await RNFS.stat(audioPath);
+          if (stat.size >= 5000) {
+            console.log('[STTScreen] Transcribing final live chunk...');
+            // Transcribe using native module (handles audio decoding)
+            const result = await RunAnywhere.transcribeFile(audioPath, { language: 'en' });
+            if (result.text && result.text.trim()) {
+              const newText = result.text.trim();
+              if (accumulatedTranscriptRef.current) {
+                accumulatedTranscriptRef.current += ' ' + newText;
+              } else {
+                accumulatedTranscriptRef.current = newText;
+              }
+              setTranscript(accumulatedTranscriptRef.current);
+              setConfidence(result.confidence || null);
+            }
+          }
+          await RNFS.unlink(audioPath).catch(() => {});
+        }
+      }
+
+      console.log('[STTScreen] Live transcription stopped');
+      console.log('[STTScreen] Final transcript:', accumulatedTranscriptRef.current);
+
     } catch (error) {
-      console.error('[STTScreen] Error stopping SDK streaming:', error);
+      console.error('[STTScreen] Error stopping live transcription:', error);
     } finally {
       setIsRecording(false);
       setIsProcessing(false);
       setPartialTranscript('');
       setRecordingDuration(0);
       setAudioLevel(0);
+      recordingPath.current = null;
     }
   };
 
@@ -578,7 +735,7 @@ export const STTScreen: React.FC = () => {
       <Text style={styles.modeDescriptionText}>
         {mode === STTMode.Batch
           ? 'Record audio, then transcribe all at once for best accuracy.'
-          : 'See transcription in real-time as you speak.'}
+          : 'Transcribes every few seconds while you speak.'}
       </Text>
     </View>
   );

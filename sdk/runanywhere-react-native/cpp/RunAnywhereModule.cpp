@@ -669,6 +669,54 @@ bool RunAnywhereModule::supportsSTTStreaming(jsi::Runtime& rt) {
     return ra_stt_supports_streaming(onnxBackend_);
 }
 
+bool RunAnywhereModule::startStreamingSTT(jsi::Runtime& rt, const std::string& language) {
+    printf("[RA_STT] startStreamingSTT called with language: %s\n", language.c_str());
+    
+    // Note: Full streaming STT requires native audio capture (AVAudioEngine on iOS)
+    // which is complex to implement in C++. For now, we indicate streaming is not
+    // supported and the app should use batch mode with the JS-based audio recorder.
+    //
+    // The Swift SDK handles this by using AVAudioEngine in native Swift code.
+    // For React Native, a similar approach would require native Objective-C code
+    // to capture audio and pass it to the C++ module.
+    
+    if (!onnxBackend_) {
+        printf("[RA_STT] ONNX backend not initialized\n");
+        return false;
+    }
+    
+    if (!ra_stt_is_model_loaded(onnxBackend_)) {
+        printf("[RA_STT] STT model not loaded\n");
+        return false;
+    }
+    
+    // Check if the model supports streaming
+    bool supportsStreaming = ra_stt_supports_streaming(onnxBackend_);
+    printf("[RA_STT] Model supports streaming: %s\n", supportsStreaming ? "YES" : "NO");
+    
+    if (!supportsStreaming) {
+        printf("[RA_STT] Streaming not supported by this model. Use batch mode instead.\n");
+        // For Whisper models, streaming is not natively supported
+        // The app should use batch mode and record audio in chunks
+        return false;
+    }
+    
+    // TODO: Implement native audio capture for streaming
+    // This would require AVAudioEngine integration
+    isStreamingSTT_ = true;
+    return true;
+}
+
+bool RunAnywhereModule::stopStreamingSTT(jsi::Runtime& rt) {
+    printf("[RA_STT] stopStreamingSTT called\n");
+    isStreamingSTT_ = false;
+    return true;
+}
+
+bool RunAnywhereModule::isStreamingSTT(jsi::Runtime& rt) {
+    return isStreamingSTT_;
+}
+
 int RunAnywhereModule::createSTTStream(jsi::Runtime& rt,
                                         const std::optional<std::string>& configJson) {
     if (!onnxBackend_) return -1;

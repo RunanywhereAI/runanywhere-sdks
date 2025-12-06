@@ -125,6 +125,13 @@ public:
     std::string transcribeFile(jsi::Runtime& rt, const std::string& filePath,
                               const std::optional<std::string>& language);
     bool supportsSTTStreaming(jsi::Runtime& rt);
+    
+    // High-level streaming API (matches TypeScript interface)
+    bool startStreamingSTT(jsi::Runtime& rt, const std::string& language);
+    bool stopStreamingSTT(jsi::Runtime& rt);
+    bool isStreamingSTT(jsi::Runtime& rt);
+    
+    // Low-level streaming API
     int createSTTStream(jsi::Runtime& rt, const std::optional<std::string>& configJson);
     bool feedSTTAudio(jsi::Runtime& rt, int streamHandle,
                       const std::string& audioBase64, int sampleRate);
@@ -267,6 +274,9 @@ private:
 
     /// Number of active event listeners
     int listenerCount_ = 0;
+
+    /// Whether streaming STT is currently active
+    bool isStreamingSTT_ = false;
 
     // ============================================================================
     // Event Queue System (Thread-Safe)
