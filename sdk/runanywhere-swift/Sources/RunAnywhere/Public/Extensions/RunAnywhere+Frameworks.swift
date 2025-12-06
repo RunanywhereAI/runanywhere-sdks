@@ -12,7 +12,7 @@ public extension RunAnywhere {
     /// Example:
     /// ```swift
     /// try await RunAnywhere.registerFramework(
-    ///     LLMSwiftAdapter(),
+    ///     LlamaCPPAdapter(),
     ///     models: [
     ///         ModelRegistration(
     ///             url: "https://huggingface.co/.../SmolLM2-360M.Q8_0.gguf",

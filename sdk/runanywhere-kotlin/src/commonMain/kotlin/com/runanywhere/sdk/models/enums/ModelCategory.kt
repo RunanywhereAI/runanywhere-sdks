@@ -22,6 +22,30 @@ enum class ModelCategory(
     AUDIO("audio", "Audio Processing", "waveform");
 
     /**
+     * Maps this category to its corresponding FrameworkModality
+     * Matches iOS ModelCategory.frameworkModality property
+     */
+    val frameworkModality: FrameworkModality
+        get() = when (this) {
+            LANGUAGE, LANGUAGE_MODEL -> FrameworkModality.TEXT_TO_TEXT
+            SPEECH_RECOGNITION -> FrameworkModality.VOICE_TO_TEXT
+            SPEECH_SYNTHESIS -> FrameworkModality.TEXT_TO_VOICE
+            VISION -> FrameworkModality.IMAGE_TO_TEXT
+            IMAGE_GENERATION -> FrameworkModality.TEXT_TO_IMAGE
+            MULTIMODAL -> FrameworkModality.MULTIMODAL
+            AUDIO -> FrameworkModality.VOICE_TO_TEXT // Audio processing maps to voice-to-text
+        }
+
+    /**
+     * Check if this category is compatible with a specific modality
+     */
+    fun isCompatible(modality: FrameworkModality): Boolean {
+        return frameworkModality == modality ||
+                (this == MULTIMODAL) || // Multimodal is compatible with most
+                (modality == FrameworkModality.MULTIMODAL) // Multimodal modality matches most categories
+    }
+
+    /**
      * Whether this category typically requires context length
      */
     val requiresContextLength: Boolean
@@ -41,21 +65,37 @@ enum class ModelCategory(
 
     companion object {
         fun fromValue(value: String): ModelCategory? {
-            return values().find { it.value == value }
+            return entries.find { it.value == value }
         }
 
         /**
          * Determine category from a framework
+         * Matches iOS ModelCategory.from(framework:)
          */
         fun from(framework: LLMFramework): ModelCategory {
             return when (framework) {
                 LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP, LLMFramework.OPEN_AI_WHISPER -> SPEECH_RECOGNITION
+                LLMFramework.SYSTEM_TTS -> SPEECH_SYNTHESIS
                 LLMFramework.LLAMA_CPP, LLMFramework.LLAMACPP, LLMFramework.MLX, LLMFramework.MLC,
                 LLMFramework.EXECU_TORCH, LLMFramework.PICO_LLM,
                 LLMFramework.FOUNDATION_MODELS, LLMFramework.SWIFT_TRANSFORMERS -> LANGUAGE
-
                 LLMFramework.CORE_ML, LLMFramework.TENSOR_FLOW_LITE,
                 LLMFramework.ONNX, LLMFramework.MEDIA_PIPE -> MULTIMODAL
+            }
+        }
+
+        /**
+         * Determine category from a FrameworkModality
+         * Matches iOS ModelCategory.from(modality:)
+         */
+        fun from(modality: FrameworkModality): ModelCategory {
+            return when (modality) {
+                FrameworkModality.TEXT_TO_TEXT -> LANGUAGE
+                FrameworkModality.VOICE_TO_TEXT -> SPEECH_RECOGNITION
+                FrameworkModality.TEXT_TO_VOICE -> SPEECH_SYNTHESIS
+                FrameworkModality.IMAGE_TO_TEXT -> VISION
+                FrameworkModality.TEXT_TO_IMAGE -> IMAGE_GENERATION
+                FrameworkModality.MULTIMODAL -> MULTIMODAL
             }
         }
 

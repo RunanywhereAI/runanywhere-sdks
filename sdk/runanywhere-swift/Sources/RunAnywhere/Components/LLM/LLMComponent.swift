@@ -288,6 +288,7 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
     private let llmConfiguration: LLMConfiguration
     private var conversationContext: Context?
     private var isModelLoaded = false
+    private let logger = SDKLogger(category: "LLMComponent")
 
     // Model lifecycle tracking
     private var modelPath: String?
@@ -309,28 +310,16 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
     // MARK: - Service Creation
 
     public override func createService() async throws -> LLMServiceWrapper {
-        // Check if model needs downloading
-        if let modelId = llmConfiguration.modelId {
-            modelPath = modelId // In real implementation, check if model exists
+        let modelId = llmConfiguration.modelId ?? "unknown"
 
-            // Simulate download check
-            let needsDownload = false // In real implementation, check model store
-
-            if needsDownload {
-                // Emit download required event
-                eventBus.publish(ComponentInitializationEvent.componentDownloadRequired(
-                    component: Self.componentType,
-                    modelId: modelId,
-                    sizeBytes: 1_000_000_000 // 1GB example
-                ))
-
-                // Download model
-                try await downloadModel(modelId: modelId)
-            }
+        // Check if we already have a cached service via the lifecycle tracker
+        if let cachedService = await ModelLifecycleTracker.shared.llmService(for: modelId) {
+            logger.info("✅ Reusing cached LLM service for model: \(modelId)")
+            isModelLoaded = true
+            return LLMServiceWrapper(cachedService)
         }
 
         // Try to get a registered LLM provider from central registry
-        // Need to access ModuleRegistry on MainActor since it's @MainActor isolated
         let provider = await MainActor.run {
             ModuleRegistry.shared.llmProvider(for: llmConfiguration.modelId)
         }
@@ -342,11 +331,20 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
         }
 
         // Create service through provider
+        // NOTE: The provider's createLLMService() already initializes the service with the correct model path
         let llmService = try await provider.createLLMService(configuration: llmConfiguration)
-
-        // Initialize the service
-        try await llmService.initialize(modelPath: modelPath)
         isModelLoaded = true
+
+        // Store service in lifecycle tracker for reuse
+        await MainActor.run {
+            ModelLifecycleTracker.shared.modelDidLoad(
+                modelId: modelId,
+                modelName: modelId,
+                framework: llmConfiguration.preferredFramework ?? .llamaCpp,
+                modality: .llm,
+                llmService: llmService
+            )
+        }
 
         // Wrap and return the service
         return LLMServiceWrapper(llmService)
@@ -520,7 +518,7 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
     // MARK: - Private Helpers
 
     private func buildPrompt(from messages: [Message], systemPrompt: String?) -> String {
-        // For LLMSwiftService, we should NOT add role markers as it handles its own templating
+        // For LLM services, we should NOT add role markers as they handle their own templating
         // Just concatenate the messages with newlines
         var prompt = ""
 
@@ -529,12 +527,12 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
             prompt += "\(system)\n\n"
         }
 
-        // Add messages without role markers - let LLMSwiftService handle formatting
+        // Add messages without role markers - let LLM service handle formatting
         for message in messages {
             prompt += "\(message.content)\n"
         }
 
-        // Don't add trailing "Assistant: " - LLMSwiftService handles this
+        // Don't add trailing "Assistant: " - LLM service handles this
         return prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

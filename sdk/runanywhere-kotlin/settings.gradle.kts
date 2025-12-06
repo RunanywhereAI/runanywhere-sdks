@@ -34,30 +34,36 @@ include(":jni")
 // WhisperKit module - standalone STT module using WhisperJNI
 include(":modules:runanywhere-whisperkit")
 
-// LlamaCpp module - provides LLM capabilities via llama.cpp
-include(":modules:runanywhere-llm-llamacpp")
+// Old LlamaCpp module removed - now using runanywhere-core-llamacpp
+// which provides the same capabilities via runanywhere-core C++ with chat template support
 
-// MLC-LLM module - provides LLM capabilities via MLC-LLM framework
-// Note: This module depends on mlc4j (MLC-LLM native library) which is included conditionally
-include(":modules:runanywhere-llm-mlc")
+// MLC-LLM module - temporarily disabled
+// include(":modules:runanywhere-llm-mlc")
 
-// MLC4J - Native MLC-LLM library (Git submodule inside MLC module)
-// Similar to llama.cpp structure: sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm
-// Only included if the submodule is initialized
-// To set up: git submodule update --init --recursive
-val mlc4jDir = file("modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j")
-if (mlc4jDir.exists()) {
-    include(":mlc4j")
-    project(":mlc4j").projectDir = mlc4jDir
-    println("✓ mlc4j found - MLC-LLM module will be fully functional")
-} else {
-    println("⚠ mlc4j not found at ${mlc4jDir.absolutePath}")
-    println("  To enable MLC-LLM support, run: git submodule update --init --recursive")
-}
+// =============================================================================
+// RunAnywhere Core Modules (mirrors iOS XCFramework architecture)
+// =============================================================================
+
+// RunAnywhere Core Native module - UNIFIED native library package
+// Contains ALL native libraries (JNI bridge + LlamaCpp + ONNX + dependencies)
+// Similar to iOS RunAnywhereCoreBinary.xcframework - single binary with everything
+include(":modules:runanywhere-core-native")
+
+// NOTE: JNI bridge code (RunAnywhereBridge.kt, RunAnywhereLoader.kt) is now in the main SDK
+// at src/jvmAndroidMain/kotlin/com/runanywhere/sdk/native/bridge/
+
+// RunAnywhere Core LlamaCPP module - LLM backend adapter (pure Kotlin)
+// Depends on main SDK (which includes native libs transitively)
+// Provides: LlamaCppAdapter, LlamaCppService
+include(":modules:runanywhere-core-llamacpp")
+
+// RunAnywhere Core ONNX module - STT/TTS/VAD backend adapter (pure Kotlin)
+// Depends on main SDK (which includes native libs transitively)
+// Provides: ONNXAdapter, ONNXService
+include(":modules:runanywhere-core-onnx")
 
 // Other modules temporarily disabled due to build issues
 // TODO: Fix module build configurations
-// include(":modules:runanywhere-core")
 // include(":modules:runanywhere-vad")
 // include(":modules:runanywhere-llm")
 // include(":modules:runanywhere-tts")

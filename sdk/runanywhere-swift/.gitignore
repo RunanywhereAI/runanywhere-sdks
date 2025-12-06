@@ -7,8 +7,11 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 
-# XCFrameworks (Generated binaries - should be built from runanywhere-core, not committed)
-# These are large binary files (235MB) that will be consumed via SPM binary targets or built locally
-*.xcframework/
+# Local XCFrameworks (excluded from git - use remote distribution by default)
+# Default mode (testLocal = false): SDK downloads XCFrameworks from runanywhere-binaries releases
+# Local mode (testLocal = true): Place XCFrameworks in Binaries/ for local development/testing
+Binaries/*.xcframework/
 XCFrameworks/
-Modules/ONNXRuntime/Sources/RunAnywhereONNX.xcframework/
+
+# SPM build artifacts (recreated during swift build)
+Modules/

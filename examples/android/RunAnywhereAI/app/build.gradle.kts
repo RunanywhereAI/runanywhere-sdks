@@ -10,12 +10,28 @@ android {
     namespace = "com.runanywhere.runanywhereai"
     compileSdk = 36
 
+    signingConfigs {
+        val keystorePath = System.getenv("KEYSTORE_PATH")
+        val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+        val keyAlias = System.getenv("KEY_ALIAS")
+        val keyPassword = System.getenv("KEY_PASSWORD")
+
+        if (keystorePath != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -31,7 +47,8 @@ android {
         // }
 
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            // Only arm64-v8a for now (RunAnywhere Core ONNX is built for arm64-v8a)
+            abiFilters += listOf("arm64-v8a")
         }
     }
 
@@ -49,6 +66,7 @@ android {
         }
 
         release {
+            // MUST be false for Play Store publishing
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
@@ -62,10 +80,14 @@ android {
             buildConfigField("boolean", "DEBUG_MODE", "false")
             buildConfigField("String", "BUILD_TYPE", "\"release\"")
 
-            // Optimization flags
+            // MUST be false for Play Store publishing
             isJniDebuggable = false
 
-            // Using default debug signing for now
+            // Use release signing config if available
+            val releaseSigningConfig = signingConfigs.findByName("release")
+            if (releaseSigningConfig != null) {
+                signingConfig = releaseSigningConfig
+            }
         }
 
         create("benchmark") {
@@ -121,7 +143,12 @@ android {
         }
 
         jniLibs {
-            useLegacyPackaging = false
+            // Use legacy packaging to extract libraries to filesystem
+            // This helps with symbol resolution for transitive dependencies
+            useLegacyPackaging = true
+            // NOTE: pickFirsts no longer needed!
+            // All native libraries now come from the unified runanywhere-core-native module,
+            // so there are no duplicates when using multiple backend modules.
         }
     }
 
@@ -185,10 +212,15 @@ android {
 
 dependencies {
     // ========================================
-    // SDK Dependencies (Local Modules)
+    // SDK Dependencies
     // ========================================
+    // Main SDK - high-level APIs, download, routing (no native libs)
     implementation(project(":sdk:runanywhere-kotlin"))
-    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp"))
+
+    // Backend modules - each is SELF-CONTAINED with all native libs
+    // Pick the backends you need:
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp"))  // ~45MB - LLM text generation
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx"))      // ~30MB - STT, TTS, VAD
 
     // ========================================
     // AndroidX Core & Lifecycle
@@ -263,6 +295,11 @@ dependencies {
     implementation(libs.androidx.security.crypto)
 
     // ========================================
+    // DataStore
+    // ========================================
+    implementation(libs.androidx.datastore.preferences)
+
+    // ========================================
     // Permissions
     // ========================================
     implementation(libs.accompanist.permissions)
@@ -274,10 +311,10 @@ dependencies {
     implementation(libs.androidx.room.ktx)
 
     // ========================================
-    // Play Services
+    // Play Services (Updated for targetSdk 34+)
     // ========================================
-    implementation(libs.google.play.core)
-    implementation(libs.google.play.core.ktx)
+    implementation(libs.google.play.app.update)
+    implementation(libs.google.play.app.update.ktx)
 
     // ========================================
     // Logging

@@ -2,6 +2,7 @@ package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.filemanager.SimplifiedFileManager
+import com.runanywhere.sdk.foundation.utils.ModelPathUtils
 import com.runanywhere.sdk.models.download.DownloadProgress
 import com.runanywhere.sdk.models.download.DownloadState
 import com.runanywhere.sdk.public.RunAnywhereSDK
@@ -63,13 +64,14 @@ fun RunAnywhereSDK.downloadModelWithProgress(modelId: String): Flow<DownloadProg
             }
         }
 
-        // Determine output path
+        // Determine output path using centralized ModelPathUtils
         val fileSystem = FileSystem.SYSTEM
         val fileName = "${modelId}.${model.format.value}"
-        val outputPath = (downloadFileManager.modelsDirectory / fileName).toString().toPath()
+        val modelsDir = ModelPathUtils.getModelsDirectory()
+        val outputPath = "$modelsDir/$fileName".toPath()
 
         // Ensure models directory exists
-        downloadFileManager.createDirectory(downloadFileManager.modelsDirectory.toString())
+        downloadFileManager.createDirectory(modelsDir)
 
         var bytesDownloaded = 0L
         var lastEmitTime = System.currentTimeMillis()
