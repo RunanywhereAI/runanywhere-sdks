@@ -23,6 +23,11 @@ export 'capabilities/download/download_service.dart';
 export 'capabilities/text_generation/generation_service.dart';
 export 'capabilities/analytics/analytics_service.dart';
 
+// Download types for model downloading
+export 'core/protocols/downloading/download_task.dart';
+export 'core/protocols/downloading/download_progress.dart';
+export 'core/protocols/downloading/download_state.dart';
+
 // Native FFI bindings for on-device AI capabilities
 // Use: import 'package:runanywhere/native/native.dart';
 // Or access via: NativeBackend, PlatformLoader, NativeProviderRegistration
