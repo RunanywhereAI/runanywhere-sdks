@@ -66,7 +66,8 @@ class ModelPathUtils {
     required LLMFramework framework,
     required ModelFormat format,
   }) async {
-    final modelFolder = await getModelFolder(modelId: modelId, framework: framework);
+    final modelFolder =
+        await getModelFolder(modelId: modelId, framework: framework);
     final fileName = '$modelId.${format.extension}';
     return File('${modelFolder.path}/$fileName');
   }
@@ -86,12 +87,14 @@ class ModelPathUtils {
   /// Returns path based on framework and format
   static Future<String> getModelPath(ModelInfo modelInfo) async {
     // Use preferred framework if available, otherwise use first compatible framework
-    final framework = modelInfo.preferredFramework ?? modelInfo.compatibleFrameworks.firstOrNull;
+    final framework = modelInfo.preferredFramework ??
+        modelInfo.compatibleFrameworks.firstOrNull;
 
     if (framework != null) {
       // For directory-based models (e.g., CoreML packages), return the folder
       if (modelInfo.format.isDirectoryBased) {
-        final folder = await getModelFolder(modelId: modelInfo.id, framework: framework);
+        final folder =
+            await getModelFolder(modelId: modelInfo.id, framework: framework);
         return folder.path;
       }
       // For single-file models, return the full file path
@@ -123,7 +126,8 @@ class ModelPathUtils {
   }) async {
     if (framework != null) {
       if (format.isDirectoryBased) {
-        final folder = await getModelFolder(modelId: modelId, framework: framework);
+        final folder =
+            await getModelFolder(modelId: modelId, framework: framework);
         return folder.path;
       }
       final file = await getModelFilePath(
@@ -199,7 +203,8 @@ class ModelPathUtils {
       final nextComponent = pathComponents[modelsIndex + 1];
 
       // Check if next component is a framework name
-      final isFramework = LLMFramework.values.any((f) => f.rawValue == nextComponent);
+      final isFramework =
+          LLMFramework.values.any((f) => f.rawValue == nextComponent);
       if (isFramework && modelsIndex + 2 < pathComponents.length) {
         // Framework structure: Models/framework/modelId
         return pathComponents[modelsIndex + 2];
@@ -294,6 +299,37 @@ class ModelPathUtils {
         }
       }
     }
+  }
+
+  /// Find model file at expected path: framework/modelId/modelId.format
+  /// Simple structure: Models/{framework}/{modelId}/{modelId}.{format}
+  static Future<Uri?> findModelFile({
+    required String modelId,
+    required LLMFramework framework,
+    required ModelFormat format,
+  }) async {
+    // Simple structure: Models/{framework}/{modelId}/{modelId}.{format}
+    if (format.isDirectoryBased) {
+      final modelFolder =
+          await getModelFolder(modelId: modelId, framework: framework);
+      if (await modelFolder.exists()) {
+        final contents = await modelFolder.list().toList();
+        if (contents.isNotEmpty) {
+          return Uri.directory(modelFolder.path);
+        }
+      }
+    } else {
+      final modelFile = await getModelFilePath(
+        modelId: modelId,
+        framework: framework,
+        format: format,
+      );
+      if (await modelFile.exists()) {
+        return Uri.file(modelFile.path);
+      }
+    }
+
+    return null;
   }
 }
 

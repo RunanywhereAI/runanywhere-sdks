@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:runanywhere/runanywhere.dart' as sdk;
 
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
@@ -162,7 +163,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
 
   Widget _buildFrameworksSection(BuildContext context) {
     // Filter frameworks based on context
-    final relevantFrameworks = _viewModel.availableFrameworks.where((framework) {
+    final relevantFrameworks =
+        _viewModel.availableFrameworks.where((framework) {
       return _shouldShowFramework(framework);
     }).toList();
 
@@ -466,8 +468,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       return model.compatibleFrameworks.contains(framework);
     });
 
-    return modelsForFramework
-        .any((model) => widget.context.relevantCategories.contains(model.category));
+    return modelsForFramework.any(
+        (model) => widget.context.relevantCategories.contains(model.category));
   }
 
   void _toggleFramework(LLMFramework framework) {
@@ -533,27 +535,42 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
         _loadingProgress = 'Loading model into memory...';
       });
 
-      // TODO: Load model based on context/modality
-      // switch (widget.context) {
-      //   case ModelSelectionContext.llm:
-      //     await RunAnywhere.loadModel(model.id);
-      //   case ModelSelectionContext.stt:
-      //     await RunAnywhere.loadSTTModel(model.id);
-      //   case ModelSelectionContext.tts:
-      //     await RunAnywhere.loadTTSModel(model.id);
-      //   case ModelSelectionContext.voice:
-      //     // Determine based on model category
-      //     break;
-      // }
-
-      // Simulate loading for demo
-      await Future.delayed(const Duration(seconds: 1));
+      // Load model based on context/modality using real SDK
+      // ModelManager will automatically update via SDK events (observer pattern)
+      switch (widget.context) {
+        case ModelSelectionContext.llm:
+          debugPrint('🎯 Loading LLM model: ${model.id}');
+          // SDK will publish events, ModelManager listens and updates automatically
+          await sdk.RunAnywhere.loadModel(model.id);
+          break;
+        case ModelSelectionContext.stt:
+          debugPrint('🎯 Loading STT model: ${model.id}');
+          await sdk.RunAnywhere.loadSTTModel(model.id);
+          break;
+        case ModelSelectionContext.tts:
+          debugPrint('🎯 Loading TTS model: ${model.id}');
+          await sdk.RunAnywhere.loadTTSModel(model.id);
+          break;
+        case ModelSelectionContext.voice:
+          // Determine based on model category
+          if (model.category == ModelCategory.speechRecognition) {
+            debugPrint('🎯 Loading Voice STT model: ${model.id}');
+            await sdk.RunAnywhere.loadSTTModel(model.id);
+          } else if (model.category == ModelCategory.speechSynthesis) {
+            debugPrint('🎯 Loading Voice TTS model: ${model.id}');
+            await sdk.RunAnywhere.loadTTSModel(model.id);
+          } else {
+            debugPrint('🎯 Loading Voice LLM model: ${model.id}');
+            await sdk.RunAnywhere.loadModel(model.id);
+          }
+          break;
+      }
 
       setState(() {
         _loadingProgress = 'Model loaded successfully!';
       });
 
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 300));
 
       await _viewModel.selectModel(model);
       await widget.onModelSelected(model);
@@ -562,12 +579,19 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
         Navigator.pop(context);
       }
     } catch (e) {
+      debugPrint('❌ Failed to load model: $e');
       setState(() {
         _isLoadingModel = false;
         _loadingProgress = '';
         _selectedModel = null;
       });
-      debugPrint('Failed to load model: $e');
+
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load model: $e')),
+        );
+      }
     }
   }
 
@@ -836,20 +860,63 @@ class _SelectableModelRowState extends State<_SelectableModelRow> {
       _downloadProgress = 0.0;
     });
 
-    // TODO: Use RunAnywhere SDK to download
-    for (int i = 0; i <= 100; i += 5) {
-      await Future.delayed(const Duration(milliseconds: 100));
+    try {
+      debugPrint('📥 Starting download for model: ${widget.model.name}');
+
+      // Get the download service from SDK
+      final downloadService = sdk.RunAnywhere.serviceContainer.downloadService;
+
+      // Get the SDK model by ID
+      final sdkModels = await sdk.RunAnywhere.availableModels();
+      final sdkModel = sdkModels.firstWhere(
+        (m) => m.id == widget.model.id,
+        orElse: () =>
+            throw Exception('Model not found in registry: ${widget.model.id}'),
+      );
+
+      // Start the actual download using SDK
+      final downloadTask = await downloadService.downloadModel(sdkModel);
+
+      // Listen to real download progress
+      await for (final progress in downloadTask.progress) {
+        if (!mounted) return;
+
+        final progressValue = progress.totalBytes > 0
+            ? progress.bytesDownloaded / progress.totalBytes
+            : 0.0;
+
+        setState(() {
+          _downloadProgress = progressValue;
+        });
+
+        // Check if completed or failed
+        if (progress.state.isCompleted) {
+          debugPrint('✅ Download completed for model: ${widget.model.name}');
+          break;
+        } else if (progress.state.isFailed) {
+          debugPrint('❌ Download failed for model: ${widget.model.name}');
+          throw Exception('Download failed');
+        }
+      }
+
       if (!mounted) return;
       setState(() {
-        _downloadProgress = i / 100;
+        _isDownloading = false;
       });
-    }
+      widget.onDownloadCompleted();
+    } catch (e) {
+      debugPrint('❌ Download error: $e');
+      if (!mounted) return;
+      setState(() {
+        _isDownloading = false;
+        _downloadProgress = 0.0;
+      });
 
-    if (!mounted) return;
-    setState(() {
-      _isDownloading = false;
-    });
-    widget.onDownloadCompleted();
+      // Show error to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Download failed: $e')),
+      );
+    }
   }
 }
 

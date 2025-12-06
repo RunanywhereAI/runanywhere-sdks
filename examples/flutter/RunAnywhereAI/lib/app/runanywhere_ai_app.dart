@@ -222,6 +222,10 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     debugPrint('✅ ONNX Runtime adapter registered with STT and TTS models');
 
     debugPrint('🎉 All adapters registered for development');
+
+    // Refresh all models to detect downloaded files from previous sessions
+    await RunAnywhere.serviceContainer.modelRegistry.refreshDownloadedModels();
+    debugPrint('✅ Refreshed model download status');
   }
 
   /// Register adapters with custom models for production mode
@@ -346,6 +350,10 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     debugPrint(
         '🎉 All adapters registered for production with hardcoded models');
     debugPrint('📡 Backend can dynamically add more models via console API');
+
+    // Refresh all models to detect downloaded files from previous sessions
+    await RunAnywhere.serviceContainer.modelRegistry.refreshDownloadedModels();
+    debugPrint('✅ Refreshed model download status');
   }
 
   @override

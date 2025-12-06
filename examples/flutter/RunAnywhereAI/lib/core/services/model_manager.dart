@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
 
@@ -5,16 +7,20 @@ import 'package:runanywhere/runanywhere.dart';
 ///
 /// Manages model loading/unloading and availability checks.
 /// Service for managing model loading and lifecycle using RunAnywhere SDK.
+/// Automatically listens to SDK events to stay in sync.
 class ModelManager extends ChangeNotifier {
   static final ModelManager shared = ModelManager._();
 
-  ModelManager._();
+  ModelManager._() {
+    _setupEventListeners();
+  }
 
   bool _isLoading = false;
   Object? _error;
   String? _currentModelId;
   ModelInfo? _currentModel;
   List<ModelInfo> _availableModels = [];
+  StreamSubscription<SDKModelEvent>? _modelEventsSubscription;
 
   bool get isLoading => _isLoading;
   Object? get error => _error;
@@ -23,6 +29,76 @@ class ModelManager extends ChangeNotifier {
   List<ModelInfo> get availableModels => _availableModels;
   bool get isModelLoaded => _currentModel != null;
   String? get loadedModelName => _currentModel?.name;
+
+  /// Setup event listeners to automatically sync with SDK state
+  void _setupEventListeners() {
+    _modelEventsSubscription = RunAnywhere.events.modelEvents.listen((event) {
+      if (event is SDKModelLoadStarted) {
+        _handleModelLoadStarted(event.modelId);
+      } else if (event is SDKModelLoadCompleted) {
+        _handleModelLoadCompleted(event.modelId);
+      } else if (event is SDKModelLoadFailed) {
+        _handleModelLoadFailed(event.modelId, event.error);
+      } else if (event is SDKModelUnloadStarted) {
+        _handleModelUnloadStarted(event.modelId);
+      } else if (event is SDKModelUnloadCompleted) {
+        _handleModelUnloadCompleted(event.modelId);
+      }
+    });
+  }
+
+  /// Handle model load started event from SDK
+  void _handleModelLoadStarted(String modelId) {
+    debugPrint('📡 SDK Event: Model load started: $modelId');
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+  }
+
+  /// Handle model load completed event from SDK
+  void _handleModelLoadCompleted(String modelId) async {
+    debugPrint('📡 SDK Event: Model load completed: $modelId');
+    // Refresh current model from SDK
+    _currentModel = RunAnywhere.currentModel;
+    _currentModelId = _currentModel?.id;
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
+    debugPrint(
+        '✅ ModelManager synced: isModelLoaded=$isModelLoaded, modelName=$loadedModelName');
+  }
+
+  /// Handle model load failed event from SDK
+  void _handleModelLoadFailed(String modelId, Object error) {
+    debugPrint('📡 SDK Event: Model load failed: $modelId - $error');
+    _isLoading = false;
+    _error = error;
+    notifyListeners();
+  }
+
+  /// Handle model unload started event from SDK
+  void _handleModelUnloadStarted(String modelId) {
+    debugPrint('📡 SDK Event: Model unload started: $modelId');
+    _isLoading = true;
+    notifyListeners();
+  }
+
+  /// Handle model unload completed event from SDK
+  void _handleModelUnloadCompleted(String modelId) {
+    debugPrint('📡 SDK Event: Model unload completed: $modelId');
+    _currentModel = null;
+    _currentModelId = null;
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
+    debugPrint('✅ ModelManager synced: isModelLoaded=$isModelLoaded');
+  }
+
+  @override
+  void dispose() {
+    _modelEventsSubscription?.cancel();
+    super.dispose();
+  }
 
   // MARK: - Model Operations
 
@@ -183,7 +259,8 @@ class ModelManager extends ChangeNotifier {
     try {
       return _availableModels.any((model) =>
           model.name.toLowerCase() == modelName.toLowerCase() &&
-          model.preferredFramework?.rawValue.toLowerCase() == framework.toLowerCase() &&
+          model.preferredFramework?.rawValue.toLowerCase() ==
+              framework.toLowerCase() &&
           model.isDownloaded);
     } catch (e) {
       return false;
@@ -214,22 +291,30 @@ class ModelManager extends ChangeNotifier {
 
   /// Filter models by category
   List<ModelInfo> filterByCategory(String category) {
-    return _availableModels.where((m) => m.category.rawValue == category).toList();
+    return _availableModels
+        .where((m) => m.category.rawValue == category)
+        .toList();
   }
 
   /// Get LLM models only
   List<ModelInfo> get llmModels {
-    return _availableModels.where((m) => m.category == ModelCategory.language).toList();
+    return _availableModels
+        .where((m) => m.category == ModelCategory.language)
+        .toList();
   }
 
   /// Get STT models only
   List<ModelInfo> get sttModels {
-    return _availableModels.where((m) => m.category == ModelCategory.speechRecognition).toList();
+    return _availableModels
+        .where((m) => m.category == ModelCategory.speechRecognition)
+        .toList();
   }
 
   /// Get TTS models only
   List<ModelInfo> get ttsModels {
-    return _availableModels.where((m) => m.category == ModelCategory.speechSynthesis).toList();
+    return _availableModels
+        .where((m) => m.category == ModelCategory.speechSynthesis)
+        .toList();
   }
 
   /// Get downloaded models only

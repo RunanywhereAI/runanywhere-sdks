@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:runanywhere/runanywhere.dart' as sdk;
 
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
@@ -391,21 +392,63 @@ class _ModelRowState extends State<ModelRow> {
       _downloadProgress = 0.0;
     });
 
-    // TODO: Use RunAnywhere SDK to download model with progress
-    // Simulate download for demo
-    for (int i = 0; i <= 100; i += 5) {
-      await Future.delayed(const Duration(milliseconds: 100));
+    try {
+      debugPrint('📥 Starting download for model: ${widget.model.name}');
+
+      // Get the download service from SDK
+      final downloadService = sdk.RunAnywhere.serviceContainer.downloadService;
+
+      // Get the SDK model by ID
+      final sdkModels = await sdk.RunAnywhere.availableModels();
+      final sdkModel = sdkModels.firstWhere(
+        (m) => m.id == widget.model.id,
+        orElse: () =>
+            throw Exception('Model not found in registry: ${widget.model.id}'),
+      );
+
+      // Start the actual download using SDK
+      final downloadTask = await downloadService.downloadModel(sdkModel);
+
+      // Listen to real download progress
+      await for (final progress in downloadTask.progress) {
+        if (!mounted) return;
+
+        final progressValue = progress.totalBytes > 0
+            ? progress.bytesDownloaded / progress.totalBytes
+            : 0.0;
+
+        setState(() {
+          _downloadProgress = progressValue;
+        });
+
+        // Check if completed or failed
+        if (progress.state.isCompleted) {
+          debugPrint('✅ Download completed for model: ${widget.model.name}');
+          break;
+        } else if (progress.state.isFailed) {
+          debugPrint('❌ Download failed for model: ${widget.model.name}');
+          throw Exception('Download failed');
+        }
+      }
+
       if (!mounted) return;
       setState(() {
-        _downloadProgress = i / 100;
+        _isDownloading = false;
       });
-    }
+      widget.onDownloadCompleted();
+    } catch (e) {
+      debugPrint('❌ Download error: $e');
+      if (!mounted) return;
+      setState(() {
+        _isDownloading = false;
+        _downloadProgress = 0.0;
+      });
 
-    if (!mounted) return;
-    setState(() {
-      _isDownloading = false;
-    });
-    widget.onDownloadCompleted();
+      // Show error to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Download failed: $e')),
+      );
+    }
   }
 }
 

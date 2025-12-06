@@ -23,10 +23,17 @@ export '../capabilities/text_generation/generation_service.dart'
 // Export component types for public use
 export '../components/stt/stt_component.dart'
     show STTComponent, STTConfiguration, STTOutput, STTMode, STTOptions;
-export '../components/tts/tts_component.dart' show TTSComponent, TTSConfiguration;
+export '../components/tts/tts_component.dart'
+    show TTSComponent, TTSConfiguration;
 export '../components/tts/tts_output.dart' show TTSOutput, SynthesisMetadata;
 export '../components/llm/llm_component.dart'
-    show LLMComponent, LLMConfiguration, LLMOutput, Message, MessageRole, Context;
+    show
+        LLMComponent,
+        LLMConfiguration,
+        LLMOutput,
+        Message,
+        MessageRole,
+        Context;
 
 // Export framework adapter types for registration
 export '../core/protocols/frameworks/unified_framework_adapter.dart';
@@ -435,8 +442,20 @@ class RunAnywhere {
 
     final currentModelInfo = currentModel;
     if (currentModelInfo != null) {
-      await serviceContainer.modelLoadingService.unloadModel(currentModelInfo.id);
-      serviceContainer.generationService.setCurrentModel(null);
+      final modelId = currentModelInfo.id;
+      EventBus.shared.publish(SDKModelEvent.unloadStarted(modelId: modelId));
+
+      try {
+        await serviceContainer.modelLoadingService.unloadModel(modelId);
+        serviceContainer.generationService.setCurrentModel(null);
+        EventBus.shared
+            .publish(SDKModelEvent.unloadCompleted(modelId: modelId));
+      } catch (e) {
+        EventBus.shared.publish(
+          SDKModelEvent.loadFailed(modelId: modelId, error: e),
+        );
+        rethrow;
+      }
     }
   }
 
