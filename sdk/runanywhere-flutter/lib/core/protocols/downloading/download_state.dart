@@ -2,6 +2,24 @@
 /// Matches iOS DownloadState from Data/Models/Downloading/DownloadState.swift
 sealed class DownloadState {
   const DownloadState();
+
+  /// Convenience getter to check if download is completed
+  bool get isCompleted => this is DownloadStateCompleted;
+
+  /// Convenience getter to check if download failed
+  bool get isFailed => this is DownloadStateFailed;
+
+  /// Convenience getter to check if download is pending
+  bool get isPending => this is DownloadStatePending;
+
+  /// Convenience getter to check if download is in progress
+  bool get isDownloading => this is DownloadStateDownloading;
+
+  /// Convenience getter to check if download was cancelled
+  bool get isCancelled => this is DownloadStateCancelled;
+
+  /// Convenience getter to check if download is extracting
+  bool get isExtracting => this is DownloadStateExtracting;
 }
 
 /// Download is pending, waiting to start

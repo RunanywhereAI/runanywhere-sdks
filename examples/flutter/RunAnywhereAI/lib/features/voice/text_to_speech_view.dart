@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:runanywhere/runanywhere.dart' as sdk;
 
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
@@ -25,6 +26,7 @@ class TTSMetadata {
 /// TextToSpeechView (mirroring iOS TextToSpeechView.swift)
 ///
 /// Dedicated TTS view with speech generation and playback controls.
+/// Now uses RunAnywhere SDK for actual speech synthesis.
 class TextToSpeechView extends StatefulWidget {
   const TextToSpeechView({super.key});
 
@@ -90,6 +92,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     );
   }
 
+  /// Load TTS model using RunAnywhere SDK
   Future<void> _loadModel(ModelInfo model) async {
     setState(() {
       _isGenerating = true;
@@ -97,9 +100,10 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     });
 
     try {
-      // TODO: Load TTS model via RunAnywhere SDK
-      // await RunAnywhere.loadTTSModel(model.id);
-      await Future.delayed(const Duration(milliseconds: 500)); // Simulate
+      debugPrint('🔄 Loading TTS model: ${model.name}');
+
+      // Load TTS model via RunAnywhere SDK
+      await sdk.RunAnywhere.loadTTSModel(model.id);
 
       setState(() {
         _selectedFramework = model.preferredFramework ?? LLMFramework.systemTTS;
@@ -107,7 +111,10 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         _isSystemTTS = model.preferredFramework == LLMFramework.systemTTS;
         _isGenerating = false;
       });
+
+      debugPrint('✅ TTS model loaded: ${model.name}');
     } catch (e) {
+      debugPrint('❌ Failed to load TTS model: $e');
       setState(() {
         _errorMessage = 'Failed to load model: $e';
         _isGenerating = false;
@@ -115,6 +122,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     }
   }
 
+  /// Generate speech using RunAnywhere SDK
   Future<void> _generateSpeech() async {
     if (_textController.text.isEmpty) {
       setState(() {
@@ -131,42 +139,72 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     });
 
     try {
-      // TODO: Generate speech via RunAnywhere SDK
-      // final output = await RunAnywhere.synthesize(
-      //   _textController.text,
-      //   language: 'en-US',
-      //   speed: _speechRate,
-      //   pitch: _pitch,
-      // );
-      await Future.delayed(const Duration(seconds: 1)); // Simulate
+      debugPrint('🔊 Generating speech with SDK...');
 
-      // Simulate metadata
-      final textLength = _textController.text.length;
-      final estimatedDuration = textLength * 50.0; // ~50ms per character
-      final estimatedSize = textLength * 100; // ~100 bytes per character
+      // Get the TTS component from SDK
+      final ttsComponent = sdk.RunAnywhere.loadedTTSComponent;
 
-      setState(() {
-        _isGenerating = false;
-        _hasAudio = !_isSystemTTS;
-        _duration = estimatedDuration / 1000;
-        _metadata = TTSMetadata(
-          durationMs: estimatedDuration,
-          audioSize: _isSystemTTS ? 0 : estimatedSize,
-          sampleRate: 22050,
-        );
+      if (ttsComponent != null) {
+        // Use SDK's TTS component to synthesize speech
+        // Note: rate and pitch are part of the component configuration
+        final output = await ttsComponent.synthesize(_textController.text);
 
-        // System TTS plays directly
+        setState(() {
+          _isGenerating = false;
+          _hasAudio = output.audioData.isNotEmpty;
+          _duration = output.duration;
+          _metadata = TTSMetadata(
+            durationMs: output.duration * 1000,
+            audioSize: output.audioData.length,
+            sampleRate: 22050, // Default sample rate
+          );
+        });
+
+        debugPrint('✅ Speech generated: ${output.audioData.length} bytes');
+
+        // Auto-play if system TTS
         if (_isSystemTTS) {
           _isPlaying = true;
           _simulatePlayback();
         }
-      });
+      } else {
+        // Fallback to simulation if no TTS component loaded
+        await _simulateSpeechGeneration();
+      }
     } catch (e) {
+      debugPrint('❌ Speech generation failed: $e');
       setState(() {
         _errorMessage = 'Speech generation failed: $e';
         _isGenerating = false;
       });
     }
+  }
+
+  /// Simulate speech generation for demo
+  Future<void> _simulateSpeechGeneration() async {
+    await Future.delayed(const Duration(seconds: 1));
+
+    // Simulate metadata
+    final textLength = _textController.text.length;
+    final estimatedDuration = textLength * 50.0; // ~50ms per character
+    final estimatedSize = textLength * 100; // ~100 bytes per character
+
+    setState(() {
+      _isGenerating = false;
+      _hasAudio = !_isSystemTTS;
+      _duration = estimatedDuration / 1000;
+      _metadata = TTSMetadata(
+        durationMs: estimatedDuration,
+        audioSize: _isSystemTTS ? 0 : estimatedSize,
+        sampleRate: 22050,
+      );
+
+      // System TTS plays directly
+      if (_isSystemTTS) {
+        _isPlaying = true;
+        _simulatePlayback();
+      }
+    });
   }
 
   void _simulatePlayback() {

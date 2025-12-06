@@ -4,7 +4,7 @@ import 'package:runanywhere/runanywhere.dart';
 /// ModelManager (mirroring iOS ModelManager.swift)
 ///
 /// Manages model loading/unloading and availability checks.
-/// Service for managing model loading and lifecycle
+/// Service for managing model loading and lifecycle using RunAnywhere SDK.
 class ModelManager extends ChangeNotifier {
   static final ModelManager shared = ModelManager._();
 
@@ -26,7 +26,7 @@ class ModelManager extends ChangeNotifier {
 
   // MARK: - Model Operations
 
-  /// Load a model by ID
+  /// Load a model by ID using SDK
   /// Matches iOS ModelManager.loadModel pattern
   Future<void> loadModel(String modelId) async {
     _isLoading = true;
@@ -34,12 +34,17 @@ class ModelManager extends ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint('⏳ Loading model: $modelId');
+
       // Use SDK's model loading with new API
       await RunAnywhere.loadModel(modelId);
       _currentModelId = modelId;
       _currentModel = RunAnywhere.currentModel;
       _error = null;
+
+      debugPrint('✅ Model loaded successfully: ${_currentModel?.name}');
     } catch (e) {
+      debugPrint('❌ Failed to load model: $e');
       _error = e;
       rethrow;
     } finally {
@@ -54,6 +59,54 @@ class ModelManager extends ChangeNotifier {
     await loadModel(modelInfo.id);
   }
 
+  /// Load an STT model by ID using SDK
+  /// Matches iOS ModelManager pattern for STT models
+  Future<void> loadSTTModel(String modelId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      debugPrint('⏳ Loading STT model: $modelId');
+
+      // Use SDK's STT model loading
+      await RunAnywhere.loadSTTModel(modelId);
+
+      debugPrint('✅ STT model loaded successfully: $modelId');
+    } catch (e) {
+      debugPrint('❌ Failed to load STT model: $e');
+      _error = e;
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Load a TTS model by ID using SDK
+  /// Matches iOS ModelManager pattern for TTS models
+  Future<void> loadTTSModel(String modelId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      debugPrint('⏳ Loading TTS model: $modelId');
+
+      // Use SDK's TTS model loading
+      await RunAnywhere.loadTTSModel(modelId);
+
+      debugPrint('✅ TTS model loaded successfully: $modelId');
+    } catch (e) {
+      debugPrint('❌ Failed to load TTS model: $e');
+      _error = e;
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   /// Unload the current model
   /// Matches iOS ModelManager.unloadCurrentModel pattern
   Future<void> unloadCurrentModel() async {
@@ -61,13 +114,17 @@ class ModelManager extends ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint('⏳ Unloading current model...');
+
       // Use SDK's model unloading with new API
       await RunAnywhere.unloadModel();
       _currentModelId = null;
       _currentModel = null;
+
+      debugPrint('✅ Model unloaded successfully');
     } catch (e) {
+      debugPrint('❌ Failed to unload model: $e');
       _error = e;
-      debugPrint('Failed to unload model: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -79,10 +136,11 @@ class ModelManager extends ChangeNotifier {
   Future<List<ModelInfo>> getAvailableModels() async {
     try {
       _availableModels = await RunAnywhere.availableModels();
+      debugPrint('✅ Loaded ${_availableModels.length} available models');
       notifyListeners();
       return _availableModels;
     } catch (e) {
-      debugPrint('Failed to get available models: $e');
+      debugPrint('❌ Failed to get available models: $e');
       return [];
     }
   }
@@ -102,11 +160,15 @@ class ModelManager extends ChangeNotifier {
   /// Check if a model is downloaded
   /// Checks the model's local path to determine if it's available
   bool isModelDownloaded(String modelId) {
-    final model = _availableModels.firstWhere(
-      (m) => m.id == modelId,
-      orElse: () => throw StateError('Model not found'),
-    );
-    return model.isDownloaded;
+    try {
+      final model = _availableModels.firstWhere(
+        (m) => m.id == modelId,
+        orElse: () => throw StateError('Model not found'),
+      );
+      return model.isDownloaded;
+    } catch (e) {
+      return false;
+    }
   }
 
   /// Check if a model is downloaded by name and framework
@@ -157,21 +219,33 @@ class ModelManager extends ChangeNotifier {
 
   /// Get LLM models only
   List<ModelInfo> get llmModels {
-    return _availableModels.where((m) => m.category.rawValue == 'language').toList();
+    return _availableModels.where((m) => m.category == ModelCategory.language).toList();
   }
 
   /// Get STT models only
   List<ModelInfo> get sttModels {
-    return _availableModels.where((m) => m.category.rawValue == 'speech-recognition').toList();
+    return _availableModels.where((m) => m.category == ModelCategory.speechRecognition).toList();
   }
 
   /// Get TTS models only
   List<ModelInfo> get ttsModels {
-    return _availableModels.where((m) => m.category.rawValue == 'speech-synthesis').toList();
+    return _availableModels.where((m) => m.category == ModelCategory.speechSynthesis).toList();
   }
 
   /// Get downloaded models only
   List<ModelInfo> get downloadedModels {
     return _availableModels.where((m) => m.isDownloaded).toList();
   }
+
+  /// Get loaded STT component from SDK
+  STTComponent? get loadedSTTComponent => RunAnywhere.loadedSTTComponent;
+
+  /// Get loaded TTS component from SDK
+  TTSComponent? get loadedTTSComponent => RunAnywhere.loadedTTSComponent;
+
+  /// Check if an STT model is loaded
+  bool get isSTTModelLoaded => RunAnywhere.loadedSTTComponent != null;
+
+  /// Check if a TTS model is loaded
+  bool get isTTSModelLoaded => RunAnywhere.loadedTTSComponent != null;
 }
