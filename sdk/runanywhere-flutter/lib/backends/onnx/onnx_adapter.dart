@@ -7,6 +7,7 @@ import '../../core/module_registry.dart';
 import '../../core/protocols/downloading/download_strategy.dart';
 import '../../core/protocols/frameworks/unified_framework_adapter.dart';
 import '../native/native_backend.dart';
+import 'onnx_download_strategy.dart';
 import 'providers/onnx_stt_provider.dart';
 import 'providers/onnx_tts_provider.dart';
 import 'providers/onnx_vad_provider.dart';
@@ -45,6 +46,9 @@ class OnnxAdapter
   OnnxTTSService? _cachedTTSService;
   OnnxVADService? _cachedVADService;
   OnnxLLMService? _cachedLLMService;
+
+  // Download strategy for ONNX models
+  OnnxDownloadStrategy? _downloadStrategy;
 
   // Track last usage for smart cleanup
   DateTime? _lastSTTUsage;
@@ -219,8 +223,9 @@ class OnnxAdapter
 
   @override
   DownloadStrategy? getDownloadStrategy() {
-    // ONNX uses default download strategy
-    return null;
+    // Return ONNX-specific download strategy
+    _downloadStrategy ??= OnnxDownloadStrategy(backend: _backend);
+    return _downloadStrategy;
   }
 
   @override

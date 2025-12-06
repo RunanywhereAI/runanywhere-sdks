@@ -9,6 +9,10 @@ import UIKit
 public class RunanywherePlugin: NSObject, FlutterPlugin {
 
     public static func register(with registrar: FlutterPluginRegistrar) {
+        // Force loading of RunAnywhereCore symbols on plugin registration
+        // This ensures symbols are available to Dart FFI via DynamicLibrary.process()
+        RunAnywhereBridge.forceSymbolLoading()
+
         // Register the plugin
         // Note: Main functionality is exposed via FFI, not method channels
         let instance = RunanywherePlugin()

@@ -94,11 +94,12 @@ class PlatformLoader {
     return DynamicLibrary.open('lib$_libraryName.so');
   }
 
-  /// Load on iOS using process() for statically linked XCFramework
+  /// Load on iOS using executable() for statically linked XCFramework
   static DynamicLibrary _loadIOS() {
     // iOS uses static linking via XCFramework in podspec
-    // Symbols are already in the process
-    return DynamicLibrary.process();
+    // Symbols are linked into the executable, use DynamicLibrary.executable()
+    // which looks up symbols in the main executable where static libraries are linked
+    return DynamicLibrary.executable();
   }
 
   /// Load on macOS for development/testing

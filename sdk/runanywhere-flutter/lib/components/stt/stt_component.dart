@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io';
+
 import '../../core/components/base_component.dart';
 import '../../core/types/sdk_component.dart';
 import '../../core/protocols/component/component_configuration.dart';
 import '../../core/models/audio_format.dart';
 import '../../core/module_registry.dart';
+import '../../foundation/dependency_injection/service_container.dart';
 import '../vad/vad_output.dart' show VADOutput;
 
 // Re-export STT types for external consumers
@@ -244,32 +247,36 @@ class STTError implements Exception {
   @override
   String toString() => 'STTError: $message';
 
-  factory STTError.serviceNotInitialized() =>
-      STTError('STT service is not initialized', STTErrorType.serviceNotInitialized);
+  factory STTError.serviceNotInitialized() => STTError(
+      'STT service is not initialized', STTErrorType.serviceNotInitialized);
 
-  factory STTError.transcriptionFailed(String reason) =>
-      STTError('Transcription failed: $reason', STTErrorType.transcriptionFailed);
+  factory STTError.transcriptionFailed(String reason) => STTError(
+      'Transcription failed: $reason', STTErrorType.transcriptionFailed);
 
-  factory STTError.streamingNotSupported() =>
-      STTError('Streaming transcription is not supported', STTErrorType.streamingNotSupported);
+  factory STTError.streamingNotSupported() => STTError(
+      'Streaming transcription is not supported',
+      STTErrorType.streamingNotSupported);
 
-  factory STTError.languageNotSupported(String language) =>
-      STTError('Language not supported: $language', STTErrorType.languageNotSupported);
+  factory STTError.languageNotSupported(String language) => STTError(
+      'Language not supported: $language', STTErrorType.languageNotSupported);
 
   factory STTError.modelNotFound(String model) =>
       STTError('Model not found: $model', STTErrorType.modelNotFound);
 
-  factory STTError.audioFormatNotSupported() =>
-      STTError('Audio format is not supported', STTErrorType.audioFormatNotSupported);
+  factory STTError.audioFormatNotSupported() => STTError(
+      'Audio format is not supported', STTErrorType.audioFormatNotSupported);
 
-  factory STTError.insufficientAudioData() =>
-      STTError('Insufficient audio data for transcription', STTErrorType.insufficientAudioData);
+  factory STTError.insufficientAudioData() => STTError(
+      'Insufficient audio data for transcription',
+      STTErrorType.insufficientAudioData);
 
-  factory STTError.noVoiceServiceAvailable() =>
-      STTError('No STT service available for transcription', STTErrorType.noVoiceServiceAvailable);
+  factory STTError.noVoiceServiceAvailable() => STTError(
+      'No STT service available for transcription',
+      STTErrorType.noVoiceServiceAvailable);
 
-  factory STTError.microphonePermissionDenied() =>
-      STTError('Microphone permission was denied', STTErrorType.microphonePermissionDenied);
+  factory STTError.microphonePermissionDenied() => STTError(
+      'Microphone permission was denied',
+      STTErrorType.microphonePermissionDenied);
 }
 
 enum STTErrorType {
@@ -303,6 +310,43 @@ class STTComponent extends BaseComponent<STTService> {
 
   @override
   Future<STTService> createService() async {
+    // Get model info from registry to get the actual model path
+    final registry = serviceContainer?.modelRegistry ??
+        ServiceContainer.shared.modelRegistry;
+    final modelId = sttConfig.modelId;
+    if (modelId == null) {
+      throw STTError(
+        'STT model ID is required',
+        STTErrorType.serviceNotInitialized,
+      );
+    }
+    final modelInfo = registry.getModel(modelId);
+
+    if (modelInfo != null && modelInfo.localPath != null) {
+      // Use the model's local path (handles nested directories for ONNX)
+      // For ONNX models, the path might be a directory containing the .onnx file
+      final localPath = modelInfo.localPath!.toFilePath();
+
+      // Check if it's a directory (ONNX models in nested dirs)
+      final pathFile = File(localPath);
+      final pathDir = Directory(localPath);
+
+      if (await pathDir.exists()) {
+        // It's a directory - ONNX models are stored in directories
+        // The native backend will find the .onnx file inside
+        _modelPath = localPath;
+      } else if (await pathFile.exists()) {
+        // It's a file - use it directly
+        _modelPath = localPath;
+      } else {
+        // Path doesn't exist, fallback to modelId
+        _modelPath = sttConfig.modelId;
+      }
+    } else {
+      // Fallback: use modelId as path (for built-in models or if not found)
+      _modelPath = sttConfig.modelId;
+    }
+
     final provider =
         ModuleRegistry.shared.sttProvider(modelId: sttConfig.modelId);
     if (provider == null) {
@@ -332,7 +376,8 @@ class STTComponent extends BaseComponent<STTService> {
   bool get supportsStreaming => service?.supportsStreaming ?? false;
 
   /// Get the recommended transcription mode based on service capabilities
-  STTMode get recommendedMode => supportsStreaming ? STTMode.live : STTMode.batch;
+  STTMode get recommendedMode =>
+      supportsStreaming ? STTMode.live : STTMode.batch;
 
   /// Check if model is loaded
   bool get isModelLoaded => _isModelLoaded;
@@ -513,7 +558,8 @@ class STTComponent extends BaseComponent<STTService> {
 
   // MARK: - Private Helpers
 
-  double _estimateAudioLength(int dataSize, AudioFormat format, int sampleRate) {
+  double _estimateAudioLength(
+      int dataSize, AudioFormat format, int sampleRate) {
     // Rough estimation based on format and sample rate
     final int bytesPerSample;
     switch (format) {

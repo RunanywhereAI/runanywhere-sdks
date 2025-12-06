@@ -56,16 +56,33 @@ class LlamaCppLLMService implements LLMService {
     // Determine template from model path
     _currentTemplate = LlamaCppTemplateResolver.determineTemplate(modelPath);
 
-    // Load the model through native backend
-    _backend.loadTextModel(
-      modelPath,
-      config: {
-        'template': _currentTemplate?.name ?? 'chatML',
-        'context_length': 2048,
-      },
-    );
+    print('🔧 [LlamaCppLLMService] Loading model from path: $modelPath');
+    print(
+        '🔧 [LlamaCppLLMService] Template: ${_currentTemplate?.name ?? 'chatML'}');
 
-    _isInitialized = true;
+    // Load the model through native backend
+    try {
+      _backend.loadTextModel(
+        modelPath,
+        config: {
+          'template': _currentTemplate?.name ?? 'chatML',
+          'context_length': 2048,
+        },
+      );
+
+      // Check if model actually loaded
+      if (!_backend.isTextModelLoaded) {
+        throw Exception(
+            'Model failed to load - native backend reports not loaded');
+      }
+
+      print('✅ [LlamaCppLLMService] Model loaded successfully');
+      _isInitialized = true;
+    } catch (e) {
+      print('❌ [LlamaCppLLMService] Failed to load model: $e');
+      _isInitialized = false;
+      rethrow;
+    }
   }
 
   @override
