@@ -42,6 +42,7 @@ export enum LLMFramework {
   WhisperKit = 'WhisperKit',
   OpenAIWhisper = 'OpenAIWhisper',
   SystemTTS = 'SystemTTS',
+  PiperTTS = 'PiperTTS',
 }
 
 /**
@@ -62,6 +63,7 @@ export const LLMFrameworkDisplayNames: Record<LLMFramework, string> = {
   [LLMFramework.WhisperKit]: 'WhisperKit',
   [LLMFramework.OpenAIWhisper]: 'OpenAI Whisper',
   [LLMFramework.SystemTTS]: 'System TTS',
+  [LLMFramework.PiperTTS]: 'Piper TTS',
 };
 
 /**
@@ -106,6 +108,7 @@ export enum ModelFormat {
   Bin = 'bin',
   Zip = 'zip',
   Folder = 'folder',
+  Proprietary = 'proprietary', // Built-in system models
   Unknown = 'unknown',
 }
 

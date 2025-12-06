@@ -1,7 +1,12 @@
 /**
  * TabNavigator - Bottom Tab Navigation
  *
- * Reference: iOS ContentView with 6 tabs (Chat, STT, TTS, Quiz, Voice, Settings)
+ * Reference: iOS ContentView.swift with 5 tabs:
+ * - Chat (LLM)
+ * - STT (Speech-to-Text)
+ * - TTS (Text-to-Speech)
+ * - Voice (Voice Assistant - STT + LLM + TTS)
+ * - Settings
  */
 
 import React from 'react';
@@ -13,38 +18,32 @@ import { RootTabParamList } from '../types';
 
 // Screens
 import ChatScreen from '../screens/ChatScreen';
-import { ModelsScreen } from '../screens/ModelsScreen';
 import STTScreen from '../screens/STTScreen';
 import TTSScreen from '../screens/TTSScreen';
-import QuizScreen from '../screens/QuizScreen';
 import VoiceAssistantScreen from '../screens/VoiceAssistantScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
 /**
- * Tab icon mapping
+ * Tab icon mapping - matching Swift sample app (ContentView.swift)
  */
 const tabIcons: Record<keyof RootTabParamList, { focused: string; unfocused: string }> = {
   Chat: { focused: 'chatbubble', unfocused: 'chatbubble-outline' },
-  Models: { focused: 'cube', unfocused: 'cube-outline' },
-  STT: { focused: 'mic', unfocused: 'mic-outline' },
-  TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' },
-  Quiz: { focused: 'school', unfocused: 'school-outline' },
-  VoiceAssistant: { focused: 'person-circle', unfocused: 'person-circle-outline' },
+  STT: { focused: 'pulse', unfocused: 'pulse-outline' },  // waveform equivalent
+  TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' },  // speaker.wave.2
+  Voice: { focused: 'mic', unfocused: 'mic-outline' },  // mic for voice assistant
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
 
 /**
- * Tab display names
+ * Tab display names - matching Swift sample app
  */
 const tabLabels: Record<keyof RootTabParamList, string> = {
   Chat: 'Chat',
-  Models: 'Models',
-  STT: 'Speech',
-  TTS: 'Voice',
-  Quiz: 'Quiz',
-  VoiceAssistant: 'Assistant',
+  STT: 'STT',
+  TTS: 'TTS',
+  Voice: 'Voice',
   Settings: 'Settings',
 };
 
@@ -70,36 +69,31 @@ export const TabNavigator: React.FC = () => {
         headerShown: false,
       })}
     >
+      {/* Tab 0: Chat (LLM) */}
       <Tab.Screen
         name="Chat"
         component={ChatScreen}
         options={{ tabBarLabel: tabLabels.Chat }}
       />
-      <Tab.Screen
-        name="Models"
-        component={ModelsScreen}
-        options={{ tabBarLabel: tabLabels.Models }}
-      />
+      {/* Tab 1: Speech-to-Text */}
       <Tab.Screen
         name="STT"
         component={STTScreen}
         options={{ tabBarLabel: tabLabels.STT }}
       />
+      {/* Tab 2: Text-to-Speech */}
       <Tab.Screen
         name="TTS"
         component={TTSScreen}
         options={{ tabBarLabel: tabLabels.TTS }}
       />
+      {/* Tab 3: Voice Assistant (STT + LLM + TTS) */}
       <Tab.Screen
-        name="Quiz"
-        component={QuizScreen}
-        options={{ tabBarLabel: tabLabels.Quiz }}
-      />
-      <Tab.Screen
-        name="VoiceAssistant"
+        name="Voice"
         component={VoiceAssistantScreen}
-        options={{ tabBarLabel: tabLabels.VoiceAssistant }}
+        options={{ tabBarLabel: tabLabels.Voice }}
       />
+      {/* Tab 4: Settings */}
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}
