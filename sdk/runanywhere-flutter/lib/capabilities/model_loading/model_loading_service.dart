@@ -51,10 +51,10 @@ class ModelLoadingService {
     // Store the task to prevent duplicate loads
     _inflightLoads[modelId] = loadTask;
 
-    // Ensure task is removed when complete
-    loadTask.whenComplete(() {
+    // Ensure task is removed when complete (don't await this)
+    unawaited(loadTask.whenComplete(() {
       _inflightLoads.remove(modelId);
-    });
+    }));
 
     return await loadTask;
   }
