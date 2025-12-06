@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.navigation
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -8,7 +9,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -17,14 +20,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
-import com.runanywhere.runanywhereai.presentation.storage.StorageScreen
+import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
+import com.runanywhere.runanywhereai.presentation.tts.TextToSpeechScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
-import com.runanywhere.runanywhereai.presentation.quiz.QuizScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
+import com.runanywhere.runanywhereai.ui.theme.AppColors
 
 /**
- * Main navigation component matching iOS app structure
- * 5 tabs: Chat, Storage, Settings, Quiz, Voice
+ * Main navigation component matching iOS app structure exactly
+ * 5 tabs: Chat, STT, TTS, Voice, Settings
+ *
+ * iOS Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/App/ContentView.swift
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,7 +39,7 @@ fun AppNavigation() {
 
     Scaffold(
         bottomBar = {
-            BottomNavigationBar(navController = navController)
+            RunAnywhereBottomNav(navController = navController)
         }
     ) { paddingValues ->
         NavHost(
@@ -45,65 +51,80 @@ fun AppNavigation() {
                 ChatScreen()
             }
 
-            composable(NavigationRoute.STORAGE) {
-                StorageScreen()
+            composable(NavigationRoute.STT) {
+                SpeechToTextScreen()
             }
 
-            composable(NavigationRoute.SETTINGS) {
-                SettingsScreen()
-            }
-
-            composable(NavigationRoute.QUIZ) {
-                QuizScreen()
+            composable(NavigationRoute.TTS) {
+                TextToSpeechScreen()
             }
 
             composable(NavigationRoute.VOICE) {
                 VoiceAssistantScreen()
             }
+
+            composable(NavigationRoute.SETTINGS) {
+                SettingsScreen()
+            }
         }
     }
 }
 
+/**
+ * Bottom navigation bar matching iOS tab bar design
+ *
+ * iOS Reference: ContentView.swift - TabView with 5 tabs
+ * - Chat (message icon)
+ * - STT (waveform icon)
+ * - TTS (speaker.wave.2 icon)
+ * - Voice (mic icon)
+ * - Settings (gear icon)
+ */
 @Composable
-fun BottomNavigationBar(navController: NavController) {
+fun RunAnywhereBottomNav(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    // Match iOS tab order and icons exactly: Chat, Storage, Settings, Quiz, Voice
+    // Match iOS tab order and icons exactly: Chat, STT, TTS, Voice, Settings
     val items = listOf(
         BottomNavItem(
             route = NavigationRoute.CHAT,
             label = "Chat",
-            icon = Icons.Filled.Chat,
+            icon = Icons.Outlined.Chat,
             selectedIcon = Icons.Filled.Chat
         ),
         BottomNavItem(
-            route = NavigationRoute.STORAGE,
-            label = "Storage",
-            icon = Icons.Outlined.Storage,
-            selectedIcon = Icons.Filled.Storage
+            route = NavigationRoute.STT,
+            label = "STT",
+            icon = Icons.Outlined.GraphicEq,
+            selectedIcon = Icons.Filled.GraphicEq
         ),
         BottomNavItem(
-            route = NavigationRoute.SETTINGS,
-            label = "Settings",
-            icon = Icons.Outlined.Settings,
-            selectedIcon = Icons.Filled.Settings
-        ),
-        BottomNavItem(
-            route = NavigationRoute.QUIZ,
-            label = "Quiz",
-            icon = Icons.Outlined.Quiz,
-            selectedIcon = Icons.Filled.Quiz
+            route = NavigationRoute.TTS,
+            label = "TTS",
+            icon = Icons.Outlined.VolumeUp,
+            selectedIcon = Icons.Filled.VolumeUp
         ),
         BottomNavItem(
             route = NavigationRoute.VOICE,
             label = "Voice",
             icon = Icons.Outlined.Mic,
             selectedIcon = Icons.Filled.Mic
+        ),
+        BottomNavItem(
+            route = NavigationRoute.SETTINGS,
+            label = "Settings",
+            icon = Icons.Outlined.Settings,
+            selectedIcon = Icons.Filled.Settings
         )
     )
 
-    NavigationBar {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(24.dp))
+    ) {
         items.forEach { item ->
             val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
 
@@ -116,6 +137,13 @@ fun BottomNavigationBar(navController: NavController) {
                 },
                 label = { Text(item.label) },
                 selected = selected,
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = AppColors.primaryBlue,
+                    selectedTextColor = AppColors.primaryBlue,
+                    indicatorColor = AppColors.primaryBlue.copy(alpha = 0.1f),
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
                 onClick = {
                     navController.navigate(item.route) {
                         // Pop up to the start destination to avoid building up a large stack
@@ -134,14 +162,16 @@ fun BottomNavigationBar(navController: NavController) {
 }
 
 /**
- * Navigation routes matching iOS tabs
+ * Navigation routes matching iOS tabs exactly
+ *
+ * iOS Reference: ContentView.swift TabView
  */
 object NavigationRoute {
     const val CHAT = "chat"
-    const val STORAGE = "storage"
-    const val SETTINGS = "settings"
-    const val QUIZ = "quiz"
+    const val STT = "stt"
+    const val TTS = "tts"
     const val VOICE = "voice"
+    const val SETTINGS = "settings"
 }
 
 /**

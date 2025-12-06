@@ -107,32 +107,3 @@ class DeviceInfoService: ObservableObject {
         return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
 }
-
-// MARK: - SDK DeviceInfo Extension
-
-extension DeviceInfo {
-    var modelName: String? {
-        // Assuming SDK has device model name
-        return nil // Replace with actual SDK property when available
-    }
-
-    var chipName: String? {
-        // Assuming SDK has chip information
-        return nil // Replace with actual SDK property when available
-    }
-
-    var totalMemory: Int64? {
-        // Assuming SDK has memory info
-        return nil // Replace with actual SDK property when available
-    }
-
-    var availableMemory: Int64? {
-        // Assuming SDK has memory info
-        return nil // Replace with actual SDK property when available
-    }
-
-    var neuralEngineAvailable: Bool? {
-        // Assuming SDK has Neural Engine detection
-        return nil // Replace with actual SDK property when available
-    }
-}

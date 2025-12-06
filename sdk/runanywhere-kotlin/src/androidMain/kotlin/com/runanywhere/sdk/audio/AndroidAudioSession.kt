@@ -6,6 +6,7 @@ import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
+import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 class AndroidAudioSession(private val context: Context) {
 
+    private val logger = SDKLogger("AndroidAudioSession")
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private var audioRecord: AudioRecord? = null
 
@@ -81,7 +83,7 @@ class AndroidAudioSession(private val context: Context) {
             return _isConfigured.value
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            logger.error("Failed to configure audio recording", e)
             return false
         }
     }
@@ -99,7 +101,7 @@ class AndroidAudioSession(private val context: Context) {
             _isRecording.value = true
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            logger.error("Failed to start audio recording", e)
             false
         }
     }
@@ -117,7 +119,7 @@ class AndroidAudioSession(private val context: Context) {
             _isRecording.value = false
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            logger.error("Failed to stop audio recording", e)
             false
         }
     }
@@ -159,7 +161,7 @@ class AndroidAudioSession(private val context: Context) {
                 audioManager.abandonAudioFocus(null)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            logger.error("Failed to release audio resources", e)
         }
     }
 

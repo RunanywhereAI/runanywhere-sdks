@@ -1,22 +1,70 @@
 package com.runanywhere.runanywhereai
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.data.models.SDKEnvironment
-import com.runanywhere.sdk.public.extensions.addModelFromURL
-import com.runanywhere.sdk.public.extensions.listAvailableModels
-import com.runanywhere.sdk.public.extensions.loadModelWithInfo
-import com.runanywhere.sdk.llm.llamacpp.LlamaCppServiceProvider
+import com.runanywhere.sdk.public.extensions.registerFramework
+import com.runanywhere.sdk.public.models.ModelRegistration
+import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.FrameworkModality
+import com.runanywhere.sdk.models.enums.ModelFormat
+import com.runanywhere.sdk.llm.llamacpp.LlamaCppAdapter
+import com.runanywhere.sdk.core.onnx.ONNXAdapter
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * Application class for RunAnywhere AI sample app
- * Matches iOS RunAnywhereAIApp.swift initialization pattern
+ * Matches iOS RunAnywhereAIApp.swift initialization pattern exactly.
+ *
+ * Uses strongly-typed enums for all framework and modality parameters:
+ * - LLMFramework enum for framework specification
+ * - FrameworkModality enum for modality specification
+ * - ModelFormat enum for format specification
+ * - ModelRegistration data class for model registration
  */
+/**
+ * Represents the SDK initialization state.
+ * Matches iOS pattern: isSDKInitialized + initializationError conditional rendering.
+ */
+sealed class SDKInitializationState {
+    /** SDK is currently initializing */
+    data object Loading : SDKInitializationState()
+
+    /** SDK initialized successfully */
+    data object Ready : SDKInitializationState()
+
+    /** SDK initialization failed */
+    data class Error(val error: Throwable) : SDKInitializationState()
+}
+
 class RunAnywhereApplication : Application() {
+
+    companion object {
+        private var instance: RunAnywhereApplication? = null
+
+        /** Get the application instance */
+        fun getInstance(): RunAnywhereApplication =
+            instance ?: throw IllegalStateException("Application not initialized")
+    }
+
+    /**
+     * Application-scoped CoroutineScope for SDK initialization and background work.
+     * Uses SupervisorJob to prevent failures in one coroutine from affecting others.
+     * This replaces GlobalScope to ensure proper lifecycle management.
+     */
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     @Volatile
     private var isSDKInitialized = false
@@ -24,63 +72,80 @@ class RunAnywhereApplication : Application() {
     @Volatile
     private var initializationError: Throwable? = null
 
+    /** Observable SDK initialization state for Compose UI - matches iOS pattern */
+    private val _initializationState = MutableStateFlow<SDKInitializationState>(SDKInitializationState.Loading)
+    val initializationState: StateFlow<SDKInitializationState> = _initializationState.asStateFlow()
+
     override fun onCreate() {
         super.onCreate()
+        instance = this
 
         Log.i("RunAnywhereApp", "🏁 App launched, initializing SDK...")
 
-        // Initialize SDK asynchronously to match iOS pattern
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
-            initializeSDK()
-        }
+        // Post initialization to main thread's message queue to ensure system is ready
+        // This prevents crashes on devices where device-encrypted storage hasn't mounted yet
+        Handler(Looper.getMainLooper()).postDelayed({
+            // Initialize SDK asynchronously using application-scoped coroutine
+            applicationScope.launch(Dispatchers.IO) {
+                try {
+                    // Additional small delay to ensure storage is mounted
+                    delay(200)
+                    initializeSDK()
+                } catch (e: Exception) {
+                    Log.e("RunAnywhereApp", "❌ Fatal error during SDK initialization: ${e.message}", e)
+                    // Don't crash the app - let it continue without SDK
+                }
+            }
+        }, 100) // 100ms delay to let system mount storage
+    }
+
+    override fun onTerminate() {
+        // Cancel all coroutines when app terminates
+        applicationScope.cancel()
+        super.onTerminate()
     }
 
     private suspend fun initializeSDK() {
+        initializationError = null
+        Log.i("RunAnywhereApp", "🎯 Starting SDK initialization...")
+        Log.w("RunAnywhereApp", "=======================================================")
+        Log.w("RunAnywhereApp", "🔍 BUILD INFO - CHECK THIS FOR ANALYTICS DEBUGGING:")
+        Log.w("RunAnywhereApp", "   BuildConfig.DEBUG = ${BuildConfig.DEBUG}")
+        Log.w("RunAnywhereApp", "   BuildConfig.DEBUG_MODE = ${BuildConfig.DEBUG_MODE}")
+        Log.w("RunAnywhereApp", "   BuildConfig.BUILD_TYPE = ${BuildConfig.BUILD_TYPE}")
+        Log.w("RunAnywhereApp", "   Package name = ${applicationContext.packageName}")
+        Log.w("RunAnywhereApp", "=======================================================")
+
+        val startTime = System.currentTimeMillis()
+
+        // Determine environment based on DEBUG_MODE (NOT BuildConfig.DEBUG!)
+        // BuildConfig.DEBUG is tied to isDebuggable flag, which we set to true for release builds
+        // to allow logging. BuildConfig.DEBUG_MODE correctly reflects debug vs release build type.
+        val environment = if (BuildConfig.DEBUG_MODE) {
+            SDKEnvironment.DEVELOPMENT
+        } else {
+            SDKEnvironment.PRODUCTION
+        }
+        Log.w("RunAnywhereApp", "🚀 SELECTED ENVIRONMENT: $environment (based on BuildConfig.DEBUG_MODE=${BuildConfig.DEBUG_MODE})")
+
+        // Try to initialize SDK - log failures but continue regardless
         try {
-            initializationError = null
-            Log.i("RunAnywhereApp", "🎯 Starting SDK initialization...")
-
-            val startTime = System.currentTimeMillis()
-
-            // Determine environment (matches iOS pattern)
-            val environment = if (BuildConfig.DEBUG) {
-                Log.i("RunAnywhereApp", "🛠️ Using DEVELOPMENT mode - No API key required!")
-                SDKEnvironment.DEVELOPMENT
-            } else {
-                Log.i("RunAnywhereApp", "🚀 Using PRODUCTION mode")
-                SDKEnvironment.PRODUCTION
-            }
-
-            // Initialize SDK based on environment (matches iOS pattern)
             if (environment == SDKEnvironment.DEVELOPMENT) {
-                // Development Mode - No API key needed!
-                // Supabase analytics are automatically configured for development mode
                 RunAnywhere.initialize(
                     context = this@RunAnywhereApplication,
-                    apiKey = "dev",  // Any string works in dev mode
-                    baseURL = "localhost",  // Not used in dev mode
+                    apiKey = "dev",
+                    baseURL = "localhost",
                     environment = SDKEnvironment.DEVELOPMENT
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode")
-                Log.i("RunAnywhereApp", "📊 Analytics: Automatically enabled (RunAnywhere Supabase)")
-                Log.i("RunAnywhereApp", "🔒 No Supabase credentials needed - handled by SDK!")
-
-                // STEP 1: Register Service Providers (matches iOS pattern)
-                val providersRegistered = registerServiceProvidersForDevelopment()
-                if (!providersRegistered) {
-                    throw IllegalStateException("Failed to register service providers")
-                }
-
-                // STEP 2: Register models for development
-                val modelsRegistered = registerModelsForDevelopment()
-                if (!modelsRegistered) {
-                    throw IllegalStateException("Failed to register models")
-                }
-
             } else {
-                // Production Mode - Real API key required
-                val apiKey = getSecureApiKey()
-                val baseURL = "https://api.runanywhere.ai"
+                val apiKey = "talk_to_runanywhere_team"
+                val baseURL = "talk_to_runanywhere_team"
+
+                Log.w("RunAnywhereApp", "🔐 PRODUCTION INIT PARAMS:")
+                Log.w("RunAnywhereApp", "   apiKey = [REDACTED]")
+                Log.w("RunAnywhereApp", "   baseURL = $baseURL")
+                Log.w("RunAnywhereApp", "   environment = PRODUCTION")
 
                 RunAnywhere.initialize(
                     context = this@RunAnywhereApplication,
@@ -88,184 +153,316 @@ class RunAnywhereApplication : Application() {
                     baseURL = baseURL,
                     environment = SDKEnvironment.PRODUCTION
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode")
-
-                // In production, models come from backend console
-                Log.i("RunAnywhereApp", "📡 Models will be fetched from backend console via API")
+                Log.w("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode - analytics SHOULD be enabled")
             }
-
-            val initTime = System.currentTimeMillis() - startTime
-            Log.i("RunAnywhereApp", "✅ SDK successfully initialized!")
-            Log.i("RunAnywhereApp", "⏱️  Initialization time: ${initTime}ms")
-            Log.i("RunAnywhereApp", "🎯 SDK Status: Active=${RunAnywhere.isInitialized}")
-            Log.i("RunAnywhereApp", "🔧 Environment: ${environment.name}")
-            Log.i(
-                "RunAnywhereApp",
-                "📱 Device registration: Will happen on first API call (lazy loading)"
-            )
-            Log.i(
-                "RunAnywhereApp",
-                "🚀 Ready for on-device AI inference with lazy device registration!"
-            )
-
-            isSDKInitialized = true
-
-            // Note: Models registered, user can now download and select models
-            Log.i("RunAnywhereApp", "💡 Models registered, user can now download and select models")
-
         } catch (e: Exception) {
-            Log.e("RunAnywhereApp", "❌ SDK initialization failed!")
-            Log.e("RunAnywhereApp", "🔍 Error: ${e.message}")
-            Log.e("RunAnywhereApp", "💡 Tip: Check your API key and network connection")
-
+            // Log the failure but continue - we'll still register adapters for local model usage
+            Log.w("RunAnywhereApp", "⚠️ SDK initialization failed (backend may be unavailable): ${e.message}")
             initializationError = e
-            isSDKInitialized = false
+
+            // Fall back to development mode so adapters can still be registered
+            try {
+                RunAnywhere.initialize(
+                    context = this@RunAnywhereApplication,
+                    apiKey = "offline",
+                    baseURL = "localhost",
+                    environment = SDKEnvironment.DEVELOPMENT
+                )
+                Log.i("RunAnywhereApp", "✅ SDK initialized in OFFLINE mode (local models only)")
+            } catch (fallbackError: Exception) {
+                Log.e("RunAnywhereApp", "❌ Fallback initialization also failed: ${fallbackError.message}")
+            }
+        }
+
+        // ALWAYS register adapters regardless of initialization success
+        // This ensures local models are available even when backend is down
+        try {
+            if (BuildConfig.DEBUG_MODE) {
+                registerAdaptersForDevelopment()
+            } else {
+                registerAdaptersForProduction()
+            }
+            Log.i("RunAnywhereApp", "✅ Adapters registered successfully")
+        } catch (e: Exception) {
+            Log.e("RunAnywhereApp", "❌ Failed to register adapters: ${e.message}", e)
+        }
+
+        val initTime = System.currentTimeMillis() - startTime
+        Log.i("RunAnywhereApp", "✅ SDK setup completed in ${initTime}ms")
+        Log.i("RunAnywhereApp", "🎯 SDK Status: Active=${RunAnywhere.isInitialized}")
+
+        isSDKInitialized = RunAnywhere.isInitialized
+
+        // Update observable state for Compose UI - matches iOS conditional rendering
+        if (isSDKInitialized) {
+            _initializationState.value = SDKInitializationState.Ready
+            Log.i("RunAnywhereApp", "🎉 App is ready to use!")
+        } else if (initializationError != null) {
+            _initializationState.value = SDKInitializationState.Error(initializationError!!)
+        } else {
+            // SDK reported not initialized but no error - treat as ready for offline mode
+            _initializationState.value = SDKInitializationState.Ready
+            Log.i("RunAnywhereApp", "🎉 App is ready to use (offline mode)!")
         }
     }
 
     /**
-     * Register Service Providers (matches iOS LLMSwiftServiceProvider.register())
-     * This is Step 1 of the two-tier registration pattern:
-     * 1. Register service providers with ModuleRegistry
-     * 2. Register models with their framework associations
+     * Register framework adapters with models for DEVELOPMENT mode.
+     * Matches iOS RunAnywhereAIApp.swift registerAdaptersForDevelopment() exactly.
+     *
+     * All parameters use strongly-typed enums:
+     * - LLMFramework.LLAMA_CPP, LLMFramework.ONNX
+     * - FrameworkModality.TEXT_TO_TEXT, VOICE_TO_TEXT, TEXT_TO_VOICE
+     * - ModelFormat.GGUF, ModelFormat.ONNX
      */
-    private fun registerServiceProvidersForDevelopment(): Boolean {
-        Log.i("RunAnywhereApp", "🔧 Registering Service Providers for DEVELOPMENT mode")
+    private suspend fun registerAdaptersForDevelopment() {
+        Log.i("RunAnywhereApp", "📦 Registering adapters with custom models for DEVELOPMENT mode")
 
-        return try {
-            // Register Llama.cpp service provider from SDK module
-            LlamaCppServiceProvider.register()
-            Log.i("RunAnywhereApp", "✅ Registered LlamaCppServiceProvider")
+        // =====================================================
+        // 1. LlamaCPP Framework (TEXT_TO_TEXT modality)
+        // Matches iOS: RunAnywhere.registerFramework(LlamaCPPCoreAdapter(), models: [...])
+        // This provides native C++ llama.cpp performance
+        // =====================================================
+        Log.i("RunAnywhereApp", "📝 Registering LlamaCPP adapter with LLM models...")
 
-            // TODO: Register WhisperKit/STT provider when available
-            // TODO: Register TTS provider when available
+        RunAnywhere.registerFramework(
+            adapter = LlamaCppAdapter.shared,
+            models = listOf(
+                // Qwen 2.5 0.5B Instruct Q6_K - Small but capable (~600MB)
+                // Matches iOS: qwen-2.5-0.5b-instruct-q6-k
+                ModelRegistration(
+                    id = "qwen-2.5-0.5b-instruct-q6-k",
+                    name = "Qwen 2.5 0.5B Instruct Q6_K",
+                    url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 600_000_000L
+                ),
+                // LiquidAI LFM2 350M Q4_K_M - Smallest and fastest (~250MB)
+                // Matches iOS: lfm2-350m-q4-k-m
+                ModelRegistration(
+                    id = "lfm2-350m-q4-k-m",
+                    name = "LiquidAI LFM2 350M Q4_K_M",
+                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 250_000_000L
+                ),
+                // LiquidAI LFM2 350M Q8_0 - Highest quality small model (~400MB)
+                // Matches iOS: lfm2-350m-q8-0
+                ModelRegistration(
+                    id = "lfm2-350m-q8-0",
+                    name = "LiquidAI LFM2 350M Q8_0",
+                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 400_000_000L
+                )
+            )
+        )
+        Log.i("RunAnywhereApp", "✅ LlamaCPP Core registered (runanywhere-core backend)")
 
-            Log.i("RunAnywhereApp", "🎉 All service providers registered successfully")
-            true
-        } catch (e: Exception) {
-            Log.e("RunAnywhereApp", "❌ Failed to register service providers: ${e.message}")
-            false
-        }
+        // =====================================================
+        // 2. ONNX Runtime Framework (VOICE_TO_TEXT, TEXT_TO_VOICE modalities)
+        // Matches iOS: RunAnywhere.registerFramework(ONNXAdapter.shared, models: [...])
+        // Note: WhisperKit models are iOS-only (CoreML), we use ONNX Sherpa models on Android
+        // =====================================================
+        Log.i("RunAnywhereApp", "🎤🔊 Registering ONNX adapter with STT and TTS models...")
+
+        RunAnywhere.registerFramework(
+            adapter = ONNXAdapter.shared,
+            models = listOf(
+                // STT Models (VOICE_TO_TEXT modality)
+                // NOTE: tar.bz2 extraction is supported on Android via Commons Compress
+                // Sherpa ONNX Whisper Tiny English (~75MB)
+                // Matches iOS: sherpa-whisper-tiny-onnx
+                ModelRegistration(
+                    id = "sherpa-whisper-tiny-onnx",
+                    name = "Sherpa Whisper Tiny (ONNX)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.VOICE_TO_TEXT,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 75_000_000L
+                ),
+                // Sherpa ONNX Whisper Small (~250MB)
+                // Matches iOS: sherpa-whisper-small-onnx
+                ModelRegistration(
+                    id = "sherpa-whisper-small-onnx",
+                    name = "Sherpa Whisper Small (ONNX)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.VOICE_TO_TEXT,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 250_000_000L
+                ),
+
+                // TTS Models (TEXT_TO_VOICE modality)
+                // Using sherpa-onnx tar.bz2 packages (includes model, tokens, and espeak-ng-data)
+                // Piper TTS - US English Lessac Medium (~65MB)
+                // Matches iOS: piper-en-us-lessac-medium
+                ModelRegistration(
+                    id = "piper-en-us-lessac-medium",
+                    name = "Piper TTS (US English - Medium)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.TEXT_TO_VOICE,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 65_000_000L
+                ),
+                // Piper TTS - British English Alba Medium (~65MB)
+                // Matches iOS: piper-en-gb-alba-medium
+                ModelRegistration(
+                    id = "piper-en-gb-alba-medium",
+                    name = "Piper TTS (British English)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.TEXT_TO_VOICE,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 65_000_000L
+                )
+            )
+        )
+        Log.i("RunAnywhereApp", "✅ ONNX Runtime registered (includes STT and TTS providers)")
+
+        // Note: WhisperKit is iOS-only (uses CoreML), ONNX Sherpa serves the same purpose on Android
+        // Note: FluidAudioDiarization is iOS-only, can be added when Android module is available
+        // Note: FoundationModels requires iOS 26+ / macOS 26+, not applicable to Android
+
+        // Scan file system for already downloaded models
+        Log.i("RunAnywhereApp", "🔍 Scanning for previously downloaded models...")
+        RunAnywhere.scanForDownloadedModels()
+        Log.i("RunAnywhereApp", "✅ File system scan complete")
+
+        Log.i("RunAnywhereApp", "🎉 All adapters registered for development")
     }
 
     /**
-     * Register models for development mode (matches iOS registerAdaptersForDevelopment)
-     * This is Step 2 - models are associated with frameworks via compatibleFrameworks field
+     * Register framework adapters with custom models for PRODUCTION mode.
+     * Hardcoded models provide immediate user access, backend can add more dynamically.
+     * Matches iOS registerAdaptersForProduction() pattern exactly.
      */
-    private suspend fun registerModelsForDevelopment(): Boolean {
-        Log.i("RunAnywhereApp", "📦 Registering models for DEVELOPMENT mode")
+    private suspend fun registerAdaptersForProduction() {
+        Log.i("RunAnywhereApp", "📦 Registering adapters with custom models for PRODUCTION mode")
+        Log.i("RunAnywhereApp", "💡 Hardcoded models provide immediate user access, backend can add more dynamically")
 
-        return try {
-            // Register LLM models (matches iOS LLMSwift models)
-            // Note: In Kotlin SDK, addModelFromURL automatically registers the model
+        // =====================================================
+        // 1. LlamaCPP Framework (TEXT_TO_TEXT modality)
+        // Same models as development mode for consistent user experience
+        // =====================================================
+        Log.i("RunAnywhereApp", "📝 Registering LlamaCPP adapter with LLM models...")
 
-            // SmolLM2 360M - smallest and fastest
-            addModelFromURL(
-                url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-                name = "SmolLM2 360M Q8_0",
-                type = "LLM"
+        RunAnywhere.registerFramework(
+            adapter = LlamaCppAdapter.shared,
+            models = listOf(
+                // Qwen 2.5 0.5B Instruct Q6_K - Small but capable (~600MB)
+                ModelRegistration(
+                    id = "qwen-2.5-0.5b-instruct-q6-k",
+                    name = "Qwen 2.5 0.5B Instruct Q6_K",
+                    url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 600_000_000L
+                ),
+                // LiquidAI LFM2 350M Q4_K_M - Smallest and fastest (~250MB)
+                ModelRegistration(
+                    id = "lfm2-350m-q4-k-m",
+                    name = "LiquidAI LFM2 350M Q4_K_M",
+                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 250_000_000L
+                ),
+                // LiquidAI LFM2 350M Q8_0 - Highest quality small model (~400MB)
+                ModelRegistration(
+                    id = "lfm2-350m-q8-0",
+                    name = "LiquidAI LFM2 350M Q8_0",
+                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 400_000_000L
+                )
             )
-            Log.i("RunAnywhereApp", "✅ Registered: SmolLM2 360M Q8_0")
+        )
+        Log.i("RunAnywhereApp", "✅ LlamaCPP adapter registered with hardcoded models")
 
-            // Qwen 2.5 0.5B - small but capable
-            addModelFromURL(
-                url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
-                name = "Qwen 2.5 0.5B Instruct Q6_K",
-                type = "LLM"
+        // =====================================================
+        // 2. ONNX Runtime Framework (VOICE_TO_TEXT, TEXT_TO_VOICE modalities)
+        // Same models as development mode for consistent user experience
+        // =====================================================
+        Log.i("RunAnywhereApp", "🎤🔊 Registering ONNX adapter with STT and TTS models...")
+
+        RunAnywhere.registerFramework(
+            adapter = ONNXAdapter.shared,
+            models = listOf(
+                // STT Models (VOICE_TO_TEXT modality)
+                // Sherpa ONNX Whisper Tiny English (~75MB)
+                ModelRegistration(
+                    id = "sherpa-whisper-tiny-onnx",
+                    name = "Sherpa Whisper Tiny (ONNX)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.VOICE_TO_TEXT,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 75_000_000L
+                ),
+                // Sherpa ONNX Whisper Small (~250MB)
+                ModelRegistration(
+                    id = "sherpa-whisper-small-onnx",
+                    name = "Sherpa Whisper Small (ONNX)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.VOICE_TO_TEXT,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 250_000_000L
+                ),
+
+                // TTS Models (TEXT_TO_VOICE modality)
+                // Piper TTS - US English Lessac Medium (~65MB)
+                ModelRegistration(
+                    id = "piper-en-us-lessac-medium",
+                    name = "Piper TTS (US English - Medium)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.TEXT_TO_VOICE,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 65_000_000L
+                ),
+                // Piper TTS - British English Alba Medium (~65MB)
+                ModelRegistration(
+                    id = "piper-en-gb-alba-medium",
+                    name = "Piper TTS (British English)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.TEXT_TO_VOICE,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 65_000_000L
+                )
             )
-            Log.i("RunAnywhereApp", "✅ Registered: Qwen 2.5 0.5B Instruct Q6_K")
+        )
+        Log.i("RunAnywhereApp", "✅ ONNX adapter registered with hardcoded models")
 
-            // Llama 3.2 1B - good quality
-            addModelFromURL(
-                url = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf",
-                name = "Llama 3.2 1B Instruct Q6_K",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: Llama 3.2 1B Instruct Q6_K")
+        // Scan file system for already downloaded models
+        // This allows models downloaded previously to be discovered
+        Log.i("RunAnywhereApp", "🔍 Scanning for previously downloaded models...")
+        RunAnywhere.scanForDownloadedModels()
+        Log.i("RunAnywhereApp", "✅ File system scan complete")
 
-
-            // Llama 3.2 1B - good quality
-            addModelFromURL(
-                url = "https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_0.gguf",
-                name = "QWEN 2 0.5B Q4_0 Instruct",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: QWEN 2 0.5B Instruct Q6_K Q4_0")
-
-            // SmolLM2 1.7B - larger but capable
-            addModelFromURL(
-                url = "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
-                name = "SmolLM2 1.7B Instruct Q6_K_L",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: SmolLM2 1.7B Instruct Q6_K_L")
-
-            // Qwen 2.5 1.5B - good for longer context
-            addModelFromURL(
-                url = "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf",
-                name = "Qwen 2.5 1.5B Instruct Q6_K",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: Qwen 2.5 1.5B Instruct Q6_K")
-
-            // LiquidAI LFM2 350M Q4_K_M - smallest and fastest
-            addModelFromURL(
-                url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
-                name = "LiquidAI LFM2 350M Q4_K_M",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: LiquidAI LFM2 350M Q4_K_M")
-
-            // LiquidAI LFM2 350M Q8_0 - highest quality
-            addModelFromURL(
-                url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
-                name = "LiquidAI LFM2 350M Q8_0",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: LiquidAI LFM2 350M Q8_0")
-
-            Log.i(
-                "RunAnywhereApp",
-                "🎉 All models registered for development (lazy loading enabled)"
-            )
-
-            // Scan file system for already downloaded models
-            Log.i("RunAnywhereApp", "🔍 Scanning for previously downloaded models...")
-            RunAnywhere.scanForDownloadedModels()
-            Log.i("RunAnywhereApp", "✅ File system scan complete")
-
-            // Note: In Kotlin SDK, we don't register STT/TTS adapters during app initialization
-            // They are registered when needed by the SDK's service container
-            // WhisperKit and other framework adapters are handled internally by the SDK
-
-            true
-        } catch (e: Exception) {
-            Log.e("RunAnywhereApp", "❌ Failed to register models: ${e.message}")
-            false
-        }
+        Log.i("RunAnywhereApp", "🎉 All adapters registered for production with hardcoded models")
+        Log.i("RunAnywhereApp", "📡 Backend can dynamically add more models via console API")
     }
 
     /**
      * Retrieves API key from secure storage.
-     * In production, this should:
-     * 1. Read from Android EncryptedSharedPreferences or Keystore
-     * 2. Or read from BuildConfig (populated from environment variables in CI/CD)
-     * 3. Never hard-code the key in source code
-     *
-     * For development/demo purposes, we use BuildConfig which can be set via:
-     * - gradle.properties (not committed to version control)
-     * - Environment variables in CI/CD
-     * - Or throw an error to force proper configuration
      */
     private fun getSecureApiKey(): String {
         // TODO: Implement secure API key retrieval before production deployment
-        // Option 1: Read from EncryptedSharedPreferences
-        // Option 2: Read from Android Keystore
-        // Option 3: Read from BuildConfig (populated from environment variables)
-        // Example: return BuildConfig.RUNANYWHERE_API_KEY
-
-        // For now, return a placeholder to allow development/testing
-        // WARNING: This must be replaced with actual secure key retrieval before production
         return "dev-placeholder-key"
     }
 
@@ -280,9 +477,10 @@ class RunAnywhereApplication : Application() {
     fun getInitializationError(): Throwable? = initializationError
 
     /**
-     * Retry SDK initialization
+     * Retry SDK initialization - matches iOS retryInitialization() pattern
      */
     suspend fun retryInitialization() {
+        _initializationState.value = SDKInitializationState.Loading
         withContext(Dispatchers.IO) {
             initializeSDK()
         }

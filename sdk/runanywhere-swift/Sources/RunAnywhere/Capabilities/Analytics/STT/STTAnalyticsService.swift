@@ -39,6 +39,8 @@ public enum STTEventType: String {
     case speakerDetected = "stt_speaker_detected"
     case speakerChanged = "stt_speaker_changed"
     case languageDetected = "stt_language_detected"
+    case modelLoaded = "stt_model_loaded"
+    case modelLoadFailed = "stt_model_load_failed"
     case error = "stt_error"
 }
 
@@ -300,6 +302,211 @@ public actor STTAnalyticsService: AnalyticsService {
             eventData: eventData
         )
         await track(event: event)
+    }
+
+    // MARK: - Enterprise Telemetry Methods
+    //
+    // These methods send rich telemetry data directly to TelemetryService
+    // for enterprise customers who need detailed performance analytics.
+
+    /// Track STT model load with full enterprise metrics
+    /// - Parameters:
+    ///   - modelId: Unique model identifier
+    ///   - modelName: Human-readable model name
+    ///   - framework: Framework used (e.g., WhisperKit, WhisperCpp)
+    ///   - loadTimeMs: Time taken to load the model in milliseconds
+    ///   - modelSizeBytes: Optional size of the model in bytes
+    ///   - success: Whether the load was successful
+    ///   - errorMessage: Error message if load failed
+    public func trackModelLoad(
+        modelId: String,
+        modelName: String,
+        framework: LLMFramework,
+        loadTimeMs: Double,
+        modelSizeBytes: Int64? = nil,
+        success: Bool,
+        errorMessage: String? = nil
+    ) async {
+        let deviceInfo = TelemetryDeviceInfo.current
+        let telemetryService = await ServiceContainer.shared.telemetryService
+
+        do {
+            try await telemetryService.trackSTTModelLoad(
+                modelId: modelId,
+                modelName: modelName,
+                framework: framework.rawValue,
+                loadTimeMs: loadTimeMs,
+                modelSizeBytes: modelSizeBytes,
+                device: deviceInfo.device,
+                osVersion: deviceInfo.osVersion,
+                success: success,
+                errorMessage: errorMessage
+            )
+            logger.debug("Tracked STT model load: \(modelName)")
+        } catch {
+            logger.error("Failed to track STT model load: \(error)")
+        }
+    }
+
+    /// Track STT transcription start with full enterprise metrics
+    /// - Parameters:
+    ///   - sessionId: Unique session identifier
+    ///   - modelId: Model being used
+    ///   - modelName: Human-readable model name
+    ///   - framework: Framework used
+    ///   - language: Target language for transcription
+    public func trackTranscriptionStarted(
+        sessionId: String,
+        modelId: String,
+        modelName: String,
+        framework: LLMFramework,
+        language: String
+    ) async {
+        let deviceInfo = TelemetryDeviceInfo.current
+        let telemetryService = await ServiceContainer.shared.telemetryService
+
+        do {
+            try await telemetryService.trackSTTTranscriptionStarted(
+                sessionId: sessionId,
+                modelId: modelId,
+                modelName: modelName,
+                framework: framework.rawValue,
+                language: language,
+                device: deviceInfo.device,
+                osVersion: deviceInfo.osVersion
+            )
+            logger.debug("Tracked STT transcription started: \(sessionId)")
+        } catch {
+            logger.error("Failed to track STT transcription started: \(error)")
+        }
+    }
+
+    /// Track STT transcription completion with full enterprise metrics
+    /// - Parameters:
+    ///   - sessionId: Unique session identifier
+    ///   - modelId: Model used
+    ///   - modelName: Human-readable model name
+    ///   - framework: Framework used
+    ///   - language: Language of transcription
+    ///   - audioDurationMs: Duration of audio processed in milliseconds
+    ///   - processingTimeMs: Time taken to process in milliseconds
+    ///   - wordCount: Number of words transcribed
+    ///   - characterCount: Number of characters transcribed
+    ///   - confidence: Confidence score (0.0 to 1.0)
+    public func trackTranscriptionCompleted(
+        sessionId: String,
+        modelId: String,
+        modelName: String,
+        framework: LLMFramework,
+        language: String,
+        audioDurationMs: Double,
+        processingTimeMs: Double,
+        wordCount: Int,
+        characterCount: Int,
+        confidence: Float
+    ) async {
+        let deviceInfo = TelemetryDeviceInfo.current
+        let telemetryService = await ServiceContainer.shared.telemetryService
+
+        // Calculate real-time factor (< 1.0 means faster than real-time)
+        let realTimeFactor = audioDurationMs > 0 ? processingTimeMs / audioDurationMs : 0
+
+        do {
+            try await telemetryService.trackSTTTranscriptionCompleted(
+                sessionId: sessionId,
+                modelId: modelId,
+                modelName: modelName,
+                framework: framework.rawValue,
+                language: language,
+                audioDurationMs: audioDurationMs,
+                processingTimeMs: processingTimeMs,
+                realTimeFactor: realTimeFactor,
+                wordCount: wordCount,
+                characterCount: characterCount,
+                confidence: confidence,
+                device: deviceInfo.device,
+                osVersion: deviceInfo.osVersion
+            )
+            logger.debug("Tracked STT transcription completed: \(sessionId), RTF: \(String(format: "%.3f", realTimeFactor))")
+        } catch {
+            logger.error("Failed to track STT transcription completed: \(error)")
+        }
+
+        // Also update local metrics
+        transcriptionCount += 1
+        totalConfidence += confidence
+        totalLatency += processingTimeMs / 1000.0
+    }
+
+    /// Track STT transcription failure with full enterprise metrics
+    /// - Parameters:
+    ///   - sessionId: Unique session identifier
+    ///   - modelId: Model used
+    ///   - modelName: Human-readable model name
+    ///   - framework: Framework used
+    ///   - language: Target language
+    ///   - audioDurationMs: Duration of audio that was being processed
+    ///   - processingTimeMs: Time spent before failure
+    ///   - errorMessage: Description of the error
+    public func trackTranscriptionFailed(
+        sessionId: String,
+        modelId: String,
+        modelName: String,
+        framework: LLMFramework,
+        language: String,
+        audioDurationMs: Double,
+        processingTimeMs: Double,
+        errorMessage: String
+    ) async {
+        let deviceInfo = TelemetryDeviceInfo.current
+        let telemetryService = await ServiceContainer.shared.telemetryService
+
+        do {
+            try await telemetryService.trackSTTTranscriptionFailed(
+                sessionId: sessionId,
+                modelId: modelId,
+                modelName: modelName,
+                framework: framework.rawValue,
+                language: language,
+                audioDurationMs: audioDurationMs,
+                processingTimeMs: processingTimeMs,
+                errorMessage: errorMessage,
+                device: deviceInfo.device,
+                osVersion: deviceInfo.osVersion
+            )
+            logger.debug("Tracked STT transcription failed: \(sessionId)")
+        } catch {
+            logger.error("Failed to track STT transcription failed: \(error)")
+        }
+    }
+
+    /// Track STT streaming update for real-time transcription
+    /// - Parameters:
+    ///   - sessionId: Unique session identifier
+    ///   - modelId: Model being used
+    ///   - framework: Framework used
+    ///   - partialWordCount: Number of words in partial result
+    ///   - elapsedMs: Time elapsed since transcription started
+    public func trackStreamingUpdate(
+        sessionId: String,
+        modelId: String,
+        framework: LLMFramework,
+        partialWordCount: Int,
+        elapsedMs: Double
+    ) async {
+        let telemetryService = await ServiceContainer.shared.telemetryService
+
+        do {
+            try await telemetryService.trackSTTStreamingUpdate(
+                sessionId: sessionId,
+                modelId: modelId,
+                framework: framework.rawValue,
+                partialWordCount: partialWordCount,
+                elapsedMs: elapsedMs
+            )
+        } catch {
+            logger.error("Failed to track STT streaming update: \(error)")
+        }
     }
 
     // MARK: - Private Methods

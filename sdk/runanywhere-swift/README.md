@@ -47,6 +47,8 @@ Add RunAnywhere to your project directly from GitHub - no package registry neede
 
 > **🏆 Recommended**: Check [releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for the most current version.
 
+> **📦 Binary Distribution**: The SDK automatically downloads pre-built native binaries (RunAnywhereCore.xcframework) from [runanywhere-binaries](https://github.com/RunanywhereAI/runanywhere-binaries) releases. No local compilation of C++ code required!
+
 #### Via Xcode (Recommended)
 1. In Xcode, select **File > Add Package Dependencies**
 2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`
@@ -55,10 +57,10 @@ Add RunAnywhere to your project directly from GitHub - no package registry neede
    - **Specific Version**: Choose **Exact** and enter `0.15.2`
    - **Development Branch**: Choose **Branch** and enter `main`
 4. Select products based on your needs:
-   - `RunAnywhere` - Core SDK (required)
-   - `LLMSwift` - GGUF/GGML models (optional, iOS 16+)
-   - `WhisperKitTranscription` - Speech-to-text (optional, iOS 16+)
-   - `FluidAudioDiarization` - Speaker diarization (optional, iOS 17+)
+   - `RunAnywhere` - Core SDK (required, iOS 17+)
+   - `RunAnywhereLlamaCPP` - GGUF/GGML models (optional, iOS 17+)
+   - `RunAnywhereWhisperKit` - Speech-to-text (optional, iOS 17+)
+   - `RunAnywhereFluidAudio` - Speaker diarization (optional, iOS 17+)
 5. Click **Add Package**
 
 #### Via Package.swift
@@ -72,8 +74,8 @@ targets: [
         name: "YourApp",
         dependencies: [
             .product(name: "RunAnywhere", package: "runanywhere-sdks"),
-            .product(name: "LLMSwift", package: "runanywhere-sdks"),
-            .product(name: "WhisperKitTranscription", package: "runanywhere-sdks")
+            .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),
+            .product(name: "RunAnywhereWhisperKit", package: "runanywhere-sdks")
         ]
     )
 ]
@@ -112,7 +114,7 @@ Currently, you need to import the adapter modules separately (we'll consolidate 
 
 ```swift
 import RunAnywhere
-import LLMSwift
+import LlamaCPPRuntime
 import WhisperKitTranscription
 import FluidAudioDiarization
 ```
@@ -125,9 +127,9 @@ Before using any AI features, register the required adapters:
 
 ```swift
 // Register LLM adapter for text generation
-await LLMSwiftServiceProvider.register()
+await LlamaCPPServiceProvider.register()
 try await RunAnywhere.registerFrameworkAdapter(
-    LLMSwiftAdapter(),
+    LlamaCPPCoreAdapter(),
     models: [
         // Register models you want to use
         try! ModelRegistration(
@@ -324,7 +326,7 @@ try await RunAnywhere.deleteModel("unused-model-id")
 ## Supported Models & Frameworks
 
 ### Currently Implemented
-- **GGUF Models** (via llama.cpp/LLM.swift)
+- **GGUF Models** (via llama.cpp)
   - Llama 3.2 (1B, 3B)
   - Mistral 7B
   - Qwen 2.5 (0.5B, 1.5B, 3B)
@@ -467,6 +469,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 Built with ❤️ by the RunAnywhere team. Special thanks to:
-- The LLM.swift and llama.cpp communities
+- The llama.cpp community
 - WhisperKit contributors
 - Our beta testers and early adopters

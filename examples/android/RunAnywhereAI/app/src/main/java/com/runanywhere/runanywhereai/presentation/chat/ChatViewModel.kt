@@ -7,7 +7,11 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.RunAnywhereApplication
 import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.*
+import com.runanywhere.sdk.models.MessageModelInfo as SDKMessageModelInfo
+import com.runanywhere.sdk.models.lifecycle.Modality
+import com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.getFirstAvailableChatModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -37,7 +41,6 @@ data class ChatUiState(
  * Enhanced ChatViewModel matching iOS ChatViewModel functionality
  * Includes streaming, thinking mode, analytics, and conversation management
  */
-// @HiltViewModel
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as RunAnywhereApplication
@@ -53,6 +56,27 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Always start with a new conversation for a fresh chat experience
         val conversation = conversationStore.createConversation()
         _uiState.value = _uiState.value.copy(currentConversation = conversation)
+
+        // Subscribe to model lifecycle tracker for LLM modality
+        viewModelScope.launch {
+            ModelLifecycleTracker.modelsByModality.collect { modelsByModality ->
+                val llmState = modelsByModality[Modality.LLM]
+                val wasLoaded = _uiState.value.isModelLoaded
+                val isNowLoaded = llmState?.state?.isLoaded == true
+
+                _uiState.value = _uiState.value.copy(
+                    isModelLoaded = isNowLoaded,
+                    loadedModelName = if (isNowLoaded) llmState?.modelName else null
+                )
+
+                // Add system message when model becomes loaded
+                if (!wasLoaded && isNowLoaded) {
+                    addSystemMessage()
+                }
+
+                Log.d("ChatViewModel", "📊 LLM lifecycle state updated: loaded=$isNowLoaded, model=${llmState?.modelName}")
+            }
+        }
 
         // Initialize with system message if model is already loaded
         viewModelScope.launch {
@@ -133,9 +157,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Create assistant message that will be updated with streaming tokens
+        // Include ModelInfo matching iOS pattern for message attribution
+        val currentModelInfo = createCurrentModelInfo()
         val assistantMessage = ChatMessage(
             role = MessageRole.ASSISTANT,
-            content = ""
+            content = "",
+            modelInfo = currentModelInfo
         )
 
         _uiState.value = _uiState.value.copy(
@@ -473,6 +500,24 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Create MessageModelInfo for the current loaded model
+     * Matches iOS pattern for attaching model info to messages
+     */
+    private fun createCurrentModelInfo(): MessageModelInfo? {
+        val modelName = _uiState.value.loadedModelName ?: return null
+
+        // Get framework from lifecycle tracker
+        val llmState = ModelLifecycleTracker.loadedModel(Modality.LLM)
+        val framework = llmState?.framework ?: com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP
+
+        return SDKMessageModelInfo(
+            modelId = llmState?.modelId ?: modelName,
+            modelName = modelName,
+            framework = framework
+        )
+    }
+
+    /**
      * Generate intelligent response from thinking content
      */
     private fun generateThinkingSummaryResponse(thinkingContent: String): String {
@@ -536,35 +581,62 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Check model status
+     * Check model status and load appropriate chat model.
+     *
+     * This method uses the SDK's model discovery API to find and load
+     * only TEXT_TO_TEXT (chat) models, ensuring we don't accidentally
+     * load STT/TTS models on the chat screen.
      */
     suspend fun checkModelStatus() {
         try {
             if (app.isSDKReady()) {
-                val availableModels = RunAnywhere.availableModels()
-                val downloadedModel = availableModels.firstOrNull { it.localPath != null }
+                // Check if LLM is already loaded via lifecycle tracker
+                if (ModelLifecycleTracker.isModelLoaded(Modality.LLM)) {
+                    val loadedModel = ModelLifecycleTracker.loadedModel(Modality.LLM)
+                    Log.i("ChatViewModel", "✅ LLM model already loaded: ${loadedModel?.modelName}")
+                    _uiState.value = _uiState.value.copy(
+                        isModelLoaded = true,
+                        loadedModelName = loadedModel?.modelName
+                    )
+                    addSystemMessageIfNeeded()
+                    return
+                }
 
-                if (downloadedModel != null) {
+                // Use SDK's clean API to find first available TEXT_TO_TEXT model
+                // This ensures we only load chat models, not STT/TTS
+                val chatModel = RunAnywhere.getFirstAvailableChatModel()
+
+                if (chatModel != null) {
                     Log.i(
                         "ChatViewModel",
-                        "📦 Found downloaded model: ${downloadedModel.name}, loading into memory..."
+                        "📦 Found downloaded chat model: ${chatModel.name} (modality: ${chatModel.category.frameworkModality}), loading..."
                     )
 
                     try {
-                        // Load the model into memory
-                        RunAnywhere.loadModel(downloadedModel.id)
+                        // Load the chat model into memory
+                        val loaded = RunAnywhere.loadModel(chatModel.id)
 
-                        _uiState.value = _uiState.value.copy(
-                            isModelLoaded = true,
-                            loadedModelName = downloadedModel.name
-                        )
-
-                        Log.i(
-                            "ChatViewModel",
-                            "✅ Model loaded successfully: ${downloadedModel.name}"
-                        )
+                        if (loaded) {
+                            _uiState.value = _uiState.value.copy(
+                                isModelLoaded = true,
+                                loadedModelName = chatModel.name
+                            )
+                            Log.i(
+                                "ChatViewModel",
+                                "✅ Chat model loaded successfully: ${chatModel.name}"
+                            )
+                        } else {
+                            Log.w(
+                                "ChatViewModel",
+                                "⚠️ Model loading returned false for: ${chatModel.name}"
+                            )
+                            _uiState.value = _uiState.value.copy(
+                                isModelLoaded = false,
+                                loadedModelName = null
+                            )
+                        }
                     } catch (e: Exception) {
-                        Log.e("ChatViewModel", "❌ Failed to load model: ${e.message}", e)
+                        Log.e("ChatViewModel", "❌ Failed to load chat model: ${e.message}", e)
                         _uiState.value = _uiState.value.copy(
                             isModelLoaded = false,
                             loadedModelName = null,
@@ -576,19 +648,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         isModelLoaded = false,
                         loadedModelName = null
                     )
-                    Log.i("ChatViewModel", "ℹ️ No downloaded models found")
+                    Log.i(
+                        "ChatViewModel",
+                        "ℹ️ No downloaded chat models (TEXT_TO_TEXT) found. STT/TTS models are ignored for chat."
+                    )
                 }
 
-                // Update system message to reflect current state
-                val currentMessages = _uiState.value.messages.toMutableList()
-                if (currentMessages.firstOrNull()?.role == MessageRole.SYSTEM) {
-                    currentMessages.removeAt(0)
-                }
-                _uiState.value = _uiState.value.copy(messages = currentMessages)
+                addSystemMessageIfNeeded()
 
-                if (_uiState.value.isModelLoaded) {
-                    addSystemMessage()
-                }
             } else {
                 _uiState.value = _uiState.value.copy(
                     isModelLoaded = false,
@@ -602,6 +669,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 isModelLoaded = false,
                 loadedModelName = null
             )
+        }
+    }
+
+    /**
+     * Helper to add system message if model is loaded and not already present.
+     */
+    private fun addSystemMessageIfNeeded() {
+        // Update system message to reflect current state
+        val currentMessages = _uiState.value.messages.toMutableList()
+        if (currentMessages.firstOrNull()?.role == MessageRole.SYSTEM) {
+            currentMessages.removeAt(0)
+        }
+        _uiState.value = _uiState.value.copy(messages = currentMessages)
+
+        if (_uiState.value.isModelLoaded) {
+            addSystemMessage()
         }
     }
 

@@ -40,6 +40,7 @@ public enum GenerationEventType: String {
     case streamingUpdate = "generation_streaming_update"
     case error = "generation_error"
     case modelLoaded = "generation_model_loaded"
+    case modelLoadFailed = "generation_model_load_failed"
     case modelUnloaded = "generation_model_unloaded"
 }
 

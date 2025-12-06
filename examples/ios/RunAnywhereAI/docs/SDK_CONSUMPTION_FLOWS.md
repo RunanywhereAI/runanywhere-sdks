@@ -27,9 +27,7 @@ RunAnywhereAI/
 │   │   ├── ModelManager.swift
 │   │   ├── ModelURLRegistry.swift
 │   │   ├── Foundation/         # Foundation Models adapter
-│   │   └── LLMSwift/          # LLMSwift adapter
-│   └── Utilities/              # Constants and helpers
-│       └── Constants.swift
+│   │   └── LlamaCPP/          # LlamaCPP adapter
 ├── Features/                    # Feature modules
 │   ├── AnalyticsView.swift    # Analytics dashboard
 │   ├── Chat/                   # Chat functionality
@@ -71,7 +69,7 @@ let config = SDKConfiguration(
 RunAnywhereSDK.shared.initialize(apiKey: apiKey, configuration: config)
 
 // Register framework adapters
-RunAnywhereSDK.shared.registerAdapter(LLMSwiftAdapter())
+RunAnywhereSDK.shared.registerAdapter(LlamaCPPCoreAdapter())
 RunAnywhereSDK.shared.registerAdapter(FoundationModelsAdapter())
 ```
 **Why**: Essential setup to enable all SDK functionality throughout the app
@@ -176,9 +174,9 @@ RunAnywhereSDK.shared.updateConfiguration(newConfig)
 
 ## Framework Adapters
 
-### LLMSwift Integration (`Core/Services/LLMSwift/`)
-- **LLMSwiftAdapter.swift**: Implements SDK adapter protocol
-- **LLMSwiftService.swift**: Handles LLMSwift-specific operations
+### LlamaCPP Integration (`Core/Services/LlamaCPP/`)
+- **LlamaCPPCoreAdapter.swift**: Implements SDK adapter protocol
+- **LlamaCPPService.swift**: Handles LlamaCPP-specific operations
 - Supports GGUF format models
 - Provides streaming generation
 

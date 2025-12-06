@@ -41,7 +41,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
     // Hysteresis parameters to prevent rapid on/off switching
     private let voiceStartThreshold = 1  // frames of voice to start - reduced to 1 frame for better short phrase detection
-    private let voiceEndThreshold = 8   // frames of silence to end (0.8 seconds at 100ms frames) - shorter for quicker responsiveness
+    private let voiceEndThreshold = 12  // frames of silence to end (1.2 seconds at 100ms frames) - allows natural pauses between words in sentences
 
     // Enhanced hysteresis for TTS mode
     private let ttsVoiceStartThreshold = 10  // Much more frames needed during TTS to prevent feedback
@@ -53,7 +53,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
     private var calibrationFrameCount = 0
     private let calibrationFramesNeeded = 20  // ~2 seconds at 100ms frames
     private var ambientNoiseLevel: Float = 0.0
-    private var calibrationMultiplier: Float = 2.5  // Threshold = ambientNoise * multiplier - higher to reduce false positives
+    private var calibrationMultiplier: Float = 2.0  // Threshold = ambientNoise * multiplier - lowered for better short word detection
 
     // Debug statistics
     private var recentEnergyValues: [Float] = []
@@ -377,7 +377,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
         // Ensure minimum threshold is high enough to avoid false positives
         // but low enough to detect actual speech
         // Use dynamic minimum based on ambient noise level
-        let minimumThreshold: Float = Swift.max(ambientNoiseLevel * 2.5, 0.006)  // At least 2.5x ambient or 0.006
+        let minimumThreshold: Float = Swift.max(ambientNoiseLevel * 2.0, 0.003)  // At least 2x ambient or 0.003 - lowered for short words
         let calculatedThreshold = ambientNoiseLevel * calibrationMultiplier
 
         // Apply threshold with sensible bounds
@@ -400,8 +400,8 @@ public class SimpleEnergyVAD: NSObject, VADService {
     }
 
     /// Manually set calibration parameters
-    public func setCalibrationParameters(multiplier: Float = 2.5) {
-        calibrationMultiplier = Swift.max(2.0, Swift.min(4.0, multiplier))  // Clamp between 2.0x and 4.0x to reduce false positives
+    public func setCalibrationParameters(multiplier: Float = 2.0) {
+        calibrationMultiplier = Swift.max(1.5, Swift.min(4.0, multiplier))  // Clamp between 1.5x and 4.0x for flexibility
         logger.info("📝 Calibration multiplier set to \(self.calibrationMultiplier)x")
     }
 
