@@ -188,7 +188,19 @@ hs_err_pid*
 .flutter-plugins
 .flutter-plugins-dependencies
 pubspec.lock
-**/ios/Flutter/ephemeral/
+.metadata
+
+# Flutter iOS generated files
+**/ios/Flutter/
+**/ios/.symlinks/
+**/ios/Pods/
+**/ios/Podfile
+**/ios/Podfile.lock
+**/ios/Runner.xcworkspace/
+
+# Flutter plugin platform-specific generated code
+sdk/runanywhere-flutter/android/
+sdk/runanywhere-flutter/ios/
 
 thoughts/shared/plans/
 thoughts
@@ -248,7 +260,3 @@ sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/na
 # Backup directories
 examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup/
 comments/
-
-# Flutter auto-generated files (contain developer-specific local paths)
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/flutter_export_environment.sh
