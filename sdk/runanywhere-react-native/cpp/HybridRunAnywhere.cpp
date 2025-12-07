@@ -24,6 +24,115 @@ extern "C" {
 }
 #endif
 
+#if defined(ANDROID) || defined(__ANDROID__)
+#include <fstream>
+#include <cstdint>
+
+namespace {
+// Simple WAV file reader for Android
+struct WavHeader {
+  char riff[4];           // "RIFF"
+  uint32_t fileSize;      // File size - 8
+  char wave[4];           // "WAVE"
+  char fmt[4];            // "fmt "
+  uint32_t fmtSize;       // Format chunk size
+  uint16_t audioFormat;   // Audio format (1 = PCM)
+  uint16_t numChannels;   // Number of channels
+  uint32_t sampleRate;    // Sample rate
+  uint32_t byteRate;      // Bytes per second
+  uint16_t blockAlign;    // Bytes per sample * channels
+  uint16_t bitsPerSample; // Bits per sample
+};
+
+bool readWavFile(const char* filePath, float** samples, size_t* numSamples, int* sampleRate) {
+  std::ifstream file(filePath, std::ios::binary);
+  if (!file.is_open()) {
+    printf("[WAV Reader] Failed to open file: %s\n", filePath);
+    return false;
+  }
+
+  // Read header
+  WavHeader header;
+  file.read(reinterpret_cast<char*>(&header), sizeof(WavHeader));
+  
+  // Verify RIFF/WAVE format
+  if (strncmp(header.riff, "RIFF", 4) != 0 || strncmp(header.wave, "WAVE", 4) != 0) {
+    printf("[WAV Reader] Not a valid WAV file\n");
+    return false;
+  }
+  
+  // Skip extra format bytes if present
+  if (header.fmtSize > 16) {
+    file.seekg(header.fmtSize - 16, std::ios::cur);
+  }
+  
+  // Find data chunk
+  char chunkId[4];
+  uint32_t chunkSize;
+  while (file.read(chunkId, 4) && file.read(reinterpret_cast<char*>(&chunkSize), 4)) {
+    if (strncmp(chunkId, "data", 4) == 0) {
+      break;
+    }
+    file.seekg(chunkSize, std::ios::cur);
+  }
+  
+  if (strncmp(chunkId, "data", 4) != 0) {
+    printf("[WAV Reader] No data chunk found\n");
+    return false;
+  }
+  
+  // Calculate number of samples
+  int bytesPerSample = header.bitsPerSample / 8;
+  size_t totalSamples = chunkSize / bytesPerSample / header.numChannels;
+  
+  // Allocate output buffer
+  *samples = new float[totalSamples];
+  *numSamples = totalSamples;
+  *sampleRate = header.sampleRate;
+  
+  // Read and convert samples
+  if (header.bitsPerSample == 16) {
+    std::vector<int16_t> buffer(chunkSize / 2);
+    file.read(reinterpret_cast<char*>(buffer.data()), chunkSize);
+    
+    for (size_t i = 0; i < totalSamples; i++) {
+      // Mix channels to mono if needed
+      float sum = 0;
+      for (int ch = 0; ch < header.numChannels; ch++) {
+        sum += buffer[i * header.numChannels + ch] / 32768.0f;
+      }
+      (*samples)[i] = sum / header.numChannels;
+    }
+  } else if (header.bitsPerSample == 32 && header.audioFormat == 3) {
+    // Float32 PCM
+    file.read(reinterpret_cast<char*>(*samples), chunkSize);
+    if (header.numChannels > 1) {
+      // Mix to mono
+      for (size_t i = 0; i < totalSamples; i++) {
+        float sum = 0;
+        for (int ch = 0; ch < header.numChannels; ch++) {
+          sum += (*samples)[i * header.numChannels + ch];
+        }
+        (*samples)[i] = sum / header.numChannels;
+      }
+    }
+  } else {
+    printf("[WAV Reader] Unsupported format: %d bits, format %d\n", header.bitsPerSample, header.audioFormat);
+    delete[] *samples;
+    *samples = nullptr;
+    return false;
+  }
+  
+  printf("[WAV Reader] Read %zu samples at %d Hz\n", *numSamples, *sampleRate);
+  return true;
+}
+
+void freeWavSamples(float* samples) {
+  delete[] samples;
+}
+} // anonymous namespace
+#endif
+
 namespace margelo::nitro::runanywhere {
 
 // ============================================================================
@@ -614,17 +723,26 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::transcribeFile(
 
     printf("[HybridRunAnywhere] transcribeFile: %s\n", filePath.c_str());
 
-#if defined(__APPLE__)
-    // Use the iOS AudioDecoder to convert the file to PCM float32
     float* samples = nullptr;
     size_t numSamples = 0;
     int sampleRate = 0;
 
+#if defined(__APPLE__)
+    // Use the iOS AudioDecoder to convert the file to PCM float32
     int decodeResult = ra_decode_audio_file(filePath.c_str(), &samples, &numSamples, &sampleRate);
     if (decodeResult != 1 || !samples || numSamples == 0) {
       printf("[HybridRunAnywhere] Failed to decode audio file\n");
       return buildJsonObject({{"error", jsonString("Failed to decode audio file")}});
     }
+#elif defined(ANDROID) || defined(__ANDROID__)
+    // Use simple WAV reader on Android
+    if (!readWavFile(filePath.c_str(), &samples, &numSamples, &sampleRate)) {
+      printf("[HybridRunAnywhere] Failed to read WAV file\n");
+      return buildJsonObject({{"error", jsonString("Failed to read audio file. Only WAV format is supported on Android.")}});
+    }
+#else
+    return buildJsonObject({{"error", jsonString("transcribeFile not supported on this platform")}});
+#endif
 
     printf("[HybridRunAnywhere] Decoded %zu samples at %d Hz\n", numSamples, sampleRate);
 
@@ -635,7 +753,11 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::transcribeFile(
         language.has_value() ? language->c_str() : "en", &result_json);
 
     // Free the decoded samples
+#if defined(__APPLE__)
     ra_free_audio_samples(samples);
+#elif defined(ANDROID) || defined(__ANDROID__)
+    freeWavSamples(samples);
+#endif
 
     if (result != RA_SUCCESS || !result_json) {
       printf("[HybridRunAnywhere] Transcription failed\n");
@@ -645,10 +767,6 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::transcribeFile(
     std::string response(result_json);
     ra_free_string(result_json);
     return response;
-#else
-    // Android: Not yet implemented
-    return buildJsonObject({{"error", jsonString("transcribeFile not yet supported on Android")}});
-#endif
   });
 }
 

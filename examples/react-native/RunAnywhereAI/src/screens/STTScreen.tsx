@@ -23,8 +23,17 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
-import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+// TODO: Replace with RN 0.81 compatible audio library
+// import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
+
+// Mock AudioRecorderPlayer until we find an RN 0.81 compatible library
+class AudioRecorderPlayer {
+  startRecorder = async () => 'mock-path.wav';
+  stopRecorder = async () => {};
+  addRecordBackListener = () => {};
+  removeRecordBackListener = () => {};
+}
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
