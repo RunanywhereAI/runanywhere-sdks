@@ -353,19 +353,13 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       return;
     }
 
-    setIsLoadingModel(true);
-    setLoadingProgress(`Loading ${model.name}...`);
-    setSelectedModelId(model.id);
-
+    // Don't show loading overlay - parent will close modal and show loading state
+    // Just call the callback and let parent handle the rest
     try {
       await onModelSelected(model);
-      onClose();
+      // Parent is responsible for closing the modal
     } catch (error) {
       console.error('[ModelSelectionSheet] Error selecting model:', error);
-      setLoadingProgress('Error loading model');
-    } finally {
-      setIsLoadingModel(false);
-      setSelectedModelId(null);
     }
   };
 
@@ -394,9 +388,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Handle System TTS selection
    */
   const handleSelectSystemTTS = async () => {
-    setIsLoadingModel(true);
-    setLoadingProgress('Configuring System TTS...');
-
     try {
       // Create a pseudo model for System TTS
       const systemTTSModel = {
@@ -412,12 +403,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         format: 'system',
       } as unknown as SDKModelInfo;
 
+      // Parent is responsible for closing the modal
       await onModelSelected(systemTTSModel);
-      onClose();
     } catch (error) {
       console.error('[ModelSelectionSheet] Error selecting System TTS:', error);
-    } finally {
-      setIsLoadingModel(false);
     }
   };
 
@@ -673,8 +662,14 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle="formSheet"
       onRequestClose={onClose}
+      onDismiss={() => {
+        // Ensure state is cleaned up when modal is dismissed
+        setIsLoadingModel(false);
+        setSelectedModelId(null);
+        setDownloadingModelId(null);
+      }}
     >
       <SafeAreaView style={styles.container}>
         {/* Header */}

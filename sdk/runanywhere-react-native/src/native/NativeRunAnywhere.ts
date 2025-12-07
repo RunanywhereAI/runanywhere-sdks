@@ -30,8 +30,8 @@ export interface NativeRunAnywhereModule {
   loadTextModel(path: string, configJson?: string): Promise<boolean>;
   isTextModelLoaded(): Promise<boolean>;
   unloadTextModel(): Promise<boolean>;
-  generateText(prompt: string, optionsJson?: string): Promise<string>;
-  generateTextStream(
+  generate(prompt: string, optionsJson?: string): Promise<string>;
+  generateStream(
     prompt: string,
     optionsJson: string,
     callback: (token: string, isComplete: boolean) => void
@@ -46,6 +46,7 @@ export interface NativeRunAnywhereModule {
   isSTTModelLoaded(): Promise<boolean>;
   unloadSTTModel(): Promise<boolean>;
   transcribe(audioBase64: string, sampleRate: number, language?: string): Promise<string>;
+  transcribeFile(filePath: string, language?: string): Promise<string>;
   supportsSTTStreaming(): Promise<boolean>;
 
   // ============================================================================

@@ -134,6 +134,9 @@ export const VoiceAssistantScreen: React.FC = () => {
    * Handle model selected from the sheet
    */
   const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
+    // Close the modal first to prevent UI issues
+    setShowModelSelection(false);
+    
     try {
       console.log(`[VoiceAssistant] Loading ${modelSelectionType} model:`, model.id, model.localPath);
 

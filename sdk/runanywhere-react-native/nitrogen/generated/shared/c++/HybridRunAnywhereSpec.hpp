@@ -59,13 +59,14 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> loadTextModel(const std::string& path, const std::optional<std::string>& configJson) = 0;
       virtual std::shared_ptr<Promise<bool>> isTextModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadTextModel() = 0;
-      virtual std::shared_ptr<Promise<std::string>> generateText(const std::string& prompt, const std::optional<std::string>& optionsJson) = 0;
-      virtual std::shared_ptr<Promise<std::string>> generateTextStream(const std::string& prompt, const std::string& optionsJson, const std::function<void(const std::string& /* token */, bool /* isComplete */)>& callback) = 0;
+      virtual std::shared_ptr<Promise<std::string>> generate(const std::string& prompt, const std::optional<std::string>& optionsJson) = 0;
+      virtual std::shared_ptr<Promise<std::string>> generateStream(const std::string& prompt, const std::string& optionsJson, const std::function<void(const std::string& /* token */, bool /* isComplete */)>& callback) = 0;
       virtual std::shared_ptr<Promise<bool>> cancelGeneration() = 0;
       virtual std::shared_ptr<Promise<bool>> loadSTTModel(const std::string& path, const std::string& modelType, const std::optional<std::string>& configJson) = 0;
       virtual std::shared_ptr<Promise<bool>> isSTTModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadSTTModel() = 0;
       virtual std::shared_ptr<Promise<std::string>> transcribe(const std::string& audioBase64, double sampleRate, const std::optional<std::string>& language) = 0;
+      virtual std::shared_ptr<Promise<std::string>> transcribeFile(const std::string& filePath, const std::optional<std::string>& language) = 0;
       virtual std::shared_ptr<Promise<bool>> supportsSTTStreaming() = 0;
       virtual std::shared_ptr<Promise<bool>> loadTTSModel(const std::string& path, const std::string& modelType, const std::optional<std::string>& configJson) = 0;
       virtual std::shared_ptr<Promise<bool>> isTTSModelLoaded() = 0;

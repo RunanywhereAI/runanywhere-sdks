@@ -22,13 +22,14 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("loadTextModel", &HybridRunAnywhereSpec::loadTextModel);
       prototype.registerHybridMethod("isTextModelLoaded", &HybridRunAnywhereSpec::isTextModelLoaded);
       prototype.registerHybridMethod("unloadTextModel", &HybridRunAnywhereSpec::unloadTextModel);
-      prototype.registerHybridMethod("generateText", &HybridRunAnywhereSpec::generateText);
-      prototype.registerHybridMethod("generateTextStream", &HybridRunAnywhereSpec::generateTextStream);
+      prototype.registerHybridMethod("generate", &HybridRunAnywhereSpec::generate);
+      prototype.registerHybridMethod("generateStream", &HybridRunAnywhereSpec::generateStream);
       prototype.registerHybridMethod("cancelGeneration", &HybridRunAnywhereSpec::cancelGeneration);
       prototype.registerHybridMethod("loadSTTModel", &HybridRunAnywhereSpec::loadSTTModel);
       prototype.registerHybridMethod("isSTTModelLoaded", &HybridRunAnywhereSpec::isSTTModelLoaded);
       prototype.registerHybridMethod("unloadSTTModel", &HybridRunAnywhereSpec::unloadSTTModel);
       prototype.registerHybridMethod("transcribe", &HybridRunAnywhereSpec::transcribe);
+      prototype.registerHybridMethod("transcribeFile", &HybridRunAnywhereSpec::transcribeFile);
       prototype.registerHybridMethod("supportsSTTStreaming", &HybridRunAnywhereSpec::supportsSTTStreaming);
       prototype.registerHybridMethod("loadTTSModel", &HybridRunAnywhereSpec::loadTTSModel);
       prototype.registerHybridMethod("isTTSModelLoaded", &HybridRunAnywhereSpec::isTTSModelLoaded);
