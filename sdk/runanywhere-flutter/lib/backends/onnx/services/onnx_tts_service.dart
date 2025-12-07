@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 import '../../../components/tts/tts_service.dart' as component_tts;
 import '../../../components/tts/tts_options.dart';
 import '../../native/native_backend.dart';
@@ -34,18 +36,57 @@ class OnnxTTSService implements component_tts.TTSService {
 
   @override
   Future<void> initialize({String? modelPath}) async {
-    if (modelPath != null && modelPath.isNotEmpty) {
+    debugPrint('[ONNXTTS] initialize() called with modelPath: $modelPath');
+    debugPrint(
+        '[ONNXTTS] Current state - isInitialized: $_isInitialized, modelLoaded: ${_backend.isTtsModelLoaded}');
+
+    if (modelPath == null || modelPath.isEmpty) {
+      debugPrint(
+          '[ONNXTTS] WARNING: No model path provided, skipping model load');
+      if (!_backend.isTtsModelLoaded) {
+        debugPrint(
+            '[ONNXTTS] ERROR: initialize() called without modelPath and no model is loaded!');
+      }
+      _isInitialized = true;
+      return;
+    }
+
+    try {
+      debugPrint('[ONNXTTS] Loading model from: $modelPath');
+
       // Load the TTS model through native backend
+      // This is synchronous and will throw if it fails
       _backend.loadTtsModel(
         modelPath,
         modelType: 'vits',
       );
 
+      debugPrint('[ONNXTTS] loadTtsModel() completed, checking status...');
+
+      // Verify the model loaded successfully
+      if (!_backend.isTtsModelLoaded) {
+        final error =
+            'TTS model failed to load - backend reports model not loaded';
+        debugPrint('[ONNXTTS] ERROR: $error');
+        throw Exception(error);
+      }
+
+      debugPrint('[ONNXTTS] Model verified as loaded, getting voices...');
+
       // Get available voices
       _voices = _backend.getTtsVoices();
+
+      debugPrint('[ONNXTTS] Found ${_voices.length} voices: $_voices');
+    } catch (e, stackTrace) {
+      debugPrint('[ONNXTTS] ERROR during initialization: $e');
+      debugPrint('[ONNXTTS] Stack trace: $stackTrace');
+      _isInitialized = false;
+      rethrow;
     }
 
     _isInitialized = true;
+    debugPrint(
+        '[ONNXTTS] Initialization complete. isReady: $isReady (isInitialized: $_isInitialized, modelLoaded: ${_backend.isTtsModelLoaded})');
   }
 
   /// Check if TTS is ready.
@@ -65,9 +106,19 @@ class OnnxTTSService implements component_tts.TTSService {
     required String text,
     required TTSOptions options,
   }) async {
+    if (!isReady) {
+      throw Exception(
+          'TTS service not ready. isInitialized: $_isInitialized, modelLoaded: ${_backend.isTtsModelLoaded}');
+    }
+
     _isSynthesizing = true;
 
     try {
+      debugPrint(
+          '[ONNXTTS] Synthesizing text: "${text.substring(0, text.length > 50 ? 50 : text.length)}..."');
+      debugPrint(
+          '[ONNXTTS] Voice: ${options.voice}, Rate: ${options.rate}, Pitch: ${options.pitch}');
+
       final result = _backend.synthesize(
         text,
         voiceId: options.voice,
@@ -77,6 +128,9 @@ class OnnxTTSService implements component_tts.TTSService {
 
       final samples = result['samples'] as Float32List;
       final sampleRate = result['sampleRate'] as int;
+
+      debugPrint(
+          '[ONNXTTS] Synthesis successful. Samples: ${samples.length}, Rate: $sampleRate');
 
       // Convert Float32 samples to PCM16 bytes
       return Uint8List.fromList(_convertToPCM16(samples, sampleRate));

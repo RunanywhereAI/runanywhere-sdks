@@ -325,21 +325,32 @@ class ModelPathUtils {
         final modelFolder =
             await getModelFolder(modelId: modelId, framework: framework);
         if (await modelFolder.exists()) {
-          // First check for direct .onnx file
-          final directFile = await _findOnnxFileInDirectory(modelFolder);
-          if (directFile != null) {
-            return Uri.file(directFile.path);
-          }
-
           // Check nested subdirectories (sherpa-onnx structure)
+          // For Sherpa ONNX models, we need to return the directory containing
+          // all the model files (encoder, decoder, tokens), not just one file
           final contents = await modelFolder.list().toList();
           for (final item in contents) {
             if (item is Directory) {
-              final nestedFile = await _findOnnxFileInDirectory(item);
-              if (nestedFile != null) {
-                return Uri.file(nestedFile.path);
+              final hasOnnxFiles = await _hasOnnxFilesInDirectory(item);
+              if (hasOnnxFiles) {
+                // Return the directory path, not a single file
+                return Uri.directory(item.path);
               }
             }
+          }
+
+          // Check for direct .onnx file in model folder (non-sherpa models)
+          final directFile = await _findOnnxFileInDirectory(modelFolder);
+          if (directFile != null) {
+            // If there are multiple .onnx files in the folder, return the directory
+            final allOnnxFiles = await modelFolder
+                .list()
+                .where((e) => e.path.toLowerCase().endsWith('.onnx'))
+                .toList();
+            if (allOnnxFiles.length > 1) {
+              return Uri.directory(modelFolder.path);
+            }
+            return Uri.file(directFile.path);
           }
         }
       } else {
@@ -374,6 +385,16 @@ class ModelPathUtils {
       // Directory might not be readable
     }
     return null;
+  }
+
+  /// Check if directory contains any .onnx files
+  static Future<bool> _hasOnnxFilesInDirectory(Directory directory) async {
+    try {
+      final file = await _findOnnxFileInDirectory(directory);
+      return file != null;
+    } catch (e) {
+      return false;
+    }
   }
 }
 

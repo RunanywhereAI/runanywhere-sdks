@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
+
 import '../../core/components/base_component.dart';
 import '../../core/types/sdk_component.dart';
 import '../../core/protocols/component/component_configuration.dart';
@@ -115,51 +118,77 @@ class TTSComponent extends BaseComponent<TTSService> {
         ServiceContainer.shared.modelRegistry;
     final modelId = ttsConfiguration.modelId;
 
+    debugPrint('[TTSComponent] createService() - modelId: $modelId');
+
     if (modelId != null) {
       final modelInfo = registry.getModel(modelId);
+      debugPrint(
+          '[TTSComponent] modelInfo from registry: ${modelInfo != null ? "found" : "NOT FOUND"}');
 
       if (modelInfo != null && modelInfo.localPath != null) {
         // Use the model's local path (handles nested directories for ONNX)
         // For ONNX models, the path might be a directory containing the .onnx file
         final localPath = modelInfo.localPath!.toFilePath();
+        debugPrint('[TTSComponent] localPath from modelInfo: $localPath');
 
         // Check if it's a directory (ONNX models in nested dirs)
         final pathFile = File(localPath);
         final pathDir = Directory(localPath);
 
-        if (await pathDir.exists()) {
+        final dirExists = await pathDir.exists();
+        final fileExists = await pathFile.exists();
+        debugPrint(
+            '[TTSComponent] Path check - dirExists: $dirExists, fileExists: $fileExists');
+
+        if (dirExists) {
           // It's a directory - ONNX models are stored in directories
           // The native backend will find the .onnx file inside
           _modelPath = localPath;
-        } else if (await pathFile.exists()) {
+          debugPrint('[TTSComponent] Using directory path: $_modelPath');
+        } else if (fileExists) {
           // It's a file - use it directly
           _modelPath = localPath;
+          debugPrint('[TTSComponent] Using file path: $_modelPath');
         } else {
           // Path doesn't exist, fallback to modelId
           _modelPath = modelId;
+          debugPrint(
+              '[TTSComponent] Path not found, falling back to modelId: $_modelPath');
         }
       } else {
         // Fallback: use modelId as path (for built-in models or if not found)
         _modelPath = modelId;
+        debugPrint(
+            '[TTSComponent] modelInfo.localPath is null, falling back to modelId: $_modelPath');
       }
+    } else {
+      debugPrint('[TTSComponent] ERROR: modelId is null!');
     }
+
+    debugPrint('[TTSComponent] Final _modelPath: $_modelPath');
 
     // Try to get a registered TTS provider from central registry
     final provider = ModuleRegistry.shared.ttsProvider(modelId: modelId);
+    debugPrint(
+        '[TTSComponent] TTS provider from registry: ${provider != null ? "found" : "NOT FOUND"}');
 
     TTSService ttsService;
 
     if (provider != null) {
       // Use registered provider (e.g., ONNX TTS or other providers)
+      debugPrint('[TTSComponent] Creating TTS service from provider...');
       final service = await provider.createTTSService(ttsConfiguration);
       if (service is! TTSService) {
         throw StateError('Provider returned invalid service type');
       }
       // Initialize with model path
+      debugPrint(
+          '[TTSComponent] Initializing service with modelPath: $_modelPath');
       await service.initialize(modelPath: _modelPath);
       ttsService = service;
     } else {
       // Fallback to system TTS
+      debugPrint('[TTSComponent] No provider, falling back to SystemTTS');
       ttsService = SystemTTSService();
       await ttsService.initialize();
     }
@@ -172,7 +201,9 @@ class TTSComponent extends BaseComponent<TTSService> {
     final service = this.service;
     if (service == null) return;
 
-    await service.initialize();
+    // Service is already initialized in createService() with the model path
+    // Don't call initialize() again as it would clear the loaded model
+    // await service.initialize();
   }
 
   // MARK: - Public API
