@@ -19,10 +19,10 @@
 #endif
 
 // RunAnywhere Core C API
-#if __has_include(<RunAnywhereCore/ra_core.h>)
-#include <RunAnywhereCore/ra_core.h>
-#elif __has_include("ra_core.h")
-#include "ra_core.h"
+#if __has_include(<RunAnywhereCore/runanywhere_bridge.h>)
+#include <RunAnywhereCore/runanywhere_bridge.h>
+#elif __has_include("runanywhere_bridge.h")
+#include "runanywhere_bridge.h"
 #else
 // Stub for compilation without the core library
 typedef void* ra_backend_handle;

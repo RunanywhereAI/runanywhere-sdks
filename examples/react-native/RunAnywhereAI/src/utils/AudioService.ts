@@ -5,31 +5,23 @@
  * - STTScreen: Record audio for transcription
  * - TTSScreen: Play synthesized audio
  * - VoiceAssistantScreen: Full pipeline with record + play
+ *
+ * NOTE: react-native-audio-recorder-player is deprecated and incompatible with RN 0.81.
+ * This is a mock implementation. Replace with a compatible library.
  */
 
 import { Platform, PermissionsAndroid } from 'react-native';
-import AudioRecorderPlayer, {
-  AudioEncoderAndroidType,
-  AudioSourceAndroidType,
-  AVEncoderAudioQualityIOSType,
-  AVEncodingOption,
-} from 'react-native-audio-recorder-player';
+
+// TODO: Replace with RN 0.81 compatible audio library
+// import AudioRecorderPlayer, {
+//   AudioEncoderAndroidType,
+//   AudioSourceAndroidType,
+//   AVEncoderAudioQualityIOSType,
+//   AVEncodingOption,
+// } from 'react-native-audio-recorder-player';
 
 // Audio configuration for speech recognition
 export const SAMPLE_RATE = 16000; // Required by Whisper models
-
-// Singleton audio recorder/player instance
-let audioRecorderPlayer: AudioRecorderPlayer | null = null;
-
-/**
- * Get or create the audio recorder/player instance
- */
-function getRecorderPlayer(): AudioRecorderPlayer {
-  if (!audioRecorderPlayer) {
-    audioRecorderPlayer = new AudioRecorderPlayer();
-  }
-  return audioRecorderPlayer;
-}
 
 /**
  * Request microphone permission
@@ -67,79 +59,44 @@ let recordingStartTime: number = 0;
 /**
  * Start recording audio
  * Returns the URI where the audio will be saved
+ * 
+ * NOTE: This is a mock implementation. Audio recording is not functional.
  */
 export async function startRecording(callbacks?: RecordingCallbacks): Promise<string> {
-  const player = getRecorderPlayer();
-
-  try {
-    // Use platform-appropriate path
-    const uri = await player.startRecorder(
-      undefined, // Use default path
-      {
-        AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
-        AudioSourceAndroid: AudioSourceAndroidType.MIC,
-        AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
-        AVNumberOfChannelsKeyIOS: 1,
-        AVSampleRateKeyIOS: SAMPLE_RATE,
-        AVFormatIDKeyIOS: AVEncodingOption.aac,
-      },
-      true // Enable metering
-    );
-
-    currentRecordUri = uri;
-    recordingStartTime = Date.now();
-    console.log('[AudioService] Recording started:', uri);
-
-    // Set up progress listener
-    if (callbacks?.onProgress) {
-      player.addRecordBackListener((e) => {
-        callbacks.onProgress?.(e.currentPosition, e.currentMetering);
-      });
-    }
-
-    return uri;
-  } catch (error) {
-    console.error('[AudioService] Start recording error:', error);
-    throw error;
-  }
+  console.warn('[AudioService] Audio recording is not available - react-native-audio-recorder-player is deprecated');
+  
+  // Return a mock path
+  const mockPath = Platform.OS === 'ios' 
+    ? `/tmp/mock_recording_${Date.now()}.wav`
+    : `/data/user/0/com.runanywhereaI/cache/mock_recording_${Date.now()}.wav`;
+  
+  currentRecordUri = mockPath;
+  recordingStartTime = Date.now();
+  
+  return mockPath;
 }
 
 /**
  * Stop recording and return the audio URI and duration
+ * 
+ * NOTE: This is a mock implementation.
  */
 export async function stopRecording(): Promise<{ uri: string; durationMs: number }> {
-  const player = getRecorderPlayer();
-
-  try {
-    const uri = await player.stopRecorder();
-    player.removeRecordBackListener();
-
-    const durationMs = Date.now() - recordingStartTime;
-    console.log('[AudioService] Recording stopped:', uri, 'duration:', durationMs);
-
-    return {
-      uri: uri || currentRecordUri || '',
-      durationMs,
-    };
-  } catch (error) {
-    console.error('[AudioService] Stop recording error:', error);
-    throw error;
-  }
+  const durationMs = Date.now() - recordingStartTime;
+  console.warn('[AudioService] Stopping mock recording');
+  
+  return {
+    uri: currentRecordUri || '',
+    durationMs,
+  };
 }
 
 /**
  * Cancel recording
  */
 export async function cancelRecording(): Promise<void> {
-  const player = getRecorderPlayer();
-
-  try {
-    await player.stopRecorder();
-    player.removeRecordBackListener();
-    currentRecordUri = null;
-  } catch (error) {
-    console.error('[AudioService] Cancel recording error:', error);
-  }
+  currentRecordUri = null;
+  console.warn('[AudioService] Cancelling mock recording');
 }
 
 export interface PlaybackCallbacks {
@@ -149,81 +106,45 @@ export interface PlaybackCallbacks {
 
 /**
  * Play audio from URI
+ * 
+ * NOTE: This is a mock implementation. Audio playback is not functional.
  */
 export async function playAudio(uri: string, callbacks?: PlaybackCallbacks): Promise<void> {
-  const player = getRecorderPlayer();
-
-  try {
-    await player.startPlayer(uri);
-    console.log('[AudioService] Playback started:', uri);
-
-    player.addPlayBackListener((e) => {
-      callbacks?.onProgress?.(e.currentPosition, e.duration);
-
-      // Check if playback is complete
-      if (e.currentPosition >= e.duration - 100) { // Small buffer for completion
-        player.stopPlayer();
-        player.removePlayBackListener();
-        callbacks?.onComplete?.();
-      }
-    });
-  } catch (error) {
-    console.error('[AudioService] Playback error:', error);
-    throw error;
-  }
+  console.warn('[AudioService] Audio playback is not available - react-native-audio-recorder-player is deprecated');
+  console.log('[AudioService] Would play:', uri);
+  
+  // Simulate playback completion after a short delay
+  setTimeout(() => {
+    callbacks?.onComplete?.();
+  }, 100);
 }
 
 /**
  * Stop playback
  */
 export async function stopPlayback(): Promise<void> {
-  const player = getRecorderPlayer();
-
-  try {
-    await player.stopPlayer();
-    player.removePlayBackListener();
-  } catch (error) {
-    console.error('[AudioService] Stop playback error:', error);
-  }
+  console.warn('[AudioService] Stopping mock playback');
 }
 
 /**
  * Pause playback
  */
 export async function pausePlayback(): Promise<void> {
-  const player = getRecorderPlayer();
-  try {
-    await player.pausePlayer();
-  } catch (error) {
-    console.error('[AudioService] Pause playback error:', error);
-  }
+  console.warn('[AudioService] Pausing mock playback');
 }
 
 /**
  * Resume playback
  */
 export async function resumePlayback(): Promise<void> {
-  const player = getRecorderPlayer();
-  try {
-    await player.resumePlayer();
-  } catch (error) {
-    console.error('[AudioService] Resume playback error:', error);
-  }
+  console.warn('[AudioService] Resuming mock playback');
 }
 
 /**
  * Cleanup resources
  */
 export async function cleanup(): Promise<void> {
-  const player = getRecorderPlayer();
-  try {
-    await player.stopRecorder().catch(() => {});
-    await player.stopPlayer().catch(() => {});
-    player.removeRecordBackListener();
-    player.removePlayBackListener();
-  } catch {
-    // Ignore cleanup errors
-  }
+  currentRecordUri = null;
 }
 
 /**

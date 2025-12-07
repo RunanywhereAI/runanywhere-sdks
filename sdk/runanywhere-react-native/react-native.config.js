@@ -9,10 +9,9 @@ module.exports = {
       },
       android: {
         sourceDir: './android',
-        packageImportPath: 'import com.runanywhere.RunAnywherePackage;',
+        packageImportPath: 'import com.margelo.nitro.runanywhere.RunAnywherePackage;',
         packageInstance: 'new RunAnywherePackage()',
       },
     },
   },
 };
-

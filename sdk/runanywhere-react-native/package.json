@@ -2,13 +2,13 @@
   "name": "runanywhere-react-native",
   "version": "0.1.0",
   "description": "RunAnywhere SDK for React Native - On-device AI with intelligent routing",
-  "main": "lib/module/index.js",
-  "types": "lib/typescript/src/index.d.ts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "exports": {
     ".": {
       "source": "./src/index.ts",
-      "types": "./lib/typescript/src/index.d.ts",
-      "default": "./lib/module/index.js"
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     },
     "./package.json": "./package.json"
   },
