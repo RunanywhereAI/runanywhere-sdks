@@ -21,8 +21,7 @@ public class ServiceContainer {
     private(set) lazy var modelLoadingService: ModelLoadingService = {
         ModelLoadingService(
             registry: modelRegistry,
-            adapterRegistry: adapterRegistry,
-            memoryService: memoryService
+            adapterRegistry: adapterRegistry
         )
     }()
 
@@ -76,15 +75,6 @@ public class ServiceContainer {
     /// Hardware manager
     private(set) lazy var hardwareManager: HardwareCapabilityManager = {
         HardwareCapabilityManager.shared
-    }()
-
-    /// Memory service (implements MemoryManager protocol)
-    private(set) lazy var memoryService: MemoryManager = {
-        MemoryService(
-            allocationManager: AllocationManager(),
-            pressureHandler: PressureHandler(),
-            cacheEviction: CacheEviction()
-        )
     }()
 
     /// Logger
@@ -273,14 +263,6 @@ public class ServiceContainer {
         }
     }
 
-    // MARK: - Public Service Access
-
-    /// Get memory service
-    public var memory: MemoryManager {
-        return memoryService
-    }
-
-
     // MARK: - Initialization
 
     public init() {
@@ -297,9 +279,8 @@ public class ServiceContainer {
      * 3. **Configuration Service**: Load configuration from backend/cache/defaults
      * 4. **Model Catalog**: Sync model information from backend
      * 5. **Model Registry**: Initialize for model discovery and management
-     * 6. **Memory Management**: Configure memory thresholds
-     * 7. **Voice Services**: Initialize voice capability (optional)
-     * 8. **Analytics**: Setup telemetry and analytics tracking
+     * 6. **Voice Services**: Initialize voice capability (optional)
+     * 7. **Analytics**: Setup telemetry and analytics tracking
      *
      * - Parameters:
      *   - params: SDK initialization parameters
@@ -374,11 +355,7 @@ public class ServiceContainer {
         await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
         logger.debug("Model registry initialized")
 
-        // Step 6: Configure memory management
-        memoryService.setMemoryThreshold(500_000_000) // 500MB default
-        logger.debug("Memory threshold configured")
-
-        // Step 7: Initialize optional voice services
+        // Step 6: Initialize optional voice services
         do {
             try await voiceCapabilityService.initialize()
             logger.info("Voice capability service initialized")
@@ -386,7 +363,7 @@ public class ServiceContainer {
             logger.warning("Voice service initialization failed (optional): \(error)")
         }
 
-        // Step 8: Initialize analytics
+        // Step 7: Initialize analytics
         if let client = self.apiClient {
             let telemetryRepo = TelemetryRepositoryImpl(
                 databaseManager: databaseManager,
@@ -421,9 +398,8 @@ public class ServiceContainer {
      * 2. **Configuration Service**: Load configuration from defaults only
      * 3. **Model Catalog**: Use mock model data
      * 4. **Model Registry**: Initialize for model discovery and management
-     * 5. **Memory Management**: Configure memory thresholds
-     * 6. **Voice Services**: Initialize voice capability (optional)
-     * 7. **Analytics**: Setup with local-only tracking
+     * 5. **Voice Services**: Initialize voice capability (optional)
+     * 6. **Analytics**: Setup with local-only tracking
      *
      * - Parameters:
      *   - params: SDK initialization parameters
@@ -474,11 +450,7 @@ public class ServiceContainer {
         await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
         logger.debug("Model registry initialized")
 
-        // Step 5: Configure memory management
-        memoryService.setMemoryThreshold(500_000_000) // 500MB default
-        logger.debug("Memory threshold configured")
-
-        // Step 6: Initialize optional voice services
+        // Step 5: Initialize optional voice services
         do {
             try await voiceCapabilityService.initialize()
             logger.info("Voice capability service initialized")
@@ -486,7 +458,7 @@ public class ServiceContainer {
             logger.warning("Voice service initialization failed (optional): \(error)")
         }
 
-        // Step 7: Skip analytics initialization in development mode
+        // Step 6: Skip analytics initialization in development mode
         logger.info("Analytics disabled in development mode")
 
         logger.info("✅ Development mode bootstrap completed")
@@ -505,18 +477,14 @@ public class ServiceContainer {
         let logger = SDKLogger(category: "ServiceContainer.LocalSetup")
         logger.info("Setting up local services...")
 
-        // Step 1: Configure memory management
-        memoryService.setMemoryThreshold(500_000_000) // 500MB default
-        logger.debug("Memory threshold configured")
-
-        // Step 2: Initialize model registry for local discovery
+        // Step 1: Initialize model registry for local discovery
         // This needs to happen even in fast initialization to discover cached models
         Task {
             await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
             logger.debug("Model registry initialized for local discovery")
         }
 
-        // Step 3: Setup analytics for local queuing (no network submission yet)
+        // Step 2: Setup analytics for local queuing (no network submission yet)
         // Analytics will be initialized when network services are available
         logger.debug("Analytics queue ready for lazy initialization")
 

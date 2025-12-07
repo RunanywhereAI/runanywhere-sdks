@@ -6,7 +6,7 @@ import PackageDescription
 // =============================================================================
 // Set to `true` to use local XCFramework from Binaries/ directory (for local development/testing)
 // Set to `false` to use remote XCFramework from GitHub releases (default for production use)
-let testLocal = false
+let testLocal = true
 // =============================================================================
 
 let package = Package(

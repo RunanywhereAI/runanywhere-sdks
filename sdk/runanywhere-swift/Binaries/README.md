@@ -73,8 +73,42 @@ shasum -a 256 RunAnywhereCore.xcframework.zip
 ## Architecture
 
 The `RunAnywhereCore.xcframework` is a unified binary that includes:
-- **ONNX Runtime backend**: STT, TTS, VAD capabilities
-- **LlamaCPP backend**: LLM text generation with GGUF models
-- **Multi-platform support**: iOS (arm64), iOS Simulator (arm64 + x86_64)
+
+- **ONNX Runtime backend**: STT, TTS, VAD capabilities via Sherpa-ONNX
+- **LlamaCPP backend**: LLM text generation with GGUF models and Metal GPU acceleration
+- **Multi-platform support**: iOS (arm64), iOS Simulator (arm64 + x86_64), macOS (arm64 + x86_64)
 
 The XCFramework is consumed by Swift through the `CRunAnywhereCore` C bridge module, which exposes the native C++ API to Swift code.
+
+## macOS ONNX Runtime Dylib
+
+**Important**: For macOS apps using the ONNX backend (STT/TTS/VAD), you must embed the ONNX Runtime dynamic library.
+
+### Location
+
+The ONNX Runtime dylib is provided in:
+
+```text
+Binaries/onnxruntime-macos/libonnxruntime.dylib
+```
+
+### Integration
+
+1. **Copy to app bundle**: Copy `libonnxruntime.dylib` to `YourApp.app/Contents/Frameworks/`
+2. **Set rpath**: Configure your app's rpath to find the dylib at runtime
+3. **Code sign**: Ensure the dylib is properly code signed
+
+### Why is this needed?
+
+- iOS: ONNX Runtime is statically linked into the XCFramework
+- macOS: ONNX Runtime is dynamically linked to reduce binary size and allow updates
+
+### Alternative (development only)
+
+Install ONNX Runtime system-wide via Homebrew:
+
+```bash
+brew install onnxruntime
+```
+
+This is only recommended for development, not production deployment.

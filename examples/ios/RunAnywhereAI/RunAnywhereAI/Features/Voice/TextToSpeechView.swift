@@ -3,6 +3,9 @@ import RunAnywhere
 import AVFoundation
 import Combine
 import os
+#if os(macOS)
+import AppKit
+#endif
 
 /// Collection of funny sample texts for TTS demo
 private let funnyTTSSampleTexts: [String] = [
@@ -104,7 +107,11 @@ struct TextToSpeechView: View {
                             .font(.body)
                             .padding(12)
                             .frame(minHeight: 120)
+                            #if os(iOS)
                             .background(Color(.secondarySystemBackground))
+                            #else
+                            .background(Color(NSColor.controlBackgroundColor))
+                            #endif
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
@@ -168,7 +175,7 @@ struct TextToSpeechView: View {
                         }
                     }
                     .padding()
-                    .background(Color(.tertiarySystemBackground))
+                    .background(AppColors.backgroundTertiary)
                     .cornerRadius(12)
 
                     // Generated audio info
@@ -187,7 +194,7 @@ struct TextToSpeechView: View {
                             .foregroundColor(.secondary)
                         }
                         .padding()
-                        .background(Color(.secondarySystemBackground))
+                        .background(AppColors.backgroundSecondary)
                         .cornerRadius(12)
                     }
                 }
@@ -285,7 +292,7 @@ struct TextToSpeechView: View {
                 }
             }
                 .padding()
-                .background(Color(.systemBackground))
+                .background(AppColors.backgroundPrimary)
                 } else {
                     // No model selected - show spacer
                     Spacer()
@@ -407,13 +414,15 @@ class TTSViewModel: ObservableObject {
     func initialize() async {
         logger.info("Initializing TTS view model")
 
-        // Configure audio session for playback
+        // Configure audio session for playback (iOS only - macOS doesn't use AVAudioSession)
+        #if os(iOS)
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
             logger.error("Failed to configure audio session: \(error.localizedDescription)")
         }
+        #endif
 
         // Subscribe to model lifecycle changes from SDK
         subscribeToModelLifecycle()

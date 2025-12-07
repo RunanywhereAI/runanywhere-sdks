@@ -3,7 +3,7 @@ import AVFoundation
 import RunAnywhere
 
 /// Manages audio capture from microphone for STT
-#if os(iOS) || os(tvOS) || os(watchOS)
+/// Works on iOS, tvOS, watchOS, and macOS using AVAudioEngine
 public class AudioCaptureManager: ObservableObject {
     private let logger = SDKLogger(category: "AudioCapture")
 
@@ -21,11 +21,20 @@ public class AudioCaptureManager: ObservableObject {
 
     /// Request microphone permission
     public func requestPermission() async -> Bool {
-        await withCheckedContinuation { continuation in
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        return await withCheckedContinuation { continuation in
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
                 continuation.resume(returning: granted)
             }
         }
+        #elseif os(macOS)
+        // On macOS, use AVCaptureDevice for permission request
+        return await withCheckedContinuation { continuation in
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                continuation.resume(returning: granted)
+            }
+        }
+        #endif
     }
 
     /// Start recording audio from microphone
@@ -35,12 +44,14 @@ public class AudioCaptureManager: ObservableObject {
             return
         }
 
-        // Configure audio session
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        // Configure audio session (iOS/tvOS/watchOS only)
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.record, mode: .measurement)
         try audioSession.setActive(true)
+        #endif
 
-        // Create audio engine
+        // Create audio engine (works on all platforms)
         let engine = AVAudioEngine()
         let inputNode = engine.inputNode
 
@@ -64,7 +75,7 @@ public class AudioCaptureManager: ObservableObject {
         }
 
         // Install tap on input node
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, time in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
             guard let self = self else { return }
 
             // Update audio level for visualization
@@ -106,8 +117,10 @@ public class AudioCaptureManager: ObservableObject {
         audioEngine = nil
         inputNode = nil
 
-        // Deactivate audio session
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        // Deactivate audio session (iOS/tvOS/watchOS only)
         try? AVAudioSession.sharedInstance().setActive(false)
+        #endif
 
         DispatchQueue.main.async {
             self.isRecording = false
@@ -134,7 +147,7 @@ public class AudioCaptureManager: ObservableObject {
         }
 
         var error: NSError?
-        let inputBlock: AVAudioConverterInputBlock = { inNumPackets, outStatus in
+        let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
             outStatus.pointee = .haveData
             return buffer
         }
@@ -188,33 +201,6 @@ public class AudioCaptureManager: ObservableObject {
         stopRecording()
     }
 }
-#else
-// macOS stub - AudioCaptureManager is iOS-only
-// On macOS, use AVCaptureSession or other APIs for audio capture
-public class AudioCaptureManager: ObservableObject {
-    private let logger = SDKLogger(category: "AudioCapture")
-
-    @Published public var isRecording = false
-    @Published public var audioLevel: Float = 0.0
-
-    public init() {
-        logger.info("AudioCaptureManager initialized (macOS stub)")
-    }
-
-    public func requestPermission() async -> Bool {
-        logger.warning("AudioCaptureManager is not available on macOS")
-        return false
-    }
-
-    public func startRecording(onAudioData: @escaping (Data) -> Void) throws {
-        throw AudioCaptureError.platformNotSupported
-    }
-
-    public func stopRecording() {
-        // No-op on macOS
-    }
-}
-#endif
 
 // MARK: - Errors
 
@@ -222,7 +208,6 @@ public enum AudioCaptureError: LocalizedError {
     case permissionDenied
     case formatConversionFailed
     case engineStartFailed
-    case platformNotSupported
 
     public var errorDescription: String? {
         switch self {
@@ -232,8 +217,6 @@ public enum AudioCaptureError: LocalizedError {
             return "Failed to convert audio format"
         case .engineStartFailed:
             return "Failed to start audio engine"
-        case .platformNotSupported:
-            return "Audio capture is not supported on this platform"
         }
     }
 }
