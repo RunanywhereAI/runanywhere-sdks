@@ -3,6 +3,9 @@ import RunAnywhere
 import AVFoundation
 import Combine
 import os
+#if os(macOS)
+import AppKit
+#endif
 
 // Using STTMode from RunAnywhere SDK
 
@@ -151,7 +154,11 @@ struct SpeechToTextView: View {
                                 .foregroundColor(.primary)
                                 .padding()
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                #if os(iOS)
                                 .background(Color(.secondarySystemBackground))
+                                #else
+                                .background(Color(NSColor.controlBackgroundColor))
+                                #endif
                                 .cornerRadius(12)
                         }
                     }
@@ -211,7 +218,11 @@ struct SpeechToTextView: View {
                     .foregroundColor(.secondary)
             }
                 .padding()
+                #if os(iOS)
                 .background(Color(.systemBackground))
+                #else
+                .background(Color(NSColor.windowBackgroundColor))
+                #endif
                 } else {
                     // No model selected - show onboarding
                     Spacer()
@@ -449,10 +460,12 @@ class STTViewModel: ObservableObject {
         }
 
         do {
-            // Configure audio session
+            // Configure audio session (iOS only - macOS doesn't use AVAudioSession)
+            #if os(iOS)
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.record, mode: .measurement)
             try audioSession.setActive(true)
+            #endif
 
             // Create audio engine
             let engine = AVAudioEngine()
@@ -644,7 +657,9 @@ class STTViewModel: ObservableObject {
             await performBatchTranscription()
         }
 
+        #if os(iOS)
         try? AVAudioSession.sharedInstance().setActive(false)
+        #endif
         logger.info("Recording stopped. Transcription: \(self.transcription)")
     }
 

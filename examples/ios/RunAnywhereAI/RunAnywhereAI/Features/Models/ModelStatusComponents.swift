@@ -7,6 +7,9 @@
 
 import SwiftUI
 import RunAnywhere
+#if os(macOS)
+import AppKit
+#endif
 
 // MARK: - Model Status Banner
 
@@ -82,7 +85,11 @@ struct ModelStatusBanner: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        #if os(iOS)
         .background(Color(.secondarySystemBackground))
+        #else
+        .background(Color(NSColor.controlBackgroundColor))
+        #endif
         .cornerRadius(12)
     }
 
@@ -150,7 +157,11 @@ struct ModelRequiredOverlay: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if os(iOS)
         .background(Color(.systemBackground).opacity(0.95))
+        #else
+        .background(Color(NSColor.windowBackgroundColor).opacity(0.95))
+        #endif
     }
 
     private var modalityIcon: String {
@@ -423,7 +434,11 @@ struct ModelSetupCard: View {
                 }
             }
             .padding(16)
+            #if os(iOS)
             .background(Color(.secondarySystemBackground))
+            #else
+            .background(Color(NSColor.controlBackgroundColor))
+            #endif
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

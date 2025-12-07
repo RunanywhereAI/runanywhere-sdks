@@ -5,7 +5,6 @@ import Foundation
 public actor ModelLoadingService {
     private let registry: ModelRegistry
     private let adapterRegistry: AdapterRegistry
-    private let memoryService: MemoryManager // Using MemoryManager protocol for now
     private let logger = SDKLogger(category: "ModelLoadingService")
 
     private var loadedModels: [String: LoadedModel] = [:]
@@ -14,12 +13,10 @@ public actor ModelLoadingService {
 
     public init(
         registry: ModelRegistry,
-        adapterRegistry: AdapterRegistry,
-        memoryService: MemoryManager
+        adapterRegistry: AdapterRegistry
     ) {
         self.registry = registry
         self.adapterRegistry = adapterRegistry
-        self.memoryService = memoryService
     }
 
     /// Load a model by identifier
@@ -102,13 +99,6 @@ public actor ModelLoadingService {
             )
         }
 
-        // Check memory availability
-        let memoryRequired = modelInfo.memoryRequired ?? 1024 * 1024 * 1024 // Default 1GB if not specified
-        let canAllocate = try await memoryService.canAllocate(memoryRequired)
-        if !canAllocate {
-            throw SDKError.loadingFailed("Insufficient memory")
-        }
-
         // ModelLoadingService handles LLMs only; constrain to text-to-text modality
         let modality: FrameworkModality = .textToText
 
@@ -145,13 +135,6 @@ public actor ModelLoadingService {
 
                 // Create loaded model
                 let loaded = LoadedModel(model: modelInfo, service: llmService)
-
-                // Register loaded model
-                memoryService.registerLoadedModel(
-                    loaded,
-                    size: modelInfo.memoryRequired ?? memoryRequired,
-                    service: llmService
-                )
                 loadedModels[modelId] = loaded
 
                 return loaded
@@ -175,9 +158,6 @@ public actor ModelLoadingService {
 
         // Unload through service
         await loaded.service.cleanup()
-
-        // Unregister from memory service
-        memoryService.unregisterModel(modelId)
 
         // Remove from loaded models
         loadedModels.removeValue(forKey: modelId)
