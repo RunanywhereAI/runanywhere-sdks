@@ -2,7 +2,7 @@
  * HybridRunAnywhereFileSystem.kt
  *
  * Android implementation of file system operations for RunAnywhere SDK.
- * Provides model management, file I/O, and disk space utilities.
+ * Uses OkHttp for maximum download speed (bypasses RN bridge).
  */
 
 package com.margelo.nitro.runanywhere
@@ -11,10 +11,13 @@ import android.os.StatFs
 import android.util.Log
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
+import java.util.concurrent.TimeUnit
 import kotlin.math.floor
 
 /**
@@ -27,21 +30,27 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
         private const val TAG = "HybridRunAnywhereFS"
         private const val DATA_DIR_NAME = "runanywhere"
         private const val MODELS_DIR_NAME = "models"
-        private const val BUFFER_SIZE = 256 * 1024
+        private const val BUFFER_SIZE = 8 * 1024 * 1024 // 8MB buffer - very large for max throughput
+        
+        // Shared OkHttp client optimized for large file downloads
+        private val httpClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.MINUTES)
+                .writeTimeout(10, TimeUnit.MINUTES)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .retryOnConnectionFailure(true)
+                .build()
+        }
     }
 
     private val context = NitroModules.applicationContext ?: error("Android context not found")
 
-    /**
-     * Get the RunAnywhere data directory path
-     */
     override fun getDataDirectory(): Promise<String> = Promise.async {
         runanywhereFile().absolutePath
     }
 
-    /**
-     * Get the models directory path
-     */
     override fun getModelsDirectory(): Promise<String> = Promise.async {
         val modelsDir = File(runanywhereFile(), MODELS_DIR_NAME)
         if (!modelsDir.exists()) {
@@ -50,31 +59,23 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
         modelsDir.absolutePath
     }
 
-    /**
-     * Check if a file exists
-     */
     override fun fileExists(path: String): Promise<Boolean> = Promise.async {
         val runanywhereDir = runanywhereFile()
         val file = File(runanywhereDir, path)
         file.exists()
     }
 
-    /**
-     * Check if a model exists
-     */
     override fun modelExists(modelId: String): Promise<Boolean> = Promise.async {
         modelFile(modelId).exists()
     }
 
-    /**
-     * Get the full path to a model
-     */
     override fun getModelPath(modelId: String): Promise<String> = Promise.async {
         modelFile(modelId).absolutePath
     }
 
     /**
-     * Download a model from URL with progress callback
+     * Download a model using OkHttp (bypasses React Native bridge for maximum speed).
+     * Uses 8MB buffer for maximum throughput.
      */
     override fun downloadModel(
         modelId: String,
@@ -85,112 +86,118 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
             val modelFile = modelFile(modelId)
 
             if (modelFile.exists()) {
+                Log.i(TAG, "Model already exists: $modelId")
                 callback?.invoke(1.0)
                 return@async
             }
 
-            val downloadUrl = try {
-                URL(url)
-            } catch (_: Throwable) {
-                throw Error("Invalid URL")
-            }
+            // Ensure parent directory exists
+            modelFile.parentFile?.mkdirs()
 
-            val tmpFile = File.createTempFile("dl_", ".tmp", context.cacheDir)
-            var connection: HttpURLConnection? = null
+            // Use temp file for atomic write
+            val tmpFile = File(modelFile.parentFile, "${modelId}.tmp")
+            tmpFile.delete() // Clean up any previous partial download
+            
+            val startTime = System.currentTimeMillis()
+            Log.i(TAG, "Starting OkHttp download: $modelId from $url")
+            callback?.invoke(0.0)
 
             try {
-                connection = (downloadUrl.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 30_000
-                    readTimeout = 5 * 60_000
-                    instanceFollowRedirects = true
-                }
-                connection.connect()
-                val code = connection.responseCode
+                val request = Request.Builder()
+                    .url(url)
+                    .header("Accept", "*/*")
+                    .header("User-Agent", "RunAnywhere-Android/1.0")
+                    .build()
 
-                if (code !in 200..299) {
-                    connection.disconnect()
-                    throw Error("Download failed with HTTP status code: $code")
-                }
+                httpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        throw Error("Download failed with HTTP ${response.code}")
+                    }
 
-                val contentLength = connection.getHeaderFieldLong("Content-Length", -1L)
-                var downloaded = 0L
-                var lastPct = -1.0
+                    val body = response.body ?: throw Error("Empty response body")
+                    val contentLength = body.contentLength()
+                    var downloaded = 0L
+                    var lastPct = -1.0
+                    var lastLogTime = startTime
 
-                callback?.invoke(0.0)
+                    Log.i(TAG, "Content-Length: $contentLength bytes (${contentLength / (1024 * 1024)}MB)")
 
-                connection.inputStream.use { input ->
-                    FileOutputStream(tmpFile).use { output ->
-                        val buf = ByteArray(BUFFER_SIZE)
+                    // Use BufferedInputStream/BufferedOutputStream with large buffer
+                    BufferedInputStream(body.byteStream(), BUFFER_SIZE).use { input ->
+                        BufferedOutputStream(FileOutputStream(tmpFile), BUFFER_SIZE).use { output ->
+                            val buffer = ByteArray(BUFFER_SIZE)
+                            
+                            while (true) {
+                                val bytesRead = input.read(buffer)
+                                if (bytesRead == -1) break
 
-                        while (true) {
-                            val read = input.read(buf)
-                            if (read == -1) break
+                                output.write(buffer, 0, bytesRead)
+                                downloaded += bytesRead
 
-                            output.write(buf, 0, read)
-                            downloaded += read
+                                if (contentLength > 0) {
+                                    val pct = floor(
+                                        (downloaded.toDouble() / contentLength.toDouble())
+                                            .coerceIn(0.0, 1.0) * 99
+                                    ) / 100.0
 
-                            if (contentLength > 0) {
-                                val pct = floor(
-                                    (downloaded.toDouble() / contentLength.toDouble())
-                                        .coerceIn(0.0, 1.0) * 99
-                                ) / 100.0
-
-                                if (pct - lastPct >= 0.01) {
-                                    callback?.invoke(pct)
-                                    lastPct = pct
+                                    // Report every 1% and log speed every 5 seconds
+                                    if (pct - lastPct >= 0.01) {
+                                        callback?.invoke(pct)
+                                        lastPct = pct
+                                        
+                                        val now = System.currentTimeMillis()
+                                        if (now - lastLogTime >= 5000) {
+                                            val elapsed = (now - startTime) / 1000.0
+                                            val speed = if (elapsed > 0) (downloaded / 1024.0 / 1024.0) / elapsed else 0.0
+                                            Log.i(TAG, "Progress: ${(pct * 100).toInt()}% @ ${String.format("%.2f", speed)} MB/s")
+                                            lastLogTime = now
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // Move temp file to final location
-                modelFile.parentFile?.mkdirs()
-                tmpFile.renameTo(modelFile)
+                // Atomic rename from temp to final
+                if (tmpFile.exists()) {
+                    if (modelFile.exists()) modelFile.delete()
+                    tmpFile.renameTo(modelFile)
+                }
 
-                Log.i(TAG, "Download complete: $modelId (${modelFile.length()} bytes)")
+                val duration = (System.currentTimeMillis() - startTime) / 1000.0
+                val sizeMB = modelFile.length() / (1024.0 * 1024.0)
+                val speedMBps = if (duration > 0) sizeMB / duration else 0.0
+
+                Log.i(TAG, "Download complete: $modelId (${String.format("%.1f", sizeMB)}MB in ${String.format("%.1f", duration)}s = ${String.format("%.2f", speedMBps)}MB/s)")
                 callback?.invoke(1.0)
 
             } catch (t: Throwable) {
-                modelFile.delete()
-                throw Error("Failed to download model: ${t.message}")
-            } finally {
+                Log.e(TAG, "Download failed: ${t.message}", t)
                 tmpFile.delete()
-                connection?.disconnect()
+                modelFile.delete()
+                throw Error("Download failed: ${t.message}")
             }
         }
     }
 
-    /**
-     * Delete a downloaded model
-     */
     override fun deleteModel(modelId: String): Promise<Unit> = Promise.async {
         val modelFile = modelFile(modelId)
-
         if (!modelFile.exists()) {
             throw Error("No such model: $modelId")
         }
-
         modelFile.deleteRecursively()
     }
 
-    /**
-     * Read a text file
-     */
     override fun readFile(path: String): Promise<String> = Promise.async {
         val runanywhereDir = runanywhereFile()
         val file = File(runanywhereDir, path)
-
         if (!file.exists()) {
             throw Error("No such file: $path")
         }
-
         file.readText()
     }
 
-    /**
-     * Write a text file
-     */
     override fun writeFile(path: String, content: String): Promise<Unit> = Promise.async {
         val runanywhereDir = runanywhereFile()
         val file = File(runanywhereDir, path)
@@ -198,31 +205,20 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
         file.writeText(content)
     }
 
-    /**
-     * Delete a file
-     */
     override fun deleteFile(path: String): Promise<Unit> = Promise.async {
         val runanywhereDir = runanywhereFile()
         val file = File(runanywhereDir, path)
-
         if (!file.exists()) {
             throw Error("No such file: $path")
         }
-
         file.deleteRecursively()
     }
 
-    /**
-     * Get available disk space in bytes
-     */
     override fun getAvailableDiskSpace(): Promise<Double> = Promise.async {
         val stat = StatFs(context.filesDir.absolutePath)
         stat.availableBytes.toDouble()
     }
 
-    /**
-     * Get total disk space in bytes
-     */
     override fun getTotalDiskSpace(): Promise<Double> = Promise.async {
         val stat = StatFs(context.filesDir.absolutePath)
         stat.totalBytes.toDouble()
@@ -238,6 +234,9 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
 
     private fun modelFile(modelId: String): File {
         val modelsDir = File(runanywhereFile(), MODELS_DIR_NAME)
+        if (!modelsDir.exists()) {
+            modelsDir.mkdirs()
+        }
         return File(modelsDir, modelId)
     }
 }
