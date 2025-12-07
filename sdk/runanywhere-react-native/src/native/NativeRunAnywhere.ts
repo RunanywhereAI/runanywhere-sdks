@@ -7,6 +7,8 @@
 
 import { NitroModules } from 'react-native-nitro-modules';
 import type { RunAnywhere } from '../specs/RunAnywhere.nitro';
+import type { RunAnywhereFileSystem } from '../specs/RunAnywhereFileSystem.nitro';
+import type { RunAnywhereDeviceInfo } from '../specs/RunAnywhereDeviceInfo.nitro';
 
 /**
  * Native module interface
@@ -76,8 +78,24 @@ function getRunAnywhere(): RunAnywhere {
   return NitroModules.createHybridObject<RunAnywhere>('RunAnywhere');
 }
 
-// Cached instance
+/**
+ * Get the RunAnywhereFileSystem Nitrogen HybridObject
+ */
+function getRunAnywhereFileSystem(): RunAnywhereFileSystem {
+  return NitroModules.createHybridObject<RunAnywhereFileSystem>('RunAnywhereFileSystem');
+}
+
+/**
+ * Get the RunAnywhereDeviceInfo Nitrogen HybridObject
+ */
+function getRunAnywhereDeviceInfo(): RunAnywhereDeviceInfo {
+  return NitroModules.createHybridObject<RunAnywhereDeviceInfo>('RunAnywhereDeviceInfo');
+}
+
+// Cached instances
 let _cachedModule: RunAnywhere | null = null;
+let _cachedFileSystem: RunAnywhereFileSystem | null = null;
+let _cachedDeviceInfo: RunAnywhereDeviceInfo | null = null;
 
 /**
  * Native module instance using Nitrogen
@@ -90,7 +108,31 @@ function getNativeModule(): NativeRunAnywhereModule {
   return _cachedModule as unknown as NativeRunAnywhereModule;
 }
 
+/**
+ * Native FileSystem module instance using Nitrogen
+ */
+function getNativeFileSystem(): RunAnywhereFileSystem {
+  if (!_cachedFileSystem) {
+    _cachedFileSystem = getRunAnywhereFileSystem();
+    console.log('[NativeRunAnywhereFileSystem] Created Nitrogen HybridObject');
+  }
+  return _cachedFileSystem;
+}
+
+/**
+ * Native DeviceInfo module instance using Nitrogen
+ */
+function getNativeDeviceInfo(): RunAnywhereDeviceInfo {
+  if (!_cachedDeviceInfo) {
+    _cachedDeviceInfo = getRunAnywhereDeviceInfo();
+    console.log('[NativeRunAnywhereDeviceInfo] Created Nitrogen HybridObject');
+  }
+  return _cachedDeviceInfo;
+}
+
 export const NativeRunAnywhere = getNativeModule();
+export const NativeRunAnywhereFileSystem = getNativeFileSystem();
+export const NativeRunAnywhereDeviceInfo = getNativeDeviceInfo();
 
 /**
  * Check if native module is available
@@ -113,6 +155,7 @@ export function isUsingNitrogen(): boolean {
 
 /**
  * Require native module (throws if not available)
+ * Returns the main RunAnywhere module for backward compatibility
  */
 export function requireNativeModule(): NativeRunAnywhereModule {
   try {
@@ -121,6 +164,34 @@ export function requireNativeModule(): NativeRunAnywhereModule {
     throw new Error(
       '[RunAnywhere] Native module is not available. ' +
         'Make sure Nitrogen is properly installed and you are running on a device or simulator. ' +
+        `Error: ${error}`
+    );
+  }
+}
+
+/**
+ * Require FileSystem module (throws if not available)
+ */
+export function requireFileSystemModule(): RunAnywhereFileSystem {
+  try {
+    return getNativeFileSystem();
+  } catch (error) {
+    throw new Error(
+      '[RunAnywhere] FileSystem module is not available. ' +
+        `Error: ${error}`
+    );
+  }
+}
+
+/**
+ * Require DeviceInfo module (throws if not available)
+ */
+export function requireDeviceInfoModule(): RunAnywhereDeviceInfo {
+  try {
+    return getNativeDeviceInfo();
+  } catch (error) {
+    throw new Error(
+      '[RunAnywhere] DeviceInfo module is not available. ' +
         `Error: ${error}`
     );
   }
