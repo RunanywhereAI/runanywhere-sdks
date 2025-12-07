@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
@@ -6,6 +7,7 @@ import 'package:runanywhere/runanywhere.dart' as sdk;
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
 import '../../core/design_system/typography.dart';
+import '../../core/services/audio_player_service.dart';
 import '../models/model_selection_sheet.dart';
 import '../models/model_status_components.dart';
 import '../models/model_types.dart';
@@ -62,8 +64,10 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   // Error state
   String? _errorMessage;
 
-  // Timer for playback simulation
-  Timer? _playbackTimer;
+  // Audio player service
+  final AudioPlayerService _playerService = AudioPlayerService.instance;
+  StreamSubscription<bool>? _playingSubscription;
+  StreamSubscription<double>? _progressSubscription;
 
   // Character limit
   static const int _maxCharacters = 5000;
@@ -72,10 +76,40 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       _selectedFramework != null && _selectedModelName != null;
 
   @override
+  void initState() {
+    super.initState();
+    _initializeAudioPlayer();
+  }
+
+  @override
   void dispose() {
     _textController.dispose();
-    _playbackTimer?.cancel();
+    _playingSubscription?.cancel();
+    _progressSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _initializeAudioPlayer() async {
+    await _playerService.initialize();
+
+    // Subscribe to playing state
+    _playingSubscription = _playerService.playingStream.listen((isPlaying) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = isPlaying;
+        });
+      }
+    });
+
+    // Subscribe to progress updates
+    _progressSubscription = _playerService.progressStream.listen((progress) {
+      if (mounted) {
+        setState(() {
+          _playbackProgress = progress;
+          _currentTime = _duration * progress;
+        });
+      }
+    });
   }
 
   void _showModelSelectionSheet() {
@@ -144,32 +178,30 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       // Get the TTS component from SDK
       final ttsComponent = sdk.RunAnywhere.loadedTTSComponent;
 
-      if (ttsComponent != null) {
-        // Use SDK's TTS component to synthesize speech
-        // Note: rate and pitch are part of the component configuration
-        final output = await ttsComponent.synthesize(_textController.text);
+      if (ttsComponent == null) {
+        throw Exception('TTS component not loaded');
+      }
 
-        setState(() {
-          _isGenerating = false;
-          _hasAudio = output.audioData.isNotEmpty;
-          _duration = output.duration;
-          _metadata = TTSMetadata(
-            durationMs: output.duration * 1000,
-            audioSize: output.audioData.length,
-            sampleRate: 22050, // Default sample rate
-          );
-        });
+      // Use SDK's TTS component to synthesize speech
+      final output = await ttsComponent.synthesize(_textController.text);
 
-        debugPrint('✅ Speech generated: ${output.audioData.length} bytes');
+      setState(() {
+        _isGenerating = false;
+        _hasAudio = output.audioData.isNotEmpty;
+        _duration = output.duration;
+        _metadata = TTSMetadata(
+          durationMs: output.duration * 1000,
+          audioSize: output.audioData.length,
+          sampleRate: 22050, // Default sample rate
+        );
+      });
 
-        // Auto-play if system TTS
-        if (_isSystemTTS) {
-          _isPlaying = true;
-          _simulatePlayback();
-        }
-      } else {
-        // Fallback to simulation if no TTS component loaded
-        await _simulateSpeechGeneration();
+      debugPrint(
+          '✅ Speech generated: ${output.audioData.length} bytes, duration: ${output.duration}s');
+
+      // Auto-play the generated audio
+      if (_hasAudio) {
+        await _playAudio(output.audioData);
       }
     } catch (e) {
       debugPrint('❌ Speech generation failed: $e');
@@ -180,88 +212,35 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     }
   }
 
-  /// Simulate speech generation for demo
-  Future<void> _simulateSpeechGeneration() async {
-    await Future.delayed(const Duration(seconds: 1));
+  /// Play audio using the audio player service
+  Future<void> _playAudio(List<int> audioData) async {
+    try {
+      // Convert List<int> to Uint8List
+      final audioBytes = Uint8List.fromList(audioData);
 
-    // Simulate metadata
-    final textLength = _textController.text.length;
-    final estimatedDuration = textLength * 50.0; // ~50ms per character
-    final estimatedSize = textLength * 100; // ~100 bytes per character
-
-    setState(() {
-      _isGenerating = false;
-      _hasAudio = !_isSystemTTS;
-      _duration = estimatedDuration / 1000;
-      _metadata = TTSMetadata(
-        durationMs: estimatedDuration,
-        audioSize: _isSystemTTS ? 0 : estimatedSize,
-        sampleRate: 22050,
+      await _playerService.playFromBytes(
+        audioBytes,
+        volume: _pitch, // Use pitch as volume for now
+        rate: _speechRate,
       );
-
-      // System TTS plays directly
-      if (_isSystemTTS) {
-        _isPlaying = true;
-        _simulatePlayback();
-      }
-    });
-  }
-
-  void _simulatePlayback() {
-    _playbackTimer?.cancel();
-
-    final totalMs = (_duration * 1000).toInt();
-    const steps = 50;
-    final stepDuration = totalMs ~/ steps;
-
-    int currentStep = 0;
-
-    _playbackTimer = Timer.periodic(
-      Duration(milliseconds: stepDuration.clamp(50, 500)),
-      (timer) {
-        if (!_isPlaying || currentStep >= steps) {
-          timer.cancel();
-          if (mounted) {
-            setState(() {
-              _isPlaying = false;
-              _playbackProgress = 0;
-              _currentTime = 0;
-            });
-          }
-          return;
-        }
-
-        currentStep++;
-        if (mounted) {
-          setState(() {
-            _playbackProgress = currentStep / steps;
-            _currentTime = _duration * _playbackProgress;
-          });
-        }
-      },
-    );
-  }
-
-  void _togglePlayback() {
-    if (_isPlaying) {
-      _stopPlayback();
-    } else if (_hasAudio) {
+      debugPrint('🔊 Playing audio...');
+    } catch (e) {
+      debugPrint('❌ Failed to play audio: $e');
       setState(() {
-        _isPlaying = true;
-        _playbackProgress = 0;
-        _currentTime = 0;
+        _errorMessage = 'Failed to play audio: $e';
       });
-      _simulatePlayback();
     }
   }
 
-  void _stopPlayback() {
-    _playbackTimer?.cancel();
-    setState(() {
-      _isPlaying = false;
-      _playbackProgress = 0;
-      _currentTime = 0;
-    });
+  void _togglePlayback() async {
+    if (_isPlaying) {
+      await _stopPlayback();
+    }
+  }
+
+  Future<void> _stopPlayback() async {
+    await _playerService.stop();
+    debugPrint('⏹️ Playback stopped');
   }
 
   String _formatTime(double seconds) {
@@ -596,7 +575,8 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
                     child: LinearProgressIndicator(
                       value: _playbackProgress,
                       backgroundColor: AppColors.backgroundGray5(context),
-                      valueColor: const AlwaysStoppedAnimation(AppColors.primaryPurple),
+                      valueColor:
+                          const AlwaysStoppedAnimation(AppColors.primaryPurple),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.smallMedium),
@@ -640,17 +620,17 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
               const SizedBox(width: AppSpacing.xLarge),
 
-              // Play/Stop button (only for non-System TTS)
-              FilledButton.icon(
-                onPressed: _hasAudio && !_isSystemTTS ? _togglePlayback : null,
-                icon: Icon(_isPlaying ? Icons.stop : Icons.play_arrow),
-                label: Text(_isPlaying ? 'Stop' : 'Play'),
-                style: FilledButton.styleFrom(
-                  backgroundColor:
-                      _hasAudio ? AppColors.statusGreen : AppColors.statusGray,
-                  minimumSize: const Size(140, 50),
+              // Stop button (when playing)
+              if (_isPlaying)
+                FilledButton.icon(
+                  onPressed: _togglePlayback,
+                  icon: const Icon(Icons.stop),
+                  label: const Text('Stop'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryRed,
+                    minimumSize: const Size(140, 50),
+                  ),
                 ),
-              ),
             ],
           ),
 
@@ -658,13 +638,11 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
           // Status text
           Text(
-            _isSystemTTS
-                ? (_isGenerating ? 'Speaking...' : 'System TTS plays directly')
-                : (_isGenerating
-                    ? 'Generating speech...'
-                    : _isPlaying
-                        ? 'Playing...'
-                        : 'Ready'),
+            _isGenerating
+                ? 'Generating speech...'
+                : _isPlaying
+                    ? 'Playing...'
+                    : 'Ready',
             style: AppTypography.caption(context).copyWith(
               color: AppColors.textSecondary(context),
             ),

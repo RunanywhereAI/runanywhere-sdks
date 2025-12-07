@@ -1,12 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
 import '../../core/design_system/typography.dart';
+import '../../core/services/permission_service.dart';
+import '../../core/services/audio_recording_service.dart';
 import '../models/model_selection_sheet.dart';
 import '../models/model_status_components.dart';
 import '../models/model_types.dart';
@@ -73,11 +74,10 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   // Error state
   String? _errorMessage;
 
-  // Timer for audio level simulation
-  Timer? _audioLevelTimer;
-
-  // Audio data for batch mode
-  List<int> _recordedAudioData = [];
+  // Audio recording service
+  final AudioRecordingService _recordingService =
+      AudioRecordingService.instance;
+  StreamSubscription<double>? _audioLevelSubscription;
 
   bool get _hasModelSelected =>
       _selectedFramework != null && _selectedModelName != null;
@@ -90,14 +90,17 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
 
   @override
   void dispose() {
-    _audioLevelTimer?.cancel();
+    _audioLevelSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _checkMicrophonePermission() async {
-    final status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      await Permission.microphone.request();
+    // Check permission status on init, will request when user tries to record
+    final hasPermission =
+        await PermissionService.shared.areSTTPermissionsGranted();
+    if (!hasPermission) {
+      debugPrint(
+          'STT permissions not yet granted, will request when recording starts');
     }
   }
 
@@ -129,7 +132,8 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       await sdk.RunAnywhere.loadSTTModel(model.id);
 
       setState(() {
-        _selectedFramework = model.preferredFramework ?? LLMFramework.whisperKit;
+        _selectedFramework =
+            model.preferredFramework ?? LLMFramework.whisperKit;
         _selectedModelName = model.name;
         // WhisperKit supports live mode, ONNX may have limitations
         _supportsLiveMode = model.preferredFramework == LLMFramework.whisperKit;
@@ -155,15 +159,14 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   }
 
   Future<void> _startRecording() async {
-    final status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      final result = await Permission.microphone.request();
-      if (!result.isGranted) {
-        setState(() {
-          _errorMessage = 'Microphone permission required';
-        });
-        return;
-      }
+    // Request STT permissions (microphone + speech recognition on iOS)
+    final hasPermission =
+        await PermissionService.shared.requestSTTPermissions(context);
+    if (!hasPermission) {
+      setState(() {
+        _errorMessage = 'Microphone permission required for recording';
+      });
+      return;
     }
 
     setState(() {
@@ -171,86 +174,86 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       _errorMessage = null;
       _transcribedText = '';
       _partialText = '';
-      _recordedAudioData = [];
     });
 
-    // Start audio level simulation
-    _startAudioLevelSimulation();
+    // Start recording with the audio service
+    final recordingPath = await _recordingService.startRecording(
+      sampleRate: 16000,
+      numChannels: 1,
+      enableAudioLevels: true,
+    );
 
-    if (_selectedMode == STTMode.live) {
-      // Live transcription using SDK's streaming capability
-      _startLiveTranscription();
-    } else {
-      // Batch mode: record audio for later transcription
-      _startBatchRecording();
+    if (recordingPath == null) {
+      setState(() {
+        _isRecording = false;
+        _errorMessage = 'Failed to start recording';
+      });
+      return;
     }
-  }
 
-  /// Start live transcription using SDK
-  void _startLiveTranscription() async {
-    debugPrint('🎙️ Starting live transcription...');
+    // Subscribe to audio levels
+    _audioLevelSubscription =
+        _recordingService.audioLevelStream?.listen((level) {
+      setState(() {
+        _audioLevel = level;
+      });
+    });
 
-    // For live mode, we would use the SDK's streaming STT
-    // Currently simulating as the native audio capture needs platform channels
-    _simulateLiveTranscription();
-  }
-
-  /// Start batch recording
-  void _startBatchRecording() {
-    debugPrint('🎙️ Starting batch recording...');
-    // In a real implementation, this would capture audio to a buffer
-    // For now, we simulate it
+    debugPrint('🎙️ Recording started in ${_selectedMode.displayName} mode');
   }
 
   Future<void> _stopRecording() async {
-    _audioLevelTimer?.cancel();
+    // Cancel audio level subscription
+    await _audioLevelSubscription?.cancel();
+    _audioLevelSubscription = null;
 
     setState(() {
       _isRecording = false;
       _audioLevel = 0.0;
     });
 
-    if (_selectedMode == STTMode.batch && _partialText.isEmpty) {
-      // Process batch recording using SDK
-      await _transcribeBatchAudio();
-    } else if (_selectedMode == STTMode.live) {
-      // Live mode - finalize the transcription
-      if (_partialText.isNotEmpty) {
-        setState(() {
-          _transcribedText = _partialText;
-          _partialText = '';
-        });
-      }
+    // Stop recording and get audio data
+    final (audioData, _) = await _recordingService.stopRecording();
+
+    if (audioData == null || audioData.isEmpty) {
+      setState(() {
+        _errorMessage = 'No audio data recorded';
+      });
+      return;
     }
+
+    // Transcribe the recorded audio
+    await _transcribeAudio(audioData);
   }
 
   /// Transcribe recorded audio using RunAnywhere SDK
-  Future<void> _transcribeBatchAudio() async {
+  Future<void> _transcribeAudio(List<int> audioData) async {
     setState(() {
       _isTranscribing = true;
+      _errorMessage = null;
     });
 
     try {
-      debugPrint('🔄 Transcribing audio with SDK...');
+      debugPrint('🔄 Transcribing ${audioData.length} bytes of audio...');
 
-      // Use SDK's transcription capability
-      // In production, this would use actual recorded audio data
-      if (_recordedAudioData.isNotEmpty) {
-        final result = await sdk.RunAnywhere.transcribe(_recordedAudioData);
-        setState(() {
-          _transcribedText = result;
-          _isTranscribing = false;
-        });
-        debugPrint('✅ Transcription complete: $result');
-      } else {
-        // Simulate transcription for demo when no real audio
-        await Future.delayed(const Duration(seconds: 1));
-        setState(() {
-          _transcribedText = 'This is a sample transcription from the batch recording. '
-              'The actual transcription will come from the STT model when audio recording is implemented.';
-          _isTranscribing = false;
-        });
+      // Get the STT component from SDK
+      final sttComponent = sdk.RunAnywhere.loadedSTTComponent;
+
+      if (sttComponent == null) {
+        throw Exception('STT component not loaded');
       }
+
+      // Transcribe using the SDK component
+      final output = await sttComponent.transcribe(audioData);
+
+      setState(() {
+        _transcribedText = output.text;
+        _isTranscribing = false;
+      });
+
+      debugPrint('✅ Transcription complete: ${output.text}');
+      debugPrint('📊 Confidence: ${output.confidence}');
+      debugPrint('⏱️ Processing time: ${output.metadata.processingTime}s');
     } catch (e) {
       debugPrint('❌ Transcription failed: $e');
       setState(() {
@@ -258,46 +261,6 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
         _isTranscribing = false;
       });
     }
-  }
-
-  void _startAudioLevelSimulation() {
-    _audioLevelTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (!_isRecording) {
-        timer.cancel();
-        return;
-      }
-
-      setState(() {
-        // Simulate audio level fluctuation
-        _audioLevel = 0.3 + (DateTime.now().millisecondsSinceEpoch % 700) / 1000;
-      });
-    });
-  }
-
-  void _simulateLiveTranscription() {
-    // Simulated live transcription for demo
-    final words = [
-      'Hello,',
-      ' this',
-      ' is',
-      ' a',
-      ' live',
-      ' transcription',
-      ' demo.',
-    ];
-    int wordIndex = 0;
-
-    Timer.periodic(const Duration(milliseconds: 400), (timer) {
-      if (!_isRecording || wordIndex >= words.length) {
-        timer.cancel();
-        return;
-      }
-
-      setState(() {
-        _partialText += words[wordIndex];
-      });
-      wordIndex++;
-    });
   }
 
   void _clearTranscription() {

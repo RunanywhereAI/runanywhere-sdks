@@ -6,7 +6,8 @@ import 'tts_options.dart';
 /// Matches iOS TTSService protocol from TTSComponent.swift
 abstract class TTSService {
   /// Initialize the TTS service
-  Future<void> initialize();
+  /// [modelPath] Optional path to the model file or directory
+  Future<void> initialize({String? modelPath});
 
   /// Synthesize text to audio
   Future<Uint8List> synthesize({

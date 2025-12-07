@@ -14,19 +14,23 @@ class SystemTTSService implements TTSService {
   SystemTTSService();
 
   @override
-  Future<void> initialize() async {
+  Future<void> initialize({String? modelPath}) async {
+    // modelPath is ignored for system TTS
     // Configure TTS engine
     await _flutterTts.setSharedInstance(true);
 
     // Get available voices
     final voices = await _flutterTts.getVoices;
     if (voices is List) {
-      _availableVoices = voices.map((v) {
-        if (v is Map) {
-          return v['locale']?.toString() ?? v['name']?.toString() ?? '';
-        }
-        return v.toString();
-      }).where((v) => v.isNotEmpty).toList();
+      _availableVoices = voices
+          .map((v) {
+            if (v is Map) {
+              return v['locale']?.toString() ?? v['name']?.toString() ?? '';
+            }
+            return v.toString();
+          })
+          .where((v) => v.isNotEmpty)
+          .toList();
     }
 
     // Set up completion handlers

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:runanywhere/runanywhere.dart';
 
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
 import '../../core/design_system/typography.dart';
 import '../../core/models/app_types.dart';
+import '../../core/services/permission_service.dart';
 
 /// VoiceAssistantView (mirroring iOS VoiceAssistantView.swift)
 ///
@@ -58,11 +58,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   }
 
   Future<void> _initialize() async {
-    // Request microphone permission
-    final status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      await Permission.microphone.request();
-    }
+    // Check if STT permissions are already granted (don't request yet, wait for user action)
+    final hasPermissions = await PermissionService.shared.areSTTPermissionsGranted();
+    debugPrint('Voice Assistant: STT permissions granted: $hasPermissions');
 
     // Check model states
     // TODO: Subscribe to model lifecycle via RunAnywhere SDK
@@ -77,6 +75,16 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   }
 
   Future<void> _startConversation() async {
+    // Request STT permissions before starting conversation
+    final hasPermission = await PermissionService.shared.requestSTTPermissions(context);
+    if (!hasPermission) {
+      setState(() {
+        _sessionState = VoiceSessionState.error;
+        _errorMessage = 'Microphone permission is required for voice assistant';
+      });
+      return;
+    }
+
     setState(() {
       _sessionState = VoiceSessionState.connecting;
       _errorMessage = null;
