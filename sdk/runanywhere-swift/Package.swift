@@ -1,12 +1,22 @@
 // swift-tools-version: 5.9
 import PackageDescription
+import Foundation
+
+// =============================================================================
+// PATH CONFIGURATION
+// =============================================================================
+// Get the package directory for relative path resolution
+let packageDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
+
+// Path to bundled ONNX Runtime dylib with CoreML support (for macOS)
+let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 
 // =============================================================================
 // BINARY TARGET CONFIGURATION
 // =============================================================================
 // Set to `true` to use local XCFramework from Binaries/ directory (for local development/testing)
 // Set to `false` to use remote XCFramework from GitHub releases (default for production use)
-let testLocal = true
+let testLocal = false
 // =============================================================================
 
 let package = Package(
@@ -129,6 +139,10 @@ let package = Package(
         // =================================================================
         // ONNX Runtime Backend
         // Provides: STT (streaming), TTS, VAD, Speaker Diarization
+        // NOTE: For macOS, ONNX Runtime is dynamically linked (not in xcframework).
+        //       For development: brew install onnxruntime
+        //       For production: embed Binaries/onnxruntime-macos/libonnxruntime.dylib
+        //                       in YourApp.app/Contents/Frameworks/
         // =================================================================
         .target(
             name: "ONNXRuntime",
@@ -143,7 +157,15 @@ let package = Package(
                 .linkedFramework("Accelerate"),
                 .linkedLibrary("archive"),
                 .linkedLibrary("bz2"),
-                .unsafeFlags(["-ObjC", "-all_load"])
+                .unsafeFlags(["-ObjC", "-all_load"]),
+                // macOS requires linking against ONNX Runtime dylib (not statically included)
+                // The bundled dylib in Binaries/onnxruntime-macos/ includes CoreML provider
+                // For production: embed libonnxruntime.dylib in YourApp.app/Contents/Frameworks/
+                .unsafeFlags([
+                    "-L\(onnxRuntimeMacOSPath)",
+                    "-lonnxruntime",
+                    "-Wl,-rpath,\(onnxRuntimeMacOSPath)"
+                ], .when(platforms: [.macOS])),
             ]
         ),
 
@@ -228,8 +250,8 @@ func binaryTargets() -> [Target] {
         return [
             .binaryTarget(
                 name: "RunAnywhereCoreBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.aade097/RunAnywhereCore.xcframework.zip",
-                checksum: "b678cbfea242a2a9004c8d52cdf3637483b4a3f4376cd51ae939c3671f33dc5c"
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.e6b7a2f/RunAnywhereCore.xcframework.zip",
+                checksum: "0c2da2bacb4931cdbe77eb0686ed20351ffe4ea1a66384f4522a61e1e4efa7aa"
             )
         ]
     }
