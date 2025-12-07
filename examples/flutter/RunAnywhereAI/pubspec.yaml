@@ -15,8 +15,19 @@ dependencies:
   provider: ^6.1.0
   flutter_markdown: ^0.6.18
   record: ^6.1.2
+  audioplayers: ^6.0.0
   permission_handler: ^11.1.0
   shared_preferences: ^2.2.2
+  # Secure storage (iOS Keychain, Android Keystore)
+  flutter_secure_storage: ^9.0.0
+  # File system access
+  path_provider: ^2.1.0
+  # UUID generation
+  uuid: ^4.0.0
+  # Device information
+  device_info_plus: ^10.0.0
+  # App package info
+  package_info_plus: ^4.2.0
 
 dev_dependencies:
   flutter_test:
@@ -25,4 +36,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-

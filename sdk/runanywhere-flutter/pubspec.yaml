@@ -10,16 +10,26 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # FFI for native bindings
+  ffi: ^2.1.0
+  # HTTP and networking
   http: ^1.2.1
   rxdart: ^0.27.7
+  # Storage
   shared_preferences: ^2.2.3
   path_provider: ^2.1.3
   flutter_secure_storage: ^9.0.0
+  # Device info
   device_info_plus: ^10.0.0
+  # Utilities
   uuid: ^4.4.0
   logger: ^2.3.0
   collection: ^1.18.0
   json_annotation: ^4.9.0
+  # Archive extraction (tar.bz2, zip)
+  archive: ^3.6.1
+  # TTS fallback (system TTS)
+  flutter_tts: ^3.8.0
 
 dev_dependencies:
   flutter_test:
@@ -32,3 +42,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  # Plugin configuration for native bindings
+  plugin:
+    platforms:
+      android:
+        ffiPlugin: true
+      ios:
+        ffiPlugin: true

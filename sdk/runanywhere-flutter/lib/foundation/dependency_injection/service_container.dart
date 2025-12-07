@@ -13,8 +13,12 @@ import '../../capabilities/download/download_service.dart';
 import '../../capabilities/analytics/analytics_service.dart';
 import '../../foundation/logging/sdk_logger.dart';
 import '../../public/configuration/sdk_environment.dart';
+import '../../core/service_registry/unified_service_registry.dart';
+import '../../core/protocols/frameworks/unified_framework_adapter.dart';
+import '../../core/models/model/model_registration.dart';
 
 /// Service container for dependency injection
+/// Matches iOS ServiceContainer from Foundation/DependencyInjection/ServiceContainer.swift
 class ServiceContainer {
   /// Shared instance
   static final ServiceContainer shared = ServiceContainer._();
@@ -22,7 +26,7 @@ class ServiceContainer {
   ServiceContainer._();
 
   // Core services (lazy initialization)
-  ModelRegistry? _modelRegistry;
+  RegistryService? _modelRegistry;
   ModelLoadingService? _modelLoadingService;
   GenerationService? _generationService;
   StreamingService? _streamingService;
@@ -34,14 +38,18 @@ class ServiceContainer {
   HardwareCapabilityManager? _hardwareManager;
   SDKLogger? _logger;
 
-  // Adapter registry
-  final AdapterRegistry adapterRegistry = AdapterRegistry();
+  /// Single adapter registry for all frameworks (text and voice)
+  /// Matches iOS adapterRegistry pattern
+  final UnifiedServiceRegistry _adapterRegistry = UnifiedServiceRegistry();
+
+  /// Public access to adapter registry
+  UnifiedServiceRegistry get adapterRegistry => _adapterRegistry;
 
   // Internal state
   SDKInitParams? _initParams;
 
   /// Model registry
-  ModelRegistry get modelRegistry {
+  RegistryService get modelRegistry {
     return _modelRegistry ??= RegistryService();
   }
 
@@ -49,7 +57,7 @@ class ServiceContainer {
   ModelLoadingService get modelLoadingService {
     return _modelLoadingService ??= ModelLoadingService(
       registry: modelRegistry,
-      adapterRegistry: adapterRegistry,
+      adapterRegistry: _adapterRegistry,
       memoryService: memoryService,
     );
   }
@@ -142,6 +150,54 @@ class ServiceContainer {
     // Initialize network services for production mode
   }
 
+  /// Register a framework adapter with optional priority
+  /// Higher priority adapters are preferred when multiple can handle the same model
+  /// Matches iOS RunAnywhere.registerFrameworkAdapter pattern
+  void registerFrameworkAdapter(UnifiedFrameworkAdapter adapter,
+      {int priority = 100}) {
+    _adapterRegistry.register(adapter, priority: priority);
+
+    // Call adapter's onRegistration callback
+    adapter.onRegistration();
+
+    // Register download strategy if adapter provides one
+    final downloadStrategy = adapter.getDownloadStrategy();
+    if (downloadStrategy != null) {
+      downloadService.registerStrategy(downloadStrategy);
+      logger.info(
+          'Registered download strategy for ${adapter.framework.displayName}');
+    }
+
+    // Register any models provided by the adapter
+    final providedModels = adapter.getProvidedModels();
+    for (final model in providedModels) {
+      modelRegistry.registerModel(model);
+    }
+
+    logger
+        .info('Registered framework adapter: ${adapter.framework.displayName}');
+  }
+
+  /// Register a framework adapter with models
+  /// Matches iOS RunAnywhere.registerFramework pattern
+  Future<void> registerFramework(
+    UnifiedFrameworkAdapter adapter, {
+    List<ModelRegistration>? models,
+    int priority = 100,
+  }) async {
+    // Register the adapter
+    registerFrameworkAdapter(adapter, priority: priority);
+
+    // Register provided models
+    if (models != null) {
+      for (final registration in models) {
+        final modelInfo = registration.toModelInfo();
+        modelRegistry.registerModel(modelInfo);
+        logger.info('Registered model: ${modelInfo.name} (${modelInfo.id})');
+      }
+    }
+  }
+
   /// Reset all services (for testing)
   void reset() {
     _modelRegistry = null;
@@ -153,21 +209,20 @@ class ServiceContainer {
     _memoryService = null;
     _hardwareManager = null;
     _logger = null;
+    _initParams = null;
   }
 }
 
-// Placeholder classes
-class AdapterRegistry {}
-
+/// Hardware capability manager placeholder
 class HardwareCapabilityManager {
   static final HardwareCapabilityManager shared = HardwareCapabilityManager._();
   HardwareCapabilityManager._();
 }
 
-// Placeholder classes for routing
+/// Placeholder classes for routing
 class CostCalculator {}
+
 class ResourceChecker {
   final HardwareCapabilityManager hardwareManager;
   ResourceChecker({required this.hardwareManager});
 }
-

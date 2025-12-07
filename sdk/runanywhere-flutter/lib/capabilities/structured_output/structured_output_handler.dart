@@ -1,6 +1,5 @@
 import 'dart:convert';
 import '../../../foundation/logging/sdk_logger.dart';
-import '../../../foundation/error_types/sdk_error.dart';
 
 /// Handler for structured output generation and parsing
 class StructuredOutputHandler {
@@ -293,4 +292,3 @@ class StructuredOutputError implements Exception {
   @override
   String toString() => message;
 }
-

@@ -1,16 +1,18 @@
 import UIKit
 import Flutter
 
-@UIApplicationMain
+@main
 @objc class AppDelegate: FlutterAppDelegate {
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
+    guard let controller = window?.rootViewController as? FlutterViewController else {
+      return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
     let platformChannel = FlutterMethodChannel(name: "com.runanywhere.sdk/native",
                                                binaryMessenger: controller.binaryMessenger)
-    
+
     platformChannel.setMethodCallHandler({
       (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
       switch call.method {
@@ -52,11 +54,11 @@ import Flutter
         result(FlutterMethodNotImplemented)
       }
     })
-    
+
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
-  
+
   private func configureAudioSession(mode: String) {
     let audioSession = AVAudioSession.sharedInstance()
     do {
@@ -74,7 +76,7 @@ import Flutter
       print("Failed to configure audio session: \(error)")
     }
   }
-  
+
   private func activateAudioSession() {
     let audioSession = AVAudioSession.sharedInstance()
     do {
@@ -83,7 +85,7 @@ import Flutter
       print("Failed to activate audio session: \(error)")
     }
   }
-  
+
   private func deactivateAudioSession() {
     let audioSession = AVAudioSession.sharedInstance()
     do {
@@ -92,17 +94,17 @@ import Flutter
       print("Failed to deactivate audio session: \(error)")
     }
   }
-  
+
   private func requestMicrophonePermission(result: @escaping FlutterResult) {
     AVAudioSession.sharedInstance().requestRecordPermission { granted in
       result(granted)
     }
   }
-  
+
   private func hasMicrophonePermission() -> Bool {
     return AVAudioSession.sharedInstance().recordPermission == .granted
   }
-  
+
   private func getDeviceCapabilities() -> [String: Any] {
     let processInfo = ProcessInfo.processInfo
     return [
@@ -110,16 +112,15 @@ import Flutter
       "availableProcessors": processInfo.processorCount,
     ]
   }
-  
+
   private func loadNativeModel(modelId: String, modelPath: String, result: @escaping FlutterResult) {
     // TODO: Implement native model loading (could bridge to Swift SDK)
     result(true)
   }
-  
+
   private func unloadNativeModel(modelId: String) {
     // TODO: Implement native model unloading
   }
 }
 
 import AVFoundation
-

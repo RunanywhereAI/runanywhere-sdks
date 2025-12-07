@@ -151,7 +151,7 @@ Each question should have 4 options and one correct answer.
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.padding16),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryRed.withOpacity(0.1),
+                  color: AppColors.primaryRed.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
                 ),
                 child: Text(
@@ -166,7 +166,7 @@ Each question should have 4 options and one correct answer.
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.quiz,
                           size: AppSpacing.iconXXLarge,
                           color: AppColors.primaryBlue,
@@ -259,9 +259,9 @@ class _QuizQuestionCardState extends State<_QuizQuestionCard> {
 
               Color? backgroundColor;
               if (_showAnswer && isCorrect) {
-                backgroundColor = AppColors.primaryGreen.withOpacity(0.2);
+                backgroundColor = AppColors.primaryGreen.withValues(alpha: 0.2);
               } else if (isSelected && !isCorrect && _showAnswer) {
-                backgroundColor = AppColors.primaryRed.withOpacity(0.2);
+                backgroundColor = AppColors.primaryRed.withValues(alpha: 0.2);
               }
 
               return Padding(
@@ -299,9 +299,9 @@ class _QuizQuestionCardState extends State<_QuizQuestionCard> {
                           ),
                         ),
                         if (_showAnswer && isCorrect)
-                          Icon(Icons.check_circle, color: AppColors.primaryGreen),
+                          const Icon(Icons.check_circle, color: AppColors.primaryGreen),
                         if (_showAnswer && isSelected && !isCorrect)
-                          Icon(Icons.cancel, color: AppColors.primaryRed),
+                          const Icon(Icons.cancel, color: AppColors.primaryRed),
                       ],
                     ),
                   ),

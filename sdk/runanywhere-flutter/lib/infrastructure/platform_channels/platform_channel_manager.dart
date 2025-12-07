@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 
 /// Platform channel manager for native code integration
@@ -60,4 +62,3 @@ class PlatformChannelManager {
     await callMethod('unloadNativeModel', {'modelId': modelId});
   }
 }
-

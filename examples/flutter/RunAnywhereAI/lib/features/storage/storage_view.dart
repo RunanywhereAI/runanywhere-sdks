@@ -120,7 +120,7 @@ class _StorageViewState extends State<StorageView> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.storage,
                             size: AppSpacing.iconXXLarge,
                             color: AppColors.primaryBlue,
@@ -224,14 +224,14 @@ class _ModelCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.padding4),
             Text(
-              'Framework: ${model.framework}',
+              'Framework: ${model.preferredFramework?.displayName ?? "Unknown"}',
               style: AppTypography.footnote(context).copyWith(
                 color: AppColors.textSecondary(context),
               ),
             ),
             const SizedBox(height: AppSpacing.padding4),
             Text(
-              'Size: ${_formatBytes(model.size)}',
+              'Size: ${_formatBytes(model.memoryRequired ?? 0)}',
               style: AppTypography.footnote(context).copyWith(
                 color: AppColors.textSecondary(context),
               ),
@@ -254,8 +254,8 @@ class _ModelCard extends StatelessWidget {
                   ),
                 ],
                 if (isDownloaded)
-                  Padding(
-                    padding: const EdgeInsets.only(left: AppSpacing.padding8),
+                  const Padding(
+                    padding: EdgeInsets.only(left: AppSpacing.padding8),
                     child: Icon(
                       Icons.check_circle,
                       color: AppColors.primaryGreen,
@@ -299,27 +299,28 @@ class _DownloadProgressDialogState extends State<_DownloadProgressDialog> {
     await for (final progress in widget.downloadTask.progress) {
       if (!mounted) return;
       setState(() {
-        _progress = progress.progress;
-        switch (progress.state) {
-          case DownloadState.downloading:
-            _status = 'Downloading...';
-            break;
-          case DownloadState.completed:
-            _status = 'Completed!';
-            break;
-          case DownloadState.failed:
-            _status = 'Failed: ${progress.error ?? "Unknown error"}';
-            break;
-          case DownloadState.cancelled:
-            _status = 'Cancelled';
-            break;
+        _progress = progress.percentage;
+        // Use pattern matching for sealed class
+        final state = progress.state;
+        if (state is DownloadStateDownloading) {
+          _status = 'Downloading...';
+        } else if (state is DownloadStateCompleted) {
+          _status = 'Completed!';
+        } else if (state is DownloadStateFailed) {
+          _status = 'Failed: ${state.error}';
+        } else if (state is DownloadStateCancelled) {
+          _status = 'Cancelled';
+        } else if (state is DownloadStateExtracting) {
+          _status = 'Extracting...';
+        } else if (state is DownloadStatePending) {
+          _status = 'Pending...';
         }
       });
 
-      if (progress.state == DownloadState.completed) {
+      if (progress.state.isCompleted) {
         await widget.downloadTask.result;
         widget.onComplete();
-      } else if (progress.state == DownloadState.failed) {
+      } else if (progress.state.isFailed) {
         if (mounted) {
           Navigator.of(context).pop();
         }

@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart';
+
 import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_spacing.dart';
 import '../../core/design_system/typography.dart';
+import '../../core/models/app_types.dart';
+import '../../core/services/permission_service.dart';
 
-/// Voice Assistant View
+/// VoiceAssistantView (mirroring iOS VoiceAssistantView.swift)
+///
+/// Main voice assistant UI with conversational interface.
 class VoiceAssistantView extends StatefulWidget {
   const VoiceAssistantView({super.key});
 
@@ -12,65 +17,180 @@ class VoiceAssistantView extends StatefulWidget {
   State<VoiceAssistantView> createState() => _VoiceAssistantViewState();
 }
 
-class _VoiceAssistantViewState extends State<VoiceAssistantView> {
-  bool _isListening = false;
-  bool _isProcessing = false;
-  String _transcription = '';
-  String _response = '';
-  String? _error;
+class _VoiceAssistantViewState extends State<VoiceAssistantView>
+    with SingleTickerProviderStateMixin {
+  // Session state
+  VoiceSessionState _sessionState = VoiceSessionState.disconnected;
 
-  Future<void> _startListening() async {
+  // Conversation
+  final List<_ConversationTurn> _conversation = [];
+  String _currentTranscription = '';
+
+  // Model state - tracks which models are configured for the voice pipeline
+  AppModelLoadState _sttModelState = AppModelLoadState.notLoaded;
+  AppModelLoadState _llmModelState = AppModelLoadState.notLoaded;
+  AppModelLoadState _ttsModelState = AppModelLoadState.notLoaded;
+
+  // Error state
+  String? _errorMessage;
+
+  // Animation
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    _initialize();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initialize() async {
+    // Check if STT permissions are already granted (don't request yet, wait for user action)
+    final hasPermissions = await PermissionService.shared.areSTTPermissionsGranted();
+    debugPrint('Voice Assistant: STT permissions granted: $hasPermissions');
+
+    // Check model states
+    // TODO: Subscribe to model lifecycle via RunAnywhere SDK
+    // await _subscribeToModelLifecycle();
+
     setState(() {
-      _isListening = true;
-      _error = null;
+      // Placeholder - in production, get actual model states
+      _sttModelState = AppModelLoadState.notLoaded;
+      _llmModelState = AppModelLoadState.notLoaded;
+      _ttsModelState = AppModelLoadState.notLoaded;
     });
+  }
 
-    // TODO: Implement actual audio recording
-    // For now, show a placeholder
-    await Future.delayed(const Duration(seconds: 2));
+  Future<void> _startConversation() async {
+    // Request STT permissions before starting conversation
+    final hasPermission = await PermissionService.shared.requestSTTPermissions(context);
+    if (!hasPermission) {
+      setState(() {
+        _sessionState = VoiceSessionState.error;
+        _errorMessage = 'Microphone permission is required for voice assistant';
+      });
+      return;
+    }
 
     setState(() {
-      _isListening = false;
-      _isProcessing = true;
+      _sessionState = VoiceSessionState.connecting;
+      _errorMessage = null;
     });
 
     try {
-      // Placeholder: In production, record audio and transcribe
-      // final audioData = await _recordAudio();
-      // final transcription = await RunAnywhere.transcribe(audioData);
+      // TODO: Create ModularVoicePipeline via RunAnywhere SDK
+      // final config = ModularPipelineConfig(
+      //   components: [.vad, .stt, .llm, .tts],
+      //   vad: VADConfig(energyThreshold: 0.005),
+      //   stt: VoiceSTTConfig(modelId: 'whisper-base'),
+      //   llm: VoiceLLMConfig(modelId: 'default', systemPrompt: '...'),
+      //   tts: VoiceTTSConfig(voice: 'system'),
+      // );
+      // _voicePipeline = await RunAnywhere.createVoicePipeline(config);
+      // _voicePipeline.events.listen(_handlePipelineEvent);
+      // await _voicePipeline.start();
 
-      // For demo purposes, simulate transcription
-      final transcription = 'Hello, how are you?';
+      // Placeholder: Simulate connection
+      await Future.delayed(const Duration(milliseconds: 500));
 
       setState(() {
-        _transcription = transcription;
-        _isProcessing = false;
+        _sessionState = VoiceSessionState.connected;
       });
 
-      // Generate response
-      final response = await RunAnywhere.chat(transcription);
-      setState(() {
-        _response = response;
-      });
+      // Start listening animation
+      _pulseController.repeat(reverse: true);
     } catch (e) {
       setState(() {
-        _error = e.toString();
-        _isProcessing = false;
+        _sessionState = VoiceSessionState.error;
+        _errorMessage = 'Failed to start voice pipeline: $e';
       });
     }
   }
 
-  void _stopListening() {
+  Future<void> _stopConversation() async {
+    _pulseController.stop();
+    _pulseController.reset();
+
+    // TODO: Stop voice pipeline
+    // await _voicePipeline?.stop();
+
     setState(() {
-      _isListening = false;
+      _sessionState = VoiceSessionState.disconnected;
+      _currentTranscription = '';
     });
   }
 
-  void _clear() {
+  void _toggleListening() {
+    if (_sessionState == VoiceSessionState.disconnected ||
+        _sessionState == VoiceSessionState.error) {
+      _startConversation();
+    } else {
+      _stopConversation();
+    }
+  }
+
+  // TODO: Call this method when STT transcription completes in voice pipeline
+  // ignore: unused_element
+  Future<void> _processTurn() async {
+    if (_currentTranscription.isEmpty) return;
+
     setState(() {
-      _transcription = '';
-      _response = '';
-      _error = null;
+      _sessionState = VoiceSessionState.processing;
+      _conversation.add(_ConversationTurn(
+        role: ConversationRole.user,
+        text: _currentTranscription,
+      ));
+    });
+
+    try {
+      // TODO: Use voice pipeline for end-to-end processing
+      // For now, use simple chat API
+      final response = await RunAnywhere.chat(_currentTranscription);
+
+      setState(() {
+        _conversation.add(_ConversationTurn(
+          role: ConversationRole.assistant,
+          text: response,
+        ));
+        _sessionState = VoiceSessionState.speaking;
+        _currentTranscription = '';
+      });
+
+      // TODO: Play TTS audio
+      // await _voicePipeline?.speak(response);
+
+      // Simulate speaking
+      await Future.delayed(const Duration(seconds: 2));
+
+      setState(() {
+        _sessionState = VoiceSessionState.connected;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to process: $e';
+        _sessionState = VoiceSessionState.connected;
+      });
+    }
+  }
+
+  void _clearConversation() {
+    setState(() {
+      _conversation.clear();
+      _currentTranscription = '';
+      _errorMessage = null;
     });
   }
 
@@ -79,142 +199,324 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Voice Assistant'),
+        actions: [
+          if (_conversation.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _clearConversation,
+              tooltip: 'Clear conversation',
+            ),
+        ],
       ),
       body: Column(
         children: [
+          // Model info banner
+          _buildModelInfoBanner(),
+
+          // Conversation area
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.padding16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_transcription.isNotEmpty) ...[
-                    Text(
-                      'You said:',
-                     // style: AppTypography.headlineSemibold,
-                    ),
-                    const SizedBox(height: AppSpacing.padding8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.padding16),
-                      decoration: BoxDecoration(
-                        color: AppColors.backgroundSecondary(context),
-                        borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
-                      ),
-                      child: Text(
-                        _transcription,
-                        style: AppTypography.body(context),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.padding24),
-                  ],
-                  if (_response.isNotEmpty) ...[
-                    Text(
-                      'Assistant:',
-                      //style: AppTypography.headlineSemibold,
-                    ),
-                    const SizedBox(height: AppSpacing.padding8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.padding16),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryBlue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
-                      ),
-                      child: Text(
-                        _response,
-                        style: AppTypography.body(context),
-                      ),
-                    ),
-                  ],
-                  if (_error != null) ...[
-                    const SizedBox(height: AppSpacing.padding16),
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.padding16),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryRed.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
-                      ),
-                      child: Text(
-                        'Error: $_error',
-                        style: AppTypography.body(context).copyWith(color: AppColors.primaryRed),
-                      ),
-                    ),
-                  ],
-                  if (_transcription.isEmpty && _response.isEmpty && _error == null)
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.mic,
-                            size: AppSpacing.iconXXLarge,
-                            color: AppColors.primaryBlue,
-                          ),
-                          const SizedBox(height: AppSpacing.large),
-                          Text(
-                            'Tap to start voice conversation',
-                            style: AppTypography.title2(context),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
+            child: _buildConversationArea(),
+          ),
+
+          // Status indicator
+          _buildStatusIndicator(),
+
+          // Error message
+          if (_errorMessage != null) _buildErrorBanner(),
+
+          // Microphone button
+          _buildMicrophoneButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModelInfoBanner() {
+    final allLoaded = _sttModelState == AppModelLoadState.loaded &&
+        _llmModelState == AppModelLoadState.loaded &&
+        _ttsModelState == AppModelLoadState.loaded;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.mediumLarge),
+      color: allLoaded ? AppColors.badgeGreen : AppColors.badgeOrange,
+      child: Row(
+        children: [
+          Icon(
+            allLoaded ? Icons.check_circle : Icons.info,
+            size: AppSpacing.iconRegular,
+            color: allLoaded ? AppColors.statusGreen : AppColors.statusOrange,
+          ),
+          const SizedBox(width: AppSpacing.smallMedium),
+          Expanded(
+            child: Text(
+              allLoaded
+                  ? 'Voice pipeline ready'
+                  : 'Voice pipeline not configured',
+              style: AppTypography.subheadline(context),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.padding24),
-            decoration: BoxDecoration(
-              color: AppColors.backgroundPrimary(context),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
+          TextButton(
+            onPressed: () {
+              // TODO: Show model selection sheet
+            },
+            child: const Text('Configure'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConversationArea() {
+    if (_conversation.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.mic,
+              size: AppSpacing.iconXXLarge,
+              color: AppColors.textSecondary(context),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (_transcription.isNotEmpty || _response.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: _clear,
-                    tooltip: 'Clear',
-                  ),
-                const SizedBox(width: AppSpacing.padding16),
-                GestureDetector(
-                  onTapDown: (_) => _startListening(),
-                  onTapUp: (_) => _stopListening(),
-                  onTapCancel: _stopListening,
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: _isListening
-                          ? AppColors.primaryRed
-                          : AppColors.primaryBlue,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      _isListening ? Icons.mic : Icons.mic_none,
-                      color: Colors.white,
-                      size: 40,
-                    ),
-                  ),
-                ),
-                if (_isProcessing)
-                  const Padding(
-                    padding: EdgeInsets.only(left: AppSpacing.padding16),
-                    child: CircularProgressIndicator(),
-                  ),
-              ],
+            const SizedBox(height: AppSpacing.large),
+            Text(
+              'Tap to start voice conversation',
+              style: AppTypography.title2(context),
+            ),
+            const SizedBox(height: AppSpacing.smallMedium),
+            Text(
+              'Speak naturally and the AI will respond',
+              style: AppTypography.subheadline(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(AppSpacing.large),
+      itemCount: _conversation.length,
+      itemBuilder: (context, index) {
+        final turn = _conversation[index];
+        return _buildConversationBubble(turn);
+      },
+    );
+  }
+
+  Widget _buildConversationBubble(_ConversationTurn turn) {
+    final isUser = turn.role == ConversationRole.user;
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.mediumLarge),
+        padding: const EdgeInsets.all(AppSpacing.large),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        decoration: BoxDecoration(
+          gradient: isUser
+              ? LinearGradient(
+                  colors: [
+                    AppColors.userBubbleGradientStart,
+                    AppColors.userBubbleGradientEnd,
+                  ],
+                )
+              : null,
+          color: isUser ? null : AppColors.backgroundGray5(context),
+          borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.shadowLight,
+              blurRadius: AppSpacing.shadowSmall,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Text(
+          turn.text,
+          style: AppTypography.body(context).copyWith(
+            color: isUser ? AppColors.textWhite : AppColors.textPrimary(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusIndicator() {
+    String statusText;
+    Color statusColor;
+
+    switch (_sessionState) {
+      case VoiceSessionState.disconnected:
+        statusText = 'Tap microphone to start';
+        statusColor = AppColors.statusGray;
+        break;
+      case VoiceSessionState.connecting:
+        statusText = 'Connecting...';
+        statusColor = AppColors.statusBlue;
+        break;
+      case VoiceSessionState.connected:
+        statusText = 'Listening...';
+        statusColor = AppColors.statusGreen;
+        break;
+      case VoiceSessionState.listening:
+        statusText = 'Speak now...';
+        statusColor = AppColors.statusGreen;
+        break;
+      case VoiceSessionState.processing:
+        statusText = 'Processing...';
+        statusColor = AppColors.statusBlue;
+        break;
+      case VoiceSessionState.speaking:
+        statusText = 'Speaking...';
+        statusColor = AppColors.statusPurple;
+        break;
+      case VoiceSessionState.error:
+        statusText = 'Error occurred';
+        statusColor = AppColors.statusRed;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.large,
+        vertical: AppSpacing.smallMedium,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.smallMedium),
+          Text(
+            statusText,
+            style: AppTypography.caption(context).copyWith(
+              color: AppColors.textSecondary(context),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildErrorBanner() {
+    return Container(
+      margin: const EdgeInsets.all(AppSpacing.large),
+      padding: const EdgeInsets.all(AppSpacing.mediumLarge),
+      decoration: BoxDecoration(
+        color: AppColors.badgeRed,
+        borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error, color: Colors.red),
+          const SizedBox(width: AppSpacing.smallMedium),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: AppTypography.subheadline(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMicrophoneButton() {
+    final isActive = _sessionState != VoiceSessionState.disconnected &&
+        _sessionState != VoiceSessionState.error;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xLarge),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundPrimary(context),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowMedium,
+            blurRadius: AppSpacing.shadowLarge,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: AnimatedBuilder(
+          animation: _pulseAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: isActive ? _pulseAnimation.value : 1.0,
+              child: GestureDetector(
+                onTap: _toggleListening,
+                child: Container(
+                  width: AppSpacing.buttonHeightLarge,
+                  height: AppSpacing.buttonHeightLarge,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isActive
+                        ? AppColors.primaryRed
+                        : AppColors.primaryBlue,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isActive
+                                ? AppColors.primaryRed
+                                : AppColors.primaryBlue)
+                            .withValues(alpha: 0.3),
+                        blurRadius: isActive ? 20 : 10,
+                        spreadRadius: isActive ? 5 : 0,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    _getButtonIcon(),
+                    color: Colors.white,
+                    size: AppSpacing.iconMedium,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  IconData _getButtonIcon() {
+    switch (_sessionState) {
+      case VoiceSessionState.disconnected:
+      case VoiceSessionState.error:
+        return Icons.mic;
+      case VoiceSessionState.connecting:
+      case VoiceSessionState.processing:
+        return Icons.hourglass_empty;
+      case VoiceSessionState.connected:
+      case VoiceSessionState.listening:
+        return Icons.mic;
+      case VoiceSessionState.speaking:
+        return Icons.volume_up;
+    }
+  }
+}
+
+// Helper classes
+
+enum ConversationRole { user, assistant }
+
+class _ConversationTurn {
+  final ConversationRole role;
+  final String text;
+  final DateTime timestamp;
+
+  _ConversationTurn({
+    required this.role,
+    required this.text,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
 }

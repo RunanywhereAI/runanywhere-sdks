@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/capabilities/analytics/analytics_service.dart';
-import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 void main() {
   group('AnalyticsService Tests', () {
@@ -46,4 +45,3 @@ void main() {
     });
   });
 }
-
