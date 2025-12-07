@@ -24,6 +24,20 @@ extern "C" {
 }
 #endif
 
+// Platform-specific logging
+#if defined(ANDROID) || defined(__ANDROID__)
+#include <android/log.h>
+#define LOG_TAG "HybridRunAnywhere"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#else
+#define LOGI(...) printf(__VA_ARGS__); printf("\n")
+#define LOGE(...) printf(__VA_ARGS__); printf("\n")
+#define LOGD(...) printf(__VA_ARGS__); printf("\n")
+#endif
+
+// Android-specific WAV reader (for STT file transcription)
 #if defined(ANDROID) || defined(__ANDROID__)
 #include <fstream>
 #include <cstdint>
@@ -248,15 +262,15 @@ std::string jsonString(const std::string& value) {
 // ============================================================================
 
 HybridRunAnywhere::HybridRunAnywhere() : HybridObject(TAG) {
-  printf("[HybridRunAnywhere] Constructor called\n");
+  LOGI("Constructor called");
 
   // Check which backends are available
   int count = 0;
   const char** backends = ra_get_available_backends(&count);
 
-  printf("[HybridRunAnywhere] Found %d available backends:\n", count);
+  LOGI("Found %d available backends:", count);
   for (int i = 0; i < count; i++) {
-    printf("[HybridRunAnywhere]   - %s\n", backends[i]);
+    LOGI("  - %s", backends[i]);
   }
 }
 
@@ -627,36 +641,46 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhere::loadSTTModel(
   return Promise<bool>::async([this, path, modelType, configJson]() {
     std::lock_guard<std::mutex> lock(modelMutex_);
 
+    LOGI("loadSTTModel called with path: %s, type: %s", path.c_str(), modelType.c_str());
+
     if (!onnxBackend_) {
-      printf("[HybridRunAnywhere] Creating ONNX backend for STT...\n");
+      LOGI("Creating ONNX backend for STT...");
       onnxBackend_ = ra_create_backend("onnx");
       if (!onnxBackend_) {
+        LOGE("Failed to create ONNX backend");
         setLastError("Failed to create ONNX backend");
         return false;
       }
 
       ra_result_code initResult = ra_initialize(onnxBackend_, nullptr);
       if (initResult != RA_SUCCESS) {
+        LOGE("Failed to initialize ONNX backend, code: %d", initResult);
         ra_destroy(onnxBackend_);
         onnxBackend_ = nullptr;
         setLastError("Failed to initialize ONNX backend");
         return false;
       }
+      LOGI("ONNX backend created and initialized");
     }
 
     std::string modelPath = extractArchiveIfNeeded(path);
-    printf("[HybridRunAnywhere] Loading STT model: %s\n", modelPath.c_str());
+    LOGI("Loading STT model from: %s (original: %s)", modelPath.c_str(), path.c_str());
 
     ra_result_code result = ra_stt_load_model(
         onnxBackend_, modelPath.c_str(), modelType.c_str(),
         configJson.has_value() ? configJson->c_str() : nullptr);
 
     if (result != RA_SUCCESS) {
+      LOGE("Failed to load STT model, code: %d", result);
+      const char* lastErr = ra_get_last_error();
+      if (lastErr) {
+        LOGE("Error: %s", lastErr);
+      }
       setLastError("Failed to load STT model");
       return false;
     }
 
-    printf("[HybridRunAnywhere] STT model loaded successfully\n");
+    LOGI("STT model loaded successfully");
     return true;
   });
 }
@@ -951,14 +975,19 @@ void HybridRunAnywhere::setLastError(const std::string& error) {
 
 std::string HybridRunAnywhere::extractArchiveIfNeeded(
     const std::string& archivePath) {
+  LOGD("extractArchiveIfNeeded called with: %s", archivePath.c_str());
+  
   bool isTarBz2 =
       endsWith(archivePath, ".tar.bz2") || endsWith(archivePath, ".bz2");
   bool isTarGz =
       endsWith(archivePath, ".tar.gz") || endsWith(archivePath, ".tgz");
 
   if (!isTarBz2 && !isTarGz) {
+    LOGD("Not an archive, returning path as-is");
     return archivePath;
   }
+  
+  LOGI("Detected archive format: %s", isTarBz2 ? "tar.bz2" : "tar.gz");
 
   std::string modelName;
   size_t lastSlash = archivePath.rfind('/');
@@ -1012,13 +1041,19 @@ std::string HybridRunAnywhere::extractArchiveIfNeeded(
     return extractDir;
   }
 
-  printf("[HybridRunAnywhere] Extracting archive to: %s\n", extractDir.c_str());
+  LOGI("Extracting archive %s to: %s", archivePath.c_str(), extractDir.c_str());
   ra_result_code result =
       ra_extract_archive(archivePath.c_str(), extractDir.c_str());
 
   if (result != RA_SUCCESS) {
+    LOGE("Archive extraction failed with code %d", result);
+    const char* lastErr = ra_get_last_error();
+    if (lastErr) {
+      LOGE("Extraction error: %s", lastErr);
+    }
     return archivePath;
   }
+  LOGI("Archive extraction successful");
 
   DIR* dir = opendir(extractDir.c_str());
   if (dir) {

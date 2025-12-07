@@ -1180,8 +1180,17 @@ export const RunAnywhere = {
     // Get native file system module for fast downloads (bypasses JS bridge)
     const fs = requireFileSystemModule();
 
-    // Determine file name with extension
-    const extension = modelInfo.downloadURL.includes('.gguf') ? '.gguf' : '';
+    // Determine file name with extension - preserve archive extensions for extraction
+    let extension = '';
+    if (modelInfo.downloadURL.includes('.gguf')) {
+      extension = '.gguf';
+    } else if (modelInfo.downloadURL.includes('.tar.bz2')) {
+      extension = '.tar.bz2';
+    } else if (modelInfo.downloadURL.includes('.tar.gz')) {
+      extension = '.tar.gz';
+    } else if (modelInfo.downloadURL.includes('.zip')) {
+      extension = '.zip';
+    }
     const fileName = `${modelId}${extension}`;
 
     console.log('[RunAnywhere] Starting native download (OkHttp/URLSession):', {
