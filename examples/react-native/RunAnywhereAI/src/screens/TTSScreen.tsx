@@ -66,8 +66,12 @@ export const TTSScreen: React.FC = () => {
     return () => {
       audioRecorderPlayer.stopPlayer().catch(() => {});
       audioRecorderPlayer.removePlayBackListener();
-      // Also stop System TTS
-      Tts.stop();
+      // Also stop System TTS (wrap in try-catch due to react-native-tts iOS bug)
+      try {
+        Tts.stop();
+      } catch {
+        // Ignore - react-native-tts has BOOL conversion issues on iOS
+      }
       // Clean up temp audio file
       if (audioFilePath) {
         RNFS.unlink(audioFilePath).catch(() => {});
@@ -350,7 +354,8 @@ export const TTSScreen: React.FC = () => {
     try {
       await audioRecorderPlayer.stopPlayer();
       audioRecorderPlayer.removePlayBackListener();
-      Tts.stop(); // Also stop any System TTS
+      // Also stop any System TTS (wrap due to iOS bug)
+      try { Tts.stop(); } catch { /* ignore */ }
     } catch {
       // Ignore errors if not playing
     }
@@ -550,8 +555,8 @@ export const TTSScreen: React.FC = () => {
       // Stop ONNX audio playback
       await audioRecorderPlayer.stopPlayer();
       audioRecorderPlayer.removePlayBackListener();
-      // Also stop System TTS if playing
-      Tts.stop();
+      // Also stop System TTS if playing (wrap due to iOS bug)
+      try { Tts.stop(); } catch { /* ignore */ }
       setIsPlaying(false);
       setCurrentTime(0);
       setPlaybackProgress(0);
