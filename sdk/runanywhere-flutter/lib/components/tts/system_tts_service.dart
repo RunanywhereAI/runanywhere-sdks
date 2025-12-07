@@ -52,6 +52,19 @@ class SystemTTSService implements TTSService {
     required String text,
     required TTSOptions options,
   }) async {
+    final completer = Completer<void>();
+
+    // Set up completion handlers for this synthesis
+    _flutterTts.setCompletionHandler(() {
+      _isSynthesizing = false;
+      if (!completer.isCompleted) completer.complete();
+    });
+
+    _flutterTts.setErrorHandler((msg) {
+      _isSynthesizing = false;
+      if (!completer.isCompleted) completer.complete();
+    });
+
     // Configure voice
     if (options.voice != null && options.voice != 'system') {
       await _flutterTts.setVoice({
@@ -70,6 +83,9 @@ class SystemTTSService implements TTSService {
     // Speak the text
     _isSynthesizing = true;
     await _flutterTts.speak(text);
+
+    // Wait for synthesis to complete
+    await completer.future;
 
     // Note: flutter_tts doesn't provide direct audio data access
     // It plays audio directly through the system

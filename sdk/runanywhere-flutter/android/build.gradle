@@ -94,6 +94,23 @@ dependencies {
 }
 
 // =============================================================================
+// Helper Functions
+// =============================================================================
+import java.security.MessageDigest
+
+def calculateChecksum(File file) {
+    MessageDigest digest = MessageDigest.getInstance("SHA-256")
+    file.withInputStream { stream ->
+        byte[] buffer = new byte[8192]
+        int read
+        while ((read = stream.read(buffer)) > 0) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().collect { String.format("%02x", it) }.join('')
+}
+
+// =============================================================================
 // Binary Download Task (runs when testLocal = false)
 // =============================================================================
 task downloadNativeLibs {
@@ -112,6 +129,25 @@ task downloadNativeLibs {
 
                 // Download the zip file
                 ant.get(src: downloadUrl, dest: zipFile)
+
+                // Verify checksum
+                def actualChecksum = calculateChecksum(zipFile)
+                def expectedChecksum = androidLibsChecksum
+
+                if (actualChecksum != expectedChecksum) {
+                    zipFile.delete()
+                    throw new GradleException("""
+                        ❌ Checksum verification failed!
+
+                        Expected: ${expectedChecksum}
+                        Got:      ${actualChecksum}
+
+                        The downloaded file may be corrupted or tampered with.
+                        Please check the download URL and checksum in binary_config.gradle.
+                    """)
+                }
+
+                println "✅ Checksum verified: ${actualChecksum}"
 
                 // Extract to jniLibs
                 copy {

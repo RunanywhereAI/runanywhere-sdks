@@ -383,9 +383,8 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('➕ Adding model from URL: $name');
 
-      // Create a ModelRegistration and register with SDK
-      // TODO: Register with SDK's model registry when API is available
-      final _ = sdk.ModelRegistration(
+      // Create a ModelRegistration
+      final registration = sdk.ModelRegistration(
         url: url,
         framework: _convertToSDKFramework(framework),
         modality: sdk.FrameworkModality.textToText,
@@ -394,9 +393,11 @@ class ModelListViewModel extends ChangeNotifier {
         supportsThinking: supportsThinking,
       );
 
-      // Register the model with the appropriate adapter
-      // Note: In production, this would be handled by the SDK's registry
-      debugPrint('⚠️ Custom model registration not yet available in SDK');
+      // Convert to ModelInfo and register with SDK's model registry
+      final modelInfo = registration.toModelInfo();
+      sdk.RunAnywhere.serviceContainer.modelRegistry.registerModel(modelInfo);
+
+      debugPrint('✅ Registered model with SDK: ${modelInfo.name} (${modelInfo.id})');
 
       // Refresh models from registry
       await loadModelsFromRegistry();

@@ -139,11 +139,26 @@ class LlamaCppBackend {
     if (!isAvailable) {
       return [];
     }
+
+    // Reuse existing adapter's backend if available
+    final existingBackend = _adapter?.nativeBackend;
+    if (existingBackend != null) {
+      try {
+        return existingBackend.getAvailableBackends();
+      } catch (_) {
+        return [];
+      }
+    }
+
+    // Otherwise create a temporary backend and dispose it
+    NativeBackend? tempBackend;
     try {
-      final backend = NativeBackend();
-      return backend.getAvailableBackends();
+      tempBackend = NativeBackend();
+      return tempBackend.getAvailableBackends();
     } catch (_) {
       return [];
+    } finally {
+      tempBackend?.dispose();
     }
   }
 

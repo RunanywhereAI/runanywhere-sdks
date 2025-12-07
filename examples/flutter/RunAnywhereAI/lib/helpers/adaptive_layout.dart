@@ -36,14 +36,10 @@ class AdaptiveColors {
 /// Adaptive sheet/modal wrapper
 class AdaptiveSheet extends StatelessWidget {
   final Widget child;
-  final bool isPresented;
-  final VoidCallback? onDismiss;
 
   const AdaptiveSheet({
     super.key,
     required this.child,
-    this.isPresented = true,
-    this.onDismiss,
   });
 
   /// Show an adaptive sheet/modal

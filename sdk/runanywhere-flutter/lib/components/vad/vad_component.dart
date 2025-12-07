@@ -73,18 +73,56 @@ class VADComponent extends BaseComponent<VADService> {
       throw StateError('VAD service not available');
     }
 
-    // For SimpleEnergyVAD, use the direct method
+    // For SimpleEnergyVAD, use the direct method and get proper confidence
     if (vadService is SimpleEnergyVAD) {
       final isSpeechDetected = vadService.processAudioData(samples);
+      // Get statistics to calculate confidence based on current energy level
+      final stats = vadService.getStatistics();
+      final currentEnergy = stats['current'] ?? 0.0;
+      final threshold = stats['threshold'] ?? vadService.energyThreshold;
+
+      // Calculate confidence based on energy level relative to threshold
+      final confidence = _calculateConfidence(currentEnergy, threshold);
+
       return VADResult(
         hasSpeech: isSpeechDetected,
-        confidence: vadService.energyThreshold,
+        confidence: confidence,
       );
     }
 
     // Convert float samples to 16-bit PCM for generic VADService
     final pcmSamples = samples.map((s) => (s * 32768.0).toInt()).toList();
     return await vadService.detect(audioData: pcmSamples);
+  }
+
+  /// Calculate confidence value between 0.0 and 1.0 based on energy level relative to threshold
+  double _calculateConfidence(double energyLevel, double threshold) {
+    if (threshold == 0.0) {
+      return 0.0;
+    }
+
+    // Calculate ratio of energy to threshold
+    final ratio = energyLevel / threshold;
+
+    // Map ratio to confidence value (0.0 to 1.0)
+    // ratio < 0.5: very confident no speech (maps to ~0.0-0.3)
+    // ratio ~ 1.0: uncertain, near threshold (maps to ~0.5)
+    // ratio > 2.0: very confident speech present (maps to ~0.7-1.0)
+
+    if (ratio < 0.5) {
+      // Far below threshold: high confidence in silence
+      // Map [0, 0.5] -> [0.0, 0.3]
+      return ratio * 0.6;
+    } else if (ratio < 2.0) {
+      // Near threshold: uncertain
+      // Map [0.5, 2.0] -> [0.3, 0.7]
+      return 0.3 + (ratio - 0.5) * 0.267;
+    } else {
+      // Far above threshold: high confidence in speech
+      // Map [2.0, inf] -> [0.7, 1.0] with asymptotic approach to 1.0
+      final normalized = (ratio - 2.0) / 3.0;
+      return 0.7 + (normalized > 1.0 ? 1.0 : normalized) * 0.3;
+    }
   }
 
   /// Process audio stream

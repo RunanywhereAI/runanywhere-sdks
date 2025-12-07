@@ -409,6 +409,7 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
 
       widget.onModelAdded(modelInfo);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Failed to add model: $e';
         _isAdding = false;

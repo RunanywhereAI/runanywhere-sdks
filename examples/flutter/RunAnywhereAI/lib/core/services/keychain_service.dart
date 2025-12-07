@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -32,8 +33,8 @@ class KeychainService {
   /// Save bytes to keychain (encoded as base64)
   Future<void> saveBytes({required String key, required Uint8List data}) async {
     try {
-      final base64 = String.fromCharCodes(data);
-      await _storage.write(key: key, value: base64);
+      final encoded = base64Encode(data);
+      await _storage.write(key: key, value: encoded);
     } catch (e) {
       throw KeychainError.saveFailed;
     }
@@ -48,12 +49,12 @@ class KeychainService {
     }
   }
 
-  /// Read bytes from keychain
+  /// Read bytes from keychain (decoded from base64)
   Future<Uint8List?> readBytes(String key) async {
     try {
       final value = await _storage.read(key: key);
       if (value == null) return null;
-      return Uint8List.fromList(value.codeUnits);
+      return base64Decode(value);
     } catch (e) {
       return null;
     }

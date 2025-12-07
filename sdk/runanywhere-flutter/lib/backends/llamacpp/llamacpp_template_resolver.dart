@@ -44,6 +44,16 @@ class LlamaCppTemplateResolver {
   }) {
     final filename = modelPath.split('/').last.toLowerCase();
 
+    // TinyLlama usually uses ChatML (check before 'llama' since it contains 'llama')
+    if (filename.contains('tinyllama')) {
+      return LLMTemplate.chatML;
+    }
+
+    // Phi models use ChatML
+    if (filename.contains('phi')) {
+      return LLMTemplate.chatML;
+    }
+
     // Qwen models typically use ChatML format
     if (filename.contains('qwen')) {
       return LLMTemplate.chatML;
@@ -59,12 +69,7 @@ class LlamaCppTemplateResolver {
       return LLMTemplate.alpaca;
     }
 
-    // Llama format
-    if (filename.contains('llama')) {
-      return LLMTemplate.llama;
-    }
-
-    // Mistral format
+    // Mistral format (check before llama since some mistral models might contain 'llama')
     if (filename.contains('mistral')) {
       return LLMTemplate.mistral;
     }
@@ -79,14 +84,9 @@ class LlamaCppTemplateResolver {
       return LLMTemplate.vicuna;
     }
 
-    // TinyLlama usually uses ChatML
-    if (filename.contains('tinyllama')) {
-      return LLMTemplate.chatML;
-    }
-
-    // Phi models use ChatML
-    if (filename.contains('phi')) {
-      return LLMTemplate.chatML;
+    // Llama format (generic llama check last after more specific patterns)
+    if (filename.contains('llama')) {
+      return LLMTemplate.llama;
     }
 
     // Default to ChatML

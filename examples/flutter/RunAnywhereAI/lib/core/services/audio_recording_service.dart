@@ -131,6 +131,14 @@ class AudioRecordingService {
       final recordingPath = _currentRecordingPath;
       _currentRecordingPath = null;
 
+      // Clean up the temp file after reading
+      try {
+        await file.delete();
+        debugPrint('🗑️ Cleaned up temp recording file');
+      } catch (e) {
+        debugPrint('⚠️ Failed to cleanup temp recording file: $e');
+      }
+
       return (audioData, recordingPath);
     } catch (e) {
       debugPrint('❌ Failed to stop recording: $e');
