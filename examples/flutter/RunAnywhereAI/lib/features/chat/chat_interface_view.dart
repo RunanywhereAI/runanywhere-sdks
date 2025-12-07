@@ -126,6 +126,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     String prompt,
     RunAnywhereGenerationOptions options,
   ) async {
+    // Capture model name before async gap to avoid context issues
+    final modelName = context.read<ModelManager>().loadedModelName;
+
     // Add empty assistant message for streaming
     final assistantMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -176,13 +179,14 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
       final analytics = MessageAnalytics(
         messageId: assistantMessage.id,
-        modelName: context.read<ModelManager>().loadedModelName,
+        modelName: modelName,
         timeToFirstToken: _timeToFirstToken,
         totalGenerationTime: totalTime,
         outputTokens: _tokenCount,
         tokensPerSecond: totalTime > 0 ? _tokenCount / totalTime : 0,
       );
 
+      if (!mounted) return;
       setState(() {
         _messages[messageIndex] = _messages[messageIndex].copyWith(
           analytics: analytics,
@@ -190,6 +194,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         _isGenerating = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _messages.removeLast();
         _errorMessage = 'Streaming failed: $e';

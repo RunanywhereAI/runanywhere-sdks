@@ -92,33 +92,52 @@ class VoiceAgentComponent extends BaseComponent<VoiceAgentService> {
   Future<void> _initializeComponents() async {
     final config = voiceAgentConfiguration;
 
-    // Initialize VAD (required)
-    vadComponent = VADComponent(
-      vadConfiguration: config.vadConfig,
-      serviceContainer: serviceContainer,
-    );
-    await vadComponent!.initialize();
+    try {
+      // Initialize VAD (required)
+      vadComponent = VADComponent(
+        vadConfiguration: config.vadConfig,
+        serviceContainer: serviceContainer,
+      );
+      await vadComponent!.initialize();
 
-    // Initialize STT (required)
-    sttComponent = STTComponent(
-      sttConfig: config.sttConfig,
-      serviceContainer: serviceContainer,
-    );
-    await sttComponent!.initialize();
+      // Initialize STT (required)
+      sttComponent = STTComponent(
+        sttConfig: config.sttConfig,
+        serviceContainer: serviceContainer,
+      );
+      await sttComponent!.initialize();
 
-    // Initialize LLM (required)
-    llmComponent = LLMComponent(
-      llmConfig: config.llmConfig,
-      serviceContainer: serviceContainer,
-    );
-    await llmComponent!.initialize();
+      // Initialize LLM (required)
+      llmComponent = LLMComponent(
+        llmConfig: config.llmConfig,
+        serviceContainer: serviceContainer,
+      );
+      await llmComponent!.initialize();
 
-    // Initialize TTS (required)
-    ttsComponent = TTSComponent(
-      ttsConfiguration: config.ttsConfig,
-      serviceContainer: serviceContainer,
-    );
-    await ttsComponent!.initialize();
+      // Initialize TTS (required)
+      ttsComponent = TTSComponent(
+        ttsConfiguration: config.ttsConfig,
+        serviceContainer: serviceContainer,
+      );
+      await ttsComponent!.initialize();
+    } catch (e) {
+      // Cleanup any partially initialized components to prevent resource leaks
+      await _cleanupPartialInitialization();
+      rethrow;
+    }
+  }
+
+  /// Clean up any components that were initialized before a failure
+  Future<void> _cleanupPartialInitialization() async {
+    await vadComponent?.cleanup();
+    await sttComponent?.cleanup();
+    await llmComponent?.cleanup();
+    await ttsComponent?.cleanup();
+
+    vadComponent = null;
+    sttComponent = null;
+    llmComponent = null;
+    ttsComponent = null;
   }
 
   /// Process audio through the full pipeline

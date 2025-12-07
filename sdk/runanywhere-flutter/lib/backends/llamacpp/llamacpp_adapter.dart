@@ -6,6 +6,7 @@ import '../../core/models/model/model_info.dart';
 import '../../core/module_registry.dart';
 import '../../core/protocols/downloading/download_strategy.dart';
 import '../../core/protocols/frameworks/unified_framework_adapter.dart';
+import '../../foundation/logging/sdk_logger.dart';
 import '../native/native_backend.dart';
 import 'providers/llamacpp_llm_provider.dart';
 import 'services/llamacpp_llm_service.dart';
@@ -33,10 +34,14 @@ class LlamaCppAdapter
   NativeBackend? _backend;
   bool _isInitialized = false;
 
-  // Cache service instance
+  // Cache service instance with model tracking
   LlamaCppLLMService? _cachedLLMService;
+  String? _cachedModelPath;
   DateTime? _lastLLMUsage;
   final Duration _cacheTimeout = const Duration(minutes: 5);
+
+  // Logger instance
+  final _logger = SDKLogger(category: 'LlamaCppAdapter');
 
   /// Supported quantization levels for GGUF models.
   static const List<String> supportedQuantizations = [
@@ -147,9 +152,17 @@ class LlamaCppAdapter
 
     final modelPath = model.localPath?.toFilePath();
 
+    // Dispose old service if model path has changed
+    if (_cachedModelPath != modelPath && _cachedLLMService != null) {
+      await _cachedLLMService!.cleanup();
+      _cachedLLMService = null;
+      _cachedModelPath = null;
+    }
+
     final service = _cachedLLMService ?? LlamaCppLLMService(_backend!);
     await service.initialize(modelPath: modelPath);
     _cachedLLMService = service;
+    _cachedModelPath = modelPath;
     _lastLLMUsage = DateTime.now();
     return service;
   }
@@ -228,9 +241,13 @@ class LlamaCppAdapter
   }
 
   /// Dispose of resources
-  void dispose() {
+  Future<void> dispose() async {
     // Cleanup cached service
-    _cachedLLMService = null;
+    if (_cachedLLMService != null) {
+      await _cachedLLMService!.cleanup();
+      _cachedLLMService = null;
+    }
+    _cachedModelPath = null;
 
     // Dispose native backend
     if (_backend != null) {
@@ -257,8 +274,15 @@ class LlamaCppAdapter
     final now = DateTime.now();
 
     if (_lastLLMUsage != null &&
-        now.difference(_lastLLMUsage!) > _cacheTimeout) {
+        now.difference(_lastLLMUsage!) > _cacheTimeout &&
+        _cachedLLMService != null) {
+      // Cleanup stale service asynchronously
+      _cachedLLMService!.cleanup().catchError((e) {
+        // Log error but don't block
+        _logger.error('Error cleaning up stale LlamaCpp service', error: e);
+      });
       _cachedLLMService = null;
+      _cachedModelPath = null;
       _lastLLMUsage = null;
     }
   }

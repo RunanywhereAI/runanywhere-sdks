@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
-
-import 'dart:typed_data' show ByteData, Endian;
 
 /// Audio Player Service
 ///
@@ -31,6 +29,9 @@ class AudioPlayerService {
       StreamController<bool>.broadcast();
   final StreamController<double> _progressController =
       StreamController<double>.broadcast();
+
+  // Track temp files for cleanup
+  File? _currentTempFile;
 
   /// Whether audio is currently playing
   bool get isPlaying => _isPlaying;
@@ -102,10 +103,14 @@ class AudioPlayerService {
       // Stop any current playback
       await stop();
 
+      // Clean up previous temp file if it exists
+      await _cleanupTempFile();
+
       // Create a temporary file for the audio data
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final tempFile = File('${tempDir.path}/tts_audio_$timestamp.wav');
+      _currentTempFile = tempFile;
 
       // Convert PCM16 to proper WAV file with headers
       final wavData = _createWavFile(audioData, sampleRate, numChannels);
@@ -252,6 +257,21 @@ class AudioPlayerService {
     await _player.setPlaybackRate(rate.clamp(0.5, 2.0));
   }
 
+  /// Clean up temporary audio file
+  Future<void> _cleanupTempFile() async {
+    if (_currentTempFile != null) {
+      try {
+        if (await _currentTempFile!.exists()) {
+          await _currentTempFile!.delete();
+          debugPrint('🗑️ Cleaned up temp audio file');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Failed to cleanup temp file: $e');
+      }
+      _currentTempFile = null;
+    }
+  }
+
   /// Dispose of resources
   Future<void> dispose() async {
     await _playerStateSubscription?.cancel();
@@ -260,6 +280,7 @@ class AudioPlayerService {
     await _playingController.close();
     await _progressController.close();
     await _player.dispose();
+    await _cleanupTempFile();
     debugPrint('🎵 Audio player disposed');
   }
 }

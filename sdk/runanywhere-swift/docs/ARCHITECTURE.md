@@ -16,7 +16,7 @@ The RunAnywhere Swift SDK is a modular, multi-backend AI SDK for iOS/macOS that 
 │  RunAnywhereONNX      │ ONNX Runtime backend (STT, TTS, VAD)    │
 │  RunAnywhereWhisperKit│ CoreML-based STT (WhisperKit)           │
 │  RunAnywhereLLM       │ llama.cpp backend (GGUF models)         │
-│  RunAnywhereAppleAI   │ Apple Intelligence (iOS 26+)            │
+│  RunAnywhereAppleAI   │ Apple Intelligence (iOS 18+)            │
 │  RunAnywhereFluidAudio│ Speaker diarization                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -73,8 +73,9 @@ Sources/CRunAnywhereONNX/
 └── types.h                 # Common types from runanywhere-core
 ```
 
-**module.modulemap:**
-```modulemap
+### module.modulemap
+
+```text
 module CRunAnywhereONNX {
     header "onnx_bridge_wrapper.h"
     header "types.h"

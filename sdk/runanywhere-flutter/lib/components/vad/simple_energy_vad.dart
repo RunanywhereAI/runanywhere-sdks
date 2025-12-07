@@ -90,12 +90,17 @@ class SimpleEnergyVAD implements VADService {
   @override
   bool get isReady => _isActive;
 
+  // Track most recent energy level for confidence calculation
+  double _lastEnergyLevel = 0.0;
+
   @override
   Future<VADResult> detect({required List<int> audioData}) async {
     processAudioBuffer(audioData);
+    // Calculate confidence based on energy level relative to threshold
+    final confidence = _calculateConfidence(_lastEnergyLevel);
     return VADResult(
       hasSpeech: _isCurrentlySpeaking,
-      confidence: energyThreshold,
+      confidence: confidence,
     );
   }
 
@@ -172,6 +177,7 @@ class SimpleEnergyVAD implements VADService {
 
     // Calculate energy of the entire buffer
     final energy = _calculateAverageEnergy(audioData);
+    _lastEnergyLevel = energy;
 
     // Update debug statistics
     _updateDebugStatistics(energy);
@@ -234,6 +240,7 @@ class SimpleEnergyVAD implements VADService {
 
     // Calculate energy
     final energy = _calculateAverageEnergy(audioData);
+    _lastEnergyLevel = energy;
 
     // Update debug statistics
     _updateDebugStatistics(energy);
@@ -272,6 +279,40 @@ class SimpleEnergyVAD implements VADService {
     }
 
     return math.sqrt(sumSquares / signal.length);
+  }
+
+  /// Calculate confidence value between 0.0 and 1.0 based on energy level relative to threshold
+  /// Confidence represents how certain we are about the speech detection result:
+  /// - When energy is far above threshold: high confidence in speech presence
+  /// - When energy is near threshold: low confidence (uncertain)
+  /// - When energy is far below threshold: high confidence in speech absence
+  double _calculateConfidence(double energyLevel) {
+    if (energyThreshold == 0.0) {
+      return 0.0;
+    }
+
+    // Calculate ratio of energy to threshold
+    final ratio = energyLevel / energyThreshold;
+
+    // Map ratio to confidence value (0.0 to 1.0)
+    // ratio < 0.5: very confident no speech (maps to ~0.0-0.3)
+    // ratio ~ 1.0: uncertain, near threshold (maps to ~0.5)
+    // ratio > 2.0: very confident speech present (maps to ~0.7-1.0)
+
+    if (ratio < 0.5) {
+      // Far below threshold: high confidence in silence
+      // Map [0, 0.5] -> [0.0, 0.3]
+      return ratio * 0.6;
+    } else if (ratio < 2.0) {
+      // Near threshold: uncertain
+      // Map [0.5, 2.0] -> [0.3, 0.7]
+      return 0.3 + (ratio - 0.5) * 0.267;
+    } else {
+      // Far above threshold: high confidence in speech
+      // Map [2.0, inf] -> [0.7, 1.0] with asymptotic approach to 1.0
+      final normalized = math.min((ratio - 2.0) / 3.0, 1.0);
+      return 0.7 + normalized * 0.3;
+    }
   }
 
   /// Update voice activity state with hysteresis to prevent rapid switching

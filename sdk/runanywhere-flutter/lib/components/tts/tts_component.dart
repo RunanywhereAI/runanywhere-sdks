@@ -64,8 +64,8 @@ class TTSConfiguration
 /// Input for Text-to-Speech (conforms to ComponentInput protocol)
 /// Matches iOS TTSInput from TTSComponent.swift
 class TTSInput implements ComponentInput {
-  /// Text to synthesize
-  final String text;
+  /// Text to synthesize (optional if SSML is provided)
+  final String? text;
 
   /// Optional SSML markup (overrides text if provided)
   final String? ssml;
@@ -80,7 +80,7 @@ class TTSInput implements ComponentInput {
   final TTSOptions? options;
 
   TTSInput({
-    required this.text,
+    this.text,
     this.ssml,
     this.voiceId,
     this.language,
@@ -89,7 +89,7 @@ class TTSInput implements ComponentInput {
 
   @override
   void validate() {
-    if (text.isEmpty && ssml == null) {
+    if ((text == null || text!.isEmpty) && ssml == null) {
       throw ArgumentError('TTSInput must contain either text or SSML');
     }
   }
@@ -233,7 +233,6 @@ class TTSComponent extends BaseComponent<TTSService> {
     ensureReady();
 
     final input = TTSInput(
-      text: '',
       ssml: ssml,
       voiceId: voice,
       language: language,
@@ -253,8 +252,8 @@ class TTSComponent extends BaseComponent<TTSService> {
     // Validate input
     input.validate();
 
-    // Get text to synthesize
-    final textToSynthesize = input.ssml ?? input.text;
+    // Get text to synthesize (prioritize SSML, then text, then empty string)
+    final String textToSynthesize = input.ssml ?? input.text ?? '';
 
     // Create options from input or use defaults
     final options = input.options ??
@@ -328,18 +327,30 @@ class TTSComponent extends BaseComponent<TTSService> {
       useSSML: false,
     );
 
-    // Use a list to collect chunks since we need to yield them
-    final chunks = <Uint8List>[];
-    await ttsService.synthesizeStream(
-      text: text,
-      options: options,
-      onChunk: (chunk) {
-        chunks.add(chunk);
-      },
+    // Use StreamController to yield chunks as they arrive
+    final controller = StreamController<Uint8List>();
+
+    // Start synthesis in background and add chunks to stream as they arrive
+    // We intentionally don't await here to allow chunks to be yielded as they arrive
+    unawaited(
+      ttsService.synthesizeStream(
+        text: text,
+        options: options,
+        onChunk: (chunk) {
+          controller.add(chunk);
+        },
+      ).then((_) {
+        // Close the stream when synthesis is complete
+        controller.close();
+      }).catchError((error) {
+        // Forward errors to the stream
+        controller.addError(error);
+        controller.close();
+      }),
     );
 
-    // Yield all collected chunks
-    for (final chunk in chunks) {
+    // Yield chunks as they become available
+    await for (final chunk in controller.stream) {
       yield chunk;
     }
   }

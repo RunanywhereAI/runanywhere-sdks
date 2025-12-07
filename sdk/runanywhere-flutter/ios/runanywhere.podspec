@@ -102,9 +102,33 @@ https://github.com/RunanywhereAI/runanywhere-binaries
 
         # Download from GitHub releases
         DOWNLOAD_URL="#{RunAnywhereBinaryConfig::IOS_XCFRAMEWORK_URL}"
+        EXPECTED_CHECKSUM="#{RunAnywhereBinaryConfig::IOS_XCFRAMEWORK_CHECKSUM}"
         echo "Downloading from: $DOWNLOAD_URL"
 
         curl -L "$DOWNLOAD_URL" -o RunAnywhereCore.xcframework.zip
+
+        # Verify checksum
+        echo "Verifying checksum..."
+        if command -v shasum >/dev/null 2>&1; then
+          ACTUAL_CHECKSUM=$(shasum -a 256 RunAnywhereCore.xcframework.zip | awk '{print $1}')
+        elif command -v sha256sum >/dev/null 2>&1; then
+          ACTUAL_CHECKSUM=$(sha256sum RunAnywhereCore.xcframework.zip | awk '{print $1}')
+        else
+          echo "❌ Error: Neither shasum nor sha256sum command found"
+          rm RunAnywhereCore.xcframework.zip
+          exit 1
+        fi
+
+        if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+          echo "❌ Checksum verification failed!"
+          echo "Expected: $EXPECTED_CHECKSUM"
+          echo "Actual:   $ACTUAL_CHECKSUM"
+          rm RunAnywhereCore.xcframework.zip
+          exit 1
+        fi
+
+        echo "✅ Checksum verified successfully"
+
         unzip -q RunAnywhereCore.xcframework.zip
         rm RunAnywhereCore.xcframework.zip
 
