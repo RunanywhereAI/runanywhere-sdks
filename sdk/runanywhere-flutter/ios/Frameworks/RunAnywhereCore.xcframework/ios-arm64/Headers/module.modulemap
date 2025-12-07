@@ -1,6 +1,0 @@
-module RunAnywhereCore {
-    umbrella header "RunAnywhereCore/ra_core.h"
-
-    export *
-    module * { export * }
-}
