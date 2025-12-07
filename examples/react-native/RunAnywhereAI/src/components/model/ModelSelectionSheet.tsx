@@ -196,8 +196,8 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const [isLoadingModel, setIsLoadingModel] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  const [downloadingModelId, setDownloadingModelId] = useState<string | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState(0);
+  // Track multiple downloads: modelId -> progress (0-1)
+  const [downloadingModels, setDownloadingModels] = useState<Record<string, number>>({});
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -401,16 +401,17 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
   /**
    * Handle model download with real-time progress
+   * Supports multiple concurrent downloads
    */
   const handleDownloadModel = async (model: SDKModelInfo) => {
-    setDownloadingModelId(model.id);
-    setDownloadProgress(0);
+    // Add this model to downloading set
+    setDownloadingModels(prev => ({ ...prev, [model.id]: 0 }));
 
     try {
       // Use real download API with progress callback
       await RunAnywhere.downloadModel(model.id, (progress) => {
-        // Update progress in real-time
-        setDownloadProgress(progress.progress);
+        // Update progress for this specific model
+        setDownloadingModels(prev => ({ ...prev, [model.id]: progress.progress }));
         console.log(`[Download] ${model.id}: ${Math.round(progress.progress * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`);
       });
       
@@ -419,8 +420,12 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     } catch (error) {
       console.error('[ModelSelectionSheet] Error downloading model:', error);
     } finally {
-      setDownloadingModelId(null);
-      setDownloadProgress(0);
+      // Remove this model from downloading set
+      setDownloadingModels(prev => {
+        const updated = { ...prev };
+        delete updated[model.id];
+        return updated;
+      });
     }
   };
 
@@ -622,7 +627,8 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Render model row
    */
   const renderModelRow = (model: SDKModelInfo) => {
-    const isDownloading = downloadingModelId === model.id;
+    const isDownloading = model.id in downloadingModels;
+    const downloadProgress = downloadingModels[model.id] ?? 0;
     const isSelected = selectedModelId === model.id;
     const canSelect = model.isDownloaded || model.localPath;
 
@@ -743,7 +749,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         // Ensure state is cleaned up when modal is dismissed
         setIsLoadingModel(false);
         setSelectedModelId(null);
-        setDownloadingModelId(null);
+        // Don't clear downloads - they continue in background
       }}
     >
       <SafeAreaView style={styles.container}>
@@ -986,7 +992,7 @@ const styles = StyleSheet.create({
   },
   progressBarBackground: {
     height: 4,
-    backgroundColor: Colors.border,
+    backgroundColor: Colors.backgroundGray5,
     borderRadius: 2,
     marginTop: 6,
     overflow: 'hidden',
