@@ -1,0 +1,39 @@
+# =============================================================================
+# Native Binaries (fetched from remote or built locally)
+# =============================================================================
+
+# iOS XCFramework - downloaded from GitHub releases or built locally
+ios/Frameworks/*.xcframework
+ios/Frameworks/*.xcframework.zip
+
+# Android native libraries - downloaded from GitHub releases or built locally
+android/src/main/jniLibs/arm64-v8a/
+android/src/main/jniLibs/armeabi-v7a/
+android/src/main/jniLibs/x86_64/
+android/src/main/jniLibs/include/
+
+# =============================================================================
+# Build artifacts
+# =============================================================================
+android/build/
+ios/build/
+.dart_tool/
+build/
+
+# =============================================================================
+# IDE and editor files
+# =============================================================================
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# =============================================================================
+# Flutter/Dart
+# =============================================================================
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock

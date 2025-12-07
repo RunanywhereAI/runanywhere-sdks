@@ -11,19 +11,20 @@
 module RunAnywhereBinaryConfig
   # Set this to true for local development/testing
   # Set to false for production builds (downloads from GitHub releases)
-  TEST_LOCAL = true
+  TEST_LOCAL = false
 
   # Remote binary configuration (used when TEST_LOCAL = false)
-  REMOTE_VERSION = "v0.0.1-dev.aade097"
+  REMOTE_VERSION = "v0.0.1-dev.27bdcd0"
+  REMOTE_COMMIT = "27bdcd0"  # Short commit hash for Android artifact naming
   REMOTE_BASE_URL = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download"
 
   # iOS XCFramework
   IOS_XCFRAMEWORK_URL = "#{REMOTE_BASE_URL}/#{REMOTE_VERSION}/RunAnywhereCore.xcframework.zip"
-  IOS_XCFRAMEWORK_CHECKSUM = "b678cbfea242a2a9004c8d52cdf3637483b4a3f4376cd51ae939c3671f33dc5c"
+  IOS_XCFRAMEWORK_CHECKSUM = "81f6d24230807dff93b6cb0d590f3dd82f69349ad47167c7cb6074903bc2af18"
 
-  # Android native libraries
-  ANDROID_LIBS_URL = "#{REMOTE_BASE_URL}/#{REMOTE_VERSION}/android-native-libs.zip"
-  ANDROID_LIBS_CHECKSUM = "TBD" # Will be updated when we publish Android binaries
+  # Android native libraries (unified package with ONNX + LlamaCPP)
+  ANDROID_LIBS_URL = "#{REMOTE_BASE_URL}/#{REMOTE_VERSION}/RunAnywhereUnified-android-#{REMOTE_COMMIT}.zip"
+  ANDROID_LIBS_CHECKSUM = "7e09fe00bad585cc245fd98f89c34b58bc84904e26e118163210e564f4bf2c18"
 
   def self.test_local?
     TEST_LOCAL
