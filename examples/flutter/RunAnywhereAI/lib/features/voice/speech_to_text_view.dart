@@ -216,9 +216,9 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     final (audioData, _) = await _recordingService.stopRecording();
 
     if (audioData == null || audioData.isEmpty) {
-      setState(() {
+        setState(() {
         _errorMessage = 'No audio data recorded';
-      });
+        });
       return;
     }
 
@@ -246,10 +246,10 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       // Transcribe using the SDK component
       final output = await sttComponent.transcribe(audioData);
 
-      setState(() {
+        setState(() {
         _transcribedText = output.text;
-        _isTranscribing = false;
-      });
+          _isTranscribing = false;
+        });
 
       debugPrint('✅ Transcription complete: ${output.text}');
       debugPrint('📊 Confidence: ${output.confidence}');

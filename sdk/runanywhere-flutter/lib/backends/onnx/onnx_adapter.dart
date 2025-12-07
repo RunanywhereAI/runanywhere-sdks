@@ -224,7 +224,7 @@ class OnnxAdapter
   @override
   DownloadStrategy? getDownloadStrategy() {
     // Return ONNX-specific download strategy
-    _downloadStrategy ??= OnnxDownloadStrategy(backend: _backend);
+    _downloadStrategy ??= OnnxDownloadStrategy();
     return _downloadStrategy;
   }
 

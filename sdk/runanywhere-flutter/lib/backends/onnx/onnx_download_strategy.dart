@@ -7,15 +7,15 @@ import '../../core/models/model/model_info.dart';
 import '../../core/protocols/downloading/download_strategy.dart';
 import '../../foundation/logging/sdk_logger.dart';
 import '../../foundation/error_types/sdk_error.dart';
-import '../native/native_backend.dart';
+import '../../foundation/file_operations/archive_utils.dart';
 
 /// ONNX download strategy for handling .onnx files and .tar.bz2 archives
 /// Matches iOS ONNXDownloadStrategy pattern
+///
+/// Uses pure Dart archive extraction (via `archive` package) for cross-platform support.
+/// This works on both iOS and Android without requiring native libarchive.
 class OnnxDownloadStrategy implements DownloadStrategy {
   final SDKLogger logger = SDKLogger(category: 'OnnxDownloadStrategy');
-  final NativeBackend? _backend;
-
-  OnnxDownloadStrategy({NativeBackend? backend}) : _backend = backend;
 
   @override
   bool canHandle(ModelInfo model) {
@@ -157,14 +157,20 @@ class OnnxDownloadStrategy implements DownloadStrategy {
 
     logger.info('Archive downloaded, extracting to: ${modelFolder.path}');
 
-    // Extract the archive using native backend
+    // Extract the archive using Flutter-side extraction (cross-platform)
     try {
-      if (_backend == null) {
-        throw SDKError.downloadFailed(
-            'Native backend not available for archive extraction');
-      }
+      // Use pure Dart archive extraction instead of native backend
+      // This works on both iOS and Android
+      await ArchiveUtils.extractTarBz2(
+        archivePath: archivePath.path,
+        destinationPath: modelFolder.path,
+        onProgress: (extractProgress) {
+          // Map extraction progress to 50% - 95% of overall progress
+          final overallProgress = 0.5 + (extractProgress * 0.45);
+          progressHandler?.call(overallProgress);
+        },
+      );
 
-      _backend!.extractArchive(archivePath.path, modelFolder.path);
       logger.info('Archive extracted successfully to: ${modelFolder.path}');
     } catch (e) {
       logger.error('Archive extraction failed: $e');
