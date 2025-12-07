@@ -33,6 +33,11 @@ class OnnxTTSServiceProvider implements TTSServiceProvider {
       return true;
     }
 
+    // Handle Piper TTS models (ONNX-based)
+    if (lower.contains('piper')) {
+      return true;
+    }
+
     // Handle Sherpa TTS models
     if (lower.contains('sherpa') && lower.contains('tts')) {
       return true;
@@ -43,16 +48,9 @@ class OnnxTTSServiceProvider implements TTSServiceProvider {
 
   @override
   Future<dynamic> createTTSService(dynamic configuration) async {
+    // Create service but don't initialize yet
+    // Component will call initialize() with the model path separately
     final service = OnnxTTSService(_backend);
-
-    String? modelPath;
-    if (configuration is Map) {
-      modelPath = configuration['modelPath'] as String?;
-    } else if (configuration is String) {
-      modelPath = configuration;
-    }
-
-    await service.initialize(modelPath: modelPath);
     return service;
   }
 }

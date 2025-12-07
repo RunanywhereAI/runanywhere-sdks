@@ -15,6 +15,7 @@ dependencies:
   provider: ^6.1.0
   flutter_markdown: ^0.6.18
   record: ^6.1.2
+  audioplayers: ^6.0.0
   permission_handler: ^11.1.0
   shared_preferences: ^2.2.2
   # Secure storage (iOS Keychain, Android Keystore)

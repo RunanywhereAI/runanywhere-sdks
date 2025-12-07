@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
-import '../../../core/module_registry.dart';
+import '../../../components/tts/tts_service.dart' as component_tts;
+import '../../../components/tts/tts_options.dart';
 import '../../native/native_backend.dart';
 
 /// ONNX-based Text-to-Speech service.
@@ -22,7 +23,7 @@ import '../../native/native_backend.dart';
 ///   options: TTSOptions(voice: 'default'),
 /// );
 /// ```
-class OnnxTTSService implements TTSService {
+class OnnxTTSService implements component_tts.TTSService {
   final NativeBackend _backend;
   bool _isInitialized = false;
   bool _isSynthesizing = false;
@@ -33,7 +34,8 @@ class OnnxTTSService implements TTSService {
 
   @override
   Future<void> initialize({String? modelPath}) async {
-    if (modelPath != null) {
+    if (modelPath != null && modelPath.isNotEmpty) {
+      // Load the TTS model through native backend
       _backend.loadTtsModel(
         modelPath,
         modelType: 'vits',
@@ -59,7 +61,7 @@ class OnnxTTSService implements TTSService {
   bool get supportsStreaming => _backend.ttsSupportsStreaming;
 
   @override
-  Future<List<int>> synthesize({
+  Future<Uint8List> synthesize({
     required String text,
     required TTSOptions options,
   }) async {
@@ -77,7 +79,7 @@ class OnnxTTSService implements TTSService {
       final sampleRate = result['sampleRate'] as int;
 
       // Convert Float32 samples to PCM16 bytes
-      return _convertToPCM16(samples, sampleRate);
+      return Uint8List.fromList(_convertToPCM16(samples, sampleRate));
     } finally {
       _isSynthesizing = false;
     }
@@ -87,7 +89,7 @@ class OnnxTTSService implements TTSService {
   Future<void> synthesizeStream({
     required String text,
     required TTSOptions options,
-    required void Function(List<int>) onChunk,
+    required void Function(Uint8List chunk) onChunk,
   }) async {
     // For now, use batch synthesis and emit as single chunk
     // TODO: Implement true streaming when supported by native backend

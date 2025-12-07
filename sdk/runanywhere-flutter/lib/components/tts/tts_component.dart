@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import '../../core/components/base_component.dart';
 import '../../core/types/sdk_component.dart';
 import '../../core/protocols/component/component_configuration.dart';
 import '../../core/models/audio_format.dart';
 import '../../core/module_registry.dart' hide TTSService, TTSOptions;
+import '../../foundation/dependency_injection/service_container.dart';
 import 'tts_service.dart';
 import 'tts_options.dart';
 import 'tts_output.dart';
@@ -12,7 +14,8 @@ import 'system_tts_service.dart';
 
 /// TTS (Text-to-Speech) Component Configuration
 /// Matches iOS TTSConfiguration from TTSComponent.swift
-class TTSConfiguration implements ComponentConfiguration, ComponentInitParameters {
+class TTSConfiguration
+    implements ComponentConfiguration, ComponentInitParameters {
   @override
   String get componentType => SDKComponent.tts.value;
 
@@ -97,6 +100,7 @@ class TTSComponent extends BaseComponent<TTSService> {
 
   final TTSConfiguration ttsConfiguration;
   String? currentVoice;
+  String? _modelPath;
 
   TTSComponent({
     required this.ttsConfiguration,
@@ -106,7 +110,39 @@ class TTSComponent extends BaseComponent<TTSService> {
 
   @override
   Future<TTSService> createService() async {
-    final modelId = ttsConfiguration.voice;
+    // Get model info from registry to get the actual model path
+    final registry = serviceContainer?.modelRegistry ??
+        ServiceContainer.shared.modelRegistry;
+    final modelId = ttsConfiguration.modelId;
+
+    if (modelId != null) {
+      final modelInfo = registry.getModel(modelId);
+
+      if (modelInfo != null && modelInfo.localPath != null) {
+        // Use the model's local path (handles nested directories for ONNX)
+        // For ONNX models, the path might be a directory containing the .onnx file
+        final localPath = modelInfo.localPath!.toFilePath();
+
+        // Check if it's a directory (ONNX models in nested dirs)
+        final pathFile = File(localPath);
+        final pathDir = Directory(localPath);
+
+        if (await pathDir.exists()) {
+          // It's a directory - ONNX models are stored in directories
+          // The native backend will find the .onnx file inside
+          _modelPath = localPath;
+        } else if (await pathFile.exists()) {
+          // It's a file - use it directly
+          _modelPath = localPath;
+        } else {
+          // Path doesn't exist, fallback to modelId
+          _modelPath = modelId;
+        }
+      } else {
+        // Fallback: use modelId as path (for built-in models or if not found)
+        _modelPath = modelId;
+      }
+    }
 
     // Try to get a registered TTS provider from central registry
     final provider = ModuleRegistry.shared.ttsProvider(modelId: modelId);
@@ -119,6 +155,8 @@ class TTSComponent extends BaseComponent<TTSService> {
       if (service is! TTSService) {
         throw StateError('Provider returned invalid service type');
       }
+      // Initialize with model path
+      await service.initialize(modelPath: _modelPath);
       ttsService = service;
     } else {
       // Fallback to system TTS
@@ -196,7 +234,8 @@ class TTSComponent extends BaseComponent<TTSService> {
           pitch: ttsConfiguration.pitch,
           volume: ttsConfiguration.volume,
           audioFormat: ttsConfiguration.audioFormat,
-          sampleRate: ttsConfiguration.audioFormat == AudioFormat.pcm ? 16000 : 44100,
+          sampleRate:
+              ttsConfiguration.audioFormat == AudioFormat.pcm ? 16000 : 44100,
           useSSML: input.ssml != null,
         );
 
@@ -209,7 +248,8 @@ class TTSComponent extends BaseComponent<TTSService> {
       options: options,
     );
 
-    final processingTime = DateTime.now().difference(startTime).inMilliseconds / 1000.0;
+    final processingTime =
+        DateTime.now().difference(startTime).inMilliseconds / 1000.0;
 
     // Calculate audio duration (estimate)
     final duration = _estimateAudioDuration(

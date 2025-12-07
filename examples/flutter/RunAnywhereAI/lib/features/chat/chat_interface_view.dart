@@ -289,9 +289,13 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           // Model status banner
           _buildModelStatusBanner(modelManager),
 
-          // Messages area
+          // Messages area - tap to dismiss keyboard
           Expanded(
-            child: _buildMessagesArea(),
+            child: GestureDetector(
+              onTap: () => FocusScope.of(context).unfocus(),
+              behavior: HitTestBehavior.opaque,
+              child: _buildMessagesArea(),
+            ),
           ),
 
           // Error banner
