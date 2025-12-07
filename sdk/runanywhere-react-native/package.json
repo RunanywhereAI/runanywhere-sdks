@@ -2,9 +2,16 @@
   "name": "runanywhere-react-native",
   "version": "0.1.0",
   "description": "RunAnywhere SDK for React Native - On-device AI with intelligent routing",
-  "main": "lib/commonjs/index",
-  "module": "lib/module/index",
+  "main": "lib/module/index.js",
   "types": "lib/typescript/src/index.d.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./lib/typescript/src/index.d.ts",
+      "default": "./lib/module/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "react-native": "src/index",
   "source": "src/index",
   "files": [
@@ -13,6 +20,8 @@
     "android",
     "ios",
     "cpp",
+    "nitrogen",
+    "nitro.json",
     "*.podspec",
     "!ios/build",
     "!android/build",
@@ -30,8 +39,10 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
-    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
-    "prepare": "bob build",
+    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib nitrogen/generated",
+    "nitrogen": "nitrogen",
+    "prepare": "nitrogen",
+    "build": "bob build",
     "release": "release-it"
   },
   "keywords": [
@@ -72,16 +83,19 @@
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.1",
     "jest": "^29.7.0",
+    "nitrogen": "^0.31.10",
     "prettier": "^3.0.3",
     "react": "18.2.0",
-    "react-native": "0.73.2",
-    "react-native-builder-bob": "^0.23.2",
+    "react-native": "0.74.0",
+    "react-native-builder-bob": "^0.40.14",
+    "react-native-nitro-modules": "^0.31.10",
     "release-it": "^15.0.0",
     "typescript": "^5.2.2"
   },
   "peerDependencies": {
     "react": "*",
-    "react-native": "*"
+    "react-native": "*",
+    "react-native-nitro-modules": "^0.31.3"
   },
   "workspaces": [
     "example"
@@ -150,19 +164,30 @@
     "source": "src",
     "output": "lib",
     "targets": [
-      "commonjs",
-      "module"
+      [
+        "custom",
+        {
+          "script": "nitrogen",
+          "clean": "nitrogen/"
+        }
+      ],
+      [
+        "module",
+        {
+          "esm": true
+        }
+      ],
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
     ]
   },
-  "codegenConfig": {
-    "name": "RunAnywhereSpec",
-    "type": "modules",
-    "jsSrcsDir": "src",
-    "ios": {
-      "mode": "cxx"
-    },
-    "android": {
-      "javaPackageName": "com.runanywhere.reactnative"
-    }
+  "create-react-native-library": {
+    "languages": "kotlin-swift",
+    "type": "nitro-module",
+    "version": "0.54.8"
   }
 }

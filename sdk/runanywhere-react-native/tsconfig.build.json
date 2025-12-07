@@ -1,19 +1,11 @@
 {
-  "extends": "./tsconfig",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./lib/typescript",
     "declaration": true,
-    "declarationMap": true,
-    "outDir": "lib/typescript",
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "skipLibCheck": true,
-    "strict": false
+    "declarationMap": true
   },
-  "include": ["src"],
-  "exclude": [
-    "src/services/AuthenticationService.ts",
-    "src/services/ConfigurationService.ts",
-    "src/services/DownloadService.ts",
-    "src/services/ModelRegistry.ts"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["lib", "node_modules", "example", "**/__tests__/**"]
 }

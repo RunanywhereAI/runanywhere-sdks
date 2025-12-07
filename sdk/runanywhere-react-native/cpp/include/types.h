@@ -25,11 +25,13 @@ typedef enum {
     RA_ERROR_INFERENCE_FAILED = -3,
     RA_ERROR_INVALID_HANDLE = -4,
     RA_ERROR_INVALID_PARAMS = -5,
+    RA_ERROR_INVALID_ARGUMENT = -5,   // Alias for INVALID_PARAMS
     RA_ERROR_OUT_OF_MEMORY = -6,
     RA_ERROR_NOT_IMPLEMENTED = -7,
     RA_ERROR_CANCELLED = -8,
     RA_ERROR_TIMEOUT = -9,
     RA_ERROR_IO = -10,
+    RA_ERROR_NOT_SUPPORTED = -11,     // Feature not supported by this backend
     RA_ERROR_UNKNOWN = -99
 } ra_result_code;
 

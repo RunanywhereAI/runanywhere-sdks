@@ -10,7 +10,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Components/TTS/TTSComponent.swift (SystemTTSService)
  */
 
-import NativeRunAnywhere from '../NativeRunAnywhere';
+import { NativeRunAnywhere } from '../native/NativeRunAnywhere';
 import type { TTSService, VoiceInfo } from '../Core/Protocols/Voice/TTSService';
 import type { TTSConfiguration } from '../Core/Models/Configuration/TTSConfiguration';
 import type { TTSResult } from '../Core/Models/TTS/TTSResult';

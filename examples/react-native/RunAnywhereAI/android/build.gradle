@@ -6,6 +6,8 @@ buildscript {
         targetSdkVersion = 34
         ndkVersion = "26.1.10909125"
         kotlinVersion = "1.9.22"
+        // React Native directory for C++ TurboModule
+        reactNativeDir = file("../node_modules/react-native")
     }
     repositories {
         google()
