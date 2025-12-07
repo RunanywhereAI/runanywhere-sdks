@@ -40,6 +40,7 @@ import {
   type ModelInfo as SDKModelInfo,
   LLMFramework as SDKLLMFramework,
   ModelCategory as SDKModelCategory,
+  requireDeviceInfoModule,
 } from 'runanywhere-react-native';
 
 /**
@@ -251,16 +252,51 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
       setAvailableModels(filteredModels);
 
-      // Load device info
-      // TODO: Get real device info from SDK when available
-      setDeviceInfo({
-        modelName: 'iPhone',
-        chipName: 'Apple Silicon',
-        totalMemory: 8 * 1024 * 1024 * 1024, // 8GB placeholder
-        availableMemory: 4 * 1024 * 1024 * 1024, // 4GB placeholder
-        hasNeuralEngine: true,
-        osVersion: 'iOS 17',
-      });
+      // Load real device info from native module
+      try {
+        const deviceInfoModule = requireDeviceInfoModule();
+        const [
+          modelName,
+          chipName,
+          totalMemory,
+          availableMemory,
+          hasNeuralEngine,
+          osVersion,
+          hasGPU,
+          cpuCores,
+        ] = await Promise.all([
+          deviceInfoModule.getDeviceModel(),
+          deviceInfoModule.getChipName(),
+          deviceInfoModule.getTotalRAM(),
+          deviceInfoModule.getAvailableRAM(),
+          deviceInfoModule.hasNPU(),
+          deviceInfoModule.getOSVersion(),
+          deviceInfoModule.hasGPU(),
+          deviceInfoModule.getCPUCores(),
+        ]);
+
+        setDeviceInfo({
+          modelName,
+          chipName: chipName || 'Unknown',
+          totalMemory,
+          availableMemory,
+          hasNeuralEngine,
+          osVersion,
+          hasGPU,
+          cpuCores,
+        });
+      } catch (error) {
+        console.warn('[ModelSelectionSheet] Failed to load device info:', error);
+        // Fallback to basic info
+        setDeviceInfo({
+          modelName: 'Unknown Device',
+          chipName: 'Unknown',
+          totalMemory: 0,
+          availableMemory: 0,
+          hasNeuralEngine: false,
+          osVersion: 'Unknown',
+        });
+      }
     } catch (error) {
       console.error('[ModelSelectionSheet] Error loading data:', error);
     } finally {
@@ -446,15 +482,39 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
             <Text style={styles.infoValue}>{formatBytes(deviceInfo.totalMemory)}</Text>
           </View>
 
-          {deviceInfo.hasNeuralEngine && (
+          {deviceInfo.cpuCores && (
             <View style={styles.infoRow}>
               <View style={styles.infoLabel}>
-                <Icon name="flash-outline" size={18} color={Colors.textSecondary} />
-                <Text style={styles.infoLabelText}>Neural Engine</Text>
+                <Icon name="speedometer-outline" size={18} color={Colors.textSecondary} />
+                <Text style={styles.infoLabelText}>CPU Cores</Text>
               </View>
-              <Icon name="checkmark-circle" size={20} color={Colors.statusGreen} />
+              <Text style={styles.infoValue}>{deviceInfo.cpuCores}</Text>
             </View>
           )}
+
+          <View style={styles.infoRow}>
+            <View style={styles.infoLabel}>
+              <Icon name="cube-outline" size={18} color={Colors.textSecondary} />
+              <Text style={styles.infoLabelText}>GPU</Text>
+            </View>
+            <Icon 
+              name={deviceInfo.hasGPU ? "checkmark-circle" : "close-circle"} 
+              size={20} 
+              color={deviceInfo.hasGPU ? Colors.statusGreen : Colors.statusRed} 
+            />
+          </View>
+
+          <View style={styles.infoRow}>
+            <View style={styles.infoLabel}>
+              <Icon name="flash-outline" size={18} color={Colors.textSecondary} />
+              <Text style={styles.infoLabelText}>NPU/Neural Engine</Text>
+            </View>
+            <Icon 
+              name={deviceInfo.hasNeuralEngine ? "checkmark-circle" : "close-circle"} 
+              size={20} 
+              color={deviceInfo.hasNeuralEngine ? Colors.statusGreen : Colors.statusRed} 
+            />
+          </View>
         </View>
       ) : (
         <View style={styles.card}>
