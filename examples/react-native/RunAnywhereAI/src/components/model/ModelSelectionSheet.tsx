@@ -364,23 +364,27 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   };
 
   /**
-   * Handle model download
+   * Handle model download with real-time progress
    */
   const handleDownloadModel = async (model: SDKModelInfo) => {
     setDownloadingModelId(model.id);
     setDownloadProgress(0);
 
     try {
-      // TODO: Use real download API with progress when available
-      const success = await RunAnywhere.downloadModel(model.id);
-      if (success) {
-        // Refresh models after download
-        await loadData();
-      }
+      // Use real download API with progress callback
+      await RunAnywhere.downloadModel(model.id, (progress) => {
+        // Update progress in real-time
+        setDownloadProgress(progress.progress);
+        console.log(`[Download] ${model.id}: ${Math.round(progress.progress * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`);
+      });
+      
+      // Refresh models after download
+      await loadData();
     } catch (error) {
       console.error('[ModelSelectionSheet] Error downloading model:', error);
     } finally {
       setDownloadingModelId(null);
+      setDownloadProgress(0);
     }
   };
 
@@ -587,12 +591,23 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           {/* Download/Status indicator */}
           <View style={styles.statusRow}>
             {isDownloading ? (
-              <>
-                <ActivityIndicator size="small" color={Colors.primaryBlue} />
-                <Text style={styles.statusText}>
-                  Downloading... {Math.round(downloadProgress * 100)}%
-                </Text>
-              </>
+              <View style={styles.downloadProgressContainer}>
+                <View style={styles.downloadProgressRow}>
+                  <ActivityIndicator size="small" color={Colors.primaryBlue} />
+                  <Text style={styles.statusText}>
+                    Downloading... {Math.round(downloadProgress * 100)}%
+                  </Text>
+                </View>
+                {/* Progress bar */}
+                <View style={styles.progressBarBackground}>
+                  <View 
+                    style={[
+                      styles.progressBarFill, 
+                      { width: `${Math.round(downloadProgress * 100)}%` }
+                    ]} 
+                  />
+                </View>
+              </View>
             ) : canSelect ? (
               <>
                 <Icon name="checkmark-circle" size={14} color={Colors.statusGreen} />
@@ -900,6 +915,26 @@ const styles = StyleSheet.create({
   statusText: {
     ...Typography.caption2,
     color: Colors.textSecondary,
+  },
+  downloadProgressContainer: {
+    flex: 1,
+  },
+  downloadProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xSmall,
+  },
+  progressBarBackground: {
+    height: 4,
+    backgroundColor: Colors.border,
+    borderRadius: 2,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: Colors.primaryBlue,
+    borderRadius: 2,
   },
   actionButtons: {
     marginLeft: Spacing.medium,

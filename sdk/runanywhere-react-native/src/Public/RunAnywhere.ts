@@ -11,7 +11,6 @@ import { EventBus } from './Events';
 import { requireNativeModule, isNativeModuleAvailable, NativeRunAnywhere, requireFileSystemModule } from '../native';
 import { SDKEnvironment, ExecutionTarget, HardwareAcceleration } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
-import RNFS from 'react-native-fs';
 import type {
   GenerationOptions,
   GenerationResult,
@@ -1149,8 +1148,8 @@ export const RunAnywhere = {
   /**
    * Download a model
    *
-   * Uses JavaScript-based download with react-native-fs for reliable model downloads.
-   * Progress is delivered via the callback and events.
+   * Uses native OkHttp (Android) / URLSession (iOS) for maximum download speed.
+   * Bypasses the React Native JS bridge for direct native file transfer.
    *
    * @param modelId - Model ID to download
    * @param onProgress - Optional progress callback
@@ -1178,63 +1177,55 @@ export const RunAnywhere = {
       throw new Error(`Model has no download URL: ${modelId}`);
     }
 
-    // Create models directory
-    const modelsDir = `${RNFS.DocumentDirectoryPath}/runanywhere-models`;
-    const dirExists = await RNFS.exists(modelsDir);
-    if (!dirExists) {
-      await RNFS.mkdir(modelsDir);
-      console.log('[RunAnywhere] Created models directory:', modelsDir);
-    }
+    // Get native file system module for fast downloads (bypasses JS bridge)
+    const fs = requireFileSystemModule();
 
-    // Determine file extension from URL
+    // Determine file name with extension
     const extension = modelInfo.downloadURL.includes('.gguf') ? '.gguf' : '';
-    const destPath = `${modelsDir}/${modelId}${extension}`;
+    const fileName = `${modelId}${extension}`;
 
-    console.log('[RunAnywhere] Starting download:', {
+    console.log('[RunAnywhere] Starting native download (OkHttp/URLSession):', {
       modelId,
       url: modelInfo.downloadURL,
-      destPath,
     });
 
-    // Use react-native-fs for reliable downloads
-    const { promise, jobId } = RNFS.downloadFile({
-      fromUrl: modelInfo.downloadURL,
-      toFile: destPath,
-      background: true,
-      discretionary: true,
-      progress: (res) => {
-        const progress = res.contentLength > 0 
-          ? res.bytesWritten / res.contentLength 
-          : 0;
-        
-        console.log(`[RunAnywhere] Download progress: ${Math.round(progress * 100)}%`);
-        
-        if (onProgress) {
-          onProgress({
-            modelId,
-            bytesDownloaded: res.bytesWritten,
-            totalBytes: res.contentLength,
-            progress,
-          });
-        }
-      },
-      progressDivider: 1, // Report progress every 1%
-    });
-
-    // Store jobId for potential cancellation
-    activeDownloads.set(modelId, jobId);
+    // Track download state
+    activeDownloads.set(modelId, 1);
+    let lastLoggedProgress = -1;
 
     try {
-      const result = await promise;
+      // Use native module for maximum download speed
+      // Android: OkHttp with HTTP/1.1 (faster than HTTP/2 for large files)
+      // iOS: URLSession with native download task
+      await fs.downloadModel(
+        fileName,
+        modelInfo.downloadURL,
+        (progress: number) => {
+          // Only log every 10% to reduce noise
+          const progressPct = Math.round(progress * 100);
+          if (progressPct - lastLoggedProgress >= 10) {
+            console.log(`[RunAnywhere] Download progress: ${progressPct}%`);
+            lastLoggedProgress = progressPct;
+          }
+
+          if (onProgress) {
+            onProgress({
+              modelId,
+              bytesDownloaded: Math.round(progress * (modelInfo.downloadSize || 0)),
+              totalBytes: modelInfo.downloadSize || 0,
+              progress,
+            });
+          }
+        }
+      );
+
+      // Get the actual path where model was downloaded
+      const destPath = await fs.getModelPath(fileName);
+
       console.log('[RunAnywhere] Download completed:', {
         modelId,
-        statusCode: result.statusCode,
-        bytesWritten: result.bytesWritten,
+        destPath,
       });
-
-      if (result.statusCode !== 200) {
-        throw new Error(`Download failed with status ${result.statusCode}`);
-      }
 
       // Update model registry
       const updatedModel: ModelInfo = {
@@ -1256,11 +1247,10 @@ export const RunAnywhere = {
    * @param modelId - Model ID being downloaded
    */
   async cancelDownload(modelId: string): Promise<boolean> {
-    const jobId = activeDownloads.get(modelId);
-    if (jobId) {
-      RNFS.stopDownload(jobId);
+    // Note: Native cancellation requires additional implementation
+    if (activeDownloads.has(modelId)) {
       activeDownloads.delete(modelId);
-      console.log('[RunAnywhere] Cancelled download:', modelId);
+      console.log('[RunAnywhere] Marked download as cancelled:', modelId);
       return true;
     }
     return false;
@@ -1273,29 +1263,26 @@ export const RunAnywhere = {
    */
   async deleteModel(modelId: string): Promise<boolean> {
     try {
-      // Get model info to find the path
+      const fs = requireFileSystemModule();
+
+      // Get model info to find the file name
       const modelInfo = await ModelRegistry.getModel(modelId);
-      
-      if (modelInfo?.localPath) {
-        const exists = await RNFS.exists(modelInfo.localPath);
-        if (exists) {
-          await RNFS.unlink(modelInfo.localPath);
-          console.log('[RunAnywhere] Deleted model file:', modelInfo.localPath);
-        }
+      const extension = modelInfo?.downloadURL?.includes('.gguf') ? '.gguf' : '';
+      const fileName = `${modelId}${extension}`;
+
+      // Check if model exists and delete via native module
+      const exists = await fs.modelExists(fileName);
+      if (exists) {
+        await fs.deleteModel(fileName);
+        console.log('[RunAnywhere] Deleted model:', modelId);
       }
-      
-      // Also try the standard path format
-      const modelsDir = `${RNFS.DocumentDirectoryPath}/runanywhere-models`;
-      const ggufPath = `${modelsDir}/${modelId}.gguf`;
-      const plainPath = `${modelsDir}/${modelId}`;
-      
-      if (await RNFS.exists(ggufPath)) {
-        await RNFS.unlink(ggufPath);
+
+      // Also try without extension
+      const existsPlain = await fs.modelExists(modelId);
+      if (existsPlain) {
+        await fs.deleteModel(modelId);
       }
-      if (await RNFS.exists(plainPath)) {
-        await RNFS.unlink(plainPath);
-      }
-      
+
       // Update registry
       if (modelInfo) {
         const updatedModel: ModelInfo = {
@@ -1305,7 +1292,7 @@ export const RunAnywhere = {
         };
         await ModelRegistry.registerModel(updatedModel);
       }
-      
+
       return true;
     } catch (error) {
       console.error('[RunAnywhere] Delete model error:', error);

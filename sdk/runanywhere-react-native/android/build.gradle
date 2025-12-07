@@ -278,4 +278,7 @@ repositories {
 dependencies {
     implementation "com.facebook.react:react-android"
     implementation project(":react-native-nitro-modules")
+    
+    // OkHttp for fast native downloads (HTTP/1.1, bypasses RN bridge)
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
 }
