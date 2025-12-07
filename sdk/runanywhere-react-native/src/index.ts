@@ -47,6 +47,8 @@ export {
   NativeRunAnywhere,
   isNativeModuleAvailable,
   requireNativeModule,
+  requireDeviceInfoModule,
+  requireFileSystemModule,
 } from './native';
 export type { NativeRunAnywhereModule } from './native';
 

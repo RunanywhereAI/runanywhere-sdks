@@ -204,11 +204,17 @@ export interface DeviceInfo {
   /** Available memory in bytes */
   availableMemory: number;
 
-  /** Whether device has Neural Engine */
+  /** Whether device has Neural Engine / NPU */
   hasNeuralEngine: boolean;
 
   /** OS version */
   osVersion: string;
+
+  /** Whether device has GPU */
+  hasGPU?: boolean;
+
+  /** Number of CPU cores */
+  cpuCores?: number;
 }
 
 /**
