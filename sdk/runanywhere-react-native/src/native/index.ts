@@ -8,9 +8,13 @@
 // Primary exports (auto-selects best implementation)
 export {
   NativeRunAnywhere,
+  NativeRunAnywhereFileSystem,
+  NativeRunAnywhereDeviceInfo,
   isNativeModuleAvailable,
   isUsingNitrogen,
   requireNativeModule,
+  requireFileSystemModule,
+  requireDeviceInfoModule,
 } from './NativeRunAnywhere';
 export type { NativeRunAnywhereModule } from './NativeRunAnywhere';
 

@@ -1,8 +1,8 @@
 /**
  * JSDownloadService.ts
  *
- * JavaScript-based model download service using react-native-fs.
- * This provides download functionality without requiring native module implementation.
+ * JavaScript-based model download service using rn-fetch-blob.
+ * This provides reliable download functionality for large files.
  *
  * Pattern matches Swift SDK's AlamofireDownloadService.swift
  */
@@ -12,12 +12,20 @@ import { EventBus } from '../Public/Events';
 import { ModelRegistry } from './ModelRegistry';
 import type { ModelInfo } from '../types';
 
-// Dynamic import of RNFS to handle cases where it's not installed
+// Dynamic import of rn-fetch-blob
+let RNFetchBlob: any = null;
+try {
+  RNFetchBlob = require('rn-fetch-blob').default;
+} catch {
+  console.warn('[JSDownloadService] rn-fetch-blob not available.');
+}
+
+// Fallback to RNFS for file operations
 let RNFS: typeof import('react-native-fs') | null = null;
 try {
   RNFS = require('react-native-fs');
 } catch {
-  console.warn('[JSDownloadService] react-native-fs not available. Download functionality will be limited.');
+  console.warn('[JSDownloadService] react-native-fs not available.');
 }
 
 /**
@@ -38,55 +46,62 @@ interface ActiveDownload {
   modelId: string;
   promise: Promise<string>;
   cancel: () => void;
+  task?: any;
 }
 
 /**
  * JavaScript-based Download Service
  *
- * Uses react-native-fs for HTTP downloads.
- * Follows the same pattern as Swift SDK's download service.
+ * Uses rn-fetch-blob for reliable file downloads.
  */
 class JSDownloadServiceImpl {
   private activeDownloads: Map<string, ActiveDownload> = new Map();
+  private jobIdCounter = 0;
 
   /**
    * Check if download functionality is available
    */
   isAvailable(): boolean {
-    return RNFS !== null;
+    return RNFetchBlob !== null || RNFS !== null;
   }
 
   /**
    * Get the models directory path
    */
   getModelsDirectory(): string {
-    if (!RNFS) {
-      throw new Error('react-native-fs not available');
+    if (RNFetchBlob) {
+      const dirs = RNFetchBlob.fs.dirs;
+      return `${dirs.DocumentDir}/runanywhere-models`;
     }
-    // Use DocumentDirectory for iOS, ExternalDirectoryPath for Android
-    const baseDir = Platform.OS === 'ios'
-      ? RNFS.DocumentDirectoryPath
-      : RNFS.ExternalDirectoryPath || RNFS.DocumentDirectoryPath;
-    return `${baseDir}/runanywhere-models`;
+    if (RNFS) {
+      return `${RNFS.DocumentDirectoryPath}/runanywhere-models`;
+    }
+    throw new Error('No file system library available');
   }
 
   /**
    * Ensure the models directory exists
    */
   async ensureModelsDirectory(): Promise<void> {
-    if (!RNFS) {
-      throw new Error('react-native-fs not available');
-    }
     const dir = this.getModelsDirectory();
-    const exists = await RNFS.exists(dir);
-    if (!exists) {
-      await RNFS.mkdir(dir);
-      console.log('[JSDownloadService] Created models directory:', dir);
+    
+    if (RNFetchBlob) {
+      const exists = await RNFetchBlob.fs.isDir(dir);
+      if (!exists) {
+        await RNFetchBlob.fs.mkdir(dir);
+        console.log('[JSDownloadService] Created models directory:', dir);
+      }
+    } else if (RNFS) {
+      const exists = await RNFS.exists(dir);
+      if (!exists) {
+        await RNFS.mkdir(dir);
+        console.log('[JSDownloadService] Created models directory:', dir);
+      }
     }
   }
 
   /**
-   * Download a model by ID
+   * Download a model by ID using rn-fetch-blob
    *
    * @param modelId - Model ID to download
    * @param onProgress - Optional progress callback
@@ -96,8 +111,8 @@ class JSDownloadServiceImpl {
     modelId: string,
     onProgress?: (progress: JSDownloadProgress) => void
   ): Promise<string> {
-    if (!RNFS) {
-      throw new Error('react-native-fs not available. Please install it to enable model downloads.');
+    if (!RNFetchBlob && !RNFS) {
+      throw new Error('No download library available. Please install rn-fetch-blob or react-native-fs.');
     }
 
     // Check if already downloading
@@ -117,12 +132,9 @@ class JSDownloadServiceImpl {
     }
 
     // Check if already downloaded
-    if (modelInfo.localPath) {
-      const exists = await RNFS.exists(modelInfo.localPath);
-      if (exists) {
-        console.log('[JSDownloadService] Model already downloaded:', modelId);
-        return modelInfo.localPath;
-      }
+    const existingPath = await this.checkExistingDownload(modelInfo);
+    if (existingPath) {
+      return existingPath;
     }
 
     // Ensure models directory exists
@@ -148,65 +160,80 @@ class JSDownloadServiceImpl {
       modelId,
     });
 
-    // Create download promise
-    const downloadPromise = new Promise<string>((resolve, reject) => {
-      const downloadTask = RNFS!.downloadFile({
-        fromUrl: modelInfo.downloadURL!,
-        toFile: destPath,
-        background: true, // Enable background downloads on iOS
-        discretionary: false, // Allow downloads on cellular
-        cacheable: false,
-        progressDivider: 1, // Report progress frequently
-        begin: (res) => {
-          console.log('[JSDownloadService] Download started, content-length:', res.contentLength);
-          // Store the job ID for cancellation
-          const download = this.activeDownloads.get(modelId);
-          if (download) {
-            download.jobId = res.jobId;
-          }
-        },
-        progress: (res) => {
-          const progress = res.contentLength > 0
-            ? res.bytesWritten / res.contentLength
-            : 0;
+    const jobId = ++this.jobIdCounter;
 
-          // Call progress callback
-          if (onProgress) {
-            onProgress({
+    // Use rn-fetch-blob for download
+    if (RNFetchBlob) {
+      return this.downloadWithRNFetchBlob(modelId, modelInfo, destPath, jobId, onProgress);
+    } else {
+      // Fallback to fetch + RNFS (may have issues with large files)
+      return this.downloadWithFetch(modelId, modelInfo, destPath, jobId, onProgress);
+    }
+  }
+
+  /**
+   * Download using rn-fetch-blob (preferred method)
+   */
+  private async downloadWithRNFetchBlob(
+    modelId: string,
+    modelInfo: ModelInfo,
+    destPath: string,
+    jobId: number,
+    onProgress?: (progress: JSDownloadProgress) => void
+  ): Promise<string> {
+    let lastProgressPercent = 0;
+
+    const downloadPromise = new Promise<string>((resolve, reject) => {
+      const task = RNFetchBlob.config({
+        path: destPath,
+        fileCache: false,
+      })
+        .fetch('GET', modelInfo.downloadURL!, {
+          // Add headers if needed
+        })
+        .progress({ interval: 100 }, (received: number, total: number) => {
+          const progress = total > 0 ? received / total : 0;
+          const progressPercent = Math.floor(progress * 100);
+
+          if (progressPercent > lastProgressPercent) {
+            lastProgressPercent = progressPercent;
+            console.log(`---Progress callback EMIT--- ${progressPercent}`);
+
+            if (onProgress) {
+              onProgress({
+                modelId,
+                bytesDownloaded: received,
+                totalBytes: total,
+                progress,
+              });
+            }
+
+            EventBus.publish('Model', {
+              type: 'downloadProgress',
               modelId,
-              bytesDownloaded: res.bytesWritten,
-              totalBytes: res.contentLength,
+              bytesDownloaded: received,
+              totalBytes: total,
               progress,
             });
           }
+        });
 
-          // Publish progress event
-          EventBus.publish('Model', {
-            type: 'downloadProgress',
-            modelId,
-            bytesDownloaded: res.bytesWritten,
-            totalBytes: res.contentLength,
-            progress,
-          });
-        },
-      });
-
-      // Store job ID immediately (may be updated in begin callback)
+      // Store task for cancellation
       const activeDownload: ActiveDownload = {
-        jobId: downloadTask.jobId,
+        jobId,
         modelId,
         promise: downloadPromise,
-        cancel: () => {
-          RNFS!.stopDownload(downloadTask.jobId);
-        },
+        cancel: () => task.cancel(),
+        task,
       };
       this.activeDownloads.set(modelId, activeDownload);
 
-      // Handle download completion
-      downloadTask.promise
-        .then(async (res) => {
-          if (res.statusCode === 200) {
-            console.log('[JSDownloadService] Download completed:', modelId);
+      task
+        .then(async (res: any) => {
+          const status = res.info().status;
+          
+          if (status === 200) {
+            console.log('[JSDownloadService] Download completed:', destPath);
 
             // Update model info with local path
             const updatedModel: ModelInfo = {
@@ -215,14 +242,12 @@ class JSDownloadServiceImpl {
               isDownloaded: true,
             };
 
-            // Update in registry
             try {
               await ModelRegistry.registerModel(updatedModel);
             } catch (e) {
               console.warn('[JSDownloadService] Failed to update model in registry:', e);
             }
 
-            // Publish completion event
             EventBus.publish('Model', {
               type: 'downloadCompleted',
               modelId,
@@ -232,17 +257,14 @@ class JSDownloadServiceImpl {
             this.activeDownloads.delete(modelId);
             resolve(destPath);
           } else {
-            const error = new Error(`Download failed with status: ${res.statusCode}`);
+            const error = new Error(`Download failed with status: ${status}`);
             console.error('[JSDownloadService] Download failed:', error);
 
             // Clean up partial file
             try {
-              const exists = await RNFS!.exists(destPath);
-              if (exists) {
-                await RNFS!.unlink(destPath);
-              }
+              await RNFetchBlob.fs.unlink(destPath);
             } catch (e) {
-              console.warn('[JSDownloadService] Failed to clean up partial download:', e);
+              // Ignore
             }
 
             EventBus.publish('Model', {
@@ -255,23 +277,20 @@ class JSDownloadServiceImpl {
             reject(error);
           }
         })
-        .catch(async (error) => {
+        .catch(async (error: any) => {
           console.error('[JSDownloadService] Download error:', error);
 
           // Clean up partial file
           try {
-            const exists = await RNFS!.exists(destPath);
-            if (exists) {
-              await RNFS!.unlink(destPath);
-            }
+            await RNFetchBlob.fs.unlink(destPath);
           } catch (e) {
-            console.warn('[JSDownloadService] Failed to clean up partial download:', e);
+            // Ignore
           }
 
           EventBus.publish('Model', {
             type: 'downloadFailed',
             modelId,
-            error: error.message,
+            error: error.message || String(error),
           });
 
           this.activeDownloads.delete(modelId);
@@ -280,6 +299,139 @@ class JSDownloadServiceImpl {
     });
 
     return downloadPromise;
+  }
+
+  /**
+   * Fallback download using fetch + RNFS
+   */
+  private async downloadWithFetch(
+    modelId: string,
+    modelInfo: ModelInfo,
+    destPath: string,
+    jobId: number,
+    onProgress?: (progress: JSDownloadProgress) => void
+  ): Promise<string> {
+    const abortController = new AbortController();
+
+    const downloadPromise = (async (): Promise<string> => {
+      try {
+        console.log('[JSDownloadService] Fetching with fallback:', modelInfo.downloadURL);
+
+        const response = await fetch(modelInfo.downloadURL!, {
+          method: 'GET',
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Download failed with status: ${response.status}`);
+        }
+
+        const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+        console.log('[JSDownloadService] Content-Length:', contentLength);
+
+        const blob = await response.blob();
+
+        // Read blob as base64
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(',')[1] || dataUrl;
+            resolve(base64);
+          };
+          reader.onerror = () => reject(new Error('Failed to read blob'));
+          reader.readAsDataURL(blob);
+        });
+
+        console.log('[JSDownloadService] Writing file...');
+        await RNFS!.writeFile(destPath, base64Data, 'base64');
+
+        // Emit 100% progress
+        if (onProgress) {
+          onProgress({
+            modelId,
+            bytesDownloaded: contentLength || blob.size,
+            totalBytes: contentLength || blob.size,
+            progress: 1,
+          });
+        }
+
+        // Update model info
+        const updatedModel: ModelInfo = {
+          ...modelInfo,
+          localPath: destPath,
+          isDownloaded: true,
+        };
+
+        try {
+          await ModelRegistry.registerModel(updatedModel);
+        } catch (e) {
+          console.warn('[JSDownloadService] Failed to update model in registry:', e);
+        }
+
+        EventBus.publish('Model', {
+          type: 'downloadCompleted',
+          modelId,
+          localPath: destPath,
+        });
+
+        this.activeDownloads.delete(modelId);
+        return destPath;
+      } catch (error: any) {
+        console.error('[JSDownloadService] Download error:', error);
+
+        try {
+          const exists = await RNFS!.exists(destPath);
+          if (exists) {
+            await RNFS!.unlink(destPath);
+          }
+        } catch (e) {
+          // Ignore
+        }
+
+        EventBus.publish('Model', {
+          type: 'downloadFailed',
+          modelId,
+          error: error.message || String(error),
+        });
+
+        this.activeDownloads.delete(modelId);
+        throw error;
+      }
+    })();
+
+    const activeDownload: ActiveDownload = {
+      jobId,
+      modelId,
+      promise: downloadPromise,
+      cancel: () => abortController.abort(),
+    };
+    this.activeDownloads.set(modelId, activeDownload);
+
+    return downloadPromise;
+  }
+
+  /**
+   * Check if model is already downloaded
+   */
+  private async checkExistingDownload(modelInfo: ModelInfo): Promise<string | null> {
+    if (!modelInfo.localPath) {
+      return null;
+    }
+
+    let exists = false;
+    if (RNFetchBlob) {
+      exists = await RNFetchBlob.fs.exists(modelInfo.localPath);
+    } else if (RNFS) {
+      exists = await RNFS.exists(modelInfo.localPath);
+    }
+
+    if (exists) {
+      console.log('[JSDownloadService] Model already downloaded:', modelInfo.id);
+      return modelInfo.localPath;
+    }
+
+    return null;
   }
 
   /**
@@ -312,22 +464,28 @@ class JSDownloadServiceImpl {
    * Delete a downloaded model
    */
   async deleteModel(modelId: string): Promise<boolean> {
-    if (!RNFS) {
-      return false;
-    }
-
     const modelInfo = await ModelRegistry.getModel(modelId);
     if (!modelInfo?.localPath) {
       return false;
     }
 
     try {
-      const exists = await RNFS.exists(modelInfo.localPath);
+      let exists = false;
+      if (RNFetchBlob) {
+        exists = await RNFetchBlob.fs.exists(modelInfo.localPath);
+        if (exists) {
+          await RNFetchBlob.fs.unlink(modelInfo.localPath);
+        }
+      } else if (RNFS) {
+        exists = await RNFS.exists(modelInfo.localPath);
+        if (exists) {
+          await RNFS.unlink(modelInfo.localPath);
+        }
+      }
+
       if (exists) {
-        await RNFS.unlink(modelInfo.localPath);
         console.log('[JSDownloadService] Deleted model:', modelId);
 
-        // Update model info
         const updatedModel: ModelInfo = {
           ...modelInfo,
           localPath: undefined,
@@ -348,16 +506,18 @@ class JSDownloadServiceImpl {
    * Check if a model file exists locally
    */
   async isModelDownloaded(modelId: string): Promise<boolean> {
-    if (!RNFS) {
-      return false;
-    }
-
     const modelInfo = await ModelRegistry.getModel(modelId);
     if (!modelInfo?.localPath) {
       return false;
     }
 
-    return RNFS.exists(modelInfo.localPath);
+    if (RNFetchBlob) {
+      return RNFetchBlob.fs.exists(modelInfo.localPath);
+    } else if (RNFS) {
+      return RNFS.exists(modelInfo.localPath);
+    }
+
+    return false;
   }
 
   /**
@@ -369,11 +529,13 @@ class JSDownloadServiceImpl {
       return null;
     }
 
-    if (!RNFS) {
-      return modelInfo.localPath;
+    let exists = false;
+    if (RNFetchBlob) {
+      exists = await RNFetchBlob.fs.exists(modelInfo.localPath);
+    } else if (RNFS) {
+      exists = await RNFS.exists(modelInfo.localPath);
     }
 
-    const exists = await RNFS.exists(modelInfo.localPath);
     return exists ? modelInfo.localPath : null;
   }
 
@@ -381,19 +543,18 @@ class JSDownloadServiceImpl {
    * Get storage usage information
    */
   async getStorageUsage(): Promise<{ used: number; free: number }> {
-    if (!RNFS) {
-      return { used: 0, free: 0 };
+    if (RNFS) {
+      try {
+        const fsInfo = await RNFS.getFSInfo();
+        return {
+          used: fsInfo.totalSpace - fsInfo.freeSpace,
+          free: fsInfo.freeSpace,
+        };
+      } catch {
+        return { used: 0, free: 0 };
+      }
     }
-
-    try {
-      const fsInfo = await RNFS.getFSInfo();
-      return {
-        used: fsInfo.totalSpace - fsInfo.freeSpace,
-        free: fsInfo.freeSpace,
-      };
-    } catch {
-      return { used: 0, free: 0 };
-    }
+    return { used: 0, free: 0 };
   }
 }
 
@@ -403,4 +564,3 @@ class JSDownloadServiceImpl {
 export const JSDownloadService = new JSDownloadServiceImpl();
 
 export default JSDownloadService;
-
