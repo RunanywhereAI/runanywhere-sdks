@@ -734,7 +734,15 @@ class NativeBackend {
       final json = ptr.toDartString();
       final decoded = jsonDecode(json);
       if (decoded is List) {
-        return decoded.cast<String>();
+        // The native backend returns a list of voice info objects
+        // Each voice is a Map with {id, name, language}
+        // We extract the IDs as strings
+        return decoded.map((voice) {
+          if (voice is Map) {
+            return voice['id']?.toString() ?? '0';
+          }
+          return voice.toString();
+        }).toList();
       }
       return [json];
     } finally {

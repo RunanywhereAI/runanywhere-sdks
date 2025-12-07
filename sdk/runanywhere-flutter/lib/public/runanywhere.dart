@@ -390,8 +390,9 @@ class RunAnywhere {
       // Lazy device registration on first API call
       await _ensureDeviceRegistered();
 
-      // Create TTS configuration
-      final ttsConfig = TTSConfiguration(voice: modelId);
+      // Create TTS configuration with the modelId
+      // Note: voice defaults to 'system' but modelId is what we need for path resolution
+      final ttsConfig = TTSConfiguration(modelId: modelId);
 
       // Create and initialize TTS component
       final ttsComponent = TTSComponent(ttsConfiguration: ttsConfig);

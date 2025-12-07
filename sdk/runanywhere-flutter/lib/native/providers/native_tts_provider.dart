@@ -19,10 +19,16 @@ class NativeTTSService implements TTSService {
     _modelPath = modelPath;
 
     // Load TTS model (VITS/Piper type)
+    // This is synchronous and will throw if it fails
     _backend.loadTtsModel(
       modelPath,
       modelType: 'vits',
     );
+
+    // Verify the model loaded successfully
+    if (!_backend.isTtsModelLoaded) {
+      throw Exception('TTS model failed to load - model not marked as loaded');
+    }
 
     _isInitialized = true;
   }
