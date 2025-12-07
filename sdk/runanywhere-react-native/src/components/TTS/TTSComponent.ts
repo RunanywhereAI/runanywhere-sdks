@@ -17,7 +17,7 @@ import type { TTSServiceProvider } from '../../Core/Protocols/Voice/TTSServicePr
 import type { TTSResult } from '../../Core/Models/TTS/TTSResult';
 import type { TTSConfiguration as CoreTTSConfiguration } from '../../Core/Models/Configuration/TTSConfiguration';
 import { AnyServiceWrapper } from '../../Core/Components/BaseComponent';
-import NativeRunAnywhere from '../../NativeRunAnywhere';
+import { NativeRunAnywhere } from '../../native/NativeRunAnywhere';
 
 /**
  * TTS Service Wrapper

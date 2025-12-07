@@ -14,7 +14,7 @@
  * - Clean separation of concerns
  */
 
-import NativeRunAnywhere from '../../NativeRunAnywhere';
+import { NativeRunAnywhere } from '../../native/NativeRunAnywhere';
 import { EventBus } from '../../Public/Events/EventBus';
 import type { SDKGenerationEvent, SDKVoiceEvent } from '../../types';
 

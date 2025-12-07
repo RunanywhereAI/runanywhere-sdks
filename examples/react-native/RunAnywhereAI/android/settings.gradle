@@ -1,4 +1,22 @@
 rootProject.name = 'RunAnywhereAI'
+
+// Configure node path for React Native CLI
+// This helps Android Studio find node when not launched from terminal
+def nodeDir = System.getenv("NODE_BINARY")?.with { new File(it).parentFile?.absolutePath }
+if (!nodeDir) {
+    // Check common node installation paths
+    def possiblePaths = [
+        "/opt/homebrew/bin",           // macOS Apple Silicon (Homebrew)
+        "/usr/local/bin",              // macOS Intel / Linux
+        System.getenv("HOME") + "/.nvm/current/bin",  // NVM
+        System.getenv("HOME") + "/.nodenv/shims",     // nodenv
+    ]
+    nodeDir = possiblePaths.find { new File(it, "node").exists() }
+}
+if (nodeDir) {
+    System.setProperty("node.dir", nodeDir)
+}
+
 apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')

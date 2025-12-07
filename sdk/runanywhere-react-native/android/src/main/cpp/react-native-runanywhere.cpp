@@ -2,50 +2,54 @@
  * react-native-runanywhere.cpp
  *
  * JNI entry point for Android - registers the C++ TurboModule with React Native.
- * This file is the minimal JNI glue that allows the pure C++ RunAnywhereModule
- * to work on Android without any Kotlin/Java bridge code.
+ * This uses the modern approach where Java/Kotlin calls a native install method
+ * with the JSI runtime pointer.
  */
 
 #include <jni.h>
-#include <fbjni/fbjni.h>
-#include <react/renderer/componentregistry/ComponentDescriptorProviderRegistry.h>
-#include <ReactCommon/CallInvokerHolder.h>
-#include <ReactCommon/TurboModuleBinding.h>
+#include <jsi/jsi.h>
 #include "RunAnywhereModule.h"
 
-using namespace facebook;
-using namespace facebook::react;
+using namespace facebook::jsi;
 
-/**
- * TurboModule provider function - called by React Native to create our module.
- * This is the key function that connects our C++ module to React Native's
- * TurboModule system.
- *
- * @param name The module name being requested (should be "RunAnywhere")
- * @param params Initialization parameters including the JSInvoker
- * @return Shared pointer to our RunAnywhereModule, or nullptr if name doesn't match
- */
-std::shared_ptr<TurboModule> provideRunAnywhereTurboModule(
-    const std::string &name,
-    const JavaTurboModule::InitParams &params) {
-  if (name == "RunAnywhere") {
-    return std::make_shared<RunAnywhereModule>(params.jsInvoker);
-  }
-  return nullptr;
-}
+// Global reference for callbacks
+static JavaVM* g_jvm = nullptr;
 
 /**
  * JNI_OnLoad - called when the native library is loaded.
- * This is where we register our TurboModule provider with React Native.
- *
- * IMPORTANT: This function is called automatically by Android when
- * System.loadLibrary("runanywhere-react-native") is invoked.
+ * Just stores the JavaVM reference for later use.
  */
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
-  return facebook::jni::initialize(vm, [] {
-    // Register our TurboModule provider function
-    // React Native will call provideRunAnywhereTurboModule when
-    // JavaScript requests the "RunAnywhere" module
-    TurboModuleBinding::registerBinding(&provideRunAnywhereTurboModule);
-  });
+    g_jvm = vm;
+    return JNI_VERSION_1_6;
+}
+
+/**
+ * Native install function - called from Kotlin/Java with the JSI runtime pointer.
+ * This installs the RunAnywhere module as a global object in the JS runtime.
+ */
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_runanywhere_reactnative_RunAnywhereModule_nativeInstall(
+    JNIEnv *env,
+    jobject thiz,
+    jlong jsiPtr) {
+
+    auto runtime = reinterpret_cast<Runtime*>(jsiPtr);
+    if (!runtime) {
+        return;
+    }
+
+    Runtime &rt = *runtime;
+
+    // Create the RunAnywhere module as a HostObject
+    auto runAnywhereModule = std::make_shared<facebook::react::RunAnywhereModule>(nullptr);
+    auto moduleHostObject = Object::createFromHostObject(rt, runAnywhereModule);
+
+    // Install it as a global property accessible from JavaScript
+    rt.global().setProperty(
+        rt,
+        "RunAnywhereNative",
+        std::move(moduleHostObject)
+    );
 }

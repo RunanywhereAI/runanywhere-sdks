@@ -2,8 +2,7 @@
 
 #import <React/RCTBundleURLProvider.h>
 
-// Import the RunAnywhere TurboModule C++ header
-#import "RunAnywhereModule.h"
+// NitroModules handles RunAnywhere HybridObject registration automatically
 
 @implementation AppDelegate
 

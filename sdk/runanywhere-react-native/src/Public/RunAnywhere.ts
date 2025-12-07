@@ -311,11 +311,8 @@ export const RunAnywhere = {
    * Get SDK version
    */
   async getVersion(): Promise<string> {
-    if (!isNativeModuleAvailable()) {
-      return '0.1.0-dev';
-    }
-    const native = requireNativeModule();
-    return native.getVersion();
+    // Version is managed at the JS layer
+    return '0.1.0';
   },
 
   // ============================================================================
