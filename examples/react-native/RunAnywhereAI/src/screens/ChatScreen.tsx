@@ -142,6 +142,9 @@ export const ChatScreen: React.FC = () => {
    * Handle model selected from the sheet
    */
   const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
+    // Close the modal first to prevent UI issues
+    setShowModelSelection(false);
+    // Then load the model
     await loadModel(model);
   }, []);
 

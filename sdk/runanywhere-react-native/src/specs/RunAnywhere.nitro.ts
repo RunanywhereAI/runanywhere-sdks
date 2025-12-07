@@ -71,18 +71,21 @@ export interface RunAnywhere
 
   /**
    * Generate text (non-streaming)
+   * Matches Swift SDK: RunAnywhere.generate(_:options:)
    * @param prompt The prompt text
-   * @param optionsJson JSON string with generation options
+   * @param optionsJson JSON string with generation options (max_tokens, temperature, system_prompt)
+   * @returns JSON string with generation result
    */
-  generateText(prompt: string, optionsJson?: string): Promise<string>;
+  generate(prompt: string, optionsJson?: string): Promise<string>;
 
   /**
    * Generate text with streaming callback
+   * Matches Swift SDK: RunAnywhere.generateStream(_:options:)
    * @param prompt The prompt text
    * @param optionsJson JSON string with generation options
    * @param callback Called for each token
    */
-  generateTextStream(
+  generateStream(
     prompt: string,
     optionsJson: string,
     callback: (token: string, isComplete: boolean) => void
@@ -131,6 +134,15 @@ export interface RunAnywhere
     sampleRate: number,
     language?: string
   ): Promise<string>;
+
+  /**
+   * Transcribe audio from a file path
+   * Native code handles M4A/WAV/CAF to PCM conversion
+   * @param filePath Path to the audio file
+   * @param language Language code (e.g., 'en')
+   * @returns JSON string with transcription result
+   */
+  transcribeFile(filePath: string, language?: string): Promise<string>;
 
   /**
    * Check if STT supports streaming

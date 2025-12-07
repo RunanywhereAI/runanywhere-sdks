@@ -357,7 +357,26 @@ export const RunAnywhere = {
   },
 
   /**
+   * Simple chat - returns just the text response
+   * Matches Swift SDK: RunAnywhere.chat(_:)
+   *
+   * @param prompt - The chat prompt
+   * @returns The generated text response
+   *
+   * @example
+   * ```typescript
+   * const response = await RunAnywhere.chat('Hello, how are you?');
+   * console.log(response);
+   * ```
+   */
+  async chat(prompt: string): Promise<string> {
+    const result = await this.generate(prompt);
+    return result.text;
+  },
+
+  /**
    * Text generation with options and full metrics
+   * Matches Swift SDK: RunAnywhere.generate(_:options:)
    *
    * @param prompt - The text prompt
    * @param options - Generation options
@@ -378,11 +397,14 @@ export const RunAnywhere = {
     }
     const native = requireNativeModule();
 
-    const maxTokens = options?.maxTokens ?? 256;
-    const temperature = options?.temperature ?? 0.7;
-    const systemPrompt = options?.systemPrompt ?? null;
+    // Build options JSON for native generateText
+    const optionsJson = JSON.stringify({
+      max_tokens: options?.maxTokens ?? 256,
+      temperature: options?.temperature ?? 0.7,
+      system_prompt: options?.systemPrompt ?? null,
+    });
 
-    const resultJson = await native.generate(prompt, systemPrompt, maxTokens, temperature);
+    const resultJson = await native.generate(prompt, optionsJson);
 
     try {
       const result = JSON.parse(resultJson);

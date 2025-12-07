@@ -89,10 +89,10 @@ public:
     const std::optional<std::string>& configJson) override;
   std::shared_ptr<Promise<bool>> isTextModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadTextModel() override;
-  std::shared_ptr<Promise<std::string>> generateText(
+  std::shared_ptr<Promise<std::string>> generate(
     const std::string& prompt,
     const std::optional<std::string>& optionsJson) override;
-  std::shared_ptr<Promise<std::string>> generateTextStream(
+  std::shared_ptr<Promise<std::string>> generateStream(
     const std::string& prompt,
     const std::string& optionsJson,
     const std::function<void(const std::string&, bool)>& callback) override;
@@ -111,6 +111,9 @@ public:
   std::shared_ptr<Promise<std::string>> transcribe(
     const std::string& audioBase64,
     double sampleRate,
+    const std::optional<std::string>& language) override;
+  std::shared_ptr<Promise<std::string>> transcribeFile(
+    const std::string& filePath,
     const std::optional<std::string>& language) override;
   std::shared_ptr<Promise<bool>> supportsSTTStreaming() override;
 

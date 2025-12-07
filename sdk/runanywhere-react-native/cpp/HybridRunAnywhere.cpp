@@ -11,9 +11,18 @@
 #include <cstring>
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <vector>
+
+// iOS AudioDecoder functions (defined in AudioDecoder.m)
+#if defined(__APPLE__)
+extern "C" {
+  int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSamples, int* sampleRate);
+  void ra_free_audio_samples(float* samples);
+}
+#endif
 
 namespace margelo::nitro::runanywhere {
 
@@ -289,7 +298,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhere::unloadTextModel() {
   });
 }
 
-std::shared_ptr<Promise<std::string>> HybridRunAnywhere::generateText(
+std::shared_ptr<Promise<std::string>> HybridRunAnywhere::generate(
     const std::string& prompt,
     const std::optional<std::string>& optionsJson) {
   return Promise<std::string>::async([this, prompt, optionsJson]() {
@@ -297,35 +306,145 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::generateText(
 
     if (!backend_ || !ra_text_is_model_loaded(backend_)) {
       setLastError("Model not loaded");
-      return std::string("");
+      return buildJsonObject({{"error", jsonString("Model not loaded")}});
     }
 
     // Parse options from JSON
-    int maxTokens = 512;
+    int maxTokens = 256;
     float temperature = 0.7f;
+    std::string systemPrompt;
 
     if (optionsJson.has_value()) {
-      maxTokens = extractIntValue(*optionsJson, "max_tokens", 512);
+      maxTokens = extractIntValue(*optionsJson, "max_tokens", 256);
       temperature = extractFloatValue(*optionsJson, "temperature", 0.7f);
+      
+      // Extract system_prompt string
+      size_t sysStart = optionsJson->find("\"system_prompt\":");
+      if (sysStart != std::string::npos) {
+        sysStart = optionsJson->find("\"", sysStart + 16);
+        if (sysStart != std::string::npos) {
+          sysStart++;
+          size_t sysEnd = optionsJson->find("\"", sysStart);
+          if (sysEnd != std::string::npos) {
+            systemPrompt = optionsJson->substr(sysStart, sysEnd - sysStart);
+          }
+        }
+      }
     }
+
+    printf("[HybridRunAnywhere] generate() called\n");
+    printf("[HybridRunAnywhere] prompt: %.50s...\n", prompt.c_str());
+    printf("[HybridRunAnywhere] maxTokens: %d, temperature: %.2f\n", maxTokens, temperature);
+
+    // Prepare full prompt with system prompt if provided
+    std::string fullPrompt = prompt;
+    if (!systemPrompt.empty() && systemPrompt != "null") {
+      fullPrompt = systemPrompt + "\n\n" + prompt;
+    }
+
+    auto startTime = std::chrono::high_resolution_clock::now();
 
     char* result_json = nullptr;
     ra_result_code result = ra_text_generate(
-        backend_, prompt.c_str(), nullptr,
+        backend_, fullPrompt.c_str(), nullptr,
         maxTokens, temperature, &result_json);
+
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
 
     if (result != RA_SUCCESS || !result_json) {
       setLastError("Text generation failed");
-      return std::string("");
+      return buildJsonObject({{"error", jsonString("Text generation failed")}});
     }
 
-    std::string response(result_json);
+    // Parse the result JSON from runanywhere-core
+    std::string coreResult(result_json);
     ra_free_string(result_json);
+
+    // Extract text from the core result
+    std::string generatedText;
+    size_t textStart = coreResult.find("\"text\":");
+    if (textStart != std::string::npos) {
+      textStart = coreResult.find("\"", textStart + 7);
+      if (textStart != std::string::npos) {
+        textStart++;
+        size_t textEnd = textStart;
+        // Find the closing quote, handling escaped quotes
+        while (textEnd < coreResult.size()) {
+          textEnd = coreResult.find("\"", textEnd);
+          if (textEnd == std::string::npos) break;
+          // Check if it's escaped
+          int backslashes = 0;
+          size_t pos = textEnd - 1;
+          while (pos < coreResult.size() && coreResult[pos] == '\\') {
+            backslashes++;
+            if (pos == 0) break;
+            pos--;
+          }
+          if (backslashes % 2 == 0) break; // Not escaped
+          textEnd++;
+        }
+        if (textEnd != std::string::npos) {
+          generatedText = coreResult.substr(textStart, textEnd - textStart);
+          // Unescape the string
+          std::string unescaped;
+          for (size_t i = 0; i < generatedText.size(); i++) {
+            if (generatedText[i] == '\\' && i + 1 < generatedText.size()) {
+              char next = generatedText[i + 1];
+              if (next == 'n') { unescaped += '\n'; i++; }
+              else if (next == 'r') { unescaped += '\r'; i++; }
+              else if (next == 't') { unescaped += '\t'; i++; }
+              else if (next == '"') { unescaped += '"'; i++; }
+              else if (next == '\\') { unescaped += '\\'; i++; }
+              else { unescaped += generatedText[i]; }
+            } else {
+              unescaped += generatedText[i];
+            }
+          }
+          generatedText = unescaped;
+        }
+      }
+    }
+
+    // If we couldn't parse text, use raw result
+    if (generatedText.empty()) {
+      generatedText = coreResult;
+    }
+
+    int tokensUsed = extractIntValue(coreResult, "tokens_used", 0);
+    if (tokensUsed == 0) {
+      tokensUsed = extractIntValue(coreResult, "tokensUsed", 0);
+    }
+    if (tokensUsed == 0) {
+      tokensUsed = static_cast<int>(generatedText.size() / 4); // Rough estimate
+    }
+
+    double tokensPerSecond = durationMs > 0 ? (tokensUsed * 1000.0 / durationMs) : 0;
+
+    // Build response in the format expected by the JS SDK
+    std::string response = buildJsonObject({
+      {"text", jsonString(generatedText)},
+      {"tokensUsed", std::to_string(tokensUsed)},
+      {"modelUsed", jsonString("llamacpp")},
+      {"latencyMs", std::to_string(durationMs)},
+      {"executionTarget", "0"},
+      {"savedAmount", "0"},
+      {"framework", jsonString("llama.cpp")},
+      {"hardwareUsed", "0"},
+      {"memoryUsed", "0"},
+      {"performanceMetrics", buildJsonObject({
+        {"timeToFirstTokenMs", std::to_string(durationMs > 0 ? durationMs / 10 : 0)},
+        {"tokensPerSecond", std::to_string(tokensPerSecond)},
+        {"inferenceTimeMs", std::to_string(durationMs)}
+      })}
+    });
+
+    printf("[HybridRunAnywhere] generate() completed in %lld ms, %d tokens\n", durationMs, tokensUsed);
     return response;
   });
 }
 
-std::shared_ptr<Promise<std::string>> HybridRunAnywhere::generateTextStream(
+std::shared_ptr<Promise<std::string>> HybridRunAnywhere::generateStream(
     const std::string& prompt,
     const std::string& optionsJson,
     const std::function<void(const std::string&, bool)>& callback) {
@@ -483,6 +602,56 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::transcribe(
       });
 }
 
+std::shared_ptr<Promise<std::string>> HybridRunAnywhere::transcribeFile(
+    const std::string& filePath,
+    const std::optional<std::string>& language) {
+  return Promise<std::string>::async([this, filePath, language]() {
+    std::lock_guard<std::mutex> lock(modelMutex_);
+
+    if (!onnxBackend_ || !ra_stt_is_model_loaded(onnxBackend_)) {
+      return buildJsonObject({{"error", jsonString("STT model not loaded")}});
+    }
+
+    printf("[HybridRunAnywhere] transcribeFile: %s\n", filePath.c_str());
+
+#if defined(__APPLE__)
+    // Use the iOS AudioDecoder to convert the file to PCM float32
+    float* samples = nullptr;
+    size_t numSamples = 0;
+    int sampleRate = 0;
+
+    int decodeResult = ra_decode_audio_file(filePath.c_str(), &samples, &numSamples, &sampleRate);
+    if (decodeResult != 1 || !samples || numSamples == 0) {
+      printf("[HybridRunAnywhere] Failed to decode audio file\n");
+      return buildJsonObject({{"error", jsonString("Failed to decode audio file")}});
+    }
+
+    printf("[HybridRunAnywhere] Decoded %zu samples at %d Hz\n", numSamples, sampleRate);
+
+    // Transcribe the samples
+    char* result_json = nullptr;
+    ra_result_code result = ra_stt_transcribe(
+        onnxBackend_, samples, numSamples, sampleRate,
+        language.has_value() ? language->c_str() : "en", &result_json);
+
+    // Free the decoded samples
+    ra_free_audio_samples(samples);
+
+    if (result != RA_SUCCESS || !result_json) {
+      printf("[HybridRunAnywhere] Transcription failed\n");
+      return buildJsonObject({{"error", jsonString("Transcription failed")}});
+    }
+
+    std::string response(result_json);
+    ra_free_string(result_json);
+    return response;
+#else
+    // Android: Not yet implemented
+    return buildJsonObject({{"error", jsonString("transcribeFile not yet supported on Android")}});
+#endif
+  });
+}
+
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::supportsSTTStreaming() {
   return Promise<bool>::async([this]() {
     if (!onnxBackend_) return false;
@@ -582,13 +751,14 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::synthesize(
         std::string audioBase64 = encodeBase64Audio(audioData, numSamples);
         ra_free_audio(audioData);
 
-        double durationMs = (numSamples * 1000.0) / sampleRate;
+        double durationSec = static_cast<double>(numSamples) / sampleRate;
 
+        // Use camelCase keys to match JS expectations
         return buildJsonObject({
-            {"audio_base64", jsonString(audioBase64)},
-            {"sample_rate", std::to_string(sampleRate)},
-            {"num_samples", std::to_string(numSamples)},
-            {"duration_ms", std::to_string(durationMs)}
+            {"audio", jsonString(audioBase64)},
+            {"sampleRate", std::to_string(sampleRate)},
+            {"numSamples", std::to_string(numSamples)},
+            {"duration", std::to_string(durationSec)}
         });
       });
 }
