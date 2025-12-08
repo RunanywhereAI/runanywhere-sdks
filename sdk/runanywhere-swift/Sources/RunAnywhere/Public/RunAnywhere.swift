@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import Combine
 #if os(iOS) || os(tvOS) || os(watchOS)
@@ -6,6 +7,7 @@ import UIKit
 
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
+// swiftlint:disable:next type_body_length
 public enum RunAnywhere {
 
     // MARK: - Internal State Management

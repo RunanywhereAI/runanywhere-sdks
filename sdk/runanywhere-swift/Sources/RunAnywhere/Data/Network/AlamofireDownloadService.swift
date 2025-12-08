@@ -1,6 +1,6 @@
-import Foundation
 import Alamofire
 import Files
+import Foundation
 import Pulse
 
 /// Simplified download service using Alamofire

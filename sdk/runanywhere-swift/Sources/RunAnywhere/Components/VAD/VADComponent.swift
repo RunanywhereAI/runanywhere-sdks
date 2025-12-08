@@ -1,5 +1,5 @@
-import Foundation
 @preconcurrency import AVFoundation
+import Foundation
 
 // MARK: - VAD Service Protocol
 
@@ -60,13 +60,9 @@ public extension VADService {
 
 /// Speech activity events
 public enum SpeechActivityEvent: String, Sendable {
-    case started = "started"
-    case ended = "ended"
+    case started
+    case ended
 }
-
-// MARK: - VAD Initialization Parameters
-
-/// Initialization parameters for VAD component (alias for VADConfiguration)
 
 // MARK: - VAD Configuration
 
@@ -110,13 +106,18 @@ public struct VADConfiguration: ComponentConfiguration, ComponentInitParameters 
     public func validate() throws {
         // Validate threshold range with better guidance
         guard energyThreshold >= 0 && energyThreshold <= 1.0 else {
-            throw SDKError.validationFailed("Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05")
+            let message = "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05"
+            throw SDKError.validationFailed(message)
         }
 
         // Warn if threshold is too low or too high
         if energyThreshold < 0.002 {
             // This is just validation, can't log here, but the value is suspicious
-            throw SDKError.validationFailed("Energy threshold \(energyThreshold) is very low and may cause false positives. Recommended minimum: 0.002")
+            let message = """
+                Energy threshold \(energyThreshold) is very low and may cause false positives. \
+                Recommended minimum: 0.002
+                """
+            throw SDKError.validationFailed(message)
         }
         if energyThreshold > 0.1 {
             // This might be intentional for very noisy environments
@@ -197,14 +198,6 @@ public struct VADOutput: ComponentOutput {
     }
 }
 
-// MARK: - VAD Service Adapter Protocol
-
-/// Protocol for VAD framework adapters (conforms to ComponentAdapter protocol)
-public protocol VADFrameworkAdapter: ComponentAdapter where ServiceType: VADService {
-    /// Create a VAD service for the given configuration
-    func createVADService(configuration: VADConfiguration) async throws -> ServiceType
-}
-
 // MARK: - Default VAD Adapter
 
 /// Default VAD adapter using SimpleEnergyVAD (conforms to ComponentAdapter)
@@ -233,6 +226,40 @@ public final class DefaultVADAdapter: ComponentAdapter {
     }
 }
 
+// MARK: - VAD Statistics
+
+/// Statistics for VAD debugging and monitoring
+public struct VADStatistics {
+    /// Current energy level
+    public let current: Float
+
+    /// Energy threshold
+    public let threshold: Float
+
+    /// Ambient noise level
+    public let ambient: Float
+
+    /// Recent average energy
+    public let recentAvg: Float
+
+    /// Recent maximum energy
+    public let recentMax: Float
+
+    public init(
+        current: Float,
+        threshold: Float,
+        ambient: Float,
+        recentAvg: Float,
+        recentMax: Float
+    ) {
+        self.current = current
+        self.threshold = threshold
+        self.ambient = ambient
+        self.recentAvg = recentAvg
+        self.recentMax = recentMax
+    }
+}
+
 // MARK: - VAD Component
 
 /// Voice Activity Detection component following the clean architecture
@@ -244,7 +271,6 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
     public override class var componentType: SDKComponent { .vad }
 
     private let vadConfiguration: VADConfiguration
-    private var lastSpeechState: Bool = false
     private var isPaused: Bool = false
 
     // MARK: - Initialization
@@ -301,11 +327,6 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
 
         // Get current state
         let isSpeechDetected = vadService.isSpeechActive
-
-        // Track state changes
-        if isSpeechDetected != lastSpeechState {
-            lastSpeechState = isSpeechDetected
-        }
 
         return VADOutput(
             isSpeechDetected: isSpeechDetected,
@@ -371,7 +392,6 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
     /// Reset VAD state
     public func reset() {
         service?.reset()
-        lastSpeechState = false
     }
 
     /// Set speech activity callback
@@ -407,11 +427,12 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
     }
 
     /// Get current VAD statistics for debugging
-    public func getStatistics() -> (current: Float, threshold: Float, ambient: Float, recentAvg: Float, recentMax: Float)? {
+    public func getStatistics() -> VADStatistics? {
         guard let vadService = service as? SimpleEnergyVAD else {
             return nil
         }
 
+        // SimpleEnergyVAD.getStatistics() returns VADStatistics directly
         return vadService.getStatistics()
     }
 

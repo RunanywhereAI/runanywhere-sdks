@@ -50,33 +50,19 @@ public enum NetworkServiceFactory {
 
     /// Create a network service with custom configuration
     /// - Parameters:
-    ///   - useMocks: Force use of mock service regardless of environment
-    ///   - baseURL: Base URL for real network calls
+    ///   - baseURL: Base URL for network calls (required)
     ///   - apiKey: API key for authentication
     /// - Returns: A NetworkService implementation
     public static func createCustomNetworkService(
-        useMocks: Bool,
-        baseURL: URL?,
+        baseURL: URL,
         apiKey: String
     ) -> any NetworkService {
-
         let logger = SDKLogger(category: "NetworkServiceFactory")
-
-        if useMocks {
-            logger.info("🔧 Creating MockNetworkService (custom configuration)")
-            return MockNetworkService()
-        } else {
-            guard let baseURL = baseURL else {
-                logger.warning("⚠️ No baseURL provided, falling back to mock service")
-                return MockNetworkService()
-            }
-
-            logger.info("🌐 Creating APIClient (custom configuration)")
-            return APIClient(
-                baseURL: baseURL,
-                apiKey: apiKey
-            )
-        }
+        logger.info("🌐 Creating APIClient (custom configuration)")
+        return APIClient(
+            baseURL: baseURL,
+            apiKey: apiKey
+        )
     }
 }
 

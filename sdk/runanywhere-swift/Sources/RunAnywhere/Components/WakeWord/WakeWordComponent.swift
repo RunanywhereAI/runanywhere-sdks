@@ -153,20 +153,6 @@ public struct WakeWordMetadata: Sendable {
     }
 }
 
-// MARK: - Wake Word Service Provider
-
-/// Protocol for registering external Wake Word implementations
-public protocol WakeWordServiceProvider {
-    /// Create a wake word service for the given configuration
-    func createWakeWordService(configuration: WakeWordConfiguration) async throws -> WakeWordService
-
-    /// Check if this provider can handle the given model
-    func canHandle(modelId: String?) -> Bool
-
-    /// Provider name for identification
-    var name: String { get }
-}
-
 // MARK: - Default Wake Word Service
 
 /// Default implementation that always returns false (no detection)
@@ -208,7 +194,6 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
     public override class var componentType: SDKComponent { .wakeWord }
 
     private let wakeWordConfiguration: WakeWordConfiguration
-    private var isDetecting = false
 
     // MARK: - Initialization
 
@@ -255,7 +240,6 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
         }
 
         wakeWordService.startListening()
-        isDetecting = true
     }
 
     /// Stop listening for wake words
@@ -263,7 +247,6 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
         guard let wakeWordService = service else { return }
 
         wakeWordService.stopListening()
-        isDetecting = false
     }
 
     /// Process audio input for wake word detection
@@ -307,7 +290,6 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
 
     public override func performCleanup() async throws {
         await service?.cleanup()
-        isDetecting = false
     }
 }
 

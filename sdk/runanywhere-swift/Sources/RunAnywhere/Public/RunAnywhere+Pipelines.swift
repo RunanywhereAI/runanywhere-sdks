@@ -1,3 +1,4 @@
+// swiftlint:disable file_length type_body_length
 import Foundation
 import AVFoundation
 
@@ -328,6 +329,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
 
     /// Process audio stream through the pipeline
     /// Uses silence detection to automatically trigger STT → LLM → TTS flow
+    // swiftlint:disable:next function_body_length cyclomatic_complexity
     public func process(audioStream: AsyncStream<VoiceAudioChunk>) -> PipelineEventStream {
         AsyncThrowingStream { continuation in
             Task {

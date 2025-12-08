@@ -1,5 +1,13 @@
-import Foundation
 import Files
+import Foundation
+
+/// Individual model file information (distinct from aggregate ModelStorageInfo)
+public struct ModelFileInfo {
+    let modelId: String
+    let format: ModelFormat
+    let size: Int64
+    let framework: LLMFramework?
+}
 
 /// Simplified file manager using Files library for all file operations
 public class SimplifiedFileManager {
@@ -244,11 +252,11 @@ public class SimplifiedFileManager {
     }
 
     /// Get all stored models
-    public func getAllStoredModels() -> [(modelId: String, format: ModelFormat, size: Int64, framework: LLMFramework?)] {
+    public func getAllStoredModels() -> [ModelFileInfo] {
         guard let modelsFolderURL = try? ModelPathUtils.getModelsDirectory(),
               let modelsFolder = try? Folder(path: modelsFolderURL.path) else { return [] }
 
-        var models: [(String, ModelFormat, Int64, LLMFramework?)] = []
+        var models: [ModelFileInfo] = []
 
         // First check direct model folders (legacy structure)
         for modelFolder in modelsFolder.subfolders {
@@ -260,7 +268,12 @@ public class SimplifiedFileManager {
             let modelId = modelFolder.name
             // Try to find model files
             if let modelInfo = detectModelInFolder(modelFolder) {
-                models.append((modelId, modelInfo.format, modelInfo.size, nil))
+                models.append(ModelFileInfo(
+                    modelId: modelId,
+                    format: modelInfo.format,
+                    size: modelInfo.size,
+                    framework: nil
+                ))
             }
         }
 
@@ -278,12 +291,22 @@ public class SimplifiedFileManager {
                 // Try to use framework-specific storage strategy if available
                 if let storageStrategy = getStorageStrategy(for: frameworkType),
                    let modelInfo = storageStrategy.detectModel(in: folderURL) {
-                    models.append((modelId, modelInfo.format, modelInfo.size, frameworkType))
+                    models.append(ModelFileInfo(
+                        modelId: modelId,
+                        format: modelInfo.format,
+                        size: modelInfo.size,
+                        framework: frameworkType
+                    ))
                     logger.debug("Detected \(frameworkType.rawValue) model \(modelId) using storage strategy")
                 } else {
                     // Fallback to generic detection for frameworks without storage strategies
                     if let modelInfo = detectModelInFolder(modelFolder) {
-                        models.append((modelId, modelInfo.format, modelInfo.size, frameworkType))
+                        models.append(ModelFileInfo(
+                            modelId: modelId,
+                            format: modelInfo.format,
+                            size: modelInfo.size,
+                            framework: frameworkType
+                        ))
                     }
                 }
             }

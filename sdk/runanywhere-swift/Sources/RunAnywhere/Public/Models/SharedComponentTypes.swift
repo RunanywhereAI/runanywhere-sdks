@@ -36,11 +36,3 @@ public enum AudioFormat: String, Sendable {
         }
     }
 }
-
-/// Image format
-public enum ImageFormat: String, Sendable {
-    case jpeg = "jpeg"
-    case png = "png"
-    case heic = "heic"
-    case webp = "webp"
-}

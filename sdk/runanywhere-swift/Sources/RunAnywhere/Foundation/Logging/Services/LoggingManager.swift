@@ -118,7 +118,6 @@ public class LoggingManager {
         }
 
         // Remote logging - ONLY if not sensitive
-        // TODO: Integrate with external logging service (Sentry/DataDog/etc)
         if configuration.enableRemoteLogging && !isSensitive {
             // Will be implemented with external service
             // e.g., Sentry.capture(event: entry)

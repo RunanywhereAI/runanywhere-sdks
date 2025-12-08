@@ -40,11 +40,15 @@ public class SimpleEnergyVAD: NSObject, VADService {
     private var isTTSActive = false  // Track if TTS is currently playing
 
     // Hysteresis parameters to prevent rapid on/off switching
-    private let voiceStartThreshold = 1  // frames of voice to start - reduced to 1 frame for better short phrase detection
-    private let voiceEndThreshold = 12  // frames of silence to end (1.2 seconds at 100ms frames) - allows natural pauses between words in sentences
+    // frames of voice to start - reduced to 1 frame for better short phrase detection
+    private let voiceStartThreshold = 1
+    // frames of silence to end (1.2 seconds at 100ms frames)
+    // - allows natural pauses between words in sentences
+    private let voiceEndThreshold = 12
 
     // Enhanced hysteresis for TTS mode
-    private let ttsVoiceStartThreshold = 10  // Much more frames needed during TTS to prevent feedback
+    // Much more frames needed during TTS to prevent feedback
+    private let ttsVoiceStartThreshold = 10
     private let ttsVoiceEndThreshold = 5     // Quicker end during TTS
 
     // Calibration properties
@@ -53,7 +57,8 @@ public class SimpleEnergyVAD: NSObject, VADService {
     private var calibrationFrameCount = 0
     private let calibrationFramesNeeded = 20  // ~2 seconds at 100ms frames
     private var ambientNoiseLevel: Float = 0.0
-    private var calibrationMultiplier: Float = 2.0  // Threshold = ambientNoise * multiplier - lowered for better short word detection
+    // Threshold = ambientNoise * multiplier - lowered for better short word detection
+    private var calibrationMultiplier: Float = 2.0
 
     // Debug statistics
     private var recentEnergyValues: [Float] = []
@@ -77,7 +82,10 @@ public class SimpleEnergyVAD: NSObject, VADService {
         self.energyThreshold = energyThreshold
         super.init()
 
-        logger.info("SimpleEnergyVAD initialized - sampleRate: \(sampleRate), frameLength: \(self.frameLengthSamples) samples, threshold: \(energyThreshold)")
+        logger.info(
+            "SimpleEnergyVAD initialized - sampleRate: \(sampleRate), " +
+            "frameLength: \(self.frameLengthSamples) samples, threshold: \(energyThreshold)"
+        )
     }
 
     // MARK: - VADService Protocol Implementation
@@ -184,7 +192,12 @@ public class SimpleEnergyVAD: NSObject, VADService {
             let maxRecent = recentEnergyValues.max() ?? 0
             let minRecent = recentEnergyValues.min() ?? 0
 
-            logger.info("📊 VAD Stats - Current: \(energyStr) | Threshold: \(thresholdStr) | Voice: \(hasVoice ? "✅" : "❌") | %Above: \(String(format: "%.1f%%", percentAboveThreshold)) | Avg: \(String(format: "%.6f", avgRecent)) | Range: [\(String(format: "%.6f", minRecent))-\(String(format: "%.6f", maxRecent))]")
+            logger.info(
+                "📊 VAD Stats - Current: \(energyStr) | Threshold: \(thresholdStr) | " +
+                "Voice: \(hasVoice ? "✅" : "❌") | %Above: \(String(format: "%.1f%%", percentAboveThreshold)) | " +
+                "Avg: \(String(format: "%.6f", avgRecent)) | " +
+                "Range: [\(String(format: "%.6f", minRecent))-\(String(format: "%.6f", maxRecent))]"
+            )
         }
         debugFrameCount += 1
 
@@ -230,7 +243,13 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
         // Enhanced debug logging
         let ratio = energy / energyThreshold
-        logger.debug("🎤 VAD: Energy=\(String(format: "%.6f", energy)) | Threshold=\(String(format: "%.6f", self.energyThreshold)) | Ratio=\(String(format: "%.2fx", ratio)) | Voice=\(hasVoice ? "YES✅" : "NO❌") | Ambient=\(String(format: "%.6f", self.ambientNoiseLevel))")
+        logger.debug(
+            "🎤 VAD: Energy=\(String(format: "%.6f", energy)) | " +
+            "Threshold=\(String(format: "%.6f", self.energyThreshold)) | " +
+            "Ratio=\(String(format: "%.2fx", ratio)) | " +
+            "Voice=\(hasVoice ? "YES✅" : "NO❌") | " +
+            "Ambient=\(String(format: "%.6f", self.ambientNoiseLevel))"
+        )
 
         // Update state
         updateVoiceActivityState(hasVoice: hasVoice)
@@ -271,7 +290,10 @@ public class SimpleEnergyVAD: NSObject, VADService {
                 }
 
                 isCurrentlySpeaking = true
-                logger.info("🎙️ VAD: SPEECH STARTED (energy above threshold for \(self.consecutiveVoiceFrames) frames)")
+                logger.info(
+                    "🎙️ VAD: SPEECH STARTED " +
+                    "(energy above threshold for \(self.consecutiveVoiceFrames) frames)"
+                )
                 DispatchQueue.main.async { [weak self] in
                     self?.onSpeechActivity?(.started)
                 }
@@ -283,7 +305,10 @@ public class SimpleEnergyVAD: NSObject, VADService {
             // Stop speaking if we have enough consecutive silent frames
             if isCurrentlySpeaking && consecutiveSilentFrames >= endThreshold {
                 isCurrentlySpeaking = false
-                logger.info("🎙️ VAD: SPEECH ENDED (silence for \(self.consecutiveSilentFrames) frames)")
+                logger.info(
+                    "🎙️ VAD: SPEECH ENDED " +
+                    "(silence for \(self.consecutiveSilentFrames) frames)"
+                )
                 DispatchQueue.main.async { [weak self] in
                     self?.onSpeechActivity?(.ended)
                 }
@@ -326,7 +351,10 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
     /// Start automatic calibration to determine ambient noise level
     public func startCalibration() async {
-        logger.info("🎯 Starting VAD calibration - measuring ambient noise for \(Float(self.calibrationFramesNeeded) * self.frameLength) seconds...")
+        let durationSeconds = Float(self.calibrationFramesNeeded) * self.frameLength
+        logger.info(
+            "🎯 Starting VAD calibration - measuring ambient noise for \(durationSeconds) seconds..."
+        )
 
         isCalibrating = true
         calibrationSamples.removeAll()
@@ -350,7 +378,10 @@ public class SimpleEnergyVAD: NSObject, VADService {
         calibrationSamples.append(energy)
         calibrationFrameCount += 1
 
-        logger.debug("📏 Calibration frame \(self.calibrationFrameCount)/\(self.calibrationFramesNeeded): energy=\(String(format: "%.6f", energy))")
+        logger.debug(
+            "📏 Calibration frame \(self.calibrationFrameCount)/\(self.calibrationFramesNeeded): " +
+            "energy=\(String(format: "%.6f", energy))"
+        )
 
         if calibrationFrameCount >= calibrationFramesNeeded {
             completeCalibration()
@@ -377,7 +408,8 @@ public class SimpleEnergyVAD: NSObject, VADService {
         // Ensure minimum threshold is high enough to avoid false positives
         // but low enough to detect actual speech
         // Use dynamic minimum based on ambient noise level
-        let minimumThreshold: Float = Swift.max(ambientNoiseLevel * 2.0, 0.003)  // At least 2x ambient or 0.003 - lowered for short words
+        // At least 2x ambient or 0.003 - lowered for short words
+        let minimumThreshold: Float = Swift.max(ambientNoiseLevel * 2.0, 0.003)
         let calculatedThreshold = ambientNoiseLevel * calibrationMultiplier
 
         // Apply threshold with sensible bounds
@@ -390,10 +422,19 @@ public class SimpleEnergyVAD: NSObject, VADService {
         }
 
         logger.info("✅ VAD Calibration Complete:")
-        logger.info("  📊 Statistics: Mean=\(String(format: "%.6f", mean)), Median=\(String(format: "%.6f", median))")
-        logger.info("  📊 Percentiles: 75th=\(String(format: "%.6f", percentile75)), 90th=\(String(format: "%.6f", percentile90)), Max=\(String(format: "%.6f", max))")
+        logger.info(
+            "  📊 Statistics: Mean=\(String(format: "%.6f", mean)), " +
+            "Median=\(String(format: "%.6f", median))"
+        )
+        logger.info(
+            "  📊 Percentiles: 75th=\(String(format: "%.6f", percentile75)), " +
+            "90th=\(String(format: "%.6f", percentile90)), Max=\(String(format: "%.6f", max))"
+        )
         logger.info("  🎯 Ambient Noise Level: \(String(format: "%.6f", self.ambientNoiseLevel))")
-        logger.info("  🔧 Threshold: \(String(format: "%.6f", oldThreshold)) → \(String(format: "%.6f", self.energyThreshold))")
+        logger.info(
+            "  🔧 Threshold: \(String(format: "%.6f", oldThreshold)) → " +
+            "\(String(format: "%.6f", self.energyThreshold))"
+        )
 
         isCalibrating = false
         calibrationSamples.removeAll()
@@ -401,17 +442,24 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
     /// Manually set calibration parameters
     public func setCalibrationParameters(multiplier: Float = 2.0) {
-        calibrationMultiplier = Swift.max(1.5, Swift.min(4.0, multiplier))  // Clamp between 1.5x and 4.0x for flexibility
+        // Clamp between 1.5x and 4.0x for flexibility
+        calibrationMultiplier = Swift.max(1.5, Swift.min(4.0, multiplier))
         logger.info("📝 Calibration multiplier set to \(self.calibrationMultiplier)x")
     }
 
     /// Get current VAD statistics for debugging
-    public func getStatistics() -> (current: Float, threshold: Float, ambient: Float, recentAvg: Float, recentMax: Float) {
+    public func getStatistics() -> VADStatistics {
         let recent = recentEnergyValues.isEmpty ? 0 : recentEnergyValues.reduce(0, +) / Float(recentEnergyValues.count)
         let maxValue = recentEnergyValues.max() ?? 0
         let current = recentEnergyValues.last ?? 0
 
-        return (current: current, threshold: energyThreshold, ambient: ambientNoiseLevel, recentAvg: recent, recentMax: maxValue)
+        return VADStatistics(
+            current: current,
+            threshold: energyThreshold,
+            ambient: ambientNoiseLevel,
+            recentAvg: recent,
+            recentMax: maxValue
+        )
     }
 
     // MARK: - Pause and Resume
@@ -465,7 +513,11 @@ public class SimpleEnergyVAD: NSObject, VADService {
         let newThreshold = energyThreshold * ttsThresholdMultiplier
         energyThreshold = Swift.min(newThreshold, 0.1) // Cap at 0.1 to prevent complete deafness
 
-        logger.info("🔊 TTS starting - VAD completely blocked and threshold increased from \(String(format: "%.6f", self.baseEnergyThreshold)) to \(String(format: "%.6f", self.energyThreshold))")
+        logger.info(
+            "🔊 TTS starting - VAD completely blocked and threshold increased " +
+            "from \(String(format: "%.6f", self.baseEnergyThreshold)) " +
+            "to \(String(format: "%.6f", self.energyThreshold))"
+        )
 
         // End any current speech detection
         if isCurrentlySpeaking {
@@ -513,3 +565,6 @@ public class SimpleEnergyVAD: NSObject, VADService {
         }
     }
 }
+
+// MARK: - Supporting Types
+// VADStatistics is defined in VADComponent.swift

@@ -286,24 +286,13 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
     public override class var componentType: SDKComponent { .llm }
 
     private let llmConfiguration: LLMConfiguration
-    private var conversationContext: Context?
     private var isModelLoaded = false
     private let logger = SDKLogger(category: "LLMComponent")
-
-    // Model lifecycle tracking
-    private var modelPath: String?
-    private var modelLoadProgress: Double = 0.0
 
     // MARK: - Initialization
 
     public init(configuration: LLMConfiguration) {
         self.llmConfiguration = configuration
-
-        // Preload context if provided
-        if let preloadContext = configuration.preloadContext {
-            self.conversationContext = Context(systemPrompt: preloadContext)
-        }
-
         super.init(configuration: configuration)
     }
 
@@ -325,9 +314,11 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
         }
 
         guard let provider = provider else {
-            throw SDKError.componentNotInitialized(
-                "No LLM service provider registered. Please add llama.cpp or another LLM implementation as a dependency and register it with ModuleRegistry.shared.registerLLM(provider)."
-            )
+            let message = """
+                No LLM service provider registered. Please add llama.cpp or another LLM implementation \
+                as a dependency and register it with ModuleRegistry.shared.registerLLM(provider).
+                """
+            throw SDKError.componentNotInitialized(message)
         }
 
         // Create service through provider
@@ -353,35 +344,6 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
     public override func performCleanup() async throws {
         await service?.wrappedService?.cleanup()
         isModelLoaded = false
-        modelPath = nil
-        conversationContext = nil
-    }
-
-    // MARK: - Model Management
-
-    private func downloadModel(modelId: String) async throws {
-        // Emit download started event
-        eventBus.publish(ComponentInitializationEvent.componentDownloadStarted(
-            component: Self.componentType,
-            modelId: modelId
-        ))
-
-        // Simulate download with progress
-        for progress in stride(from: 0.0, through: 1.0, by: 0.1) {
-            modelLoadProgress = progress
-            eventBus.publish(ComponentInitializationEvent.componentDownloadProgress(
-                component: Self.componentType,
-                modelId: modelId,
-                progress: progress
-            ))
-            try await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-        }
-
-        // Emit download completed event
-        eventBus.publish(ComponentInitializationEvent.componentDownloadCompleted(
-            component: Self.componentType,
-            modelId: modelId
-        ))
     }
 
     // MARK: - Helper Properties

@@ -174,59 +174,63 @@ public final class DeviceKitAdapter {
 
     private func detectCPUFromDevice() -> (cpu: CPUType, variant: ProcessorVariant) {
         #if os(iOS) || os(tvOS) || os(watchOS)
-        // Map device to CPU type based on known configurations
-        switch device {
-        // A18 Pro devices
-        case .iPhone16Pro, .iPhone16ProMax:
-            return (.a18Pro, .standard)
-
-        // A18 devices
-        case .iPhone16, .iPhone16Plus:
-            return (.a18, .standard)
-
-        // A17 Pro devices
-        case .iPhone15Pro, .iPhone15ProMax:
-            return (.a17Pro, .standard)
-
-        // A16 devices
-        case .iPhone15, .iPhone15Plus, .iPhone14Pro, .iPhone14ProMax:
-            return (.a16Bionic, .standard)
-
-        // A15 devices
-        case .iPhone14, .iPhone14Plus, .iPhone13, .iPhone13Mini, .iPhone13Pro, .iPhone13ProMax, .iPhoneSE3:
-            return (.a15Bionic, .standard)
-
-        // iPad M4
-        case .iPadPro13M4, .iPadPro11M4:
-            return (.m4, .standard)
-
-        // iPad M2
-        case .iPadPro12Inch6, .iPadPro11Inch4, .iPadAir11M2, .iPadAir13M2:
-            return (.m2, .standard)
-
-        // iPad M1
-        case .iPadPro12Inch5, .iPadPro11Inch3, .iPadAir5:
-            return (.m1, .standard)
-
-        // Older iPads with A-series
-        case .iPad10:
-            return (.a14Bionic, .standard)
-
-        case .iPadMini6:
-            return (.a15Bionic, .standard)
-
-        default:
-            // Fallback detection based on device age/type
-            if device.isPad {
-                return (.a14Bionic, .standard) // Conservative fallback for iPads
-            } else {
-                return (.a15Bionic, .standard) // Conservative fallback for iPhones
-            }
-        }
+        return detectiOSCPU()
         #else
         return (.unknown, .standard)
         #endif
     }
+
+    #if os(iOS) || os(tvOS) || os(watchOS)
+    private func detectiOSCPU() -> (cpu: CPUType, variant: ProcessorVariant) {
+        // Check for iPhones first
+        if let iphoneCPU = detectiPhoneCPU() {
+            return iphoneCPU
+        }
+
+        // Check for iPads
+        if let ipadCPU = detectiPadCPU() {
+            return ipadCPU
+        }
+
+        // Fallback detection based on device type
+        return device.isPad ? (.a14Bionic, .standard) : (.a15Bionic, .standard)
+    }
+
+    private func detectiPhoneCPU() -> (cpu: CPUType, variant: ProcessorVariant)? {
+        switch device {
+        case .iPhone16Pro, .iPhone16ProMax:
+            return (.a18Pro, .standard)
+        case .iPhone16, .iPhone16Plus:
+            return (.a18, .standard)
+        case .iPhone15Pro, .iPhone15ProMax:
+            return (.a17Pro, .standard)
+        case .iPhone15, .iPhone15Plus, .iPhone14Pro, .iPhone14ProMax:
+            return (.a16Bionic, .standard)
+        case .iPhone14, .iPhone14Plus, .iPhone13, .iPhone13Mini,
+             .iPhone13Pro, .iPhone13ProMax, .iPhoneSE3:
+            return (.a15Bionic, .standard)
+        default:
+            return nil
+        }
+    }
+
+    private func detectiPadCPU() -> (cpu: CPUType, variant: ProcessorVariant)? {
+        switch device {
+        case .iPadPro13M4, .iPadPro11M4:
+            return (.m4, .standard)
+        case .iPadPro12Inch6, .iPadPro11Inch4, .iPadAir11M2, .iPadAir13M2:
+            return (.m2, .standard)
+        case .iPadPro12Inch5, .iPadPro11Inch3, .iPadAir5:
+            return (.m1, .standard)
+        case .iPad10:
+            return (.a14Bionic, .standard)
+        case .iPadMini6:
+            return (.a15Bionic, .standard)
+        default:
+            return nil
+        }
+    }
+    #endif
 
     private func getMacProcessorInfo() -> ProcessorInfo {
         #if os(macOS)
@@ -259,59 +263,65 @@ public final class DeviceKitAdapter {
 
     private func detectMacCPU() -> (cpu: CPUType, variant: ProcessorVariant) {
         #if os(macOS)
-        // Use sysctlbyname to get chip info
+        let brandString = getMacCPUBrandString()
+
+        // Parse brand string to determine chip
+        if let result = parseMacBrandString(brandString) {
+            return result
+        }
+
+        // Fallback to core count detection
+        return fallbackMacCPUDetection()
+        #else
+        return (.unknown, .standard)
+        #endif
+    }
+
+    #if os(macOS)
+    private func getMacCPUBrandString() -> String {
         var size = 0
         sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0)
 
         var cpuBrand = [CChar](repeating: 0, count: size)
         sysctlbyname("machdep.cpu.brand_string", &cpuBrand, &size, nil, 0)
-        let brandString = String(cString: cpuBrand)
 
-        // Parse brand string to determine chip
-        if brandString.contains("M4") {
-            if brandString.contains("Max") {
-                return (.m4, .max)
-            } else if brandString.contains("Pro") {
-                return (.m4, .pro)
-            } else {
-                return (.m4, .standard)
-            }
-        } else if brandString.contains("M3") {
-            if brandString.contains("Max") {
-                return (.m3, .max)
-            } else if brandString.contains("Pro") {
-                return (.m3, .pro)
-            } else if brandString.contains("Ultra") {
-                return (.m3, .ultra)
-            } else {
-                return (.m3, .standard)
-            }
-        } else if brandString.contains("M2") {
-            if brandString.contains("Max") {
-                return (.m2, .max)
-            } else if brandString.contains("Pro") {
-                return (.m2, .pro)
-            } else if brandString.contains("Ultra") {
-                return (.m2, .ultra)
-            } else {
-                return (.m2, .standard)
-            }
-        } else if brandString.contains("M1") {
-            if brandString.contains("Max") {
-                return (.m1, .max)
-            } else if brandString.contains("Pro") {
-                return (.m1, .pro)
-            } else if brandString.contains("Ultra") {
-                return (.m1, .ultra)
-            } else {
-                return (.m1, .standard)
-            }
-        } else if brandString.contains("Intel") {
+        return String(cString: cpuBrand)
+    }
+
+    private func parseMacBrandString(_ brandString: String) -> (cpu: CPUType, variant: ProcessorVariant)? {
+        if brandString.contains("Intel") {
             return (.intel, .standard)
         }
 
-        // Fallback to core count detection
+        // Check M-series chips
+        if brandString.contains("M4") {
+            return (.m4, parseVariant(from: brandString))
+        } else if brandString.contains("M3") {
+            return (.m3, parseVariant(from: brandString))
+        } else if brandString.contains("M2") {
+            return (.m2, parseVariant(from: brandString))
+        } else if brandString.contains("M1") {
+            return (.m1, parseVariant(from: brandString))
+        }
+
+        return nil
+    }
+
+    private func parseVariant(from brandString: String) -> ProcessorVariant {
+        if brandString.contains("Max") {
+            return .max
+        } else if brandString.contains("Pro") {
+            return .pro
+        } else if brandString.contains("Ultra") {
+            return .ultra
+        } else {
+            return .standard
+        }
+    }
+
+    private func fallbackMacCPUDetection() -> (cpu: CPUType, variant: ProcessorVariant) {
         let coreCount = ProcessInfo.processInfo.processorCount
+
         if coreCount >= 20 {
             return (.m2, .ultra) // Ultra chips have 20+ cores
         } else if coreCount >= 14 {
@@ -321,10 +331,8 @@ public final class DeviceKitAdapter {
         } else {
             return (.m2, .standard) // Conservative fallback
         }
-        #else
-        return (.unknown, .standard)
-        #endif
     }
+    #endif
 
     private func getMacModelName() -> String {
         #if os(macOS)
@@ -340,6 +348,7 @@ public final class DeviceKitAdapter {
         #endif
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private func getProcessorType() -> ProcessorType {
         let cpuInfo = detectCPUFromDevice()
 
@@ -441,74 +450,150 @@ public final class DeviceKitAdapter {
         let clockSpeed: Double
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private func getBasicSpec(for cpu: CPUType, variant: ProcessorVariant) -> ChipSpec {
         switch cpu {
         case .a14Bionic:
-            return ChipSpec(name: "A14 Bionic", coreCount: 6, performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.0)
+            return ChipSpec(
+                name: "A14 Bionic", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
+                neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.0
+            )
         case .a15Bionic:
-            return ChipSpec(name: "A15 Bionic", coreCount: 6, performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.23)
+            return ChipSpec(
+                name: "A15 Bionic", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
+                neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.23
+            )
         case .a16Bionic:
-            return ChipSpec(name: "A16 Bionic", coreCount: 6, performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 17, clockSpeed: 3.46)
+            return ChipSpec(
+                name: "A16 Bionic", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
+                neuralEngineCores: 16, estimatedTops: 17, clockSpeed: 3.46
+            )
         case .a17Pro:
-            return ChipSpec(name: "A17 Pro", coreCount: 6, performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 35, clockSpeed: 3.78)
+            return ChipSpec(
+                name: "A17 Pro", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
+                neuralEngineCores: 16, estimatedTops: 35, clockSpeed: 3.78
+            )
         case .a18:
-            return ChipSpec(name: "A18", coreCount: 6, performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.0)
+            return ChipSpec(
+                name: "A18", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
+                neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.0
+            )
         case .a18Pro:
-            return ChipSpec(name: "A18 Pro", coreCount: 6, performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 45, clockSpeed: 4.05)
+            return ChipSpec(
+                name: "A18 Pro", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
+                neuralEngineCores: 16, estimatedTops: 45, clockSpeed: 4.05
+            )
 
         case .m1:
             switch variant {
             case .standard:
-                return ChipSpec(name: "M1", coreCount: 8, performanceCores: 4, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.2)
+                return ChipSpec(
+                    name: "M1", coreCount: 8, performanceCores: 4, efficiencyCores: 4,
+                    neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.2
+                )
             case .pro:
-                return ChipSpec(name: "M1 Pro", coreCount: 10, performanceCores: 8, efficiencyCores: 2, neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.2)
+                return ChipSpec(
+                    name: "M1 Pro", coreCount: 10, performanceCores: 8, efficiencyCores: 2,
+                    neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.2
+                )
             case .max:
-                return ChipSpec(name: "M1 Max", coreCount: 10, performanceCores: 8, efficiencyCores: 2, neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.2)
+                return ChipSpec(
+                    name: "M1 Max", coreCount: 10, performanceCores: 8, efficiencyCores: 2,
+                    neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.2
+                )
             case .ultra:
-                return ChipSpec(name: "M1 Ultra", coreCount: 20, performanceCores: 16, efficiencyCores: 4, neuralEngineCores: 32, estimatedTops: 22, clockSpeed: 3.2)
+                return ChipSpec(
+                    name: "M1 Ultra", coreCount: 20, performanceCores: 16, efficiencyCores: 4,
+                    neuralEngineCores: 32, estimatedTops: 22, clockSpeed: 3.2
+                )
             }
 
         case .m2:
             switch variant {
             case .standard:
-                return ChipSpec(name: "M2", coreCount: 8, performanceCores: 4, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.5)
+                return ChipSpec(
+                    name: "M2", coreCount: 8, performanceCores: 4, efficiencyCores: 4,
+                    neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.5
+                )
             case .pro:
-                return ChipSpec(name: "M2 Pro", coreCount: 12, performanceCores: 8, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.5)
+                return ChipSpec(
+                    name: "M2 Pro", coreCount: 12, performanceCores: 8, efficiencyCores: 4,
+                    neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.5
+                )
             case .max:
-                return ChipSpec(name: "M2 Max", coreCount: 12, performanceCores: 8, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.5)
+                return ChipSpec(
+                    name: "M2 Max", coreCount: 12, performanceCores: 8, efficiencyCores: 4,
+                    neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.5
+                )
             case .ultra:
-                return ChipSpec(name: "M2 Ultra", coreCount: 24, performanceCores: 16, efficiencyCores: 8, neuralEngineCores: 32, estimatedTops: 31.6, clockSpeed: 3.5)
+                return ChipSpec(
+                    name: "M2 Ultra", coreCount: 24, performanceCores: 16, efficiencyCores: 8,
+                    neuralEngineCores: 32, estimatedTops: 31.6, clockSpeed: 3.5
+                )
             }
 
         case .m3:
             switch variant {
             case .standard:
-                return ChipSpec(name: "M3", coreCount: 8, performanceCores: 4, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 18, clockSpeed: 4.0)
+                return ChipSpec(
+                    name: "M3", coreCount: 8, performanceCores: 4, efficiencyCores: 4,
+                    neuralEngineCores: 16, estimatedTops: 18, clockSpeed: 4.0
+                )
             case .pro:
-                return ChipSpec(name: "M3 Pro", coreCount: 12, performanceCores: 6, efficiencyCores: 6, neuralEngineCores: 16, estimatedTops: 18, clockSpeed: 4.0)
+                return ChipSpec(
+                    name: "M3 Pro", coreCount: 12, performanceCores: 6, efficiencyCores: 6,
+                    neuralEngineCores: 16, estimatedTops: 18, clockSpeed: 4.0
+                )
             case .max:
-                return ChipSpec(name: "M3 Max", coreCount: 16, performanceCores: 12, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 18, clockSpeed: 4.0)
+                return ChipSpec(
+                    name: "M3 Max", coreCount: 16, performanceCores: 12, efficiencyCores: 4,
+                    neuralEngineCores: 16, estimatedTops: 18, clockSpeed: 4.0
+                )
             case .ultra:
-                return ChipSpec(name: "M3 Ultra", coreCount: 32, performanceCores: 24, efficiencyCores: 8, neuralEngineCores: 32, estimatedTops: 36, clockSpeed: 4.0)
+                return ChipSpec(
+                    name: "M3 Ultra", coreCount: 32, performanceCores: 24, efficiencyCores: 8,
+                    neuralEngineCores: 32, estimatedTops: 36, clockSpeed: 4.0
+                )
             }
 
         case .m4:
             switch variant {
             case .standard:
-                return ChipSpec(name: "M4", coreCount: 10, performanceCores: 4, efficiencyCores: 6, neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.4)
+                return ChipSpec(
+                    name: "M4", coreCount: 10, performanceCores: 4, efficiencyCores: 6,
+                    neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.4
+                )
             case .pro:
-                return ChipSpec(name: "M4 Pro", coreCount: 14, performanceCores: 10, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.5)
+                return ChipSpec(
+                    name: "M4 Pro", coreCount: 14, performanceCores: 10, efficiencyCores: 4,
+                    neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.5
+                )
             case .max:
-                return ChipSpec(name: "M4 Max", coreCount: 16, performanceCores: 12, efficiencyCores: 4, neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.5)
+                return ChipSpec(
+                    name: "M4 Max", coreCount: 16, performanceCores: 12, efficiencyCores: 4,
+                    neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.5
+                )
             case .ultra:
-                return ChipSpec(name: "M4 Ultra", coreCount: 32, performanceCores: 24, efficiencyCores: 8, neuralEngineCores: 32, estimatedTops: 76, clockSpeed: 4.5)
+                return ChipSpec(
+                    name: "M4 Ultra", coreCount: 32, performanceCores: 24, efficiencyCores: 8,
+                    neuralEngineCores: 32, estimatedTops: 76, clockSpeed: 4.5
+                )
             }
 
         case .intel:
-            return ChipSpec(name: "Intel x86_64", coreCount: ProcessInfo.processInfo.processorCount, performanceCores: ProcessInfo.processInfo.processorCount, efficiencyCores: 0, neuralEngineCores: 0, estimatedTops: 0, clockSpeed: 2.5)
+            let coreCount = ProcessInfo.processInfo.processorCount
+            return ChipSpec(
+                name: "Intel x86_64", coreCount: coreCount, performanceCores: coreCount,
+                efficiencyCores: 0, neuralEngineCores: 0, estimatedTops: 0, clockSpeed: 2.5
+            )
 
         case .unknown:
-            return ChipSpec(name: "Unknown", coreCount: ProcessInfo.processInfo.processorCount, performanceCores: 2, efficiencyCores: max(0, ProcessInfo.processInfo.processorCount - 2), neuralEngineCores: 0, estimatedTops: 0, clockSpeed: 2.0)
+            let coreCount = ProcessInfo.processInfo.processorCount
+            return ChipSpec(
+                name: "Unknown", coreCount: coreCount, performanceCores: 2,
+                efficiencyCores: max(0, coreCount - 2),
+                neuralEngineCores: 0, estimatedTops: 0, clockSpeed: 2.0
+            )
         }
     }
 }

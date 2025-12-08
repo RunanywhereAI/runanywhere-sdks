@@ -38,14 +38,9 @@ public final class FluidAudioDiarizationProvider: SpeakerDiarizationServiceProvi
     public func createSpeakerDiarizationService(configuration: SpeakerDiarizationConfiguration) async throws -> SpeakerDiarizationService {
         logger.info("Creating FluidAudioDiarization service")
 
-        // Create the service
-        let service = FluidDiarizationService(
-            maxSpeakers: configuration.maxSpeakers,
-            minSpeechDuration: configuration.minSpeechDuration
-        )
-
-        // Initialize the service
-        try await service.initialize()
+        // Create FluidAudioDiarization service directly
+        let threshold: Float = 0.65  // Default threshold
+        let service = try await FluidAudioDiarization(threshold: threshold)
 
         logger.info("FluidAudioDiarization service created successfully")
         return service
@@ -66,62 +61,5 @@ public enum FluidAudioDiarizationModule {
     @MainActor
     public static func autoRegister() {
         FluidAudioDiarizationProvider.register()
-    }
-}
-
-// MARK: - FluidDiarizationService Implementation
-
-/// Actual service implementation for FluidAudioDiarization
-/// This is a placeholder - the real implementation would be in the external module
-private final class FluidDiarizationService: SpeakerDiarizationService {
-    private let maxSpeakers: Int
-    private let minSpeechDuration: Double
-    private var speakers: [SpeakerInfo] = []
-    private var isInitialized = false
-
-    init(maxSpeakers: Int, minSpeechDuration: Double) {
-        self.maxSpeakers = maxSpeakers
-        self.minSpeechDuration = minSpeechDuration
-    }
-
-    func initialize() async throws {
-        // Initialize the diarization model
-        // In real implementation, this would load the model
-        isInitialized = true
-    }
-
-    func processAudio(_ samples: [Float]) -> SpeakerInfo {
-        // Process audio to identify speaker
-        // This is a placeholder implementation
-        let speakerId = "speaker_1"
-        let speaker = SpeakerInfo(
-            id: speakerId,
-            name: "Speaker 1",
-            confidence: 0.95,
-            embedding: Array(repeating: 0.0, count: 256)
-        )
-
-        if !speakers.contains(where: { $0.id == speakerId }) {
-            speakers.append(speaker)
-        }
-
-        return speaker
-    }
-
-    func reset() {
-        speakers.removeAll()
-    }
-
-    func getAllSpeakers() -> [SpeakerInfo] {
-        return speakers
-    }
-
-    var isReady: Bool {
-        return isInitialized
-    }
-
-    func cleanup() async {
-        speakers.removeAll()
-        isInitialized = false
     }
 }

@@ -84,8 +84,6 @@ public final class ModuleRegistry {
     private var llmProviders: [PrioritizedProvider<LLMServiceProvider>] = []
     private var ttsProviders: [PrioritizedProvider<TTSServiceProvider>] = []
     private var speakerDiarizationProviders: [SpeakerDiarizationServiceProvider] = []
-    private var vlmProviders: [VLMServiceProvider] = []
-    private var wakeWordProviders: [WakeWordServiceProvider] = []
 
     private init() {}
 
@@ -131,18 +129,6 @@ public final class ModuleRegistry {
     public func registerSpeakerDiarization(_ provider: SpeakerDiarizationServiceProvider) {
         speakerDiarizationProviders.append(provider)
         print("[ModuleRegistry] Registered Speaker Diarization provider: \(provider.name)")
-    }
-
-    /// Register a Vision Language Model provider
-    public func registerVLM(_ provider: VLMServiceProvider) {
-        vlmProviders.append(provider)
-        print("[ModuleRegistry] Registered VLM provider: \(provider.name)")
-    }
-
-    /// Register a Wake Word Detection provider
-    public func registerWakeWord(_ provider: WakeWordServiceProvider) {
-        wakeWordProviders.append(provider)
-        print("[ModuleRegistry] Registered Wake Word provider: \(provider.name)")
     }
 
     // MARK: - Provider Access
@@ -203,22 +189,6 @@ public final class ModuleRegistry {
         return speakerDiarizationProviders.first
     }
 
-    /// Get a VLM provider for the specified model
-    public func vlmProvider(for modelId: String? = nil) -> VLMServiceProvider? {
-        if let modelId = modelId {
-            return vlmProviders.first { $0.canHandle(modelId: modelId) }
-        }
-        return vlmProviders.first
-    }
-
-    /// Get a Wake Word provider
-    public func wakeWordProvider(for modelId: String? = nil) -> WakeWordServiceProvider? {
-        if let modelId = modelId {
-            return wakeWordProviders.first { $0.canHandle(modelId: modelId) }
-        }
-        return wakeWordProviders.first
-    }
-
     // MARK: - Availability Checking
 
     /// Check if STT is available
@@ -233,12 +203,6 @@ public final class ModuleRegistry {
     /// Check if Speaker Diarization is available
     public var hasSpeakerDiarization: Bool { !speakerDiarizationProviders.isEmpty }
 
-    /// Check if VLM is available
-    public var hasVLM: Bool { !vlmProviders.isEmpty }
-
-    /// Check if Wake Word Detection is available
-    public var hasWakeWord: Bool { !wakeWordProviders.isEmpty }
-
     /// Get list of all registered modules
     public var registeredModules: [String] {
         var modules: [String] = []
@@ -246,8 +210,6 @@ public final class ModuleRegistry {
         if hasLLM { modules.append("LLM") }
         if hasTTS { modules.append("TTS") }
         if hasSpeakerDiarization { modules.append("SpeakerDiarization") }
-        if hasVLM { modules.append("VLM") }
-        if hasWakeWord { modules.append("WakeWord") }
         return modules
     }
 }
@@ -257,8 +219,7 @@ public final class ModuleRegistry {
 // Service provider protocols are defined in their respective component files:
 // - STTServiceProvider in STTComponent.swift
 // - LLMServiceProvider in LLMComponent.swift
-// - WakeWordServiceProvider in WakeWordComponent.swift
-// - VLMServiceProvider, TTSServiceProvider, and SpeakerDiarizationServiceProvider defined below
+// - TTSServiceProvider and SpeakerDiarizationServiceProvider defined below
 
 /// Provider for Text-to-Speech services
 public protocol TTSServiceProvider {
@@ -266,13 +227,6 @@ public protocol TTSServiceProvider {
     func canHandle(modelId: String?) -> Bool
     var name: String { get }
     var version: String { get }
-}
-
-/// Provider for Vision Language Model services
-public protocol VLMServiceProvider {
-    func createVLMService(configuration: VLMConfiguration) async throws -> VLMService
-    func canHandle(modelId: String?) -> Bool
-    var name: String { get }
 }
 
 /// Provider for Speaker Diarization services

@@ -122,7 +122,11 @@ public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
     private func calculateDirectorySize(at url: URL) -> Int64 {
         var totalSize: Int64 = 0
 
-        if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: []) {
+        if let enumerator = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.fileSizeKey],
+            options: []
+        ) {
             for case let fileURL as URL in enumerator {
                 if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
                     totalSize += Int64(fileSize)
@@ -135,9 +139,9 @@ public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
 
     public func canHandle(model: ModelInfo) -> Bool {
         // Handle speech recognition models compatible with WhisperKit
-        return model.category == .speechRecognition &&
-               (model.preferredFramework == .whisperKit ||
-                model.compatibleFrameworks.contains(.whisperKit))
+        model.category == .speechRecognition &&
+        (model.preferredFramework == .whisperKit ||
+         model.compatibleFrameworks.contains(.whisperKit))
     }
 
     public func download(
@@ -147,118 +151,176 @@ public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
     ) async throws -> URL {
         logger.info("Starting WhisperKit download for model: \(model.id)")
 
-        // Get base URL from model's downloadURL or use default HuggingFace URL
-        let baseURL: String
-        if let modelURL = model.downloadURL {
-            // Extract base URL from provided URL
-            let urlString = modelURL.absoluteString
-            if let range = urlString.range(of: "/resolve/main/") {
-                baseURL = String(urlString[..<range.upperBound])
-            } else {
-                baseURL = "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/"
-            }
-        } else {
-            // Default HuggingFace base URL
-            baseURL = "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/"
-        }
-
-        // Map model ID to HuggingFace path
+        let baseURL = extractBaseURL(from: model.downloadURL)
         let modelPath = mapToHuggingFacePath(model.id)
 
-        // Create destination folder if needed
         try FileManager.default.createDirectory(
             at: destinationFolder,
             withIntermediateDirectories: true,
             attributes: nil
         )
 
-        // Calculate total files to download
-        var totalFiles = configFiles.count
-        for (_, files) in mlmodelcFiles {
-            totalFiles += files.count
-        }
+        let totalFiles = calculateTotalFiles()
         var filesDownloaded = 0
 
         // Download mlmodelc directories
+        filesDownloaded = try await downloadMLModelcDirectories(
+            baseURL: baseURL,
+            modelPath: modelPath,
+            destinationFolder: destinationFolder,
+            totalFiles: totalFiles,
+            filesDownloaded: filesDownloaded,
+            progressHandler: progressHandler
+        )
+
+        // Download config files
+        try await downloadConfigFiles(
+            baseURL: baseURL,
+            modelPath: modelPath,
+            destinationFolder: destinationFolder,
+            totalFiles: totalFiles,
+            filesDownloaded: filesDownloaded,
+            progressHandler: progressHandler
+        )
+
+        logger.info("WhisperKit download complete for model: \(model.id)")
+        return destinationFolder
+    }
+
+    private func extractBaseURL(from downloadURL: URL?) -> String {
+        if let modelURL = downloadURL {
+            let urlString = modelURL.absoluteString
+            if let range = urlString.range(of: "/resolve/main/") {
+                return String(urlString[..<range.upperBound])
+            }
+        }
+        return "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/"
+    }
+
+    private func calculateTotalFiles() -> Int {
+        var total = configFiles.count
+        for (_, files) in mlmodelcFiles {
+            total += files.count
+        }
+        return total
+    }
+
+    private func downloadMLModelcDirectories(
+        baseURL: String,
+        modelPath: String,
+        destinationFolder: URL,
+        totalFiles: Int,
+        filesDownloaded: Int,
+        progressHandler: ((Double) -> Void)?
+    ) async throws -> Int {
+        var count = filesDownloaded
+
         for (mlmodelcDir, files) in mlmodelcFiles {
             let dirPath = destinationFolder.appendingPathComponent(mlmodelcDir)
+            try createMLModelcDirectoryStructure(at: dirPath)
 
-            // Create mlmodelc directory structure
-            try FileManager.default.createDirectory(
-                at: dirPath,
-                withIntermediateDirectories: true,
-                attributes: nil
+            count = try await downloadFilesInDirectory(
+                files: files,
+                baseURL: baseURL,
+                modelPath: modelPath,
+                mlmodelcDir: mlmodelcDir,
+                dirPath: dirPath,
+                totalFiles: totalFiles,
+                filesDownloaded: count,
+                progressHandler: progressHandler
             )
+        }
 
-            // Create subdirectories if needed
-            let analyticsPath = dirPath.appendingPathComponent("analytics")
-            let weightsPath = dirPath.appendingPathComponent("weights")
-            try FileManager.default.createDirectory(at: analyticsPath, withIntermediateDirectories: true, attributes: nil)
-            try FileManager.default.createDirectory(at: weightsPath, withIntermediateDirectories: true, attributes: nil)
+        return count
+    }
 
-            // Download each file in the mlmodelc directory
-            for file in files {
-                let fileURLString = "\(baseURL)\(modelPath)/\(mlmodelcDir)/\(file)"
-                guard let fileURL = URL(string: fileURLString) else {
-                    logger.error("Invalid URL: \(fileURLString)")
-                    throw DownloadError.invalidURL
+    private func createMLModelcDirectoryStructure(at dirPath: URL) throws {
+        try FileManager.default.createDirectory(
+            at: dirPath,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+
+        let analyticsPath = dirPath.appendingPathComponent("analytics")
+        let weightsPath = dirPath.appendingPathComponent("weights")
+        try FileManager.default.createDirectory(
+            at: analyticsPath,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        try FileManager.default.createDirectory(
+            at: weightsPath,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+    }
+
+    private func downloadFilesInDirectory(
+        files: [String],
+        baseURL: String,
+        modelPath: String,
+        mlmodelcDir: String,
+        dirPath: URL,
+        totalFiles: Int,
+        filesDownloaded: Int,
+        progressHandler: ((Double) -> Void)?
+    ) async throws -> Int {
+        var count = filesDownloaded
+
+        for file in files {
+            let fileURLString = "\(baseURL)\(modelPath)/\(mlmodelcDir)/\(file)"
+            guard let fileURL = URL(string: fileURLString) else {
+                logger.error("Invalid URL: \(fileURLString)")
+                throw DownloadError.invalidURL
+            }
+
+            logger.debug("Attempting to download \(file) from \(fileURL.absoluteString)")
+
+            do {
+                let (localURL, response) = try await URLSession.shared.download(from: fileURL)
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    logger.warning("File \(file) might not exist, skipping")
+                    count += 1
+                    progressHandler?(Double(count) / Double(totalFiles))
+                    continue
                 }
 
-                logger.debug("Attempting to download \(file) from \(fileURL.absoluteString)")
-
-                do {
-                    // Download file using URLSession
-                    let (localURL, response) = try await URLSession.shared.download(from: fileURL)
-
-                    // Check response
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        logger.warning("File \(file) might not exist, skipping")
-                        filesDownloaded += 1
-                        let progress = Double(filesDownloaded) / Double(totalFiles)
-                        progressHandler?(progress)
-                        continue
-                    }
-
-                    if httpResponse.statusCode == 404 {
-                        // File doesn't exist, skip it
-                        logger.info("File \(file) not found (404), skipping - this is normal for some models")
-                        filesDownloaded += 1
-                        let progress = Double(filesDownloaded) / Double(totalFiles)
-                        progressHandler?(progress)
-                        continue
-                    }
-
-                    guard httpResponse.statusCode == 200 else {
-                        logger.error("Failed to download \(file): HTTP \(httpResponse.statusCode)")
-                        throw DownloadError.httpError(httpResponse.statusCode)
-                    }
-
-                    // Determine destination path
-                    let destPath = dirPath.appendingPathComponent(file)
-
-                    // Remove existing file if present
-                    if FileManager.default.fileExists(atPath: destPath.path) {
-                        try FileManager.default.removeItem(at: destPath)
-                    }
-
-                    // Move to destination
-                    try FileManager.default.moveItem(at: localURL, to: destPath)
-                    logger.debug("Saved \(file) to \(destPath.path)")
-
-                    filesDownloaded += 1
-                    let progress = Double(filesDownloaded) / Double(totalFiles)
-                    progressHandler?(progress)
-                } catch {
-                    // Log error but continue with other files
-                    logger.warning("Failed to download \(file): \(error.localizedDescription), continuing...")
-                    filesDownloaded += 1
-                    let progress = Double(filesDownloaded) / Double(totalFiles)
-                    progressHandler?(progress)
+                if httpResponse.statusCode == 404 {
+                    logger.info("File \(file) not found (404), skipping - this is normal for some models")
+                    count += 1
+                    progressHandler?(Double(count) / Double(totalFiles))
+                    continue
                 }
+
+                guard httpResponse.statusCode == 200 else {
+                    logger.error("Failed to download \(file): HTTP \(httpResponse.statusCode)")
+                    throw DownloadError.httpError(httpResponse.statusCode)
+                }
+
+                try saveDownloadedFile(localURL: localURL, destPath: dirPath.appendingPathComponent(file), file: file)
+                count += 1
+                progressHandler?(Double(count) / Double(totalFiles))
+            } catch {
+                logger.warning("Failed to download \(file): \(error.localizedDescription), continuing...")
+                count += 1
+                progressHandler?(Double(count) / Double(totalFiles))
             }
         }
 
-        // Download config files
+        return count
+    }
+
+    private func downloadConfigFiles(
+        baseURL: String,
+        modelPath: String,
+        destinationFolder: URL,
+        totalFiles: Int,
+        filesDownloaded: Int,
+        progressHandler: ((Double) -> Void)?
+    ) async throws {
+        var count = filesDownloaded
+
         for configFile in configFiles {
             let fileURLString = "\(baseURL)\(modelPath)/\(configFile)"
             guard let fileURL = URL(string: fileURLString) else {
@@ -267,34 +329,30 @@ public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
 
             logger.debug("Downloading \(configFile) from \(fileURL.absoluteString)")
 
-            // Download file using URLSession
             let (localURL, response) = try await URLSession.shared.download(from: fileURL)
 
-            // Check response
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                logger.error("Failed to download \(configFile): HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
-                throw DownloadError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0)
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+                logger.error("Failed to download \(configFile): HTTP \(statusCode)")
+                throw DownloadError.httpError(statusCode)
             }
 
-            // Move to destination
             let destPath = destinationFolder.appendingPathComponent(configFile)
+            try saveDownloadedFile(localURL: localURL, destPath: destPath, file: configFile)
 
-            // Remove existing file if present
-            if FileManager.default.fileExists(atPath: destPath.path) {
-                try FileManager.default.removeItem(at: destPath)
-            }
+            count += 1
+            progressHandler?(Double(count) / Double(totalFiles))
+        }
+    }
 
-            try FileManager.default.moveItem(at: localURL, to: destPath)
-            logger.debug("Saved \(configFile) to \(destPath.path)")
-
-            filesDownloaded += 1
-            let progress = Double(filesDownloaded) / Double(totalFiles)
-            progressHandler?(progress)
+    private func saveDownloadedFile(localURL: URL, destPath: URL, file: String) throws {
+        if FileManager.default.fileExists(atPath: destPath.path) {
+            try FileManager.default.removeItem(at: destPath)
         }
 
-        logger.info("WhisperKit download complete for model: \(model.id)")
-        return destinationFolder
+        try FileManager.default.moveItem(at: localURL, to: destPath)
+        logger.debug("Saved \(file) to \(destPath.path)")
     }
 
     private func mapToHuggingFacePath(_ modelId: String) -> String {

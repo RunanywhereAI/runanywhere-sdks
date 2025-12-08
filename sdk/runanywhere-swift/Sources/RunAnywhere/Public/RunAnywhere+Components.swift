@@ -138,16 +138,6 @@ extension RunAnywhere {
         return await componentInitializer.initialize([config])
     }
 
-    /// Preload components for vision tasks
-    @discardableResult
-    public static func preloadVision(modelId: String? = nil) async -> InitializationResult {
-        let config = UnifiedComponentConfig.vlm(
-            VLMConfiguration(modelId: modelId),
-            priority: InitializationPriority.critical
-        )
-        return await componentInitializer.initialize([config])
-    }
-
     // MARK: - Builder Pattern
 
     /// Builder for creating component initialization requests
@@ -195,18 +185,6 @@ extension RunAnywhere {
             configs.append(UnifiedComponentConfig.vad(params, priority: priority))
             return self
         }
-
-        /// Add VLM with parameters
-        @discardableResult
-        public func withVLM(
-            _ params: VLMConfiguration,
-            priority: InitializationPriority = .normal,
-            downloadPolicy: DownloadPolicy = .automatic
-        ) -> Self {
-            configs.append(UnifiedComponentConfig.vlm(params, priority: priority, downloadPolicy: downloadPolicy))
-            return self
-        }
-
 
         /// Add Speaker Diarization with parameters
         @discardableResult
@@ -319,8 +297,6 @@ extension RunAnywhere {
             return TTSConfiguration()
         case .vad:
             return VADConfiguration()
-        case .vlm:
-            return VLMConfiguration()
         case .speakerDiarization:
             return SpeakerDiarizationConfiguration()
         case .embedding:

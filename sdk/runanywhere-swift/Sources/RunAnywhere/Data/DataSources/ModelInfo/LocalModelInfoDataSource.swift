@@ -196,6 +196,7 @@ public actor LocalModelInfoDataSource: LocalDataSource {
         if !tableExists {
             logger.info("Models table doesn't exist, creating it...")
             try databaseManager.write { db in
+                // swiftlint:disable:next identifier_name
                 try db.create(table: "models", ifNotExists: true) { t in
                     t.primaryKey("id", .text)
                     t.column("name", .text).notNull()

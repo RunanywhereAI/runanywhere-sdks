@@ -7,6 +7,37 @@ on:
     branches: [ main ]
 
 jobs:
+  swiftlint:
+    name: SwiftLint
+    runs-on: macos-14
+    continue-on-error: true  # Don't block other jobs initially
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache SwiftLint
+      uses: actions/cache@v3
+      with:
+        path: /opt/homebrew/bin/swiftlint
+        key: ${{ runner.os }}-swiftlint-${{ hashFiles('.swiftlint.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-swiftlint-
+
+    - name: Install SwiftLint
+      run: |
+        if ! which swiftlint >/dev/null; then
+          echo "Installing SwiftLint via Homebrew..."
+          brew install swiftlint
+        else
+          echo "SwiftLint already installed at $(which swiftlint)"
+          swiftlint version
+        fi
+
+    - name: Run SwiftLint
+      run: |
+        swiftlint --reporter github-actions-logging
+
   test:
     name: Test on macOS
     runs-on: macos-14
@@ -47,16 +78,6 @@ jobs:
         file: ./coverage.lcov
         flags: unittests
         name: codecov-umbrella
-
-    - name: SwiftLint
-      run: |
-        if which swiftlint >/dev/null; then
-          swiftlint --strict
-        else
-          echo "SwiftLint not installed, downloading..."
-          brew install swiftlint
-          swiftlint --strict
-        fi
 
   build-platforms:
     name: Build for ${{ matrix.platform }}

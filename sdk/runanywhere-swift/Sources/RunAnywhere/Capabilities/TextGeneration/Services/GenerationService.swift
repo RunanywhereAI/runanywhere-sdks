@@ -208,7 +208,8 @@ public class GenerationService {
         )
 
         // Get memory usage (placeholder - actual implementation depends on service)
-        let memoryUsage: Int64 = 0 // TODO: Add memory tracking to LLMService protocol
+        // TODO: #TBD - Add memory tracking to LLMService protocol
+        let memoryUsage: Int64 = 0
 
         // Calculate response time (time after thinking)
         let responseTimeMs: Double? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
@@ -315,7 +316,8 @@ public class GenerationService {
         let latency = Date().timeIntervalSince(startTime) * 1000
 
         // Get memory usage (placeholder - actual implementation depends on service)
-        let memoryUsage: Int64 = 0 // TODO: Add memory tracking to LLMService protocol
+        // TODO: #TBD - Add memory tracking to LLMService protocol
+        let memoryUsage: Int64 = 0
 
         // Parse thinking content if model supports it
         let modelInfo = loadedModel.model

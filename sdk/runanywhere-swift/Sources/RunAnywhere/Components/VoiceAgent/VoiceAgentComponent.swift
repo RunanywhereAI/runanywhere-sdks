@@ -27,10 +27,6 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
     // Configuration
     private let agentParams: VoiceAgentConfiguration
 
-    // State
-    private var isProcessing = false
-    private let processQueue = DispatchQueue(label: "com.runanywhere.voiceagent", qos: .userInteractive)
-
     // MARK: - Initialization
 
     public init(configuration: VoiceAgentConfiguration, serviceContainer: ServiceContainer? = nil) {
@@ -76,9 +72,6 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
         guard state == .ready else {
             throw SDKError.notInitialized
         }
-
-        isProcessing = true
-        defer { isProcessing = false }
 
         var result = VoiceAgentResult()
 
@@ -190,8 +183,6 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
     // MARK: - Cleanup
 
     public override func performCleanup() async throws {
-        isProcessing = false
-
         try? await vadComponent?.cleanup()
         try? await sttComponent?.cleanup()
         try? await llmComponent?.cleanup()

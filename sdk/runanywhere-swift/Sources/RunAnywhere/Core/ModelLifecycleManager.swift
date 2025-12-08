@@ -2,7 +2,7 @@
 //  ModelLifecycleManager.swift
 //  RunAnywhere
 //
-//  Unified model lifecycle tracking across all modalities (LLM, STT, TTS, VLM)
+//  Unified model lifecycle tracking across all modalities (LLM, STT, TTS)
 //
 
 import Foundation
@@ -89,7 +89,6 @@ public enum Modality: String, CaseIterable, Sendable {
     case llm = "llm"           // Large Language Models
     case stt = "stt"           // Speech-to-Text
     case tts = "tts"           // Text-to-Speech
-    case vlm = "vlm"           // Vision-Language Models
     case speakerDiarization = "speaker_diarization"
     case wakeWord = "wake_word"
 
@@ -98,7 +97,6 @@ public enum Modality: String, CaseIterable, Sendable {
         case .llm: return "Language Model"
         case .stt: return "Speech Recognition"
         case .tts: return "Text to Speech"
-        case .vlm: return "Vision Model"
         case .speakerDiarization: return "Speaker Diarization"
         case .wakeWord: return "Wake Word"
         }
