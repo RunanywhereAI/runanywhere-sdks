@@ -329,10 +329,12 @@ class STTViewModel: ObservableObject {
         logger.info("Initializing STT view model")
 
         // Request microphone permission
+        #if os(iOS)
         let status = AVAudioApplication.shared.recordPermission
         if status != .granted {
             await AVAudioApplication.requestRecordPermission()
         }
+        #endif
 
         // Subscribe to model lifecycle changes from SDK
         subscribeToModelLifecycle()

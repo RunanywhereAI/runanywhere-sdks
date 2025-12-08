@@ -12,9 +12,6 @@
     <!-- macOS Microphone access for voice features -->
     <key>com.apple.security.device.microphone</key>
     <true/>
-    <!-- macOS Download directory access for model downloads -->
-    <key>com.apple.security.files.downloads.read-write</key>
-    <true/>
     <!-- macOS User-selected files for model imports (read-write) -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>

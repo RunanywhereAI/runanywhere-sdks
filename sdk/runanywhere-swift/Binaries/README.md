@@ -86,11 +86,20 @@ The XCFramework is consumed by Swift through the `CRunAnywhereCore` C bridge mod
 
 ### Location
 
-The ONNX Runtime dylib is provided in:
+**Important**: The `onnxruntime-macos/` directory is **NOT committed to git**. You must obtain the ONNX Runtime dylib from one of these sources:
 
-```text
-Binaries/onnxruntime-macos/libonnxruntime.dylib
-```
+1. **Download from GitHub releases** (Recommended for production):
+   - Get `onnxruntime-macos.zip` from [runanywhere-binaries releases](https://github.com/RunanywhereAI/runanywhere-binaries/releases)
+   - Extract to `Binaries/onnxruntime-macos/`
+   - The dylib will be at: `Binaries/onnxruntime-macos/libonnxruntime.dylib`
+
+2. **Install via Homebrew** (Development only):
+
+   ```bash
+   brew install onnxruntime
+   ```
+
+   The system-wide installation is only recommended for development, not production deployment.
 
 ### Integration
 
@@ -102,13 +111,3 @@ Binaries/onnxruntime-macos/libonnxruntime.dylib
 
 - iOS: ONNX Runtime is statically linked into the XCFramework
 - macOS: ONNX Runtime is dynamically linked to reduce binary size and allow updates
-
-### Alternative (development only)
-
-Install ONNX Runtime system-wide via Homebrew:
-
-```bash
-brew install onnxruntime
-```
-
-This is only recommended for development, not production deployment.

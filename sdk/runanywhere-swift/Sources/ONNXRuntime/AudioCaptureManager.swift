@@ -3,7 +3,9 @@ import AVFoundation
 import RunAnywhere
 
 /// Manages audio capture from microphone for STT
-/// Works on iOS, tvOS, watchOS, and macOS using AVAudioEngine
+/// Works on iOS, tvOS, and macOS using AVAudioEngine
+/// NOTE: watchOS is NOT supported - AVAudioEngine inputNode tap does not work reliably on watchOS.
+/// watchOS typically requires AVAudioRecorder or watch-specific APIs for audio recording.
 public class AudioCaptureManager: ObservableObject {
     private let logger = SDKLogger(category: "AudioCapture")
 
@@ -21,7 +23,20 @@ public class AudioCaptureManager: ObservableObject {
 
     /// Request microphone permission
     public func requestPermission() async -> Bool {
-        #if os(iOS) || os(tvOS) || os(watchOS)
+        #if os(iOS)
+        // Use modern AVAudioApplication API for iOS 17+
+        if #available(iOS 17.0, *) {
+            return await AVAudioApplication.requestRecordPermission()
+        } else {
+            // Fallback to deprecated API for older iOS versions
+            return await withCheckedContinuation { continuation in
+                AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                    continuation.resume(returning: granted)
+                }
+            }
+        }
+        #elseif os(tvOS)
+        // tvOS doesn't have AVAudioApplication, use legacy API
         return await withCheckedContinuation { continuation in
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
                 continuation.resume(returning: granted)
@@ -38,14 +53,16 @@ public class AudioCaptureManager: ObservableObject {
     }
 
     /// Start recording audio from microphone
+    /// - Note: Not supported on watchOS due to AVAudioEngine limitations
     public func startRecording(onAudioData: @escaping (Data) -> Void) throws {
         guard !isRecording else {
             logger.warning("Already recording")
             return
         }
 
-        #if os(iOS) || os(tvOS) || os(watchOS)
-        // Configure audio session (iOS/tvOS/watchOS only)
+        #if os(iOS) || os(tvOS)
+        // Configure audio session (iOS/tvOS only)
+        // watchOS is NOT supported - AVAudioEngine inputNode tap does not work on watchOS
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.record, mode: .measurement)
         try audioSession.setActive(true)
@@ -117,8 +134,8 @@ public class AudioCaptureManager: ObservableObject {
         audioEngine = nil
         inputNode = nil
 
-        #if os(iOS) || os(tvOS) || os(watchOS)
-        // Deactivate audio session (iOS/tvOS/watchOS only)
+        #if os(iOS) || os(tvOS)
+        // Deactivate audio session (iOS/tvOS only)
         try? AVAudioSession.sharedInstance().setActive(false)
         #endif
 
