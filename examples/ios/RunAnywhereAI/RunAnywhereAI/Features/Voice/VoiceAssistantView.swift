@@ -120,9 +120,9 @@ struct VoiceAssistantView: View {
                             .padding(.top, 100)
                         }
                     }
-                    .padding(.horizontal, 30)
+                    .padding(.horizontal, AdaptiveSizing.contentPadding)
                     .padding(.vertical, 20)
-                    .frame(maxWidth: 800, alignment: .leading)
+                    .adaptiveConversationWidth()
                 }
                 .onChange(of: viewModel.assistantResponse) { _ in
                     withAnimation {
@@ -148,7 +148,14 @@ struct VoiceAssistantView: View {
                 HStack {
                     Spacer()
 
-                    Button(action: {
+                    AdaptiveMicButton(
+                        isActive: viewModel.sessionState == .listening,
+                        isPulsing: viewModel.isSpeechDetected,
+                        isLoading: viewModel.sessionState == .connecting || (viewModel.isProcessing && !viewModel.isListening),
+                        activeColor: micButtonColor,
+                        inactiveColor: micButtonColor,
+                        icon: micButtonIcon
+                    ) {
                         Task {
                             if viewModel.sessionState == .listening ||
                                viewModel.sessionState == .speaking ||
@@ -159,39 +166,7 @@ struct VoiceAssistantView: View {
                                 await viewModel.startConversation()
                             }
                         }
-                    }) {
-                        ZStack {
-                            // Background circle
-                            Circle()
-                                .fill(micButtonColor)
-                                .frame(width: 72, height: 72)
-
-                            // Pulsing effect when active
-                            if viewModel.isSpeechDetected {
-                                Circle()
-                                    .stroke(Color.white.opacity(0.4), lineWidth: 2)
-                                    .scaleEffect(viewModel.isSpeechDetected ? 1.3 : 1.0)
-                                    .opacity(viewModel.isSpeechDetected ? 0 : 0.8)
-                                    .animation(
-                                        .easeOut(duration: 1.0).repeatForever(autoreverses: false),
-                                        value: viewModel.isSpeechDetected
-                                    )
-                            }
-
-                            // Icon
-                            if viewModel.sessionState == .connecting ||
-                               (viewModel.isProcessing && !viewModel.isListening) {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(1.2)
-                            } else {
-                                Image(systemName: micButtonIcon)
-                                    .font(.system(size: 28))
-                                    .foregroundColor(.white)
-                            }
-                        }
                     }
-                    .buttonStyle(.plain)
 
                     Spacer()
                 }
@@ -392,14 +367,8 @@ struct VoiceAssistantView: View {
                                 .background(Color.red.opacity(0.1))
                                 .cornerRadius(4)
 
-                                // Audio level bars
-                                HStack(spacing: 4) {
-                                    ForEach(0..<10, id: \.self) { index in
-                                        RoundedRectangle(cornerRadius: 2)
-                                            .fill(index < Int(viewModel.audioLevel * 10) ? Color.green : Color.gray.opacity(0.3))
-                                            .frame(width: 25, height: 8)
-                                    }
-                                }
+                                // Audio level bars - using adaptive sizing
+                                AdaptiveAudioLevelIndicator(level: viewModel.audioLevel)
                             }
                             .padding(.bottom, 8)
                             .animation(.easeInOut(duration: 0.2), value: viewModel.audioLevel)
@@ -409,7 +378,14 @@ struct VoiceAssistantView: View {
                         HStack {
                             Spacer()
 
-                            Button(action: {
+                            AdaptiveMicButton(
+                                isActive: viewModel.sessionState == .listening,
+                                isPulsing: viewModel.isSpeechDetected,
+                                isLoading: viewModel.sessionState == .connecting || (viewModel.isProcessing && !viewModel.isListening),
+                                activeColor: micButtonColor,
+                                inactiveColor: micButtonColor,
+                                icon: micButtonIcon
+                            ) {
                                 Task {
                                     if viewModel.sessionState == .listening ||
                                        viewModel.sessionState == .speaking ||
@@ -418,37 +394,6 @@ struct VoiceAssistantView: View {
                                         await viewModel.stopConversation()
                                     } else {
                                         await viewModel.startConversation()
-                                    }
-                                }
-                            }) {
-                                ZStack {
-                                    // Background circle
-                                    Circle()
-                                        .fill(micButtonColor)
-                                        .frame(width: 72, height: 72)
-
-                                    // Pulsing effect when active
-                                    if viewModel.isSpeechDetected {
-                                        Circle()
-                                            .stroke(Color.white.opacity(0.4), lineWidth: 2)
-                                            .scaleEffect(viewModel.isSpeechDetected ? 1.3 : 1.0)
-                                            .opacity(viewModel.isSpeechDetected ? 0 : 0.8)
-                                            .animation(
-                                                .easeOut(duration: 1.0).repeatForever(autoreverses: false),
-                                                value: viewModel.isSpeechDetected
-                                            )
-                                    }
-
-                                    // Icon
-                                    if viewModel.sessionState == .connecting ||
-                                       (viewModel.isProcessing && !viewModel.isListening) {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                            .scaleEffect(1.2)
-                                    } else {
-                                        Image(systemName: micButtonIcon)
-                                            .font(.system(size: 28))
-                                            .foregroundColor(.white)
                                     }
                                 }
                             }
@@ -658,7 +603,7 @@ struct ConversationBubble: View {
     }
 }
 
-// Compact model badge component
+// Compact model badge component with adaptive sizing
 struct ModelBadge: View {
     let icon: String
     let label: String
@@ -668,20 +613,20 @@ struct ModelBadge: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.caption2)
+                .font(.system(size: AdaptiveSizing.badgeFontSize))
                 .foregroundColor(color)
             VStack(alignment: .leading, spacing: 0) {
                 Text(label)
-                    .font(.system(size: 9))
+                    .font(.system(size: AdaptiveSizing.badgeFontSize - 1))
                     .foregroundColor(.secondary)
                 Text(value)
-                    .font(.caption2)
+                    .font(.system(size: AdaptiveSizing.badgeFontSize))
                     .fontWeight(.medium)
                     .lineLimit(1)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, AdaptiveSizing.badgePaddingH)
+        .padding(.vertical, AdaptiveSizing.badgePaddingV)
         .background(color.opacity(0.1))
         .cornerRadius(6)
     }

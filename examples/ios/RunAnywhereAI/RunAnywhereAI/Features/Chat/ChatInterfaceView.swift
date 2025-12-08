@@ -858,7 +858,38 @@ struct ChatDetailsView: View {
     @State private var selectedTab = 0
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
+            #if os(macOS)
+            // macOS: Use segmented control picker instead of TabView for better appearance
+            VStack(spacing: 0) {
+                // Tab selector
+                Picker("Analytics", selection: $selectedTab) {
+                    Text("Overview").tag(0)
+                    Text("Messages").tag(1)
+                    Text("Performance").tag(2)
+                }
+                .pickerStyle(.segmented)
+                .padding()
+
+                Divider()
+
+                // Tab content
+                Group {
+                    switch selectedTab {
+                    case 0:
+                        ChatOverviewTab(messages: messages, conversation: conversation)
+                    case 1:
+                        MessageAnalyticsTab(messages: messages)
+                    case 2:
+                        PerformanceTab(messages: messages)
+                    default:
+                        ChatOverviewTab(messages: messages, conversation: conversation)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            #else
+            // iOS: Use standard TabView
             TabView(selection: $selectedTab) {
                 // Overview Tab
                 ChatOverviewTab(messages: messages, conversation: conversation)
@@ -881,26 +912,36 @@ struct ChatDetailsView: View {
                     }
                     .tag(2)
             }
-            .navigationTitle("Chat Analytics")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-                #else
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-                #endif
-            }
         }
+        .navigationTitle("Chat Analytics")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            #if os(iOS)
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+            #else
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+                .keyboardShortcut(.escape)
+            }
+            #endif
+        }
+        .adaptiveSheetFrame(
+            minWidth: 500,
+            idealWidth: 650,
+            maxWidth: 800,
+            minHeight: 450,
+            idealHeight: 550,
+            maxHeight: 700
+        )
     }
 }
 

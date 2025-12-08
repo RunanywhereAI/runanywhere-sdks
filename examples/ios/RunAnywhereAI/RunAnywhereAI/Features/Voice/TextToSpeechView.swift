@@ -231,7 +231,7 @@ struct TextToSpeechView: View {
                     .padding(.horizontal, 40)
                 }
 
-                // Action buttons
+                // Action buttons - adaptive sizing
                 HStack(spacing: 20) {
                     // Generate/Speak button
                     Button(action: {
@@ -252,7 +252,8 @@ struct TextToSpeechView: View {
                             Text(viewModel.isSystemTTS ? "Speak" : "Generate")
                                 .fontWeight(.semibold)
                         }
-                        .frame(width: 140, height: 50)
+                        .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
+                        .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
                         .background(inputText.isEmpty || viewModel.selectedModelName == nil ? Color.gray : Color.purple)
                         .foregroundColor(.white)
                         .cornerRadius(25)
@@ -271,7 +272,8 @@ struct TextToSpeechView: View {
                             Text(viewModel.isPlaying ? "Stop" : "Play")
                                 .fontWeight(.semibold)
                         }
-                        .frame(width: 140, height: 50)
+                        .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
+                        .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
                         .background(viewModel.hasGeneratedAudio ? Color.green : Color.gray)
                         .foregroundColor(.white)
                         .cornerRadius(25)
