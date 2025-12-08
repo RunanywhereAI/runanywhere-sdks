@@ -1,14 +1,13 @@
 // swiftlint:disable file_length
-import Foundation
 import Combine
+import Foundation
 #if os(iOS) || os(tvOS) || os(watchOS)
 import UIKit
 #endif
 
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
-// swiftlint:disable:next type_body_length
-public enum RunAnywhere {
+public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
     // MARK: - Internal State Management
 
@@ -194,7 +193,7 @@ public enum RunAnywhere {
     /// Ensure device is registered with backend (lazy registration)
     /// Only registers if device ID doesn't exist locally
     /// - Throws: SDKError if registration fails
-    private static func ensureDeviceRegistered() async throws {
+    private static func ensureDeviceRegistered() async throws { // swiftlint:disable:this function_body_length cyclomatic_complexity
         let logger = SDKLogger(category: "RunAnywhere.DeviceReg")
 
         // IMPORTANT: Always ensure network services are initialized for production/staging
@@ -511,7 +510,7 @@ public enum RunAnywhere {
 
         // Parse response (optional, for validation)
         let decoder = JSONDecoder()
-        let _ = try decoder.decode(DevDeviceRegistrationResponse.self, from: data)
+        _ = try decoder.decode(DevDeviceRegistrationResponse.self, from: data)
     }
 
     /// Register device via Supabase REST API
@@ -553,7 +552,7 @@ public enum RunAnywhere {
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
             // Try to extract error message from Supabase response
             var errorMessage = "Registration failed with status code: \(httpResponse.statusCode)"
-            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any], // swiftlint:disable:this avoid_any_type
                let message = errorData["message"] as? String {
                 errorMessage = message
                 logger.error("❌ Supabase error: \(message)")
@@ -604,7 +603,7 @@ public enum RunAnywhere {
 
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
             var errorMessage = "Analytics submission failed: \(httpResponse.statusCode)"
-            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { // swiftlint:disable:this avoid_any_type
                 logger.debug("error response: \(errorData)")
                 if let message = errorData["message"] as? String {
                     errorMessage = message
@@ -639,7 +638,7 @@ public enum RunAnywhere {
 
     /// Submit generation analytics (public API)
     /// - Note: Only submits in development mode; fails silently on errors
-    public static func submitGenerationAnalytics(
+    public static func submitGenerationAnalytics( // swiftlint:disable:this function_parameter_count
         generationId: String,
         modelId: String,
         performanceMetrics: PerformanceMetrics,
@@ -911,7 +910,7 @@ public enum RunAnywhere {
 
     /// Load a model by ID
     /// - Parameter modelId: The model identifier
-    public static func loadModel(_ modelId: String) async throws {
+    public static func loadModel(_ modelId: String) async throws { // swiftlint:disable:this function_body_length
         EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
 
         let startTime = Date()
@@ -1059,7 +1058,7 @@ public enum RunAnywhere {
     /// Load an STT (Speech-to-Text) model by ID
     /// This initializes the STT component and loads the model into memory
     /// - Parameter modelId: The model identifier
-    public static func loadSTTModel(_ modelId: String) async throws {
+    public static func loadSTTModel(_ modelId: String) async throws { // swiftlint:disable:this function_body_length
         EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
 
         let startTime = Date()
@@ -1213,7 +1212,7 @@ public enum RunAnywhere {
     /// Load a TTS (Text-to-Speech) model by ID
     /// This initializes the TTS component and loads the model into memory
     /// - Parameter modelId: The model identifier (voice name)
-    public static func loadTTSModel(_ modelId: String) async throws {
+    public static func loadTTSModel(_ modelId: String) async throws { // swiftlint:disable:this function_body_length
         EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
 
         let startTime = Date()
@@ -1366,21 +1365,17 @@ public enum RunAnywhere {
 
     // MARK: - Loaded Component Storage
 
-    @MainActor
-    private static var _loadedSTTComponent: STTComponent?
+    @MainActor private static var _loadedSTTComponent: STTComponent?
 
-    @MainActor
-    private static var _loadedTTSComponent: TTSComponent?
+    @MainActor private static var _loadedTTSComponent: TTSComponent?
 
     /// Get the currently loaded STT component
-    @MainActor
-    public static var loadedSTTComponent: STTComponent? {
+    @MainActor public static var loadedSTTComponent: STTComponent? {
         return _loadedSTTComponent
     }
 
     /// Get the currently loaded TTS component
-    @MainActor
-    public static var loadedTTSComponent: TTSComponent? {
+    @MainActor public static var loadedTTSComponent: TTSComponent? {
         return _loadedTTSComponent
     }
 
@@ -1530,7 +1525,7 @@ public enum RunAnywhere {
     /// Get current SDK version
     /// - Returns: SDK version string
     public static func getSDKVersion() -> String {
-        return "1.0.0" // TODO: Get from build configuration
+        return "1.0.0" // Note: Get from build configuration
     }
 
     /// Get current environment

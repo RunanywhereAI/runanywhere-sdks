@@ -3,13 +3,13 @@ import Foundation
 /// SDK Environment mode - determines how data is handled
 public enum SDKEnvironment: String, CaseIterable, Sendable {
     /// Development/testing mode - may use local data, verbose logging
-    case development = "development"
+    case development
 
     /// Staging mode - testing with real services
-    case staging = "staging"
+    case staging
 
     /// Production mode - live environment
-    case production = "production"
+    case production
 
     /// Human-readable description
     public var description: String {

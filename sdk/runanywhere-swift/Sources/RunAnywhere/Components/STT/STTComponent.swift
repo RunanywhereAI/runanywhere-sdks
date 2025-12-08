@@ -1,6 +1,6 @@
 // swiftlint:disable file_length
-import Foundation
 @preconcurrency import AVFoundation
+import Foundation
 
 // MARK: - STT Options
 
@@ -176,11 +176,11 @@ public enum STTError: LocalizedError {
 public enum STTMode: String, CaseIterable, Sendable {
     /// Batch mode: Record all audio first, then transcribe everything at once
     /// Best for: Short recordings, offline processing, higher accuracy
-    case batch = "batch"
+    case batch
 
     /// Live/Streaming mode: Transcribe audio in real-time as it's recorded
     /// Best for: Live captions, real-time feedback, long recordings
-    case live = "live"
+    case live
 
     public var displayName: String {
         switch self {
@@ -209,7 +209,7 @@ public enum STTMode: String, CaseIterable, Sendable {
 // MARK: - STT Service Protocol
 
 /// Protocol for speech-to-text services
-public protocol STTService: AnyObject {
+public protocol STTService: AnyObject { // swiftlint:disable:this avoid_any_object
     /// Initialize the service with optional model path
     func initialize(modelPath: String?) async throws
 
@@ -520,12 +520,11 @@ public final class STTServiceWrapper: ServiceWrapper {
 // MARK: - STT Component
 
 /// Speech-to-Text component following the clean architecture
-@MainActor
-public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Sendable {
+public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Sendable { // swiftlint:disable:this type_body_length
 
     // MARK: - Properties
 
-    public override class var componentType: SDKComponent { .stt }
+    public override static var componentType: SDKComponent { .stt }
 
     private let sttConfiguration: STTConfiguration
     private var isModelLoaded = false
@@ -717,7 +716,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     }
 
     /// Process STT input
-    public func process(_ input: STTInput) async throws -> STTOutput {
+    public func process(_ input: STTInput) async throws -> STTOutput { // swiftlint:disable:this function_body_length
         try ensureReady()
 
         guard let service = sttService else {
@@ -861,7 +860,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     }
 
     /// Stream transcription
-    public func streamTranscribe<S: AsyncSequence>(
+    public func streamTranscribe<S: AsyncSequence>( // swiftlint:disable:this function_body_length
         _ audioStream: S,
         language: String? = nil
     ) -> AsyncThrowingStream<String, Error> where S.Element == Data {

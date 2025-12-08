@@ -63,7 +63,7 @@ public class PersistentDeviceIdentity {
         components.append("os:\(osVersion.majorVersion)")
 
         // Create fingerprint hash
-        let fingerprintString = components.joined(separator:"|")
+        let fingerprintString = components.joined(separator: "|")
         let fingerprint = sha256(fingerprintString)
 
         // Store fingerprint for future validation

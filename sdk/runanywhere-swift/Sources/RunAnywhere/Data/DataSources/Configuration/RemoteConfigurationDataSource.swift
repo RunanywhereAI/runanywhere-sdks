@@ -51,6 +51,7 @@ public actor RemoteConfigurationDataSource: RemoteDataSource {
         }
     }
 
+    // swiftlint:disable:next prefer_concrete_types avoid_any_type
     public func fetchAll(filter: [String: Any]?) async throws -> [ConfigurationData] {
         // Not typically used for configuration
         return []

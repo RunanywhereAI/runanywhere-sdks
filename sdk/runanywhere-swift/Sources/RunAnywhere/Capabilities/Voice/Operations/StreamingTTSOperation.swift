@@ -12,7 +12,7 @@ public class StreamingTTSHandler {
     private let queue = DispatchQueue(label: "com.runanywhere.streamingtts", qos: .userInitiated)
 
     // Configuration
-    private let sentenceDelimiters: CharacterSet = CharacterSet(charactersIn: ".!?")
+    private let sentenceDelimiters = CharacterSet(charactersIn: ".!?")
     private let minSentenceLength = 3 // Minimum characters for a valid sentence
 
     public init(ttsService: TTSService) {

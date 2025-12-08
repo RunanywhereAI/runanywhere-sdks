@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Files
 import Foundation
 
@@ -10,7 +11,7 @@ public struct ModelFileInfo {
 }
 
 /// Simplified file manager using Files library for all file operations
-public class SimplifiedFileManager {
+public class SimplifiedFileManager { // swiftlint:disable:this type_body_length
 
     // MARK: - Properties
 
@@ -21,7 +22,10 @@ public class SimplifiedFileManager {
 
     public init() throws {
         // Create base RunAnywhere folder in Documents
-        self.baseFolder = try Folder.documents!.createSubfolderIfNeeded(withName: "RunAnywhere")
+        guard let documentsFolder = Folder.documents else {
+            throw SDKError.storageError("Unable to access documents directory")
+        }
+        self.baseFolder = try documentsFolder.createSubfolderIfNeeded(withName: "RunAnywhere")
 
         // Create basic directory structure
         try createDirectoryStructure()
@@ -116,21 +120,19 @@ public class SimplifiedFileManager {
         let modelsFolder = try Folder(path: modelsFolderURL.path)
 
         // Check framework-specific folders
-        for frameworkFolder in modelsFolder.subfolders {
-            if LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) {
-                if frameworkFolder.containsSubfolder(named: modelId) {
-                    let modelFolder = try frameworkFolder.subfolder(named: modelId)
-                    try modelFolder.delete()
+        for frameworkFolder in modelsFolder.subfolders where LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) {
+            if frameworkFolder.containsSubfolder(named: modelId) {
+                let modelFolder = try frameworkFolder.subfolder(named: modelId)
+                try modelFolder.delete()
 
-                    // Remove metadata
-                    Task {
-                        let modelInfoService = await ServiceContainer.shared.modelInfoService
-                        try? await modelInfoService.removeModel(modelId)
-                    }
-
-                    logger.info("Deleted model: \(modelId) from framework: \(frameworkFolder.name)")
-                    return
+                // Remove metadata
+                Task {
+                    let modelInfoService = await ServiceContainer.shared.modelInfoService
+                    try? await modelInfoService.removeModel(modelId)
                 }
+
+                logger.info("Deleted model: \(modelId) from framework: \(frameworkFolder.name)")
+                return
             }
         }
 
@@ -369,7 +371,7 @@ public class SimplifiedFileManager {
     }
 
     /// Get device storage information (total, free, used space)
-    public func getDeviceStorageInfo() -> (totalSpace: Int64, freeSpace: Int64, usedSpace: Int64) {
+    public func getDeviceStorageInfo() -> DeviceStorageInfo {
         do {
             let homeURL = URL(fileURLWithPath: NSHomeDirectory())
             let attributes = try FileManager.default.attributesOfFileSystem(forPath: homeURL.path)
@@ -378,10 +380,10 @@ public class SimplifiedFileManager {
             let freeSpace = (attributes[.systemFreeSize] as? Int64) ?? 0
             let usedSpace = totalSpace - freeSpace
 
-            return (totalSpace: totalSpace, freeSpace: freeSpace, usedSpace: usedSpace)
+            return DeviceStorageInfo(totalSpace: totalSpace, freeSpace: freeSpace, usedSpace: usedSpace)
         } catch {
             logger.error("Failed to get device storage info: \(error)")
-            return (totalSpace: 0, freeSpace: 0, usedSpace: 0)
+            return DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0)
         }
     }
 
@@ -426,7 +428,7 @@ public class SimplifiedFileManager {
     }
 
     /// Find model file by searching all possible locations
-    public func findModelFile(modelId: String, expectedPath: String? = nil) -> URL? {
+    public func findModelFile(modelId: String, expectedPath: String? = nil) -> URL? { // swiftlint:disable:this cyclomatic_complexity
         // If expected path exists and is valid, return it
         if let expectedPath = expectedPath,
            FileManager.default.fileExists(atPath: expectedPath) {

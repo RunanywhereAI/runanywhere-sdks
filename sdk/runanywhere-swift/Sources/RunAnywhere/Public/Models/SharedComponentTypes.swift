@@ -18,12 +18,12 @@ public struct AudioMetadata: Sendable {
 
 /// Audio format information
 public enum AudioFormat: String, Sendable {
-    case wav = "wav"
-    case mp3 = "mp3"
-    case m4a = "m4a"
-    case flac = "flac"
-    case pcm = "pcm"
-    case opus = "opus"
+    case wav
+    case mp3
+    case m4a
+    case flac
+    case pcm
+    case opus
 
     public var sampleRate: Int {
         switch self {

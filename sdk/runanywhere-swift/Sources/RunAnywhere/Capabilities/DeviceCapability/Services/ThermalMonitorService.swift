@@ -32,10 +32,10 @@ public actor ThermalMonitorService {
 
 /// Thermal state enumeration
 public enum ThermalState: String, Codable {
-    case nominal = "nominal"
-    case fair = "fair"
-    case serious = "serious"
-    case critical = "critical"
+    case nominal
+    case fair
+    case serious
+    case critical
 
     #if os(iOS) || os(macOS)
     init(from processInfoState: ProcessInfo.ThermalState) {

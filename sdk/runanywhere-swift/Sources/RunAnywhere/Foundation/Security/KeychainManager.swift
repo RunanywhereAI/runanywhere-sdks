@@ -161,6 +161,7 @@ public final class KeychainManager {
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
 
+        // swiftlint:disable:next avoid_any_object
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
 
@@ -200,8 +201,8 @@ public final class KeychainManager {
 
     // MARK: - Private Methods
 
-    private func baseQuery(for key: String) -> [String: Any] {
-        var query: [String: Any] = [
+    private func baseQuery(for key: String) -> [String: Any] { // swiftlint:disable:this prefer_concrete_types avoid_any_type
+        var query: [String: Any] = [ // swiftlint:disable:this prefer_concrete_types avoid_any_type
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: key,

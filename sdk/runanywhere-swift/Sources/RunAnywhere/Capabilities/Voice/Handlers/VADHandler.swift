@@ -1,5 +1,5 @@
-import Foundation
 import AVFoundation
+import Foundation
 
 /// Temporary bridge handler for VAD to work with existing VoicePipelineManager
 /// This will be removed once VoicePipelineManager is refactored to use the new component architecture

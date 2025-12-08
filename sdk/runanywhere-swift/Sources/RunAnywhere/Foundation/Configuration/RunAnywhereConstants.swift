@@ -67,16 +67,17 @@ public enum RunAnywhereConstants {
     private static func loadFromJSON(key: String) -> String? {
         guard let url = Bundle.main.url(forResource: "RunAnywhereConfig", withExtension: "json"),
               let data = try? Data(contentsOf: url),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] // swiftlint:disable:this avoid_any_type
+        else {
             return nil
         }
 
         // Navigate through nested keys (e.g., "api.production")
         let keyParts = key.split(separator: ".")
-        var current: Any = json
+        var current: Any = json // swiftlint:disable:this avoid_any_type
 
         for part in keyParts {
-            guard let dict = current as? [String: Any],
+            guard let dict = current as? [String: Any], // swiftlint:disable:this avoid_any_type
                   let value = dict[String(part)] else {
                 return nil
             }

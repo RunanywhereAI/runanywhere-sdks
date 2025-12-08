@@ -33,9 +33,9 @@ public struct Message: Sendable {
 
 /// Role of the message sender
 public enum MessageRole: String, Sendable {
-    case system = "system"
-    case user = "user"
-    case assistant = "assistant"
+    case system
+    case user
+    case assistant
 }
 
 // MARK: - Context

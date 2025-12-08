@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 //
 //  DeviceKitAdapter.swift
 //  RunAnywhere SDK
@@ -5,8 +6,8 @@
 //  Bridges DeviceKit functionality to RunAnywhere SDK
 //
 
-import Foundation
 import DeviceKit
+import Foundation
 #if os(iOS) || os(tvOS)
 import UIKit
 #endif
@@ -16,7 +17,7 @@ import WatchKit
 
 /// Bridges DeviceKit functionality to RunAnywhere SDK
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-public final class DeviceKitAdapter {
+public final class DeviceKitAdapter { // swiftlint:disable:this type_body_length
 
     // MARK: - Properties
 
@@ -430,7 +431,7 @@ public final class DeviceKitAdapter {
         switch state {
         case .full:
             return .full
-        case .charging(_):
+        case .charging:
             return .charging
         case .unplugged:
             return .unplugged
@@ -450,61 +451,111 @@ public final class DeviceKitAdapter {
         let clockSpeed: Double
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private func getBasicSpec(for cpu: CPUType, variant: ProcessorVariant) -> ChipSpec {
         switch cpu {
         case .a14Bionic:
             return ChipSpec(
-                name: "A14 Bionic", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
-                neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.0
+                name: "A14 Bionic",
+                coreCount: 6,
+                performanceCores: 2,
+                efficiencyCores: 4,
+                neuralEngineCores: 16,
+                estimatedTops: 11,
+                clockSpeed: 3.0
             )
         case .a15Bionic:
             return ChipSpec(
-                name: "A15 Bionic", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
-                neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.23
+                name: "A15 Bionic",
+                coreCount: 6,
+                performanceCores: 2,
+                efficiencyCores: 4,
+                neuralEngineCores: 16,
+                estimatedTops: 15.8,
+                clockSpeed: 3.23
             )
         case .a16Bionic:
             return ChipSpec(
-                name: "A16 Bionic", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
-                neuralEngineCores: 16, estimatedTops: 17, clockSpeed: 3.46
+                name: "A16 Bionic",
+                coreCount: 6,
+                performanceCores: 2,
+                efficiencyCores: 4,
+                neuralEngineCores: 16,
+                estimatedTops: 17,
+                clockSpeed: 3.46
             )
         case .a17Pro:
             return ChipSpec(
-                name: "A17 Pro", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
-                neuralEngineCores: 16, estimatedTops: 35, clockSpeed: 3.78
+                name: "A17 Pro",
+                coreCount: 6,
+                performanceCores: 2,
+                efficiencyCores: 4,
+                neuralEngineCores: 16,
+                estimatedTops: 35,
+                clockSpeed: 3.78
             )
         case .a18:
             return ChipSpec(
-                name: "A18", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
-                neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.0
+                name: "A18",
+                coreCount: 6,
+                performanceCores: 2,
+                efficiencyCores: 4,
+                neuralEngineCores: 16,
+                estimatedTops: 38,
+                clockSpeed: 4.0
             )
         case .a18Pro:
             return ChipSpec(
-                name: "A18 Pro", coreCount: 6, performanceCores: 2, efficiencyCores: 4,
-                neuralEngineCores: 16, estimatedTops: 45, clockSpeed: 4.05
+                name: "A18 Pro",
+                coreCount: 6,
+                performanceCores: 2,
+                efficiencyCores: 4,
+                neuralEngineCores: 16,
+                estimatedTops: 45,
+                clockSpeed: 4.05
             )
 
         case .m1:
             switch variant {
             case .standard:
                 return ChipSpec(
-                    name: "M1", coreCount: 8, performanceCores: 4, efficiencyCores: 4,
-                    neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.2
+                    name: "M1",
+                    coreCount: 8,
+                    performanceCores: 4,
+                    efficiencyCores: 4,
+                    neuralEngineCores: 16,
+                    estimatedTops: 11,
+                    clockSpeed: 3.2
                 )
             case .pro:
                 return ChipSpec(
-                    name: "M1 Pro", coreCount: 10, performanceCores: 8, efficiencyCores: 2,
-                    neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.2
+                    name: "M1 Pro",
+                    coreCount: 10,
+                    performanceCores: 8,
+                    efficiencyCores: 2,
+                    neuralEngineCores: 16,
+                    estimatedTops: 11,
+                    clockSpeed: 3.2
                 )
             case .max:
                 return ChipSpec(
-                    name: "M1 Max", coreCount: 10, performanceCores: 8, efficiencyCores: 2,
-                    neuralEngineCores: 16, estimatedTops: 11, clockSpeed: 3.2
+                    name: "M1 Max",
+                    coreCount: 10,
+                    performanceCores: 8,
+                    efficiencyCores: 2,
+                    neuralEngineCores: 16,
+                    estimatedTops: 11,
+                    clockSpeed: 3.2
                 )
             case .ultra:
                 return ChipSpec(
-                    name: "M1 Ultra", coreCount: 20, performanceCores: 16, efficiencyCores: 4,
-                    neuralEngineCores: 32, estimatedTops: 22, clockSpeed: 3.2
+                    name: "M1 Ultra",
+                    coreCount: 20,
+                    performanceCores: 16,
+                    efficiencyCores: 4,
+                    neuralEngineCores: 32,
+                    estimatedTops: 22,
+                    clockSpeed: 3.2
                 )
             }
 
@@ -512,23 +563,43 @@ public final class DeviceKitAdapter {
             switch variant {
             case .standard:
                 return ChipSpec(
-                    name: "M2", coreCount: 8, performanceCores: 4, efficiencyCores: 4,
-                    neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.5
+                    name: "M2",
+                    coreCount: 8,
+                    performanceCores: 4,
+                    efficiencyCores: 4,
+                    neuralEngineCores: 16,
+                    estimatedTops: 15.8,
+                    clockSpeed: 3.5
                 )
             case .pro:
                 return ChipSpec(
-                    name: "M2 Pro", coreCount: 12, performanceCores: 8, efficiencyCores: 4,
-                    neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.5
+                    name: "M2 Pro",
+                    coreCount: 12,
+                    performanceCores: 8,
+                    efficiencyCores: 4,
+                    neuralEngineCores: 16,
+                    estimatedTops: 15.8,
+                    clockSpeed: 3.5
                 )
             case .max:
                 return ChipSpec(
-                    name: "M2 Max", coreCount: 12, performanceCores: 8, efficiencyCores: 4,
-                    neuralEngineCores: 16, estimatedTops: 15.8, clockSpeed: 3.5
+                    name: "M2 Max",
+                    coreCount: 12,
+                    performanceCores: 8,
+                    efficiencyCores: 4,
+                    neuralEngineCores: 16,
+                    estimatedTops: 15.8,
+                    clockSpeed: 3.5
                 )
             case .ultra:
                 return ChipSpec(
-                    name: "M2 Ultra", coreCount: 24, performanceCores: 16, efficiencyCores: 8,
-                    neuralEngineCores: 32, estimatedTops: 31.6, clockSpeed: 3.5
+                    name: "M2 Ultra",
+                    coreCount: 24,
+                    performanceCores: 16,
+                    efficiencyCores: 8,
+                    neuralEngineCores: 32,
+                    estimatedTops: 31.6,
+                    clockSpeed: 3.5
                 )
             }
 
@@ -536,23 +607,43 @@ public final class DeviceKitAdapter {
             switch variant {
             case .standard:
                 return ChipSpec(
-                    name: "M3", coreCount: 8, performanceCores: 4, efficiencyCores: 4,
-                    neuralEngineCores: 16, estimatedTops: 18, clockSpeed: 4.0
+                    name: "M3",
+                    coreCount: 8,
+                    performanceCores: 4,
+                    efficiencyCores: 4,
+                    neuralEngineCores: 16,
+                    estimatedTops: 18,
+                    clockSpeed: 4.0
                 )
             case .pro:
                 return ChipSpec(
-                    name: "M3 Pro", coreCount: 12, performanceCores: 6, efficiencyCores: 6,
-                    neuralEngineCores: 16, estimatedTops: 18, clockSpeed: 4.0
+                    name: "M3 Pro",
+                    coreCount: 12,
+                    performanceCores: 6,
+                    efficiencyCores: 6,
+                    neuralEngineCores: 16,
+                    estimatedTops: 18,
+                    clockSpeed: 4.0
                 )
             case .max:
                 return ChipSpec(
-                    name: "M3 Max", coreCount: 16, performanceCores: 12, efficiencyCores: 4,
-                    neuralEngineCores: 16, estimatedTops: 18, clockSpeed: 4.0
+                    name: "M3 Max",
+                    coreCount: 16,
+                    performanceCores: 12,
+                    efficiencyCores: 4,
+                    neuralEngineCores: 16,
+                    estimatedTops: 18,
+                    clockSpeed: 4.0
                 )
             case .ultra:
                 return ChipSpec(
-                    name: "M3 Ultra", coreCount: 32, performanceCores: 24, efficiencyCores: 8,
-                    neuralEngineCores: 32, estimatedTops: 36, clockSpeed: 4.0
+                    name: "M3 Ultra",
+                    coreCount: 32,
+                    performanceCores: 24,
+                    efficiencyCores: 8,
+                    neuralEngineCores: 32,
+                    estimatedTops: 36,
+                    clockSpeed: 4.0
                 )
             }
 
@@ -560,39 +651,68 @@ public final class DeviceKitAdapter {
             switch variant {
             case .standard:
                 return ChipSpec(
-                    name: "M4", coreCount: 10, performanceCores: 4, efficiencyCores: 6,
-                    neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.4
+                    name: "M4",
+                    coreCount: 10,
+                    performanceCores: 4,
+                    efficiencyCores: 6,
+                    neuralEngineCores: 16,
+                    estimatedTops: 38,
+                    clockSpeed: 4.4
                 )
             case .pro:
                 return ChipSpec(
-                    name: "M4 Pro", coreCount: 14, performanceCores: 10, efficiencyCores: 4,
-                    neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.5
+                    name: "M4 Pro",
+                    coreCount: 14,
+                    performanceCores: 10,
+                    efficiencyCores: 4,
+                    neuralEngineCores: 16,
+                    estimatedTops: 38,
+                    clockSpeed: 4.5
                 )
             case .max:
                 return ChipSpec(
-                    name: "M4 Max", coreCount: 16, performanceCores: 12, efficiencyCores: 4,
-                    neuralEngineCores: 16, estimatedTops: 38, clockSpeed: 4.5
+                    name: "M4 Max",
+                    coreCount: 16,
+                    performanceCores: 12,
+                    efficiencyCores: 4,
+                    neuralEngineCores: 16,
+                    estimatedTops: 38,
+                    clockSpeed: 4.5
                 )
             case .ultra:
                 return ChipSpec(
-                    name: "M4 Ultra", coreCount: 32, performanceCores: 24, efficiencyCores: 8,
-                    neuralEngineCores: 32, estimatedTops: 76, clockSpeed: 4.5
+                    name: "M4 Ultra",
+                    coreCount: 32,
+                    performanceCores: 24,
+                    efficiencyCores: 8,
+                    neuralEngineCores: 32,
+                    estimatedTops: 76,
+                    clockSpeed: 4.5
                 )
             }
 
         case .intel:
             let coreCount = ProcessInfo.processInfo.processorCount
             return ChipSpec(
-                name: "Intel x86_64", coreCount: coreCount, performanceCores: coreCount,
-                efficiencyCores: 0, neuralEngineCores: 0, estimatedTops: 0, clockSpeed: 2.5
+                name: "Intel x86_64",
+                coreCount: coreCount,
+                performanceCores: coreCount,
+                efficiencyCores: 0,
+                neuralEngineCores: 0,
+                estimatedTops: 0,
+                clockSpeed: 2.5
             )
 
         case .unknown:
             let coreCount = ProcessInfo.processInfo.processorCount
             return ChipSpec(
-                name: "Unknown", coreCount: coreCount, performanceCores: 2,
+                name: "Unknown",
+                coreCount: coreCount,
+                performanceCores: 2,
                 efficiencyCores: max(0, coreCount - 2),
-                neuralEngineCores: 0, estimatedTops: 0, clockSpeed: 2.0
+                neuralEngineCores: 0,
+                estimatedTops: 0,
+                clockSpeed: 2.0
             )
         }
     }

@@ -1,6 +1,6 @@
-// swiftlint:disable file_length type_body_length
-import Foundation
+// swiftlint:disable file_length
 import AVFoundation
+import Foundation
 
 // MARK: - Pipeline Extensions
 
@@ -125,14 +125,14 @@ public struct VoiceTTSConfig {
 // MARK: - Pipeline Delegate
 
 /// Protocol for pipeline delegates
-public protocol ModularPipelineDelegate: AnyObject {
+public protocol ModularPipelineDelegate: AnyObject { // swiftlint:disable:this avoid_any_object
     func pipelineDidGenerateEvent(_ event: ModularPipelineEvent)
 }
 
 // MARK: - Modular Voice Pipeline
 
 /// Modular voice pipeline that orchestrates individual components
-public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
+public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlint:disable:this type_body_length
     private var vadComponent: VADComponent?
     private var sttComponent: STTComponent?
     private var llmComponent: LLMComponent?
@@ -329,8 +329,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate {
 
     /// Process audio stream through the pipeline
     /// Uses silence detection to automatically trigger STT → LLM → TTS flow
-    // swiftlint:disable:next function_body_length cyclomatic_complexity
-    public func process(audioStream: AsyncStream<VoiceAudioChunk>) -> PipelineEventStream {
+    public func process(audioStream: AsyncStream<VoiceAudioChunk>) -> PipelineEventStream { // swiftlint:disable:this function_body_length cyclomatic_complexity
         AsyncThrowingStream { continuation in
             Task {
                 do {

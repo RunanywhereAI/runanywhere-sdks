@@ -37,7 +37,7 @@ public struct RoutingConfiguration: Codable, Sendable {
         self.minConfidenceScore = minConfidenceScore
     }
 
-    // Custom encoding/decoding to handle [String: Any]
+    // Custom encoding/decoding to handle customRules
     private enum CodingKeys: String, CodingKey {
         case policy, cloudEnabled, privacyMode, customRules
         case maxLatencyThreshold, minConfidenceScore

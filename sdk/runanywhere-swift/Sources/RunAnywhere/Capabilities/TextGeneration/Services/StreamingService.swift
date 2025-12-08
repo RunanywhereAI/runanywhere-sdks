@@ -1,7 +1,8 @@
+// swiftlint:disable file_length
 import Foundation
 
 /// Service for streaming text generation
-public class StreamingService {
+public class StreamingService { // swiftlint:disable:this type_body_length
     private let generationService: GenerationService
     private let modelLoadingService: ModelLoadingService
     private let optionsResolver = GenerationOptionsResolver()
@@ -63,7 +64,7 @@ public class StreamingService {
     }
 
     /// Submit success analytics for completed generation
-    private func submitSuccessAnalytics(
+    private func submitSuccessAnalytics( // swiftlint:disable:this function_parameter_count
         result: GenerationResult,
         modelName: String,
         prompt: String,
@@ -120,8 +121,7 @@ public class StreamingService {
     /// 1. Runtime Options (highest priority) - User knows best for their specific request
     /// 2. Remote Configuration - Organization-wide defaults from console
     /// 3. SDK Defaults (lowest priority) - Fallback values when nothing else is specified
-    // swiftlint:disable:next function_body_length
-    public func generateStreamWithMetrics(
+    public func generateStreamWithMetrics( // swiftlint:disable:this function_body_length
         prompt: String,
         options: RunAnywhereGenerationOptions
     ) -> StreamingResult {
@@ -185,6 +185,7 @@ public class StreamingService {
                 }
             }
 
+            // swiftlint:disable:next function_parameter_count
             func recordStreamComplete(
                 modelName: String,
                 framework: LLMFramework?,
@@ -234,17 +235,28 @@ public class StreamingService {
                 let totalTime = endTime.timeIntervalSince(startTime)
 
                 // Use TokenCounter for accurate token counting
+                let responseContent = fullText.replacingOccurrences(of: thinkingContent ?? "", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
                 let tokenCounts = TokenCounter.splitTokenCounts(
                     fullText: fullText,
                     thinkingContent: thinkingContent,
-                    responseContent: fullText.replacingOccurrences(of: thinkingContent ?? "", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    responseContent: responseContent
                 )
 
                 // Calculate timing metrics
                 let timeToFirstToken = firstTokenTime?.timeIntervalSince(startTime)
-                let thinkingTime = (thinkingStartTime != nil && thinkingEndTime != nil)
-                    ? thinkingEndTime!.timeIntervalSince(thinkingStartTime!) : nil
-                let responseTime = thinkingTime != nil ? totalTime - thinkingTime! : totalTime
+                let thinkingTime: TimeInterval?
+                if let thinkingStart = thinkingStartTime, let thinkingEnd = thinkingEndTime {
+                    thinkingTime = thinkingEnd.timeIntervalSince(thinkingStart)
+                } else {
+                    thinkingTime = nil
+                }
+                let responseTime: TimeInterval
+                if let thinking = thinkingTime {
+                    responseTime = totalTime - thinking
+                } else {
+                    responseTime = totalTime
+                }
 
                 // Calculate tokens per second
                 let tokensPerSecond = TokenCounter.calculateTokensPerSecond(
@@ -262,9 +274,9 @@ public class StreamingService {
                     timeToFirstTokenMs: timeToFirstToken.map { $0 * 1000 },
                     thinkingTimeMs: thinkingTime.map { $0 * 1000 },
                     responseTimeMs: responseTime * 1000,
-                    thinkingStartTimeMs: thinkingStartTime != nil ? thinkingStartTime!.timeIntervalSince(startTime) * 1000 : nil,
-                    thinkingEndTimeMs: thinkingEndTime != nil ? thinkingEndTime!.timeIntervalSince(startTime) * 1000 : nil,
-                    firstResponseTokenTimeMs: firstTokenTime != nil ? firstTokenTime!.timeIntervalSince(startTime) * 1000 : nil
+                    thinkingStartTimeMs: thinkingStartTime.map { $0.timeIntervalSince(startTime) * 1000 },
+                    thinkingEndTimeMs: thinkingEndTime.map { $0.timeIntervalSince(startTime) * 1000 },
+                    firstResponseTokenTimeMs: firstTokenTime.map { $0.timeIntervalSince(startTime) * 1000 }
                 )
 
                 return GenerationResult(
@@ -409,8 +421,7 @@ public class StreamingService {
     // All streaming now includes metrics by default
 
     /// Generate streaming text with token-level granularity
-    // swiftlint:disable:next function_body_length
-    public func generateTokenStream(
+    public func generateTokenStream( // swiftlint:disable:this function_body_length
         prompt: String,
         options: RunAnywhereGenerationOptions
     ) -> AsyncThrowingStream<StreamingToken, Error> {

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for wake word detection in audio streams
-public protocol WakeWordDetector: AnyObject {
+public protocol WakeWordDetector: AnyObject { // swiftlint:disable:this avoid_any_object
     /// Initialize the detector with specific wake words
     /// - Parameter wakeWords: Array of wake words to detect
     func initialize(wakeWords: [String]) async throws

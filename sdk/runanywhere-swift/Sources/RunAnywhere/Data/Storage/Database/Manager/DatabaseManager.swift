@@ -17,10 +17,12 @@ public final class DatabaseManager {
 
     /// Database file URL
     private var databaseURL: URL {
-        let documentsPath = FileManager.default.urls(
+        guard let documentsPath = FileManager.default.urls(
             for: .documentDirectory,
             in: .userDomainMask
-        ).first!
+        ).first else {
+            fatalError("Unable to access documents directory")
+        }
         return documentsPath.appendingPathComponent(SDKConstants.DatabaseDefaults.databaseFileName)
     }
 
@@ -150,12 +152,15 @@ public final class DatabaseManager {
             throw DatabaseError.notInitialized
         }
 
-        var result: T!
+        var result: T?
         try dbQueue.inTransaction { db in
             result = try block(db)
             return .commit
         }
-        return result
+        guard let finalResult = result else {
+            throw DatabaseError.invalidData("Transaction completed but result was nil")
+        }
+        return finalResult
     }
 
     // MARK: - Observation

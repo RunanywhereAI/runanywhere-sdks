@@ -1,9 +1,10 @@
+// swiftlint:disable file_length
 import Foundation
 
 // MARK: - Speaker Diarization Service Protocol
 
 /// Protocol for speaker diarization services
-public protocol SpeakerDiarizationService: AnyObject {
+public protocol SpeakerDiarizationService: AnyObject { // swiftlint:disable:this avoid_any_object
     /// Initialize the service
     func initialize() async throws
 
@@ -296,7 +297,7 @@ public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiar
 
     // MARK: - Properties
 
-    public override class var componentType: SDKComponent { .speakerDiarization }
+    public override static var componentType: SDKComponent { .speakerDiarization }
 
     private let diarizationConfiguration: SpeakerDiarizationConfiguration
     private var speakerProfiles: [String: SpeakerProfile] = [:]

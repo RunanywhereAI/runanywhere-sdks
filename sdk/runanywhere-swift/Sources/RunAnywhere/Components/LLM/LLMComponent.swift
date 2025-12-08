@@ -1,9 +1,10 @@
+// swiftlint:disable file_length
 import Foundation
 
 // MARK: - LLM Service Protocol
 
 /// Protocol for language model services
-public protocol LLMService: AnyObject {
+public protocol LLMService: AnyObject { // swiftlint:disable:this avoid_any_object
     /// Initialize the LLM service with optional model path
     func initialize(modelPath: String?) async throws
 
@@ -283,7 +284,7 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
 
     // MARK: - Properties
 
-    public override class var componentType: SDKComponent { .llm }
+    public override static var componentType: SDKComponent { .llm }
 
     private let llmConfiguration: LLMConfiguration
     private var isModelLoaded = false

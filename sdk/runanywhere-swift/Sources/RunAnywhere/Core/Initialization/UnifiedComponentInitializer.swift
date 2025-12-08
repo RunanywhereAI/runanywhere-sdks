@@ -6,8 +6,8 @@ import Foundation
 public actor UnifiedComponentInitializer {
     // MARK: - Properties
 
-    private let logger: SDKLogger = SDKLogger(category: "UnifiedComponentInitializer")
-    private let eventBus: EventBus = EventBus.shared
+    private let logger = SDKLogger(category: "UnifiedComponentInitializer")
+    private let eventBus = EventBus.shared
     // Component factory no longer needed - create components directly
     private weak var serviceContainer: ServiceContainer?
 

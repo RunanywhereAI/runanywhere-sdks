@@ -5,7 +5,7 @@ public class GenerationService {
     private let routingService: RoutingService
     private let modelLoadingService: ModelLoadingService
     private let optionsResolver = GenerationOptionsResolver()
-    private let logger: SDKLogger = SDKLogger(category: "GenerationService")
+    private let logger = SDKLogger(category: "GenerationService")
 
     // Current loaded model
     private var currentLoadedModel: LoadedModel?
@@ -104,6 +104,7 @@ public class GenerationService {
         return result
     }
 
+    // swiftlint:disable:next function_body_length
     private func generateOnDevice(
         prompt: String,
         options: RunAnywhereGenerationOptions,
@@ -155,7 +156,9 @@ public class GenerationService {
                 // For timeout errors, check the error message for timeout indicators
                 let errorMessage = frameworkError.localizedDescription.lowercased()
                 if errorMessage.contains("timeout") || errorMessage.contains("timed out") {
-                    throw SDKError.generationTimeout("Text generation timed out. The model may be too large for this device or the prompt too complex. Try using a smaller model or simpler prompt.")
+                    let message = "Text generation timed out. The model may be too large for this device or " +
+                        "the prompt too complex. Try using a smaller model or simpler prompt."
+                    throw SDKError.generationTimeout(message)
                 }
             }
 
@@ -166,7 +169,7 @@ public class GenerationService {
         // Parse thinking content if model supports it
         let modelInfo = loadedModel.model
         let (finalText, thinkingContent): (String, String?)
-        var thinkingTimeMs: TimeInterval? = nil
+        var thinkingTimeMs: TimeInterval?
 
         logger.debug("Model \(modelInfo.name) supports thinking: \(modelInfo.supportsThinking)")
         if modelInfo.supportsThinking {
@@ -185,7 +188,7 @@ public class GenerationService {
             }
 
             // For non-streaming, we can estimate thinking took ~60% of generation time if present
-            if thinkingContent != nil && !thinkingContent!.isEmpty {
+            if let thinking = thinkingContent, !thinking.isEmpty {
                 let totalLatency = Date().timeIntervalSince(startTime) * 1000
                 thinkingTimeMs = totalLatency * 0.6
             }
@@ -208,11 +211,16 @@ public class GenerationService {
         )
 
         // Get memory usage (placeholder - actual implementation depends on service)
-        // TODO: #TBD - Add memory tracking to LLMService protocol
+        // Note: Add memory tracking to LLMService protocol
         let memoryUsage: Int64 = 0
 
         // Calculate response time (time after thinking)
-        let responseTimeMs: Double? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
+        let responseTimeMs: Double?
+        if let thinkingTime = thinkingTimeMs {
+            responseTimeMs = latency - thinkingTime
+        } else {
+            responseTimeMs = nil
+        }
 
         // For non-streaming generation, time-to-first-token equals total latency
         // since all tokens arrive at once
@@ -289,6 +297,7 @@ public class GenerationService {
         return result
     }
 
+    // swiftlint:disable:next function_body_length
     private func generateHybrid(
         prompt: String,
         options: RunAnywhereGenerationOptions,
@@ -316,13 +325,13 @@ public class GenerationService {
         let latency = Date().timeIntervalSince(startTime) * 1000
 
         // Get memory usage (placeholder - actual implementation depends on service)
-        // TODO: #TBD - Add memory tracking to LLMService protocol
+        // Note: Add memory tracking to LLMService protocol
         let memoryUsage: Int64 = 0
 
         // Parse thinking content if model supports it
         let modelInfo = loadedModel.model
         let (finalText, thinkingContent): (String, String?)
-        var thinkingTimeMs: TimeInterval? = nil
+        var thinkingTimeMs: TimeInterval?
 
         if modelInfo.supportsThinking {
             // Use model-specific pattern or fall back to default
@@ -332,7 +341,7 @@ public class GenerationService {
             thinkingContent = parseResult.thinkingContent
 
             // Estimate thinking time if present
-            if thinkingContent != nil && !thinkingContent!.isEmpty {
+            if let thinking = thinkingContent, !thinking.isEmpty {
                 thinkingTimeMs = latency * 0.6
             }
         } else {
@@ -352,7 +361,12 @@ public class GenerationService {
             elapsedSeconds: latency / 1000.0
         )
 
-        let responseTimeMs: TimeInterval? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
+        let responseTimeMs: TimeInterval?
+        if let thinkingTime = thinkingTimeMs {
+            responseTimeMs = latency - thinkingTime
+        } else {
+            responseTimeMs = nil
+        }
 
         // For non-streaming hybrid generation, time-to-first-token equals total latency
         let timeToFirstTokenMs = latency

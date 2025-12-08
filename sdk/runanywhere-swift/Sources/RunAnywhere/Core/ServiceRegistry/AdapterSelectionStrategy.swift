@@ -66,11 +66,9 @@ public struct PatternBasedAdapterSelectionStrategy: AdapterSelectionStrategy {
 
         // Check patterns in model ID
         let modelIdLower = model.id.lowercased()
-        for (pattern, framework) in patterns {
-            if modelIdLower.contains(pattern.lowercased()) {
-                if let match = candidates.first(where: { $0.framework == framework }) {
-                    return match
-                }
+        for (pattern, framework) in patterns where modelIdLower.contains(pattern.lowercased()) {
+            if let match = candidates.first(where: { $0.framework == framework }) {
+                return match
             }
         }
 
