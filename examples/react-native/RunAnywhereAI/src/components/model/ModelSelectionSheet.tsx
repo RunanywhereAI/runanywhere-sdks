@@ -743,7 +743,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="formSheet"
       onRequestClose={onClose}
       onDismiss={() => {
         // Ensure state is cleaned up when modal is dismissed
