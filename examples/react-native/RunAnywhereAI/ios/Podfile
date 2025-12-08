@@ -60,11 +60,20 @@ target 'RunAnywhereAI' do
       :mac_catalyst_enabled => false
       # :ccache_enabled => true
     )
-    
+
     # Force all pods to use iOS 15.1 (required for react-native-audio-api)
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+      end
+    end
+
+    # Fix Xcode 16 sandbox issue for script phases
+    installer.pods_project.targets.each do |target|
+      target.build_phases.each do |phase|
+        if phase.is_a?(Xcodeproj::Project::Object::PBXShellScriptBuildPhase)
+          phase.always_out_of_date = "1"
+        end
       end
     end
   end

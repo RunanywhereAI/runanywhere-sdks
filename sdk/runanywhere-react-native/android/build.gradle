@@ -33,8 +33,10 @@ def getExtOrIntegerDefault(name) {
 // =============================================================================
 
 // Version of pre-built native libraries to download
-def nativeLibVersion = project.findProperty("runanywhere.native.version") ?: 
-    (file("native-version.txt").exists() ? file("native-version.txt").text.trim() : "0.0.1-dev.2230b4e")
+// First check SDK root native-version.txt, then android/ subdirectory, then fallback
+def nativeLibVersion = project.findProperty("runanywhere.native.version") ?:
+    (file("../native-version.txt").exists() ? file("../native-version.txt").text.trim() :
+     file("native-version.txt").exists() ? file("native-version.txt").text.trim() : "0.0.1-dev.e6b7a2f")
 
 // Use local build mode (requires runanywhere-core to be built locally)
 def useLocalBuild = project.findProperty("runanywhere.testLocal")?.toBoolean() ?: false
@@ -122,7 +124,7 @@ android {
                 "generated/java",
                 "generated/jni"
             ]
-            
+
             // Configure jniLibs source based on build mode
             if (useLocalBuild) {
                 // Local mode: use locally built libraries from runanywhere-core
@@ -136,11 +138,11 @@ android {
                     def jniDir = new File(runAnywhereCoreDir, "dist/android/jni")
                     def llamacppDir = new File(runAnywhereCoreDir, "dist/android/llamacpp")
                     def onnxDir = new File(runAnywhereCoreDir, "dist/android/onnx")
-                    
+
                     if (jniDir.exists()) sourceDirs.add(jniDir)
                     if (llamacppDir.exists()) sourceDirs.add(llamacppDir)
                     if (onnxDir.exists()) sourceDirs.add(onnxDir)
-                    
+
                     if (!sourceDirs.isEmpty()) {
                         jniLibs.srcDirs = sourceDirs
                         logger.lifecycle("Using local native libraries from: ${sourceDirs.join(', ')}")
@@ -160,63 +162,63 @@ android {
 task downloadNativeLibs {
     description = "Downloads pre-built unified native library from GitHub releases"
     group = "build setup"
-    
+
     def versionFile = file("${jniLibsDir}/.version")
-    
+
     // Extract just the commit hash from version (e.g., "0.0.1-dev.2cd70fc" -> "2cd70fc")
     def shortVersion = nativeLibVersion.contains(".") ? nativeLibVersion.substring(nativeLibVersion.lastIndexOf(".") + 1) : nativeLibVersion
-    
+
     // Unified archive with all backends in one package
     def unifiedArchive = "RunAnywhereUnified-android-${shortVersion}.zip"
-    
+
     outputs.dir(jniLibsDir)
     outputs.upToDateWhen {
         versionFile.exists() && versionFile.text.trim() == nativeLibVersion
     }
-    
+
     doLast {
         if (useLocalBuild) {
             logger.lifecycle("Skipping download - using local build mode")
             return
         }
-        
+
         def currentVersion = versionFile.exists() ? versionFile.text.trim() : ""
         if (currentVersion == nativeLibVersion) {
             logger.lifecycle("Native libraries version $nativeLibVersion already downloaded")
             return
         }
-        
+
         logger.lifecycle("Downloading unified native library version $nativeLibVersion...")
-        
+
         // Create download directory
         downloadedLibsDir.mkdirs()
-        
+
         // Clear existing jniLibs
         jniLibsDir.deleteDir()
         jniLibsDir.mkdirs()
-        
+
         // Download unified archive
         def unifiedUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/$unifiedArchive"
         def unifiedZipFile = file("$downloadedLibsDir/$unifiedArchive")
-        
+
         try {
             logger.lifecycle("Downloading unified archive: $unifiedArchive")
             logger.lifecycle("URL: $unifiedUrl")
-            
+
             new URL(unifiedUrl).withInputStream { input ->
                 unifiedZipFile.withOutputStream { output ->
                     output << input
                 }
             }
             logger.lifecycle("Downloaded: ${unifiedZipFile.length() / 1024}KB")
-            
+
             // Extract unified archive directly to jniLibs
             logger.lifecycle("Extracting unified archive...")
             copy {
                 from zipTree(unifiedZipFile)
                 into jniLibsDir
             }
-            
+
             // List extracted files
             jniLibsDir.listFiles()?.findAll { it.isDirectory() }?.each { abiDir ->
                 logger.lifecycle("  ${abiDir.name}/")
@@ -224,7 +226,7 @@ task downloadNativeLibs {
                     logger.lifecycle("    ${soFile.name} (${soFile.length() / 1024}KB)")
                 }
             }
-            
+
             logger.lifecycle("✅ Unified native library installed successfully")
         } catch (Exception e) {
             logger.error("Failed to download unified native library: ${e.message}")
@@ -236,7 +238,7 @@ task downloadNativeLibs {
             logger.error("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
             throw new GradleException("Failed to download unified native library: $unifiedArchive", e)
         }
-        
+
         // Write version marker
         versionFile.text = nativeLibVersion
         logger.lifecycle("Unified native library version $nativeLibVersion installed")
@@ -246,10 +248,10 @@ task downloadNativeLibs {
 // Make preBuild depend on download task when not using local build
 if (!useLocalBuild) {
     preBuild.dependsOn downloadNativeLibs
-    
+
     // Ensure codegen tasks also wait for native libs download
     afterEvaluate {
-        tasks.matching { 
+        tasks.matching {
             it.name.contains("generateCodegen") || it.name.contains("Codegen")
         }.configureEach {
             mustRunAfter downloadNativeLibs
@@ -278,7 +280,7 @@ repositories {
 dependencies {
     implementation "com.facebook.react:react-android"
     implementation project(":react-native-nitro-modules")
-    
+
     // Apache Commons Compress for archive extraction on Android
     // (same library used by runanywhere-kotlin SDK)
     // Needed because Android pre-built binaries don't have libarchive linked
