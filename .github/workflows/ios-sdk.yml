@@ -22,7 +22,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Select Xcode version
-      run: sudo xcode-select -s /Applications/Xcode_15.2.app
+      run: sudo xcode-select -s /Applications/Xcode_16.1.app
 
     - name: Install SwiftLint
       run: brew install swiftlint
@@ -44,7 +44,7 @@ jobs:
       run: |
         xcodebuild build \
           -scheme RunAnywhere \
-          -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2' \
+          -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' \
           -derivedDataPath build
 
     - name: Upload build artifacts
