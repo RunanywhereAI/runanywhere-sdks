@@ -11,8 +11,8 @@ The XCFramework is automatically downloaded from the [runanywhere-binaries](http
 ```swift
 .binaryTarget(
     name: "RunAnywhereCoreBinary",
-    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.8ad8483/RunAnywhereCore.xcframework.zip",
-    checksum: "644eb467d2e0e29d7a1a651882b333210086e9d0298d3d6ad39a2fefb09856fd"
+    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.e6b7a2f/RunAnywhereCore.xcframework.zip",
+    checksum: "0c2da2bacb4931cdbe77eb0686ed20351ffe4ea1a66384f4522a61e1e4efa7aa"
 )
 ```
 
@@ -63,18 +63,51 @@ For local testing or development with custom-built XCFrameworks, you can enable 
 ```bash
 # Download the binary
 curl -L -o RunAnywhereCore.xcframework.zip \
-  "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.8ad8483/RunAnywhereCore.xcframework.zip"
+  "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.e6b7a2f/RunAnywhereCore.xcframework.zip"
 
 # Verify checksum
 shasum -a 256 RunAnywhereCore.xcframework.zip
-# Should output: 644eb467d2e0e29d7a1a651882b333210086e9d0298d3d6ad39a2fefb09856fd
+# Should output: 0c2da2bacb4931cdbe77eb0686ed20351ffe4ea1a66384f4522a61e1e4efa7aa
 ```
 
 ## Architecture
 
 The `RunAnywhereCore.xcframework` is a unified binary that includes:
-- **ONNX Runtime backend**: STT, TTS, VAD capabilities
-- **LlamaCPP backend**: LLM text generation with GGUF models
-- **Multi-platform support**: iOS (arm64), iOS Simulator (arm64 + x86_64)
+
+- **ONNX Runtime backend**: STT, TTS, VAD capabilities via Sherpa-ONNX
+- **LlamaCPP backend**: LLM text generation with GGUF models and Metal GPU acceleration
+- **Multi-platform support**: iOS (arm64), iOS Simulator (arm64 + x86_64), macOS (arm64 + x86_64)
 
 The XCFramework is consumed by Swift through the `CRunAnywhereCore` C bridge module, which exposes the native C++ API to Swift code.
+
+## macOS ONNX Runtime Dylib
+
+**Important**: For macOS apps using the ONNX backend (STT/TTS/VAD), you must embed the ONNX Runtime dynamic library.
+
+### Location
+
+**Important**: The `onnxruntime-macos/` directory is **NOT committed to git**. You must obtain the ONNX Runtime dylib from one of these sources:
+
+1. **Download from GitHub releases** (Recommended for production):
+   - Get `onnxruntime-macos.zip` from [runanywhere-binaries releases](https://github.com/RunanywhereAI/runanywhere-binaries/releases)
+   - Extract to `Binaries/onnxruntime-macos/`
+   - The dylib will be at: `Binaries/onnxruntime-macos/libonnxruntime.dylib`
+
+2. **Install via Homebrew** (Development only):
+
+   ```bash
+   brew install onnxruntime
+   ```
+
+   The system-wide installation is only recommended for development, not production deployment.
+
+### Integration
+
+1. **Copy to app bundle**: Copy `libonnxruntime.dylib` to `YourApp.app/Contents/Frameworks/`
+2. **Set rpath**: Configure your app's rpath to find the dylib at runtime
+3. **Code sign**: Ensure the dylib is properly code signed
+
+### Why is this needed?
+
+- iOS: ONNX Runtime is statically linked into the XCFramework
+- macOS: ONNX Runtime is dynamically linked to reduce binary size and allow updates

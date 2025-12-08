@@ -3,7 +3,9 @@ import AVFoundation
 import RunAnywhere
 
 /// Manages audio capture from microphone for STT
-#if os(iOS) || os(tvOS) || os(watchOS)
+/// Works on iOS, tvOS, and macOS using AVAudioEngine
+/// NOTE: watchOS is NOT supported - AVAudioEngine inputNode tap does not work reliably on watchOS.
+/// watchOS typically requires AVAudioRecorder or watch-specific APIs for audio recording.
 public class AudioCaptureManager: ObservableObject {
     private let logger = SDKLogger(category: "AudioCapture")
 
@@ -21,26 +23,52 @@ public class AudioCaptureManager: ObservableObject {
 
     /// Request microphone permission
     public func requestPermission() async -> Bool {
-        await withCheckedContinuation { continuation in
+        #if os(iOS)
+        // Use modern AVAudioApplication API for iOS 17+
+        if #available(iOS 17.0, *) {
+            return await AVAudioApplication.requestRecordPermission()
+        } else {
+            // Fallback to deprecated API for older iOS versions
+            return await withCheckedContinuation { continuation in
+                AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                    continuation.resume(returning: granted)
+                }
+            }
+        }
+        #elseif os(tvOS)
+        // tvOS doesn't have AVAudioApplication, use legacy API
+        return await withCheckedContinuation { continuation in
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
                 continuation.resume(returning: granted)
             }
         }
+        #elseif os(macOS)
+        // On macOS, use AVCaptureDevice for permission request
+        return await withCheckedContinuation { continuation in
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                continuation.resume(returning: granted)
+            }
+        }
+        #endif
     }
 
     /// Start recording audio from microphone
+    /// - Note: Not supported on watchOS due to AVAudioEngine limitations
     public func startRecording(onAudioData: @escaping (Data) -> Void) throws {
         guard !isRecording else {
             logger.warning("Already recording")
             return
         }
 
-        // Configure audio session
+        #if os(iOS) || os(tvOS)
+        // Configure audio session (iOS/tvOS only)
+        // watchOS is NOT supported - AVAudioEngine inputNode tap does not work on watchOS
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.record, mode: .measurement)
         try audioSession.setActive(true)
+        #endif
 
-        // Create audio engine
+        // Create audio engine (works on all platforms)
         let engine = AVAudioEngine()
         let inputNode = engine.inputNode
 
@@ -64,7 +92,7 @@ public class AudioCaptureManager: ObservableObject {
         }
 
         // Install tap on input node
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, time in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
             guard let self = self else { return }
 
             // Update audio level for visualization
@@ -106,8 +134,10 @@ public class AudioCaptureManager: ObservableObject {
         audioEngine = nil
         inputNode = nil
 
-        // Deactivate audio session
+        #if os(iOS) || os(tvOS)
+        // Deactivate audio session (iOS/tvOS only)
         try? AVAudioSession.sharedInstance().setActive(false)
+        #endif
 
         DispatchQueue.main.async {
             self.isRecording = false
@@ -134,7 +164,7 @@ public class AudioCaptureManager: ObservableObject {
         }
 
         var error: NSError?
-        let inputBlock: AVAudioConverterInputBlock = { inNumPackets, outStatus in
+        let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
             outStatus.pointee = .haveData
             return buffer
         }
@@ -188,33 +218,6 @@ public class AudioCaptureManager: ObservableObject {
         stopRecording()
     }
 }
-#else
-// macOS stub - AudioCaptureManager is iOS-only
-// On macOS, use AVCaptureSession or other APIs for audio capture
-public class AudioCaptureManager: ObservableObject {
-    private let logger = SDKLogger(category: "AudioCapture")
-
-    @Published public var isRecording = false
-    @Published public var audioLevel: Float = 0.0
-
-    public init() {
-        logger.info("AudioCaptureManager initialized (macOS stub)")
-    }
-
-    public func requestPermission() async -> Bool {
-        logger.warning("AudioCaptureManager is not available on macOS")
-        return false
-    }
-
-    public func startRecording(onAudioData: @escaping (Data) -> Void) throws {
-        throw AudioCaptureError.platformNotSupported
-    }
-
-    public func stopRecording() {
-        // No-op on macOS
-    }
-}
-#endif
 
 // MARK: - Errors
 
@@ -222,7 +225,6 @@ public enum AudioCaptureError: LocalizedError {
     case permissionDenied
     case formatConversionFailed
     case engineStartFailed
-    case platformNotSupported
 
     public var errorDescription: String? {
         switch self {
@@ -232,8 +234,6 @@ public enum AudioCaptureError: LocalizedError {
             return "Failed to convert audio format"
         case .engineStartFailed:
             return "Failed to start audio engine"
-        case .platformNotSupported:
-            return "Audio capture is not supported on this platform"
         }
     }
 }
