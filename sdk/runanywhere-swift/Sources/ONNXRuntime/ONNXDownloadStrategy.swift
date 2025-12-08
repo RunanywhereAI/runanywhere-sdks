@@ -1,6 +1,6 @@
+import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 import Foundation
 import RunAnywhere
-import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 
 /// Custom download strategy for ONNX models that handles .tar.bz2 archives and direct .onnx files
 /// Also implements ModelStorageStrategy for proper model detection in nested directories
@@ -77,10 +77,8 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
             return nil
         }
 
-        for item in contents {
-            if item.pathExtension.lowercased() == "onnx" {
-                return item
-            }
+        for item in contents where item.pathExtension.lowercased() == "onnx" {
+            return item
         }
         return nil
     }
@@ -96,10 +94,8 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
         }
 
         // First check for .onnx files at this level
-        for item in contents {
-            if item.pathExtension.lowercased() == "onnx" {
-                return item
-            }
+        for item in contents where item.pathExtension.lowercased() == "onnx" {
+            return item
         }
 
         // Then recursively check subdirectories
@@ -206,7 +202,9 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
         let modelDestination = modelFolder.appendingPathComponent(modelFilename)
 
         // Also download the companion .onnx.json config file
-        let configURL = URL(string: downloadURL.absoluteString + ".json")!
+        guard let configURL = URL(string: downloadURL.absoluteString + ".json") else {
+            throw DownloadError.invalidURL
+        }
         let configFilename = modelFilename + ".json"
         let configDestination = modelFolder.appendingPathComponent(configFilename)
 
@@ -250,7 +248,7 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
         // IMPORTANT: We must move the file INSIDE the callback because the temp file
         // is only guaranteed to exist during the callback execution
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let task = URLSession.shared.downloadTask(with: url) { [destination] (downloadedURL, response, error) in
+            let task = URLSession.shared.downloadTask(with: url) { [destination] downloadedURL, response, error in
                 if let error = error {
                     continuation.resume(throwing: error)
                     return
@@ -336,7 +334,7 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
         // IMPORTANT: We must move the file INSIDE the callback because the temp file
         // is only guaranteed to exist during the callback execution
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let task = URLSession.shared.downloadTask(with: downloadURL) { [archivePath] (url, response, error) in
+            let task = URLSession.shared.downloadTask(with: downloadURL) { [archivePath] url, response, error in
                 if let error = error {
                     continuation.resume(throwing: error)
                     return

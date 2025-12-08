@@ -85,6 +85,6 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
     }
 
     // MARK: - Debug Support
-    // Mock data population removed - now handled by MockNetworkService in development mode
+    // Mock data population removed - development mode now uses real network calls
 
 }

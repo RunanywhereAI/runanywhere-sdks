@@ -19,7 +19,7 @@ public extension RunAnywhere {
     }
 
     /// Get currently loaded model for a specific modality
-    /// - Parameter modality: The modality to check (llm, stt, tts, vlm)
+    /// - Parameter modality: The modality to check (llm, stt, tts)
     /// - Returns: The loaded model state, or nil if no model is loaded
     @MainActor
     static func loadedModel(for modality: Modality) -> LoadedModelState? {
@@ -84,15 +84,12 @@ public extension RunAnywhere {
             case .tts:
                 // TTS models are loaded through components
                 break
-            case .vlm:
-                // VLM models use the same path as LLM for now
-                try await RunAnywhere.loadModel(modelId)
             default:
                 break
             }
 
-            // For LLM/VLM, mark as loaded now
-            if modality == .llm || modality == .vlm {
+            // For LLM, mark as loaded now
+            if modality == .llm {
                 ModelLifecycleTracker.shared.modelDidLoad(
                     modelId: modelId,
                     modelName: modelInfo.name,
@@ -124,7 +121,7 @@ public extension RunAnywhere {
 
         // Perform unload based on modality
         switch modality {
-        case .llm, .vlm:
+        case .llm:
             do {
                 try await serviceContainer.modelLoadingService.unloadModel(state.modelId)
             } catch {

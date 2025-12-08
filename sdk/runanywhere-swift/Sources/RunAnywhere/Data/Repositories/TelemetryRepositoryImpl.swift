@@ -73,9 +73,10 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     public func fetchByDateRange(from: Date, to: Date) async throws -> [TelemetryData] {
         // Use local data source with filtering
         let allEvents = try await localDataSource.loadAll()
-        return allEvents.filter { event in
+        let filteredEvents = allEvents.filter { event in
             event.timestamp >= from && event.timestamp <= to
-        }.sorted { $0.timestamp > $1.timestamp }
+        }
+        return filteredEvents.sorted { $0.timestamp > $1.timestamp }
     }
 
     public func fetchUnsent() async throws -> [TelemetryData] {

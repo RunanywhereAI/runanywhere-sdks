@@ -44,6 +44,46 @@ public enum STTEventType: String {
     case error = "stt_error"
 }
 
+// MARK: - STT Event Data Models
+
+/// Parameters for STT transcription completion tracking
+public struct STTTranscriptionCompletionParams {
+    public let sessionId: String
+    public let modelId: String
+    public let modelName: String
+    public let framework: LLMFramework
+    public let language: String
+    public let audioDurationMs: Double
+    public let processingTimeMs: Double
+    public let wordCount: Int
+    public let characterCount: Int
+    public let confidence: Float
+
+    public init(
+        sessionId: String,
+        modelId: String,
+        modelName: String,
+        framework: LLMFramework,
+        language: String,
+        audioDurationMs: Double,
+        processingTimeMs: Double,
+        wordCount: Int,
+        characterCount: Int,
+        confidence: Float
+    ) {
+        self.sessionId = sessionId
+        self.modelId = modelId
+        self.modelName = modelName
+        self.framework = framework
+        self.language = language
+        self.audioDurationMs = audioDurationMs
+        self.processingTimeMs = processingTimeMs
+        self.wordCount = wordCount
+        self.characterCount = characterCount
+        self.confidence = confidence
+    }
+}
+
 // MARK: - STT Metrics
 
 /// STT-specific metrics
@@ -382,60 +422,43 @@ public actor STTAnalyticsService: AnalyticsService {
     }
 
     /// Track STT transcription completion with full enterprise metrics
-    /// - Parameters:
-    ///   - sessionId: Unique session identifier
-    ///   - modelId: Model used
-    ///   - modelName: Human-readable model name
-    ///   - framework: Framework used
-    ///   - language: Language of transcription
-    ///   - audioDurationMs: Duration of audio processed in milliseconds
-    ///   - processingTimeMs: Time taken to process in milliseconds
-    ///   - wordCount: Number of words transcribed
-    ///   - characterCount: Number of characters transcribed
-    ///   - confidence: Confidence score (0.0 to 1.0)
-    public func trackTranscriptionCompleted(
-        sessionId: String,
-        modelId: String,
-        modelName: String,
-        framework: LLMFramework,
-        language: String,
-        audioDurationMs: Double,
-        processingTimeMs: Double,
-        wordCount: Int,
-        characterCount: Int,
-        confidence: Float
-    ) async {
+    /// - Parameter params: Transcription completion parameters
+    public func trackTranscriptionCompleted(params: STTTranscriptionCompletionParams) async {
         let deviceInfo = TelemetryDeviceInfo.current
         let telemetryService = await ServiceContainer.shared.telemetryService
 
         // Calculate real-time factor (< 1.0 means faster than real-time)
-        let realTimeFactor = audioDurationMs > 0 ? processingTimeMs / audioDurationMs : 0
+        let realTimeFactor = params.audioDurationMs > 0 ?
+            params.processingTimeMs / params.audioDurationMs : 0
 
         do {
             try await telemetryService.trackSTTTranscriptionCompleted(
-                sessionId: sessionId,
-                modelId: modelId,
-                modelName: modelName,
-                framework: framework.rawValue,
-                language: language,
-                audioDurationMs: audioDurationMs,
-                processingTimeMs: processingTimeMs,
+                sessionId: params.sessionId,
+                modelId: params.modelId,
+                modelName: params.modelName,
+                framework: params.framework.rawValue,
+                language: params.language,
+                audioDurationMs: params.audioDurationMs,
+                processingTimeMs: params.processingTimeMs,
                 realTimeFactor: realTimeFactor,
-                wordCount: wordCount,
-                characterCount: characterCount,
-                confidence: confidence,
+                wordCount: params.wordCount,
+                characterCount: params.characterCount,
+                confidence: params.confidence,
                 device: deviceInfo.device,
                 osVersion: deviceInfo.osVersion
             )
-            logger.debug("Tracked STT transcription completed: \(sessionId), RTF: \(String(format: "%.3f", realTimeFactor))")
+            logger.debug(
+                "Tracked STT transcription completed: \(params.sessionId), " +
+                "RTF: \(String(format: "%.3f", realTimeFactor))"
+            )
         } catch {
             logger.error("Failed to track STT transcription completed: \(error)")
         }
 
         // Also update local metrics
         transcriptionCount += 1
-        totalConfidence += confidence
-        totalLatency += processingTimeMs / 1000.0
+        totalConfidence += params.confidence
+        totalLatency += params.processingTimeMs / 1000.0
     }
 
     /// Track STT transcription failure with full enterprise metrics

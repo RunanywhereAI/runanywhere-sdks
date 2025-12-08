@@ -57,6 +57,44 @@ public struct TTSSynthesisStartData: AnalyticsEventData {
     }
 }
 
+/// Parameters for TTS synthesis completion tracking
+public struct TTSSynthesisCompletionParams {
+    public let synthesisId: String
+    public let modelId: String
+    public let modelName: String
+    public let framework: LLMFramework
+    public let language: String
+    public let characterCount: Int
+    public let audioDurationMs: Double
+    public let audioSizeBytes: Int
+    public let sampleRate: Int
+    public let processingTimeMs: Double
+
+    public init(
+        synthesisId: String,
+        modelId: String,
+        modelName: String,
+        framework: LLMFramework,
+        language: String,
+        characterCount: Int,
+        audioDurationMs: Double,
+        audioSizeBytes: Int,
+        sampleRate: Int,
+        processingTimeMs: Double
+    ) {
+        self.synthesisId = synthesisId
+        self.modelId = modelId
+        self.modelName = modelName
+        self.framework = framework
+        self.language = language
+        self.characterCount = characterCount
+        self.audioDurationMs = audioDurationMs
+        self.audioSizeBytes = audioSizeBytes
+        self.sampleRate = sampleRate
+        self.processingTimeMs = processingTimeMs
+    }
+}
+
 /// TTS synthesis completion event data
 public struct TTSSynthesisCompletionData: AnalyticsEventData {
     public let characterCount: Int
@@ -363,63 +401,47 @@ public actor TTSAnalyticsService: AnalyticsService {
     }
 
     /// Track TTS synthesis completion with full enterprise metrics
-    /// - Parameters:
-    ///   - synthesisId: Unique synthesis session identifier
-    ///   - modelId: Model used
-    ///   - modelName: Human-readable model name
-    ///   - framework: Framework used
-    ///   - language: Language of synthesis
-    ///   - characterCount: Number of characters synthesized
-    ///   - audioDurationMs: Duration of generated audio in milliseconds
-    ///   - audioSizeBytes: Size of generated audio in bytes
-    ///   - sampleRate: Audio sample rate (e.g., 22050, 44100)
-    ///   - processingTimeMs: Time taken to synthesize in milliseconds
-    public func trackSynthesisCompleted(
-        synthesisId: String,
-        modelId: String,
-        modelName: String,
-        framework: LLMFramework,
-        language: String,
-        characterCount: Int,
-        audioDurationMs: Double,
-        audioSizeBytes: Int,
-        sampleRate: Int,
-        processingTimeMs: Double
-    ) async {
-        logger.info("📊 trackSynthesisCompleted called - synthesisId: \(synthesisId)")
+    /// - Parameter params: Synthesis completion parameters
+    public func trackSynthesisCompleted(params: TTSSynthesisCompletionParams) async {
+        logger.info("📊 trackSynthesisCompleted called - synthesisId: \(params.synthesisId)")
         let deviceInfo = TelemetryDeviceInfo.current
         let telemetryService = await ServiceContainer.shared.telemetryService
 
         // Calculate performance metrics
-        let charactersPerSecond = processingTimeMs > 0 ? Double(characterCount) / (processingTimeMs / 1000.0) : 0
-        let realTimeFactor = audioDurationMs > 0 ? processingTimeMs / audioDurationMs : 0
+        let charactersPerSecond = params.processingTimeMs > 0 ?
+            Double(params.characterCount) / (params.processingTimeMs / 1000.0) : 0
+        let realTimeFactor = params.audioDurationMs > 0 ?
+            params.processingTimeMs / params.audioDurationMs : 0
 
         do {
             try await telemetryService.trackTTSSynthesisCompleted(
-                synthesisId: synthesisId,
-                modelId: modelId,
-                modelName: modelName,
-                framework: framework.rawValue,
-                language: language,
-                characterCount: characterCount,
-                audioDurationMs: audioDurationMs,
-                audioSizeBytes: audioSizeBytes,
-                sampleRate: sampleRate,
-                processingTimeMs: processingTimeMs,
+                synthesisId: params.synthesisId,
+                modelId: params.modelId,
+                modelName: params.modelName,
+                framework: params.framework.rawValue,
+                language: params.language,
+                characterCount: params.characterCount,
+                audioDurationMs: params.audioDurationMs,
+                audioSizeBytes: params.audioSizeBytes,
+                sampleRate: params.sampleRate,
+                processingTimeMs: params.processingTimeMs,
                 charactersPerSecond: charactersPerSecond,
                 realTimeFactor: realTimeFactor,
                 device: deviceInfo.device,
                 osVersion: deviceInfo.osVersion
             )
-            logger.info("✅ Tracked TTS synthesis completed: \(synthesisId), CPS: \(String(format: "%.1f", charactersPerSecond))")
+            logger.info(
+                "✅ Tracked TTS synthesis completed: \(params.synthesisId), " +
+                "CPS: \(String(format: "%.1f", charactersPerSecond))"
+            )
         } catch {
             logger.error("❌ Failed to track TTS synthesis completed: \(error)")
         }
 
         // Update local metrics
         synthesisCount += 1
-        totalCharacters += characterCount
-        totalProcessingTime += processingTimeMs
+        totalCharacters += params.characterCount
+        totalProcessingTime += params.processingTimeMs
         totalCharactersPerSecond += charactersPerSecond
     }
 

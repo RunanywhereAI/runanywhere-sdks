@@ -426,13 +426,11 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
 
     private let logger = SDKLogger(category: "TTSComponent")
     private let ttsConfiguration: TTSConfiguration
-    private var currentVoice: String?
 
     // MARK: - Initialization
 
     public init(configuration: TTSConfiguration, serviceContainer: ServiceContainer? = nil) {
         self.ttsConfiguration = configuration
-        self.currentVoice = configuration.voice
         super.init(configuration: configuration, serviceContainer: serviceContainer)
     }
 
@@ -739,7 +737,6 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
     public override func performCleanup() async throws {
         service?.wrappedService?.stop()
         await service?.wrappedService?.cleanup()
-        currentVoice = nil
     }
 
     // MARK: - Private Helpers

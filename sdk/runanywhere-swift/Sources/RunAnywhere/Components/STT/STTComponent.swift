@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 @preconcurrency import AVFoundation
 
@@ -167,12 +168,6 @@ public enum STTError: LocalizedError {
             return "Microphone permission was denied"
         }
     }
-}
-
-/// Enum to specify preferred audio format for the service
-public enum STTServiceAudioFormat {
-    case data       // Service prefers raw Data
-    case floatArray // Service prefers Float array samples
 }
 
 // MARK: - STT Mode
@@ -629,32 +624,6 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         await service?.wrappedService?.cleanup()
         isModelLoaded = false
         modelPath = nil
-    }
-
-    // MARK: - Model Management
-
-    private func downloadModel(modelId: String) async throws {
-        // Emit download started event
-        eventBus.publish(ComponentInitializationEvent.componentDownloadStarted(
-            component: Self.componentType,
-            modelId: modelId
-        ))
-
-        // Simulate download with progress
-        for progress in stride(from: 0.0, through: 1.0, by: 0.1) {
-            eventBus.publish(ComponentInitializationEvent.componentDownloadProgress(
-                component: Self.componentType,
-                modelId: modelId,
-                progress: progress
-            ))
-            try await Task.sleep(nanoseconds: 50_000_000) // 0.05 second
-        }
-
-        // Emit download completed event
-        eventBus.publish(ComponentInitializationEvent.componentDownloadCompleted(
-            component: Self.componentType,
-            modelId: modelId
-        ))
     }
 
     // MARK: - Helper Methods

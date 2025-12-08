@@ -443,8 +443,8 @@ public class ServiceContainer {
         EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: defaultConfig))
         logger.info("Configuration loaded (source: defaults for development)")
 
-        // Step 3: Mock model catalog
-        logger.debug("Mock models will be provided by MockNetworkService")
+        // Step 3: Model catalog
+        logger.debug("Models will be loaded from network")
 
         // Step 4: Initialize model registry
         await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)

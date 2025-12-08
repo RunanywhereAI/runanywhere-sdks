@@ -5,6 +5,14 @@ import UIKit
 import AppKit
 #endif
 
+/// Chip information structure
+private struct ChipInfo {
+    let chipName: String
+    let performanceCores: Int
+    let efficiencyCores: Int
+    let neuralEngineCores: Int
+}
+
 /// Service responsible for authentication and token management
 public actor AuthenticationService {
 
@@ -271,7 +279,7 @@ public actor AuthenticationService {
         #endif
 
         // Get chip info based on device model
-        let (chipName, performanceCores, efficiencyCores, neuralEngineCores) = getChipInfo(for: deviceModel)
+        let chipInfo = getChipInfo(for: deviceModel)
 
         // Get persistent device UUID for deduplication
         let deviceUUID = PersistentDeviceIdentity.getPersistentDeviceUUID()
@@ -281,69 +289,69 @@ public actor AuthenticationService {
             availableMemory: Int64(processInfo.physicalMemory / 2), // Available memory estimate
             batteryLevel: batteryLevel,
             batteryState: batteryState,
-            chipName: chipName,
+            chipName: chipInfo.chipName,
             coreCount: coreCount,
             deviceModel: deviceModel,
             deviceName: deviceName,
             deviceUUID: deviceUUID,
-            efficiencyCores: efficiencyCores,
+            efficiencyCores: chipInfo.efficiencyCores,
             formFactor: formFactor,
             gpuFamily: "apple",
             hasNeuralEngine: true,  // All modern Apple devices have Neural Engine
             isLowPowerMode: isLowPowerMode,
-            neuralEngineCores: neuralEngineCores,
+            neuralEngineCores: chipInfo.neuralEngineCores,
             osVersion: osVersion,
-            performanceCores: performanceCores,
+            performanceCores: chipInfo.performanceCores,
             platform: SDKConstants.platform,
             totalMemory: totalMemory
         )
     }
 
-    private func getChipInfo(for model: String) -> (chipName: String, performanceCores: Int, efficiencyCores: Int, neuralEngineCores: Int) {
+    private func getChipInfo(for model: String) -> ChipInfo {
         // Map device models to chip info
         // iPhone models
         if model.contains("iPhone16") {
-            return ("A18 Pro", 2, 4, 16)
+            return ChipInfo(chipName: "A18 Pro", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
         } else if model.contains("iPhone15") {
             if model.contains("Pro") {
-                return ("A17 Pro", 2, 4, 16)
+                return ChipInfo(chipName: "A17 Pro", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
             } else {
-                return ("A16 Bionic", 2, 4, 16)
+                return ChipInfo(chipName: "A16 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
             }
         } else if model.contains("iPhone14") {
             if model.contains("Pro") {
-                return ("A16 Bionic", 2, 4, 16)
+                return ChipInfo(chipName: "A16 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
             } else {
-                return ("A15 Bionic", 2, 4, 16)
+                return ChipInfo(chipName: "A15 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
             }
         } else if model.contains("iPhone13") {
-            return ("A15 Bionic", 2, 4, 16)
+            return ChipInfo(chipName: "A15 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
         } else if model.contains("iPhone12") {
-            return ("A14 Bionic", 2, 4, 16)
+            return ChipInfo(chipName: "A14 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
         }
         // iPad models
         else if model.contains("iPad") {
             if model.contains("Pro") {
-                return ("M2", 8, 4, 16)
+                return ChipInfo(chipName: "M2", performanceCores: 8, efficiencyCores: 4, neuralEngineCores: 16)
             } else {
-                return ("A15 Bionic", 2, 4, 16)
+                return ChipInfo(chipName: "A15 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
             }
         }
         // Mac models
         else if model.contains("Mac") {
             if model.contains("Studio") || model.contains("Pro") {
-                return ("M2 Max", 8, 4, 32)
+                return ChipInfo(chipName: "M2 Max", performanceCores: 8, efficiencyCores: 4, neuralEngineCores: 32)
             } else {
-                return ("M2", 8, 4, 16)
+                return ChipInfo(chipName: "M2", performanceCores: 8, efficiencyCores: 4, neuralEngineCores: 16)
             }
         }
         // Simulator or unknown
         else if model == "arm64" || model.contains("Simulator") {
-            return ("Apple Silicon", 8, 4, 16)
+            return ChipInfo(chipName: "Apple Silicon", performanceCores: 8, efficiencyCores: 4, neuralEngineCores: 16)
         }
         // Default fallback
         else {
-            return ("Apple Chip", 2, 4, 16)
+            return ChipInfo(chipName: "Apple Chip", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
         }
     }
 

@@ -152,7 +152,7 @@ public class DeviceManager {
         #endif
 
         // Add SDK info
-        deviceInfo["sdkVersion"] = "1.0.0" // TODO: Get from build config
+        deviceInfo["sdkVersion"] = "1.0.0"
         deviceInfo["registrationTimestamp"] = Date().timeIntervalSince1970
 
         return deviceInfo

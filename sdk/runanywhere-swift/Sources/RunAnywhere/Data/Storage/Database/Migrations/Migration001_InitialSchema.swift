@@ -2,13 +2,16 @@ import Foundation
 import GRDB
 
 /// Initial database schema migration
+// swiftlint:disable:next type_name
 struct Migration001_InitialSchema {
 
+    // swiftlint:disable:next function_body_length
     static func migrate(_ db: Database) throws {
         // MARK: - Configuration Table
         // Using GRDB's built-in Codable support for nested structures
         // Complex objects (routing, analytics, generation, storage) are stored as JSON
 
+        // swiftlint:disable:next identifier_name
         try db.create(table: "configuration") { t in
             t.primaryKey("id", .text)
 
@@ -37,6 +40,7 @@ struct Migration001_InitialSchema {
 
         // MARK: - Models Table
 
+        // swiftlint:disable:next identifier_name
         try db.create(table: "models") { t in
             t.primaryKey("id", .text)
             t.column("name", .text).notNull()
@@ -101,6 +105,7 @@ struct Migration001_InitialSchema {
 
         // MARK: - Model Usage Stats Table
 
+        // swiftlint:disable:next identifier_name
         try db.create(table: "model_usage_stats") { t in
             t.primaryKey("id", .text)
             t.belongsTo("models", onDelete: .cascade).notNull()
@@ -118,6 +123,7 @@ struct Migration001_InitialSchema {
 
         // MARK: - Generation Sessions Table
 
+        // swiftlint:disable:next identifier_name
         try db.create(table: "generation_sessions") { t in
             t.primaryKey("id", .text)
             t.belongsTo("models").notNull()
@@ -135,6 +141,7 @@ struct Migration001_InitialSchema {
 
         // MARK: - Generations Table
 
+        // swiftlint:disable:next identifier_name
         try db.create(table: "generations") { t in
             t.primaryKey("id", .text)
             t.belongsTo("generation_sessions", onDelete: .cascade).notNull()
@@ -177,6 +184,7 @@ struct Migration001_InitialSchema {
 
         // MARK: - Telemetry Table
 
+        // swiftlint:disable:next identifier_name
         try db.create(table: "telemetry") { t in
             t.primaryKey("id", .text)
             t.column("eventType", .text).notNull()
@@ -189,6 +197,7 @@ struct Migration001_InitialSchema {
 
         // MARK: - User Preferences Table
 
+        // swiftlint:disable:next identifier_name
         try db.create(table: "user_preferences") { t in
             t.primaryKey("id", .text)
             t.column("preference_key", .text).notNull().unique()

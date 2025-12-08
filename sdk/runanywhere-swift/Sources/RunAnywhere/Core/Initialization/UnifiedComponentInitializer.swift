@@ -168,8 +168,6 @@ public actor UnifiedComponentInitializer {
             return try await createTTSComponent(config, container: container)
         case .vad:
             return try await createVADComponent(config, container: container)
-        case .vlm:
-            return try await createVLMComponent(config, container: container)
         case .embedding:
             return try await createEmbeddingComponent(config, container: container)
         case .speakerDiarization:
@@ -219,15 +217,6 @@ public actor UnifiedComponentInitializer {
         return await VADComponent(configuration: params)
     }
 
-    private func createVLMComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
-        guard config.parameters is VLMConfiguration else {
-            throw SDKError.validationFailed("Invalid VLM parameters")
-        }
-
-        // For now, VLM is not implemented - would need adapter support
-        throw SDKError.validationFailed("VLM component not yet implemented")
-    }
-
     private func createEmbeddingComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
         // For now, Embedding is not implemented
         throw SDKError.validationFailed("Embedding component not yet implemented")
@@ -245,8 +234,8 @@ public actor UnifiedComponentInitializer {
 
     private func canParallelize(_ component: SDKComponent) -> Bool {
         switch component {
-        case .llm, .vlm:
-            return false // Heavy memory components
+        case .llm:
+            return false // Heavy memory component
         default:
             return true
         }

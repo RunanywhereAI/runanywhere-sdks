@@ -93,11 +93,11 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     }
 
     public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
-        return model.memoryRequired ?? 0
+        model.memoryRequired ?? 0
     }
 
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
-        return HardwareConfiguration()
+        HardwareConfiguration()
     }
 
     // MARK: - Initialization
@@ -127,17 +127,17 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     /// Get models provided by this adapter
     /// Returns empty array since models come from configuration
     public func getProvidedModels() -> [ModelInfo] {
-        return []
+        []
     }
 
     /// Get storage strategy for WhisperKit models
     public func getDownloadStrategy() -> DownloadStrategy? {
-        return storageStrategy
+        storageStrategy
     }
 
     /// Get storage strategy for WhisperKit models
     public func getStorageStrategy() -> ModelStorageStrategy? {
-        return storageStrategy
+        storageStrategy
     }
 
     // MARK: - Cache Management
