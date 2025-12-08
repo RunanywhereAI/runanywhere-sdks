@@ -5,11 +5,18 @@ node_modules/
 lib/
 dist/
 
+# Nitrogen/Nitro generated files (auto-generated bridge code)
+nitrogen/generated/
+
 # iOS
 ios/Frameworks/
 ios/build/
 *.xcframework
 *.xcframework.zip
+
+# Xcode environment (machine-specific Node.js paths)
+.xcode.env
+.xcode.env.local
 
 # Android
 android/build/

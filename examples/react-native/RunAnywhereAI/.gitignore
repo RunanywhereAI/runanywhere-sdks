@@ -26,6 +26,10 @@ ios/*.xcodeproj/xcuserdata/
 ios/*.xcodeproj/project.xcworkspace/xcuserdata/
 ios/Podfile.lock
 
+# Xcode environment (machine-specific Node.js paths)
+ios/.xcode.env
+ios/.xcode.env.local
+
 # Android
 android/.gradle/
 android/app/build/
