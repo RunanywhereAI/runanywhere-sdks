@@ -217,6 +217,53 @@ import {
 - iOS 14.0+
 - Android API 24+
 
+## Development Setup
+
+After cloning the repository, you need to generate the Nitrogen binding files before building:
+
+```bash
+cd sdk/runanywhere-react-native
+
+# Install dependencies
+npm install
+
+# Generate Nitrogen bindings (REQUIRED before first build)
+npm run nitrogen
+```
+
+### What is Nitrogen?
+
+Nitrogen is the code generator for [NitroModules](https://github.com/margelo/react-native-nitro-modules) - a high-performance native module system for React Native. It generates:
+
+- **C++ bridge code** - Type-safe bindings between JS and native
+- **Swift/Kotlin code** - Platform-specific implementations  
+- **Autolinking files** - For CocoaPods and Gradle integration
+
+The generated files are in `nitrogen/generated/` and are gitignored (auto-generated on each machine).
+
+### Native Binaries
+
+Native binaries (XCFramework for iOS, .so libraries for Android) are **automatically downloaded** from [runanywhere-binaries](https://github.com/RunanywhereAI/runanywhere-binaries) releases:
+
+- **iOS**: Downloaded during `pod install` via the podspec's `prepare_command`
+- **Android**: Downloaded during Gradle's `preBuild` phase via `downloadNativeLibs` task
+
+The version is controlled by `native-version.txt` in the SDK root.
+
+### Build Commands
+
+```bash
+# iOS
+cd examples/react-native/RunAnywhereAI/ios
+pod install
+cd ..
+npx react-native run-ios
+
+# Android  
+cd examples/react-native/RunAnywhereAI
+npx react-native run-android
+```
+
 ## License
 
 MIT

@@ -23,6 +23,7 @@ android/build/
 android/.gradle/
 android/.cxx/
 android/libs/
+android/src/main/jniLibs/
 *.aar
 
 # TypeScript
