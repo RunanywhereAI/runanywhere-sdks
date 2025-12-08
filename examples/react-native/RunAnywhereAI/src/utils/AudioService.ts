@@ -7,12 +7,15 @@
  * - VoiceAssistantScreen: Full pipeline with record + play
  *
  * Platform-specific implementations:
- * - iOS: Audio recording not available (Nitrogen requires bridgeless=NO, incompatible with audio libs)
- * - Android: Uses react-native-live-audio-stream for raw PCM recording (STT WAV format)
+ * - iOS: Native AVFoundation module (NativeAudioModule)
+ * - Android: react-native-live-audio-stream for raw PCM recording
  */
 
-import { Platform, PermissionsAndroid, Alert } from 'react-native';
+import { Platform, PermissionsAndroid, NativeModules } from 'react-native';
 import RNFS from 'react-native-fs';
+
+// Native iOS Audio Module
+const NativeAudioModule = Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
 
 // Lazy load LiveAudioStream (Android only)
 let LiveAudioStream: any = null;
@@ -42,6 +45,7 @@ let recordingStartTime = 0;
 let currentRecordPath: string | null = null;
 let audioChunks: string[] = [];
 let progressCallback: ((currentPositionMs: number, metering?: number) => void) | null = null;
+let audioLevelInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Calculate RMS (Root Mean Square) audio level from PCM data
@@ -157,21 +161,53 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  * Returns the URI where the audio will be saved
  * 
  * Platform support:
- * - iOS: Not available (Nitrogen requires bridgeless=NO, incompatible with audio libraries)
+ * - iOS: NativeAudioModule (AVFoundation)
  * - Android: react-native-live-audio-stream (raw PCM for STT WAV format)
  */
 export async function startRecording(callbacks?: RecordingCallbacks): Promise<string> {
   return new Promise(async (resolve, reject) => {
     try {
-      // iOS: Recording not available
+      // iOS: Use native audio module
       if (Platform.OS === 'ios') {
-        console.log('[AudioService] iOS: Audio recording not available');
-        Alert.alert(
-          'STT Not Available on iOS',
-          'Speech-to-Text recording requires Android. LLM and TTS (ONNX models) work on iOS.',
-          [{ text: 'OK' }]
-        );
-        reject(new Error('Audio recording not available on iOS'));
+        console.log('[AudioService] iOS: Starting native recording...');
+        
+        if (!NativeAudioModule) {
+          console.error('[AudioService] iOS: NativeAudioModule not available');
+          reject(new Error('Native audio module not available on iOS'));
+          return;
+        }
+        
+        try {
+          const result = await NativeAudioModule.startRecording();
+          console.log('[AudioService] iOS: Recording started:', result);
+          
+          isRecording = true;
+          recordingStartTime = Date.now();
+          currentRecordPath = result.path;
+          progressCallback = callbacks?.onProgress || null;
+          
+          // Poll for audio levels on iOS
+          if (progressCallback) {
+            audioLevelInterval = setInterval(async () => {
+              if (isRecording && NativeAudioModule) {
+                try {
+                  const levelResult = await NativeAudioModule.getAudioLevel();
+                  const elapsed = Date.now() - recordingStartTime;
+                  // Convert linear level (0-1) to dB (-60 to 0)
+                  const db = levelResult.level > 0 ? 20 * Math.log10(levelResult.level) : -60;
+                  progressCallback?.(elapsed, db);
+                } catch (e) {
+                  // Ignore errors
+                }
+              }
+            }, 100);
+          }
+          
+          resolve(result.path);
+        } catch (error: any) {
+          console.error('[AudioService] iOS: Failed to start recording:', error);
+          reject(error);
+        }
         return;
       }
       
@@ -236,6 +272,26 @@ export async function stopRecording(): Promise<{ uri: string; durationMs: number
   }
 
   try {
+    // Clear iOS audio level polling
+    if (audioLevelInterval) {
+      clearInterval(audioLevelInterval);
+      audioLevelInterval = null;
+    }
+    
+    // iOS: Use native audio module
+    if (Platform.OS === 'ios' && NativeAudioModule) {
+      console.log('[AudioService] iOS: Stopping native recording...');
+      
+      const result = await NativeAudioModule.stopRecording();
+      const durationMs = Date.now() - recordingStartTime;
+      
+      isRecording = false;
+      progressCallback = null;
+      
+      console.log('[AudioService] iOS: Recording stopped:', result);
+      return { uri: result.path, durationMs };
+    }
+    
     // Android: Stop LiveAudioStream
     const audioStream = getLiveAudioStream();
     if (audioStream) {
@@ -303,20 +359,31 @@ export async function stopRecording(): Promise<{ uri: string; durationMs: number
  * Cancel recording
  */
 export async function cancelRecording(): Promise<void> {
+  // Clear iOS audio level polling
+  if (audioLevelInterval) {
+    clearInterval(audioLevelInterval);
+    audioLevelInterval = null;
+  }
+  
   if (isRecording) {
     try {
-      // Android: Stop LiveAudioStream
-      const audioStream = getLiveAudioStream();
-      if (audioStream) {
-        audioStream.stop();
-      }
-      
-      // Delete the partial recording file
-      if (currentRecordPath) {
-        try {
-          await RNFS.unlink(currentRecordPath);
-        } catch (e) {
-          // File may not exist, ignore
+      // iOS: Use native audio module
+      if (Platform.OS === 'ios' && NativeAudioModule) {
+        await NativeAudioModule.cancelRecording();
+      } else {
+        // Android: Stop LiveAudioStream
+        const audioStream = getLiveAudioStream();
+        if (audioStream) {
+          audioStream.stop();
+        }
+        
+        // Delete the partial recording file
+        if (currentRecordPath) {
+          try {
+            await RNFS.unlink(currentRecordPath);
+          } catch (e) {
+            // File may not exist, ignore
+          }
         }
       }
     } catch (error) {
@@ -334,34 +401,165 @@ export interface PlaybackCallbacks {
   onComplete?: () => void;
 }
 
+// Track playback state
+let isPlaying = false;
+let playbackProgressInterval: ReturnType<typeof setInterval> | null = null;
+let playbackCallbacks: PlaybackCallbacks | null = null;
+
 /**
  * Play audio from URI
- * Note: For now, playback is not implemented - can be added with react-native-sound if needed
+ * 
+ * Platform support:
+ * - iOS: NativeAudioModule (AVAudioPlayer)
+ * - Android: react-native-sound (if available)
  */
 export async function playAudio(uri: string, callbacks?: PlaybackCallbacks): Promise<void> {
-  console.log('[AudioService] Playback not implemented yet:', uri);
-  // TODO: Implement playback if needed using react-native-sound
+  console.log('[AudioService] Playing audio:', uri);
+  
+  // iOS: Use native audio module
+  if (Platform.OS === 'ios' && NativeAudioModule) {
+    try {
+      playbackCallbacks = callbacks || null;
+      const result = await NativeAudioModule.playAudio(uri);
+      isPlaying = true;
+      
+      const duration = (result.duration || 0) * 1000; // Convert to ms
+      
+      // Poll for playback progress
+      if (callbacks?.onProgress || callbacks?.onComplete) {
+        playbackProgressInterval = setInterval(async () => {
+          if (!isPlaying) {
+            if (playbackProgressInterval) {
+              clearInterval(playbackProgressInterval);
+              playbackProgressInterval = null;
+            }
+            return;
+          }
+          
+          try {
+            const status = await NativeAudioModule.getPlaybackStatus();
+            const currentTimeMs = (status.currentTime || 0) * 1000;
+            const durationMs = (status.duration || 0) * 1000;
+            
+            callbacks?.onProgress?.(currentTimeMs, durationMs);
+            
+            if (!status.isPlaying && currentTimeMs >= durationMs - 100) {
+              isPlaying = false;
+              if (playbackProgressInterval) {
+                clearInterval(playbackProgressInterval);
+                playbackProgressInterval = null;
+              }
+              callbacks?.onComplete?.();
+            }
+          } catch (e) {
+            // Ignore errors
+          }
+        }, 100);
+      }
+      
+      console.log('[AudioService] iOS: Playback started, duration:', duration);
+    } catch (error) {
+      console.error('[AudioService] iOS: Failed to play audio:', error);
+      throw error;
+    }
+    return;
+  }
+  
+  // Android: Use react-native-sound if available
+  console.log('[AudioService] Android: Playback via react-native-sound');
+  try {
+    const Sound = require('react-native-sound').default;
+    Sound.setCategory('Playback');
+    
+    return new Promise((resolve, reject) => {
+      const sound = new Sound(uri, '', (error: any) => {
+        if (error) {
+          console.error('[AudioService] Failed to load sound:', error);
+          reject(error);
+          return;
+        }
+        
+        const duration = sound.getDuration() * 1000;
+        isPlaying = true;
+        playbackCallbacks = callbacks || null;
+        
+        // Progress polling
+        if (callbacks?.onProgress) {
+          playbackProgressInterval = setInterval(() => {
+            sound.getCurrentTime((seconds: number) => {
+              callbacks?.onProgress?.(seconds * 1000, duration);
+            });
+          }, 100);
+        }
+        
+        sound.play((success: boolean) => {
+          isPlaying = false;
+          if (playbackProgressInterval) {
+            clearInterval(playbackProgressInterval);
+            playbackProgressInterval = null;
+          }
+          
+          if (success) {
+            callbacks?.onComplete?.();
+            resolve();
+          } else {
+            reject(new Error('Playback failed'));
+          }
+          sound.release();
+        });
+      });
+    });
+  } catch (e) {
+    console.log('[AudioService] react-native-sound not available:', e);
+    throw new Error('Audio playback not available');
+  }
 }
 
 /**
  * Stop playback
  */
 export async function stopPlayback(): Promise<void> {
-  // TODO: Implement if playback is added
+  if (playbackProgressInterval) {
+    clearInterval(playbackProgressInterval);
+    playbackProgressInterval = null;
+  }
+  
+  isPlaying = false;
+  playbackCallbacks = null;
+  
+  if (Platform.OS === 'ios' && NativeAudioModule) {
+    try {
+      await NativeAudioModule.stopPlayback();
+    } catch (e) {
+      // Ignore errors
+    }
+  }
 }
 
 /**
  * Pause playback
  */
 export async function pausePlayback(): Promise<void> {
-  // TODO: Implement if playback is added
+  if (Platform.OS === 'ios' && NativeAudioModule) {
+    try {
+      await NativeAudioModule.pausePlayback();
+    } catch (e) {
+      // Ignore errors
+    }
+  }
 }
 
 /**
  * Resume playback
  */
 export async function resumePlayback(): Promise<void> {
-  // TODO: Implement if playback is added
+  if (Platform.OS === 'ios' && NativeAudioModule) {
+    try {
+      await NativeAudioModule.resumePlayback();
+    } catch (e) {
+      // Ignore errors
+    }
+  }
 }
 
 /**
@@ -371,6 +569,7 @@ export async function cleanup(): Promise<void> {
   if (isRecording) {
     await cancelRecording();
   }
+  await stopPlayback();
 }
 
 /**

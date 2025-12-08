@@ -1,5 +1,5 @@
 /**
- * React Native configuration - following Cactus example pattern
+ * React Native configuration for RunAnywhere
  */
 module.exports = {
   project: {

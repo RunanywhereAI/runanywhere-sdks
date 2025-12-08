@@ -14,6 +14,8 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		7699B88040F8A987B510C191 /* libPods-RunAnywhereAI-RunAnywhereAITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 19F6CBCC0A4E27FBF8BF4A61 /* libPods-RunAnywhereAI-RunAnywhereAITests.a */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		AABB001122334455 /* NativeAudioModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABB001122334456 /* NativeAudioModule.swift */; };
+		AABB001122334457 /* NativeAudioModule.m in Sources */ = {isa = PBXBuildFile; fileRef = AABB001122334458 /* NativeAudioModule.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -42,6 +44,9 @@
 		5DCACB8F33CDC322A6C60F78 /* libPods-RunAnywhereAI.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RunAnywhereAI.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = RunAnywhereAI/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		89C6BE57DB24E9ADA2F236DE /* Pods-RunAnywhereAI-RunAnywhereAITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAI-RunAnywhereAITests.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAI-RunAnywhereAITests/Pods-RunAnywhereAI-RunAnywhereAITests.release.xcconfig"; sourceTree = "<group>"; };
+		AABB001122334456 /* NativeAudioModule.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = NativeAudioModule.swift; path = RunAnywhereAI/NativeAudioModule.swift; sourceTree = "<group>"; };
+		AABB001122334458 /* NativeAudioModule.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = NativeAudioModule.m; path = RunAnywhereAI/NativeAudioModule.m; sourceTree = "<group>"; };
+		AABB001122334459 /* RunAnywhereAI-Bridging-Header.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "RunAnywhereAI-Bridging-Header.h"; path = "RunAnywhereAI/RunAnywhereAI-Bridging-Header.h"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FF375136ECCEFB06442E8E31 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = RunAnywhereAI/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -87,6 +92,9 @@
 			isa = PBXGroup;
 			children = (
 				13B07FB01A68108700A75B9A /* AppDelegate.swift */,
+				AABB001122334456 /* NativeAudioModule.swift */,
+				AABB001122334458 /* NativeAudioModule.m */,
+				AABB001122334459 /* RunAnywhereAI-Bridging-Header.h */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
@@ -394,6 +402,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				13B07FBC1A68108700A75B9A /* AppDelegate.swift in Sources */,
+				AABB001122334455 /* NativeAudioModule.swift in Sources */,
+				AABB001122334457 /* NativeAudioModule.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -481,6 +491,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = RunAnywhereAI;
+				SWIFT_OBJC_BRIDGING_HEADER = "RunAnywhereAI/RunAnywhereAI-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -508,6 +519,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = RunAnywhereAI;
+				SWIFT_OBJC_BRIDGING_HEADER = "RunAnywhereAI/RunAnywhereAI-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
