@@ -188,7 +188,8 @@ export const TTSScreen: React.FC = () => {
         return;
       }
 
-      // Load using the actual local path for ONNX models
+      // Pass the path directly - C++ extractArchiveIfNeeded handles archive extraction
+      // and finding the correct nested model folder
       const success = await RunAnywhere.loadTTSModel(model.localPath, model.modelType || 'piper');
 
       if (success) {

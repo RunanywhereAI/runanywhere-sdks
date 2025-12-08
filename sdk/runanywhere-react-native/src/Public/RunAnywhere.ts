@@ -1236,7 +1236,8 @@ export const RunAnywhere = {
         destPath,
       });
 
-      // Update model registry
+      // Keep the archive path - C++ extractArchiveIfNeeded will handle extraction
+      // and finding the correct nested model folder when loading
       const updatedModel: ModelInfo = {
         ...modelInfo,
         localPath: destPath,
