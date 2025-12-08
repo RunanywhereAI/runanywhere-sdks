@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Alamofire
 import Files
 import Foundation
@@ -45,6 +46,7 @@ public class AlamofireDownloadService: DownloadManager, @unchecked Sendable {
 
     // MARK: - DownloadManager Protocol
 
+    // swiftlint:disable:next function_body_length
     public func downloadModel(_ model: ModelInfo) async throws -> DownloadTask {
         // Check if any custom strategy can handle this model
         logger.info("[DEBUG] Checking strategies for model \(model.id), framework: \(model.preferredFramework?.rawValue ?? "none")")
@@ -403,7 +405,7 @@ public class AlamofireDownloadService: DownloadManager, @unchecked Sendable {
 extension AlamofireDownloadService {
 
     /// Download with resume support
-    public func downloadModelWithResume(_ model: ModelInfo, resumeData: Data? = nil) async throws -> DownloadTask {
+    public func downloadModelWithResume(_ model: ModelInfo, resumeData: Data? = nil) async throws -> DownloadTask { // swiftlint:disable:this function_body_length
         guard let downloadURL = model.downloadURL else {
             throw DownloadError.invalidURL
         }

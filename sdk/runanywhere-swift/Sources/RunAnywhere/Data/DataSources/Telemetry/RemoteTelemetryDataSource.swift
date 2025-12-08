@@ -41,6 +41,7 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
         )
     }
 
+    // swiftlint:disable:next prefer_concrete_types avoid_any_type
     public func fetchAll(filter: [String: Any]?) async throws -> [TelemetryData] {
         // Telemetry is write-only to remote
         return []

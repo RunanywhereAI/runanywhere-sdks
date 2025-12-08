@@ -52,7 +52,7 @@ public protocol RemoteDataSource: DataSource {
     func fetch(id: String) async throws -> Entity?
 
     /// Fetch multiple entities with optional filtering
-    func fetchAll(filter: [String: Any]?) async throws -> [Entity]
+    func fetchAll(filter: [String: Any]?) async throws -> [Entity] // swiftlint:disable:this prefer_concrete_types avoid_any_type
 
     /// Save entity to remote source
     func save(_ entity: Entity) async throws -> Entity

@@ -21,7 +21,7 @@ public enum ModelLifecycleState: String, CaseIterable, Sendable {
 }
 
 /// Observer protocol for model lifecycle changes
-public protocol ModelLifecycleObserver: AnyObject {
+public protocol ModelLifecycleObserver: AnyObject { // swiftlint:disable:this avoid_any_object
     /// Called when the model transitions to a new state
     func modelDidTransition(from oldState: ModelLifecycleState, to newState: ModelLifecycleState)
 

@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 //
 //  TelemetryService.swift
 //  RunAnywhere SDK
@@ -96,7 +97,7 @@ public struct TTSSynthesisParams {
 }
 
 /// Service for managing telemetry data and analytics
-public actor TelemetryService {
+public actor TelemetryService { // swiftlint:disable:this type_body_length
     private let logger = SDKLogger(category: "TelemetryService")
     private let telemetryRepository: any TelemetryRepository
     private let syncCoordinator: SyncCoordinator?
@@ -179,7 +180,7 @@ public actor TelemetryService {
     // MARK: - Model Loading
 
     /// Track model loading (generic)
-    public func trackModelLoad(
+    public func trackModelLoad(  // swiftlint:disable:this function_parameter_count
         modelId: String,
         modelName: String,
         framework: String,
@@ -216,7 +217,7 @@ public actor TelemetryService {
     // MARK: - LLM Generation (Text-to-Text)
 
     /// Track LLM generation start
-    public func trackGenerationStarted(
+    public func trackGenerationStarted(  // swiftlint:disable:this function_parameter_count
         generationId: String,
         modelId: String,
         modelName: String,
@@ -239,8 +240,7 @@ public actor TelemetryService {
     }
 
     /// Track LLM generation completion with full metrics
-    // swiftlint:disable:next function_parameter_count
-    public func trackGenerationCompleted(
+    public func trackGenerationCompleted(  // swiftlint:disable:this function_parameter_count
         generationId: String,
         modelId: String,
         modelName: String,
@@ -270,8 +270,7 @@ public actor TelemetryService {
     }
 
     /// Track LLM generation failure
-    // swiftlint:disable:next function_parameter_count
-    public func trackGenerationFailed(
+    public func trackGenerationFailed(  // swiftlint:disable:this function_parameter_count
         generationId: String,
         modelId: String,
         modelName: String,
@@ -314,8 +313,7 @@ public actor TelemetryService {
     // MARK: - STT (Speech-to-Text)
 
     /// Track STT model load
-    // swiftlint:disable:next function_parameter_count
-    public func trackSTTModelLoad(
+    public func trackSTTModelLoad(  // swiftlint:disable:this function_parameter_count
         modelId: String,
         modelName: String,
         framework: String,
@@ -348,7 +346,7 @@ public actor TelemetryService {
     }
 
     /// Track STT transcription start
-    public func trackSTTTranscriptionStarted(
+    public func trackSTTTranscriptionStarted(  // swiftlint:disable:this function_parameter_count
         sessionId: String,
         modelId: String,
         modelName: String,
@@ -369,8 +367,7 @@ public actor TelemetryService {
     }
 
     /// Track STT transcription completion with full metrics
-    // swiftlint:disable:next function_parameter_count
-    public func trackSTTTranscriptionCompleted(
+    public func trackSTTTranscriptionCompleted(  // swiftlint:disable:this function_parameter_count
         sessionId: String,
         modelId: String,
         modelName: String,
@@ -403,8 +400,7 @@ public actor TelemetryService {
     }
 
     /// Track STT transcription failure
-    // swiftlint:disable:next function_parameter_count
-    public func trackSTTTranscriptionFailed(
+    public func trackSTTTranscriptionFailed(  // swiftlint:disable:this function_parameter_count
         sessionId: String,
         modelId: String,
         modelName: String,
@@ -450,7 +446,7 @@ public actor TelemetryService {
     // MARK: - TTS (Text-to-Speech)
 
     /// Track TTS model load
-    public func trackTTSModelLoad(
+    public func trackTTSModelLoad(  // swiftlint:disable:this function_parameter_count
         modelId: String,
         modelName: String,
         framework: String,
@@ -483,8 +479,7 @@ public actor TelemetryService {
     }
 
     /// Track TTS synthesis start
-    // swiftlint:disable:next function_parameter_count
-    public func trackTTSSynthesisStarted(
+    public func trackTTSSynthesisStarted(  // swiftlint:disable:this function_parameter_count
         synthesisId: String,
         modelId: String,
         modelName: String,
@@ -513,8 +508,7 @@ public actor TelemetryService {
     }
 
     /// Track TTS synthesis completion with full metrics
-    // swiftlint:disable:next function_parameter_count
-    public func trackTTSSynthesisCompleted(
+    public func trackTTSSynthesisCompleted(  // swiftlint:disable:this function_parameter_count
         synthesisId: String,
         modelId: String,
         modelName: String,
@@ -549,8 +543,7 @@ public actor TelemetryService {
     }
 
     /// Track TTS synthesis failure
-    // swiftlint:disable:next function_parameter_count
-    public func trackTTSSynthesisFailed(
+    public func trackTTSSynthesisFailed(  // swiftlint:disable:this function_parameter_count
         synthesisId: String,
         modelId: String,
         modelName: String,

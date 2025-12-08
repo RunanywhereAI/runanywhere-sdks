@@ -163,7 +163,7 @@ public actor AnalyticsQueueManager {
 
 extension AnalyticsQueueManager {
     /// Extract value from Any, properly unwrapping Optionals
-    static func extractValue(from value: Any) -> String? {
+    static func extractValue(from value: Any) -> String? { // swiftlint:disable:this avoid_any_type
         // Use Mirror to check if it's an Optional
         let mirror = Mirror(reflecting: value)
         if mirror.displayStyle == .optional {

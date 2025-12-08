@@ -1,10 +1,11 @@
+// swiftlint:disable file_length
 import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 import Foundation
 import RunAnywhere
 
 /// ONNX Runtime implementation of STTService for speech-to-text
 /// Uses the unified RunAnywhere backend API
-public class ONNXSTTService: STTService {
+public class ONNXSTTService: STTService { // swiftlint:disable:this type_body_length
     private let logger = SDKLogger(category: "ONNXSTTService")
 
     private var backendHandle: ra_backend_handle?

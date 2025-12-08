@@ -1,10 +1,11 @@
-import Foundation
-import AVFoundation
+// swiftlint:disable file_length
 import Accelerate
+import AVFoundation
+import Foundation
 
 /// Simple energy-based Voice Activity Detection
 /// Based on WhisperKit's EnergyVAD implementation but simplified for real-time audio processing
-public class SimpleEnergyVAD: NSObject, VADService {
+public class SimpleEnergyVAD: NSObject, VADService { // swiftlint:disable:this type_body_length
     // MARK: - Properties
 
     private let logger = SDKLogger(category: "SimpleEnergyVAD")
@@ -187,7 +188,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
         let thresholdStr = String(format: "%.6f", energyThreshold)
         let percentAboveThreshold = ((energy - energyThreshold) / energyThreshold) * 100
 
-        if debugFrameCount % 10 == 0 {  // Log every 10th frame to reduce noise
+        if debugFrameCount.isMultiple(of: 10) {  // Log every 10th frame to reduce noise
             let avgRecent = recentEnergyValues.isEmpty ? 0 : recentEnergyValues.reduce(0, +) / Float(recentEnergyValues.count)
             let maxRecent = recentEnergyValues.max() ?? 0
             let minRecent = recentEnergyValues.min() ?? 0

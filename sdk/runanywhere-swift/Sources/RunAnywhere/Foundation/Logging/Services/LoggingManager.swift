@@ -95,7 +95,7 @@ public class LoggingManager {
     }
 
     /// Log a message with the specified level and metadata
-    internal func log(level: LogLevel, category: String, message: String, metadata: [String: Any]? = nil) {
+    internal func log(level: LogLevel, category: String, message: String, metadata: [String: Any]? = nil) { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         // Check against SDK configuration minimum log level
         guard level >= configuration.minLogLevel else { return }
 
@@ -175,6 +175,7 @@ public class LoggingManager {
         }
     }
 
+    // swiftlint:disable:next avoid_any_type
     private func convertToMetadataValue(_ value: Any) -> LoggerStore.MetadataValue {
         switch value {
         case let string as String:
@@ -190,15 +191,16 @@ public class LoggingManager {
         }
     }
 
+    // swiftlint:disable:next prefer_concrete_types avoid_any_type
     private func checkIfSensitive(metadata: [String: Any]?) -> Bool {
         guard let metadata = metadata else { return false }
 
         // Check for sensitive data markers
-        if let _ = metadata[LogMetadataKeys.sensitiveDataPolicy] {
+        if metadata[LogMetadataKeys.sensitiveDataPolicy] != nil {
             return true
         }
 
-        if let _ = metadata[LogMetadataKeys.sensitiveDataCategory] {
+        if metadata[LogMetadataKeys.sensitiveDataCategory] != nil {
             return true
         }
 

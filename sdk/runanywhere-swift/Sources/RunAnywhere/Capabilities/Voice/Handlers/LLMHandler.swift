@@ -15,7 +15,7 @@ public class VoiceLLMHandler {
     ///   - ttsEnabled: Whether TTS is enabled in pipeline
     ///   - continuation: Event stream continuation
     /// - Returns: LLM response text
-    public func processWithLLM(
+    public func processWithLLM( // swiftlint:disable:this function_parameter_count
         transcript: String,
         llmService: LLMService?,
         config: LLMConfiguration?,
@@ -37,11 +37,11 @@ public class VoiceLLMHandler {
         // Check if streaming is enabled (prefer streaming for voice pipelines)
         let useStreaming = config?.streamingEnabled ?? true
 
-        if useStreaming && llmService != nil && llmService!.isReady {
+        if useStreaming, let service = llmService, service.isReady {
             // Use streaming for real-time responses
             return try await streamGenerate(
                 transcript: transcript,
-                llmService: llmService!,
+                llmService: service,
                 options: options,
                 streamingTTSHandler: streamingTTSHandler,
                 ttsEnabled: ttsEnabled,
@@ -61,6 +61,7 @@ public class VoiceLLMHandler {
 
     // MARK: - Private Methods
 
+    // swiftlint:disable:next function_parameter_count function_body_length
     private func streamGenerate(
         transcript: String,
         llmService: LLMService,

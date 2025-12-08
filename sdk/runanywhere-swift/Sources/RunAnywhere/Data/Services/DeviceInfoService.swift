@@ -90,12 +90,12 @@ public actor DeviceInfoService {
 
     /// Sync device information to cloud
     public func syncToCloud() async throws {
-        guard syncCoordinator != nil else {
+        guard let coordinator = syncCoordinator else {
             logger.debug("No sync coordinator available")
             return
         }
 
-        try await syncCoordinator!.sync(deviceInfoRepository)
+        try await coordinator.sync(deviceInfoRepository)
         logger.info("Device information sync completed")
     }
 
@@ -151,8 +151,11 @@ extension DeviceInfoService {
         }
 
         let batteryInfo = deviceInfo.batteryLevel.map { "Battery: \(Int($0 * 100))%" } ?? "No battery"
-        let memoryInfo = "Memory: \(deviceInfo.totalMemory / 1024 / 1024 / 1024)GB total, \(deviceInfo.availableMemory / 1024 / 1024 / 1024)GB available"
-        let neuralEngineInfo = deviceInfo.hasNeuralEngine ? "Neural Engine: \(deviceInfo.neuralEngineCores) cores" : "No Neural Engine"
+        let totalMemoryGB = deviceInfo.totalMemory / 1024 / 1024 / 1024
+        let availableMemoryGB = deviceInfo.availableMemory / 1024 / 1024 / 1024
+        let memoryInfo = "Memory: \(totalMemoryGB)GB total, \(availableMemoryGB)GB available"
+        let neuralEngineInfo = deviceInfo.hasNeuralEngine ?
+            "Neural Engine: \(deviceInfo.neuralEngineCores) cores" : "No Neural Engine"
 
         return """
         Device: \(deviceInfo.deviceModel) (\(deviceInfo.deviceName))

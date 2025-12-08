@@ -365,7 +365,7 @@ public actor TTSAnalyticsService: AnalyticsService {
     ///   - characterCount: Number of characters to synthesize
     ///   - speakingRate: Speaking rate multiplier
     ///   - pitch: Pitch multiplier
-    public func trackSynthesisStarted(
+    public func trackSynthesisStarted( // swiftlint:disable:this function_parameter_count
         synthesisId: String,
         modelId: String,
         modelName: String,
@@ -455,7 +455,7 @@ public actor TTSAnalyticsService: AnalyticsService {
     ///   - characterCount: Number of characters that were being synthesized
     ///   - processingTimeMs: Time spent before failure
     ///   - errorMessage: Description of the error
-    public func trackSynthesisFailed(
+    public func trackSynthesisFailed( // swiftlint:disable:this function_parameter_count
         synthesisId: String,
         modelId: String,
         modelName: String,

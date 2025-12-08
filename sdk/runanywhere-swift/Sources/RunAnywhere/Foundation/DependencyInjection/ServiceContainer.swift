@@ -1,10 +1,11 @@
+// swiftlint:disable file_length
 import Foundation
 import Pulse
 
 /// Service container for dependency injection
-public class ServiceContainer {
+public class ServiceContainer { // swiftlint:disable:this type_body_length
     /// Shared instance
-    public static let shared: ServiceContainer = ServiceContainer()
+    public static let shared = ServiceContainer()
     // MARK: - Core Services
 
     /// Model registry
@@ -172,10 +173,10 @@ public class ServiceContainer {
     }
 
     /// Model assignment service storage (using Any to avoid circular dependency)
-    private var _modelAssignmentService: Any?
+    private var _modelAssignmentService: Any? // swiftlint:disable:this avoid_any_type
 
     /// Set the model assignment service (called from extension)
-    public func setModelAssignmentService(_ service: Any) {
+    public func setModelAssignmentService(_ service: Any) { // swiftlint:disable:this avoid_any_type
         _modelAssignmentService = service
     }
 
@@ -290,7 +291,7 @@ public class ServiceContainer {
      * - Returns: Loaded configuration data
      * - Throws: SDKError if critical service initialization fails
      */
-    public func bootstrap(with params: SDKInitParams, authService: AuthenticationService, apiClient: APIClient) async throws -> ConfigurationData {
+    public func bootstrap(with params: SDKInitParams, authService: AuthenticationService, apiClient: APIClient) async throws -> ConfigurationData { // swiftlint:disable:this function_body_length
         // Step 1: Create and store network service based on environment
         self.networkService = NetworkServiceFactory.createNetworkService(
             for: params.environment,

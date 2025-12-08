@@ -5,16 +5,15 @@
 //  Public API for model lifecycle management
 //
 
-import Foundation
 import Combine
+import Foundation
 
 public extension RunAnywhere {
 
     // MARK: - Model Lifecycle State
 
     /// Get the lifecycle tracker for observing model state changes
-    @MainActor
-    static var modelLifecycle: ModelLifecycleTracker {
+    @MainActor static var modelLifecycle: ModelLifecycleTracker {
         ModelLifecycleTracker.shared
     }
 
@@ -43,8 +42,7 @@ public extension RunAnywhere {
 
     /// Subscribe to model lifecycle events
     /// - Returns: A publisher that emits model lifecycle events
-    @MainActor
-    static var modelLifecycleEvents: AnyPublisher<ModelLifecycleEvent, Never> {
+    @MainActor static var modelLifecycleEvents: AnyPublisher<ModelLifecycleEvent, Never> {
         return ModelLifecycleTracker.shared.lifecycleEvents.eraseToAnyPublisher()
     }
 

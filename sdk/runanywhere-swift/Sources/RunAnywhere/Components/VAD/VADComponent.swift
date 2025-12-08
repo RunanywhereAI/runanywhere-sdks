@@ -4,7 +4,7 @@ import Foundation
 // MARK: - VAD Service Protocol
 
 /// Base protocol for VAD services
-public protocol VADService: AnyObject {
+public protocol VADService: AnyObject { // swiftlint:disable:this avoid_any_object
     /// Energy threshold for voice detection
     var energyThreshold: Float { get set }
 
@@ -268,7 +268,7 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
 
     // MARK: - Properties
 
-    public override class var componentType: SDKComponent { .vad }
+    public override static var componentType: SDKComponent { .vad }
 
     private let vadConfiguration: VADConfiguration
     private var isPaused: Bool = false

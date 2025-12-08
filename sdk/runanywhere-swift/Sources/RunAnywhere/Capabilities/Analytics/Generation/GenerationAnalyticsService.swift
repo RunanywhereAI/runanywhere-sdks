@@ -229,10 +229,11 @@ public actor GenerationAnalyticsService: AnalyticsService {
     public func trackFirstToken(generationId: String) async {
         guard var tracker = activeGenerations[generationId] else { return }
 
-        tracker.firstTokenTime = Date()
+        let firstTokenTime = Date()
+        tracker.firstTokenTime = firstTokenTime
         activeGenerations[generationId] = tracker
 
-        let timeToFirstToken = tracker.firstTokenTime!.timeIntervalSince(tracker.startTime)
+        let timeToFirstToken = firstTokenTime.timeIntervalSince(tracker.startTime)
 
         let eventData = FirstTokenData(
             generationId: generationId,
@@ -257,11 +258,12 @@ public actor GenerationAnalyticsService: AnalyticsService {
     ) async {
         guard var tracker = activeGenerations[generationId] else { return }
 
-        tracker.endTime = Date()
+        let endTime = Date()
+        tracker.endTime = endTime
         tracker.inputTokens = inputTokens
         tracker.outputTokens = outputTokens
 
-        let totalTime = tracker.endTime!.timeIntervalSince(tracker.startTime)
+        let totalTime = endTime.timeIntervalSince(tracker.startTime)
         let timeToFirstToken = tracker.firstTokenTime?.timeIntervalSince(tracker.startTime) ?? 0
         let tokensPerSecond = totalTime > 0 ? Double(outputTokens) / totalTime : 0
 

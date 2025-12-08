@@ -2,8 +2,7 @@ import Foundation
 import GRDB
 
 /// Initial database schema migration
-// swiftlint:disable:next type_name
-struct Migration001_InitialSchema {
+struct Migration001_InitialSchema { // swiftlint:disable:this type_name
 
     // swiftlint:disable:next function_body_length
     static func migrate(_ db: Database) throws {

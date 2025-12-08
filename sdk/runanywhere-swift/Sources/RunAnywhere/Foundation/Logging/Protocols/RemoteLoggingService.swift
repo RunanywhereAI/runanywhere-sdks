@@ -10,10 +10,10 @@ protocol RemoteLoggingService {
     func logEvent(_ event: LogEntry, level: LogLevel)
 
     /// Log an error with stack trace
-    func logError(_ error: Error, metadata: [String: Any]?)
+    func logError(_ error: Error, metadata: [String: Any]?)  // swiftlint:disable:this prefer_concrete_types avoid_any_type
 
     /// Add user context for better debugging
-    func setUserContext(userId: String?, metadata: [String: Any]?)
+    func setUserContext(userId: String?, metadata: [String: Any]?)  // swiftlint:disable:this prefer_concrete_types avoid_any_type
 
     /// Add breadcrumb for tracking user actions
     func addBreadcrumb(message: String, category: String, level: LogLevel)

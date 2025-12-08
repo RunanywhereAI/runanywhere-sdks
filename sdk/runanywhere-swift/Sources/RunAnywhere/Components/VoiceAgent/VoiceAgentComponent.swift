@@ -16,7 +16,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
 
     // MARK: - Properties
 
-    public override class var componentType: SDKComponent { .voiceAgent }
+    public override static var componentType: SDKComponent { .voiceAgent }
 
     // Individual components (accessible for custom orchestration)
     public private(set) var vadComponent: VADComponent?

@@ -48,7 +48,7 @@ public struct RunAnywhereGenerationOptions: Sendable {
         maxTokens: Int = 100,
         temperature: Float = 0.8,
         topP: Float = 1.0,
-enableRealTimeTracking: Bool = true,
+        enableRealTimeTracking: Bool = true,
         stopSequences: [String] = [],
         streamingEnabled: Bool = false,
         preferredExecutionTarget: ExecutionTarget? = nil,
@@ -59,7 +59,7 @@ enableRealTimeTracking: Bool = true,
         self.maxTokens = maxTokens
         self.temperature = temperature
         self.topP = topP
-self.enableRealTimeTracking = enableRealTimeTracking
+        self.enableRealTimeTracking = enableRealTimeTracking
         self.stopSequences = stopSequences
         self.streamingEnabled = streamingEnabled
         self.preferredExecutionTarget = preferredExecutionTarget

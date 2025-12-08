@@ -5,8 +5,8 @@
 //  Unified model lifecycle tracking across all modalities (LLM, STT, TTS)
 //
 
-import Foundation
 import Combine
+import Foundation
 
 // MARK: - Model Load State
 

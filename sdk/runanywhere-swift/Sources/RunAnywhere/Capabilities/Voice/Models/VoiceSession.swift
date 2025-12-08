@@ -51,10 +51,10 @@ public struct VoiceSession {
 
 /// Voice session state
 public enum VoiceSessionState: String {
-    case idle = "idle"
-    case listening = "listening"
-    case processing = "processing"
-    case speaking = "speaking"
-    case ended = "ended"
-    case error = "error"
+    case idle
+    case listening
+    case processing
+    case speaking
+    case ended
+    case error
 }

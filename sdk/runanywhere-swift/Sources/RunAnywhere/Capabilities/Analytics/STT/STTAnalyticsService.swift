@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 //
 //  STTAnalyticsService.swift
 //  RunAnywhere SDK
@@ -124,7 +125,7 @@ public struct STTMetrics: AnalyticsMetrics {
 // MARK: - STT Analytics Service
 
 /// STT analytics service using unified pattern
-public actor STTAnalyticsService: AnalyticsService {
+public actor STTAnalyticsService: AnalyticsService { // swiftlint:disable:this type_body_length
 
     // MARK: - Type Aliases
     public typealias Event = STTEvent
@@ -471,7 +472,7 @@ public actor STTAnalyticsService: AnalyticsService {
     ///   - audioDurationMs: Duration of audio that was being processed
     ///   - processingTimeMs: Time spent before failure
     ///   - errorMessage: Description of the error
-    public func trackTranscriptionFailed(
+    public func trackTranscriptionFailed( // swiftlint:disable:this function_parameter_count
         sessionId: String,
         modelId: String,
         modelName: String,

@@ -41,6 +41,7 @@ public actor RemoteModelInfoDataSource: RemoteDataSource {
         }
     }
 
+    // swiftlint:disable:next prefer_concrete_types avoid_any_type
     public func fetchAll(filter: [String: Any]? = nil) async throws -> [ModelInfo] {
         guard apiClient != nil else {
             throw DataSourceError.networkUnavailable

@@ -1,5 +1,5 @@
-import Foundation
 import Accelerate
+import Foundation
 
 /// Default implementation of speaker diarization using simple audio features
 /// This provides basic speaker tracking functionality without external dependencies
@@ -104,7 +104,11 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
             let similarity = cosineSimilarity(embedding, speakerEmbedding)
 
             if similarity > speakerChangeThreshold {
-                if bestMatch == nil || similarity > bestMatch!.similarity {
+                if let currentBest = bestMatch {
+                    if similarity > currentBest.similarity {
+                        bestMatch = (speaker, similarity)
+                    }
+                } else {
                     bestMatch = (speaker, similarity)
                 }
             }
@@ -130,16 +134,16 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
     }
 
     /// Calculate cosine similarity between two embeddings
-    private func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
-        guard a.count == b.count, !a.isEmpty else { return 0.0 }
+    private func cosineSimilarity(_ embedding1: [Float], _ embedding2: [Float]) -> Float {
+        guard embedding1.count == embedding2.count, !embedding1.isEmpty else { return 0.0 }
 
         var dotProduct: Float = 0
         var normA: Float = 0
         var normB: Float = 0
 
-        vDSP_dotpr(a, 1, b, 1, &dotProduct, vDSP_Length(a.count))
-        vDSP_svesq(a, 1, &normA, vDSP_Length(a.count))
-        vDSP_svesq(b, 1, &normB, vDSP_Length(b.count))
+        vDSP_dotpr(embedding1, 1, embedding2, 1, &dotProduct, vDSP_Length(embedding1.count))
+        vDSP_svesq(embedding1, 1, &normA, vDSP_Length(embedding1.count))
+        vDSP_svesq(embedding2, 1, &normB, vDSP_Length(embedding2.count))
 
         let denominator = sqrt(normA) * sqrt(normB)
         return denominator > 0 ? dotProduct / denominator : 0

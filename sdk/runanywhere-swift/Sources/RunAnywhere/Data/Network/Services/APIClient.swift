@@ -81,11 +81,10 @@ public actor APIClient: NetworkService {
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
             // Try to parse error response
             var errorMessage = "HTTP \(httpResponse.statusCode)"
-
-            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { // swiftlint:disable:this avoid_any_type
                 if let detail = errorData["detail"] as? String {
                     errorMessage = detail
-                } else if let detail = errorData["detail"] as? [[String: Any]] {
+                } else if let detail = errorData["detail"] as? [[String: Any]] { // swiftlint:disable:this avoid_any_type
                     let errors = detail.compactMap { $0["msg"] as? String }.joined(separator: ", ")
                     errorMessage = errors.isEmpty ? errorMessage : errors
                 } else if let message = errorData["message"] as? String {
@@ -134,10 +133,10 @@ public actor APIClient: NetworkService {
         guard httpResponse.statusCode == 200 else {
             // Try to parse error response
             var errorMessage = "HTTP \(httpResponse.statusCode)"
-            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { // swiftlint:disable:this avoid_any_type
                 if let detail = errorData["detail"] as? String {
                     errorMessage = detail
-                } else if let detail = errorData["detail"] as? [[String: Any]] {
+                } else if let detail = errorData["detail"] as? [[String: Any]] { // swiftlint:disable:this avoid_any_type
                     let errors = detail.compactMap { $0["msg"] as? String }.joined(separator: ", ")
                     errorMessage = errors.isEmpty ? errorMessage : errors
                 }

@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Wake Word Service Protocol
 
 /// Protocol for wake word detection services
-public protocol WakeWordService: AnyObject {
+public protocol WakeWordService: AnyObject { // swiftlint:disable:this avoid_any_object
     /// Initialize the service
     func initialize() async throws
 
@@ -191,7 +191,7 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
 
     // MARK: - Properties
 
-    public override class var componentType: SDKComponent { .wakeWord }
+    public override static var componentType: SDKComponent { .wakeWord }
 
     private let wakeWordConfiguration: WakeWordConfiguration
 
@@ -213,7 +213,7 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
 
         // Try to get a registered wake word provider from central registry
         // For now, always return default implementation
-        // TODO: Add support for external wake word providers
+        // Note: Add support for external wake word providers
 
         return DefaultWakeWordService()
     }
