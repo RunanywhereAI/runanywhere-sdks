@@ -22,6 +22,7 @@
     "react-native-permissions": "^5.4.4",
     "react-native-safe-area-context": "^5.4.0",
     "react-native-screens": "^4.10.0",
+    "react-native-sound": "^0.13.0",
     "react-native-tts": "^4.1.1",
     "react-native-vector-icons": "^10.1.0",
     "rn-fetch-blob": "^0.12.0",

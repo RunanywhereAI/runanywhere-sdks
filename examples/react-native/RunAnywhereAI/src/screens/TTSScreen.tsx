@@ -18,17 +18,12 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
-// TODO: Replace with RN 0.81 compatible audio library
-// import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
+import Sound from 'react-native-sound';
 
-// Mock AudioRecorderPlayer until we find an RN 0.81 compatible library
-class AudioRecorderPlayer {
-  startPlayer = async (_path: string) => {};
-  stopPlayer = async () => {};
-  addPlayBackListener = (_callback: (e: any) => void) => {};
-  removePlayBackListener = () => {};
-}
+// Enable playback in silence mode on iOS
+Sound.setCategory('Playback');
+
 import Tts from 'react-native-tts';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
@@ -63,18 +58,36 @@ export const TTSScreen: React.FC = () => {
   const [sampleRate, setSampleRate] = useState(22050);
   const [showModelSelection, setShowModelSelection] = useState(false);
 
-  // Audio player ref
-  const audioRecorderPlayer = useRef(new AudioRecorderPlayer()).current;
+  // Audio player refs - using react-native-sound directly
+  const soundRef = useRef<Sound | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Character count
   const charCount = text.length;
   const maxChars = 1000;
 
+  // Helper to stop progress updates
+  const stopProgressUpdates = useCallback(() => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+  }, []);
+
+  // Helper to stop sound playback
+  const stopSound = useCallback(() => {
+    stopProgressUpdates();
+    if (soundRef.current) {
+      soundRef.current.stop();
+      soundRef.current.release();
+      soundRef.current = null;
+    }
+  }, [stopProgressUpdates]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      audioRecorderPlayer.stopPlayer().catch(() => {});
-      audioRecorderPlayer.removePlayBackListener();
+      stopSound();
       // Also stop System TTS (wrap in try-catch due to react-native-tts iOS bug)
       try {
         Tts.stop();
@@ -86,7 +99,7 @@ export const TTSScreen: React.FC = () => {
         RNFS.unlink(audioFilePath).catch(() => {});
       }
     };
-  }, [audioFilePath]);
+  }, [audioFilePath, stopSound]);
 
   /**
    * Load available models and check for loaded model
@@ -361,14 +374,9 @@ export const TTSScreen: React.FC = () => {
     setAudioGenerated(false);
 
     // Stop any existing playback
-    try {
-      await audioRecorderPlayer.stopPlayer();
-      audioRecorderPlayer.removePlayBackListener();
-      // Also stop any System TTS (wrap due to iOS bug)
-      try { Tts.stop(); } catch { /* ignore */ }
-    } catch {
-      // Ignore errors if not playing
-    }
+    stopSound();
+    // Also stop any System TTS (wrap due to iOS bug)
+    try { Tts.stop(); } catch { /* ignore */ }
 
     // Check if using System TTS
     const isSystemTTS = currentModel.id === 'system-tts' ||
@@ -464,7 +472,7 @@ export const TTSScreen: React.FC = () => {
   };
 
   /**
-   * Toggle playback - plays or pauses audio
+   * Toggle playback - plays or pauses audio using react-native-sound
    */
   const handleTogglePlayback = useCallback(async () => {
     console.log('[TTSScreen] handleTogglePlayback called', {
@@ -499,81 +507,102 @@ export const TTSScreen: React.FC = () => {
       if (isPlaying) {
         // Pause playback
         console.log('[TTSScreen] Pausing playback...');
-        await audioRecorderPlayer.pausePlayer();
+        if (soundRef.current) {
+          soundRef.current.pause();
+        }
+        stopProgressUpdates();
         setIsPlaying(false);
         console.log('[TTSScreen] Playback paused');
       } else {
         // Start or resume playback
-        console.log('[TTSScreen] Setting up playback listener...');
-        audioRecorderPlayer.addPlayBackListener((e) => {
-          const currentSec = e.currentPosition / 1000;
-          const totalSec = e.duration / 1000;
-
-          setCurrentTime(currentSec);
-          if (totalSec > 0) {
-            setPlaybackProgress(currentSec / totalSec);
-          }
-
-          // Log playback progress periodically
-          if (Math.floor(currentSec) !== Math.floor(currentSec - 0.1)) {
-            console.log('[TTSScreen] Playback progress:', currentSec.toFixed(1), '/', totalSec.toFixed(1));
-          }
-
-          // Check if playback finished
-          if (e.currentPosition >= e.duration && e.duration > 0) {
-            console.log('[TTSScreen] Playback finished');
-            audioRecorderPlayer.stopPlayer();
-            audioRecorderPlayer.removePlayBackListener();
+        if (soundRef.current && currentTime > 0) {
+          // Resume existing sound
+          console.log('[TTSScreen] Resuming playback from:', currentTime);
+          soundRef.current.setVolume(volume);
+          soundRef.current.play((success) => {
+            if (success) {
+              console.log('[TTSScreen] Playback finished');
+            }
+            stopProgressUpdates();
             setIsPlaying(false);
             setCurrentTime(0);
             setPlaybackProgress(0);
-          }
-        });
-
-        // Check if we need to start fresh or resume
-        if (currentTime === 0 || playbackProgress === 0) {
-          // Start from beginning
-          // IMPORTANT: react-native-audio-recorder-player requires file:// prefix on iOS
-          // Without it, it mangles the path by prepending Library/Caches/
-          const fileUri = `file://${audioFilePath}`;
-          console.log('[TTSScreen] Starting playback from beginning, URI:', fileUri);
-          const result = await audioRecorderPlayer.startPlayer(fileUri);
-          console.log('[TTSScreen] startPlayer result:', result);
-          await audioRecorderPlayer.setVolume(volume);
-          console.log('[TTSScreen] Volume set to:', volume);
+          });
+          
+          // Start progress updates
+          progressIntervalRef.current = setInterval(() => {
+            soundRef.current?.getCurrentTime((seconds) => {
+              const totalDuration = soundRef.current?.getDuration() || duration;
+              setCurrentTime(seconds);
+              if (totalDuration > 0) {
+                setPlaybackProgress(seconds / totalDuration);
+              }
+            });
+          }, 100);
+          
+          setIsPlaying(true);
         } else {
-          // Resume from current position
-          console.log('[TTSScreen] Resuming playback from:', currentTime);
-          await audioRecorderPlayer.resumePlayer();
+          // Start fresh playback
+          console.log('[TTSScreen] Starting fresh playback...');
+          stopSound(); // Clean up any existing sound
+          
+          const sound = new Sound(audioFilePath, '', (error) => {
+            if (error) {
+              console.error('[TTSScreen] Failed to load sound:', error);
+              Alert.alert('Playback Error', `Failed to load audio: ${error.message}`);
+              return;
+            }
+            
+            console.log('[TTSScreen] Sound loaded, duration:', sound.getDuration(), 'seconds');
+            soundRef.current = sound;
+            sound.setVolume(volume);
+            
+            sound.play((success) => {
+              if (success) {
+                console.log('[TTSScreen] Playback finished successfully');
+              } else {
+                console.log('[TTSScreen] Playback interrupted');
+              }
+              stopProgressUpdates();
+              setIsPlaying(false);
+              setCurrentTime(0);
+              setPlaybackProgress(0);
+            });
+            
+            // Start progress updates
+            progressIntervalRef.current = setInterval(() => {
+              sound.getCurrentTime((seconds) => {
+                const totalDuration = sound.getDuration();
+                setCurrentTime(seconds);
+                if (totalDuration > 0) {
+                  setPlaybackProgress(seconds / totalDuration);
+                }
+              });
+            }, 100);
+            
+            setIsPlaying(true);
+            console.log('[TTSScreen] Playback started successfully');
+          });
         }
-
-        setIsPlaying(true);
-        console.log('[TTSScreen] Playback started successfully');
       }
     } catch (error) {
       console.error('[TTSScreen] Playback error:', error);
       Alert.alert('Playback Error', `Failed to play audio: ${error}`);
       setIsPlaying(false);
     }
-  }, [audioGenerated, audioFilePath, isPlaying, currentTime, playbackProgress, volume]);
+  }, [audioGenerated, audioFilePath, isPlaying, currentTime, playbackProgress, volume, duration, stopSound, stopProgressUpdates]);
 
   /**
    * Stop playback completely
    */
-  const handleStop = useCallback(async () => {
-    try {
-      // Stop ONNX audio playback
-      await audioRecorderPlayer.stopPlayer();
-      audioRecorderPlayer.removePlayBackListener();
-      // Also stop System TTS if playing (wrap due to iOS bug)
-      try { Tts.stop(); } catch { /* ignore */ }
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setPlaybackProgress(0);
-    } catch (error) {
-      console.error('[TTSScreen] Stop error:', error);
-    }
-  }, []);
+  const handleStop = useCallback(() => {
+    stopSound();
+    // Also stop System TTS if playing (wrap due to iOS bug)
+    try { Tts.stop(); } catch { /* ignore */ }
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setPlaybackProgress(0);
+  }, [stopSound]);
 
   /**
    * Clear text
