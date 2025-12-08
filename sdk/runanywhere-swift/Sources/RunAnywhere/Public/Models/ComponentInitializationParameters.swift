@@ -121,15 +121,6 @@ public struct UnifiedComponentConfig: Sendable {
         UnifiedComponentConfig(parameters: params, priority: priority)
     }
 
-    public static func vlm(
-        _ params: VLMConfiguration,
-        priority: InitializationPriority = .normal,
-        downloadPolicy: DownloadPolicy = .automatic
-    ) -> UnifiedComponentConfig {
-        UnifiedComponentConfig(parameters: params, priority: priority, downloadPolicy: downloadPolicy)
-    }
-
-
     public static func speakerDiarization(
         _ params: SpeakerDiarizationConfiguration,
         priority: InitializationPriority = .normal

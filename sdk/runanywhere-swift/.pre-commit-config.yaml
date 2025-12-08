@@ -1,0 +1,117 @@
+# Pre-commit hooks configuration for RunAnywhere Swift SDK
+# See https://pre-commit.com for more information
+
+default_language_version:
+  python: python3
+
+repos:
+  # Swift linting with SwiftLint
+  - repo: https://github.com/realm/SwiftLint
+    rev: 0.57.0
+    hooks:
+      - id: swiftlint
+        name: SwiftLint
+        description: Run SwiftLint on staged Swift files
+        entry: swiftlint lint
+        language: system
+        types: [swift]
+        files: \.(swift)$
+        exclude: ^(\.build|DerivedData|Package\.swift)
+        args:
+          - --strict
+          - --config
+          - .swiftlint.yml
+
+      - id: swiftlint-fix
+        name: SwiftLint AutoFix
+        description: Run SwiftLint with auto-fix on staged Swift files
+        entry: swiftlint
+        language: system
+        types: [swift]
+        files: \.(swift)$
+        exclude: ^(\.build|DerivedData|Package\.swift)
+        args:
+          - --fix
+          - --config
+          - .swiftlint.yml
+        stages: [manual]
+
+  # General file hygiene hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # Remove trailing whitespace
+      - id: trailing-whitespace
+        name: Trim Trailing Whitespace
+        description: Remove trailing whitespace from all files
+        exclude: ^(\.build|DerivedData)
+        args: [--markdown-linebreak-ext=md]
+
+      # Ensure files end with a newline
+      - id: end-of-file-fixer
+        name: Fix End of Files
+        description: Ensure files end with a newline
+        exclude: ^(\.build|DerivedData)
+
+      # Check for merge conflicts
+      - id: check-merge-conflict
+        name: Check for Merge Conflicts
+        description: Check for files that contain merge conflict strings
+
+      # Check YAML syntax
+      - id: check-yaml
+        name: Check YAML Syntax
+        description: Validate YAML file syntax
+        exclude: ^(\.build|DerivedData)
+
+      # Check for large files
+      - id: check-added-large-files
+        name: Check for Large Files
+        description: Prevent large files from being committed
+        args: ['--maxkb=1000']
+        exclude: ^(Binaries|\.build)
+
+      # Detect private keys
+      - id: detect-private-key
+        name: Detect Private Keys
+        description: Detect private keys that should not be committed
+
+      # Check for case conflicts
+      - id: check-case-conflict
+        name: Check for Case Conflicts
+        description: Check for files that would conflict in case-insensitive filesystems
+
+      # Mixed line endings
+      - id: mixed-line-ending
+        name: Fix Mixed Line Endings
+        description: Fix files with mixed line endings
+        args: ['--fix=lf']
+        exclude: ^(\.build|DerivedData)
+
+  # Swift-specific formatting (optional - requires swift-format to be installed)
+  # Uncomment if you want to use swift-format
+  # - repo: local
+  #   hooks:
+  #     - id: swift-format
+  #       name: Swift Format
+  #       description: Format Swift code with swift-format
+  #       entry: swift-format
+  #       language: system
+  #       types: [swift]
+  #       args:
+  #         - --in-place
+  #         - --configuration
+  #         - .swift-format.json
+
+# Configuration
+fail_fast: false
+minimum_pre_commit_version: '2.18.0'
+
+# Exclude patterns that apply to all hooks
+exclude: |
+  (?x)^(
+    \.build/.*|
+    DerivedData/.*|
+    \.swiftpm/.*|
+    Package\.resolved
+  )$

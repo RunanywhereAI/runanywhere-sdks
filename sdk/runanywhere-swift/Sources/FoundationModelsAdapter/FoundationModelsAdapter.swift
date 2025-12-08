@@ -1,6 +1,6 @@
 import Foundation
-import RunAnywhere
 import OSLog
+import RunAnywhere
 
 // Import FoundationModels with conditional compilation
 #if canImport(FoundationModels)
@@ -19,7 +19,10 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
     }
 
     private var hardwareConfig: HardwareConfiguration?
-    private let logger = Logger(subsystem: "com.runanywhere.FoundationModels", category: "FoundationModelsAdapter")
+    private let logger = Logger(
+        subsystem: "com.runanywhere.FoundationModels",
+        category: "FoundationModelsAdapter"
+    )
 
     public init() {}
 
@@ -36,9 +39,9 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
         guard #available(iOS 26.0, macOS 26.0, *) else { return false }
 
         // Check if the model name indicates it's for Foundation Models
-        return model.name.lowercased().contains("foundation") ||
-               model.name.lowercased().contains("apple") ||
-               model.id == "foundation-models-default"
+        return model.name.lowercased().contains("foundation")
+            || model.name.lowercased().contains("apple")
+            || model.id == "foundation-models-default"
     }
 
     public func createService(for modality: FrameworkModality) -> Any? {
@@ -64,11 +67,11 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
     public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
         // Foundation Models memory is managed by the system
         // Estimate based on typical usage
-        return 500_000_000 // 500MB typical for system models
+        500_000_000 // 500MB typical for system models
     }
 
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
-        return HardwareConfiguration(
+        HardwareConfiguration(
             primaryAccelerator: .neuralEngine,
             memoryMode: .balanced,
             threadCount: 2
@@ -96,7 +99,10 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
                 metadata: ModelInfoMetadata(
                     author: "Apple",
                     license: "Apple EULA",
-                    description: "Apple's built-in on-device language model (requires iOS 26+ / macOS 26+ with Apple Intelligence enabled)"
+                    description: """
+                    Apple's built-in on-device language model \
+                    (requires iOS 26+ / macOS 26+ with Apple Intelligence enabled)
+                    """
                 ),
                 source: .defaults  // Built-in, not from remote
             )

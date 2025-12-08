@@ -1,5 +1,6 @@
-import Foundation
+// swiftlint:disable file_length
 import AVFoundation
+import Foundation
 
 // MARK: - TTS Options
 
@@ -53,7 +54,7 @@ public struct TTSOptions: Sendable {
 // MARK: - TTS Service Protocol
 
 /// Protocol for text-to-speech services
-public protocol TTSService: AnyObject {
+public protocol TTSService: AnyObject { // swiftlint:disable:this avoid_any_object
     /// Initialize the TTS service
     func initialize() async throws
 
@@ -422,22 +423,21 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
 
     // MARK: - Properties
 
-    public override class var componentType: SDKComponent { .tts }
+    public override static var componentType: SDKComponent { .tts }
 
     private let logger = SDKLogger(category: "TTSComponent")
     private let ttsConfiguration: TTSConfiguration
-    private var currentVoice: String?
 
     // MARK: - Initialization
 
     public init(configuration: TTSConfiguration, serviceContainer: ServiceContainer? = nil) {
         self.ttsConfiguration = configuration
-        self.currentVoice = configuration.voice
         super.init(configuration: configuration, serviceContainer: serviceContainer)
     }
 
     // MARK: - Service Creation
 
+    // swiftlint:disable:next function_body_length
     public override func createService() async throws -> TTSServiceWrapper {
         let modelId = ttsConfiguration.voice
         let modelName = modelId
@@ -452,13 +452,13 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
 
         // Try to get a registered TTS provider from central registry
         let provider = await MainActor.run {
-            let p = ModuleRegistry.shared.ttsProvider(for: modelId)
-            if let p = p {
-                logger.info("Found TTS provider: \(p.name) for modelId: \(modelId)")
+            let ttsProvider = ModuleRegistry.shared.ttsProvider(for: modelId)
+            if let ttsProvider = ttsProvider {
+                logger.info("Found TTS provider: \(ttsProvider.name) for modelId: \(modelId)")
             } else {
                 logger.info("No TTS provider found for modelId: \(modelId), will use system TTS fallback")
             }
-            return p
+            return ttsProvider
         }
 
         // Determine framework based on provider availability
@@ -559,7 +559,7 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
     }
 
     /// Process TTS input
-    public func process(_ input: TTSInput) async throws -> TTSOutput {
+    public func process(_ input: TTSInput) async throws -> TTSOutput { // swiftlint:disable:this function_body_length
         try ensureReady()
 
         guard let ttsService = service?.wrappedService else {
@@ -739,7 +739,6 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
     public override func performCleanup() async throws {
         service?.wrappedService?.stop()
         await service?.wrappedService?.cleanup()
-        currentVoice = nil
     }
 
     // MARK: - Private Helpers

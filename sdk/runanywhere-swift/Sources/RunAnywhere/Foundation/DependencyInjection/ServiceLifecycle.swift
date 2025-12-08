@@ -18,11 +18,9 @@ public actor ServiceLifecycle {
 
     /// Start all registered services
     public func startAll() async throws {
-        for (name, service) in services {
-            if !startedServices.contains(name) {
-                try await service.start()
-                startedServices.insert(name)
-            }
+        for (name, service) in services where !startedServices.contains(name) {
+            try await service.start()
+            startedServices.insert(name)
         }
     }
 

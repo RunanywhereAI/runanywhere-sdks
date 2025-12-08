@@ -1,8 +1,8 @@
 import Foundation
 import GRDB
 
-//TODO: how do we set this?
 /// Configuration options for the GRDB database
+/// Configuration can be set via factory methods (default, testing, encrypted)
 public struct DatabaseConfiguration {
 
     // MARK: - Properties

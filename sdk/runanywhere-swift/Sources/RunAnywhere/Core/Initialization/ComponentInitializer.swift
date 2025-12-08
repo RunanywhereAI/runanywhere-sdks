@@ -1,10 +1,10 @@
-import Foundation
 import Combine
+import Foundation
 
 /// Manages component initialization - delegates to UnifiedComponentInitializer
 /// Kept for backward compatibility with existing API
 public actor ComponentInitializer {
-    private let logger: SDKLogger = SDKLogger(category: "ComponentInitializer")
+    private let logger = SDKLogger(category: "ComponentInitializer")
     private let unifiedInitializer: UnifiedComponentInitializer
 
     // Services

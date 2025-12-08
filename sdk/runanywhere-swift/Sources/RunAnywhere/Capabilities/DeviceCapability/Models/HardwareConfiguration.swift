@@ -12,9 +12,9 @@ public struct HardwareConfiguration: Codable, Sendable {
     public var threadCount: Int = ProcessInfo.processInfo.processorCount
 
     public enum MemoryMode: String, Codable, Sendable {
-        case conservative = "conservative"
-        case balanced = "balanced"
-        case aggressive = "aggressive"
+        case conservative
+        case balanced
+        case aggressive
     }
 
     public init(

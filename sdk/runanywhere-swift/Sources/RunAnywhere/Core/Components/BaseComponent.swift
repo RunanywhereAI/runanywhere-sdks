@@ -19,6 +19,7 @@ public protocol ComponentConfiguration: Sendable {
 
 /// Base protocol for component adapters
 public protocol ComponentAdapter {
+    // swiftlint:disable:next avoid_any_object
     associatedtype ServiceType: AnyObject
     func createService(configuration: any ComponentConfiguration) async throws -> ServiceType
 }
@@ -26,7 +27,7 @@ public protocol ComponentAdapter {
 // MARK: - Simplified Base Component
 
 /// Service wrapper protocol that allows protocol types to be used with BaseComponent
-public protocol ServiceWrapper: AnyObject {
+public protocol ServiceWrapper: AnyObject { // swiftlint:disable:this avoid_any_object
     associatedtype ServiceProtocol
     var wrappedService: ServiceProtocol? { get set }
 }
@@ -43,7 +44,7 @@ public final class AnyServiceWrapper<T>: ServiceWrapper {
 /// Simplified base component for all SDK components
 /// Using @unchecked Sendable as we manage thread safety with @MainActor
 @MainActor
-open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
+open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable { // swiftlint:disable:this avoid_any_object
     // MARK: - Core Properties
 
     /// Component type identifier
@@ -70,7 +71,7 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
     public weak var serviceContainer: ServiceContainer?
 
     /// Event bus for publishing events
-    public let eventBus: EventBus = EventBus.shared
+    public let eventBus = EventBus.shared
 
     /// Current processing stage
     public private(set) var currentStage: String?

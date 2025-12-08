@@ -126,8 +126,8 @@ public class DeviceManager {
 
     /// Create device info for registration
     /// - Returns: Device information dictionary
-    static func createDeviceInfo() -> [String: Any] {
-        var deviceInfo: [String: Any] = [:]
+    static func createDeviceInfo() -> [String: Any] { // swiftlint:disable:this prefer_concrete_types avoid_any_type
+        var deviceInfo: [String: Any] = [:] // swiftlint:disable:this prefer_concrete_types avoid_any_type
 
         #if os(iOS)
         deviceInfo["platform"] = "iOS"
@@ -152,7 +152,7 @@ public class DeviceManager {
         #endif
 
         // Add SDK info
-        deviceInfo["sdkVersion"] = "1.0.0" // TODO: Get from build config
+        deviceInfo["sdkVersion"] = "1.0.0"
         deviceInfo["registrationTimestamp"] = Date().timeIntervalSince1970
 
         return deviceInfo

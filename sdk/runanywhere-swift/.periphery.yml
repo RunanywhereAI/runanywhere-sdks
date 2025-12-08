@@ -1,0 +1,38 @@
+# Periphery configuration for RunAnywhere Swift SDK
+# Detects unused code: types, functions, properties, protocols, etc.
+
+# Project configuration
+project: "."
+format: "checkstyle"
+skip_build: false
+
+# Targets to analyze (main SDK and backend modules)
+targets:
+  - RunAnywhere
+  - ONNXRuntime
+  - LlamaCPPRuntime
+  - WhisperKitTranscription
+  - FoundationModelsAdapter
+  - FluidAudioDiarization
+
+# Retain patterns - don't flag these as unused
+retain_public: false
+retain_objc_accessible: true
+retain_assign_only_property_types:
+  - Encoder
+  - Decoder
+
+# Index stores (optional - helps with SPM packages)
+index_exclude:
+  - ".build"
+  - "DerivedData"
+  - "Tests"
+
+# Exclude specific files from analysis
+file_targets_path:
+  - "Sources/RunAnywhere"
+  - "Sources/ONNXRuntime"
+  - "Sources/LlamaCPPRuntime"
+  - "Sources/WhisperKitTranscription"
+  - "Sources/FoundationModelsAdapter"
+  - "Sources/FluidAudioDiarization"

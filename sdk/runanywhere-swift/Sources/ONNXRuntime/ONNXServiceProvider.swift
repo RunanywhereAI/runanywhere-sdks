@@ -14,7 +14,7 @@ public struct ONNXSTTServiceProvider: STTServiceProvider {
         Self.logger.info("Creating ONNX Runtime STT service for model: \(configuration.modelId ?? "unknown")")
 
         // Get the actual model file path from the model registry
-        var modelPath: String? = nil
+        var modelPath: String?
         if let modelId = configuration.modelId {
             // Query all available models and find the one we need
             let allModels = try await RunAnywhere.availableModels()

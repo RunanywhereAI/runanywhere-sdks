@@ -1,6 +1,6 @@
+import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 import Foundation
 import RunAnywhere
-import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 
 /// ONNX Runtime implementation of TTSService for text-to-speech
 /// Uses the unified RunAnywhere backend API with Sherpa-ONNX VITS/Piper models
@@ -44,117 +44,13 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
         }
 
         logger.info("Initializing ONNX TTS with model at: \(modelPath)")
+        verifyModelExists(at: modelPath)
+        logAvailableBackends()
 
-        // Check if model file exists
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: modelPath) {
-            logger.info("Model file exists at path")
-        } else {
-            logger.error("Model file does NOT exist at path: \(modelPath)")
-        }
+        try createAndInitializeBackend()
 
-        // Check available backends first
-        var backendCount: Int32 = 0
-        if let backends = ra_get_available_backends(&backendCount) {
-            var availableBackends: [String] = []
-            for i in 0..<Int(backendCount) {
-                if let backendName = backends[i] {
-                    availableBackends.append(String(cString: backendName))
-                }
-            }
-            logger.info("Available backends (\(backendCount)): \(availableBackends)")
-        } else {
-            logger.warning("ra_get_available_backends returned nil")
-        }
-
-        // Create ONNX backend
-        logger.info("Creating ONNX backend via ra_create_backend('onnx')...")
-        backendHandle = ra_create_backend("onnx")
-        if let handle = backendHandle {
-            logger.info("Backend handle created successfully: \(handle)")
-        } else {
-            // Get the last error message
-            if let lastError = ra_get_last_error() {
-                let errorStr = String(cString: lastError)
-                logger.error("ra_create_backend('onnx') returned nil - Last error: \(errorStr)")
-            } else {
-                logger.error("ra_create_backend('onnx') returned nil - No error message available")
-            }
-            throw ONNXError.initializationFailed
-        }
-
-        // Initialize backend
-        logger.info("Initializing backend via ra_initialize()...")
-        let initStatus = ra_initialize(backendHandle, nil)
-        logger.info("ra_initialize() returned status: \(initStatus.rawValue) (RA_SUCCESS=\(RA_SUCCESS.rawValue))")
-        guard initStatus == RA_SUCCESS else {
-            if let lastError = ra_get_last_error() {
-                let errorStr = String(cString: lastError)
-                logger.error("Failed to initialize ONNX backend: status=\(initStatus.rawValue), error: \(errorStr)")
-            } else {
-                logger.error("Failed to initialize ONNX backend: status=\(initStatus.rawValue)")
-            }
-            ra_destroy(backendHandle)
-            backendHandle = nil
-            throw ONNXError.from(code: Int32(initStatus.rawValue))
-        }
-        logger.info("Backend initialized successfully")
-
-        // Prepare model directory path
-        var modelDir = modelPath
-        var isDirectory: ObjCBool = false
-
-        if fileManager.fileExists(atPath: modelPath, isDirectory: &isDirectory) && !isDirectory.boolValue {
-            modelDir = (modelPath as NSString).deletingLastPathComponent
-        }
-
-        // Handle tar.bz2 archives using platform-native ArchiveUtility
-        if modelPath.hasSuffix(".tar.bz2") {
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let pathNS = modelPath as NSString
-            let modelName = ((pathNS.deletingPathExtension as NSString).deletingPathExtension as NSString).lastPathComponent
-            let extractURL = documentsPath.appendingPathComponent("sherpa-models/tts/\(modelName)")
-
-            logger.info("Extracting TTS model archive to: \(extractURL.path)")
-
-            // Check if already extracted
-            if !fileManager.fileExists(atPath: extractURL.path) {
-                do {
-                    try ArchiveUtility.extractTarBz2Archive(
-                        from: URL(fileURLWithPath: modelPath),
-                        to: extractURL
-                    )
-                } catch {
-                    logger.error("Failed to extract TTS model archive: \(error.localizedDescription)")
-                    throw ONNXError.modelLoadFailed("Failed to extract archive: \(error.localizedDescription)")
-                }
-            }
-
-            modelDir = extractURL.path
-        }
-
-        // Load TTS model
-        logger.info("Loading TTS model from directory: \(modelDir)")
-        logger.info("Model type: vits")
-
-        // List directory contents for debugging
-        if let contents = try? fileManager.contentsOfDirectory(atPath: modelDir) {
-            logger.info("Model directory contents: \(contents)")
-        } else {
-            logger.warning("Could not list model directory contents")
-        }
-
-        let loadStatus = ra_tts_load_model(backendHandle, modelDir, "vits", nil)
-        logger.info("ra_tts_load_model() returned status: \(loadStatus.rawValue)")
-        guard loadStatus == RA_SUCCESS else {
-            if let lastError = ra_get_last_error() {
-                let errorStr = String(cString: lastError)
-                logger.error("Failed to load TTS model: status=\(loadStatus.rawValue), modelDir=\(modelDir), error: \(errorStr)")
-            } else {
-                logger.error("Failed to load TTS model: status=\(loadStatus.rawValue), modelDir=\(modelDir)")
-            }
-            throw ONNXError.modelLoadFailed(modelPath)
-        }
+        let modelDir = try prepareModelDirectory(from: modelPath)
+        try loadTTSModel(from: modelDir, originalPath: modelPath)
 
         _isReady = true
         logger.info("ONNX TTS initialized successfully")
@@ -272,7 +168,134 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
         _isSynthesizing = false
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Private Helpers - Initialization
+
+    private func verifyModelExists(at path: String) {
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: path) {
+            logger.info("Model file exists at path")
+        } else {
+            logger.error("Model file does NOT exist at path: \(path)")
+        }
+    }
+
+    private func logAvailableBackends() {
+        var backendCount: Int32 = 0
+        if let backends = ra_get_available_backends(&backendCount) {
+            var availableBackends: [String] = []
+            for i in 0..<Int(backendCount) {
+                if let backendName = backends[i] {
+                    availableBackends.append(String(cString: backendName))
+                }
+            }
+            logger.info("Available backends (\(backendCount)): \(availableBackends)")
+        } else {
+            logger.warning("ra_get_available_backends returned nil")
+        }
+    }
+
+    private func createAndInitializeBackend() throws {
+        // Create ONNX backend
+        logger.info("Creating ONNX backend via ra_create_backend('onnx')...")
+        backendHandle = ra_create_backend("onnx")
+        if let handle = backendHandle {
+            logger.info("Backend handle created successfully: \(handle)")
+        } else {
+            // Get the last error message
+            if let lastError = ra_get_last_error() {
+                let errorStr = String(cString: lastError)
+                logger.error("ra_create_backend('onnx') returned nil - Last error: \(errorStr)")
+            } else {
+                logger.error("ra_create_backend('onnx') returned nil - No error message available")
+            }
+            throw ONNXError.initializationFailed
+        }
+
+        // Initialize backend
+        logger.info("Initializing backend via ra_initialize()...")
+        let initStatus = ra_initialize(backendHandle, nil)
+        logger.info("ra_initialize() returned status: \(initStatus.rawValue) (RA_SUCCESS=\(RA_SUCCESS.rawValue))")
+        guard initStatus == RA_SUCCESS else {
+            if let lastError = ra_get_last_error() {
+                let errorStr = String(cString: lastError)
+                let statusMessage = "Failed to initialize ONNX backend: status=\(initStatus.rawValue), error: \(errorStr)"
+                logger.error(statusMessage)
+            } else {
+                logger.error("Failed to initialize ONNX backend: status=\(initStatus.rawValue)")
+            }
+            ra_destroy(backendHandle)
+            backendHandle = nil
+            throw ONNXError.from(code: Int32(initStatus.rawValue))
+        }
+        logger.info("Backend initialized successfully")
+    }
+
+    private func prepareModelDirectory(from modelPath: String) throws -> String {
+        let fileManager = FileManager.default
+        var modelDir = modelPath
+        var isDirectory: ObjCBool = false
+
+        if fileManager.fileExists(atPath: modelPath, isDirectory: &isDirectory) && !isDirectory.boolValue {
+            modelDir = (modelPath as NSString).deletingLastPathComponent
+        }
+
+        // Handle tar.bz2 archives using platform-native ArchiveUtility
+        if modelPath.hasSuffix(".tar.bz2") {
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let pathNS = modelPath as NSString
+            let baseName = (pathNS.deletingPathExtension as NSString).deletingPathExtension as NSString
+            let modelName = baseName.lastPathComponent
+            let extractURL = documentsPath.appendingPathComponent("sherpa-models/tts/\(modelName)")
+
+            logger.info("Extracting TTS model archive to: \(extractURL.path)")
+
+            // Check if already extracted
+            if !fileManager.fileExists(atPath: extractURL.path) {
+                do {
+                    try ArchiveUtility.extractTarBz2Archive(
+                        from: URL(fileURLWithPath: modelPath),
+                        to: extractURL
+                    )
+                } catch {
+                    logger.error("Failed to extract TTS model archive: \(error.localizedDescription)")
+                    throw ONNXError.modelLoadFailed("Failed to extract archive: \(error.localizedDescription)")
+                }
+            }
+
+            modelDir = extractURL.path
+        }
+
+        return modelDir
+    }
+
+    private func loadTTSModel(from modelDir: String, originalPath: String) throws {
+        logger.info("Loading TTS model from directory: \(modelDir)")
+        logger.info("Model type: vits")
+
+        // List directory contents for debugging
+        let fileManager = FileManager.default
+        if let contents = try? fileManager.contentsOfDirectory(atPath: modelDir) {
+            logger.info("Model directory contents: \(contents)")
+        } else {
+            logger.warning("Could not list model directory contents")
+        }
+
+        let loadStatus = ra_tts_load_model(backendHandle, modelDir, "vits", nil)
+        logger.info("ra_tts_load_model() returned status: \(loadStatus.rawValue)")
+        guard loadStatus == RA_SUCCESS else {
+            if let lastError = ra_get_last_error() {
+                let errorStr = String(cString: lastError)
+                let statusMessage = "Failed to load TTS model: status=\(loadStatus.rawValue), " +
+                                  "modelDir=\(modelDir), error: \(errorStr)"
+                logger.error(statusMessage)
+            } else {
+                logger.error("Failed to load TTS model: status=\(loadStatus.rawValue), modelDir=\(modelDir)")
+            }
+            throw ONNXError.modelLoadFailed(originalPath)
+        }
+    }
+
+    // MARK: - Private Helpers - Audio Conversion
 
     /// Convert float samples [-1, 1] to 16-bit PCM WAV data
     private func convertToPCMData(samples: UnsafePointer<Float>, count: Int, sampleRate: Int) -> Data {
@@ -334,7 +357,7 @@ public struct ONNXTTSServiceProvider: TTSServiceProvider {
         let modelId = configuration.voice
 
         // Get the actual model file path from the model registry
-        var modelPath: String? = nil
+        var modelPath: String?
 
         // Query all available models and find the one we need
         let allModels: [ModelInfo]

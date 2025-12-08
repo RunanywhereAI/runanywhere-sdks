@@ -16,6 +16,7 @@ internal struct LogEntry: Encodable {
     let metadata: [String: String]?
     let deviceInfo: DeviceInfo?
 
+    // swiftlint:disable:next prefer_concrete_types avoid_any_type
     init(timestamp: Date, level: LogLevel, category: String, message: String, metadata: [String: Any]?, deviceInfo: DeviceInfo? = nil) {
         self.timestamp = timestamp
         self.level = level

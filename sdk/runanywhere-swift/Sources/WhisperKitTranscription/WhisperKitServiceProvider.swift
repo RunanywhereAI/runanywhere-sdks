@@ -70,7 +70,10 @@ public final class WhisperKitServiceProvider: STTServiceProvider {
         }
 
         // Check if it's a whisper model
-        let whisperPrefixes = ["whisper", "openai-whisper", "whisper-tiny", "whisper-base", "whisper-small", "whisper-medium", "whisper-large"]
+        let whisperPrefixes = [
+            "whisper", "openai-whisper", "whisper-tiny",
+            "whisper-base", "whisper-small", "whisper-medium", "whisper-large"
+        ]
         if whisperPrefixes.contains(where: { lowercased.contains($0) }) {
             logger.debug("Model \(modelId) matches Whisper pattern (fallback)")
             return true

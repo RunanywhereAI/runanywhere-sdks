@@ -3,13 +3,13 @@ import Foundation
 /// SDK Environment mode - determines how data is handled
 public enum SDKEnvironment: String, CaseIterable, Sendable {
     /// Development/testing mode - may use local data, verbose logging
-    case development = "development"
+    case development
 
     /// Staging mode - testing with real services
-    case staging = "staging"
+    case staging
 
     /// Production mode - live environment
-    case production = "production"
+    case production
 
     /// Human-readable description
     public var description: String {
@@ -91,7 +91,10 @@ internal struct SupabaseConfig: Sendable {
             }
             return SupabaseConfig(
                 projectURL: projectURL,
-                anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodGdqdHh1b2lrd3dvdXhxenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExOTkwNzIsImV4cCI6MjA3Njc3NTA3Mn0.aIssX-t8CIqt8zoctNhMS8fm3wtH-DzsQiy9FunqD9E"
+                anonKey: """
+                eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodGdqdHh1b2lrd3dvdXhxenJuIiwic\
+                m9sZSI6ImFub24iLCJpYXQiOjE3NjExOTkwNzIsImV4cCI6MjA3Njc3NTA3Mn0.aIssX-t8CIqt8zoctNhMS8fm3wtH-DzsQiy9FunqD9E
+                """
             )
         case .staging, .production:
             // Production/Staging: No Supabase, use traditional backend

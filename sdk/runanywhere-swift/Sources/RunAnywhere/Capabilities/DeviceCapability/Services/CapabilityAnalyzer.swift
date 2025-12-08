@@ -62,7 +62,11 @@ public class CapabilityAnalyzer: @unchecked Sendable {
             modelIdentifier: getDeviceIdentifier()
         )
 
-        logger.info("Device capabilities: \(processorInfo.coreCount) cores, \(hasNeuralEngine ? "Neural Engine" : "No Neural Engine"), \(hasGPU ? "GPU" : "No GPU")")
+        logger.info(
+            "Device capabilities: \(processorInfo.coreCount) cores, " +
+            "\(hasNeuralEngine ? "Neural Engine" : "No Neural Engine"), " +
+            "\(hasGPU ? "GPU" : "No GPU")"
+        )
 
         return capabilities
     }

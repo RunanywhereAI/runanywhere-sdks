@@ -1,7 +1,8 @@
+// swiftlint:disable file_length
 import Foundation
 
 /// Service for streaming text generation
-public class StreamingService {
+public class StreamingService { // swiftlint:disable:this type_body_length
     private let generationService: GenerationService
     private let modelLoadingService: ModelLoadingService
     private let optionsResolver = GenerationOptionsResolver()
@@ -15,6 +16,102 @@ public class StreamingService {
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
     }
 
+    // MARK: - Helper Methods
+
+    /// Submit dev analytics for failed generation
+    private func submitFailureAnalytics(
+        modelName: String,
+        error: Error,
+        prompt: String,
+        options: RunAnywhereGenerationOptions
+    ) async {
+        await RunAnywhere.submitGenerationAnalytics(
+            generationId: UUID().uuidString,
+            modelId: modelName,
+            performanceMetrics: PerformanceMetrics(),
+            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+            outputTokens: 0,
+            success: false,
+            executionTarget: "unknown"
+        )
+
+        let temperature = options.temperature
+        let maxTokens = options.maxTokens
+        let deviceInfo = TelemetryDeviceInfo.current
+        let eventData = GenerationCompletionData(
+            modelId: modelName,
+            modelName: modelName,
+            framework: nil,
+            device: deviceInfo.device,
+            osVersion: deviceInfo.osVersion,
+            platform: deviceInfo.platform,
+            sdkVersion: SDKConstants.version,
+            processingTimeMs: nil,
+            success: false,
+            errorMessage: error.localizedDescription,
+            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+            outputTokens: 0,
+            totalTokens: RunAnywhere.estimateTokenCount(prompt),
+            tokensPerSecond: nil,
+            timeToFirstTokenMs: nil,
+            generationTimeMs: nil,
+            temperature: Double(temperature),
+            maxTokens: maxTokens
+        )
+        let event = GenerationEvent(type: .generationCompleted, eventData: eventData)
+        await AnalyticsQueueManager.shared.enqueue(event)
+        await AnalyticsQueueManager.shared.flush()
+    }
+
+    /// Submit success analytics for completed generation
+    private func submitSuccessAnalytics( // swiftlint:disable:this function_parameter_count
+        result: GenerationResult,
+        modelName: String,
+        prompt: String,
+        options: RunAnywhereGenerationOptions,
+        contextLength: Int?,
+        framework: LLMFramework?
+    ) async {
+        // Dev analytics
+        await RunAnywhere.submitGenerationAnalytics(
+            generationId: UUID().uuidString,
+            modelId: result.modelUsed,
+            performanceMetrics: result.performanceMetrics,
+            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+            outputTokens: result.tokensUsed,
+            success: true,
+            executionTarget: result.executionTarget.rawValue
+        )
+
+        // Production telemetry
+        let temperature = options.temperature
+        let maxTokens = options.maxTokens
+        let deviceInfo = TelemetryDeviceInfo.current
+        let eventData = GenerationCompletionData(
+            modelId: result.modelUsed,
+            modelName: modelName,
+            framework: framework?.rawValue,
+            device: deviceInfo.device,
+            osVersion: deviceInfo.osVersion,
+            platform: deviceInfo.platform,
+            sdkVersion: SDKConstants.version,
+            processingTimeMs: result.latencyMs,
+            success: true,
+            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+            outputTokens: result.tokensUsed,
+            totalTokens: RunAnywhere.estimateTokenCount(prompt) + result.tokensUsed,
+            tokensPerSecond: result.performanceMetrics.tokensPerSecond,
+            timeToFirstTokenMs: result.performanceMetrics.timeToFirstTokenMs,
+            generationTimeMs: result.latencyMs,
+            contextLength: contextLength,
+            temperature: Double(temperature),
+            maxTokens: maxTokens
+        )
+        let event = GenerationEvent(type: .generationCompleted, eventData: eventData)
+        await AnalyticsQueueManager.shared.enqueue(event)
+        await AnalyticsQueueManager.shared.flush()
+    }
+
     /// Generate streaming text with metrics tracking
     ///
     /// Returns both the token stream and a task that resolves to final metrics.
@@ -24,7 +121,7 @@ public class StreamingService {
     /// 1. Runtime Options (highest priority) - User knows best for their specific request
     /// 2. Remote Configuration - Organization-wide defaults from console
     /// 3. SDK Defaults (lowest priority) - Fallback values when nothing else is specified
-    public func generateStreamWithMetrics(
+    public func generateStreamWithMetrics( // swiftlint:disable:this function_body_length
         prompt: String,
         options: RunAnywhereGenerationOptions
     ) -> StreamingResult {
@@ -69,58 +166,41 @@ public class StreamingService {
                 thinkingEndTime = Date()
             }
 
-            func recordError(_ err: Error, modelName: String?, prompt: String, options: RunAnywhereGenerationOptions) {
+            func recordError(
+                _ err: Error,
+                modelName: String?,
+                prompt: String,
+                options: RunAnywhereGenerationOptions,
+                submitAnalytics: @escaping (String, Error, String, RunAnywhereGenerationOptions) async -> Void
+            ) {
                 error = err
                 resultContinuation?.resume(throwing: err)
                 resultContinuation = nil
 
-                // Submit dev analytics for failed generation (non-blocking, silent failures)
+                // Submit analytics (non-blocking, silent failures)
                 if let modelName = modelName {
                     Task.detached(priority: .background) {
-                        await RunAnywhere.submitGenerationAnalytics(
-                            generationId: UUID().uuidString,
-                            modelId: modelName,
-                            performanceMetrics: PerformanceMetrics(),
-                            inputTokens: RunAnywhere.estimateTokenCount(prompt),
-                            outputTokens: 0,
-                            success: false,
-                            executionTarget: "unknown"
-                        )
-                    }
-
-                    // Also submit via AnalyticsQueueManager for production telemetry
-                    let temperature = options.temperature
-                    let maxTokens = options.maxTokens
-                    Task.detached(priority: .background) {
-                        let deviceInfo = TelemetryDeviceInfo.current
-                        let eventData = GenerationCompletionData(
-                            modelId: modelName,
-                            modelName: modelName,
-                            framework: nil,
-                            device: deviceInfo.device,
-                            osVersion: deviceInfo.osVersion,
-                            platform: deviceInfo.platform,
-                            sdkVersion: SDKConstants.version,
-                            processingTimeMs: nil,
-                            success: false,
-                            errorMessage: err.localizedDescription,
-                            inputTokens: RunAnywhere.estimateTokenCount(prompt),
-                            outputTokens: 0,
-                            totalTokens: RunAnywhere.estimateTokenCount(prompt),
-                            tokensPerSecond: nil,
-                            timeToFirstTokenMs: nil,
-                            generationTimeMs: nil,
-                            temperature: Double(temperature),
-                            maxTokens: maxTokens
-                        )
-                        let event = GenerationEvent(type: .generationCompleted, eventData: eventData)
-                        await AnalyticsQueueManager.shared.enqueue(event)
-                        await AnalyticsQueueManager.shared.flush()
+                        await submitAnalytics(modelName, err, prompt, options)
                     }
                 }
             }
 
-            func recordStreamComplete(modelName: String, framework: LLMFramework?, prompt: String, options: RunAnywhereGenerationOptions, contextLength: Int?) {
+            // swiftlint:disable:next function_parameter_count
+            func recordStreamComplete(
+                modelName: String,
+                framework: LLMFramework?,
+                prompt: String,
+                options: RunAnywhereGenerationOptions,
+                contextLength: Int?,
+                submitAnalytics: @escaping (
+                    GenerationResult,
+                    String,
+                    String,
+                    RunAnywhereGenerationOptions,
+                    Int?,
+                    LLMFramework?
+                ) async -> Void
+            ) {
                 self.modelName = modelName
                 self.framework = framework
                 self.isComplete = true
@@ -131,47 +211,9 @@ public class StreamingService {
                     continuation.resume(returning: result)
                     resultContinuation = nil
 
-                    // Submit dev analytics (non-blocking, silent failures) - only works in dev mode
+                    // Submit analytics (non-blocking, silent failures)
                     Task.detached(priority: .background) {
-                        await RunAnywhere.submitGenerationAnalytics(
-                            generationId: UUID().uuidString,
-                            modelId: result.modelUsed,
-                            performanceMetrics: result.performanceMetrics,
-                            inputTokens: RunAnywhere.estimateTokenCount(prompt),
-                            outputTokens: result.tokensUsed,
-                            success: true,
-                            executionTarget: result.executionTarget.rawValue
-                        )
-                    }
-
-                    // Also submit via AnalyticsQueueManager for production telemetry
-                    let temperature = options.temperature
-                    let maxTokens = options.maxTokens
-                    Task.detached(priority: .background) {
-                        let deviceInfo = TelemetryDeviceInfo.current
-                        let eventData = GenerationCompletionData(
-                            modelId: result.modelUsed,
-                            modelName: modelName,
-                            framework: framework?.rawValue,
-                            device: deviceInfo.device,
-                            osVersion: deviceInfo.osVersion,
-                            platform: deviceInfo.platform,
-                            sdkVersion: SDKConstants.version,
-                            processingTimeMs: result.latencyMs,
-                            success: true,
-                            inputTokens: RunAnywhere.estimateTokenCount(prompt),
-                            outputTokens: result.tokensUsed,
-                            totalTokens: RunAnywhere.estimateTokenCount(prompt) + result.tokensUsed,
-                            tokensPerSecond: result.performanceMetrics.tokensPerSecond,
-                            timeToFirstTokenMs: result.performanceMetrics.timeToFirstTokenMs,
-                            generationTimeMs: result.latencyMs,
-                            contextLength: contextLength,
-                            temperature: Double(temperature),
-                            maxTokens: maxTokens
-                        )
-                        let event = GenerationEvent(type: .generationCompleted, eventData: eventData)
-                        await AnalyticsQueueManager.shared.enqueue(event)
-                        await AnalyticsQueueManager.shared.flush()
+                        await submitAnalytics(result, modelName, prompt, options, contextLength, framework)
                     }
                 }
             }
@@ -193,17 +235,28 @@ public class StreamingService {
                 let totalTime = endTime.timeIntervalSince(startTime)
 
                 // Use TokenCounter for accurate token counting
+                let responseContent = fullText.replacingOccurrences(of: thinkingContent ?? "", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
                 let tokenCounts = TokenCounter.splitTokenCounts(
                     fullText: fullText,
                     thinkingContent: thinkingContent,
-                    responseContent: fullText.replacingOccurrences(of: thinkingContent ?? "", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    responseContent: responseContent
                 )
 
                 // Calculate timing metrics
                 let timeToFirstToken = firstTokenTime?.timeIntervalSince(startTime)
-                let thinkingTime = (thinkingStartTime != nil && thinkingEndTime != nil)
-                    ? thinkingEndTime!.timeIntervalSince(thinkingStartTime!) : nil
-                let responseTime = thinkingTime != nil ? totalTime - thinkingTime! : totalTime
+                let thinkingTime: TimeInterval?
+                if let thinkingStart = thinkingStartTime, let thinkingEnd = thinkingEndTime {
+                    thinkingTime = thinkingEnd.timeIntervalSince(thinkingStart)
+                } else {
+                    thinkingTime = nil
+                }
+                let responseTime: TimeInterval
+                if let thinking = thinkingTime {
+                    responseTime = totalTime - thinking
+                } else {
+                    responseTime = totalTime
+                }
 
                 // Calculate tokens per second
                 let tokensPerSecond = TokenCounter.calculateTokensPerSecond(
@@ -221,9 +274,9 @@ public class StreamingService {
                     timeToFirstTokenMs: timeToFirstToken.map { $0 * 1000 },
                     thinkingTimeMs: thinkingTime.map { $0 * 1000 },
                     responseTimeMs: responseTime * 1000,
-                    thinkingStartTimeMs: thinkingStartTime != nil ? thinkingStartTime!.timeIntervalSince(startTime) * 1000 : nil,
-                    thinkingEndTimeMs: thinkingEndTime != nil ? thinkingEndTime!.timeIntervalSince(startTime) * 1000 : nil,
-                    firstResponseTokenTimeMs: firstTokenTime != nil ? firstTokenTime!.timeIntervalSince(startTime) * 1000 : nil
+                    thinkingStartTimeMs: thinkingStartTime.map { $0.timeIntervalSince(startTime) * 1000 },
+                    thinkingEndTimeMs: thinkingEndTime.map { $0.timeIntervalSince(startTime) * 1000 },
+                    firstResponseTokenTimeMs: firstTokenTime.map { $0.timeIntervalSince(startTime) * 1000 }
                 )
 
                 return GenerationResult(
@@ -339,10 +392,17 @@ public class StreamingService {
                         framework: loadedModel.model.compatibleFrameworks.first,
                         prompt: prompt,
                         options: resolvedOptions,
-                        contextLength: loadedModel.model.contextLength
+                        contextLength: loadedModel.model.contextLength,
+                        submitAnalytics: self.submitSuccessAnalytics
                     )
                 } catch {
-                    await collector.recordError(error, modelName: modelName, prompt: prompt, options: options)
+                    await collector.recordError(
+                        error,
+                        modelName: modelName,
+                        prompt: prompt,
+                        options: options,
+                        submitAnalytics: self.submitFailureAnalytics
+                    )
                     continuation.finish(throwing: error)
                 }
             }
@@ -361,7 +421,7 @@ public class StreamingService {
     // All streaming now includes metrics by default
 
     /// Generate streaming text with token-level granularity
-    public func generateTokenStream(
+    public func generateTokenStream( // swiftlint:disable:this function_body_length
         prompt: String,
         options: RunAnywhereGenerationOptions
     ) -> AsyncThrowingStream<StreamingToken, Error> {

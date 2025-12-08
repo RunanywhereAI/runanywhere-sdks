@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Wake Word Service Protocol
 
 /// Protocol for wake word detection services
-public protocol WakeWordService: AnyObject {
+public protocol WakeWordService: AnyObject { // swiftlint:disable:this avoid_any_object
     /// Initialize the service
     func initialize() async throws
 
@@ -153,20 +153,6 @@ public struct WakeWordMetadata: Sendable {
     }
 }
 
-// MARK: - Wake Word Service Provider
-
-/// Protocol for registering external Wake Word implementations
-public protocol WakeWordServiceProvider {
-    /// Create a wake word service for the given configuration
-    func createWakeWordService(configuration: WakeWordConfiguration) async throws -> WakeWordService
-
-    /// Check if this provider can handle the given model
-    func canHandle(modelId: String?) -> Bool
-
-    /// Provider name for identification
-    var name: String { get }
-}
-
 // MARK: - Default Wake Word Service
 
 /// Default implementation that always returns false (no detection)
@@ -205,10 +191,9 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
 
     // MARK: - Properties
 
-    public override class var componentType: SDKComponent { .wakeWord }
+    public override static var componentType: SDKComponent { .wakeWord }
 
     private let wakeWordConfiguration: WakeWordConfiguration
-    private var isDetecting = false
 
     // MARK: - Initialization
 
@@ -228,7 +213,7 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
 
         // Try to get a registered wake word provider from central registry
         // For now, always return default implementation
-        // TODO: Add support for external wake word providers
+        // Note: Add support for external wake word providers
 
         return DefaultWakeWordService()
     }
@@ -255,7 +240,6 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
         }
 
         wakeWordService.startListening()
-        isDetecting = true
     }
 
     /// Stop listening for wake words
@@ -263,7 +247,6 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
         guard let wakeWordService = service else { return }
 
         wakeWordService.stopListening()
-        isDetecting = false
     }
 
     /// Process audio input for wake word detection
@@ -307,7 +290,6 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
 
     public override func performCleanup() async throws {
         await service?.cleanup()
-        isDetecting = false
     }
 }
 

@@ -1,5 +1,18 @@
 import Foundation
 
+/// Result of splitting token counts between thinking and response content
+public struct TokenCountResult {
+    public let thinkingTokens: Int?
+    public let responseTokens: Int
+    public let totalTokens: Int
+
+    public init(thinkingTokens: Int?, responseTokens: Int, totalTokens: Int) {
+        self.thinkingTokens = thinkingTokens
+        self.responseTokens = responseTokens
+        self.totalTokens = totalTokens
+    }
+}
+
 /// Service for counting tokens in text with improved accuracy
 public class TokenCounter {
 
@@ -50,15 +63,15 @@ public class TokenCounter {
         fullText: String,
         thinkingContent: String?,
         responseContent: String
-    ) -> (thinkingTokens: Int?, responseTokens: Int, totalTokens: Int) {
+    ) -> TokenCountResult {
         let responseTokens = estimateTokenCount(responseContent)
 
         if let thinking = thinkingContent, !thinking.isEmpty {
             let thinkingTokens = estimateTokenCount(thinking)
             let totalTokens = thinkingTokens + responseTokens
-            return (thinkingTokens, responseTokens, totalTokens)
+            return TokenCountResult(thinkingTokens: thinkingTokens, responseTokens: responseTokens, totalTokens: totalTokens)
         } else {
-            return (nil, responseTokens, responseTokens)
+            return TokenCountResult(thinkingTokens: nil, responseTokens: responseTokens, totalTokens: responseTokens)
         }
     }
 }

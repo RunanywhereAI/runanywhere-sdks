@@ -50,6 +50,7 @@ public actor RemoteDeviceInfoDataSource: RemoteDataSource {
         }
     }
 
+    // swiftlint:disable:next prefer_concrete_types avoid_any_type
     public func fetchAll(filter: [String: Any]?) async throws -> [DeviceInfoData] {
         // Not typically used for device info - each device has its own info
         return []

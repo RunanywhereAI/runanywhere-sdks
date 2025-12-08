@@ -1,8 +1,17 @@
-import Foundation
+// swiftlint:disable file_length
 import Files
+import Foundation
+
+/// Individual model file information (distinct from aggregate ModelStorageInfo)
+public struct ModelFileInfo {
+    let modelId: String
+    let format: ModelFormat
+    let size: Int64
+    let framework: LLMFramework?
+}
 
 /// Simplified file manager using Files library for all file operations
-public class SimplifiedFileManager {
+public class SimplifiedFileManager { // swiftlint:disable:this type_body_length
 
     // MARK: - Properties
 
@@ -13,7 +22,10 @@ public class SimplifiedFileManager {
 
     public init() throws {
         // Create base RunAnywhere folder in Documents
-        self.baseFolder = try Folder.documents!.createSubfolderIfNeeded(withName: "RunAnywhere")
+        guard let documentsFolder = Folder.documents else {
+            throw SDKError.storageError("Unable to access documents directory")
+        }
+        self.baseFolder = try documentsFolder.createSubfolderIfNeeded(withName: "RunAnywhere")
 
         // Create basic directory structure
         try createDirectoryStructure()
@@ -108,21 +120,19 @@ public class SimplifiedFileManager {
         let modelsFolder = try Folder(path: modelsFolderURL.path)
 
         // Check framework-specific folders
-        for frameworkFolder in modelsFolder.subfolders {
-            if LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) {
-                if frameworkFolder.containsSubfolder(named: modelId) {
-                    let modelFolder = try frameworkFolder.subfolder(named: modelId)
-                    try modelFolder.delete()
+        for frameworkFolder in modelsFolder.subfolders where LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) {
+            if frameworkFolder.containsSubfolder(named: modelId) {
+                let modelFolder = try frameworkFolder.subfolder(named: modelId)
+                try modelFolder.delete()
 
-                    // Remove metadata
-                    Task {
-                        let modelInfoService = await ServiceContainer.shared.modelInfoService
-                        try? await modelInfoService.removeModel(modelId)
-                    }
-
-                    logger.info("Deleted model: \(modelId) from framework: \(frameworkFolder.name)")
-                    return
+                // Remove metadata
+                Task {
+                    let modelInfoService = await ServiceContainer.shared.modelInfoService
+                    try? await modelInfoService.removeModel(modelId)
                 }
+
+                logger.info("Deleted model: \(modelId) from framework: \(frameworkFolder.name)")
+                return
             }
         }
 
@@ -244,11 +254,11 @@ public class SimplifiedFileManager {
     }
 
     /// Get all stored models
-    public func getAllStoredModels() -> [(modelId: String, format: ModelFormat, size: Int64, framework: LLMFramework?)] {
+    public func getAllStoredModels() -> [ModelFileInfo] {
         guard let modelsFolderURL = try? ModelPathUtils.getModelsDirectory(),
               let modelsFolder = try? Folder(path: modelsFolderURL.path) else { return [] }
 
-        var models: [(String, ModelFormat, Int64, LLMFramework?)] = []
+        var models: [ModelFileInfo] = []
 
         // First check direct model folders (legacy structure)
         for modelFolder in modelsFolder.subfolders {
@@ -260,7 +270,12 @@ public class SimplifiedFileManager {
             let modelId = modelFolder.name
             // Try to find model files
             if let modelInfo = detectModelInFolder(modelFolder) {
-                models.append((modelId, modelInfo.format, modelInfo.size, nil))
+                models.append(ModelFileInfo(
+                    modelId: modelId,
+                    format: modelInfo.format,
+                    size: modelInfo.size,
+                    framework: nil
+                ))
             }
         }
 
@@ -278,12 +293,22 @@ public class SimplifiedFileManager {
                 // Try to use framework-specific storage strategy if available
                 if let storageStrategy = getStorageStrategy(for: frameworkType),
                    let modelInfo = storageStrategy.detectModel(in: folderURL) {
-                    models.append((modelId, modelInfo.format, modelInfo.size, frameworkType))
+                    models.append(ModelFileInfo(
+                        modelId: modelId,
+                        format: modelInfo.format,
+                        size: modelInfo.size,
+                        framework: frameworkType
+                    ))
                     logger.debug("Detected \(frameworkType.rawValue) model \(modelId) using storage strategy")
                 } else {
                     // Fallback to generic detection for frameworks without storage strategies
                     if let modelInfo = detectModelInFolder(modelFolder) {
-                        models.append((modelId, modelInfo.format, modelInfo.size, frameworkType))
+                        models.append(ModelFileInfo(
+                            modelId: modelId,
+                            format: modelInfo.format,
+                            size: modelInfo.size,
+                            framework: frameworkType
+                        ))
                     }
                 }
             }
@@ -346,7 +371,7 @@ public class SimplifiedFileManager {
     }
 
     /// Get device storage information (total, free, used space)
-    public func getDeviceStorageInfo() -> (totalSpace: Int64, freeSpace: Int64, usedSpace: Int64) {
+    public func getDeviceStorageInfo() -> DeviceStorageInfo {
         do {
             let homeURL = URL(fileURLWithPath: NSHomeDirectory())
             let attributes = try FileManager.default.attributesOfFileSystem(forPath: homeURL.path)
@@ -355,10 +380,10 @@ public class SimplifiedFileManager {
             let freeSpace = (attributes[.systemFreeSize] as? Int64) ?? 0
             let usedSpace = totalSpace - freeSpace
 
-            return (totalSpace: totalSpace, freeSpace: freeSpace, usedSpace: usedSpace)
+            return DeviceStorageInfo(totalSpace: totalSpace, freeSpace: freeSpace, usedSpace: usedSpace)
         } catch {
             logger.error("Failed to get device storage info: \(error)")
-            return (totalSpace: 0, freeSpace: 0, usedSpace: 0)
+            return DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0)
         }
     }
 
@@ -403,7 +428,7 @@ public class SimplifiedFileManager {
     }
 
     /// Find model file by searching all possible locations
-    public func findModelFile(modelId: String, expectedPath: String? = nil) -> URL? {
+    public func findModelFile(modelId: String, expectedPath: String? = nil) -> URL? { // swiftlint:disable:this cyclomatic_complexity
         // If expected path exists and is valid, return it
         if let expectedPath = expectedPath,
            FileManager.default.fileExists(atPath: expectedPath) {

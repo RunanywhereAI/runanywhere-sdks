@@ -1,9 +1,10 @@
+// swiftlint:disable file_length
 import Foundation
 
 // MARK: - Speaker Diarization Service Protocol
 
 /// Protocol for speaker diarization services
-public protocol SpeakerDiarizationService: AnyObject {
+public protocol SpeakerDiarizationService: AnyObject { // swiftlint:disable:this avoid_any_object
     /// Initialize the service
     func initialize() async throws
 
@@ -266,14 +267,6 @@ public struct SpeakerDiarizationOptions: Sendable {
     }
 }
 
-// MARK: - Speaker Diarization Framework Adapter Protocol
-
-/// Protocol for Speaker Diarization framework adapters
-public protocol SpeakerDiarizationFrameworkAdapter: ComponentAdapter where ServiceType: SpeakerDiarizationService {
-    /// Create a diarization service for the given configuration
-    func createDiarizationService(configuration: SpeakerDiarizationConfiguration) async throws -> ServiceType
-}
-
 // MARK: - Default Speaker Diarization Adapter
 
 /// Default adapter using simple energy-based diarization
@@ -304,11 +297,10 @@ public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiar
 
     // MARK: - Properties
 
-    public override class var componentType: SDKComponent { .speakerDiarization }
+    public override static var componentType: SDKComponent { .speakerDiarization }
 
     private let diarizationConfiguration: SpeakerDiarizationConfiguration
     private var speakerProfiles: [String: SpeakerProfile] = [:]
-    private var isServiceReady = false
 
     // MARK: - Initialization
 
@@ -326,22 +318,6 @@ public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiar
             modelId: diarizationConfiguration.modelId
         ))
 
-        // Check if model needs downloading (for ML-based diarization)
-        if let modelId = diarizationConfiguration.modelId {
-            // In real implementation, check if model exists
-            let needsDownload = false
-
-            if needsDownload {
-                eventBus.publish(ComponentInitializationEvent.componentDownloadRequired(
-                    component: Self.componentType,
-                    modelId: modelId,
-                    sizeBytes: 100_000_000 // 100MB example
-                ))
-
-                try await downloadModel(modelId: modelId)
-            }
-        }
-
         // For now, we don't have an adapter registry
 
         // Fallback to default adapter
@@ -357,31 +333,6 @@ public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiar
         ))
 
         // Service is ready to use
-        isServiceReady = true
-    }
-
-    // MARK: - Model Management
-
-    private func downloadModel(modelId: String) async throws {
-        eventBus.publish(ComponentInitializationEvent.componentDownloadStarted(
-            component: Self.componentType,
-            modelId: modelId
-        ))
-
-        // Simulate download
-        for progress in stride(from: 0.0, through: 1.0, by: 0.2) {
-            eventBus.publish(ComponentInitializationEvent.componentDownloadProgress(
-                component: Self.componentType,
-                modelId: modelId,
-                progress: progress
-            ))
-            try await Task.sleep(nanoseconds: 100_000_000)
-        }
-
-        eventBus.publish(ComponentInitializationEvent.componentDownloadCompleted(
-            component: Self.componentType,
-            modelId: modelId
-        ))
     }
 
     // MARK: - Public API
@@ -516,7 +467,6 @@ public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiar
     public override func performCleanup() async throws {
         speakerProfiles.removeAll()
         service?.reset()
-        isServiceReady = false
     }
 
     // MARK: - Private Helpers

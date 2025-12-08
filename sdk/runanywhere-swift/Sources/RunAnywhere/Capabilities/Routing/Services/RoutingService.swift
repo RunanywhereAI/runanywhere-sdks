@@ -18,7 +18,7 @@ public class RoutingService {
     /// FORCE LOCAL ONLY - Always route to on-device execution
     public func determineRouting(
         prompt: String,
-        context: Any?,
+        context: Any?, // swiftlint:disable:this avoid_any_type
         options: RunAnywhereGenerationOptions
     ) async throws -> RoutingDecision {
         // FORCE ON-DEVICE ONLY - ignore all other logic
@@ -35,7 +35,7 @@ public class RoutingService {
     private func handleUserPreference(
         _ target: ExecutionTarget,
         prompt: String,
-        context: Any?,
+        context: Any?, // swiftlint:disable:this avoid_any_type
         options: RunAnywhereGenerationOptions
     ) async throws -> RoutingDecision {
         switch target {
@@ -71,7 +71,7 @@ public class RoutingService {
 
     private func checkPolicyConstraints(
         prompt: String,
-        context: Any?,
+        context: Any?, // swiftlint:disable:this avoid_any_type
         options: RunAnywhereGenerationOptions
     ) async throws -> RoutingDecision? {
         // Check for privacy-sensitive content

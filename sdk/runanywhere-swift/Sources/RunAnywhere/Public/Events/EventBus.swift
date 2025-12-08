@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 /// Central event bus for SDK-wide event distribution
 /// Thread-safe event bus using Combine's built-in thread safety
@@ -140,28 +140,28 @@ public final class EventBus: @unchecked Sendable {
     /// Generic event publisher
     public func publish(_ event: any SDKEvent) {
         switch event {
-        case let e as SDKInitializationEvent:
-            publish(e)
-        case let e as SDKConfigurationEvent:
-            publish(e)
-        case let e as SDKGenerationEvent:
-            publish(e)
-        case let e as SDKModelEvent:
-            publish(e)
-        case let e as SDKVoiceEvent:
-            publish(e)
-        case let e as SDKPerformanceEvent:
-            publish(e)
-        case let e as SDKNetworkEvent:
-            publish(e)
-        case let e as SDKStorageEvent:
-            publish(e)
-        case let e as SDKFrameworkEvent:
-            publish(e)
-        case let e as SDKDeviceEvent:
-            publish(e)
-        case let e as ComponentInitializationEvent:
-            publish(e)
+        case let initEvent as SDKInitializationEvent:
+            publish(initEvent)
+        case let configEvent as SDKConfigurationEvent:
+            publish(configEvent)
+        case let genEvent as SDKGenerationEvent:
+            publish(genEvent)
+        case let modelEvent as SDKModelEvent:
+            publish(modelEvent)
+        case let voiceEvent as SDKVoiceEvent:
+            publish(voiceEvent)
+        case let perfEvent as SDKPerformanceEvent:
+            publish(perfEvent)
+        case let netEvent as SDKNetworkEvent:
+            publish(netEvent)
+        case let storageEvent as SDKStorageEvent:
+            publish(storageEvent)
+        case let frameworkEvent as SDKFrameworkEvent:
+            publish(frameworkEvent)
+        case let deviceEvent as SDKDeviceEvent:
+            publish(deviceEvent)
+        case let componentEvent as ComponentInitializationEvent:
+            publish(componentEvent)
         default:
             allEventsSubject.send(event)
         }

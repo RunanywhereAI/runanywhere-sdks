@@ -102,7 +102,8 @@ public class IOSAudioSession {
         )
     }
 
-    @objc private func handleRouteChange(notification: Notification) {
+    @objc
+    private func handleRouteChange(notification: Notification) {
         guard let userInfo = notification.userInfo,
               let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
@@ -131,7 +132,8 @@ public class IOSAudioSession {
         )
     }
 
-    @objc private func handleInterruption(notification: Notification) {
+    @objc
+    private func handleInterruption(notification: Notification) {
         guard let userInfo = notification.userInfo,
               let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
               let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {

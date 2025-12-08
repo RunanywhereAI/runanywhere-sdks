@@ -27,7 +27,7 @@ public final class HardwareCapabilityManager: @unchecked Sendable {
     // MARK: - Properties
 
     /// Shared instance
-    public static let shared: HardwareCapabilityManager = HardwareCapabilityManager()
+    public static let shared = HardwareCapabilityManager()
 
     /// Capability analyzer
     private let capabilityAnalyzer: CapabilityAnalyzer

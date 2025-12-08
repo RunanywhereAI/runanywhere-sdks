@@ -202,6 +202,6 @@ public actor AudioPipelineStateManager {
 }
 
 /// Protocol for components that need to respond to pipeline state changes
-public protocol AudioPipelineStateObserver: AnyObject {
+public protocol AudioPipelineStateObserver: AnyObject { // swiftlint:disable:this avoid_any_object
     func audioStateDidChange(from oldState: AudioPipelineState, to newState: AudioPipelineState)
 }

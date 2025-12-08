@@ -16,7 +16,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
 
     // MARK: - Properties
 
-    public override class var componentType: SDKComponent { .voiceAgent }
+    public override static var componentType: SDKComponent { .voiceAgent }
 
     // Individual components (accessible for custom orchestration)
     public private(set) var vadComponent: VADComponent?
@@ -26,10 +26,6 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
 
     // Configuration
     private let agentParams: VoiceAgentConfiguration
-
-    // State
-    private var isProcessing = false
-    private let processQueue = DispatchQueue(label: "com.runanywhere.voiceagent", qos: .userInteractive)
 
     // MARK: - Initialization
 
@@ -76,9 +72,6 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
         guard state == .ready else {
             throw SDKError.notInitialized
         }
-
-        isProcessing = true
-        defer { isProcessing = false }
 
         var result = VoiceAgentResult()
 
@@ -190,8 +183,6 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
     // MARK: - Cleanup
 
     public override func performCleanup() async throws {
-        isProcessing = false
-
         try? await vadComponent?.cleanup()
         try? await sttComponent?.cleanup()
         try? await llmComponent?.cleanup()

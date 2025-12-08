@@ -11,9 +11,10 @@ import WatchKit
 
 /// Device architecture types
 public enum DeviceArchitecture: String, Codable, CaseIterable, Sendable {
-    case arm64 = "arm64"
-    case x86_64 = "x86_64"
-    case unknown = "unknown"
+    case arm64
+    // swiftlint:disable:next identifier_name
+    case x86_64
+    case unknown
 
     public var displayName: String {
         switch self {
@@ -56,13 +57,13 @@ extension BatteryState {
 
 /// Device form factor types
 public enum DeviceFormFactor: String, Codable, CaseIterable, Sendable {
-    case phone = "phone"
-    case tablet = "tablet"
-    case desktop = "desktop"
-    case laptop = "laptop"
-    case watch = "watch"
-    case tv = "tv"
-    case unknown = "unknown"
+    case phone
+    case tablet
+    case desktop
+    case laptop
+    case watch
+    case tv
+    case unknown
 
     public var displayName: String {
         switch self {

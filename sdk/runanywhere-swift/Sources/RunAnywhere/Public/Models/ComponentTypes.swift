@@ -8,7 +8,6 @@ public enum SDKComponent: String, CaseIterable, Sendable {
     case stt = "STT"
     case tts = "TTS"
     case vad = "VAD"
-    case vlm = "VLM"
     case embedding = "Embedding"
     case speakerDiarization = "SpeakerDiarization"
     case voiceAgent = "VoiceAgent"
@@ -21,7 +20,6 @@ public enum SDKComponent: String, CaseIterable, Sendable {
         case .stt: return "Speech-to-Text"
         case .tts: return "Text-to-Speech"
         case .vad: return "Voice Activity Detection"
-        case .vlm: return "Vision Language Model"
         case .embedding: return "Embeddings"
         case .speakerDiarization: return "Speaker Diarization"
         case .voiceAgent: return "Voice Agent"
@@ -32,7 +30,7 @@ public enum SDKComponent: String, CaseIterable, Sendable {
     /// Whether this component requires model download
     public var requiresModel: Bool {
         switch self {
-        case .llm, .stt, .vlm, .embedding: return true
+        case .llm, .stt, .embedding: return true
         case .tts, .vad, .speakerDiarization, .voiceAgent, .wakeWord: return false
         }
     }

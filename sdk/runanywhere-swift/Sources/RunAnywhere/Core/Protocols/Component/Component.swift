@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Core Component Protocol
 
 /// Base protocol that all SDK components must implement
-public protocol Component: AnyObject, Sendable {
+public protocol Component: AnyObject, Sendable { // swiftlint:disable:this avoid_any_object
     /// Unique identifier for this component type
     static var componentType: SDKComponent { get }
 

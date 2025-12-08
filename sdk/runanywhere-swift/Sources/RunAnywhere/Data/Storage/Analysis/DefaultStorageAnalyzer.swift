@@ -187,15 +187,15 @@ public class DefaultStorageAnalyzer: StorageAnalyzer {
         let registeredModelsMap = Dictionary(uniqueKeysWithValues: registeredModels.map { ($0.id, $0) })
 
         // Convert stored model data to StoredModel objects
-        for (modelId, format, size, framework) in storedModelsData {
+        for modelInfo in storedModelsData {
             // Try to find corresponding registered model for additional metadata
-            let registeredModel = registeredModelsMap[modelId]
+            let registeredModel = registeredModelsMap[modelInfo.modelId]
 
             // Try to get the model URL
             let modelURL: URL
-            if let url = try? fileManager.getModelURL(modelId: modelId, format: format) {
+            if let url = try? fileManager.getModelURL(modelId: modelInfo.modelId, format: modelInfo.format) {
                 modelURL = url
-            } else if let url = fileManager.findModelFile(modelId: modelId) {
+            } else if let url = fileManager.findModelFile(modelId: modelInfo.modelId) {
                 modelURL = url
             } else {
                 // Skip if we can't find the file
@@ -203,16 +203,16 @@ public class DefaultStorageAnalyzer: StorageAnalyzer {
             }
 
             let storedModel = StoredModel(
-                id: modelId,
-                name: registeredModel?.name ?? modelId,
+                id: modelInfo.modelId,
+                name: registeredModel?.name ?? modelInfo.modelId,
                 path: modelURL,
-                size: size,
-                format: format,
-                framework: framework ?? registeredModel?.preferredFramework,
+                size: modelInfo.size,
+                format: modelInfo.format,
+                framework: modelInfo.framework ?? registeredModel?.preferredFramework,
                 createdDate: fileManager.getFileCreationDate(at: modelURL) ?? Date(),
                 lastUsed: fileManager.getFileAccessDate(at: modelURL),
                 metadata: registeredModel?.metadata,
-                contextLength: registeredModel?.contextLength,
+                contextLength: registeredModel?.contextLength
             )
 
             storedModels.append(storedModel)

@@ -1,6 +1,6 @@
 import Foundation
-import RunAnywhere
 import OSLog
+import RunAnywhere
 
 /// Foundation Models provider for Language Model services (Apple's built-in LLM)
 ///
@@ -15,7 +15,10 @@ import OSLog
 /// ```
 @available(iOS 26.0, macOS 26.0, *)
 public final class FoundationModelsServiceProvider: LLMServiceProvider {
-    private let logger = Logger(subsystem: "com.runanywhere.FoundationModels", category: "FoundationModelsServiceProvider")
+    private let logger = Logger(
+        subsystem: "com.runanywhere.FoundationModels",
+        category: "FoundationModelsServiceProvider"
+    )
 
     // MARK: - Singleton for easy registration
 
@@ -46,10 +49,10 @@ public final class FoundationModelsServiceProvider: LLMServiceProvider {
 
         // Handle Foundation Models specific identifiers
         let lowercasedId = modelId.lowercased()
-        return lowercasedId.contains("foundation") ||
-               lowercasedId.contains("apple") ||
-               modelId == "foundation-models-default" ||
-               modelId == "foundation-models-native"
+        return lowercasedId.contains("foundation")
+            || lowercasedId.contains("apple")
+            || modelId == "foundation-models-default"
+            || modelId == "foundation-models-native"
     }
 
     public func createLLMService(configuration: LLMConfiguration) async throws -> LLMService {

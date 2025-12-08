@@ -44,7 +44,7 @@ public struct DevDeviceRegistrationResponse: Codable {
 
     enum CodingKeys: String, CodingKey {
         case success
-        case deviceId = "deviceId"
-        case registeredAt = "registeredAt"
+        case deviceId
+        case registeredAt
     }
 }

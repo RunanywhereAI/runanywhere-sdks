@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 //
 //  AnalyticsEventData.swift
 //  RunAnywhere SDK

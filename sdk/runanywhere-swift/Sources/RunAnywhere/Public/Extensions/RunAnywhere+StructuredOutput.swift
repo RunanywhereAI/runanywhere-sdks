@@ -155,7 +155,7 @@ public extension RunAnywhere {
     ///   - content: The content to generate from (e.g., educational content for quiz)
     ///   - options: Generation options (optional)
     /// - Returns: A structured output stream containing tokens and final result
-    static func generateStructuredStream<T: Generatable>(
+    static func generateStructuredStream<T: Generatable>( // swiftlint:disable:this function_body_length
         _ type: T.Type,
         content: String,
         options: RunAnywhereGenerationOptions? = nil

@@ -5,7 +5,9 @@ class RegistryStorage {
     private let storageURL: URL
 
     init() {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            fatalError("Unable to access documents directory")
+        }
         storageURL = documentsURL.appendingPathComponent("ModelRegistry.plist")
     }
 

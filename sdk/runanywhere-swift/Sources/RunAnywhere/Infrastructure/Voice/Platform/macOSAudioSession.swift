@@ -3,8 +3,8 @@ import Foundation
 import AVFoundation
 
 /// macOS-specific audio session management for voice processing
-public class macOSAudioSession {
-    private let logger = SDKLogger(category: "macOSAudioSession")
+public class MacOSAudioSession {
+    private let logger = SDKLogger(category: "MacOSAudioSession")
 
     // Audio engine for macOS
     private let audioEngine = AVAudioEngine()
@@ -156,7 +156,7 @@ public class macOSAudioSession {
 
     /// Get current input level (0.0 to 1.0)
     public var inputLevel: Float {
-        guard isRunning, let _ = inputNode else { return 0 }
+        guard isRunning, inputNode != nil else { return 0 }
 
         // Install tap to measure level if needed
         // This is a simplified implementation
