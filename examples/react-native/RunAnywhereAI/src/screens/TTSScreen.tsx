@@ -163,21 +163,17 @@ export const TTSScreen: React.FC = () => {
   }, []);
 
   /**
-   * Handle model selected from the sheet
-   */
-  const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
-    // Close the modal first to prevent UI issues
-    setShowModelSelection(false);
-    // Then load the model
-    await loadModel(model);
-  }, []);
-
-  /**
    * Load a model from its info
    */
-  const loadModel = async (model: SDKModelInfo) => {
+  const loadModel = useCallback(async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
+      
+      // Reset audio state when switching models
+      setAudioGenerated(false);
+      setAudioFilePath(null);
+      stopSound();
+      
       console.log(`[TTSScreen] Loading model: ${model.id} from ${model.localPath}`);
 
       // Handle System TTS specially - it's always available, no download needed
@@ -201,9 +197,23 @@ export const TTSScreen: React.FC = () => {
         return;
       }
 
+      // Unload any existing TTS model first
+      try {
+        const wasLoaded = await RunAnywhere.isTTSModelLoaded();
+        if (wasLoaded) {
+          console.log('[TTSScreen] Unloading previous TTS model...');
+          await RunAnywhere.unloadTTSModel();
+        }
+      } catch (unloadError) {
+        console.log('[TTSScreen] Error unloading previous model (ignoring):', unloadError);
+      }
+
       // Pass the path directly - C++ extractArchiveIfNeeded handles archive extraction
       // and finding the correct nested model folder
-      const success = await RunAnywhere.loadTTSModel(model.localPath, model.modelType || 'piper');
+      const modelType = model.modelType || 'piper';
+      console.log(`[TTSScreen] Calling loadTTSModel with path: ${model.localPath}, type: ${modelType}`);
+      
+      const success = await RunAnywhere.loadTTSModel(model.localPath, modelType);
 
       if (success) {
         const isLoaded = await RunAnywhere.isTTSModelLoaded();
@@ -218,9 +228,11 @@ export const TTSScreen: React.FC = () => {
           console.log(`[TTSScreen] Model ${model.name} loaded successfully, currentModel set`);
         } else {
           console.log(`[TTSScreen] Model reported success but isTTSModelLoaded() returned false`);
+          Alert.alert('Warning', 'Model may not have loaded correctly. Try generating speech to verify.');
         }
       } else {
         const error = await RunAnywhere.getLastError();
+        console.error('[TTSScreen] loadTTSModel returned false, error:', error);
         Alert.alert('Error', `Failed to load model: ${error || 'Unknown error'}`);
       }
     } catch (error) {
@@ -229,7 +241,17 @@ export const TTSScreen: React.FC = () => {
     } finally {
       setIsModelLoading(false);
     }
-  };
+  }, [stopSound]);
+
+  /**
+   * Handle model selected from the sheet
+   */
+  const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
+    // Close the modal first to prevent UI issues
+    setShowModelSelection(false);
+    // Then load the model
+    await loadModel(model);
+  }, [loadModel]);
 
   /**
    * Convert base64 PCM float32 audio to WAV file
@@ -460,7 +482,7 @@ export const TTSScreen: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
-  }, [text, speed, pitch, volume, currentModel, audioFilePath, handleSystemTTSGenerate]);
+  }, [text, speed, pitch, volume, currentModel, audioFilePath, handleSystemTTSGenerate, stopSound]);
 
   /**
    * Format time for display (MM:SS)
