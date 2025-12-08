@@ -23,17 +23,8 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
-// TODO: Replace with RN 0.81 compatible audio library
-// import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
-
-// Mock AudioRecorderPlayer until we find an RN 0.81 compatible library
-class AudioRecorderPlayer {
-  startRecorder = async () => 'mock-path.wav';
-  stopRecorder = async () => {};
-  addRecordBackListener = () => {};
-  removeRecordBackListener = () => {};
-}
+import * as AudioService from '../utils/AudioService';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
@@ -67,8 +58,7 @@ export const STTScreen: React.FC = () => {
   const [audioLevel, setAudioLevel] = useState(0);
   const [showModelSelection, setShowModelSelection] = useState(false);
 
-  // Audio recorder ref (for batch mode only)
-  const audioRecorderPlayer = useRef(new AudioRecorderPlayer()).current;
+  // Audio recording path ref (for batch mode only)
   const recordingPath = useRef<string | null>(null);
 
   // Live mode accumulated transcript ref
@@ -118,8 +108,7 @@ export const STTScreen: React.FC = () => {
       // Stop SDK streaming if active
       RunAnywhere.stopStreamingSTT().catch(() => {});
       // Stop batch mode recorder
-      audioRecorderPlayer.stopRecorder().catch(() => {});
-      audioRecorderPlayer.removeRecordBackListener();
+      AudioService.cleanup().catch(() => {});
       // Clean up temp audio file
       if (recordingPath.current) {
         RNFS.unlink(recordingPath.current).catch(() => {});
@@ -315,25 +304,20 @@ export const STTScreen: React.FC = () => {
         return;
       }
 
-      // Let the library choose its own default path - this avoids file creation issues
-      // Record audio with default settings - native module handles format conversion
-      // iOS will record to M4A, which our native AudioDecoder can convert to PCM
-      console.log('[STTScreen] Starting recorder with default settings...');
-      
-      // Use default path and settings - most reliable across platforms
-      const uri = await audioRecorderPlayer.startRecorder(undefined, undefined, true);
+      // Start recording using expo-av
+      console.log('[STTScreen] Starting recorder...');
+      const uri = await AudioService.startRecording({
+        onProgress: (currentPositionMs, metering) => {
+          setRecordingDuration(currentPositionMs);
+          // Convert metering level to 0-1 range (metering is typically negative dB)
+          const level = metering ? Math.max(0, Math.min(1, (metering + 60) / 60)) : 0;
+          setAudioLevel(level);
+        },
+      });
 
       // Store the returned URI as the recording path
       recordingPath.current = uri;
       console.log('[STTScreen] Recording started at:', uri);
-
-      // Set up progress listener
-      audioRecorderPlayer.addRecordBackListener((e) => {
-        setRecordingDuration(e.currentPosition);
-        // Convert metering level to 0-1 range
-        const level = e.currentMetering ? Math.max(0, (e.currentMetering + 60) / 60) : 0;
-        setAudioLevel(level);
-      });
 
       setIsRecording(true);
       setTranscript('');
@@ -353,8 +337,7 @@ export const STTScreen: React.FC = () => {
       console.log('[STTScreen] Stopping recording...');
 
       // Stop recording
-      const uri = await audioRecorderPlayer.stopRecorder();
-      audioRecorderPlayer.removeRecordBackListener();
+      const { uri } = await AudioService.stopRecording();
       setIsRecording(false);
       setIsProcessing(true);
 
@@ -481,21 +464,20 @@ export const STTScreen: React.FC = () => {
       const chunkNum = liveChunkCountRef.current;
       console.log(`[STTScreen] Starting live chunk #${chunkNum}...`);
 
-      // Record with default settings
-      const path = await audioRecorderPlayer.startRecorder(undefined, undefined, true);
+      // Record with expo-av
+      const path = await AudioService.startRecording({
+        onProgress: (currentPositionMs, metering) => {
+          const duration = Math.floor(currentPositionMs / 1000);
+          setRecordingDuration(duration);
+          // Update audio level from metering
+          if (metering !== undefined) {
+            const normalized = Math.max(0, Math.min(1, (metering + 60) / 60));
+            setAudioLevel(normalized);
+          }
+        },
+      });
       recordingPath.current = path;
       console.log(`[STTScreen] Live chunk #${chunkNum} recording at:`, path);
-
-      // Set up metering callback
-      audioRecorderPlayer.addRecordBackListener((e) => {
-        const duration = Math.floor(e.currentPosition / 1000);
-        setRecordingDuration(duration);
-        // Update audio level from metering
-        if (e.currentMetering !== undefined) {
-          const normalized = Math.max(0, Math.min(1, (e.currentMetering + 60) / 60));
-          setAudioLevel(normalized);
-        }
-      });
 
       // Schedule transcription after interval (3 seconds for each chunk)
       liveRecordingIntervalRef.current = setTimeout(async () => {
@@ -523,8 +505,7 @@ export const STTScreen: React.FC = () => {
       setPartialTranscript('Processing...');
 
       // Stop current recording
-      const resultPath = await audioRecorderPlayer.stopRecorder();
-      audioRecorderPlayer.removeRecordBackListener();
+      const { uri: resultPath } = await AudioService.stopRecording();
 
       // Get the path
       let audioPath = resultPath;
@@ -610,8 +591,7 @@ export const STTScreen: React.FC = () => {
       setPartialTranscript('Processing final chunk...');
 
       // Stop current recording
-      const resultPath = await audioRecorderPlayer.stopRecorder().catch(() => '');
-      audioRecorderPlayer.removeRecordBackListener();
+      const { uri: resultPath } = await AudioService.stopRecording().catch(() => ({ uri: '', durationMs: 0 }));
 
       // Transcribe final chunk if there's audio
       if (resultPath && recordingPath.current) {
