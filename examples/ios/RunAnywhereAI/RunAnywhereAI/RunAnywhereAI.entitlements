@@ -6,5 +6,14 @@
     <true/>
     <key>com.apple.security.files.user-selected.read-only</key>
     <true/>
+    <!-- macOS Network access for API calls and model downloads -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <!-- macOS Microphone access for voice features -->
+    <key>com.apple.security.device.microphone</key>
+    <true/>
+    <!-- macOS User-selected files for model imports (read-write) -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
 </dict>
 </plist>

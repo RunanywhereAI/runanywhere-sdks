@@ -3,6 +3,9 @@ import RunAnywhere
 import AVFoundation
 import Combine
 import os
+#if os(macOS)
+import AppKit
+#endif
 
 // Using STTMode from RunAnywhere SDK
 
@@ -151,7 +154,11 @@ struct SpeechToTextView: View {
                                 .foregroundColor(.primary)
                                 .padding()
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                #if os(iOS)
                                 .background(Color(.secondarySystemBackground))
+                                #else
+                                .background(Color(NSColor.controlBackgroundColor))
+                                #endif
                                 .cornerRadius(12)
                         }
                     }
@@ -172,46 +179,37 @@ struct SpeechToTextView: View {
                         .padding(.horizontal)
                 }
 
-                // Audio level indicator
+                // Audio level indicator - using adaptive sizing
                 if viewModel.isRecording {
-                    HStack(spacing: 4) {
-                        ForEach(0..<10, id: \.self) { index in
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(index < Int(viewModel.audioLevel * 10) ? Color.green : Color.gray.opacity(0.3))
-                                .frame(width: 25, height: 8)
-                        }
-                    }
+                    AdaptiveAudioLevelIndicator(level: viewModel.audioLevel)
                 }
 
-                // Record button
-                Button(action: {
+                // Record button - using adaptive sizing
+                AdaptiveMicButton(
+                    isActive: viewModel.isRecording,
+                    isPulsing: false,
+                    isLoading: viewModel.isProcessing || viewModel.isTranscribing,
+                    activeColor: .red,
+                    inactiveColor: viewModel.isTranscribing ? .orange : .blue,
+                    icon: viewModel.isRecording ? "stop.fill" : "mic.fill"
+                ) {
                     Task {
                         await viewModel.toggleRecording()
                     }
-                }) {
-                    ZStack {
-                        Circle()
-                            .fill(viewModel.isRecording ? Color.red : (viewModel.isTranscribing ? Color.orange : Color.blue))
-                            .frame(width: 72, height: 72)
-
-                        if viewModel.isProcessing || viewModel.isTranscribing {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        } else {
-                            Image(systemName: viewModel.isRecording ? "stop.fill" : "mic.fill")
-                                .font(.system(size: 32))
-                                .foregroundColor(.white)
-                        }
-                    }
                 }
                 .disabled(viewModel.selectedModelName == nil || viewModel.isProcessing || viewModel.isTranscribing)
+                .opacity(viewModel.selectedModelName == nil || viewModel.isProcessing || viewModel.isTranscribing ? 0.6 : 1.0)
 
                 Text(viewModel.isTranscribing ? "Processing transcription..." : (viewModel.isRecording ? "Tap to stop recording" : "Tap to start recording"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
                 .padding()
+                #if os(iOS)
                 .background(Color(.systemBackground))
+                #else
+                .background(Color(NSColor.windowBackgroundColor))
+                #endif
                 } else {
                     // No model selected - show onboarding
                     Spacer()
@@ -318,10 +316,12 @@ class STTViewModel: ObservableObject {
         logger.info("Initializing STT view model")
 
         // Request microphone permission
+        #if os(iOS)
         let status = AVAudioApplication.shared.recordPermission
         if status != .granted {
             await AVAudioApplication.requestRecordPermission()
         }
+        #endif
 
         // Subscribe to model lifecycle changes from SDK
         subscribeToModelLifecycle()
@@ -449,10 +449,12 @@ class STTViewModel: ObservableObject {
         }
 
         do {
-            // Configure audio session
+            // Configure audio session (iOS only - macOS doesn't use AVAudioSession)
+            #if os(iOS)
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.record, mode: .measurement)
             try audioSession.setActive(true)
+            #endif
 
             // Create audio engine
             let engine = AVAudioEngine()
@@ -644,7 +646,9 @@ class STTViewModel: ObservableObject {
             await performBatchTranscription()
         }
 
+        #if os(iOS)
         try? AVAudioSession.sharedInstance().setActive(false)
+        #endif
         logger.info("Recording stopped. Transcription: \(self.transcription)")
     }
 

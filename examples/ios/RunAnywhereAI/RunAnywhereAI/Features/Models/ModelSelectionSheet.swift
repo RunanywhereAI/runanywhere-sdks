@@ -76,41 +76,44 @@ struct ModelSelectionSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItemGroup(placement: .navigationBarLeading) {
-                    #if os(iOS)
                     Button("Cancel") {
                         dismiss()
                     }
                     .disabled(isLoadingModel)
-                    #else
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .disabled(isLoadingModel)
-                    .keyboardShortcut(.escape)
-                    #endif
                 }
-
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("Add Model") {
                         showingAddModelSheet = true
                     }
                     .disabled(isLoadingModel)
                 }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .disabled(isLoadingModel)
+                    .keyboardShortcut(.escape)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add Model") {
+                        showingAddModelSheet = true
+                    }
+                    .disabled(isLoadingModel)
+                }
+                #endif
             }
         }
-        #if os(macOS)
-        .frame(minWidth: AppLayout.sheetMinWidth, idealWidth: AppLayout.sheetIdealWidth, minHeight: AppLayout.sheetMinHeight, idealHeight: AppLayout.sheetIdealHeight)
-        #endif
+        .adaptiveSheetFrame()
         .sheet(isPresented: $showingAddModelSheet) {
             AddModelFromURLView(onModelAdded: { modelInfo in
                 Task {
                     await viewModel.addImportedModel(modelInfo)
                 }
             })
-            #if os(macOS)
-            .frame(minWidth: AppLayout.sheetMinWidth, idealWidth: AppLayout.sheetIdealWidth, minHeight: AppLayout.sheetMinHeight, idealHeight: AppLayout.sheetIdealHeight)
-            #endif
+            .adaptiveSheetFrame()
         }
         .task {
             await loadInitialData()
@@ -131,7 +134,10 @@ struct ModelSelectionSheet: View {
             .overlay {
                 VStack(spacing: AppSpacing.xLarge) {
                     ProgressView()
-                        .scaleEffect(1.2)
+                        .scaleEffect(DeviceFormFactor.current == .desktop ? 1.5 : 1.2)
+                        #if os(macOS)
+                        .controlSize(.large)
+                        #endif
 
                     Text("Loading Model")
                         .font(AppTypography.headline)
@@ -140,8 +146,10 @@ struct ModelSelectionSheet: View {
                         .font(AppTypography.subheadline)
                         .foregroundColor(AppColors.textSecondary)
                         .multilineTextAlignment(.center)
+                        .frame(minWidth: 200)
                 }
-                .padding(AppSpacing.xxLarge)
+                .padding(DeviceFormFactor.current == .desktop ? 40 : AppSpacing.xxLarge)
+                .frame(minWidth: DeviceFormFactor.current == .desktop ? 300 : nil)
                 .background(AppColors.backgroundPrimary)
                 .cornerRadius(AppSpacing.cornerRadiusXLarge)
                 .shadow(radius: AppSpacing.shadowXLarge)

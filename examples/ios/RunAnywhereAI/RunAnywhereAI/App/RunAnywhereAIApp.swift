@@ -15,6 +15,9 @@ import LlamaCPPRuntime
 import UIKit
 #endif
 import os
+#if os(macOS)
+import AppKit
+#endif
 // Import Foundation Models adapter from SDK (requires iOS 26+ / macOS 26+)
 #if canImport(FoundationModelsAdapter)
 import FoundationModelsAdapter
@@ -23,9 +26,29 @@ import FoundationModelsAdapter
 @main
 struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
+    #if os(macOS)
+    private let memoryPressureSource: DispatchSourceMemoryPressure
+    #endif
     @StateObject private var modelManager = ModelManager.shared
     @State private var isSDKInitialized = false
     @State private var initializationError: Error?
+
+    init() {
+        #if os(macOS)
+        // Setup macOS memory pressure monitoring
+        memoryPressureSource = DispatchSource.makeMemoryPressureSource(
+            eventMask: [.warning, .critical],
+            queue: .main
+        )
+        memoryPressureSource.setEventHandler { [logger] in
+            logger.warning("⚠️ macOS memory pressure detected, cleaning up cached services")
+            Task {
+                await WhisperKitAdapter.shared.forceCleanup()
+            }
+        }
+        memoryPressureSource.resume()
+        #endif
+    }
 
     var body: some Scene {
         WindowGroup {
