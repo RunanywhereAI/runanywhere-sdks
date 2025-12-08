@@ -15,18 +15,22 @@ import {
   ScrollView,
   Alert,
   Platform,
+  NativeModules,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 
-// Audio playback using react-native-sound (Android only - iOS has compatibility issues)
+// Native iOS Audio Module
+const NativeAudioModule = Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
+
+// Audio playback using react-native-sound (Android only - iOS uses NativeAudioModule)
 let Sound: any = null;
 let soundInitialized = false;
 
 function getSound() {
   if (Platform.OS === 'ios') {
-    return null; // Disabled on iOS due to bridgeless=NO requirement for Nitrogen
+    return null; // iOS uses NativeAudioModule instead
   }
   if (!Sound) {
     try {
@@ -111,7 +115,17 @@ export const TTSScreen: React.FC = () => {
   // Helper to stop sound playback
   const stopSound = useCallback(async () => {
     stopProgressUpdates();
-    // Stop react-native-sound (works on both iOS and Android)
+    
+    // iOS: Stop NativeAudioModule
+    if (Platform.OS === 'ios' && NativeAudioModule) {
+      try {
+        await NativeAudioModule.stopPlayback();
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
+    // Stop react-native-sound (Android)
     if (soundRef.current) {
       soundRef.current.stop();
       soundRef.current.release();
@@ -123,11 +137,17 @@ export const TTSScreen: React.FC = () => {
   useEffect(() => {
     return () => {
       stopSound();
-      // Also stop System TTS (wrap in try-catch due to react-native-tts iOS bug)
-      try {
-        getTts().stop();
-      } catch {
-        // Ignore - react-native-tts has BOOL conversion issues on iOS
+      // Also stop System TTS
+      if (Platform.OS === 'ios' && NativeAudioModule) {
+        // Stop iOS native TTS
+        NativeAudioModule.stopSpeaking().catch(() => {});
+      } else {
+        // Stop Android react-native-tts
+        try {
+          getTts()?.stop();
+        } catch {
+          // Ignore
+        }
       }
       // Clean up temp audio file
       if (audioFilePath) {
@@ -373,24 +393,42 @@ export const TTSScreen: React.FC = () => {
 
   /**
    * Generate speech using System TTS (AVSpeechSynthesizer on iOS)
-   * This uses react-native-tts which wraps the native platform TTS
+   * iOS: Uses NativeAudioModule directly
+   * Android: Uses react-native-tts
    */
   const handleSystemTTSGenerate = useCallback(async () => {
     console.log('[TTSScreen] Using System TTS (native speech synthesizer)');
 
     try {
+      // iOS: Use NativeAudioModule for System TTS
+      if (Platform.OS === 'ios' && NativeAudioModule) {
+        console.log('[TTSScreen] iOS: Using NativeAudioModule.speak()');
+        
+        setIsPlaying(true);
+        
+        // Estimate duration based on text length and speed
+        const estimatedDuration = (text.length * 0.06) / speed;
+        setDuration(estimatedDuration);
+        setSampleRate(0); // System TTS doesn't expose sample rate
+        setAudioGenerated(false); // No audio file for System TTS
+        
+        try {
+          const result = await NativeAudioModule.speak(text, speed, pitch);
+          console.log('[TTSScreen] iOS System TTS result:', result);
+          setIsPlaying(false);
+        } catch (speakError: any) {
+          console.error('[TTSScreen] iOS System TTS error:', speakError);
+          Alert.alert('Error', `System TTS failed: ${speakError.message || speakError}`);
+          setIsPlaying(false);
+        }
+        return;
+      }
+      
+      // Android: Use react-native-tts
       const tts = getTts();
       
       if (!tts) {
-        if (Platform.OS === 'ios') {
-          Alert.alert(
-            'System TTS Not Available',
-            'System TTS is not available on iOS in this build. Please use an ONNX TTS model instead.',
-            [{ text: 'OK' }]
-          );
-        } else {
-          Alert.alert('TTS Not Available', 'System TTS is not available.');
-        }
+        Alert.alert('TTS Not Available', 'System TTS is not available.');
         return;
       }
       
@@ -410,15 +448,14 @@ export const TTSScreen: React.FC = () => {
 
       // Speak the text with options
       // iOS rate: 0.0-1.0, Android rate: 0.01-0.99
-      const iosRate = Math.min(0.99, Math.max(0.01, speed * 0.5));
+      const androidRate = Math.min(0.99, Math.max(0.01, speed * 0.5));
       
-      console.log('[TTSScreen] System TTS speaking with rate:', iosRate, 'pitch:', pitch);
+      console.log('[TTSScreen] Android System TTS speaking with rate:', androidRate, 'pitch:', pitch);
       
       // Just speak with default settings - avoid setDefaultRate issue
       // The speak function itself should work
       tts.speak(text, {
-        iosVoiceId: '', // Use default voice
-        rate: iosRate,
+        rate: androidRate,
         pitch: pitch,
       });
 
@@ -447,8 +484,12 @@ export const TTSScreen: React.FC = () => {
 
     // Stop any existing playback
     stopSound();
-    // Also stop any System TTS (wrap due to iOS bug)
-    try { getTts().stop(); } catch { /* ignore */ }
+    // Also stop any System TTS
+    if (Platform.OS === 'ios' && NativeAudioModule) {
+      try { await NativeAudioModule.stopSpeaking(); } catch { /* ignore */ }
+    } else {
+      try { getTts()?.stop(); } catch { /* ignore */ }
+    }
 
     // Check if using System TTS
     const isSystemTTS = currentModel.id === 'system-tts' ||
@@ -579,14 +620,59 @@ export const TTSScreen: React.FC = () => {
       if (isPlaying) {
         // Pause playback
         console.log('[TTSScreen] Pausing playback...');
-        if (soundRef.current) {
+        
+        // iOS: Use NativeAudioModule
+        if (Platform.OS === 'ios' && NativeAudioModule) {
+          try {
+            await NativeAudioModule.pausePlayback();
+          } catch (e) {
+            console.log('[TTSScreen] iOS pause error:', e);
+          }
+        } else if (soundRef.current) {
           soundRef.current.pause();
         }
+        
         stopProgressUpdates();
         setIsPlaying(false);
         console.log('[TTSScreen] Playback paused');
       } else {
-        // Use react-native-sound for both iOS and Android
+        // Check if we should resume on iOS
+        if (Platform.OS === 'ios' && NativeAudioModule && currentTime > 0) {
+          // Resume iOS playback
+          console.log('[TTSScreen] Resuming iOS playback from:', currentTime);
+          try {
+            await NativeAudioModule.resumePlayback();
+            setIsPlaying(true);
+            
+            // Restart progress updates
+            progressIntervalRef.current = setInterval(async () => {
+              try {
+                const status = await NativeAudioModule.getPlaybackStatus();
+                const currentSec = status.currentTime || 0;
+                const totalDuration = status.duration || duration;
+                setCurrentTime(currentSec);
+                if (totalDuration > 0) {
+                  setPlaybackProgress(currentSec / totalDuration);
+                }
+                
+                if (!status.isPlaying && currentSec >= totalDuration - 0.1) {
+                  stopProgressUpdates();
+                  setIsPlaying(false);
+                  setCurrentTime(0);
+                  setPlaybackProgress(0);
+                }
+              } catch (e) {
+                // Ignore
+              }
+            }, 100);
+            
+            return;
+          } catch (e) {
+            console.log('[TTSScreen] iOS resume error, starting fresh:', e);
+          }
+        }
+        
+        // Android: Use react-native-sound
         if (soundRef.current && currentTime > 0) {
           // Resume existing sound
           console.log('[TTSScreen] Resuming playback from:', currentTime);
@@ -618,17 +704,49 @@ export const TTSScreen: React.FC = () => {
           console.log('[TTSScreen] Starting fresh playback...');
           await stopSound(); // Clean up any existing sound
           
+          // iOS: Use NativeAudioModule
+          if (Platform.OS === 'ios' && NativeAudioModule) {
+            console.log('[TTSScreen] Using NativeAudioModule for iOS playback');
+            try {
+              const result = await NativeAudioModule.playAudio(audioFilePath);
+              console.log('[TTSScreen] iOS playback started:', result);
+              setIsPlaying(true);
+              
+              // Start progress updates for iOS
+              progressIntervalRef.current = setInterval(async () => {
+                try {
+                  const status = await NativeAudioModule.getPlaybackStatus();
+                  const currentSec = status.currentTime || 0;
+                  const totalDuration = status.duration || duration;
+                  setCurrentTime(currentSec);
+                  if (totalDuration > 0) {
+                    setPlaybackProgress(currentSec / totalDuration);
+                  }
+                  
+                  // Check if playback finished
+                  if (!status.isPlaying && currentSec >= totalDuration - 0.1) {
+                    stopProgressUpdates();
+                    setIsPlaying(false);
+                    setCurrentTime(0);
+                    setPlaybackProgress(0);
+                    console.log('[TTSScreen] iOS playback finished');
+                  }
+                } catch (e) {
+                  // Ignore errors during polling
+                }
+              }, 100);
+              
+              return;
+            } catch (error: any) {
+              console.error('[TTSScreen] iOS playback error:', error);
+              Alert.alert('Playback Error', `Failed to play audio: ${error.message}`);
+              return;
+            }
+          }
+          
           const SoundClass = getSound();
           if (!SoundClass) {
-            if (Platform.OS === 'ios') {
-              Alert.alert(
-                'Playback Not Available',
-                'Audio playback is not available on iOS in this build. The audio file was generated successfully at: ' + audioFilePath,
-                [{ text: 'OK' }]
-              );
-            } else {
-              Alert.alert('Playback Error', 'Sound player not available');
-            }
+            Alert.alert('Playback Error', 'Sound player not available');
             return;
           }
           const sound = new SoundClass(audioFilePath, '', (error) => {
@@ -683,9 +801,13 @@ export const TTSScreen: React.FC = () => {
   const handleStop = useCallback(async () => {
     await stopSound();
     // Also stop System TTS if playing
-    const tts = getTts();
-    if (tts) {
-      try { tts.stop(); } catch { /* ignore */ }
+    if (Platform.OS === 'ios' && NativeAudioModule) {
+      try { await NativeAudioModule.stopSpeaking(); } catch { /* ignore */ }
+    } else {
+      const tts = getTts();
+      if (tts) {
+        try { tts.stop(); } catch { /* ignore */ }
+      }
     }
     setIsPlaying(false);
     setCurrentTime(0);
