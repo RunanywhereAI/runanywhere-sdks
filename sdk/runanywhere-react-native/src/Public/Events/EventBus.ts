@@ -26,8 +26,11 @@ import type {
   UnsubscribeFunction,
 } from '../../types';
 
-// Native module reference
-const { RunAnywhereModule } = NativeModules;
+// Native module reference - accessed lazily in setup() to avoid
+// accessing NativeModules before React Native is fully initialized (bridgeless mode)
+function getRunAnywhereModule() {
+  return NativeModules.RunAnywhereModule;
+}
 
 // Event name constants matching native modules
 export const NativeEventNames = {
@@ -77,6 +80,8 @@ class EventBusImpl {
     if (this.isSetup) return;
 
     // Only create NativeEventEmitter if native module exists
+    // Access NativeModules lazily to avoid issues with bridgeless mode
+    const RunAnywhereModule = getRunAnywhereModule();
     if (RunAnywhereModule) {
       this.emitter = new NativeEventEmitter(RunAnywhereModule);
 

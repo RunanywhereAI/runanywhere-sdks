@@ -92,13 +92,15 @@ function getRunAnywhereDeviceInfo(): RunAnywhereDeviceInfo {
   return NitroModules.createHybridObject<RunAnywhereDeviceInfo>('RunAnywhereDeviceInfo');
 }
 
-// Cached instances
+// Cached instances - lazily initialized to avoid accessing native modules
+// before React Native's JS runtime is fully initialized (bridgeless mode)
 let _cachedModule: RunAnywhere | null = null;
 let _cachedFileSystem: RunAnywhereFileSystem | null = null;
 let _cachedDeviceInfo: RunAnywhereDeviceInfo | null = null;
 
 /**
  * Native module instance using Nitrogen
+ * Lazily creates the HybridObject on first access
  */
 function getNativeModule(): NativeRunAnywhereModule {
   if (!_cachedModule) {
@@ -110,6 +112,7 @@ function getNativeModule(): NativeRunAnywhereModule {
 
 /**
  * Native FileSystem module instance using Nitrogen
+ * Lazily creates the HybridObject on first access
  */
 function getNativeFileSystem(): RunAnywhereFileSystem {
   if (!_cachedFileSystem) {
@@ -121,6 +124,7 @@ function getNativeFileSystem(): RunAnywhereFileSystem {
 
 /**
  * Native DeviceInfo module instance using Nitrogen
+ * Lazily creates the HybridObject on first access
  */
 function getNativeDeviceInfo(): RunAnywhereDeviceInfo {
   if (!_cachedDeviceInfo) {
@@ -130,9 +134,51 @@ function getNativeDeviceInfo(): RunAnywhereDeviceInfo {
   return _cachedDeviceInfo;
 }
 
-export const NativeRunAnywhere = getNativeModule();
-export const NativeRunAnywhereFileSystem = getNativeFileSystem();
-export const NativeRunAnywhereDeviceInfo = getNativeDeviceInfo();
+/**
+ * Lazy proxy for NativeRunAnywhere
+ * Defers HybridObject creation until first property access to avoid
+ * accessing native modules before React Native is fully initialized
+ */
+export const NativeRunAnywhere: NativeRunAnywhereModule = new Proxy({} as NativeRunAnywhereModule, {
+  get(_target, prop) {
+    const module = getNativeModule();
+    const value = (module as any)[prop];
+    if (typeof value === 'function') {
+      return value.bind(module);
+    }
+    return value;
+  },
+});
+
+/**
+ * Lazy proxy for NativeRunAnywhereFileSystem
+ * Defers HybridObject creation until first property access
+ */
+export const NativeRunAnywhereFileSystem: RunAnywhereFileSystem = new Proxy({} as RunAnywhereFileSystem, {
+  get(_target, prop) {
+    const module = getNativeFileSystem();
+    const value = (module as any)[prop];
+    if (typeof value === 'function') {
+      return value.bind(module);
+    }
+    return value;
+  },
+});
+
+/**
+ * Lazy proxy for NativeRunAnywhereDeviceInfo
+ * Defers HybridObject creation until first property access
+ */
+export const NativeRunAnywhereDeviceInfo: RunAnywhereDeviceInfo = new Proxy({} as RunAnywhereDeviceInfo, {
+  get(_target, prop) {
+    const module = getNativeDeviceInfo();
+    const value = (module as any)[prop];
+    if (typeof value === 'function') {
+      return value.bind(module);
+    }
+    return value;
+  },
+});
 
 /**
  * Check if native module is available

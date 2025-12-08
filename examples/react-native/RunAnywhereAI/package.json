@@ -12,10 +12,13 @@
     "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && npm install && cd ios && pod install"
   },
   "dependencies": {
-    "@react-navigation/bottom-tabs": "^7.3.10",
-    "@react-navigation/native": "^7.1.6",
+    "@react-navigation/bottom-tabs": "^7.8.11",
+    "@react-navigation/native": "^7.1.24",
+    "@react-navigation/native-stack": "^7.8.5",
+    "prop-types": "^15.8.1",
     "react": "19.1.0",
     "react-native": "0.81.1",
+    "react-native-audio-recorder-player": "^3.6.14",
     "react-native-fs": "^2.18.0",
     "react-native-live-audio-stream": "^1.1.1",
     "react-native-nitro-modules": "^0.31.10",
@@ -44,6 +47,7 @@
     "@types/react-native-vector-icons": "^6.4.18",
     "eslint": "^8.57.0",
     "prettier": "^3.3.2",
+    "react-native-monorepo-config": "^0.3.0",
     "typescript": "^5.5.3"
   },
   "engines": {

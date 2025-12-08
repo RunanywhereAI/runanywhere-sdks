@@ -6,13 +6,31 @@
  * - TTSScreen: Play synthesized audio
  * - VoiceAssistantScreen: Full pipeline with record + play
  *
- * Uses react-native-live-audio-stream for raw PCM recording
- * and creates WAV files for transcription compatibility
+ * Platform-specific implementations:
+ * - iOS: Audio recording not available (Nitrogen requires bridgeless=NO, incompatible with audio libs)
+ * - Android: Uses react-native-live-audio-stream for raw PCM recording (STT WAV format)
  */
 
-import { Platform, PermissionsAndroid } from 'react-native';
-import LiveAudioStream from 'react-native-live-audio-stream';
+import { Platform, PermissionsAndroid, Alert } from 'react-native';
 import RNFS from 'react-native-fs';
+
+// Lazy load LiveAudioStream (Android only)
+let LiveAudioStream: any = null;
+
+function getLiveAudioStream() {
+  if (Platform.OS !== 'android') {
+    return null;
+  }
+  if (!LiveAudioStream) {
+    try {
+      LiveAudioStream = require('react-native-live-audio-stream').default;
+    } catch (e) {
+      console.error('[AudioService] Failed to load LiveAudioStream:', e);
+      return null;
+    }
+  }
+  return LiveAudioStream;
+}
 
 // Audio configuration for speech recognition
 export const SAMPLE_RATE = 16000; // Required by Whisper models
@@ -137,24 +155,43 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 /**
  * Start recording audio
  * Returns the URI where the audio will be saved
+ * 
+ * Platform support:
+ * - iOS: Not available (Nitrogen requires bridgeless=NO, incompatible with audio libraries)
+ * - Android: react-native-live-audio-stream (raw PCM for STT WAV format)
  */
 export async function startRecording(callbacks?: RecordingCallbacks): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
-      console.log('[AudioService] Starting live audio stream...');
+      // iOS: Recording not available
+      if (Platform.OS === 'ios') {
+        console.log('[AudioService] iOS: Audio recording not available');
+        Alert.alert(
+          'STT Not Available on iOS',
+          'Speech-to-Text recording requires Android. LLM and TTS (ONNX models) work on iOS.',
+          [{ text: 'OK' }]
+        );
+        reject(new Error('Audio recording not available on iOS'));
+        return;
+      }
       
-      // Generate file path
+      // Android: Use LiveAudioStream for raw PCM
+      console.log('[AudioService] Android: Starting live audio stream...');
+      
       const fileName = `recording_${Date.now()}.wav`;
-      const filePath = Platform.select({
-        ios: `${RNFS.DocumentDirectoryPath}/${fileName}`,
-        android: `${RNFS.CachesDirectoryPath}/${fileName}`,
-      })!;
-
+      const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
       currentRecordPath = filePath;
       audioChunks = [];
       
+      const audioStream = getLiveAudioStream();
+      
+      if (!audioStream) {
+        reject(new Error('Audio stream not available'));
+        return;
+      }
+      
       // Initialize live audio stream
-      LiveAudioStream.init({
+      audioStream.init({
         sampleRate: SAMPLE_RATE,
         channels: CHANNELS,
         bitsPerSample: BITS_PER_SAMPLE,
@@ -166,7 +203,7 @@ export async function startRecording(callbacks?: RecordingCallbacks): Promise<st
       progressCallback = callbacks?.onProgress || null;
 
       // Listen for audio data
-      LiveAudioStream.on('data', (data: string) => {
+      audioStream.on('data', (data: string) => {
         audioChunks.push(data);
         
         if (progressCallback) {
@@ -177,11 +214,11 @@ export async function startRecording(callbacks?: RecordingCallbacks): Promise<st
       });
 
       // Start recording
-      LiveAudioStream.start();
+      audioStream.start();
       isRecording = true;
       recordingStartTime = Date.now();
 
-      console.log('[AudioService] Recording started:', filePath);
+      console.log('[AudioService] Android recording started:', filePath);
       resolve(filePath);
     } catch (error) {
       console.error('[AudioService] Failed to start recording:', error);
@@ -199,8 +236,11 @@ export async function stopRecording(): Promise<{ uri: string; durationMs: number
   }
 
   try {
-    // Stop the stream
-    LiveAudioStream.stop();
+    // Android: Stop LiveAudioStream
+    const audioStream = getLiveAudioStream();
+    if (audioStream) {
+      audioStream.stop();
+    }
     isRecording = false;
     
     const durationMs = Date.now() - recordingStartTime;
@@ -265,7 +305,11 @@ export async function stopRecording(): Promise<{ uri: string; durationMs: number
 export async function cancelRecording(): Promise<void> {
   if (isRecording) {
     try {
-      LiveAudioStream.stop();
+      // Android: Stop LiveAudioStream
+      const audioStream = getLiveAudioStream();
+      if (audioStream) {
+        audioStream.stop();
+      }
       
       // Delete the partial recording file
       if (currentRecordPath) {
