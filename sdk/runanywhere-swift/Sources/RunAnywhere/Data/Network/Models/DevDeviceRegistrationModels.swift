@@ -9,13 +9,9 @@ public struct DevDeviceRegistrationRequest: Codable {
     let deviceId: String
     let deviceModel: String
     let osVersion: String
-    let chipName: String?
-    let totalMemory: Int64
-    let hasNeuralEngine: Bool
     let architecture: String
-    let formFactor: String
-    let sdkVersion: String
     let platform: String
+    let sdkVersion: String
     let buildToken: String
     let lastSeenAt: String  // ISO 8601 timestamp for UPSERT updates
 
@@ -24,13 +20,9 @@ public struct DevDeviceRegistrationRequest: Codable {
         case deviceId = "device_id"
         case deviceModel = "device_model"
         case osVersion = "os_version"
-        case chipName = "chip_name"
-        case totalMemory = "total_memory"
-        case hasNeuralEngine = "has_neural_engine"
         case architecture
-        case formFactor = "form_factor"
-        case sdkVersion = "sdk_version"
         case platform
+        case sdkVersion = "sdk_version"
         case buildToken = "build_token"
         case lastSeenAt = "last_seen_at"
     }

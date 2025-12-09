@@ -547,91 +547,7 @@ public struct STTTranscriptionTelemetryData: AnalyticsEventData {
     }
 }
 
-// MARK: - Monitoring Event Data Models
-
-/// Resource usage event data
-public struct ResourceUsageData: AnalyticsEventData {
-    public let memoryUsageMB: Double
-    public let cpuUsagePercent: Double
-    public let diskUsageMB: Double?
-    public let batteryLevel: Float?
-
-    public init(memoryUsageMB: Double, cpuUsagePercent: Double, diskUsageMB: Double? = nil, batteryLevel: Float? = nil) {
-        self.memoryUsageMB = memoryUsageMB
-        self.cpuUsagePercent = cpuUsagePercent
-        self.diskUsageMB = diskUsageMB
-        self.batteryLevel = batteryLevel
-    }
-
-}
-
-/// Performance metrics event data
-public struct PerformanceMetricsData: AnalyticsEventData {
-    public let operationName: String
-    public let durationMs: Double
-    public let success: Bool
-    public let errorCode: String?
-
-    public init(operationName: String, durationMs: Double, success: Bool, errorCode: String? = nil) {
-        self.operationName = operationName
-        self.durationMs = durationMs
-        self.success = success
-        self.errorCode = errorCode
-    }
-
-}
-
-/// CPU threshold event data
-public struct CPUThresholdData: AnalyticsEventData {
-    public let cpuUsage: Double
-    public let threshold: Double
-    public let timestamp: TimeInterval
-
-    public init(cpuUsage: Double, threshold: Double) {
-        self.cpuUsage = cpuUsage
-        self.threshold = threshold
-        self.timestamp = Date().timeIntervalSince1970
-    }
-}
-
-/// Disk space warning event data
-public struct DiskSpaceWarningData: AnalyticsEventData {
-    public let availableSpaceMB: Int
-    public let requiredSpaceMB: Int
-    public let timestamp: TimeInterval
-
-    public init(availableSpaceMB: Int, requiredSpaceMB: Int) {
-        self.availableSpaceMB = availableSpaceMB
-        self.requiredSpaceMB = requiredSpaceMB
-        self.timestamp = Date().timeIntervalSince1970
-    }
-}
-
-/// Network latency event data
-public struct NetworkLatencyData: AnalyticsEventData {
-    public let endpoint: String
-    public let latencyMs: Double
-    public let timestamp: TimeInterval
-
-    public init(endpoint: String, latencyMs: Double) {
-        self.endpoint = endpoint
-        self.latencyMs = latencyMs
-        self.timestamp = Date().timeIntervalSince1970
-    }
-}
-
-/// Memory warning event data
-public struct MemoryWarningData: AnalyticsEventData {
-    public let warningLevel: String
-    public let availableMemoryMB: Int
-    public let timestamp: TimeInterval
-
-    public init(warningLevel: String, availableMemoryMB: Int) {
-        self.warningLevel = warningLevel
-        self.availableMemoryMB = availableMemoryMB
-        self.timestamp = Date().timeIntervalSince1970
-    }
-}
+// MARK: - Session Event Data Models
 
 /// Session started event data
 public struct SessionStartedData: AnalyticsEventData {
@@ -661,18 +577,82 @@ public struct SessionEndedData: AnalyticsEventData {
 
 // MARK: - Generic Error Data
 
-/// Generic error event data
+/// Generic error event data with full context including stack trace
 public struct ErrorEventData: AnalyticsEventData {
+    /// The error description
     public let error: String
+
+    /// The context where the error occurred (e.g., "generation", "stt", "tts")
     public let context: String
+
+    /// Machine-readable error code
     public let errorCode: String?
+
+    /// Error category for grouping
+    public let category: String?
+
+    /// Stack trace at the point of error (debug builds only)
+    public let stackTrace: String?
+
+    /// Source file where error occurred
+    public let file: String?
+
+    /// Line number where error occurred
+    public let line: Int?
+
+    /// Function name where error occurred
+    public let function: String?
+
+    /// Timestamp when the error occurred
     public let timestamp: TimeInterval
 
-    public init(error: String, context: AnalyticsContext, errorCode: String? = nil) {
+    /// Full initializer with all context fields
+    public init(
+        error: String,
+        context: AnalyticsContext,
+        errorCode: String? = nil,
+        category: String? = nil,
+        stackTrace: String? = nil,
+        file: String? = nil,
+        line: Int? = nil,
+        function: String? = nil
+    ) {
         self.error = error
         self.context = context.rawValue
         self.errorCode = errorCode
+        self.category = category
+        self.stackTrace = stackTrace
+        self.file = file
+        self.line = line
+        self.function = function
         self.timestamp = Date().timeIntervalSince1970
     }
 
+    /// Convenience initializer from Error with automatic context capture
+    public init(
+        from error: Error,
+        context: AnalyticsContext,
+        file: String = #file,
+        line: Int = #line,
+        function: String = #function
+    ) {
+        let raError = error.asRunAnywhereError()
+        let errorContext = error.errorContext ?? ErrorContext(file: file, line: line, function: function)
+
+        self.error = raError.errorDescription ?? error.localizedDescription
+        self.context = context.rawValue
+        self.errorCode = String(raError.code.rawValue)
+        self.category = raError.category.rawValue
+        self.file = errorContext.file
+        self.line = errorContext.line
+        self.function = errorContext.function
+        self.timestamp = Date().timeIntervalSince1970
+
+        // Only include stack trace in debug builds
+        #if DEBUG
+        self.stackTrace = errorContext.formattedStackTrace
+        #else
+        self.stackTrace = nil
+        #endif
+    }
 }

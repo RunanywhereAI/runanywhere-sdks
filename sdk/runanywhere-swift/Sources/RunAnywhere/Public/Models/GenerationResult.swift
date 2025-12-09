@@ -45,9 +45,6 @@ public struct GenerationResult {
     /// Framework used for generation (if on-device)
     public let framework: LLMFramework?
 
-    /// Hardware acceleration used
-    public let hardwareUsed: HardwareAcceleration
-
     /// Memory used during generation (in bytes)
     public let memoryUsed: Int64
 
@@ -75,7 +72,6 @@ public struct GenerationResult {
         executionTarget: ExecutionTarget,
         savedAmount: Double,
         framework: LLMFramework? = nil,
-        hardwareUsed: HardwareAcceleration = .cpu,
         memoryUsed: Int64 = 0,
         performanceMetrics: PerformanceMetrics,
         structuredOutputValidation: StructuredOutputValidation? = nil,
@@ -90,7 +86,6 @@ public struct GenerationResult {
         self.executionTarget = executionTarget
         self.savedAmount = savedAmount
         self.framework = framework
-        self.hardwareUsed = hardwareUsed
         self.memoryUsed = memoryUsed
         self.performanceMetrics = performanceMetrics
         self.structuredOutputValidation = structuredOutputValidation

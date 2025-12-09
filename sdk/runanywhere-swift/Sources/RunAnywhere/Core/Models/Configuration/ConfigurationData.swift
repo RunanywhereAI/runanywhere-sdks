@@ -26,9 +26,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
     /// Download configuration
     public var download: ModelDownloadConfiguration
 
-    /// Hardware preferences (optional)
-    public var hardware: HardwareConfiguration?
-
     /// Debug mode flag
     public var debugMode: Bool
 
@@ -52,7 +49,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
         storage: StorageConfiguration = StorageConfiguration(),
         api: APIConfiguration = APIConfiguration(),
         download: ModelDownloadConfiguration = ModelDownloadConfiguration(),
-        hardware: HardwareConfiguration? = nil,
         debugMode: Bool = false,
         apiKey: String? = nil,
         allowUserOverride: Bool = true,
@@ -66,7 +62,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
         self.storage = storage
         self.api = api
         self.download = download
-        self.hardware = hardware
         self.debugMode = debugMode
         self.apiKey = apiKey
         self.allowUserOverride = allowUserOverride

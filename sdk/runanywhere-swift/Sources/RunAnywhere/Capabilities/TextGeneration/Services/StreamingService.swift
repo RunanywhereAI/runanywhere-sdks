@@ -288,7 +288,6 @@ public class StreamingService { // swiftlint:disable:this type_body_length
                     executionTarget: .onDevice,
                     savedAmount: 0.0,
                     framework: framework,
-                    hardwareUsed: .cpu,
                     memoryUsed: 0,
                     performanceMetrics: performanceMetrics,
                     thinkingTokens: tokenCounts.thinkingTokens,

@@ -59,7 +59,7 @@ public final class FoundationModelsServiceProvider: LLMServiceProvider {
         logger.info("Creating Foundation Models service")
 
         // Create the service
-        let service = FoundationModelsService(hardwareConfig: nil)
+        let service = FoundationModelsService()
 
         // Initialize the service (Foundation Models doesn't need a model path)
         logger.info("Initializing Foundation Models service")

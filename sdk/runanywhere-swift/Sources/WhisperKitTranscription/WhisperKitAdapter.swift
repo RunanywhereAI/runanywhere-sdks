@@ -88,16 +88,8 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
         }
     }
 
-    public func configure(with hardware: HardwareConfiguration) async {
-        // WhisperKit doesn't need special hardware configuration
-    }
-
     public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
         model.memoryRequired ?? 0
-    }
-
-    public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
-        HardwareConfiguration()
     }
 
     // MARK: - Initialization

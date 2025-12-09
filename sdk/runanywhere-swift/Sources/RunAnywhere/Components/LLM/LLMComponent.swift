@@ -67,7 +67,6 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters 
 
     // Model loading parameters
     public let contextLength: Int
-    public let useGPUIfAvailable: Bool
     public let quantizationLevel: QuantizationLevel?
     public let cacheSize: Int // Token cache size in MB
     public let preloadContext: String? // Optional system prompt to preload
@@ -92,7 +91,6 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters 
     public init(
         modelId: String? = nil,
         contextLength: Int = 2048,
-        useGPUIfAvailable: Bool = true,
         quantizationLevel: QuantizationLevel? = nil,
         cacheSize: Int = 100,
         preloadContext: String? = nil,
@@ -104,7 +102,6 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters 
     ) {
         self.modelId = modelId
         self.contextLength = contextLength
-        self.useGPUIfAvailable = useGPUIfAvailable
         self.quantizationLevel = quantizationLevel
         self.cacheSize = cacheSize
         self.preloadContext = preloadContext

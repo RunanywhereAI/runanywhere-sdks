@@ -7,8 +7,6 @@ public struct ModelCriteria {
     public let maxSize: Int64?
     public let minContextLength: Int?
     public let maxContextLength: Int?
-    public let requiresNeuralEngine: Bool?
-    public let requiresGPU: Bool?
     public let tags: [String]
     public let quantization: String?
     public let search: String?
@@ -19,8 +17,6 @@ public struct ModelCriteria {
         maxSize: Int64? = nil,
         minContextLength: Int? = nil,
         maxContextLength: Int? = nil,
-        requiresNeuralEngine: Bool? = nil,
-        requiresGPU: Bool? = nil,
         tags: [String] = [],
         quantization: String? = nil,
         search: String? = nil
@@ -30,8 +26,6 @@ public struct ModelCriteria {
         self.maxSize = maxSize
         self.minContextLength = minContextLength
         self.maxContextLength = maxContextLength
-        self.requiresNeuralEngine = requiresNeuralEngine
-        self.requiresGPU = requiresGPU
         self.tags = tags
         self.quantization = quantization
         self.search = search

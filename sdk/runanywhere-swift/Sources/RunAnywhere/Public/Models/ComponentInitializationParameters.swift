@@ -34,7 +34,6 @@ public struct EmbeddingInitParameters: ComponentInitParameters {
     public let maxSequenceLength: Int
     public let poolingStrategy: PoolingStrategy
     public let normalize: Bool
-    public let useGPUIfAvailable: Bool
 
     public enum PoolingStrategy: String, Sendable {
         case mean = "mean"
@@ -48,15 +47,13 @@ public struct EmbeddingInitParameters: ComponentInitParameters {
         dimensions: Int = 768,
         maxSequenceLength: Int = 512,
         poolingStrategy: PoolingStrategy = .mean,
-        normalize: Bool = true,
-        useGPUIfAvailable: Bool = true
+        normalize: Bool = true
     ) {
         self.modelId = modelId
         self.dimensions = dimensions
         self.maxSequenceLength = maxSequenceLength
         self.poolingStrategy = poolingStrategy
         self.normalize = normalize
-        self.useGPUIfAvailable = useGPUIfAvailable
     }
 
     public func validate() throws {

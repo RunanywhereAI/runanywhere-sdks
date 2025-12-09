@@ -256,7 +256,6 @@ public struct STTConfiguration: ComponentConfiguration, ComponentInitParameters 
     public let vocabularyList: [String]
     public let maxAlternatives: Int
     public let enableTimestamps: Bool
-    public let useGPUIfAvailable: Bool
 
     public init(
         modelId: String? = nil,
@@ -266,8 +265,7 @@ public struct STTConfiguration: ComponentConfiguration, ComponentInitParameters 
         enableDiarization: Bool = false,
         vocabularyList: [String] = [],
         maxAlternatives: Int = 1,
-        enableTimestamps: Bool = true,
-        useGPUIfAvailable: Bool = true
+        enableTimestamps: Bool = true
     ) {
         self.modelId = modelId
         self.language = language
@@ -277,7 +275,6 @@ public struct STTConfiguration: ComponentConfiguration, ComponentInitParameters 
         self.vocabularyList = vocabularyList
         self.maxAlternatives = maxAlternatives
         self.enableTimestamps = enableTimestamps
-        self.useGPUIfAvailable = useGPUIfAvailable
     }
 
     public func validate() throws {

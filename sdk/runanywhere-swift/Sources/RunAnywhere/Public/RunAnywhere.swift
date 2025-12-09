@@ -444,11 +444,8 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             throw SDKError.notInitialized
         }
 
-        // Collect device info using DeviceKitAdapter
-        let deviceAdapter = DeviceKitAdapter()
-        let deviceInfoResult = deviceAdapter.getDeviceInfo()
-        let processorInfo = deviceAdapter.getProcessorInfo()
-        let capabilities = deviceAdapter.getDeviceCapabilities()
+        // Collect simple device info
+        let deviceInfo = DeviceInfo.current
 
         // Get or generate device ID (but DON'T store it yet - only after successful registration)
         let deviceId = getStoredDeviceId() ?? generateDeviceIdentifier()
@@ -458,15 +455,11 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         let now = ISO8601DateFormatter().string(from: Date())
         let request = DevDeviceRegistrationRequest(
             deviceId: deviceId,
-            deviceModel: deviceInfoResult.model,
-            osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
-            chipName: processorInfo.chipName,
-            totalMemory: Int64(ProcessInfo.processInfo.physicalMemory),
-            hasNeuralEngine: capabilities.hasNeuralEngine,
-            architecture: processorInfo.architecture,
-            formFactor: deviceInfoResult.name,
+            deviceModel: deviceInfo.model,
+            osVersion: deviceInfo.osVersion,
+            architecture: deviceInfo.architecture,
+            platform: deviceInfo.platform,
             sdkVersion: SDKConstants.version,
-            platform: SDKConstants.platform,
             buildToken: BuildToken.token,
             lastSeenAt: now  // Will be updated on every registration via UPSERT
         )

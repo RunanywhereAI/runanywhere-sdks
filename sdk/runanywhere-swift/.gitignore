@@ -15,3 +15,5 @@ XCFrameworks/
 
 # SPM build artifacts (recreated during swift build)
 Modules/
+
+EXTERNAL/

@@ -18,7 +18,6 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
         [.mlmodel, .mlpackage]
     }
 
-    private var hardwareConfig: HardwareConfiguration?
     private let logger = Logger(
         subsystem: "com.runanywhere.FoundationModels",
         category: "FoundationModelsAdapter"
@@ -46,7 +45,7 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
 
     public func createService(for modality: FrameworkModality) -> Any? {
         guard modality == .textToText else { return nil }
-        return FoundationModelsService(hardwareConfig: hardwareConfig)
+        return FoundationModelsService()
     }
 
     public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
@@ -55,27 +54,15 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
         }
         // Foundation Models doesn't need to load external models
         // It uses Apple's built-in models
-        let service = FoundationModelsService(hardwareConfig: hardwareConfig)
+        let service = FoundationModelsService()
         try await service.initialize(modelPath: "built-in")
         return service
-    }
-
-    public func configure(with hardware: HardwareConfiguration) async {
-        self.hardwareConfig = hardware
     }
 
     public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
         // Foundation Models memory is managed by the system
         // Estimate based on typical usage
         500_000_000 // 500MB typical for system models
-    }
-
-    public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
-        HardwareConfiguration(
-            primaryAccelerator: .neuralEngine,
-            memoryMode: .balanced,
-            threadCount: 2
-        )
     }
 
     /// Get a built-in model info for Foundation Models
