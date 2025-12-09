@@ -28,19 +28,10 @@ public protocol UnifiedFrameworkAdapter {
     /// - Returns: A service instance with the loaded model
     func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any
 
-    /// Configure the adapter with hardware settings
-    /// - Parameter hardware: Hardware configuration
-    func configure(with hardware: HardwareConfiguration) async
-
     /// Estimate memory usage for a model
     /// - Parameter model: The model to estimate
     /// - Returns: Estimated memory in bytes
     func estimateMemoryUsage(for model: ModelInfo) -> Int64
-
-    /// Get optimal hardware configuration for a model
-    /// - Parameter model: The model to configure for
-    /// - Returns: Optimal hardware configuration
-    func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration
 
     /// Called when the adapter is registered with the SDK
     /// Adapters should register their service providers with ModuleRegistry here

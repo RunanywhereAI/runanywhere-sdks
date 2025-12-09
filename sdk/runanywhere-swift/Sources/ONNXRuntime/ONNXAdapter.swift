@@ -137,19 +137,8 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
         }
     }
 
-    public func configure(with hardware: HardwareConfiguration) async {
-        // ONNX Runtime will use CPU by default
-        // Future: Could configure execution providers here (CoreML, etc.)
-        logger.info("Hardware configuration: \(hardware.primaryAccelerator.rawValue)")
-    }
-
     public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
         return model.memoryRequired ?? 0
-    }
-
-    public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
-        // For now, use CPU. Future: detect available hardware and use CoreML if available
-        return HardwareConfiguration(primaryAccelerator: .cpu)
     }
 
     /// Called when adapter is registered with the SDK

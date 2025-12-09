@@ -31,16 +31,9 @@ public enum ErrorCode: Int {
     case fileAccessDenied = 1303
     case fileCorrupted = 1304
 
-    // Memory errors (1400-1499)
-    case outOfMemory = 1400
-    case memoryWarning = 1401
-    case memoryAllocationFailed = 1402
-
     // Hardware errors (1500-1599)
     case hardwareUnsupported = 1500
     case hardwareUnavailable = 1501
-    case thermalStateExceeded = 1502
-    case batteryLow = 1503
 
     // Authentication errors (1600-1699)
     case authenticationFailed = 1600
@@ -83,14 +76,8 @@ public enum ErrorCode: Int {
         case .fileAccessDenied: return "File access denied"
         case .fileCorrupted: return "File is corrupted"
 
-        case .outOfMemory: return "Out of memory"
-        case .memoryWarning: return "Memory warning"
-        case .memoryAllocationFailed: return "Memory allocation failed"
-
         case .hardwareUnsupported: return "Hardware not supported"
         case .hardwareUnavailable: return "Hardware unavailable"
-        case .thermalStateExceeded: return "Device too hot"
-        case .batteryLow: return "Battery too low"
 
         case .authenticationFailed: return "Authentication failed"
         case .authenticationExpired: return "Authentication expired"

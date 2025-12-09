@@ -64,10 +64,6 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
     }()
 
     // MARK: - Infrastructure
-    /// Hardware manager
-    private(set) lazy var hardwareManager: HardwareCapabilityManager = {
-        HardwareCapabilityManager.shared
-    }()
 
     /// Logger
     private(set) lazy var logger: SDKLogger = {
@@ -176,26 +172,6 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         return _modelAssignmentService
     }
 
-    /// Device info service
-    private var _deviceInfoService: DeviceInfoService?
-    public var deviceInfoService: DeviceInfoService {
-        get async {
-            if let service = _deviceInfoService {
-                return service
-            }
-            let deviceRepo = DeviceInfoRepositoryImpl(
-                databaseManager: databaseManager,
-                apiClient: apiClient
-            )
-            let service = DeviceInfoService(
-                deviceInfoRepository: deviceRepo,
-                syncCoordinator: await syncCoordinator
-            )
-            _deviceInfoService = service
-            return service
-        }
-    }
-
     /// Generation analytics service - using unified pattern
     private var _generationAnalytics: GenerationAnalyticsService?
     public var generationAnalytics: GenerationAnalyticsService {
@@ -267,12 +243,11 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
      * This method performs complete SDK service initialization:
      *
      * 1. **Network Services**: Store authentication service and API client
-     * 2. **Device Information**: Collect and sync device info to backend
-     * 3. **Configuration Service**: Load configuration from backend/cache/defaults
-     * 4. **Model Catalog**: Sync model information from backend
-     * 5. **Model Registry**: Initialize for model discovery and management
-     * 6. **Voice Services**: Initialize voice capability (optional)
-     * 7. **Analytics**: Setup telemetry and analytics tracking
+     * 2. **Configuration Service**: Load configuration from backend/cache/defaults
+     * 3. **Model Catalog**: Sync model information from backend
+     * 4. **Model Registry**: Initialize for model discovery and management
+     * 5. **Voice Services**: Initialize voice capability (optional)
+     * 6. **Analytics**: Setup telemetry and analytics tracking
      *
      * - Parameters:
      *   - params: SDK initialization parameters
@@ -295,22 +270,7 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
 
         logger.debug("Network services configured for \(params.environment.description)")
 
-        // Step 2: Initialize and sync device information
-        logger.debug("Collecting device information")
-        let deviceInfoService = await self.deviceInfoService
-        if let deviceInfo = await deviceInfoService.loadCurrentDeviceInfo() {
-            EventBus.shared.publish(SDKDeviceEvent.deviceInfoCollected(deviceInfo: deviceInfo))
-
-            // Sync to backend
-            try? await deviceInfoService.syncToCloud()
-            logger.info("Device information synced to backend")
-
-            // Log device summary for debugging
-            let summary = await deviceInfoService.getDeviceInfoSummary()
-            logger.info("Device Info:\n\(summary)")
-        }
-
-        // Step 3: Initialize configuration service and load configuration
+        // Step 2: Initialize configuration service and load configuration
         let configRepository = ConfigurationRepositoryImpl(
             databaseManager: databaseManager,
             apiClient: apiClient
@@ -329,7 +289,7 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
             logger.info("Configuration loaded (source: \(effectiveConfig.source))")
         }
 
-        // Step 4: Sync model catalog from backend
+        // Step 3: Sync model catalog from backend
         logger.debug("Syncing model catalog")
         let modelInfoService = await self.modelInfoService
 
@@ -343,11 +303,11 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
             EventBus.shared.publish(SDKModelEvent.catalogLoaded(models: models))
         }
 
-        // Step 5: Initialize model registry
+        // Step 4: Initialize model registry
         await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
         logger.debug("Model registry initialized")
 
-        // Step 6: Initialize optional voice services
+        // Step 5: Initialize optional voice services
         do {
             try await voiceCapabilityService.initialize()
             logger.info("Voice capability service initialized")
@@ -355,7 +315,7 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
             logger.warning("Voice service initialization failed (optional): \(error)")
         }
 
-        // Step 7: Initialize analytics
+        // Step 6: Initialize analytics
         if let client = self.apiClient {
             let telemetryRepo = TelemetryRepositoryImpl(
                 databaseManager: databaseManager,
@@ -386,12 +346,11 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
      *
      * This method performs local-only SDK service initialization:
      *
-     * 1. **Device Information**: Collect local device info
-     * 2. **Configuration Service**: Load configuration from defaults only
-     * 3. **Model Catalog**: Use mock model data
-     * 4. **Model Registry**: Initialize for model discovery and management
-     * 5. **Voice Services**: Initialize voice capability (optional)
-     * 6. **Analytics**: Setup with local-only tracking
+     * 1. **Configuration Service**: Load configuration from defaults only
+     * 2. **Model Catalog**: Use mock model data
+     * 3. **Model Registry**: Initialize for model discovery and management
+     * 4. **Voice Services**: Initialize voice capability (optional)
+     * 5. **Analytics**: Setup with local-only tracking
      *
      * - Parameters:
      *   - params: SDK initialization parameters
@@ -409,18 +368,7 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         )
         logger.info("🔧 Mock network service initialized")
 
-        // Step 1: Collect device information (local only)
-        logger.debug("Collecting device information")
-        let deviceInfoService = await self.deviceInfoService
-        if let deviceInfo = await deviceInfoService.loadCurrentDeviceInfo() {
-            EventBus.shared.publish(SDKDeviceEvent.deviceInfoCollected(deviceInfo: deviceInfo))
-
-            // Log device summary for debugging
-            let summary = await deviceInfoService.getDeviceInfoSummary()
-            logger.info("Device Info:\n\(summary)")
-        }
-
-        // Step 2: Create default configuration (no API needed)
+        // Step 1: Create default configuration (no API needed)
         let defaultConfig = ConfigurationData(
             id: "dev-\(UUID().uuidString)",
             apiKey: params.apiKey.isEmpty ? "dev-mode" : params.apiKey,
@@ -435,14 +383,14 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: defaultConfig))
         logger.info("Configuration loaded (source: defaults for development)")
 
-        // Step 3: Model catalog
+        // Step 2: Model catalog
         logger.debug("Models will be loaded from network")
 
-        // Step 4: Initialize model registry
+        // Step 3: Initialize model registry
         await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
         logger.debug("Model registry initialized")
 
-        // Step 5: Initialize optional voice services
+        // Step 4: Initialize optional voice services
         do {
             try await voiceCapabilityService.initialize()
             logger.info("Voice capability service initialized")
@@ -450,7 +398,7 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
             logger.warning("Voice service initialization failed (optional): \(error)")
         }
 
-        // Step 6: Skip analytics initialization in development mode
+        // Step 5: Skip analytics initialization in development mode
         logger.info("Analytics disabled in development mode")
 
         logger.info("✅ Development mode bootstrap completed")
@@ -545,7 +493,6 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         _telemetryService = nil
         _modelInfoService = nil
         _modelAssignmentService = nil
-        _deviceInfoService = nil
         _generationAnalytics = nil
         _sttAnalytics = nil
         _voiceAnalytics = nil

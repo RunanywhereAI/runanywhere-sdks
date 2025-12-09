@@ -10,7 +10,6 @@ import FoundationModels
 /// Service implementation for Apple's Foundation Models
 @available(iOS 26.0, macOS 26.0, *)
 public class FoundationModelsService: LLMService {
-    private var hardwareConfig: HardwareConfiguration?
     private var _currentModel: String?
     private var _isReady = false
     private let logger = Logger(
@@ -39,8 +38,7 @@ public class FoundationModelsService: LLMService {
     }
     #endif
 
-    public init(hardwareConfig: HardwareConfiguration?) {
-        self.hardwareConfig = hardwareConfig
+    public init() {
     }
 
     public func initialize(modelPath: String?) async throws {

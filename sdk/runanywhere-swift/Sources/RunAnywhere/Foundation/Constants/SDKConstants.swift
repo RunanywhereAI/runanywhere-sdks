@@ -36,12 +36,6 @@ public enum SDKConstants {
     /// Retry delay in seconds
     public static let retryDelay: TimeInterval = 1.0
 
-    /// Memory warning threshold (percentage)
-    public static let memoryWarningThreshold: Float = 0.8
-
-    /// Memory critical threshold (percentage)
-    public static let memoryCriticalThreshold: Float = 0.9
-
     /// Cache size limit in bytes (100 MB)
     public static let cacheSizeLimit: Int64 = 100 * 1024 * 1024
 
@@ -123,12 +117,6 @@ public enum SDKConstants {
 
         /// Default model cache size
         public static let defaultModelCacheSize = 5
-
-        /// Default max memory usage in MB
-        public static let defaultMaxMemoryUsageMB = 1024
-
-        /// Memory buffer percentage for recommended memory (25%)
-        public static let recommendedMemoryBufferPercentage = 0.25
     }
 
     // MARK: - Analytics Constants

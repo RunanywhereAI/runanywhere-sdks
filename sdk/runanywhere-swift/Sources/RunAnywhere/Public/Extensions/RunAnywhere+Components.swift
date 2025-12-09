@@ -37,14 +37,12 @@ extension RunAnywhere {
     public static func initializeLLM(
         modelId: String? = nil,
         contextLength: Int = 2048,
-        useGPU: Bool = true,
         quantization: LLMConfiguration.QuantizationLevel? = nil,
         priority: InitializationPriority = .normal
     ) async -> InitializationResult {
         let params = LLMConfiguration(
             modelId: modelId,
             contextLength: contextLength,
-            useGPUIfAvailable: useGPU,
             quantizationLevel: quantization
         )
         let config = UnifiedComponentConfig.llm(params, priority: priority)

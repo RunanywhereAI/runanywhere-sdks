@@ -135,8 +135,6 @@ public enum SDKVoiceEvent: SDKEvent {
 
 /// SDK Performance Events for public API
 public enum SDKPerformanceEvent: SDKEvent {
-    case memoryWarning(usage: Int64)
-    case thermalStateChanged(state: String)
     case latencyMeasured(operation: String, milliseconds: Double)
     case throughputMeasured(tokensPerSecond: Double)
 
@@ -195,12 +193,8 @@ public enum SDKFrameworkEvent: SDKEvent {
 
 /// SDK Device Events for public API
 public enum SDKDeviceEvent: SDKEvent {
-    case deviceInfoCollected(deviceInfo: DeviceInfoData)
-    case deviceInfoCollectionFailed(Error)
-    case deviceInfoRefreshed(deviceInfo: DeviceInfoData)
-    case deviceInfoSyncStarted
-    case deviceInfoSyncCompleted
-    case deviceInfoSyncFailed(Error)
+    case deviceRegistered(deviceId: String)
+    case deviceRegistrationFailed(Error)
     case deviceStateChanged(property: String, newValue: String)
 
     public var timestamp: Date { Date() }

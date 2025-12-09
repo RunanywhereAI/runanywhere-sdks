@@ -80,19 +80,6 @@ public class LlamaCPPCoreAdapter: UnifiedFrameworkAdapter {
         return baseSize + overhead
     }
 
-    public func configure(with hardware: HardwareConfiguration) async {
-        // Configuration handled by runanywhere-core based on device capabilities
-        // Metal acceleration is automatically enabled on iOS
-    }
-
-    public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
-        // LlamaCPP with Metal acceleration
-        return HardwareConfiguration(
-            primaryAccelerator: .gpu,  // Metal on iOS/macOS
-            memoryMode: .balanced
-        )
-    }
-
     private func isQuantizationSupported(_ quantization: String) -> Bool {
         let supportedQuantizations = [
             "Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L",

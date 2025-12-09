@@ -206,15 +206,6 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable { 
     }
 }
 
-// MARK: - SDK Error Extension
-
-extension SDKError {
-    /// Component is not ready for the requested operation
-    public static func componentNotReady(_ message: String) -> SDKError {
-        SDKError.componentNotInitialized(message)
-    }
-}
-
 // MARK: - Empty Component Parameters
 
 /// Empty parameters for components that don't need configuration
