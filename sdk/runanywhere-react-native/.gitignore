@@ -63,3 +63,11 @@ tmp/
 # Uncomment the one you don't use:
 # yarn.lock
 # package-lock.json
+
+# Yarn PnP
+.pnp.cjs
+.pnp.loader.mjs
+.yarn/
+
+# Package artifacts
+package.tgz
