@@ -644,7 +644,7 @@ export const RunAnywhere = {
     }
     const native = requireNativeModule();
 
-    const language = options?.language ?? null;
+    const language = options?.language ?? 'en';  // Default to English
     const resultJson = await native.transcribeFile(filePath, language);
 
     try {
@@ -832,7 +832,7 @@ export const RunAnywhere = {
     }
     const native = requireNativeModule();
 
-    const voiceId = configuration?.voice ?? null;
+    const voiceId = configuration?.voice ?? '';  // Empty string, not null - native expects string
     const speedRate = configuration?.rate ?? 1.0;
     const pitchShift = configuration?.pitch ?? 1.0;
 
