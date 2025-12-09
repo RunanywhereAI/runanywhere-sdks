@@ -2,7 +2,6 @@ import Foundation
 
 /// Main service for text generation
 public class GenerationService {
-    private let routingService: RoutingService
     private let modelLoadingService: ModelLoadingService
     private let optionsResolver = GenerationOptionsResolver()
     private let logger = SDKLogger(category: "GenerationService")
@@ -11,10 +10,8 @@ public class GenerationService {
     private var currentLoadedModel: LoadedModel?
 
     public init(
-        routingService: RoutingService,
         modelLoadingService: ModelLoadingService? = nil
     ) {
-        self.routingService = routingService
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
     }
 
@@ -53,39 +50,12 @@ public class GenerationService {
         // Prepare prompt with system prompt and structured output formatting
         let effectivePrompt = optionsResolver.preparePrompt(prompt, withOptions: resolvedOptions)
 
-        // Get routing decision
-        let routingDecision = try await routingService.determineRouting(
+        // Always use on-device generation
+        let result = try await generateOnDevice(
             prompt: effectivePrompt,
-            context: nil,
-            options: resolvedOptions
+            options: resolvedOptions,
+            framework: nil
         )
-
-        // Generate based on routing decision
-        let result: GenerationResult
-
-        switch routingDecision {
-        case .onDevice(let framework, _):
-            result = try await generateOnDevice(
-                prompt: effectivePrompt,
-                options: resolvedOptions,
-                framework: framework
-            )
-
-        case .cloud(let provider, _):
-            result = try await generateInCloud(
-                prompt: effectivePrompt,
-                options: resolvedOptions,
-                provider: provider
-            )
-
-        case .hybrid(let devicePortion, let framework, _):
-            result = try await generateHybrid(
-                prompt: effectivePrompt,
-                options: resolvedOptions,
-                devicePortion: devicePortion,
-                framework: framework
-            )
-        }
 
         // Validate structured output if configured
         if let structuredConfig = resolvedOptions.structuredOutput {
@@ -234,151 +204,6 @@ public class GenerationService {
             latencyMs: latency,
             executionTarget: .onDevice,
             savedAmount: 0.001, // Calculate based on cloud pricing
-            performanceMetrics: PerformanceMetrics(
-                inferenceTimeMs: latency,
-                tokensPerSecond: tokensPerSecond,
-                peakMemoryUsage: memoryUsage,
-                timeToFirstTokenMs: timeToFirstTokenMs,
-                thinkingTimeMs: thinkingTimeMs,
-                responseTimeMs: responseTimeMs
-            ),
-            thinkingTokens: tokenCounts.thinkingTokens,
-            responseTokens: tokenCounts.responseTokens
-        )
-
-        // Submit analytics (non-blocking, silent failures)
-        Task.detached(priority: .background) {
-            await RunAnywhere.submitGenerationAnalytics(
-                generationId: UUID().uuidString,
-                modelId: result.modelUsed,
-                performanceMetrics: result.performanceMetrics,
-                inputTokens: RunAnywhere.estimateTokenCount(prompt),
-                outputTokens: result.tokensUsed,
-                success: true,
-                executionTarget: result.executionTarget.rawValue
-            )
-        }
-
-        return result
-    }
-
-    private func generateInCloud(
-        prompt: String,
-        options: RunAnywhereGenerationOptions,
-        provider: String?
-    ) async throws -> GenerationResult {
-        // Placeholder implementation
-        let result = GenerationResult(
-            text: "Generated text in cloud",
-            tokensUsed: 10,
-            modelUsed: "cloud-model",
-            latencyMs: 50.0,
-            executionTarget: .cloud,
-            savedAmount: 0.001,
-            performanceMetrics: PerformanceMetrics(
-                inferenceTimeMs: 50.0,
-                tokensPerSecond: 20.0
-            )
-        )
-
-        // Submit analytics (non-blocking, silent failures)
-        Task.detached(priority: .background) {
-            await RunAnywhere.submitGenerationAnalytics(
-                generationId: UUID().uuidString,
-                modelId: result.modelUsed,
-                performanceMetrics: result.performanceMetrics,
-                inputTokens: RunAnywhere.estimateTokenCount(prompt),
-                outputTokens: result.tokensUsed,
-                success: true,
-                executionTarget: result.executionTarget.rawValue
-            )
-        }
-
-        return result
-    }
-
-    // swiftlint:disable:next function_body_length
-    private func generateHybrid(
-        prompt: String,
-        options: RunAnywhereGenerationOptions,
-        devicePortion: Double,
-        framework: LLMFramework?
-    ) async throws -> GenerationResult {
-        // For hybrid approach, use on-device generation with partial processing
-        // In a real implementation, this would split processing between device and cloud
-        let startTime = Date()
-
-        // Use the current loaded model
-        guard let loadedModel = currentLoadedModel else {
-            throw SDKError.modelNotFound("No model is currently loaded")
-        }
-
-
-        // For now, use on-device generation entirely
-        // In a real implementation, this would coordinate between device and cloud
-        let generatedText = try await loadedModel.service.generate(
-            prompt: prompt,
-            options: options
-        )
-
-        // Calculate metrics
-        let latency = Date().timeIntervalSince(startTime) * 1000
-
-        // Get memory usage (placeholder - actual implementation depends on service)
-        // Note: Add memory tracking to LLMService protocol
-        let memoryUsage: Int64 = 0
-
-        // Parse thinking content if model supports it
-        let modelInfo = loadedModel.model
-        let (finalText, thinkingContent): (String, String?)
-        var thinkingTimeMs: TimeInterval?
-
-        if modelInfo.supportsThinking {
-            // Use model-specific pattern or fall back to default
-            let pattern = modelInfo.thinkingPattern ?? ThinkingTagPattern.defaultPattern
-            let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
-            finalText = parseResult.content
-            thinkingContent = parseResult.thinkingContent
-
-            // Estimate thinking time if present
-            if let thinking = thinkingContent, !thinking.isEmpty {
-                thinkingTimeMs = latency * 0.6
-            }
-        } else {
-            finalText = generatedText
-            thinkingContent = nil
-        }
-
-        // Calculate token counts
-        let tokenCounts = TokenCounter.splitTokenCounts(
-            fullText: generatedText,
-            thinkingContent: thinkingContent,
-            responseContent: finalText
-        )
-
-        let tokensPerSecond = TokenCounter.calculateTokensPerSecond(
-            tokenCount: tokenCounts.totalTokens,
-            elapsedSeconds: latency / 1000.0
-        )
-
-        let responseTimeMs: TimeInterval?
-        if let thinkingTime = thinkingTimeMs {
-            responseTimeMs = latency - thinkingTime
-        } else {
-            responseTimeMs = nil
-        }
-
-        // For non-streaming hybrid generation, time-to-first-token equals total latency
-        let timeToFirstTokenMs = latency
-
-        let result = GenerationResult(
-            text: finalText,
-            thinkingContent: thinkingContent,
-            tokensUsed: tokenCounts.totalTokens,
-            modelUsed: loadedModel.model.id,
-            latencyMs: latency,
-            executionTarget: .hybrid,
-            savedAmount: 0.0005, // Hybrid saves less than full on-device
             performanceMetrics: PerformanceMetrics(
                 inferenceTimeMs: latency,
                 tokensPerSecond: tokensPerSecond,

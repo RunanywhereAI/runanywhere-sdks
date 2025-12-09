@@ -47,10 +47,6 @@ public enum SDKConfigurationEvent: SDKEvent {
     // Configuration read events
     case settingsRequested
     case settingsRetrieved(settings: DefaultGenerationSettings)
-    case routingPolicyRequested
-    case routingPolicyRetrieved(policy: RoutingPolicy)
-    case privacyModeRequested
-    case privacyModeRetrieved(mode: PrivacyMode)
     case analyticsStatusRequested
     case analyticsStatusRetrieved(enabled: Bool)
     case syncRequested
@@ -77,9 +73,8 @@ public enum SDKGenerationEvent: SDKEvent {
     case modelLoaded(modelId: String)
     case modelUnloaded(modelId: String)
 
-    // Cost and routing
+    // Cost tracking
     case costCalculated(amount: Double, savedAmount: Double)
-    case routingDecision(target: String, reason: String)
 
     public var timestamp: Date { Date() }
     public var eventType: SDKEventType { .generation }

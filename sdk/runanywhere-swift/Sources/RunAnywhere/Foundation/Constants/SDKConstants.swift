@@ -70,11 +70,8 @@ public enum SDKConstants {
         public static let topP: Double = 0.95
         public static let topK: Int = 40
 
-        // SDK configuration - FORCE LOCAL ONLY
-        public static let cloudRoutingEnabled: Bool = false  // Disable cloud routing completely
-        public static let privacyModeEnabled: Bool = true
-        public static let routingPolicy = RoutingPolicy.deviceOnly  // Force on-device only
-        public static let allowUserOverride: Bool = false  // Don't allow override to cloud
+        // SDK configuration - On-device only execution
+        public static let onDeviceOnly: Bool = true
 
         // Analytics configuration - hardcoded to be fully enabled
         public static let analyticsEnabled: Bool = true
@@ -134,14 +131,6 @@ public enum SDKConstants {
         public static let recommendedMemoryBufferPercentage = 0.25
     }
 
-    // MARK: - Privacy Constants
-
-    /// Privacy mode defaults
-    public enum PrivacyDefaults {
-        /// Default privacy mode
-        public static let defaultPrivacyMode = "standard"
-    }
-
     // MARK: - Analytics Constants
 
     /// Analytics configuration defaults
@@ -167,14 +156,6 @@ public enum SDKConstants {
 
         /// Default model retention days
         public static let defaultModelRetentionDays = 30
-    }
-
-    // MARK: - Routing Constants
-
-    /// Routing policy defaults
-    public enum RoutingDefaults {
-        /// Default on-device threshold (0.0 to 1.0)
-        public static let defaultOnDeviceThreshold = 0.8
     }
 
     // MARK: - Execution Constants
@@ -206,7 +187,4 @@ public enum SDKConstants {
         /// Default supported platforms
         public static let defaultSupportedPlatforms = ["ios", "macos"]
     }
-
-    // MARK: - Routing Policies
-    // Note: RoutingPolicy enum has been moved to Public/Configuration/RoutingPolicy.swift
 }

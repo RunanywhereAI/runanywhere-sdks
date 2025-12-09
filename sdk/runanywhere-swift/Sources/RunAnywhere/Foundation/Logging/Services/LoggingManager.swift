@@ -2,23 +2,14 @@
 //  LoggingManager.swift
 //  RunAnywhere SDK
 //
-//  Central logging coordination service
-//
-//  Current Implementation:
-//  - Uses Pulse for local debugging and development
-//  - Remote logging temporarily disabled pending service selection
-//
-//  Remote Logging Strategy:
-//  - Recommended: Sentry for production error tracking
-//  - Alternative: DataDog for enterprise integration
-//  - See RemoteLoggingService.swift for detailed recommendations
+//  Central logging coordination service using Pulse for local debugging
 //
 
 import Foundation
 import Pulse
 
 /// Centralized logging manager for the SDK
-/// Uses Pulse for local logging and prepares for remote service integration
+/// Uses Pulse for local logging and debugging
 public class LoggingManager {
 
     // MARK: - Singleton
@@ -49,9 +40,6 @@ public class LoggingManager {
     /// Pulse logger for local debugging and development
     private let pulseLogger = LoggerStore.shared
 
-    /// Logger for internal use
-    private let logger = SDKLogger(category: "LoggingManager")
-
     // MARK: - Initialization
 
     private init() {
@@ -67,40 +55,12 @@ public class LoggingManager {
     /// Update logging configuration
     public func configure(_ config: LoggingConfiguration) {
         _configuration.withLock { $0 = config }
-
-        // Remote logging configuration will be handled by external service
-        // when implemented (e.g., Sentry, DataDog, etc.)
-    }
-
-    /// Configure SDK logging endpoint (for SDK team debugging)
-    public func configureSDKLogging(endpoint: URL?, enabled: Bool = true) {
-        _configuration.withLock { config in
-            config.remoteEndpoint = endpoint
-            config.enableRemoteLogging = enabled && endpoint != nil
-        }
-
-        // This will be replaced with external service configuration
-        // e.g., Sentry.configure(dsn: endpoint)
-
-        // Log configuration change
-        let entry = LogEntry(
-            timestamp: Date(),
-            level: .info,
-            category: "LoggingManager",
-            message: "SDK logging configured: \(enabled ? "enabled" : "disabled")",
-            metadata: nil,
-            deviceInfo: nil
-        )
-        logToPulse(entry, isSensitive: false)
     }
 
     /// Log a message with the specified level and metadata
     internal func log(level: LogLevel, category: String, message: String, metadata: [String: Any]? = nil) { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         // Check against SDK configuration minimum log level
         guard level >= configuration.minLogLevel else { return }
-
-        // Check if this contains sensitive data
-        let isSensitive = checkIfSensitive(metadata: metadata)
 
         // Create log entry
         let entry = LogEntry(
@@ -114,25 +74,18 @@ public class LoggingManager {
 
         // Local logging with Pulse
         if configuration.enableLocalLogging {
-            logToPulse(entry, isSensitive: isSensitive)
-        }
-
-        // Remote logging - ONLY if not sensitive
-        if configuration.enableRemoteLogging && !isSensitive {
-            // Will be implemented with external service
-            // e.g., Sentry.capture(event: entry)
+            logToPulse(entry)
         }
     }
 
     /// Force flush all pending logs
     public func flush() {
-        // Will flush external service when implemented
-        // e.g., Sentry.flush()
+        // Pulse handles its own flushing
     }
 
     // MARK: - Private Methods
 
-    private func logToPulse(_ entry: LogEntry, isSensitive: Bool) {
+    private func logToPulse(_ entry: LogEntry) {
         var pulseMetadata: [String: LoggerStore.MetadataValue] = [:]
 
         // Add category
@@ -141,16 +94,11 @@ public class LoggingManager {
         // Convert metadata to Pulse format
         if let metadata = entry.metadata {
             for (key, value) in metadata {
-                // Skip internal sensitive data markers
+                // Skip internal markers
                 if key.hasPrefix("__") { continue }
 
                 pulseMetadata[key] = convertToMetadataValue(value)
             }
-        }
-
-        // Mark if sensitive
-        if isSensitive {
-            pulseMetadata["sensitive"] = .string("true")
         }
 
         // Convert LogLevel to Pulse level
@@ -191,43 +139,6 @@ public class LoggingManager {
         }
     }
 
-    // swiftlint:disable:next prefer_concrete_types avoid_any_type
-    private func checkIfSensitive(metadata: [String: Any]?) -> Bool {
-        guard let metadata = metadata else { return false }
-
-        // Check for sensitive data markers
-        if metadata[LogMetadataKeys.sensitiveDataPolicy] != nil {
-            return true
-        }
-
-        if metadata[LogMetadataKeys.sensitiveDataCategory] != nil {
-            return true
-        }
-
-        return false
-    }
-
-    private func sanitizeForRemote(_ entry: LogEntry) -> LogEntry {
-        // Remove any sensitive metadata
-        var sanitizedMetadata = entry.metadata ?? [:]
-
-        // Remove sensitive markers and content
-        sanitizedMetadata.removeValue(forKey: LogMetadataKeys.sensitiveDataPolicy)
-        sanitizedMetadata.removeValue(forKey: LogMetadataKeys.sensitiveDataCategory)
-        sanitizedMetadata.removeValue(forKey: LogMetadataKeys.isUserContent)
-        sanitizedMetadata.removeValue(forKey: LogMetadataKeys.containsPII)
-
-        // Create sanitized entry
-        return LogEntry(
-            timestamp: entry.timestamp,
-            level: entry.level,
-            category: entry.category,
-            message: entry.message,
-            metadata: sanitizedMetadata,
-            deviceInfo: entry.deviceInfo
-        )
-    }
-
     private func applyEnvironmentConfiguration() {
         // Update SDK configuration based on environment
         var config = configuration
@@ -236,17 +147,14 @@ public class LoggingManager {
         switch environment {
         case .development:
             config.enableLocalLogging = true
-            config.enableRemoteLogging = false
             config.minLogLevel = .debug
             config.includeDeviceMetadata = false
         case .staging:
-            config.enableLocalLogging = false
-            config.enableRemoteLogging = true
+            config.enableLocalLogging = true
             config.minLogLevel = .info
             config.includeDeviceMetadata = true
         case .production:
             config.enableLocalLogging = false
-            config.enableRemoteLogging = true
             config.minLogLevel = .warning
             config.includeDeviceMetadata = true
         }
@@ -256,26 +164,10 @@ public class LoggingManager {
 
         // Configure Pulse
         configurePulse()
-
-        // Log current environment for debugging
-        if environment == .development {
-            let entry = LogEntry(
-                timestamp: Date(),
-                level: .info,
-                category: "LoggingManager",
-                message: "🚀 Running in \(environment.rawValue) environment - Remote: \(config.enableRemoteLogging), MinLevel: \(config.minLogLevel)",
-                metadata: nil,
-                deviceInfo: nil
-            )
-            logToPulse(entry, isSensitive: false)
-        }
     }
 
     private func configurePulse() {
         // Enable automatic network logging
         URLSessionProxyDelegate.enableAutomaticRegistration()
-
-        // Pulse configuration is done at the LoggerStore level
-        // Network logging is enabled by default when using URLSessionProxyDelegate
     }
 }

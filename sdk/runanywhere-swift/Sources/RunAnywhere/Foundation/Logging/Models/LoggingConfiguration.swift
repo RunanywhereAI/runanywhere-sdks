@@ -7,28 +7,16 @@
 
 import Foundation
 
-/// Simplified logging configuration
+/// Logging configuration for local debugging
 public struct LoggingConfiguration {
-    /// Enable local logging (console/os_log)
+    /// Enable local logging (console/Pulse)
     public var enableLocalLogging: Bool = true
-
-    /// Enable remote logging (telemetry)
-    public var enableRemoteLogging: Bool = false
-
-    /// Remote logging endpoint
-    public var remoteEndpoint: URL?
 
     /// Minimum log level filter
     public var minLogLevel: LogLevel = .info
 
-    /// Include device metadata in remote logs
+    /// Include device metadata in logs
     public var includeDeviceMetadata: Bool = true
-
-    /// Maximum log entries to batch before sending
-    public var batchSize: Int = 100
-
-    /// Maximum time to wait before sending logs (seconds)
-    public var batchInterval: TimeInterval = 60
 
     public init() {}
 }
