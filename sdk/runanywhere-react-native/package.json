@@ -1,6 +1,6 @@
 {
   "name": "runanywhere-react-native",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "RunAnywhere SDK for React Native - On-device AI with intelligent routing",
   "main": "src/index.ts",
   "types": "src/index.ts",
