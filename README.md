@@ -7,9 +7,11 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![iOS SDK](https://img.shields.io/badge/iOS%20SDK-Available-brightgreen.svg)](sdk/runanywhere-swift/)
 [![Android SDK](https://img.shields.io/badge/Android%20SDK-Available-brightgreen.svg)](sdk/runanywhere-kotlin/)
+[![React Native SDK](https://img.shields.io/badge/React%20Native%20SDK-Beta-yellow.svg)](sdk/runanywhere-react-native/)
+[![Flutter SDK](https://img.shields.io/badge/Flutter%20SDK-Beta-yellow.svg)](sdk/runanywhere-flutter/)
 [![GitHub stars](https://img.shields.io/github/stars/RunanywhereAI/runanywhere-sdks?style=social)](https://github.com/RunanywhereAI/runanywhere-sdks)
 
-**Privacy-first, on-device AI SDKs** that bring powerful language models directly to your iOS and Android applications. RunAnywhere enables intelligent AI execution with automatic optimization for performance, privacy, and user experience.
+**Privacy-first, on-device AI SDKs** that bring powerful language models directly to your mobile applications. RunAnywhere enables intelligent AI execution with automatic optimization for performance, privacy, and user experience across iOS, Android, React Native, and Flutter.
 
 ## 🚀 Current Status
 
@@ -18,6 +20,12 @@ The iOS SDK provides high-performance on-device text generation, complete voice 
 
 ### ✅ Android SDK - **Available**
 The Android Kotlin Multiplatform SDK provides high-performance on-device text generation with streaming support, comprehensive model management, structured outputs with JSON generation, and thinking model support for privacy-first AI applications. [View Android SDK →](sdk/runanywhere-kotlin/)
+
+### 🧪 React Native SDK - **Beta**
+The React Native SDK brings on-device AI to cross-platform mobile apps with a TypeScript API, native bridges using Nitrogen/Nitro for performance, and support for LLM, STT, TTS, and VAD capabilities. [View React Native SDK →](sdk/runanywhere-react-native/)
+
+### 🧪 Flutter SDK - **Beta**
+The Flutter SDK provides Dart bindings for on-device AI with platform channels for native communication. [View Flutter SDK →](sdk/runanywhere-flutter/)
 
 ## 🎯 See It In Action
 
@@ -49,6 +57,14 @@ The Android Kotlin Multiplatform SDK provides high-performance on-device text ge
 ### Android Components (Available Now)
 - **[Android SDK](sdk/runanywhere-kotlin/)** - Kotlin Multiplatform SDK with JVM and Android targets
 - **[Android Demo App](examples/android/RunAnywhereAI/)** - Full-featured sample app showcasing text generation
+
+### React Native Components (Beta)
+- **[React Native SDK](sdk/runanywhere-react-native/)** - TypeScript SDK with native bridges for iOS and Android
+- **[React Native Demo App](examples/react-native/RunAnywhereAI/)** - Sample app demonstrating chat, voice, and analytics features
+
+### Flutter Components (Beta)
+- **[Flutter SDK](sdk/runanywhere-flutter/)** - Dart SDK with platform channels for iOS and Android
+- **[Flutter Demo App](examples/flutter/RunAnywhereAI/)** - Sample app demonstrating SDK features
 
 ## ✨ SDK Features
 
