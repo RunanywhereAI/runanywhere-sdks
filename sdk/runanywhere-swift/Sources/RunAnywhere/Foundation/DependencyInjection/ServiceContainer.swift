@@ -29,7 +29,6 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
     /// Generation service
     private(set) lazy var generationService: GenerationService = {
         GenerationService(
-            routingService: routingService,
             modelLoadingService: modelLoadingService
         )
     }()
@@ -62,14 +61,6 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
     /// Storage analyzer for storage operations
     private(set) lazy var storageAnalyzer: StorageAnalyzer = {
         DefaultStorageAnalyzer(fileManager: fileManager, modelRegistry: modelRegistry)
-    }()
-
-    /// Routing service
-    private(set) lazy var routingService: RoutingService = {
-        RoutingService(
-            costCalculator: CostCalculator(),
-            resourceChecker: ResourceChecker(hardwareManager: hardwareManager)
-        )
     }()
 
     // MARK: - Infrastructure

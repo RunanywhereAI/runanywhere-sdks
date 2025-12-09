@@ -2,23 +2,14 @@
 //  RunAnywhere+Logging.swift
 //  RunAnywhere SDK
 //
-//  Extension for configuring logging and analytics endpoints
+//  Extension for configuring logging
 //
 
 import Foundation
 
 extension RunAnywhere {
 
-    // MARK: - Logging Configuration (SDK Team Debugging)
-
-    /// Configure SDK logging endpoint for internal debugging
-    /// - Parameters:
-    ///   - endpoint: URL endpoint for SDK team logging (e.g., Sentry, DataDog)
-    ///   - enabled: Whether to enable remote SDK logging
-    /// - Note: This is for SDK team debugging, not consumer analytics
-    public static func configureSDKLogging(endpoint: URL?, enabled: Bool = true) {
-        LoggingManager.shared.configureSDKLogging(endpoint: endpoint, enabled: enabled)
-    }
+    // MARK: - Logging Configuration
 
     /// Enable or disable local logging via Pulse
     /// - Parameter enabled: Whether to enable local Pulse logging
@@ -40,7 +31,6 @@ extension RunAnywhere {
 
     /// Configure analytics endpoint for consumer events
     /// - Parameters:
-    ///   - endpoint: URL endpoint for consumer analytics (set via baseURL in Configuration)
     ///   - batchSize: Number of events to batch before sending
     ///   - flushInterval: Time interval between automatic flushes
     /// - Note: Analytics endpoint is configured via the baseURL in SDK Configuration
@@ -51,9 +41,6 @@ extension RunAnywhere {
         // Analytics uses the baseURL from Configuration
         // The endpoint is already configured via TelemetryRepository
         // This method could be used to adjust batching parameters if needed
-
-        // Note: Currently batching params are hardcoded in AnalyticsQueueManager
-        // We could make them configurable if needed
     }
 
     // MARK: - Debugging Helpers

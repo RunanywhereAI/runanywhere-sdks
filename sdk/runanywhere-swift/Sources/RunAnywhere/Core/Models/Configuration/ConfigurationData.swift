@@ -14,9 +14,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
     /// Unique identifier for this configuration
     public let id: String
 
-    /// Routing configuration
-    public var routing: RoutingConfiguration
-
     /// Generation configuration
     public var generation: GenerationConfiguration
 
@@ -51,7 +48,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
 
     public init(
         id: String = "default",
-        routing: RoutingConfiguration = RoutingConfiguration(),
         generation: GenerationConfiguration = GenerationConfiguration(),
         storage: StorageConfiguration = StorageConfiguration(),
         api: APIConfiguration = APIConfiguration(),
@@ -66,7 +62,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
         syncPending: Bool = false
     ) {
         self.id = id
-        self.routing = routing
         self.generation = generation
         self.storage = storage
         self.api = api
@@ -100,7 +95,6 @@ extension ConfigurationData: TableRecord {
 extension ConfigurationData {
     public enum Columns: String, ColumnExpression {
         case id
-        case routing
         case generation
         case storage
         case apiKey
