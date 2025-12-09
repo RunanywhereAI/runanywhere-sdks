@@ -1,0 +1,82 @@
+# .npmignore - Override .gitignore for npm publishing
+# IMPORTANT: nitrogen/generated/ must be INCLUDED in npm package
+
+# Dependencies (always excluded)
+node_modules/
+
+# Development files
+.git/
+.github/
+.vscode/
+.idea/
+
+# Build outputs (lib is published, but built fresh)
+dist/
+
+# iOS development files (XCFramework is downloaded via podspec)
+ios/build/
+*.xcframework
+*.xcframework.zip
+
+# Android development files (native libs downloaded via gradle)
+android/build/
+android/.gradle/
+android/.cxx/
+android/src/main/jniLibs/
+*.aar
+
+# Example apps
+example/
+examples/
+
+# Tests
+__tests__/
+__mocks__/
+__fixtures__/
+coverage/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Documentation (README is kept)
+docs/
+*.md
+!README.md
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Metro
+.metro-health-check*
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Temporary files
+*.tmp
+tmp/
+
+# Lock files
+yarn.lock
+package-lock.json
+
+# Yarn PnP
+.pnp.cjs
+.pnp.loader.mjs
+.yarn/
+
+# Package artifacts
+package.tgz
+
