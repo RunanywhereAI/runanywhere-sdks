@@ -76,6 +76,7 @@
     "@react-native/eslint-config": "^0.73.1",
     "@release-it/conventional-changelog": "^5.0.0",
     "@types/jest": "^29.5.5",
+    "@types/node": "^24.10.2",
     "@types/react": "^18.2.44",
     "commitlint": "^17.0.2",
     "del-cli": "^5.1.0",
