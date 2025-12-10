@@ -2,9 +2,11 @@ def getExtOrDefault(name) {
     return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['RunAnywhere_' + name]
 }
 
+// Only arm64-v8a is supported - native libraries are only built for 64-bit ARM
+// This overrides any reactNativeArchitectures from root project
 def reactNativeArchitectures() {
-    def value = rootProject.getProperties().get("reactNativeArchitectures")
-    return value ? value.split(",") : ["arm64-v8a"]
+    // Native libraries are only available for arm64-v8a
+    return ["arm64-v8a"]
 }
 
 apply plugin: 'com.android.library'
@@ -61,11 +63,16 @@ android {
         minSdkVersion getExtOrIntegerDefault('minSdkVersion')
         targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
 
+        // Only arm64-v8a is supported - native libraries are only built for 64-bit ARM
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+
         externalNativeBuild {
             cmake {
                 cppFlags "-frtti -fexceptions -Wall -fstack-protector-all"
                 arguments "-DANDROID_STL=c++_shared"
-                abiFilters(*reactNativeArchitectures())
+                abiFilters 'arm64-v8a'
             }
         }
     }
