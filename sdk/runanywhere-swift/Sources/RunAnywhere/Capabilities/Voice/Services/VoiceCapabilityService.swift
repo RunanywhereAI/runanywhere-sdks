@@ -202,23 +202,3 @@ public class VoiceCapabilityService: @unchecked Sendable {
         }
     }
 }
-
-// MARK: - Backward Compatibility
-
-extension VoiceCapabilityService {
-    /// Create a voice pipeline using the new architecture
-    public func createPipeline(
-        vadParams: VADConfiguration? = nil,
-        sttParams: STTConfiguration? = nil,
-        llmParams: LLMConfiguration? = nil,
-        ttsParams: TTSConfiguration? = nil
-    ) async throws -> VoiceAgentComponent {
-        // Use the new VoiceAgent component which is the modern pipeline
-        return try await createVoiceAgent(
-            vadParams: vadParams,
-            sttParams: sttParams,
-            llmParams: llmParams,
-            ttsParams: ttsParams
-        )
-    }
-}

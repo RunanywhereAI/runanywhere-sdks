@@ -15,7 +15,7 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
     public let id: String
 
     /// Generation configuration
-    public var generation: GenerationConfiguration
+    public var generation: LLMGenerationConfig
 
     /// Storage configuration (includes memory threshold)
     public var storage: StorageConfiguration
@@ -24,7 +24,7 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
     public var api: APIConfiguration
 
     /// Download configuration
-    public var download: ModelDownloadConfiguration
+    public var download: DownloadConfiguration
 
     /// Debug mode flag
     public var debugMode: Bool
@@ -45,10 +45,10 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
 
     public init(
         id: String = "default",
-        generation: GenerationConfiguration = GenerationConfiguration(),
+        generation: LLMGenerationConfig = LLMGenerationConfig(),
         storage: StorageConfiguration = StorageConfiguration(),
         api: APIConfiguration = APIConfiguration(),
-        download: ModelDownloadConfiguration = ModelDownloadConfiguration(),
+        download: DownloadConfiguration = DownloadConfiguration(),
         debugMode: Bool = false,
         apiKey: String? = nil,
         allowUserOverride: Bool = true,

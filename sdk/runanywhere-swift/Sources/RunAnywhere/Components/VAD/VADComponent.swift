@@ -107,7 +107,7 @@ public struct VADConfiguration: ComponentConfiguration, ComponentInitParameters 
         // Validate threshold range with better guidance
         guard energyThreshold >= 0 && energyThreshold <= 1.0 else {
             let message = "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05"
-            throw SDKError.validationFailed(message)
+            throw RunAnywhereError.validationFailed(message)
         }
 
         // Warn if threshold is too low or too high
@@ -117,23 +117,23 @@ public struct VADConfiguration: ComponentConfiguration, ComponentInitParameters 
                 Energy threshold \(energyThreshold) is very low and may cause false positives. \
                 Recommended minimum: 0.002
                 """
-            throw SDKError.validationFailed(message)
+            throw RunAnywhereError.validationFailed(message)
         }
         if energyThreshold > 0.1 {
             // This might be intentional for very noisy environments
-            throw SDKError.validationFailed("Energy threshold \(energyThreshold) is very high and may miss speech. Recommended maximum: 0.1")
+            throw RunAnywhereError.validationFailed("Energy threshold \(energyThreshold) is very high and may miss speech. Recommended maximum: 0.1")
         }
 
         guard sampleRate > 0 && sampleRate <= 48000 else {
-            throw SDKError.validationFailed("Sample rate must be between 1 and 48000 Hz")
+            throw RunAnywhereError.validationFailed("Sample rate must be between 1 and 48000 Hz")
         }
         guard frameLength > 0 && frameLength <= 1.0 else {
-            throw SDKError.validationFailed("Frame length must be between 0 and 1 second")
+            throw RunAnywhereError.validationFailed("Frame length must be between 0 and 1 second")
         }
 
         // Validate calibration multiplier
         guard calibrationMultiplier >= 1.5 && calibrationMultiplier <= 5.0 else {
-            throw SDKError.validationFailed("Calibration multiplier must be between 1.5 and 5.0")
+            throw RunAnywhereError.validationFailed("Calibration multiplier must be between 1.5 and 5.0")
         }
     }
 }
@@ -166,11 +166,11 @@ public struct VADInput: ComponentInput {
     /// Validate the input
     public func validate() throws {
         if buffer == nil && audioSamples == nil {
-            throw SDKError.validationFailed("VADInput must contain either buffer or audioSamples")
+            throw RunAnywhereError.validationFailed("VADInput must contain either buffer or audioSamples")
         }
         if let threshold = energyThresholdOverride {
             guard threshold >= 0 && threshold <= 1.0 else {
-                throw SDKError.validationFailed("Energy threshold override must be between 0 and 1.0")
+                throw RunAnywhereError.validationFailed("Energy threshold override must be between 0 and 1.0")
             }
         }
     }
@@ -209,7 +209,7 @@ public final class DefaultVADAdapter: ComponentAdapter {
     /// Create service (required by ComponentAdapter)
     public func createService(configuration: any ComponentConfiguration) async throws -> SimpleEnergyVAD {
         guard let vadConfig = configuration as? VADConfiguration else {
-            throw SDKError.validationFailed("Expected VADConfiguration")
+            throw RunAnywhereError.validationFailed("Expected VADConfiguration")
         }
         return try await createVADService(configuration: vadConfig)
     }
@@ -312,7 +312,7 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
         try ensureReady()
 
         guard let vadService = service else {
-            throw SDKError.componentNotReady("VAD service not available")
+            throw RunAnywhereError.componentNotReady("VAD service not available")
         }
 
         // No need to change state during processing
@@ -339,7 +339,7 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
         try ensureReady()
 
         guard let vadService = service else {
-            throw SDKError.componentNotReady("VAD service not available")
+            throw RunAnywhereError.componentNotReady("VAD service not available")
         }
 
         // No need to change state during processing
@@ -367,7 +367,7 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
         } else if let samples = input.audioSamples {
             return try await detectSpeech(in: samples)
         } else {
-            throw SDKError.validationFailed("VADInput must contain either buffer or audioSamples")
+            throw RunAnywhereError.validationFailed("VADInput must contain either buffer or audioSamples")
         }
     }
 
@@ -419,7 +419,7 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
         try ensureReady()
 
         guard let vadService = service as? SimpleEnergyVAD else {
-            throw SDKError.componentNotReady("VAD service does not support calibration")
+            throw RunAnywhereError.componentNotReady("VAD service does not support calibration")
         }
 
         // Start calibration

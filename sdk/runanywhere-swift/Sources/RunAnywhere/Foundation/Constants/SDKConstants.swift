@@ -112,9 +112,6 @@ public enum SDKConstants {
         /// Default context length for models
         public static let defaultContextLength = 4096
 
-        /// Default execution target
-        public static let defaultExecutionTarget = ExecutionTargets.onDevice
-
         /// Default model cache size
         public static let defaultModelCacheSize = 5
     }
@@ -144,17 +141,6 @@ public enum SDKConstants {
 
         /// Default model retention days
         public static let defaultModelRetentionDays = 30
-    }
-
-    // MARK: - Execution Constants
-
-    /// Execution target constants
-    public enum ExecutionTargets {
-        /// On-device execution
-        public static let onDevice = "onDevice"
-
-        /// Cloud execution
-        public static let cloud = "cloud"
     }
 
     // MARK: - Session Constants

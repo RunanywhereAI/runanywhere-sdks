@@ -10,7 +10,7 @@ import FoundationModels
 /// Adapter for Apple's native Foundation Models framework (iOS 26.0+)
 /// Uses Apple's built-in language models without requiring external model files
 @available(iOS 26.0, macOS 26.0, *)
-public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
+public class FoundationModelsAdapter: FrameworkAdapter {
     public var framework: LLMFramework { .foundationModels }
     public let supportedModalities: Set<FrameworkModality> = [.textToText]
     public var supportedFormats: [ModelFormat] {
@@ -50,7 +50,7 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
 
     public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
         guard modality == .textToText else {
-            throw LLMServiceError.modelNotFound("modality not supported")
+            throw LLMError.modelNotFound(path: "modality not supported")
         }
         // Foundation Models doesn't need to load external models
         // It uses Apple's built-in models

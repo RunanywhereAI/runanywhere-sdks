@@ -9,7 +9,7 @@ import Foundation
 
 /// Unified model errors
 public enum UnifiedModelError: LocalizedError {
-    case lifecycle(ModelLifecycleError)
+    case lifecycle(LifecycleError)
     case framework(FrameworkError)
     case insufficientMemory(required: Int64, available: Int64)
     case deviceNotSupported(String)

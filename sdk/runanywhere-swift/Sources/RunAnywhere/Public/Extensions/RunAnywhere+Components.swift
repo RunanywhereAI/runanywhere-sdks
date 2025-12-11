@@ -5,8 +5,8 @@ import Foundation
 
 extension RunAnywhere {
 
-    /// Component initializer for managing component lifecycle
-    private static let componentInitializer = ComponentInitializer(serviceContainer: serviceContainer)
+    /// Component lifecycle manager for managing component initialization
+    private static let componentLifecycleManager = ComponentLifecycleManager(serviceContainer: serviceContainer)
 
     // MARK: - Simple Initialization API
 
@@ -19,7 +19,7 @@ extension RunAnywhere {
             let params = defaultParameters(for: component)
             return UnifiedComponentConfig(parameters: params)
         }
-        return await componentInitializer.initialize(configs)
+        return await componentLifecycleManager.initialize(configs)
     }
 
     /// Initialize a single component with default parameters
@@ -46,7 +46,7 @@ extension RunAnywhere {
             quantizationLevel: quantization
         )
         let config = UnifiedComponentConfig.llm(params, priority: priority)
-        return await componentInitializer.initialize([config])
+        return await componentLifecycleManager.initialize([config])
     }
 
     /// Initialize STT with specific parameters
@@ -63,7 +63,7 @@ extension RunAnywhere {
             enableDiarization: enableSpeakerDiarization
         )
         let config = UnifiedComponentConfig.stt(params, priority: priority)
-        return await componentInitializer.initialize([config])
+        return await componentLifecycleManager.initialize([config])
     }
 
     /// Initialize TTS with specific parameters
@@ -82,7 +82,7 @@ extension RunAnywhere {
             pitch: pitch
         )
         let config = UnifiedComponentConfig.tts(params, priority: priority)
-        return await componentInitializer.initialize([config])
+        return await componentLifecycleManager.initialize([config])
     }
 
     /// Initialize VAD with specific parameters
@@ -96,7 +96,7 @@ extension RunAnywhere {
             energyThreshold: energyThreshold
         )
         let config = UnifiedComponentConfig.vad(params, priority: priority)
-        return await componentInitializer.initialize([config])
+        return await componentLifecycleManager.initialize([config])
     }
 
     // MARK: - Advanced Initialization
@@ -106,7 +106,7 @@ extension RunAnywhere {
     /// - Returns: Initialization result
     @discardableResult
     public static func initializeComponents(configs: [UnifiedComponentConfig]) async -> InitializationResult {
-        return await componentInitializer.initialize(configs)
+        return await componentLifecycleManager.initialize(configs)
     }
 
     // MARK: - Preload Scenarios
@@ -123,7 +123,7 @@ extension RunAnywhere {
             UnifiedComponentConfig.llm(LLMConfiguration(modelId: llmModelId), priority: .high),
             UnifiedComponentConfig.tts(TTSConfiguration(), priority: .normal)
         ]
-        return await componentInitializer.initialize(configs)
+        return await componentLifecycleManager.initialize(configs)
     }
 
     /// Preload components for text generation
@@ -133,7 +133,7 @@ extension RunAnywhere {
             LLMConfiguration(modelId: modelId),
             priority: .critical
         )
-        return await componentInitializer.initialize([config])
+        return await componentLifecycleManager.initialize([config])
     }
 
     // MARK: - Builder Pattern
@@ -196,7 +196,7 @@ extension RunAnywhere {
 
         /// Build and initialize
         public func initialize() async -> InitializationResult {
-            return await RunAnywhere.componentInitializer.initialize(configs)
+            return await RunAnywhere.componentLifecycleManager.initialize(configs)
         }
     }
 
@@ -209,38 +209,41 @@ extension RunAnywhere {
 
     /// Get current status of all components
     public static func getComponentStatuses() async -> [ComponentStatus] {
-        await componentInitializer.getAllStatuses()
+        await componentLifecycleManager.getAllStatuses()
     }
 
     /// Get status of a specific component
     public static func getComponentStatus(_ component: SDKComponent) async -> ComponentStatus {
-        await componentInitializer.getStatus(for: component)
+        await componentLifecycleManager.getStatus(for: component)
     }
 
     /// Check if a component is ready
     public static func isComponentReady(_ component: SDKComponent) async -> Bool {
-        await componentInitializer.isReady(component)
+        await componentLifecycleManager.isReady(component)
     }
 
     /// Check if multiple components are ready
     public static func areComponentsReady(_ components: [SDKComponent]) async -> Bool {
-        await componentInitializer.areReady(components)
+        for component in components {
+            if !(await componentLifecycleManager.isReady(component)) {
+                return false
+            }
+        }
+        return true
     }
 
     /// Get component status with its initialization parameters
     public static func getComponentStatusWithParameters(
         _ component: SDKComponent
     ) async -> (status: ComponentStatus, parameters: (any ComponentInitParameters)?) {
-        let statuses = await componentInitializer.getAllStatusesWithParameters()
-        return statuses.first { $0.status.component == component } ?? (
-            ComponentStatus(component: component, state: .notInitialized),
-            nil
-        )
+        let status = await componentLifecycleManager.getStatus(for: component)
+        return (status, nil) // Parameters not tracked in new implementation
     }
 
     /// Get all component statuses with their initialization parameters
     public static func getAllComponentStatusesWithParameters() async -> [(status: ComponentStatus, parameters: (any ComponentInitParameters)?)] {
-        return await componentInitializer.getAllStatusesWithParameters()
+        let statuses = await componentLifecycleManager.getAllStatuses()
+        return statuses.map { ($0, nil) } // Parameters not tracked in new implementation
     }
 
     // MARK: - Event Subscriptions

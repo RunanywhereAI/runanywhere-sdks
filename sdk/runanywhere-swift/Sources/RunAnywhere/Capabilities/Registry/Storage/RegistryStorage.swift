@@ -5,7 +5,7 @@ class RegistryStorage {
     private let storageURL: URL
 
     init() {
-        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+        guard let documentsURL = try? FileOperationsUtilities.getDocumentsDirectory() else {
             fatalError("Unable to access documents directory")
         }
         storageURL = documentsURL.appendingPathComponent("ModelRegistry.plist")
@@ -48,10 +48,6 @@ class RegistryStorage {
     }
 
     func getStorageSize() -> Int64 {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: storageURL.path),
-              let size = attributes[.size] as? Int64 else {
-            return 0
-        }
-        return size
+        return FileOperationsUtilities.fileSize(at: storageURL) ?? 0
     }
 }

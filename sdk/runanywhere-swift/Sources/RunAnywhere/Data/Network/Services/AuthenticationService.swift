@@ -1,17 +1,4 @@
 import Foundation
-#if os(iOS)
-import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
-
-/// Chip information structure
-private struct ChipInfo {
-    let chipName: String
-    let performanceCores: Int
-    let efficiencyCores: Int
-    let neuralEngineCores: Int
-}
 
 /// Service responsible for authentication and token management
 public actor AuthenticationService {
@@ -37,7 +24,7 @@ public actor AuthenticationService {
 
     /// Authenticate with the backend and obtain access token
     public func authenticate(apiKey: String) async throws -> AuthenticationResponse {
-        let deviceId = PersistentDeviceIdentity.getPersistentDeviceUUID()
+        let deviceId = Device.shared.persistentUUID
 
         let request = AuthenticationRequest(
             apiKey: apiKey,
@@ -85,7 +72,7 @@ public actor AuthenticationService {
         }
 
         // Otherwise, we can't re-authenticate without API key
-        throw SDKError.authenticationFailed("No valid token and no way to re-authenticate")
+        throw RunAnywhereError.authenticationFailed("No valid token and no way to re-authenticate")
     }
 
     /// Perform health check
@@ -127,11 +114,11 @@ public actor AuthenticationService {
 
     private func refreshAccessToken() async throws -> String {
         guard let refreshToken = refreshToken else {
-            throw SDKError.invalidAPIKey("No refresh token available")
+            throw RunAnywhereError.invalidAPIKey("No refresh token available")
         }
 
         guard let deviceId = deviceId else {
-            throw SDKError.authenticationFailed("No device ID available for refresh")
+            throw RunAnywhereError.authenticationFailed("No device ID available for refresh")
         }
 
         logger.debug("Refreshing access token")
@@ -221,7 +208,7 @@ public actor AuthenticationService {
         logger.debug("Registering device with backend")
 
         // Collect device information
-        let deviceInfo = await collectDeviceInfo()
+        let deviceInfo = collectDeviceInfo()
         let request = DeviceRegistrationRequest(deviceInfo: deviceInfo)
 
         // Make API call with authentication
@@ -237,174 +224,20 @@ public actor AuthenticationService {
 
     // MARK: - Device Info Collection
 
-    /// Collect comprehensive device information
-    private func collectDeviceInfo() async -> DeviceRegistrationInfo {
+    /// Collect device information using centralized DeviceInfo
+    private func collectDeviceInfo() -> DeviceRegistrationInfo {
+        let deviceInfo = DeviceInfo.current
         let processInfo = ProcessInfo.processInfo
-
-        // Get basic system info
-        let architecture = getArchitecture()
-        let coreCount = processInfo.processorCount
-        let totalMemory = Int64(processInfo.physicalMemory)
-        let osVersion = processInfo.operatingSystemVersionString
-
-        // Get device-specific info
-        let deviceModel = getDeviceModel()
-        let formFactor = getFormFactor()
-
-        // Get device name and battery info
-        #if os(iOS)
-        let device = await MainActor.run { UIDevice.current }
-        let deviceName = await MainActor.run { device.name }
-
-        // Enable battery monitoring to get real values
-        await MainActor.run { device.isBatteryMonitoringEnabled = true }
-        let batteryLevel = await MainActor.run {
-            device.batteryLevel >= 0 ? Double(device.batteryLevel) : 1.0
-        }
-        let batteryState = await MainActor.run {
-            switch device.batteryState {
-            case .unplugged: return "unplugged"
-            case .charging: return "charging"
-            case .full: return "full"
-            case .unknown: return "unknown"
-            @unknown default: return "unknown"
-            }
-        }
-        let isLowPowerMode = processInfo.isLowPowerModeEnabled
-        #else
-        let deviceName = Host.current().localizedName ?? "Mac"
-        let batteryLevel = 1.0  // Default for Mac
-        let batteryState = "charging"  // Default for Mac
-        let isLowPowerMode = false
-        #endif
-
-        // Get chip info based on device model
-        let chipInfo = getChipInfo(for: deviceModel)
-
-        // Get persistent device UUID for deduplication
-        let deviceUUID = PersistentDeviceIdentity.getPersistentDeviceUUID()
+        let deviceUUID = Device.shared.persistentUUID
 
         return DeviceRegistrationInfo(
-            architecture: architecture,
-            availableMemory: Int64(processInfo.physicalMemory / 2), // Available memory estimate
-            batteryLevel: batteryLevel,
-            batteryState: batteryState,
-            chipName: chipInfo.chipName,
-            coreCount: coreCount,
-            deviceModel: deviceModel,
-            deviceName: deviceName,
+            architecture: deviceInfo.architecture,
+            deviceModel: deviceInfo.model,
             deviceUUID: deviceUUID,
-            efficiencyCores: chipInfo.efficiencyCores,
-            formFactor: formFactor,
-            gpuFamily: "apple",
-            hasNeuralEngine: true,  // All modern Apple devices have Neural Engine
-            isLowPowerMode: isLowPowerMode,
-            neuralEngineCores: chipInfo.neuralEngineCores,
-            osVersion: osVersion,
-            performanceCores: chipInfo.performanceCores,
-            platform: SDKConstants.platform,
-            totalMemory: totalMemory
+            formFactor: deviceInfo.formFactor,
+            osVersion: deviceInfo.osVersion,
+            platform: deviceInfo.platform,
+            totalMemory: Int64(processInfo.physicalMemory)
         )
-    }
-
-    private func getChipInfo(for model: String) -> ChipInfo {
-        // Map device models to chip info
-        // iPhone models
-        if model.contains("iPhone16") {
-            return ChipInfo(chipName: "A18 Pro", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
-        } else if model.contains("iPhone15") {
-            if model.contains("Pro") {
-                return ChipInfo(chipName: "A17 Pro", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
-            } else {
-                return ChipInfo(chipName: "A16 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
-            }
-        } else if model.contains("iPhone14") {
-            if model.contains("Pro") {
-                return ChipInfo(chipName: "A16 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
-            } else {
-                return ChipInfo(chipName: "A15 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
-            }
-        } else if model.contains("iPhone13") {
-            return ChipInfo(chipName: "A15 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
-        } else if model.contains("iPhone12") {
-            return ChipInfo(chipName: "A14 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
-        }
-        // iPad models
-        else if model.contains("iPad") {
-            if model.contains("Pro") {
-                return ChipInfo(chipName: "M2", performanceCores: 8, efficiencyCores: 4, neuralEngineCores: 16)
-            } else {
-                return ChipInfo(chipName: "A15 Bionic", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
-            }
-        }
-        // Mac models
-        else if model.contains("Mac") {
-            if model.contains("Studio") || model.contains("Pro") {
-                return ChipInfo(chipName: "M2 Max", performanceCores: 8, efficiencyCores: 4, neuralEngineCores: 32)
-            } else {
-                return ChipInfo(chipName: "M2", performanceCores: 8, efficiencyCores: 4, neuralEngineCores: 16)
-            }
-        }
-        // Simulator or unknown
-        else if model == "arm64" || model.contains("Simulator") {
-            return ChipInfo(chipName: "Apple Silicon", performanceCores: 8, efficiencyCores: 4, neuralEngineCores: 16)
-        }
-        // Default fallback
-        else {
-            return ChipInfo(chipName: "Apple Chip", performanceCores: 2, efficiencyCores: 4, neuralEngineCores: 16)
-        }
-    }
-
-    private func getArchitecture() -> String {
-        #if arch(arm64)
-        return "arm64"
-        #elseif arch(x86_64)
-        return "x86_64"
-        #else
-        return "unknown"
-        #endif
-    }
-
-    private func getDeviceModel() -> String {
-        #if os(iOS)
-        var systemInfo = utsname()
-        uname(&systemInfo)
-        let modelCode = withUnsafePointer(to: &systemInfo.machine) {
-            $0.withMemoryRebound(to: CChar.self, capacity: 1) {
-                String(validatingUTF8: $0)
-            }
-        }
-        return modelCode ?? UIDevice.current.model
-        #elseif os(macOS)
-        var size = 0
-        sysctlbyname("hw.model", nil, &size, nil, 0)
-        var model = [CChar](repeating: 0, count: size)
-        sysctlbyname("hw.model", &model, &size, nil, 0)
-        return String(cString: model)
-        #else
-        return "Unknown"
-        #endif
-    }
-
-    private func getFormFactor() -> String {
-        #if os(iOS)
-        let device = UIDevice.current
-        if device.userInterfaceIdiom == .phone {
-            return "phone"
-        } else if device.userInterfaceIdiom == .pad {
-            return "tablet"
-        } else {
-            return "unknown"
-        }
-        #elseif os(macOS)
-        var size = 0
-        sysctlbyname("hw.model", nil, &size, nil, 0)
-        var model = [CChar](repeating: 0, count: size)
-        sysctlbyname("hw.model", &model, &size, nil, 0)
-        let modelString = String(cString: model)
-        return modelString.contains("MacBook") ? "laptop" : "desktop"
-        #else
-        return "unknown"
-        #endif
     }
 }

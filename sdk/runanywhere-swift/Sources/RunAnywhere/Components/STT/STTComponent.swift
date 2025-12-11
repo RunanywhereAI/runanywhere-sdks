@@ -279,10 +279,10 @@ public struct STTConfiguration: ComponentConfiguration, ComponentInitParameters 
 
     public func validate() throws {
         guard sampleRate > 0 && sampleRate <= 48000 else {
-            throw SDKError.validationFailed("Sample rate must be between 1 and 48000 Hz")
+            throw RunAnywhereError.validationFailed("Sample rate must be between 1 and 48000 Hz")
         }
         guard maxAlternatives > 0 && maxAlternatives <= 10 else {
-            throw SDKError.validationFailed("Max alternatives must be between 1 and 10")
+            throw RunAnywhereError.validationFailed("Max alternatives must be between 1 and 10")
         }
     }
 }
@@ -341,7 +341,7 @@ public struct STTInput: ComponentInput {
 
     public func validate() throws {
         if audioData.isEmpty && audioBuffer == nil {
-            throw SDKError.validationFailed("STTInput must contain either audioData or audioBuffer")
+            throw RunAnywhereError.validationFailed("STTInput must contain either audioData or audioBuffer")
         }
     }
 }
@@ -572,7 +572,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
                     error: "No STT service provider registered"
                 )
             }
-            throw SDKError.componentNotInitialized(
+            throw RunAnywhereError.componentNotInitialized(
                 "No STT service provider registered. Please register WhisperKitServiceProvider.register()"
             )
         }
@@ -717,7 +717,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         try ensureReady()
 
         guard let service = sttService else {
-            throw SDKError.componentNotReady("STT service not available")
+            throw RunAnywhereError.componentNotReady("STT service not available")
         }
 
         // Validate input
@@ -747,7 +747,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         } else if let buffer = input.audioBuffer {
             audioData = convertBufferToData(buffer)
         } else {
-            throw SDKError.validationFailed("No audio data provided")
+            throw RunAnywhereError.validationFailed("No audio data provided")
         }
 
         // Track processing time
@@ -871,7 +871,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
                     try ensureReady()
 
                     guard let service = sttService else {
-                        continuation.finish(throwing: SDKError.componentNotReady("STT service not available"))
+                        continuation.finish(throwing: RunAnywhereError.componentNotReady("STT service not available"))
                         return
                     }
 

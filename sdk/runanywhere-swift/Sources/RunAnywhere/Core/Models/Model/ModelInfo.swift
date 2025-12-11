@@ -54,17 +54,11 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         }
 
         // Check if the file or directory actually exists on disk
-        var isDirectory: ObjCBool = false
-        let exists = FileManager.default.fileExists(atPath: localPath.path, isDirectory: &isDirectory)
+        let (exists, isDirectory) = FileOperationsUtilities.existsWithType(at: localPath)
 
         // For directories, verify they contain files (not empty)
-        if exists && isDirectory.boolValue {
-            // Check if directory has any content
-            if let contents = try? FileManager.default.contentsOfDirectory(atPath: localPath.path),
-               !contents.isEmpty {
-                return true
-            }
-            return false
+        if exists && isDirectory {
+            return FileOperationsUtilities.isNonEmptyDirectory(at: localPath)
         }
 
         return exists

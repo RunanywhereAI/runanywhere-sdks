@@ -41,12 +41,12 @@ class ModelDiscovery {
     }
 
     private func searchForModelsRecursively(in directory: URL, modelExtensions: [String], onModelFound: (ModelInfo) async -> Void) async {
-        guard FileManager.default.fileExists(atPath: directory.path) else {
+        guard FileOperationsUtilities.exists(at: directory) else {
             logger.debug("Directory does not exist: \(directory.path)")
             return
         }
 
-        guard let enumerator = FileManager.default.enumerator(
+        guard let enumerator = FileOperationsUtilities.enumerateDirectory(
             at: directory,
             includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
@@ -83,7 +83,7 @@ class ModelDiscovery {
         let frameworks = detectCompatibleFrameworks(format: format)
 
         // Get file size
-        let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+        let fileSize = FileOperationsUtilities.fileSize(at: url) ?? 0
 
         // Create model info
         let modelId = generateModelId(from: url)

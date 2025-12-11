@@ -111,7 +111,6 @@ struct Migration001_InitialSchema { // swiftlint:disable:this type_name
             t.column("date", .date).notNull()
             t.column("generation_count", .integer).notNull().defaults(to: 0)
             t.column("total_tokens", .integer).notNull().defaults(to: 0)
-            t.column("total_cost", .double).notNull().defaults(to: 0.0)
             t.column("average_latency_ms", .double)
             t.column("error_count", .integer).notNull().defaults(to: 0)
             t.column("created_at", .datetime).notNull()
@@ -128,7 +127,6 @@ struct Migration001_InitialSchema { // swiftlint:disable:this type_name
             t.belongsTo("models").notNull()
             t.column("session_type", .text).notNull() // chat, completion, etc.
             t.column("total_tokens", .integer).notNull().defaults(to: 0)
-            t.column("total_cost", .double).notNull().defaults(to: 0.0)
             t.column("message_count", .integer).notNull().defaults(to: 0)
             t.column("context_data", .blob) // JSON: custom context data
             t.column("started_at", .datetime).notNull()
@@ -154,15 +152,8 @@ struct Migration001_InitialSchema { // swiftlint:disable:this type_name
             // Performance metrics
             t.column("latency_ms", .double).notNull()
             t.column("tokens_per_second", .double)
-            t.column("time_to_first_token_ms", .double)
-
-            // Cost tracking
-            t.column("cost", .double).notNull().defaults(to: 0.0)
-            t.column("cost_saved", .double).notNull().defaults(to: 0.0)
 
             // Execution details
-            t.column("execution_target", .text).notNull() // onDevice, cloud
-            t.column("routing_reason", .text) // costOptimization, latencyOptimization, etc.
             t.column("framework_used", .text) // Actual framework used
 
             // Request/Response data (optional, for debugging)
@@ -176,9 +167,6 @@ struct Migration001_InitialSchema { // swiftlint:disable:this type_name
             // Timestamps
             t.column("created_at", .datetime).notNull()
             t.column("sync_pending", .boolean).notNull().defaults(to: true)
-
-            // Check constraints
-            t.check(sql: "execution_target IN ('\(SDKConstants.ExecutionTargets.onDevice)', '\(SDKConstants.ExecutionTargets.cloud)')")
         }
 
         // MARK: - Telemetry Table

@@ -71,13 +71,13 @@ public struct WakeWordConfiguration: ComponentConfiguration, ComponentInitParame
 
     public func validate() throws {
         guard !wakeWords.isEmpty else {
-            throw SDKError.validationFailed("At least one wake word must be specified")
+            throw RunAnywhereError.validationFailed("At least one wake word must be specified")
         }
         guard sensitivity >= 0 && sensitivity <= 1 else {
-            throw SDKError.validationFailed("Sensitivity must be between 0 and 1")
+            throw RunAnywhereError.validationFailed("Sensitivity must be between 0 and 1")
         }
         guard confidenceThreshold >= 0 && confidenceThreshold <= 1 else {
-            throw SDKError.validationFailed("Confidence threshold must be between 0 and 1")
+            throw RunAnywhereError.validationFailed("Confidence threshold must be between 0 and 1")
         }
     }
 }
@@ -99,7 +99,7 @@ public struct WakeWordInput: ComponentInput {
 
     public func validate() throws {
         guard !audioBuffer.isEmpty else {
-            throw SDKError.validationFailed("Audio buffer cannot be empty")
+            throw RunAnywhereError.validationFailed("Audio buffer cannot be empty")
         }
     }
 }
@@ -236,7 +236,7 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
         try ensureReady()
 
         guard let wakeWordService = service else {
-            throw SDKError.componentNotReady("Wake word service not available")
+            throw RunAnywhereError.componentNotReady("Wake word service not available")
         }
 
         wakeWordService.startListening()
@@ -254,7 +254,7 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
         try ensureReady()
 
         guard let wakeWordService = service else {
-            throw SDKError.componentNotReady("Wake word service not available")
+            throw RunAnywhereError.componentNotReady("Wake word service not available")
         }
 
         // Validate input

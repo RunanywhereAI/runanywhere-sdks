@@ -38,7 +38,7 @@ public struct ModelRegistration {
         contextLength: Int? = nil
     ) throws {
         guard let modelURL = URL(string: url) else {
-            throw SDKError.invalidConfiguration("Invalid model URL: \(url)")
+            throw RunAnywhereError.invalidConfiguration("Invalid model URL: \(url)")
         }
 
         self.url = modelURL

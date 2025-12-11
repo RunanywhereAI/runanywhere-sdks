@@ -59,10 +59,10 @@ public struct EmbeddingInitParameters: ComponentInitParameters {
     public func validate() throws {
         let validDimensions = [128, 256, 384, 512, 768, 1024, 1536, 2048]
         guard validDimensions.contains(dimensions) else {
-            throw SDKError.validationFailed("Dimensions must be one of: \(validDimensions)")
+            throw RunAnywhereError.validationFailed("Dimensions must be one of: \(validDimensions)")
         }
         guard maxSequenceLength > 0 && maxSequenceLength <= 8192 else {
-            throw SDKError.validationFailed("Max sequence length must be between 1 and 8192")
+            throw RunAnywhereError.validationFailed("Max sequence length must be between 1 and 8192")
         }
     }
 }

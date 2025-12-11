@@ -27,15 +27,15 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
     }()
 
     /// Generation service
-    private(set) lazy var generationService: GenerationService = {
-        GenerationService(
+    private(set) lazy var generationService: LLMGenerationService = {
+        LLMGenerationService(
             modelLoadingService: modelLoadingService
         )
     }()
 
     /// Streaming service
-    private(set) lazy var streamingService: StreamingService = {
-        StreamingService(generationService: generationService, modelLoadingService: modelLoadingService)
+    private(set) lazy var streamingService: LLMStreamingService = {
+        LLMStreamingService(generationService: generationService, modelLoadingService: modelLoadingService)
     }()
 
     /// Voice capability service

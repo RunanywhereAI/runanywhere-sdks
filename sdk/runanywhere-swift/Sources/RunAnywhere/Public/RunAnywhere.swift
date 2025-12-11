@@ -94,7 +94,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             // Step 1: Validate API key (skip in development mode)
             if params.environment != .development {
                 guard !params.apiKey.isEmpty else {
-                    throw SDKError.invalidAPIKey("API key cannot be empty")
+                    throw RunAnywhereError.invalidAPIKey("API key cannot be empty")
                 }
             }
 
@@ -247,7 +247,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             if let deviceId = await registrationState.getCachedDeviceId(), !deviceId.isEmpty {
                 return
             } else if waitAttempts >= maxWaitAttempts {
-                throw SDKError.timeout("Device registration timeout")
+                throw RunAnywhereError.timeout("Device registration timeout")
             }
             return
         }
@@ -265,7 +265,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
                 // Get the device ID that was just registered (must exist now)
                 guard let deviceId = getStoredDeviceId() else {
-                    throw SDKError.storageError("Device ID not found after successful registration")
+                    throw RunAnywhereError.storageError("Device ID not found after successful registration")
                 }
 
                 await registrationState.setCachedDeviceId(deviceId)
@@ -290,14 +290,14 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
                 } catch {
                     logger.error("Failed to store mock device ID: \(error.localizedDescription)")
                     await registrationState.clearRegistering()
-                    throw SDKError.storageError("Failed to store device ID: \(error.localizedDescription)")
+                    throw RunAnywhereError.storageError("Failed to store device ID: \(error.localizedDescription)")
                 }
             }
         }
 
         // Ensure we have network services initialized
         guard let params = initParams else {
-            throw SDKError.notInitialized
+            throw RunAnywhereError.notInitialized
         }
 
         // Registration with retry logic
@@ -313,7 +313,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
                 }
 
                 guard let authService = serviceContainer.authenticationService else {
-                    throw SDKError.invalidState("Authentication service not available")
+                    throw RunAnywhereError.invalidState("Authentication service not available")
                 }
 
                 // Register device with backend
@@ -348,7 +348,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         }
 
         // All retries exhausted
-        let finalError = lastError ?? SDKError.networkError("Device registration failed after \(maxRegistrationRetries) attempts")
+        let finalError = lastError ?? RunAnywhereError.networkError("Device registration failed after \(maxRegistrationRetries) attempts")
         logger.error("Device registration failed after all retries: \(finalError.localizedDescription)")
         await registrationState.clearRegistering()
         throw finalError
@@ -441,7 +441,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// Perform the actual dev device registration
     private static func registerDevDevice() async throws {
         guard let params = initParams else {
-            throw SDKError.notInitialized
+            throw RunAnywhereError.notInitialized
         }
 
         // Collect simple device info
@@ -494,11 +494,11 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw SDKError.networkError("Invalid response from server")
+            throw RunAnywhereError.networkError("Invalid response from server")
         }
 
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
-            throw SDKError.networkError("Registration failed with status code: \(httpResponse.statusCode)")
+            throw RunAnywhereError.networkError("Registration failed with status code: \(httpResponse.statusCode)")
         }
 
         // Parse response (optional, for validation)
@@ -536,7 +536,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
         guard let httpResponse = response as? HTTPURLResponse else {
             logger.error("❌ Invalid response from Supabase")
-            throw SDKError.networkError("Invalid response from Supabase")
+            throw RunAnywhereError.networkError("Invalid response from Supabase")
         }
 
         logger.debug("Supabase response: HTTP \(httpResponse.statusCode)")
@@ -556,7 +556,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
                 logger.debug("Response body: \(responseString)")
             }
 
-            throw SDKError.networkError(errorMessage)
+            throw RunAnywhereError.networkError(errorMessage)
         }
 
         logger.info("✅ Device successfully registered with Supabase!")
@@ -589,7 +589,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw SDKError.networkError("Invalid response from Supabase")
+            throw RunAnywhereError.networkError("Invalid response from Supabase")
         }
 
         logger.debug("Analytics HTTP Response: \(httpResponse.statusCode)")
@@ -602,7 +602,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
                     errorMessage = message
                 }
             }
-            throw SDKError.networkError(errorMessage)
+            throw RunAnywhereError.networkError(errorMessage)
         }
 
         logger.debug("Analytics submission successful")
@@ -625,7 +625,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
-            throw SDKError.networkError("Analytics submission failed")
+            throw RunAnywhereError.networkError("Analytics submission failed")
         }
     }
 
@@ -634,11 +634,11 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     public static func submitGenerationAnalytics( // swiftlint:disable:this function_parameter_count
         generationId: String,
         modelId: String,
-        performanceMetrics: PerformanceMetrics,
+        latencyMs: Double,
+        tokensPerSecond: Double,
         inputTokens: Int,
         outputTokens: Int,
-        success: Bool,
-        executionTarget: String
+        success: Bool
     ) async {
         guard let params = initParams else { return }
         guard params.environment == .development else { return }
@@ -658,13 +658,11 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
                     generationId: generationId,
                     deviceId: deviceId,
                     modelId: modelId,
-                    timeToFirstTokenMs: performanceMetrics.timeToFirstTokenMs,
-                    tokensPerSecond: performanceMetrics.tokensPerSecond,
-                    totalGenerationTimeMs: performanceMetrics.inferenceTimeMs,
+                    tokensPerSecond: tokensPerSecond,
+                    totalGenerationTimeMs: latencyMs,
                     inputTokens: inputTokens,
                     outputTokens: outputTokens,
                     success: success,
-                    executionTarget: executionTarget,
                     buildToken: BuildToken.token,
                     sdkVersion: SDKConstants.version,
                     timestamp: ISO8601DateFormatter().string(from: Date()),
@@ -672,7 +670,6 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
                     hostAppName: hostAppName,
                     hostAppVersion: hostAppVersion
                 )
-
 
                 if let supabaseConfig = params.supabaseConfig {
                     try await submitAnalyticsViaSupabase(request: request, config: supabaseConfig)
@@ -713,7 +710,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// Store device ID in local persistence
     private static func storeDeviceId(_ deviceId: String) throws {
         guard !deviceId.isEmpty else {
-            throw SDKError.validationFailed("Device ID cannot be empty")
+            throw RunAnywhereError.validationFailed("Device ID cannot be empty")
         }
 
         let logger = SDKLogger(category: "RunAnywhere.DeviceID")
@@ -782,14 +779,14 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// - Returns: GenerationResult with full metrics including thinking tokens, timing, performance, etc.
     public static func generate(
         _ prompt: String,
-        options: RunAnywhereGenerationOptions? = nil
-    ) async throws -> GenerationResult {
+        options: LLMGenerationOptions? = nil
+    ) async throws -> LLMGenerationResult {
         EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
             // Ensure initialized
             guard isInitialized else {
-                throw SDKError.notInitialized
+                throw RunAnywhereError.notInitialized
             }
 
             // Lazy device registration on first API call
@@ -798,7 +795,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             // Use options directly or defaults
             let result = try await serviceContainer.generationService.generate(
                 prompt: prompt,
-                options: options ?? RunAnywhereGenerationOptions()
+                options: options ?? LLMGenerationOptions()
             )
 
             EventBus.shared.publish(SDKGenerationEvent.completed(
@@ -806,13 +803,6 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
                 tokensUsed: result.tokensUsed,
                 latencyMs: result.latencyMs
             ))
-
-            if result.savedAmount > 0 {
-                EventBus.shared.publish(SDKGenerationEvent.costCalculated(
-                    amount: 0,
-                    savedAmount: result.savedAmount
-                ))
-            }
 
             return result
         } catch {
@@ -847,13 +837,13 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// - Returns: StreamingResult containing both the token stream and final metrics task
     public static func generateStream(
         _ prompt: String,
-        options: RunAnywhereGenerationOptions? = nil
-    ) async throws -> StreamingResult {
+        options: LLMGenerationOptions? = nil
+    ) async throws -> LLMStreamingResult {
         EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
 
         // Ensure initialized
         guard isInitialized else {
-            throw SDKError.notInitialized
+            throw RunAnywhereError.notInitialized
         }
 
         // Lazy device registration on first API call
@@ -861,7 +851,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
         return serviceContainer.streamingService.generateStreamWithMetrics(
             prompt: prompt,
-            options: options ?? RunAnywhereGenerationOptions()
+            options: options ?? LLMGenerationOptions()
         )
     }
 
@@ -876,7 +866,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         do {
             // Ensure initialized
             guard isInitialized else {
-                throw SDKError.notInitialized
+                throw RunAnywhereError.notInitialized
             }
 
             // Lazy device registration on first API call
@@ -911,7 +901,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         do {
             // Ensure initialized
             guard isInitialized else {
-                throw SDKError.notInitialized
+                throw RunAnywhereError.notInitialized
             }
 
             // Lazy device registration on first API call
@@ -1059,7 +1049,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         do {
             // Ensure initialized
             guard isInitialized else {
-                throw SDKError.notInitialized
+                throw RunAnywhereError.notInitialized
             }
 
             // Lazy device registration and network services initialization
@@ -1213,7 +1203,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         do {
             // Ensure initialized
             guard isInitialized else {
-                throw SDKError.notInitialized
+                throw RunAnywhereError.notInitialized
             }
 
             // Lazy device registration and network services initialization
@@ -1376,7 +1366,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
         guard isInitialized else {
-            throw SDKError.notInitialized
+            throw RunAnywhereError.notInitialized
         }
 
         // Use model registry to get available models
@@ -1407,7 +1397,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// - Parameters:
     ///   - adapter: The framework adapter to register
     ///   - priority: Priority level (higher = preferred, default: 100)
-    public static func registerFrameworkAdapter(_ adapter: UnifiedFrameworkAdapter, priority: Int = 100) {
+    public static func registerFrameworkAdapter(_ adapter: FrameworkAdapter, priority: Int = 100) {
         // Note: Adapter registration can happen before SDK initialization
         // This allows registering adapters during app setup
         serviceContainer.adapterRegistry.register(adapter, priority: priority)

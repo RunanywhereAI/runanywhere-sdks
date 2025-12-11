@@ -70,7 +70,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
     /// Process audio through the full pipeline
     public func processAudio(_ audioData: Data) async throws -> VoiceAgentResult {
         guard state == .ready else {
-            throw SDKError.notInitialized
+            throw RunAnywhereError.notInitialized
         }
 
         var result = VoiceAgentResult()
@@ -103,7 +103,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
            let transcript = result.transcription {
             let response = try await llm.generate(
                 prompt: transcript,
-                options: RunAnywhereGenerationOptions(
+                options: LLMGenerationOptions(
                     maxTokens: agentParams.llmConfig.maxTokens,
                     temperature: Float(agentParams.llmConfig.temperature),
                     preferredFramework: agentParams.llmConfig.preferredFramework
@@ -165,7 +165,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
         guard let llm = llmComponent?.getService() else { return nil }
         let result = try await llm.generate(
             prompt: prompt,
-            options: RunAnywhereGenerationOptions(
+            options: LLMGenerationOptions(
                 maxTokens: agentParams.llmConfig.maxTokens,
                 temperature: Float(agentParams.llmConfig.temperature),
                 preferredFramework: agentParams.llmConfig.preferredFramework

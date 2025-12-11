@@ -14,17 +14,13 @@ extension RunAnywhere {
     /// Enable or disable local logging via Pulse
     /// - Parameter enabled: Whether to enable local Pulse logging
     public static func configureLocalLogging(enabled: Bool) {
-        var config = LoggingManager.shared.configuration
-        config.enableLocalLogging = enabled
-        LoggingManager.shared.configure(config)
+        Logging.shared.setLocalLoggingEnabled(enabled)
     }
 
     /// Set minimum log level for SDK logging
     /// - Parameter level: Minimum log level to capture
     public static func setLogLevel(_ level: LogLevel) {
-        var config = LoggingManager.shared.configuration
-        config.minLogLevel = level
-        LoggingManager.shared.configure(config)
+        Logging.shared.setMinLogLevel(level)
     }
 
     // MARK: - Analytics Configuration (Consumer Events)
@@ -66,7 +62,7 @@ extension RunAnywhere {
     /// Force flush all pending logs and analytics
     public static func flushAll() async {
         // Flush SDK logs
-        LoggingManager.shared.flush()
+        Logging.shared.flush()
 
         // Flush analytics events
         await AnalyticsQueueManager.shared.flush()

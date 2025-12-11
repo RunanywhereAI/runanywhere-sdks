@@ -2,7 +2,7 @@ import Foundation
 import RunAnywhere
 
 /// ONNX Runtime adapter for multi-modal inference
-public class ONNXAdapter: UnifiedFrameworkAdapter {
+public class ONNXAdapter: FrameworkAdapter {
     private let logger = SDKLogger(category: "ONNXAdapter")
 
     // Singleton instance to ensure caching works across the app
@@ -25,7 +25,7 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
     private var lastTTSUsage: Date?
     private let cacheTimeout: TimeInterval = 300 // 5 minutes
 
-    // MARK: - UnifiedFrameworkAdapter Implementation
+    // MARK: - FrameworkAdapter Implementation
 
     public func canHandle(model: ModelInfo) -> Bool {
         // Check if model is compatible with ONNX Runtime

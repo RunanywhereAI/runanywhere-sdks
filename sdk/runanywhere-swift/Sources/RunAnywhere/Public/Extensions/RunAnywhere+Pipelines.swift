@@ -230,7 +230,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlin
                     logger.info("TTS audio playback started")
                 } else {
                     audioPlaybackContinuation = nil
-                    continuation.resume(throwing: SDKError.generationFailed("Failed to start TTS audio playback"))
+                    continuation.resume(throwing: RunAnywhereError.generationFailed("Failed to start TTS audio playback"))
                 }
             } catch {
                 logger.error("Failed to create audio player: \(error)")
@@ -250,7 +250,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlin
         if flag {
             audioPlaybackContinuation?.resume()
         } else {
-            audioPlaybackContinuation?.resume(throwing: SDKError.generationFailed("TTS audio playback failed"))
+            audioPlaybackContinuation?.resume(throwing: RunAnywhereError.generationFailed("TTS audio playback failed"))
         }
         audioPlaybackContinuation = nil
     }
@@ -260,7 +260,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlin
         guard player === audioPlayer else { return }
         logger.error("TTS audio decode error: \(error?.localizedDescription ?? "unknown")")
         audioPlayer = nil
-        audioPlaybackContinuation?.resume(throwing: error ?? SDKError.generationFailed("TTS audio decode error"))
+        audioPlaybackContinuation?.resume(throwing: error ?? RunAnywhereError.generationFailed("TTS audio decode error"))
         audioPlaybackContinuation = nil
     }
 
