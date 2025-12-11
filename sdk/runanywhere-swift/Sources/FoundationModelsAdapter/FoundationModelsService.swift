@@ -47,7 +47,7 @@ public class FoundationModelsService: LLMService {
         #if canImport(FoundationModels)
         guard #available(iOS 26.0, macOS 26.0, *) else {
             logger.error("iOS 26.0+ or macOS 26.0+ not available")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         }
 
         logger.info("FoundationModels framework is available, proceeding with initialization")
@@ -59,12 +59,12 @@ public class FoundationModelsService: LLMService {
             logger.info("Foundation Models initialized successfully")
         } catch {
             logger.error("Failed to initialize Foundation Models: \(error)")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         }
         #else
         // Foundation Models framework not available
         logger.error("FoundationModels framework not available")
-        throw LLMServiceError.notInitialized
+        throw LLMError.notInitialized
         #endif
     }
 
@@ -95,26 +95,26 @@ public class FoundationModelsService: LLMService {
             logger.info("Foundation Models is available")
         case .unavailable(.deviceNotEligible):
             logger.error("Device not eligible for Apple Intelligence")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         case .unavailable(.appleIntelligenceNotEnabled):
             logger.error("Apple Intelligence not enabled. Please enable it in Settings.")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         case .unavailable(.modelNotReady):
             logger.error("Model not ready. It may be downloading or initializing.")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         case .unavailable(let other):
             logger.error("Foundation Models unavailable: \(String(describing: other))")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         @unknown default:
             logger.error("Unknown availability status")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         }
     }
     #endif
 
-    public func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String {
+    public func generate(prompt: String, options: LLMGenerationOptions) async throws -> String {
         guard isReady else {
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         }
 
         logger.debug("Generating response for prompt: \(prompt.prefix(100))...")
@@ -122,7 +122,7 @@ public class FoundationModelsService: LLMService {
         #if canImport(FoundationModels)
         guard let sessionWrapper = session else {
             logger.error("Session not available - was initialization successful?")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         }
 
         let sessionObj = sessionWrapper.session
@@ -130,7 +130,7 @@ public class FoundationModelsService: LLMService {
         // Check if session is responding to another request
         guard !sessionObj.isResponding else {
             logger.warning("Session is already responding to another request")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         }
 
         do {
@@ -143,25 +143,25 @@ public class FoundationModelsService: LLMService {
             return response
         } catch let error as LanguageModelSession.GenerationError {
             try handleGenerationError(error)
-            throw LLMServiceError.generationFailed(error)
+            throw LLMError.generationFailed(error)
         } catch {
             logger.error("Generation failed: \(error)")
-            throw LLMServiceError.generationFailed(error)
+            throw LLMError.generationFailed(error)
         }
         #else
         // Foundation Models framework not available
         logger.error("FoundationModels framework not available")
-        throw LLMServiceError.notInitialized
+        throw LLMError.notInitialized
         #endif
     }
 
     public func streamGenerate(
         prompt: String,
-        options: RunAnywhereGenerationOptions,
+        options: LLMGenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isReady else {
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         }
 
         logger.debug("Starting streaming generation for prompt: \(prompt.prefix(100))...")
@@ -169,7 +169,7 @@ public class FoundationModelsService: LLMService {
         #if canImport(FoundationModels)
         guard let sessionWrapper = session else {
             logger.error("Session not available for streaming")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         }
 
         let sessionObj = sessionWrapper.session
@@ -177,7 +177,7 @@ public class FoundationModelsService: LLMService {
         // Check if session is responding to another request
         guard !sessionObj.isResponding else {
             logger.warning("Session is already responding to another request")
-            throw LLMServiceError.notInitialized
+            throw LLMError.notInitialized
         }
 
         do {
@@ -190,15 +190,15 @@ public class FoundationModelsService: LLMService {
             logger.debug("Streaming generation completed successfully")
         } catch let error as LanguageModelSession.GenerationError {
             try handleGenerationError(error)
-            throw LLMServiceError.generationFailed(error)
+            throw LLMError.generationFailed(error)
         } catch {
             logger.error("Streaming generation failed: \(error)")
-            throw LLMServiceError.generationFailed(error)
+            throw LLMError.generationFailed(error)
         }
         #else
         // Foundation Models framework not available
         logger.error("FoundationModels framework not available for streaming")
-        throw LLMServiceError.notInitialized
+        throw LLMError.notInitialized
         #endif
     }
 
@@ -241,10 +241,10 @@ public class FoundationModelsService: LLMService {
         switch error {
         case .exceededContextWindowSize:
             logger.error("Exceeded context window size - please reduce prompt length")
-            throw LLMServiceError.contextLengthExceeded
+            throw LLMError.contextLengthExceeded(maxLength: 0, requestedLength: 0)
         default:
             logger.error("Other generation error: \(error)")
-            throw LLMServiceError.generationFailed(error)
+            throw LLMError.generationFailed(error)
         }
     }
     #endif

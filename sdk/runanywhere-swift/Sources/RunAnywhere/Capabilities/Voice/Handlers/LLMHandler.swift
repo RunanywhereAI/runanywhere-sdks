@@ -27,7 +27,7 @@ public class VoiceLLMHandler {
 
         continuation.yield(.llmThinking)
 
-        let options = RunAnywhereGenerationOptions(
+        let options = LLMGenerationOptions(
             maxTokens: config?.maxTokens ?? 100,
             temperature: Float(config?.temperature ?? 0.7),
             preferredFramework: config?.preferredFramework,
@@ -65,7 +65,7 @@ public class VoiceLLMHandler {
     private func streamGenerate(
         transcript: String,
         llmService: LLMService,
-        options: RunAnywhereGenerationOptions,
+        options: LLMGenerationOptions,
         streamingTTSHandler: StreamingTTSHandler?,
         ttsEnabled: Bool,
         ttsConfig: TTSConfiguration?,
@@ -180,7 +180,7 @@ public class VoiceLLMHandler {
     private func generateNonStreaming(
         transcript: String,
         llmService: LLMService?,
-        options: RunAnywhereGenerationOptions,
+        options: LLMGenerationOptions,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws -> String {
 

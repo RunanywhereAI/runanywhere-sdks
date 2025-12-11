@@ -125,18 +125,4 @@ public actor ConfigurationService: ConfigurationServiceProtocol {
             try await syncCoordinator.sync(repository)
         }
     }
-
-    // MARK: - Required protocol methods (simplified)
-
-    public func loadConfigurationWithFallback(apiKey: String) async -> ConfigurationData {
-        return await loadConfigurationOnLaunch(apiKey: apiKey)
-    }
-
-    public func clearCache() async throws {
-        // No cache to clear
-    }
-
-    public func startBackgroundSync(apiKey: String) async {
-        // No background sync
-    }
 }

@@ -5,7 +5,7 @@ import RunAnywhere
 ///
 /// This adapter provides LLM text generation via the runanywhere-core LlamaCPP backend.
 /// It uses the native C++ llama.cpp implementation via XCFramework for maximum performance.
-public class LlamaCPPCoreAdapter: UnifiedFrameworkAdapter {
+public class LlamaCPPCoreAdapter: FrameworkAdapter {
     public let framework: LLMFramework = .llamaCpp
 
     public let supportedModalities: Set<FrameworkModality> = [.textToText]
@@ -54,7 +54,7 @@ public class LlamaCPPCoreAdapter: UnifiedFrameworkAdapter {
 
         guard let localPath = model.localPath else {
             logger.error("Model has no local path - not downloaded")
-            throw LLMServiceError.modelNotFound("Model not downloaded at expected path")
+            throw LLMError.modelNotFound(path: "Model not downloaded at expected path")
         }
 
         logger.debug("Creating LlamaCPPService with model path: \(localPath.path)")
@@ -97,7 +97,7 @@ public class LlamaCPPCoreAdapter: UnifiedFrameworkAdapter {
 extension LlamaCPPService: LLMService {
     // Note: isReady, currentModel, and initialize(modelPath:) are already defined in LlamaCPPService
 
-    public func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String {
+    public func generate(prompt: String, options: LLMGenerationOptions) async throws -> String {
         let config = LlamaCPPGenerationConfig(
             maxTokens: options.maxTokens,
             temperature: options.temperature,  // Already Float
@@ -108,7 +108,7 @@ extension LlamaCPPService: LLMService {
 
     public func streamGenerate(
         prompt: String,
-        options: RunAnywhereGenerationOptions,
+        options: LLMGenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
         let config = LlamaCPPGenerationConfig(

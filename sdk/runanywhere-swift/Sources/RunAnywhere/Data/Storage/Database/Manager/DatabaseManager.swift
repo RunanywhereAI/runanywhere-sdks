@@ -17,10 +17,7 @@ public final class DatabaseManager {
 
     /// Database file URL
     private var databaseURL: URL {
-        guard let documentsPath = FileManager.default.urls(
-            for: .documentDirectory,
-            in: .userDomainMask
-        ).first else {
+        guard let documentsPath = try? FileOperationsUtilities.getDocumentsDirectory() else {
             fatalError("Unable to access documents directory")
         }
         return documentsPath.appendingPathComponent(SDKConstants.DatabaseDefaults.databaseFileName)
@@ -249,22 +246,10 @@ public final class DatabaseManager {
     public func reset() throws {
         close()
 
-        // Delete database file
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: databaseURL.path) {
-            try fileManager.removeItem(at: databaseURL)
-        }
-
-        // Delete WAL files
-        let walURL = databaseURL.appendingPathExtension("wal")
-        if fileManager.fileExists(atPath: walURL.path) {
-            try fileManager.removeItem(at: walURL)
-        }
-
-        let shmURL = databaseURL.appendingPathExtension("shm")
-        if fileManager.fileExists(atPath: shmURL.path) {
-            try fileManager.removeItem(at: shmURL)
-        }
+        // Delete database file and related WAL/SHM files
+        FileOperationsUtilities.removeItemIfExists(at: databaseURL)
+        FileOperationsUtilities.removeItemIfExists(at: databaseURL.appendingPathExtension("wal"))
+        FileOperationsUtilities.removeItemIfExists(at: databaseURL.appendingPathExtension("shm"))
 
         // Recreate database
         try setup()

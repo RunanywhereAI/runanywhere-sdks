@@ -78,46 +78,22 @@ public enum HealthStatus: String, Codable {
 
 // MARK: - Device Registration Models
 
-/// Device information for registration
+/// Device information for registration - simplified to essential fields only
 public struct DeviceRegistrationInfo: Codable {
     let architecture: String
-    let availableMemory: Int64
-    let batteryLevel: Double?
-    let batteryState: String?
-    let chipName: String?
-    let coreCount: Int
     let deviceModel: String
-    let deviceName: String?
     let deviceUUID: String  // Persistent device identifier to prevent duplicate registrations
-    let efficiencyCores: Int?
     let formFactor: String
-    let gpuFamily: String?
-    let hasNeuralEngine: Bool
-    let isLowPowerMode: Bool?
-    let neuralEngineCores: Int?
     let osVersion: String
-    let performanceCores: Int?
     let platform: String
     let totalMemory: Int64
 
     enum CodingKeys: String, CodingKey {
         case architecture
-        case availableMemory = "available_memory"
-        case batteryLevel = "battery_level"
-        case batteryState = "battery_state"
-        case chipName = "chip_name"
-        case coreCount = "core_count"
         case deviceModel = "device_model"
-        case deviceName = "device_name"
         case deviceUUID = "device_uuid"
-        case efficiencyCores = "efficiency_cores"
         case formFactor = "form_factor"
-        case gpuFamily = "gpu_family"
-        case hasNeuralEngine = "has_neural_engine"
-        case isLowPowerMode = "is_low_power_mode"
-        case neuralEngineCores = "neural_engine_cores"
         case osVersion = "os_version"
-        case performanceCores = "performance_cores"
         case platform
         case totalMemory = "total_memory"
     }

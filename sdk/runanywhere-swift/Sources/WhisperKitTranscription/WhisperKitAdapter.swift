@@ -2,7 +2,7 @@ import Foundation
 import RunAnywhere
 
 /// WhisperKit adapter for voice transcription
-public class WhisperKitAdapter: UnifiedFrameworkAdapter {
+public class WhisperKitAdapter: FrameworkAdapter {
     private let logger = SDKLogger(category: "WhisperKitAdapter")
 
     // Singleton instance to ensure caching works across the app
@@ -23,7 +23,7 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     private var lastWhisperKitUsage: Date?
     private let cacheTimeout: TimeInterval = 300 // 5 minutes
 
-    // MARK: - UnifiedFrameworkAdapter Implementation
+    // MARK: - FrameworkAdapter Implementation
 
     public func canHandle(model: ModelInfo) -> Bool {
         // Check if model is for speech recognition and compatible with WhisperKit

@@ -52,7 +52,7 @@ public actor APIClient: NetworkService {
         let token: String?
         if requiresAuth {
             guard let authService = authService else {
-                throw SDKError.notInitialized
+                throw RunAnywhereError.notInitialized
             }
             token = try await authService.getAccessToken()
         } else {
@@ -108,7 +108,7 @@ public actor APIClient: NetworkService {
         let token: String?
         if requiresAuth {
             guard let authService = authService else {
-                throw SDKError.notInitialized
+                throw RunAnywhereError.notInitialized
             }
             token = try await authService.getAccessToken()
         } else {

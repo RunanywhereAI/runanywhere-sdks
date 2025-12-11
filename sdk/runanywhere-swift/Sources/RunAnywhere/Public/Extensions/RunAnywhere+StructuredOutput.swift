@@ -96,7 +96,7 @@ public extension RunAnywhere {
     static func generateStructured<T: Generatable>(
         _ type: T.Type,
         prompt: String,
-        options: RunAnywhereGenerationOptions? = nil
+        options: LLMGenerationOptions? = nil
     ) async throws -> T {
         events.publish(SDKGenerationEvent.started(prompt: prompt))
 
@@ -108,14 +108,12 @@ public extension RunAnywhere {
             let systemPrompt = handler.getSystemPrompt(for: type)
 
             // Create effective options with system prompt
-            let effectiveOptions = RunAnywhereGenerationOptions(
+            let effectiveOptions = LLMGenerationOptions(
                 maxTokens: options?.maxTokens ?? type.generationHints?.maxTokens ?? 1500,
                 temperature: options?.temperature ?? type.generationHints?.temperature ?? 0.7,
                 topP: options?.topP ?? 1.0,
-                enableRealTimeTracking: options?.enableRealTimeTracking ?? true,
                 stopSequences: options?.stopSequences ?? [],
                 streamingEnabled: false,
-                preferredExecutionTarget: options?.preferredExecutionTarget,
                 preferredFramework: options?.preferredFramework,
                 structuredOutput: StructuredOutputConfig(
                     type: type,
@@ -158,7 +156,7 @@ public extension RunAnywhere {
     static func generateStructuredStream<T: Generatable>( // swiftlint:disable:this function_body_length
         _ type: T.Type,
         content: String,
-        options: RunAnywhereGenerationOptions? = nil
+        options: LLMGenerationOptions? = nil
     ) -> StructuredOutputStreamResult<T> {
         // Create a shared accumulator
         let accumulator = StreamAccumulator()
@@ -170,14 +168,12 @@ public extension RunAnywhere {
         let systemPrompt = handler.getSystemPrompt(for: type)
 
         // Create effective options with system prompt
-        let effectiveOptions = RunAnywhereGenerationOptions(
+        let effectiveOptions = LLMGenerationOptions(
             maxTokens: options?.maxTokens ?? type.generationHints?.maxTokens ?? 1500,
             temperature: options?.temperature ?? type.generationHints?.temperature ?? 0.7,
             topP: options?.topP ?? 1.0,
-            enableRealTimeTracking: options?.enableRealTimeTracking ?? true,
             stopSequences: options?.stopSequences ?? [],
             streamingEnabled: true,
-            preferredExecutionTarget: options?.preferredExecutionTarget,
             preferredFramework: options?.preferredFramework,
             structuredOutput: StructuredOutputConfig(
                 type: type,
@@ -265,21 +261,19 @@ public extension RunAnywhere {
     static func generateWithStructuredOutput(
         prompt: String,
         structuredOutput: StructuredOutputConfig,
-        options: RunAnywhereGenerationOptions? = nil
-    ) async throws -> GenerationResult {
+        options: LLMGenerationOptions? = nil
+    ) async throws -> LLMGenerationResult {
         events.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
             // Generate using regular generation with structured config in options
-            let baseOptions = options ?? RunAnywhereGenerationOptions()
-            let internalOptions = RunAnywhereGenerationOptions(
+            let baseOptions = options ?? LLMGenerationOptions()
+            let internalOptions = LLMGenerationOptions(
                 maxTokens: baseOptions.maxTokens,
                 temperature: baseOptions.temperature,
                 topP: baseOptions.topP,
-                enableRealTimeTracking: baseOptions.enableRealTimeTracking,
                 stopSequences: baseOptions.stopSequences,
                 streamingEnabled: baseOptions.streamingEnabled,
-                preferredExecutionTarget: baseOptions.preferredExecutionTarget,
                 preferredFramework: baseOptions.preferredFramework,
                 structuredOutput: structuredOutput,
                 systemPrompt: baseOptions.systemPrompt
@@ -295,13 +289,6 @@ public extension RunAnywhere {
                 tokensUsed: result.tokensUsed,
                 latencyMs: result.latencyMs
             ))
-
-            if result.savedAmount > 0 {
-                events.publish(SDKGenerationEvent.costCalculated(
-                    amount: 0,
-                    savedAmount: result.savedAmount
-                ))
-            }
 
             return result
         } catch {

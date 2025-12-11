@@ -332,8 +332,5 @@ public enum RunAnywhereError: LocalizedError, SDKErrorProtocol {
     }
 }
 
-// MARK: - Backward Compatibility Type Alias
-
-/// Type alias for backward compatibility with code using SDKError
-/// @available(*, deprecated, renamed: "RunAnywhereError")
+/// Type alias for convenience
 public typealias SDKError = RunAnywhereError

@@ -77,13 +77,13 @@ public struct SpeakerDiarizationConfiguration: ComponentConfiguration, Component
 
     public func validate() throws {
         guard maxSpeakers > 0 && maxSpeakers <= 100 else {
-            throw SDKError.validationFailed("Max speakers must be between 1 and 100")
+            throw RunAnywhereError.validationFailed("Max speakers must be between 1 and 100")
         }
         guard minSpeechDuration > 0 && minSpeechDuration <= 10 else {
-            throw SDKError.validationFailed("Min speech duration must be between 0 and 10 seconds")
+            throw RunAnywhereError.validationFailed("Min speech duration must be between 0 and 10 seconds")
         }
         guard speakerChangeThreshold >= 0 && speakerChangeThreshold <= 1.0 else {
-            throw SDKError.validationFailed("Speaker change threshold must be between 0 and 1")
+            throw RunAnywhereError.validationFailed("Speaker change threshold must be between 0 and 1")
         }
     }
 }
@@ -123,7 +123,7 @@ public struct SpeakerDiarizationInput: ComponentInput {
 
     public func validate() throws {
         guard !audioData.isEmpty else {
-            throw SDKError.validationFailed("Audio data cannot be empty")
+            throw RunAnywhereError.validationFailed("Audio data cannot be empty")
         }
     }
 }
@@ -277,7 +277,7 @@ public final class DefaultSpeakerDiarizationAdapter: ComponentAdapter {
 
     public func createService(configuration: any ComponentConfiguration) async throws -> DefaultSpeakerDiarization {
         guard let diarizationConfig = configuration as? SpeakerDiarizationConfiguration else {
-            throw SDKError.validationFailed("Expected SpeakerDiarizationConfiguration")
+            throw RunAnywhereError.validationFailed("Expected SpeakerDiarizationConfiguration")
         }
         return try await createDiarizationService(configuration: diarizationConfig)
     }
@@ -366,7 +366,7 @@ public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiar
         try ensureReady()
 
         guard let diarizationService = service else {
-            throw SDKError.componentNotReady("Speaker diarization service not available")
+            throw RunAnywhereError.componentNotReady("Speaker diarization service not available")
         }
 
         // Validate input

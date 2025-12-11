@@ -1,7 +1,4 @@
 import Foundation
-#if os(iOS)
-import UIKit
-#endif
 
 /// Service for fetching and managing model assignments from the backend
 public actor ModelAssignmentService {
@@ -38,14 +35,13 @@ public actor ModelAssignmentService {
 
         logger.info("Fetching model assignments from backend...")
 
-        // Determine device type and platform
-        let deviceType = getDeviceType()
-        let platform = SDKConstants.platform
+        // Use centralized device info
+        let deviceInfo = DeviceInfo.current
 
         // Create the endpoint with parameters
         let endpoint = APIEndpoint.modelAssignments(
-            deviceType: deviceType,
-            platform: platform
+            deviceType: deviceInfo.deviceType,
+            platform: deviceInfo.platform
         )
 
         do {
@@ -110,29 +106,6 @@ public actor ModelAssignmentService {
         cachedAssignments = nil
         lastFetchTime = nil
         logger.debug("Model assignments cache cleared")
-    }
-
-    // MARK: - Private Methods
-
-    private func getDeviceType() -> String {
-        #if os(iOS)
-        let device = UIDevice.current
-        if device.userInterfaceIdiom == .phone {
-            return "mobile"
-        } else if device.userInterfaceIdiom == .pad {
-            return "tablet"
-        } else {
-            return "mobile"
-        }
-        #elseif os(macOS)
-        return "desktop"
-        #elseif os(tvOS)
-        return "tv"
-        #elseif os(watchOS)
-        return "watch"
-        #else
-        return "unknown"
-        #endif
     }
 }
 

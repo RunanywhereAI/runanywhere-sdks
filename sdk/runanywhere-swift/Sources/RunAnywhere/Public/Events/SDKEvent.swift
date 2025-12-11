@@ -73,9 +73,6 @@ public enum SDKGenerationEvent: SDKEvent {
     case modelLoaded(modelId: String)
     case modelUnloaded(modelId: String)
 
-    // Cost tracking
-    case costCalculated(amount: Double, savedAmount: Double)
-
     public var timestamp: Date { Date() }
     public var eventType: SDKEventType { .generation }
 }

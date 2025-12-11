@@ -14,7 +14,7 @@ extension RunAnywhere {
 
         // Ensure SDK is initialized
         guard isSDKInitialized else {
-            throw SDKError.notInitialized
+            throw RunAnywhereError.notInitialized
         }
 
         // Ensure network services are initialized (lazy initialization)
@@ -30,7 +30,7 @@ extension RunAnywhere {
             // Create new service
             guard let networkService = serviceContainer.networkService else {
                 logger.error("Network service not available")
-                throw SDKError.componentNotInitialized("Network service not initialized")
+                throw RunAnywhereError.componentNotInitialized("Network service not initialized")
             }
 
             let modelInfoService = await serviceContainer.modelInfoService
@@ -72,7 +72,7 @@ extension RunAnywhere {
             // Now get the service
             guard let service = serviceContainer.getModelAssignmentService() as? ModelAssignmentService else {
                 logger.error("Model assignment service not available")
-                throw SDKError.componentNotInitialized("Model assignment service not initialized")
+                throw RunAnywhereError.componentNotInitialized("Model assignment service not initialized")
             }
             return try await service.getModelsForFramework(framework)
         }
@@ -94,7 +94,7 @@ extension RunAnywhere {
             // Now get the service
             guard let service = serviceContainer.getModelAssignmentService() as? ModelAssignmentService else {
                 logger.error("Model assignment service not available")
-                throw SDKError.componentNotInitialized("Model assignment service not initialized")
+                throw RunAnywhereError.componentNotInitialized("Model assignment service not initialized")
             }
             return try await service.getModelsForCategory(category)
         }

@@ -86,7 +86,7 @@ public extension RunAnywhere {
                     try await modelService.saveModel(registryModel)
                     // Now try again
                     guard let savedModel = try await modelService.getModel(by: modelIdentifier) else {
-                        throw SDKError.modelNotFound(modelIdentifier)
+                        throw RunAnywhereError.modelNotFound(modelIdentifier)
                     }
                     // Use the saved model
                     let downloadService = serviceContainer.downloadService
@@ -99,7 +99,7 @@ public extension RunAnywhere {
                     events.publish(SDKModelEvent.downloadCompleted(modelId: modelIdentifier))
                     return
                 }
-                throw SDKError.modelNotFound(modelIdentifier)
+                throw RunAnywhereError.modelNotFound(modelIdentifier)
             }
 
             // Use the download service to download the model
@@ -230,7 +230,7 @@ public extension RunAnywhere {
     static func loadModelWithTracking(_ modelId: String, modality: Modality = .llm) async throws {
         // Get model info
         guard let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId) else {
-            throw SDKError.modelNotFound(modelId)
+            throw RunAnywhereError.modelNotFound(modelId)
         }
 
         let framework = modelInfo.preferredFramework ?? .llamaCpp

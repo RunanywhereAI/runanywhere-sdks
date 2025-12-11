@@ -97,7 +97,7 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable { 
             if state == .ready {
                 return // Already initialized
             }
-            throw SDKError.invalidState("Cannot initialize from state: \(state)")
+            throw RunAnywhereError.invalidState("Cannot initialize from state: \(state)")
         }
 
         // Emit state change event
@@ -183,7 +183,7 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable { 
     /// Ensure component is ready for processing
     public func ensureReady() throws {
         guard state == .ready else {
-            throw SDKError.componentNotReady("\(Self.componentType) is not ready. Current state: \(state)")
+            throw RunAnywhereError.componentNotReady("\(Self.componentType) is not ready. Current state: \(state)")
         }
     }
 

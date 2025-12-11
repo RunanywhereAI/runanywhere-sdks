@@ -123,13 +123,13 @@ public struct TTSConfiguration: ComponentConfiguration, ComponentInitParameters 
 
     public func validate() throws {
         guard speakingRate >= 0.5 && speakingRate <= 2.0 else {
-            throw SDKError.validationFailed("Speaking rate must be between 0.5 and 2.0")
+            throw RunAnywhereError.validationFailed("Speaking rate must be between 0.5 and 2.0")
         }
         guard pitch >= 0.5 && pitch <= 2.0 else {
-            throw SDKError.validationFailed("Pitch must be between 0.5 and 2.0")
+            throw RunAnywhereError.validationFailed("Pitch must be between 0.5 and 2.0")
         }
         guard volume >= 0.0 && volume <= 1.0 else {
-            throw SDKError.validationFailed("Volume must be between 0.0 and 1.0")
+            throw RunAnywhereError.validationFailed("Volume must be between 0.0 and 1.0")
         }
     }
 }
@@ -169,7 +169,7 @@ public struct TTSInput: ComponentInput {
 
     public func validate() throws {
         if text.isEmpty && ssml == nil {
-            throw SDKError.validationFailed("TTSInput must contain either text or SSML")
+            throw RunAnywhereError.validationFailed("TTSInput must contain either text or SSML")
         }
     }
 }
@@ -391,7 +391,7 @@ public final class DefaultTTSAdapter: ComponentAdapter {
 
     public func createService(configuration: any ComponentConfiguration) async throws -> SystemTTSService {
         guard let ttsConfig = configuration as? TTSConfiguration else {
-            throw SDKError.validationFailed("Expected TTSConfiguration")
+            throw RunAnywhereError.validationFailed("Expected TTSConfiguration")
         }
         return try await createTTSService(configuration: ttsConfig)
     }
@@ -563,7 +563,7 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
         try ensureReady()
 
         guard let ttsService = service?.wrappedService else {
-            throw SDKError.componentNotReady("TTS service not available")
+            throw RunAnywhereError.componentNotReady("TTS service not available")
         }
 
         // Validate input
@@ -684,7 +684,7 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
                     try ensureReady()
 
                     guard let ttsService = service?.wrappedService else {
-                        continuation.finish(throwing: SDKError.componentNotReady("TTS service not available"))
+                        continuation.finish(throwing: RunAnywhereError.componentNotReady("TTS service not available"))
                         return
                     }
 

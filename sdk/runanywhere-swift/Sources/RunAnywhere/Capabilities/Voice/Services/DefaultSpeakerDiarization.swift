@@ -1,15 +1,21 @@
 import Accelerate
 import Foundation
+import os
 
 /// Default implementation of speaker diarization using simple audio features
 /// This provides basic speaker tracking functionality without external dependencies
 public class DefaultSpeakerDiarization: SpeakerDiarizationService {
 
-    /// Manages detected speakers and their profiles
-    private var speakers: [String: SpeakerInfo] = [:]
+    /// Internal state protected by lock (Swift 6 concurrency pattern)
+    private struct State {
+        var speakers: [String: SpeakerInfo] = [:]
+        var currentSpeaker: SpeakerInfo?
+        var temporarySpeakerSegments: [String: Int] = [:]
+        var nextSpeakerId: Int = 1
+    }
 
-    /// Current active speaker
-    private var currentSpeaker: SpeakerInfo?
+    /// Thread-safe state using OSAllocatedUnfairLock (Swift 6 pattern)
+    private let state = OSAllocatedUnfairLock(initialState: State())
 
     /// Speaker change threshold (cosine similarity)
     /// Lowered from 0.7 to 0.5 for better speaker differentiation
@@ -17,15 +23,6 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
 
     /// Minimum segments before confirming new speaker
     private let minSegmentsForNewSpeaker: Int = 2
-
-    /// Temporary speaker segments counter
-    private var temporarySpeakerSegments: [String: Int] = [:]
-
-    /// Next speaker ID counter
-    private var nextSpeakerId: Int = 1
-
-    /// Lock for thread safety
-    private let lock = UnfairLock()
 
     /// Logger
     private let logger = SDKLogger(category: "DefaultSpeakerDiarization")
@@ -37,40 +34,39 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
     // MARK: - SpeakerDiarizationProtocol Implementation
 
     public func processAudio(_ samples: [Float]) -> SpeakerInfo {
-        return lock.withLock {
-            // Create a simple embedding from audio features
-            let embedding = createSimpleEmbedding(from: samples)
+        // Create embedding outside the lock
+        let embedding = createSimpleEmbedding(from: samples)
 
+        return state.withLock { state in
             // Try to match with existing speakers
-            if let matchedSpeaker = findMatchingSpeaker(embedding: embedding) {
-                currentSpeaker = matchedSpeaker
+            if let matchedSpeaker = findMatchingSpeaker(embedding: embedding, speakers: state.speakers) {
+                state.currentSpeaker = matchedSpeaker
                 return matchedSpeaker
             }
 
             // Create new speaker if no match found
-            let newSpeaker = createNewSpeaker(embedding: embedding)
-            currentSpeaker = newSpeaker
+            let newSpeaker = createNewSpeaker(embedding: embedding, state: &state)
+            state.currentSpeaker = newSpeaker
             logger.info("Detected new speaker: \(newSpeaker.id)")
             return newSpeaker
         }
     }
 
     public func updateSpeakerName(speakerId: String, name: String) {
-        lock.withLock {
-            if var speaker = speakers[speakerId] {
+        state.withLock { state in
+            if var speaker = state.speakers[speakerId] {
                 speaker.name = name
-                speakers[speakerId] = speaker
+                state.speakers[speakerId] = speaker
                 logger.debug("Updated speaker name: \(speakerId) -> \(name)")
             }
         }
     }
 
     public func getAllSpeakers() -> [SpeakerInfo] {
-        return lock.withLock {
-            return Array(speakers.values)
+        return state.withLock { state in
+            return Array(state.speakers.values)
         }
     }
-
 
     public func initialize() async throws {
         // No initialization needed for default implementation
@@ -83,19 +79,19 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
     }
 
     public func reset() {
-        lock.withLock {
-            speakers.removeAll()
-            currentSpeaker = nil
-            temporarySpeakerSegments.removeAll()
-            nextSpeakerId = 1
-            logger.debug("Reset speaker diarization state")
+        state.withLock { state in
+            state.speakers.removeAll()
+            state.currentSpeaker = nil
+            state.temporarySpeakerSegments.removeAll()
+            state.nextSpeakerId = 1
         }
+        logger.debug("Reset speaker diarization state")
     }
 
     // MARK: - Private Methods
 
     /// Find speaker that matches the given embedding
-    private func findMatchingSpeaker(embedding: [Float]) -> SpeakerInfo? {
+    private func findMatchingSpeaker(embedding: [Float], speakers: [String: SpeakerInfo]) -> SpeakerInfo? {
         var bestMatch: (speaker: SpeakerInfo, similarity: Float)?
 
         for speaker in speakers.values {
@@ -118,10 +114,10 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
     }
 
     /// Create a new speaker profile
-    private func createNewSpeaker(embedding: [Float]?) -> SpeakerInfo {
-        let speakerId = "speaker_\(nextSpeakerId)"
-        let speakerNumber = nextSpeakerId
-        nextSpeakerId += 1
+    private func createNewSpeaker(embedding: [Float]?, state: inout State) -> SpeakerInfo {
+        let speakerId = "speaker_\(state.nextSpeakerId)"
+        let speakerNumber = state.nextSpeakerId
+        state.nextSpeakerId += 1
 
         let speaker = SpeakerInfo(
             id: speakerId,
@@ -129,7 +125,7 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
             embedding: embedding
         )
 
-        speakers[speakerId] = speaker
+        state.speakers[speakerId] = speaker
         return speaker
     }
 

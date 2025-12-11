@@ -73,9 +73,3 @@ public enum ErrorCategory: String, Sendable, CaseIterable {
         return .unknown
     }
 }
-
-// MARK: - Backward Compatibility
-
-/// Type alias for backward compatibility with existing code
-@available(*, deprecated, renamed: "ErrorCategory")
-public typealias ErrorType = ErrorCategory

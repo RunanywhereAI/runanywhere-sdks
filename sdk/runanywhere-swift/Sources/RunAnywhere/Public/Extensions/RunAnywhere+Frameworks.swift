@@ -30,7 +30,7 @@ public extension RunAnywhere {
     ///   - models: Array of models to register with this adapter
     @MainActor
     static func registerFramework(
-        _ adapter: UnifiedFrameworkAdapter,
+        _ adapter: FrameworkAdapter,
         models: [ModelRegistration] = []
     ) async {
         let logger = SDKLogger(category: "RunAnywhere.Frameworks")
@@ -68,7 +68,7 @@ public extension RunAnywhere {
 
     /// Get registered adapters with event reporting
     /// - Returns: Dictionary of registered adapters
-    static func getRegisteredAdapters() -> [LLMFramework: UnifiedFrameworkAdapter] {
+    static func getRegisteredAdapters() -> [LLMFramework: FrameworkAdapter] {
         Task {
             events.publish(SDKFrameworkEvent.adaptersRequested)
         }
