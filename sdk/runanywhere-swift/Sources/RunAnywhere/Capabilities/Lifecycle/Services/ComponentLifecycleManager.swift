@@ -256,8 +256,6 @@ public actor ComponentLifecycleManager {
             return try await createEmbeddingComponent(config, container: container)
         case .speakerDiarization:
             return try await createSpeakerDiarizationComponent(config, container: container)
-        case .wakeWord:
-            throw LifecycleError.componentNotInitialized(component: "Wake word component not yet implemented")
         case .voiceAgent:
             throw LifecycleError.componentNotInitialized(component: "Voice agent should be created through createVoiceAgent method")
         }
@@ -298,10 +296,9 @@ public actor ComponentLifecycleManager {
     }
 
     private func createSpeakerDiarizationComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
-        guard let params = config.parameters as? SpeakerDiarizationConfiguration else {
-            throw LifecycleError.invalidConfiguration(reason: "Invalid Speaker Diarization parameters")
-        }
-        return await SpeakerDiarizationComponent(configuration: params)
+        // Speaker Diarization uses facade pattern (SpeakerDiarization.shared) instead of Component pattern
+        // Access via SpeakerDiarization.shared.configure(with: configuration) instead
+        throw LifecycleError.componentNotInitialized(component: "Speaker Diarization uses SpeakerDiarization.shared facade, not Component pattern")
     }
 
     // MARK: - Helper Methods

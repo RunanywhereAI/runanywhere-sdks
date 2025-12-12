@@ -48,28 +48,3 @@ public struct LLMInput: ComponentInput, Sendable {
         }
     }
 }
-
-/// Request for inference (internal use)
-internal struct InferenceRequest: Sendable {
-
-    let id: UUID
-    let prompt: String
-    let options: LLMGenerationOptions?
-    let timestamp: Date
-    let estimatedTokens: Int?
-    let priority: RequestPriority
-
-    init(
-        prompt: String,
-        options: LLMGenerationOptions? = nil,
-        estimatedTokens: Int? = nil,
-        priority: RequestPriority = .normal
-    ) {
-        self.id = UUID()
-        self.prompt = prompt
-        self.options = options
-        self.timestamp = Date()
-        self.estimatedTokens = estimatedTokens
-        self.priority = priority
-    }
-}

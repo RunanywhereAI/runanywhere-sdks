@@ -42,7 +42,7 @@ public actor ConfigurationService: ConfigurationServiceProtocol {
         }
 
         // Step 2: Try to load from DB
-        if let dbConfig = try? await repository.fetch(id: SDKConstants.ConfigurationDefaults.configurationId) {
+        if let dbConfig = try? await repository.fetch(id: RegistryConstants.configurationId) {
             logger.info("Using DB configuration")
             currentConfig = dbConfig
             return dbConfig

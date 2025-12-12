@@ -102,7 +102,7 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
 
     nonisolated public func getSDKDefaultConfiguration() -> ConfigurationData {
         return ConfigurationData(
-            id: SDKConstants.ConfigurationDefaults.configurationId,
+            id: RegistryConstants.configurationId,
             source: .defaults
         )
     }

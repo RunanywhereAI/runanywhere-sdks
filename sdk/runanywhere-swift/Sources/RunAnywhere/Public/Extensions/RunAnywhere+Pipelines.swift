@@ -137,8 +137,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlin
     private var sttComponent: STTComponent?
     private var llmComponent: LLMComponent?
     private var ttsComponent: TTSComponent?
-    private var speakerDiarizationComponent: SpeakerDiarizationComponent?
-    private var customDiarizationService: SpeakerDiarizationService?
+    private var speakerDiarizationService: SpeakerDiarizationService?
 
     private let config: ModularPipelineConfig
     public weak var delegate: ModularPipelineDelegate?
@@ -182,11 +181,12 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlin
 
         // Setup speaker diarization if provided
         if let diarization = speakerDiarization {
-            customDiarizationService = diarization
+            speakerDiarizationService = diarization
         } else if config.components.contains(.speakerDiarization) {
-            // Create default speaker diarization component
-            let diarizationConfig = SpeakerDiarizationConfiguration()
-            speakerDiarizationComponent = await SpeakerDiarizationComponent(configuration: diarizationConfig)
+            // Create default speaker diarization service
+            let defaultService = DefaultSpeakerDiarizationService()
+            try await defaultService.initialize()
+            speakerDiarizationService = defaultService
         }
     }
 
@@ -308,14 +308,10 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlin
                     }
 
                     // Initialize Speaker Diarization
-                    if let diarization = speakerDiarizationComponent {
+                    if let diarization = speakerDiarizationService {
                         continuation.yield(.componentInitializing("SpeakerDiarization"))
                         try await diarization.initialize()
                         continuation.yield(.componentInitialized("SpeakerDiarization"))
-                    } else if let customDiarization = customDiarizationService {
-                        continuation.yield(.componentInitializing("CustomDiarization"))
-                        try await customDiarization.initialize()
-                        continuation.yield(.componentInitialized("CustomDiarization"))
                     }
 
                     continuation.yield(.allComponentsInitialized)
@@ -333,7 +329,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlin
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    var currentSpeaker: SpeakerInfo?
+                    var currentSpeaker: SpeakerDiarizationSpeakerInfo?
                     var audioBuffer: [Float] = []  // Accumulate audio samples
                     var isSpeaking = false
 
@@ -456,7 +452,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlin
 
                                             // Process through TTS if available
                                             if let tts = ttsComponent {
-                                                if let vad = await vadComponent?.service as? SimpleEnergyVAD {
+                                                if let vad = await vadComponent?.service as? SimpleEnergyVADService {
                                                     vad.notifyTTSWillStart()
                                                 }
 
@@ -502,7 +498,7 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlin
                                             }
 
                                             // Notify VAD that TTS finished
-                                            if let vad = await vadComponent?.service as? SimpleEnergyVAD {
+                                            if let vad = await vadComponent?.service as? SimpleEnergyVADService {
                                                 vad.notifyTTSDidFinish()
                                             }
 
@@ -744,26 +740,10 @@ public class ModularVoicePipeline: NSObject, AVAudioPlayerDelegate { // swiftlin
                         }
 
                         // Process speaker diarization if enabled
-                        var detectedSpeaker: SpeakerInfo?
+                        var detectedSpeaker: SpeakerDiarizationSpeakerInfo?
                         if enableDiarization {
-                            if let customDiarization = customDiarizationService {
-                                detectedSpeaker = customDiarization.processAudio(floatSamples)
-                            } else if let diarization = speakerDiarizationComponent {
-                                // Use component's diarization
-                                let diarizationInput = SpeakerDiarizationInput(
-                                    audioData: audioChunk,
-                                    format: .pcm
-                                )
-                                let diarizationResult = try await diarization.process(diarizationInput)
-                                // Convert SpeakerProfile to SpeakerInfo
-                                if let profile = diarizationResult.speakers.first {
-                                    detectedSpeaker = SpeakerInfo(
-                                        id: profile.id,
-                                        name: profile.name,
-                                        confidence: nil,
-                                        embedding: profile.embedding
-                                    )
-                                }
+                            if let diarization = speakerDiarizationService {
+                                detectedSpeaker = diarization.processAudio(floatSamples)
                             }
 
                             // Check for speaker change

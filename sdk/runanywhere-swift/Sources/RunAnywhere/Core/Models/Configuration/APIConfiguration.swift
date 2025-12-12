@@ -9,7 +9,7 @@ public struct APIConfiguration: Codable, Sendable {
     public var timeoutInterval: TimeInterval
 
     public init(
-        baseURL: URL = URL(string: RunAnywhereConstants.apiURLs.current) ?? URL(fileURLWithPath: "/"),
+        baseURL: URL = URL(string: RegistryConstants.apiURLs.current) ?? URL(fileURLWithPath: "/"),
         timeoutInterval: TimeInterval = 30.0
     ) {
         self.baseURL = baseURL
