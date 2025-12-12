@@ -216,25 +216,11 @@ public final class ModuleRegistry {
 
 // MARK: - Service Provider Protocols
 
-// Service provider protocols are defined in their respective component files:
-// - STTServiceProvider in STTComponent.swift
-// - LLMServiceProvider in LLMComponent.swift
-// - TTSServiceProvider and SpeakerDiarizationServiceProvider defined below
-
-/// Provider for Text-to-Speech services
-public protocol TTSServiceProvider {
-    func createTTSService(configuration: TTSConfiguration) async throws -> TTSService
-    func canHandle(modelId: String?) -> Bool
-    var name: String { get }
-    var version: String { get }
-}
-
-/// Provider for Speaker Diarization services
-public protocol SpeakerDiarizationServiceProvider {
-    func createSpeakerDiarizationService(configuration: SpeakerDiarizationConfiguration) async throws -> SpeakerDiarizationService
-    func canHandle(modelId: String?) -> Bool
-    var name: String { get }
-}
+// Service provider protocols are defined in their respective capability files:
+// - STTServiceProvider in Capabilities/STT/Protocol/STTServiceProvider.swift
+// - LLMServiceProvider in Capabilities/LLM/Protocol/LLMProvider.swift
+// - TTSServiceProvider in Capabilities/TTS/Protocol/TTSServiceProvider.swift
+// - SpeakerDiarizationServiceProvider in Capabilities/SpeakerDiarization/Protocol/SpeakerDiarizationProvider.swift
 
 
 // MARK: - SDK Component Extension

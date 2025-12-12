@@ -31,11 +31,6 @@ public class LlamaCPPCoreAdapter: FrameworkAdapter {
         // Check format support
         guard supportedFormats.contains(model.format) else { return false }
 
-        // Check quantization compatibility
-        if let metadata = model.metadata, let quantization = metadata.quantizationLevel {
-            return isQuantizationSupported(quantization.rawValue)
-        }
-
         // Check memory requirements
         let availableMemory = ProcessInfo.processInfo.physicalMemory
         return model.memoryRequired ?? 0 < Int64(Double(availableMemory) * 0.7)

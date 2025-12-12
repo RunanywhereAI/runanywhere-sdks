@@ -2,44 +2,17 @@ import FluidAudio
 import Foundation
 @preconcurrency import RunAnywhere
 
-// Define the missing type locally until it's added to the SDK
-public struct SpeakerDiarizationResult {
-    public let segments: [DiarizedSegment]
-    public let speakers: [SpeakerInfo]
-
-    public init(segments: [DiarizedSegment], speakers: [SpeakerInfo]) {
-        self.segments = segments
-        self.speakers = speakers
-    }
+// Internal type for detailed diarization results
+struct DetailedDiarizationResult {
+    let segments: [InternalSegment]
+    let speakers: [SpeakerDiarizationSpeakerInfo]
 }
 
-public struct DiarizedSegment {
-    public let speaker: String
-    public let startTime: TimeInterval
-    public let endTime: TimeInterval
-    public let text: String?
-
-    public init(speaker: String, startTime: TimeInterval, endTime: TimeInterval, text: String? = nil) {
-        self.speaker = speaker
-        self.startTime = startTime
-        self.endTime = endTime
-        self.text = text
-    }
-}
-
-// Legacy type for compatibility
-struct SpeakerSegment {
+struct InternalSegment {
     let startTime: TimeInterval
     let endTime: TimeInterval
     let speakerId: String
     let confidence: Float?
-
-    init(startTime: TimeInterval, endTime: TimeInterval, speakerId: String, confidence: Float? = nil) {
-        self.startTime = startTime
-        self.endTime = endTime
-        self.speakerId = speakerId
-        self.confidence = confidence
-    }
 }
 
 /// FluidAudio-based implementation of speaker diarization
@@ -48,8 +21,8 @@ struct SpeakerSegment {
 public class FluidAudioDiarization: SpeakerDiarizationService {
 
     private let diarizerManager: DiarizerManager
-    private var speakers: [String: SpeakerInfo] = [:]
-    private var currentSpeaker: SpeakerInfo?
+    private var speakers: [String: SpeakerDiarizationSpeakerInfo] = [:]
+    private var currentSpeaker: SpeakerDiarizationSpeakerInfo?
     private let logger = SDKLogger(category: "FluidAudioDiarization")
     private let diarizationQueue = DispatchQueue(
         label: "com.runanywhere.fluidaudio.diarization",
@@ -73,9 +46,9 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
         isReady = false
     }
 
-    public func processAudio(_ samples: [Float]) -> SpeakerInfo {
+    public func processAudio(_ samples: [Float]) -> SpeakerDiarizationSpeakerInfo {
         // For now, return a placeholder until API is fixed
-        return currentSpeaker ?? SpeakerInfo(id: "speaker_1", confidence: 0.95)
+        return currentSpeaker ?? SpeakerDiarizationSpeakerInfo(id: "speaker_1", name: "Speaker 1", embedding: nil)
     }
 
     /// Initialize FluidAudio diarization service
@@ -107,7 +80,7 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
 
     // MARK: - SpeakerDiarizationService Implementation
 
-    public func detectSpeaker(from audioBuffer: [Float], sampleRate: Int) -> SpeakerInfo {
+    public func detectSpeaker(from audioBuffer: [Float], sampleRate: Int) -> SpeakerDiarizationSpeakerInfo {
         return diarizationQueue.sync {
             do {
                 // Perform diarization to extract embeddings
@@ -182,13 +155,13 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
         }
     }
 
-    public func getAllSpeakers() -> [SpeakerInfo] {
+    public func getAllSpeakers() -> [SpeakerDiarizationSpeakerInfo] {
         return diarizationQueue.sync {
             // Get all speakers from FluidAudio
             let fluidSpeakers = diarizerManager.speakerManager.getAllSpeakers()
 
             // Update our cache and return
-            var allSpeakers: [SpeakerInfo] = []
+            var allSpeakers: [SpeakerDiarizationSpeakerInfo] = []
             for (_, fluidSpeaker) in fluidSpeakers {
                 let speakerInfo = mapToSpeakerInfo(fluidSpeaker)
                 speakers[speakerInfo.id] = speakerInfo
@@ -198,7 +171,7 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
         }
     }
 
-    public func getCurrentSpeaker() -> SpeakerInfo? {
+    public func getCurrentSpeaker() -> SpeakerDiarizationSpeakerInfo? {
         return diarizationQueue.sync {
             currentSpeaker
         }
@@ -216,7 +189,7 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
     // MARK: - Advanced Features
 
     /// Perform detailed diarization with segments and multiple speakers
-    public func performDetailedDiarization(audioBuffer: [Float]) async throws -> SpeakerDiarizationResult? {
+    func performDetailedDiarization(audioBuffer: [Float]) async throws -> DetailedDiarizationResult? {
         do {
             // Perform complete diarization
             let result = try diarizerManager.performCompleteDiarization(
@@ -226,7 +199,7 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
 
             // Map FluidAudio segments to our format
             let segments = result.segments.map { segment in
-                SpeakerSegment(
+                InternalSegment(
                     startTime: TimeInterval(segment.startTimeSeconds),
                     endTime: TimeInterval(segment.endTimeSeconds),
                     speakerId: segment.speakerId,
@@ -246,17 +219,7 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
                 }
             }
 
-            // Convert SpeakerSegment to DiarizedSegment
-            let diarizedSegments = segments.map { segment in
-                DiarizedSegment(
-                    speaker: segment.speakerId,
-                    startTime: segment.startTime,
-                    endTime: segment.endTime,
-                    text: nil
-                )
-            }
-
-            return SpeakerDiarizationResult(segments: diarizedSegments, speakers: speakerInfos)
+            return DetailedDiarizationResult(segments: segments, speakers: speakerInfos)
         } catch {
             logger.error("Detailed diarization failed: \(error.localizedDescription)")
             throw error
@@ -288,20 +251,20 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
 
     // MARK: - Private Helpers
 
-    /// Map FluidAudio Speaker to RunAnywhere SpeakerInfo
-    private func mapToSpeakerInfo(_ fluidSpeaker: Speaker) -> SpeakerInfo {
+    /// Map FluidAudio Speaker to RunAnywhere SpeakerDiarizationSpeakerInfo
+    private func mapToSpeakerInfo(_ fluidSpeaker: Speaker) -> SpeakerDiarizationSpeakerInfo {
         // Check if we already have this speaker with a custom name
         if let existingSpeaker = speakers[fluidSpeaker.id] {
             // Update embedding but preserve custom name
-            return SpeakerInfo(
+            return SpeakerDiarizationSpeakerInfo(
                 id: fluidSpeaker.id,
                 name: existingSpeaker.name ?? fluidSpeaker.name,
                 embedding: fluidSpeaker.currentEmbedding
             )
         }
 
-        // Create new SpeakerInfo from FluidAudio Speaker
-        return SpeakerInfo(
+        // Create new SpeakerDiarizationSpeakerInfo from FluidAudio Speaker
+        return SpeakerDiarizationSpeakerInfo(
             id: fluidSpeaker.id,
             name: fluidSpeaker.name,
             embedding: fluidSpeaker.currentEmbedding
@@ -309,8 +272,8 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
     }
 
     /// Create an unknown speaker when detection fails
-    private func createUnknownSpeaker() -> SpeakerInfo {
-        return SpeakerInfo(
+    private func createUnknownSpeaker() -> SpeakerDiarizationSpeakerInfo {
+        return SpeakerDiarizationSpeakerInfo(
             id: "unknown",
             name: "Unknown Speaker",
             embedding: nil

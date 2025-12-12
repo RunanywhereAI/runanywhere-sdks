@@ -20,7 +20,7 @@ public final class DatabaseManager {
         guard let documentsPath = try? FileOperationsUtilities.getDocumentsDirectory() else {
             fatalError("Unable to access documents directory")
         }
-        return documentsPath.appendingPathComponent(SDKConstants.DatabaseDefaults.databaseFileName)
+        return documentsPath.appendingPathComponent(LifecycleConstants.databaseFileName)
     }
 
     // MARK: - Initialization

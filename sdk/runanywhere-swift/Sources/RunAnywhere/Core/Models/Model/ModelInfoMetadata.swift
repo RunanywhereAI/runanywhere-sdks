@@ -8,7 +8,6 @@ public struct ModelInfoMetadata: Codable, Sendable {
     public let description: String?
     public let trainingDataset: String?
     public let baseModel: String?
-    public let quantizationLevel: QuantizationLevel?
     public let version: String?
     public let minOSVersion: String?
     public let minMemory: Int64?
@@ -20,7 +19,6 @@ public struct ModelInfoMetadata: Codable, Sendable {
         description: String? = nil,
         trainingDataset: String? = nil,
         baseModel: String? = nil,
-        quantizationLevel: QuantizationLevel? = nil,
         version: String? = nil,
         minOSVersion: String? = nil,
         minMemory: Int64? = nil
@@ -31,7 +29,6 @@ public struct ModelInfoMetadata: Codable, Sendable {
         self.description = description
         self.trainingDataset = trainingDataset
         self.baseModel = baseModel
-        self.quantizationLevel = quantizationLevel
         self.version = version
         self.minOSVersion = minOSVersion
         self.minMemory = minMemory

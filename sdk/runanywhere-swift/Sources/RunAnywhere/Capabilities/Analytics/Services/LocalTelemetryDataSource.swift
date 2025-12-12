@@ -7,7 +7,7 @@ public actor LocalTelemetryDataSource: LocalDataSource {
 
     private let databaseManager: DatabaseManager
     private let logger = SDKLogger(category: "LocalTelemetryDataSource")
-    private let batchSize = SDKConstants.TelemetryDefaults.batchSize
+    private let batchSize = AnalyticsConstants.telemetryBatchSize
 
     public init(databaseManager: DatabaseManager) {
         self.databaseManager = databaseManager
