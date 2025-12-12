@@ -13,7 +13,6 @@ public final class DatabaseManager {
 
     private var databaseQueue: DatabaseQueue?
     private let logger = SDKLogger(category: "DatabaseManager")
-    private let configuration: DatabaseConfiguration
 
     /// Database file URL
     private var databaseURL: URL {
@@ -25,9 +24,7 @@ public final class DatabaseManager {
 
     // MARK: - Initialization
 
-    private init() {
-        self.configuration = DatabaseConfiguration()
-    }
+    private init() {}
 
     // MARK: - Setup
 
@@ -48,8 +45,6 @@ public final class DatabaseManager {
 
             // Enable WAL mode for better concurrency
             config.prepareDatabase { db in
-                // SQLCipher passphrase would go here if available
-                // try db.usePassphrase(self.configuration.passphrase)
                 try db.execute(sql: "PRAGMA journal_mode = WAL")
 
                 // Performance optimizations
