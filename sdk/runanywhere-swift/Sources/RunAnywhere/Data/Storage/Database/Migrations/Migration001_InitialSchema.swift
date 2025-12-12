@@ -61,9 +61,11 @@ struct Migration001_InitialSchema { // swiftlint:disable:this type_name
             // Model-specific capabilities
             t.column("contextLength", .integer) // For language models
             t.column("supportsThinking", .boolean).notNull().defaults(to: false)
+            t.column("thinkingPattern", .blob) // JSON: ThinkingTagPattern
 
-            // Metadata (stored as JSON)
-            t.column("metadata", .blob) // JSON: ModelInfoMetadata
+            // Metadata (flattened from ModelInfoMetadata)
+            t.column("tags", .blob).notNull() // JSON array of strings
+            t.column("description", .text)
 
             // Tracking fields
             t.column("source", .text).notNull().defaults(to: "remote")

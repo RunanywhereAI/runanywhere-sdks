@@ -104,7 +104,8 @@ class ModelDiscovery {
             preferredFramework: frameworks.first,
             contextLength: category == .language ? 2048 : nil,
             supportsThinking: false,
-            metadata: nil
+            tags: [],
+            description: nil
         )
     }
 

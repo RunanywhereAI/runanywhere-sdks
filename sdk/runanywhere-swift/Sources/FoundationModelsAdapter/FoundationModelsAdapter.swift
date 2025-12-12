@@ -83,14 +83,11 @@ public class FoundationModelsAdapter: FrameworkAdapter {
                 contextLength: 4096,  // Estimated context length
                 supportsThinking: false,
                 thinkingPattern: nil,
-                metadata: ModelInfoMetadata(
-                    author: "Apple",
-                    license: "Apple EULA",
-                    description: """
-                    Apple's built-in on-device language model \
-                    (requires iOS 26+ / macOS 26+ with Apple Intelligence enabled)
-                    """
-                ),
+                tags: ["apple", "built-in", "foundation-models"],
+                description: """
+                Apple's built-in on-device language model \
+                (requires iOS 26+ / macOS 26+ with Apple Intelligence enabled)
+                """,
                 source: .defaults  // Built-in, not from remote
             )
         ]
