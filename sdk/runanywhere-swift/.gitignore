@@ -17,3 +17,7 @@ XCFrameworks/
 Modules/
 
 EXTERNAL/
+
+# Documentation (auto-generated, keep local only)
+docs/
+Docs/
