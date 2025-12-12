@@ -209,7 +209,8 @@ public class DefaultStorageAnalyzer: StorageAnalyzer {
                 framework: modelInfo.framework ?? registeredModel?.preferredFramework,
                 createdDate: fileManager.getFileCreationDate(at: modelURL) ?? Date(),
                 lastUsed: fileManager.getFileAccessDate(at: modelURL),
-                metadata: registeredModel?.metadata,
+                tags: registeredModel?.tags ?? [],
+                description: registeredModel?.description,
                 contextLength: registeredModel?.contextLength
             )
 

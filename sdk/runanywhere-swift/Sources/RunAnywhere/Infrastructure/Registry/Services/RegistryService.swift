@@ -173,26 +173,10 @@ public class RegistryService: ModelRegistry {
                 return false
             }
 
-            // Context length filters (only for models that have context length)
-            if let minContext = criteria.minContextLength,
-               let modelContext = model.contextLength,
-               modelContext < minContext {
-                return false
-            }
-
-            if let maxContext = criteria.maxContextLength,
-               let modelContext = model.contextLength,
-               modelContext > maxContext {
-                return false
-            }
-
-            // Hardware requirements removed for simplicity
-
             // Tag filter
             if !criteria.tags.isEmpty {
-                let modelTags = model.metadata?.tags ?? []
                 let hasAllTags = criteria.tags.allSatisfy { tag in
-                    modelTags.contains(tag)
+                    model.tags.contains(tag)
                 }
                 if !hasAllTags {
                     return false
@@ -204,7 +188,7 @@ public class RegistryService: ModelRegistry {
                 let searchLower = search.lowercased()
                 let nameMatch = model.name.lowercased().contains(searchLower)
                 let idMatch = model.id.lowercased().contains(searchLower)
-                let descMatch = model.metadata?.description?.lowercased()
+                let descMatch = model.description?.lowercased()
                     .contains(searchLower) ?? false
 
                 if !nameMatch && !idMatch && !descMatch {
@@ -264,10 +248,8 @@ public class RegistryService: ModelRegistry {
             preferredFramework: framework,
             contextLength: category == .language ? 2048 : nil, // Only for language models
             supportsThinking: supportsThinking,
-            metadata: ModelInfoMetadata(
-                tags: ["user-added", framework.rawValue.lowercased()],
-                description: "User-added model"
-            )
+            tags: ["user-added", framework.rawValue.lowercased()],
+            description: "User-added model"
         )
 
         registerModel(modelInfo)

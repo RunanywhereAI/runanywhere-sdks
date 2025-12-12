@@ -167,7 +167,8 @@ public extension RunAnywhere {
             preferredFramework: .llamaCpp,
             contextLength: 4096,
             supportsThinking: false,
-            metadata: nil
+            tags: [],
+            description: nil
         )
 
         // Register the model

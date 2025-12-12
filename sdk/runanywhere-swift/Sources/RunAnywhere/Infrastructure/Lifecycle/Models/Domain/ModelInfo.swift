@@ -26,8 +26,9 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     public let supportsThinking: Bool  // For reasoning models
     public let thinkingPattern: ThinkingTagPattern?  // Custom thinking pattern (if supportsThinking)
 
-    // Optional metadata
-    public let metadata: ModelInfoMetadata?
+    // Optional metadata (flattened from ModelInfoMetadata)
+    public let tags: [String]
+    public let description: String?
 
     // Tracking fields for sync and database
     public let source: ConfigurationSource
@@ -38,9 +39,6 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     // Usage tracking
     public var lastUsed: Date?
     public var usageCount: Int
-
-    // Non-Codable runtime properties (Sendable-compatible)
-    public var additionalProperties: [String: String] = [:]
 
     // MARK: - Computed Properties
 
@@ -74,7 +72,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         case downloadSize, memoryRequired
         case compatibleFrameworks, preferredFramework
         case contextLength, supportsThinking, thinkingPattern
-        case metadata
+        case tags, description
         case source, createdAt, updatedAt, syncPending
         case lastUsed, usageCount
     }
@@ -93,14 +91,14 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
         thinkingPattern: ThinkingTagPattern? = nil,
-        metadata: ModelInfoMetadata? = nil,
+        tags: [String] = [],
+        description: String? = nil,
         source: ConfigurationSource = .remote,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         syncPending: Bool = false,
         lastUsed: Date? = nil,
-        usageCount: Int = 0,
-        additionalProperties: [String: String] = [:]
+        usageCount: Int = 0
     ) {
         self.id = id
         self.name = name
@@ -126,14 +124,14 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         // Set thinking pattern based on supportsThinking
         self.thinkingPattern = supportsThinking ? (thinkingPattern ?? .defaultPattern) : nil
 
-        self.metadata = metadata
+        self.tags = tags
+        self.description = description
         self.source = source
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.syncPending = syncPending
         self.lastUsed = lastUsed
         self.usageCount = usageCount
-        self.additionalProperties = additionalProperties
     }
 
     // MARK: - Sync methods provided by RepositoryEntity protocol extension
@@ -160,7 +158,8 @@ extension ModelInfo {
         case contextLength
         case supportsThinking
         case thinkingPattern
-        case metadata
+        case tags
+        case description
         case source
         case createdAt
         case updatedAt

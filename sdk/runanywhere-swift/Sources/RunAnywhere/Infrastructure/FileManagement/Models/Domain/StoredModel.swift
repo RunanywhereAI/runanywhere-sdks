@@ -10,7 +10,8 @@ public struct StoredModel: Sendable {
     public let framework: LLMFramework?
     public let createdDate: Date
     public let lastUsed: Date?
-    public let metadata: ModelInfoMetadata?
+    public let tags: [String]
+    public let description: String?
     public let contextLength: Int?
     public let checksum: String?
 
@@ -23,7 +24,8 @@ public struct StoredModel: Sendable {
         framework: LLMFramework?,
         createdDate: Date,
         lastUsed: Date?,
-        metadata: ModelInfoMetadata? = nil,
+        tags: [String] = [],
+        description: String? = nil,
         contextLength: Int? = nil,
         checksum: String? = nil
     ) {
@@ -35,7 +37,8 @@ public struct StoredModel: Sendable {
         self.framework = framework
         self.createdDate = createdDate
         self.lastUsed = lastUsed
-        self.metadata = metadata
+        self.tags = tags
+        self.description = description
         self.contextLength = contextLength
         self.checksum = checksum
     }

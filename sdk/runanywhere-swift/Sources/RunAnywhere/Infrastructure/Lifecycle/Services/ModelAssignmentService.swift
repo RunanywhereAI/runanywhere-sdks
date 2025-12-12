@@ -189,16 +189,9 @@ extension ModelAssignment {
         let frameworks = compatibleFrameworks.compactMap { LLMFramework(rawValue: $0.lowercased()) }
         let preferred = preferredFramework.flatMap { LLMFramework(rawValue: $0.lowercased()) }
 
-        // Convert metadata if available
-        let modelMetadata = metadata.map { apiMetadata in
-            ModelInfoMetadata(
-                author: apiMetadata.author,
-                license: apiMetadata.license,
-                tags: apiMetadata.tags ?? [],
-                description: apiMetadata.description,
-                version: version
-            )
-        }
+        // Extract tags and description from metadata
+        let modelTags = metadata?.tags ?? []
+        let modelDescription = metadata?.description
 
         // Create download URL if provided
         let downloadURL = downloadUrl.flatMap { URL(string: $0) }
@@ -216,7 +209,8 @@ extension ModelAssignment {
             preferredFramework: preferred,
             contextLength: contextLength,
             supportsThinking: supportsThinking,
-            metadata: modelMetadata,
+            tags: modelTags,
+            description: modelDescription,
             source: .remote,
             createdAt: Date(),
             updatedAt: Date(),
