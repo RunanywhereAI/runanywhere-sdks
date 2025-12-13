@@ -2,80 +2,148 @@
 //  GenerationAnalyticsService.swift
 //  RunAnywhere SDK
 //
-//  Generation-specific analytics service following unified pattern
+//  LLM Generation analytics service.
+//  Tracks generation operations and metrics.
+//  Lifecycle events are handled by ManagedLifecycle.
 //
 
 import Foundation
 
 // MARK: - Generation Analytics Service
 
-/// Generation analytics service using unified pattern
-public actor GenerationAnalyticsService: AnalyticsService {
-
-    // MARK: - Type Aliases
-    public typealias Event = GenerationEvent
-    public typealias Metrics = GenerationMetrics
+/// LLM analytics service for tracking generation operations.
+/// Model lifecycle events (load/unload) are handled by ManagedLifecycle.
+public actor GenerationAnalyticsService {
 
     // MARK: - Properties
 
-    private let queueManager: AnalyticsQueueManager
-    private let logger: SDKLogger
-    private var currentSession: SessionInfo?
-    private var events: [GenerationEvent] = []
+    private let logger = SDKLogger(category: "GenerationAnalytics")
 
-    private struct SessionInfo {
-        let id: String
-        let modelId: String?
-        let startTime: Date
-    }
+    /// Active generation operations
+    private var activeGenerations: [String: GenerationTracker] = [:]
 
-    private var metrics = GenerationMetrics()
+    /// Metrics
     private var totalGenerations = 0
     private var totalTimeToFirstToken: TimeInterval = 0
     private var totalTokensPerSecond: Double = 0
     private var totalInputTokens = 0
     private var totalOutputTokens = 0
+    private let startTime = Date()
+    private var lastEventTime: Date?
 
-    // Generation tracking
-    private var activeGenerations: [String: GenerationTracker] = [:]
+    // MARK: - Types
 
     private struct GenerationTracker {
         let id: String
         let startTime: Date
+        let modelId: String
         var firstTokenTime: Date?
-        var endTime: Date?
-        var inputTokens: Int = 0
-        var outputTokens: Int = 0
     }
 
     // MARK: - Initialization
 
-    public init(queueManager: AnalyticsQueueManager = .shared) {
-        self.queueManager = queueManager
-        self.logger = SDKLogger(category: "GenerationAnalytics")
+    public init() {}
+
+    // MARK: - Generation Tracking
+
+    /// Start tracking a generation
+    public func startGeneration(modelId: String, executionTarget: String) -> String {
+        let id = UUID().uuidString
+        activeGenerations[id] = GenerationTracker(id: id, startTime: Date(), modelId: modelId)
+
+        EventPublisher.shared.track(LLMEvent.generationStarted(
+            generationId: id,
+            modelId: modelId,
+            prompt: nil
+        ))
+
+        logger.debug("Generation started: \(id)")
+        return id
     }
 
-    // MARK: - Analytics Service Protocol
+    /// Track first token (time-to-first-token metric)
+    public func trackFirstToken(generationId: String) {
+        guard var tracker = activeGenerations[generationId] else { return }
+        tracker.firstTokenTime = Date()
+        activeGenerations[generationId] = tracker
 
-    public func track(event: GenerationEvent) async {
-        events.append(event)
-        await queueManager.enqueue(event)
-        await processEvent(event)
+        let latencyMs = tracker.firstTokenTime!.timeIntervalSince(tracker.startTime) * 1000
+
+        EventPublisher.shared.track(LLMEvent.firstToken(
+            generationId: generationId,
+            latencyMs: latencyMs
+        ))
     }
 
-    public func trackBatch(events: [GenerationEvent]) async {
-        self.events.append(contentsOf: events)
-        await queueManager.enqueueBatch(events)
-        for event in events {
-            await processEvent(event)
-        }
+    /// Track streaming update (analytics only)
+    public func trackStreamingUpdate(generationId: String, tokensGenerated: Int) {
+        EventPublisher.shared.track(LLMEvent.streamingUpdate(
+            generationId: generationId,
+            tokensGenerated: tokensGenerated
+        ))
     }
 
-    public func getMetrics() async -> GenerationMetrics {
-        return GenerationMetrics(
-            totalEvents: events.count,
-            startTime: metrics.startTime,
-            lastEventTime: events.last?.timestamp,
+    /// Complete a generation
+    public func completeGeneration(
+        generationId: String,
+        inputTokens: Int,
+        outputTokens: Int,
+        modelId: String,
+        executionTarget: String
+    ) {
+        guard let tracker = activeGenerations.removeValue(forKey: generationId) else { return }
+
+        let totalTime = Date().timeIntervalSince(tracker.startTime)
+        let tokensPerSecond = totalTime > 0 ? Double(outputTokens) / totalTime : 0
+
+        // Update metrics
+        totalGenerations += 1
+        totalTimeToFirstToken += tracker.firstTokenTime?.timeIntervalSince(tracker.startTime) ?? 0
+        totalTokensPerSecond += tokensPerSecond
+        totalInputTokens += inputTokens
+        totalOutputTokens += outputTokens
+        lastEventTime = Date()
+
+        EventPublisher.shared.track(LLMEvent.generationCompleted(
+            generationId: generationId,
+            modelId: modelId,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            durationMs: totalTime * 1000,
+            tokensPerSecond: tokensPerSecond
+        ))
+
+        logger.debug("Generation completed: \(generationId)")
+    }
+
+    /// Track generation failure
+    public func trackGenerationFailed(generationId: String, error: Error) {
+        activeGenerations.removeValue(forKey: generationId)
+        lastEventTime = Date()
+
+        EventPublisher.shared.track(LLMEvent.generationFailed(
+            generationId: generationId,
+            error: error.localizedDescription
+        ))
+    }
+
+    /// Track an error during operations
+    public func trackError(_ error: Error, operation: String) {
+        lastEventTime = Date()
+        EventPublisher.shared.track(ErrorEvent.error(
+            operation: operation,
+            message: error.localizedDescription,
+            code: (error as NSError).code
+        ))
+    }
+
+    // MARK: - Metrics
+
+    public func getMetrics() -> GenerationMetrics {
+        GenerationMetrics(
+            totalEvents: totalGenerations,
+            startTime: startTime,
+            lastEventTime: lastEventTime,
             totalGenerations: totalGenerations,
             averageTimeToFirstToken: totalGenerations > 0 ? totalTimeToFirstToken / Double(totalGenerations) : 0,
             averageTokensPerSecond: totalGenerations > 0 ? totalTokensPerSecond / Double(totalGenerations) : 0,
@@ -83,245 +151,37 @@ public actor GenerationAnalyticsService: AnalyticsService {
             totalOutputTokens: totalOutputTokens
         )
     }
+}
 
-    public func clearMetrics(olderThan date: Date) async {
-        events.removeAll { event in
-            event.timestamp < date
-        }
-    }
+// MARK: - Generation Metrics
 
-    public func startSession(metadata: SessionMetadata) async -> String {
-        let sessionInfo = SessionInfo(
-            id: metadata.id,
-            modelId: metadata.modelId,
-            startTime: Date()
-        )
-        currentSession = sessionInfo
-        return metadata.id
-    }
+public struct GenerationMetrics: AnalyticsMetrics {
+    public let totalEvents: Int
+    public let startTime: Date
+    public let lastEventTime: Date?
+    public let totalGenerations: Int
+    public let averageTimeToFirstToken: TimeInterval
+    public let averageTokensPerSecond: Double
+    public let totalInputTokens: Int
+    public let totalOutputTokens: Int
 
-    public func endSession(sessionId: String) async {
-        if currentSession?.id == sessionId {
-            currentSession = nil
-        }
-    }
-
-    public func isHealthy() async -> Bool {
-        return true
-    }
-
-    // MARK: - Generation-Specific Methods
-
-    /// Start tracking a new generation
-    public func startGeneration(
-        generationId: String? = nil,
-        modelId: String,
-        executionTarget: String
-    ) async -> String {
-        let id = generationId ?? UUID().uuidString
-
-        let tracker = GenerationTracker(
-            id: id,
-            startTime: Date()
-        )
-        activeGenerations[id] = tracker
-
-        let eventData = GenerationStartData(
-            generationId: id,
-            modelId: modelId,
-            executionTarget: executionTarget,
-            promptTokens: 0,
-            maxTokens: 0
-        )
-        let event = GenerationEvent(
-            type: .generationStarted,
-            sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-        return id
-    }
-
-    /// Track first token generation
-    public func trackFirstToken(generationId: String) async {
-        guard var tracker = activeGenerations[generationId] else { return }
-
-        tracker.firstTokenTime = Date()
-        activeGenerations[generationId] = tracker
-
-        let timeToFirstToken = tracker.firstTokenTime!.timeIntervalSince(tracker.startTime)
-
-        let eventData = FirstTokenData(
-            generationId: generationId,
-            timeToFirstTokenMs: timeToFirstToken * 1000
-        )
-        let event = GenerationEvent(
-            type: .firstTokenGenerated,
-            sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-    }
-
-    /// Complete a generation with performance metrics
-    public func completeGeneration(
-        generationId: String,
-        inputTokens: Int,
-        outputTokens: Int,
-        modelId: String,
-        executionTarget: String
-    ) async {
-        guard var tracker = activeGenerations[generationId] else { return }
-
-        tracker.endTime = Date()
-        tracker.inputTokens = inputTokens
-        tracker.outputTokens = outputTokens
-
-        let totalTime = tracker.endTime!.timeIntervalSince(tracker.startTime)
-        let timeToFirstToken = tracker.firstTokenTime?.timeIntervalSince(tracker.startTime) ?? 0
-        let tokensPerSecond = totalTime > 0 ? Double(outputTokens) / totalTime : 0
-
-        // Update metrics
-        totalGenerations += 1
-        totalTimeToFirstToken += timeToFirstToken
-        totalTokensPerSecond += tokensPerSecond
-        totalInputTokens += inputTokens
-        totalOutputTokens += outputTokens
-
-        let eventData = GenerationCompletionData(
-            generationId: generationId,
-            modelId: modelId,
-            executionTarget: executionTarget,
-            inputTokens: inputTokens,
-            outputTokens: outputTokens,
-            totalTimeMs: totalTime * 1000,
-            timeToFirstTokenMs: timeToFirstToken * 1000,
-            tokensPerSecond: tokensPerSecond
-        )
-        let event = GenerationEvent(
-            type: .generationCompleted,
-            sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-
-        // Clean up tracker
-        activeGenerations.removeValue(forKey: generationId)
-    }
-
-    /// Track streaming update
-    public func trackStreamingUpdate(
-        generationId: String,
-        tokensGenerated: Int
-    ) async {
-        let eventData = StreamingUpdateData(
-            generationId: generationId,
-            tokensGenerated: tokensGenerated
-        )
-        let event = GenerationEvent(
-            type: .streamingUpdate,
-            sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-    }
-
-    /// Track model loading
-    public func trackModelLoading(
-        modelId: String,
-        loadTime: TimeInterval,
-        success: Bool
-    ) async {
-        let eventData = ModelLoadingData(
-            modelId: modelId,
-            loadTimeMs: loadTime * 1000,
-            success: success
-        )
-        let event = GenerationEvent(
-            type: success ? .modelLoaded : .modelLoadFailed,
-            sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-    }
-
-    /// Track model unloading
-    public func trackModelUnloading(modelId: String) async {
-        let eventData = ModelUnloadingData(modelId: modelId)
-        let event = GenerationEvent(
-            type: .modelUnloaded,
-            sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-    }
-
-    /// Track error
-    public func trackError(error: Error, context: AnalyticsContext) async {
-        let eventData = ErrorEventData(
-            error: error.localizedDescription,
-            context: context
-        )
-        let event = GenerationEvent(
-            type: .error,
-            sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-    }
-
-    // MARK: - Session Management Override
-
-    /// Start a generation session
-    public func startGenerationSession(modelId: String, type: String = "text") async -> String {
-        let metadata = SessionMetadata(
-            modelId: modelId,
-            type: type
-        )
-
-        let sessionId = await startSession(metadata: metadata)
-
-        let eventData = SessionStartedData(
-            modelId: modelId,
-            sessionType: type
-        )
-        let event = GenerationEvent(
-            type: .sessionStarted,
-            sessionId: sessionId,
-            eventData: eventData
-        )
-
-        await track(event: event)
-        return sessionId
-    }
-
-    /// End a generation session
-    public func endGenerationSession(sessionId: String) async {
-        await endSession(sessionId: sessionId)
-
-        let eventData = SessionEndedData(
-            sessionId: sessionId,
-            duration: 0
-        )
-        let event = GenerationEvent(
-            type: .sessionEnded,
-            sessionId: sessionId,
-            eventData: eventData
-        )
-
-        await track(event: event)
-    }
-
-    // MARK: - Private Methods
-
-    private func processEvent(_ event: GenerationEvent) async {
-        // Custom processing for generation events if needed
+    public init(
+        totalEvents: Int = 0,
+        startTime: Date = Date(),
+        lastEventTime: Date? = nil,
+        totalGenerations: Int = 0,
+        averageTimeToFirstToken: TimeInterval = 0,
+        averageTokensPerSecond: Double = 0,
+        totalInputTokens: Int = 0,
+        totalOutputTokens: Int = 0
+    ) {
+        self.totalEvents = totalEvents
+        self.startTime = startTime
+        self.lastEventTime = lastEventTime
+        self.totalGenerations = totalGenerations
+        self.averageTimeToFirstToken = averageTimeToFirstToken
+        self.averageTokensPerSecond = averageTokensPerSecond
+        self.totalInputTokens = totalInputTokens
+        self.totalOutputTokens = totalOutputTokens
     }
 }

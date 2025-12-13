@@ -9,14 +9,24 @@ import Foundation
 
 // MARK: - Component Protocols
 
-/// Protocol for component configuration
+/// Protocol for component configuration and initialization
+///
+/// All component configurations (LLM, STT, TTS, VAD, etc.) conform to this protocol.
+/// Provides common properties needed for model selection and framework preference.
 public protocol ComponentConfiguration: Sendable {
+    /// Model identifier (optional - uses default if not specified)
     var modelId: String? { get }
+
+    /// Preferred inference framework for this component (optional)
+    var preferredFramework: InferenceFramework? { get }
+
+    /// Validates the configuration
+    func validate() throws
 }
 
-/// Protocol for component initialization parameters
-public protocol ComponentInitParameters: Sendable {
-    var modelId: String? { get }
+// Default implementation for preferredFramework (most configs don't need it)
+extension ComponentConfiguration {
+    public var preferredFramework: InferenceFramework? { nil }
 }
 
 /// Protocol for component input data
@@ -49,35 +59,6 @@ public enum SDKComponent: String, CaseIterable, Sendable {
         case .speakerDiarization: return "Speaker Diarization"
         case .voice: return "Voice Agent"
         case .embedding: return "Embedding"
-        }
-    }
-}
-
-// MARK: - Audio Format
-
-/// Audio format options for audio processing
-public enum AudioFormat: String, Sendable, CaseIterable {
-    case pcm
-    case wav
-    case mp3
-    case opus
-    case aac
-    case flac
-
-    /// File extension for this format
-    public var fileExtension: String {
-        rawValue
-    }
-
-    /// MIME type for this format
-    public var mimeType: String {
-        switch self {
-        case .pcm: return "audio/pcm"
-        case .wav: return "audio/wav"
-        case .mp3: return "audio/mpeg"
-        case .opus: return "audio/opus"
-        case .aac: return "audio/aac"
-        case .flac: return "audio/flac"
         }
     }
 }

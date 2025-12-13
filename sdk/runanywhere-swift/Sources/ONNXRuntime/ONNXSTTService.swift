@@ -14,6 +14,11 @@ public class ONNXSTTService: STTService { // swiftlint:disable:this type_body_le
     private var _currentModel: String?
     private var _supportsStreaming: Bool = false
 
+    // MARK: - Framework Identification
+
+    /// ONNX Runtime inference framework
+    public let inferenceFramework: InferenceFrameworkType = .onnx
+
     // MARK: - STTService Protocol
 
     public var isReady: Bool {

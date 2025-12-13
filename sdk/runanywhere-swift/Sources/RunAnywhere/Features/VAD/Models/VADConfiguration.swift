@@ -8,15 +8,18 @@
 import Foundation
 
 /// Configuration for Voice Activity Detection operations
-public struct VADConfiguration: ComponentConfiguration, ComponentInitParameters, Sendable {
+public struct VADConfiguration: ComponentConfiguration, Sendable {
 
-    // MARK: - ComponentInitParameters Conformance
+    // MARK: - ComponentConfiguration
 
     /// Component type
     public var componentType: SDKComponent { .vad }
 
     /// Model ID (not used for VAD)
     public var modelId: String? { nil }
+
+    /// Preferred framework (uses default extension implementation)
+    public var preferredFramework: InferenceFramework? { nil }
 
     // MARK: - Configuration Properties
 
@@ -53,7 +56,7 @@ public struct VADConfiguration: ComponentConfiguration, ComponentInitParameters,
         self.calibrationMultiplier = calibrationMultiplier
     }
 
-    // MARK: - ComponentConfiguration Conformance
+    // MARK: - Validation
 
     public func validate() throws {
         // Validate threshold range

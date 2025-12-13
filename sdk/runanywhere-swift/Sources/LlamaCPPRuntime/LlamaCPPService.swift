@@ -68,6 +68,11 @@ public class LlamaCPPService {
     private var _isReady: Bool = false
     private var _currentModel: String?
 
+    // MARK: - Framework Identification
+
+    /// LlamaCPP uses the llama.cpp inference framework
+    public var inferenceFramework: InferenceFrameworkType { .llamaCpp }
+
     // MARK: - Properties
 
     public var isReady: Bool {

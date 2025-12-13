@@ -10,17 +10,18 @@ import Foundation
 // MARK: - Speaker Diarization Configuration
 
 /// Configuration for Speaker Diarization component
-public struct SpeakerDiarizationConfiguration: ComponentConfiguration, ComponentInitParameters, Sendable {
+public struct SpeakerDiarizationConfiguration: ComponentConfiguration, Sendable {
 
-    // MARK: - Component Type
+    // MARK: - ComponentConfiguration
 
     /// Component type identifier
     public var componentType: SDKComponent { .speakerDiarization }
 
-    // MARK: - Model Configuration
-
     /// Model ID (if using ML-based diarization)
     public let modelId: String?
+
+    /// Preferred framework (uses default extension implementation)
+    public var preferredFramework: InferenceFramework? { nil }
 
     // MARK: - Diarization Parameters
 
@@ -62,7 +63,7 @@ public struct SpeakerDiarizationConfiguration: ComponentConfiguration, Component
         self.stepSize = stepSize
     }
 
-    // MARK: - ComponentConfiguration
+    // MARK: - Validation
 
     public func validate() throws {
         guard maxSpeakers > 0 && maxSpeakers <= 100 else {

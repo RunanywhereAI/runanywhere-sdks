@@ -11,6 +11,13 @@ import Foundation
 
 /// Protocol for speech-to-text services
 public protocol STTService: AnyObject { // swiftlint:disable:this avoid_any_object
+
+    // MARK: - Framework Identification
+
+    /// The inference framework used by this service.
+    /// Required for analytics and performance tracking.
+    var inferenceFramework: InferenceFrameworkType { get }
+
     /// Initialize the service with optional model path
     func initialize(modelPath: String?) async throws
 

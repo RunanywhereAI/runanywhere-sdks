@@ -10,6 +10,14 @@ import Foundation
 
 /// Protocol defining Voice Activity Detection service capabilities
 public protocol VADService: AnyObject { // swiftlint:disable:this avoid_any_object
+
+    // MARK: - Framework Identification
+
+    /// The inference framework used by this service.
+    /// Required for analytics and performance tracking.
+    /// For simple energy-based VAD, use `.builtIn`. For model-based VAD, use the appropriate framework.
+    var inferenceFramework: InferenceFrameworkType { get }
+
     /// Energy threshold for voice detection (0.0 to 1.0)
     var energyThreshold: Float { get set }
 

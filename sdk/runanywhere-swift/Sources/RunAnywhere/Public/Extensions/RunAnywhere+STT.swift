@@ -2,7 +2,8 @@
 //  RunAnywhere+STT.swift
 //  RunAnywhere SDK
 //
-//  Public API for Speech-to-Text operations
+//  Public API for Speech-to-Text operations.
+//  Events are tracked via EventPublisher.
 //
 
 @preconcurrency import AVFoundation
@@ -16,6 +17,7 @@ public extension RunAnywhere {
     // Note: loadSTTModel is defined in RunAnywhere.swift
 
     /// Unload the currently loaded STT model
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func unloadSTTModel() async throws {
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized
@@ -38,6 +40,7 @@ public extension RunAnywhere {
     ///   - audioData: Raw audio data
     ///   - options: Transcription options
     /// - Returns: Transcription output with text and metadata
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func transcribeWithOptions(
         _ audioData: Data,
         options: STTOptions
@@ -46,16 +49,7 @@ public extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        events.publishAsync(SDKVoiceEvent.transcriptionStarted)
-
-        do {
-            let result = try await serviceContainer.sttCapability.transcribe(audioData, options: options)
-            events.publishAsync(SDKVoiceEvent.transcriptionFinal(text: result.text))
-            return result
-        } catch {
-            events.publishAsync(SDKVoiceEvent.pipelineError(error))
-            throw error
-        }
+        return try await serviceContainer.sttCapability.transcribe(audioData, options: options)
     }
 
     /// Transcribe audio buffer to text
@@ -63,6 +57,7 @@ public extension RunAnywhere {
     ///   - buffer: Audio buffer
     ///   - language: Optional language hint
     /// - Returns: Transcription output
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func transcribeBuffer(
         _ buffer: AVAudioPCMBuffer,
         language: String? = nil
@@ -71,16 +66,7 @@ public extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        events.publishAsync(SDKVoiceEvent.transcriptionStarted)
-
-        do {
-            let result = try await serviceContainer.sttCapability.transcribe(buffer, language: language)
-            events.publishAsync(SDKVoiceEvent.transcriptionFinal(text: result.text))
-            return result
-        } catch {
-            events.publishAsync(SDKVoiceEvent.pipelineError(error))
-            throw error
-        }
+        return try await serviceContainer.sttCapability.transcribe(buffer, language: language)
     }
 
     /// Stream transcription for real-time processing
@@ -95,8 +81,6 @@ public extension RunAnywhere {
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized
         }
-
-        events.publishAsync(SDKVoiceEvent.transcriptionStarted)
 
         return await serviceContainer.sttCapability.streamTranscribe(audioStream, options: options)
     }

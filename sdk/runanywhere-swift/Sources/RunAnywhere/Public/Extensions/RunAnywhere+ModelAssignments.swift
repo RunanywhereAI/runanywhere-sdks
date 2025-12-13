@@ -27,13 +27,9 @@ extension RunAnywhere {
             let models = try await serviceContainer.modelAssignmentService.fetchModelAssignments(forceRefresh: forceRefresh)
             logger.info("Successfully fetched \(models.count) model assignments")
 
-            // Publish event for model assignments fetched
-            events.publish(SDKModelEvent.assignmentsFetched(models: models))
-
             return models
         } catch {
             logger.error("Failed to fetch model assignments: \(error)")
-            events.publish(SDKModelEvent.assignmentsFetchFailed(error: error))
             throw error
         }
     }

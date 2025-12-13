@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Frameworks Extensions (Event-Based)
+// MARK: - Frameworks Extensions
 
 public extension RunAnywhere {
 
@@ -8,18 +8,14 @@ public extension RunAnywhere {
     /// - Parameter framework: The framework to query
     /// - Returns: Array of models for the framework
     static func getModelsForFramework(_ framework: InferenceFramework) -> [ModelInfo] {
-        Task {
-            events.publish(SDKFrameworkEvent.modelsForFrameworkRequested(framework: framework))
-        }
+        EventPublisher.shared.track(FrameworkEvent.modelsRequested(framework: framework.rawValue))
 
         let models = RunAnywhere.serviceContainer.modelRegistry.filterModels(by: ModelCriteria(framework: framework))
 
-        Task {
-            events.publish(SDKFrameworkEvent.modelsForFrameworkRetrieved(
-                framework: framework,
-                models: models
-            ))
-        }
+        EventPublisher.shared.track(FrameworkEvent.modelsRetrieved(
+            framework: framework.rawValue,
+            count: models.count
+        ))
 
         return models
     }

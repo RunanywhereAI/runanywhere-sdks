@@ -2,7 +2,8 @@
 //  RunAnywhere+VoiceAgent.swift
 //  RunAnywhere SDK
 //
-//  Public API for Voice Agent operations (full voice pipeline)
+//  Public API for Voice Agent operations (full voice pipeline).
+//  Events are tracked via EventPublisher.
 //
 
 import Foundation
@@ -14,7 +15,6 @@ public extension RunAnywhere {
     // MARK: - Initialization
 
     /// Initialize the voice agent with configuration
-    /// - Parameter config: Voice agent configuration
     static func initializeVoiceAgent(_ config: VoiceAgentConfiguration) async throws {
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized
@@ -22,22 +22,18 @@ public extension RunAnywhere {
 
         try await ensureDeviceRegistered()
 
-        events.publishAsync(SDKVoiceEvent.pipelineStarted)
+        EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
 
         do {
             try await serviceContainer.voiceAgentCapability.initialize(config)
-            events.publishAsync(SDKVoiceEvent.pipelineCompleted)
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
-            events.publishAsync(SDKVoiceEvent.pipelineError(error))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
             throw error
         }
     }
 
     /// Initialize voice agent with individual model IDs
-    /// - Parameters:
-    ///   - sttModelId: STT model identifier
-    ///   - llmModelId: LLM model identifier
-    ///   - ttsVoice: TTS voice identifier
     static func initializeVoiceAgent(
         sttModelId: String,
         llmModelId: String,
@@ -49,7 +45,7 @@ public extension RunAnywhere {
 
         try await ensureDeviceRegistered()
 
-        events.publishAsync(SDKVoiceEvent.pipelineStarted)
+        EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
 
         do {
             try await serviceContainer.voiceAgentCapability.initialize(
@@ -57,9 +53,9 @@ public extension RunAnywhere {
                 llmModelId: llmModelId,
                 ttsVoice: ttsVoice
             )
-            events.publishAsync(SDKVoiceEvent.pipelineCompleted)
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
-            events.publishAsync(SDKVoiceEvent.pipelineError(error))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
             throw error
         }
     }
@@ -74,37 +70,22 @@ public extension RunAnywhere {
     // MARK: - Voice Processing
 
     /// Process a complete voice turn: audio → transcription → LLM response → synthesized speech
-    /// - Parameter audioData: Audio data from user
-    /// - Returns: Voice agent result with all outputs
     static func processVoiceTurn(_ audioData: Data) async throws -> VoiceAgentResult {
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized
         }
 
         do {
+            // Voice agent capability handles all event tracking internally
             let result = try await serviceContainer.voiceAgentCapability.processVoiceTurn(audioData)
-
-            // Publish events (using optional fields from VoiceAgentResult)
-            if let transcription = result.transcription {
-                events.publishAsync(SDKVoiceEvent.transcriptionFinal(text: transcription))
-            }
-            if let response = result.response {
-                events.publishAsync(SDKVoiceEvent.responseGenerated(text: response))
-            }
-            if let audioData = result.synthesizedAudio {
-                events.publishAsync(SDKVoiceEvent.audioGenerated(data: audioData))
-            }
-
             return result
         } catch {
-            events.publishAsync(SDKVoiceEvent.pipelineError(error))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
             throw error
         }
     }
 
     /// Process audio stream for continuous conversation
-    /// - Parameter audioStream: Async stream of audio data chunks
-    /// - Returns: Async stream of voice agent events
     static func processVoiceStream(_ audioStream: AsyncStream<Data>) async -> AsyncThrowingStream<VoiceAgentEvent, Error> {
         guard isSDKInitialized else {
             return AsyncThrowingStream { continuation in
@@ -118,42 +99,27 @@ public extension RunAnywhere {
     // MARK: - Individual Operations
 
     /// Transcribe audio (voice agent must be initialized)
-    /// - Parameter audioData: Audio data to transcribe
-    /// - Returns: Transcribed text
     static func voiceAgentTranscribe(_ audioData: Data) async throws -> String {
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized
         }
-
-        let text = try await serviceContainer.voiceAgentCapability.transcribe(audioData)
-        events.publishAsync(SDKVoiceEvent.transcriptionFinal(text: text))
-        return text
+        return try await serviceContainer.voiceAgentCapability.transcribe(audioData)
     }
 
     /// Generate LLM response (voice agent must be initialized)
-    /// - Parameter prompt: Input prompt
-    /// - Returns: Generated response
     static func voiceAgentGenerateResponse(_ prompt: String) async throws -> String {
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized
         }
-
-        let response = try await serviceContainer.voiceAgentCapability.generateResponse(prompt)
-        events.publishAsync(SDKVoiceEvent.responseGenerated(text: response))
-        return response
+        return try await serviceContainer.voiceAgentCapability.generateResponse(prompt)
     }
 
     /// Synthesize speech (voice agent must be initialized)
-    /// - Parameter text: Text to synthesize
-    /// - Returns: Synthesized audio data
     static func voiceAgentSynthesizeSpeech(_ text: String) async throws -> Data {
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized
         }
-
-        let audioData = try await serviceContainer.voiceAgentCapability.synthesizeSpeech(text)
-        events.publishAsync(SDKVoiceEvent.audioGenerated(data: audioData))
-        return audioData
+        return try await serviceContainer.voiceAgentCapability.synthesizeSpeech(text)
     }
 
     // MARK: - Cleanup

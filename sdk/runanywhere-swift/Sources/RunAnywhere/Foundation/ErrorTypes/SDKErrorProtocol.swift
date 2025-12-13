@@ -27,8 +27,8 @@ extension SDKErrorProtocol {
     public var underlyingError: Error? { nil }
 
     /// Convert this error to analytics event data with optional context
-    public func toAnalyticsData(context: AnalyticsContext, errorContext: ErrorContext? = nil) -> ErrorEventData {
-        ErrorEventData(
+    public func toAnalyticsData(context: AnalyticsContext, errorContext: ErrorContext? = nil) -> LegacyErrorEventData {
+        LegacyErrorEventData(
             error: errorDescription ?? "Unknown error",
             context: context,
             errorCode: String(code.rawValue)

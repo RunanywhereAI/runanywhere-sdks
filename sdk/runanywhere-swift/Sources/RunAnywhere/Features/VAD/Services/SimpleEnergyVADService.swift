@@ -14,6 +14,11 @@ import Foundation
 /// Energy-based Voice Activity Detection implementation
 public class SimpleEnergyVADService: NSObject, VADService { // swiftlint:disable:this type_body_length
 
+    // MARK: - Framework Identification
+
+    /// This is a built-in energy-based VAD, no external framework required
+    public let inferenceFramework: InferenceFrameworkType = .builtIn
+
     // MARK: - Properties
 
     private let logger = SDKLogger(category: "SimpleEnergyVADService")

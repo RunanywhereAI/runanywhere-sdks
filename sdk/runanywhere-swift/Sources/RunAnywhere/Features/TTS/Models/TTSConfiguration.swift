@@ -8,18 +8,18 @@
 import Foundation
 
 /// Configuration for TTS component
-///
-/// Conforms to ComponentConfiguration and ComponentInitParameters protocols
-/// for integration with the SDK's component system.
-public struct TTSConfiguration: ComponentConfiguration, ComponentInitParameters, Sendable {
+public struct TTSConfiguration: ComponentConfiguration, Sendable {
 
-    // MARK: - ComponentInitParameters
+    // MARK: - ComponentConfiguration
 
     /// Component type
     public var componentType: SDKComponent { .tts }
 
     /// Model ID (voice identifier for TTS)
     public let modelId: String?
+
+    /// Preferred framework (uses default extension implementation)
+    public var preferredFramework: InferenceFramework? { nil }
 
     // MARK: - TTS-Specific Properties
 
@@ -71,7 +71,7 @@ public struct TTSConfiguration: ComponentConfiguration, ComponentInitParameters,
         self.modelId = nil
     }
 
-    // MARK: - ComponentConfiguration
+    // MARK: - Validation
 
     public func validate() throws {
         guard speakingRate >= 0.5 && speakingRate <= 2.0 else {

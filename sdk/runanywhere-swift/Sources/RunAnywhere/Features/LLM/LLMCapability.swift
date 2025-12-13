@@ -2,21 +2,25 @@
 //  LLMCapability.swift
 //  RunAnywhere SDK
 //
-//  Actor-based LLM capability that owns model lifecycle and generation
+//  Actor-based LLM capability that owns model lifecycle and generation.
+//  Uses ManagedLifecycle for unified lifecycle + analytics handling.
 //
 
 import Foundation
 
-/// Actor-based LLM capability that provides a simplified interface for text generation
-/// Owns the model lifecycle and provides thread-safe access to LLM operations
+/// Actor-based LLM capability that provides a simplified interface for text generation.
+/// Owns the model lifecycle and provides thread-safe access to LLM operations.
+///
+/// Uses `ManagedLifecycle` to handle model loading/unloading with automatic analytics tracking,
+/// eliminating duplicate lifecycle management code.
 public actor LLMCapability: ModelLoadableCapability {
     public typealias Configuration = LLMConfiguration
     public typealias Service = LLMService
 
     // MARK: - State
 
-    /// Unified model lifecycle manager
-    private let lifecycle: ModelLifecycleManager<LLMService>
+    /// Managed lifecycle with integrated event tracking
+    private let managedLifecycle: ManagedLifecycle<LLMService>
 
     /// Current configuration
     private var config: LLMConfiguration?
@@ -29,50 +33,38 @@ public actor LLMCapability: ModelLoadableCapability {
     // MARK: - Initialization
 
     public init(analyticsService: GenerationAnalyticsService = GenerationAnalyticsService()) {
-        self.lifecycle = ModelLifecycleManager.forLLM()
         self.analyticsService = analyticsService
+        self.managedLifecycle = ManagedLifecycle.forLLM()
     }
 
     // MARK: - Configuration (Capability Protocol)
 
     public func configure(_ config: LLMConfiguration) {
         self.config = config
-        Task { await lifecycle.configure(config) }
+        Task { await managedLifecycle.configure(config) }
     }
 
     // MARK: - Model Lifecycle (ModelLoadableCapability Protocol)
+    // All lifecycle operations are delegated to ManagedLifecycle which handles analytics automatically
 
     public var isModelLoaded: Bool {
-        get async { await lifecycle.isLoaded }
+        get async { await managedLifecycle.isLoaded }
     }
 
     public var currentModelId: String? {
-        get async { await lifecycle.currentResourceId }
+        get async { await managedLifecycle.currentResourceId }
     }
 
     public func loadModel(_ modelId: String) async throws {
-        let startTime = Date()
-
-        do {
-            try await lifecycle.load(modelId)
-            let loadTime = Date().timeIntervalSince(startTime)
-            await analyticsService.trackModelLoading(modelId: modelId, loadTime: loadTime, success: true)
-        } catch {
-            let loadTime = Date().timeIntervalSince(startTime)
-            await analyticsService.trackModelLoading(modelId: modelId, loadTime: loadTime, success: false)
-            throw error
-        }
+        try await managedLifecycle.load(modelId)
     }
 
     public func unload() async throws {
-        if let modelId = await lifecycle.currentResourceId {
-            await analyticsService.trackModelUnloading(modelId: modelId)
-        }
-        await lifecycle.unload()
+        await managedLifecycle.unload()
     }
 
     public func cleanup() async {
-        await lifecycle.reset()
+        await managedLifecycle.reset()
     }
 
     // MARK: - Generation
@@ -86,8 +78,8 @@ public actor LLMCapability: ModelLoadableCapability {
         _ prompt: String,
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) async throws -> LLMGenerationResult {
-        let service = try await lifecycle.requireService()
-        let modelId = await lifecycle.currentResourceId ?? "unknown"
+        let service = try await managedLifecycle.requireService()
+        let modelId = await managedLifecycle.resourceIdOrUnknown()
 
         logger.info("Generating with model: \(modelId)")
 
@@ -106,7 +98,7 @@ public actor LLMCapability: ModelLoadableCapability {
             generatedText = try await service.generate(prompt: prompt, options: effectiveOptions)
         } catch {
             logger.error("Generation failed: \(error)")
-            await analyticsService.trackError(error: error, context: .generation)
+            await managedLifecycle.trackOperationError(error, operation: "generate")
             throw CapabilityError.operationFailed("Generation", error)
         }
 
@@ -147,7 +139,7 @@ public actor LLMCapability: ModelLoadableCapability {
     /// - Note: Returns `false` if no model is loaded
     public var supportsStreaming: Bool {
         get async {
-            guard let service = try? await lifecycle.requireService() else {
+            guard let service = await managedLifecycle.currentService else {
                 return false
             }
             return service.supportsStreaming
@@ -164,7 +156,7 @@ public actor LLMCapability: ModelLoadableCapability {
         _ prompt: String,
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) async throws -> LLMStreamingResult {
-        let service = try await lifecycle.requireService()
+        let service = try await managedLifecycle.requireService()
 
         // Check if streaming is supported by this service
         guard service.supportsStreaming else {
@@ -172,7 +164,7 @@ public actor LLMCapability: ModelLoadableCapability {
             throw LLMError.streamingNotSupported
         }
 
-        let modelId = await lifecycle.currentResourceId ?? "unknown"
+        let modelId = await managedLifecycle.resourceIdOrUnknown()
         let effectiveOptions = mergeOptions(options)
 
         logger.info("Starting streaming generation with model: \(modelId)")
@@ -308,7 +300,7 @@ private actor StreamingMetricsCollector {
 
     func markFailed(_ error: Error) async {
         self.error = error
-        await analyticsService.trackError(error: error, context: .generation)
+        await analyticsService.trackError(error, operation: "streaming_generation")
 
         if let continuation = resultContinuation {
             continuation.resume(throwing: error)

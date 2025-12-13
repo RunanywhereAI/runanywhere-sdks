@@ -91,7 +91,9 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         }
 
         let logger = SDKLogger(category: "RunAnywhere.Init")
-        EventBus.shared.publish(SDKInitializationEvent.started)
+
+        // Dispatch SDK init started event
+        EventPublisher.shared.track(SDKLifecycleEvent.initStarted)
 
         do {
             // Step 1: Validate API key (skip in development mode)
@@ -123,7 +125,9 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             isInitialized = true
 
             logger.info("✅ SDK initialization completed successfully (\(params.environment.description) mode)")
-            EventBus.shared.publish(SDKInitializationEvent.completed)
+
+            // Dispatch SDK init completed event
+            EventPublisher.shared.track(SDKLifecycleEvent.initCompleted(durationMs: 0))
 
             // Step 6: Device registration (after marking as initialized)
             // For development mode: Register immediately with Supabase for dev analytics
@@ -149,7 +153,10 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             configurationData = nil
             initParams = nil
             isInitialized = false
-            EventBus.shared.publish(SDKInitializationEvent.failed(error))
+
+            // Dispatch SDK init failed event
+            EventPublisher.shared.track(SDKLifecycleEvent.initFailed(error: error.localizedDescription))
+
             throw error
         }
     }
@@ -236,7 +243,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
             // Step 4: Load configuration
             let config = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
-            EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: config))
+            EventPublisher.shared.track(SDKLifecycleEvent.configLoaded(source: config.source.rawValue))
             logger.info("Configuration loaded (source: \(config.source))")
 
             // Step 5: Sync model catalog (events are now published inside loadStoredModels)
@@ -248,9 +255,10 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
             logger.debug("Model registry initialized")
 
-            // Step 7: Initialize analytics
+            // Step 7: Initialize analytics and event publisher
             await serviceContainer.analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
-            logger.info("Analytics initialized with remote data source")
+            EventPublisher.shared.initialize(analyticsQueue: serviceContainer.analyticsQueueManager)
+            logger.info("Analytics and event publisher initialized")
 
             logger.info("✅ Production/staging bootstrap completed")
         } else if environment == .development && serviceContainer.networkService == nil {
@@ -268,7 +276,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
                 apiKey: params.apiKey.isEmpty ? "dev-mode" : params.apiKey,
                 source: .defaults
             )
-            EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: config))
+            EventPublisher.shared.track(SDKLifecycleEvent.configLoaded(source: config.source.rawValue))
             logger.info("Configuration loaded (source: defaults for development)")
 
             // Step 3: Initialize model registry
@@ -333,40 +341,24 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     ///   - prompt: The text prompt
     ///   - options: Generation options (optional)
     /// - Returns: GenerationResult with full metrics including thinking tokens, timing, performance, etc.
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     public static func generate(
         _ prompt: String,
         options: LLMGenerationOptions? = nil
     ) async throws -> LLMGenerationResult {
-        // Non-blocking event publish
-        events.publishAsync(SDKGenerationEvent.started(prompt: prompt))
-
-        do {
-            // Ensure initialized
-            guard isInitialized else {
-                throw RunAnywhereError.notInitialized
-            }
-
-            // Lazy device registration on first API call (O(1) after first call)
-            try await ensureDeviceRegistered()
-
-            // Use the new LLMCapability
-            let result = try await serviceContainer.llmCapability.generate(
-                prompt,
-                options: options ?? LLMGenerationOptions()
-            )
-
-            // Non-blocking event publish
-            events.publishAsync(SDKGenerationEvent.completed(
-                response: result.text,
-                tokensUsed: result.tokensUsed,
-                latencyMs: result.latencyMs
-            ))
-
-            return result
-        } catch {
-            events.publishAsync(SDKGenerationEvent.failed(error))
-            throw error
+        // Ensure initialized
+        guard isInitialized else {
+            throw RunAnywhereError.notInitialized
         }
+
+        // Lazy device registration on first API call (O(1) after first call)
+        try await ensureDeviceRegistered()
+
+        // LLMCapability handles all event tracking automatically
+        return try await serviceContainer.llmCapability.generate(
+            prompt,
+            options: options ?? LLMGenerationOptions()
+        )
     }
 
     /// Streaming text generation with complete analytics
@@ -397,9 +389,6 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         _ prompt: String,
         options: LLMGenerationOptions? = nil
     ) async throws -> LLMStreamingResult {
-        // Non-blocking event publish
-        events.publishAsync(SDKGenerationEvent.started(prompt: prompt))
-
         // Ensure initialized
         guard isInitialized else {
             throw RunAnywhereError.notInitialized
@@ -408,7 +397,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         // Lazy device registration on first API call (O(1) after first call)
         try await ensureDeviceRegistered()
 
-        // Use the new LLMCapability
+        // LLMCapability handles all event tracking automatically
         return try await serviceContainer.llmCapability.generateStream(
             prompt,
             options: options ?? LLMGenerationOptions()
@@ -420,29 +409,21 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// Simple voice transcription using default model
     /// - Parameter audioData: Audio data to transcribe
     /// - Returns: Transcribed text
-    /// - Note: For more control, use `RunAnywhere.transcribe(_:options:)` in RunAnywhere+STT
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     public static func transcribe(_ audioData: Data) async throws -> String {
         guard isInitialized else { throw RunAnywhereError.notInitialized }
         try await ensureDeviceRegistered()
 
-        // Non-blocking event publish
-        events.publishAsync(SDKVoiceEvent.transcriptionStarted)
-
-        do {
-            // Use the new STTCapability
-            let result = try await serviceContainer.sttCapability.transcribe(audioData)
-            events.publishAsync(SDKVoiceEvent.transcriptionFinal(text: result.text))
-            return result.text
-        } catch {
-            events.publishAsync(SDKVoiceEvent.pipelineError(error))
-            throw error
-        }
+        // STTCapability handles all event tracking automatically
+        let result = try await serviceContainer.sttCapability.transcribe(audioData)
+        return result.text
     }
 
     // MARK: - Model Management
 
     /// Load an LLM model by ID
     /// - Parameter modelId: The model identifier
+    /// - Note: Events are automatically dispatched to both EventBus (for apps) and Analytics (for telemetry)
     public static func loadModel(_ modelId: String) async throws {
         // Ensure initialized
         guard isInitialized else {
@@ -452,33 +433,19 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         // Lazy device registration on first API call
         try await ensureDeviceRegistered()
 
-        events.publishAsync(SDKModelEvent.loadStarted(modelId: modelId))
-
-        do {
-            // Use the new LLMCapability
-            try await serviceContainer.llmCapability.loadModel(modelId)
-            events.publishAsync(SDKModelEvent.loadCompleted(modelId: modelId))
-        } catch {
-            events.publishAsync(SDKModelEvent.loadFailed(modelId: modelId, error: error))
-            throw error
-        }
+        // LLMCapability handles all event tracking automatically
+        try await serviceContainer.llmCapability.loadModel(modelId)
     }
 
     /// Unload the currently loaded LLM model
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     public static func unloadModel() async throws {
         guard isInitialized else {
             throw RunAnywhereError.notInitialized
         }
 
-        events.publishAsync(SDKModelEvent.unloadStarted)
-
-        do {
-            try await serviceContainer.llmCapability.unload()
-            events.publishAsync(SDKModelEvent.unloadCompleted)
-        } catch {
-            events.publishAsync(SDKModelEvent.unloadFailed(error))
-            throw error
-        }
+        // LLMCapability handles all event tracking automatically
+        try await serviceContainer.llmCapability.unload()
     }
 
     /// Check if an LLM model is loaded
@@ -491,7 +458,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// Load an STT (Speech-to-Text) model by ID
     /// This loads the model into the STT capability
     /// - Parameter modelId: The model identifier (e.g., "whisper-base")
-    /// - Note: Use `loadSTTModel` from RunAnywhere+STT for the same functionality
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     public static func loadSTTModel(_ modelId: String) async throws {
         // Ensure initialized
         guard isInitialized else {
@@ -501,22 +468,14 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         // Lazy device registration on first API call
         try await ensureDeviceRegistered()
 
-        events.publishAsync(SDKModelEvent.loadStarted(modelId: modelId))
-
-        do {
-            // Use the new STTCapability
-            try await serviceContainer.sttCapability.loadModel(modelId)
-            events.publishAsync(SDKModelEvent.loadCompleted(modelId: modelId))
-        } catch {
-            events.publishAsync(SDKModelEvent.loadFailed(modelId: modelId, error: error))
-            throw error
-        }
+        // STTCapability handles all event tracking automatically
+        try await serviceContainer.sttCapability.loadModel(modelId)
     }
 
     /// Load a TTS (Text-to-Speech) voice by ID
     /// This loads the voice into the TTS capability
     /// - Parameter voiceId: The voice identifier
-    /// - Note: Use `loadTTSVoice` from RunAnywhere+TTS for the same functionality
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     public static func loadTTSModel(_ voiceId: String) async throws {
         // Ensure initialized
         guard isInitialized else {
@@ -526,16 +485,8 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         // Lazy device registration on first API call
         try await ensureDeviceRegistered()
 
-        events.publishAsync(SDKModelEvent.loadStarted(modelId: voiceId))
-
-        do {
-            // Use the new TTSCapability
-            try await serviceContainer.ttsCapability.loadVoice(voiceId)
-            events.publishAsync(SDKModelEvent.loadCompleted(modelId: voiceId))
-        } catch {
-            events.publishAsync(SDKModelEvent.loadFailed(modelId: voiceId, error: error))
-            throw error
-        }
+        // TTSCapability handles all event tracking automatically
+        try await serviceContainer.ttsCapability.loadVoice(voiceId)
     }
 
     /// Get available models

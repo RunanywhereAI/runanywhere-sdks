@@ -13,6 +13,12 @@ import Foundation
 /// Defines the contract for identifying and tracking speakers in audio
 public protocol SpeakerDiarizationService: AnyObject {
 
+    // MARK: - Framework Identification
+
+    /// The inference framework used by this service.
+    /// Required for analytics and performance tracking.
+    var inferenceFramework: InferenceFrameworkType { get }
+
     // MARK: - Initialization
 
     /// Initialize the service

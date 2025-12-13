@@ -2,22 +2,25 @@
 //  STTCapability.swift
 //  RunAnywhere SDK
 //
-//  Actor-based STT capability that owns model lifecycle and transcription
+//  Actor-based STT capability that owns model lifecycle and transcription.
+//  Uses ManagedLifecycle for unified lifecycle + analytics handling.
 //
 
 @preconcurrency import AVFoundation
 import Foundation
 
-/// Actor-based STT capability that provides a simplified interface for speech-to-text
-/// Owns the model lifecycle and provides thread-safe access to transcription operations
+/// Actor-based STT capability that provides a simplified interface for speech-to-text.
+/// Owns the model lifecycle and provides thread-safe access to transcription operations.
+///
+/// Uses `ManagedLifecycle` to handle model loading/unloading with automatic analytics tracking.
 public actor STTCapability: ModelLoadableCapability {
     public typealias Configuration = STTConfiguration
     public typealias Service = STTService
 
     // MARK: - State
 
-    /// Unified model lifecycle manager
-    private let lifecycle: ModelLifecycleManager<STTService>
+    /// Managed lifecycle with integrated event tracking
+    private let managedLifecycle: ManagedLifecycle<STTService>
 
     /// Current configuration
     private var config: STTConfiguration?
@@ -30,63 +33,46 @@ public actor STTCapability: ModelLoadableCapability {
     // MARK: - Initialization
 
     public init(analyticsService: STTAnalyticsService = STTAnalyticsService()) {
-        self.lifecycle = ModelLifecycleManager.forSTT()
         self.analyticsService = analyticsService
+        self.managedLifecycle = ManagedLifecycle.forSTT()
     }
 
     // MARK: - Configuration (Capability Protocol)
 
     public func configure(_ config: STTConfiguration) {
         self.config = config
-        Task { await lifecycle.configure(config) }
+        Task { await managedLifecycle.configure(config) }
     }
 
     // MARK: - Model Lifecycle (ModelLoadableCapability Protocol)
+    // All lifecycle operations are delegated to ManagedLifecycle which handles analytics automatically
 
     public var isModelLoaded: Bool {
-        get async { await lifecycle.isLoaded }
+        get async { await managedLifecycle.isLoaded }
     }
 
     public var currentModelId: String? {
-        get async { await lifecycle.currentResourceId }
+        get async { await managedLifecycle.currentResourceId }
     }
 
     /// Whether the service supports streaming transcription
     public var supportsStreaming: Bool {
         get async {
-            guard let service = await lifecycle.currentService else { return false }
+            guard let service = await managedLifecycle.currentService else { return false }
             return service.supportsStreaming
         }
     }
 
     public func loadModel(_ modelId: String) async throws {
-        let startTime = Date()
-
-        do {
-            try await lifecycle.load(modelId)
-            let loadTime = Date().timeIntervalSince(startTime)
-            await analyticsService.trackModelLoading(
-                modelId: modelId,
-                loadTime: loadTime,
-                success: true
-            )
-        } catch {
-            let loadTime = Date().timeIntervalSince(startTime)
-            await analyticsService.trackModelLoading(
-                modelId: modelId,
-                loadTime: loadTime,
-                success: false
-            )
-            throw error
-        }
+        try await managedLifecycle.load(modelId)
     }
 
     public func unload() async throws {
-        await lifecycle.unload()
+        await managedLifecycle.unload()
     }
 
     public func cleanup() async {
-        await lifecycle.reset()
+        await managedLifecycle.reset()
     }
 
     // MARK: - Transcription
@@ -100,8 +86,8 @@ public actor STTCapability: ModelLoadableCapability {
         _ audioData: Data,
         options: STTOptions = STTOptions()
     ) async throws -> STTOutput {
-        let service = try await lifecycle.requireService()
-        let modelId = await lifecycle.currentResourceId ?? "unknown"
+        let service = try await managedLifecycle.requireService()
+        let modelId = await managedLifecycle.resourceIdOrUnknown()
 
         logger.info("Transcribing audio with model: \(modelId)")
 
@@ -132,6 +118,7 @@ public actor STTCapability: ModelLoadableCapability {
                 processingTimeMs: processingTimeMs,
                 errorMessage: error.localizedDescription
             )
+            await managedLifecycle.trackOperationError(error, operation: "transcribe")
             throw CapabilityError.operationFailed("Transcription", error)
         }
 
@@ -200,14 +187,13 @@ public actor STTCapability: ModelLoadableCapability {
     ) -> AsyncThrowingStream<String, Error> where S.Element == Data {
         AsyncThrowingStream { continuation in
             Task {
-                guard let service = await self.lifecycle.currentService else {
+                guard let service = await self.managedLifecycle.currentService else {
                     continuation.finish(
                         throwing: CapabilityError.resourceNotLoaded("STT model")
                     )
                     return
                 }
 
-                let modelId = await self.lifecycle.currentResourceId ?? "unknown"
                 let effectiveOptions = self.mergeOptions(options)
 
                 // Start transcription tracking

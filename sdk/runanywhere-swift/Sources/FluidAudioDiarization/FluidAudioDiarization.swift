@@ -32,6 +32,11 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
     /// Configuration for diarization
     private let config: DiarizerConfig
 
+    // MARK: - Framework Identification
+
+    /// FluidAudio uses ONNX-based models for speaker diarization
+    public let inferenceFramework: InferenceFrameworkType = .onnx
+
     // MARK: - Protocol Requirements
 
     public var isReady: Bool = false
