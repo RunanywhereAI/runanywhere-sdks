@@ -133,6 +133,10 @@ public actor DeviceRegistrationService {
 
             cachedDeviceId = deviceId
             markDevDeviceAsRegistered()
+
+            // Track device registration success
+            EventPublisher.shared.track(DeviceEvent.registered(deviceId: deviceId))
+
             logger.info("Dev device registration successful")
 
         } catch {
@@ -142,6 +146,10 @@ public actor DeviceRegistrationService {
             let mockDeviceId = "dev-" + generateDeviceIdentifier()
             try storeDeviceId(mockDeviceId)
             cachedDeviceId = mockDeviceId
+
+            // Track with mock ID (still successful from SDK perspective)
+            EventPublisher.shared.track(DeviceEvent.registered(deviceId: mockDeviceId))
+
             logger.info("Using mock device ID for development: \(mockDeviceId.prefix(8))...")
         }
     }
@@ -194,6 +202,9 @@ public actor DeviceRegistrationService {
                 try storeDeviceId(registration.deviceId)
                 cachedDeviceId = registration.deviceId
 
+                // Track device registration success
+                EventPublisher.shared.track(DeviceEvent.registered(deviceId: registration.deviceId))
+
                 logger.info("Device registered successfully: \(registration.deviceId.prefix(8))...")
                 return
 
@@ -212,7 +223,11 @@ public actor DeviceRegistrationService {
             }
         }
 
-        throw lastError ?? RunAnywhereError.networkError("Device registration failed after \(Self.maxRetries) attempts")
+        // Track device registration failure
+        let finalError = lastError ?? RunAnywhereError.networkError("Device registration failed after \(Self.maxRetries) attempts")
+        EventPublisher.shared.track(DeviceEvent.registrationFailed(error: finalError.localizedDescription))
+
+        throw finalError
     }
 
     // MARK: - Network Requests

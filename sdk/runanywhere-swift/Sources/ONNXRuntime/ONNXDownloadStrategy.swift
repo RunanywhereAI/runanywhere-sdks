@@ -147,9 +147,9 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
         guard let url = model.downloadURL else { return false }
         let urlString = url.absoluteString.lowercased()
 
-        let isONNX = model.compatibleFrameworks.contains(.onnx)
+        let isONNX = model.compatibleFrameworks.contains(.onnx) || model.preferredFramework == .onnx || model.format == .onnx
 
-        // Handle tar.bz2 archives (sherpa-onnx models) - macOS only
+        // Handle tar.bz2 archives (sherpa-onnx models)
         let isTarBz2 = urlString.hasSuffix(".tar.bz2")
 
         // Handle direct .onnx files (HuggingFace Piper models) - works on all platforms

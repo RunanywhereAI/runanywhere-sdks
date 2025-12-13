@@ -13,6 +13,10 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     public let downloadURL: URL?
     public var localPath: URL?
 
+    // Artifact type - describes how the model is packaged and what processing is needed
+    // This drives download and extraction behavior
+    public let artifactType: ModelArtifactType
+
     // Size information (in bytes)
     public let downloadSize: Int64?  // Size when downloading
     public let memoryRequired: Int64?  // RAM needed to run the model
@@ -69,6 +73,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
 
     private enum CodingKeys: String, CodingKey {
         case id, name, category, format, downloadURL, localPath
+        case artifactType
         case downloadSize, memoryRequired
         case compatibleFrameworks, preferredFramework
         case contextLength, supportsThinking, thinkingPattern
@@ -84,6 +89,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         format: ModelFormat,
         downloadURL: URL? = nil,
         localPath: URL? = nil,
+        artifactType: ModelArtifactType? = nil,
         downloadSize: Int64? = nil,
         memoryRequired: Int64? = nil,
         compatibleFrameworks: [InferenceFramework] = [],
@@ -106,6 +112,10 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         self.format = format
         self.downloadURL = downloadURL
         self.localPath = localPath
+
+        // Infer artifact type from URL and format if not explicitly provided
+        self.artifactType = artifactType ?? ModelArtifactType.infer(from: downloadURL, format: format)
+
         self.downloadSize = downloadSize
         self.memoryRequired = memoryRequired
         self.compatibleFrameworks = compatibleFrameworks
@@ -151,6 +161,7 @@ extension ModelInfo {
         case format
         case downloadURL
         case localPath
+        case artifactType
         case downloadSize
         case memoryRequired
         case compatibleFrameworks

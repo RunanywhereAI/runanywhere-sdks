@@ -50,11 +50,20 @@ public enum SDKLifecycleEvent: SDKEvent {
 /// Common model lifecycle events (download, delete).
 /// For capability-specific load/unload, use LLMEvent, STTEvent, TTSEvent.
 public enum ModelEvent: SDKEvent {
+    // Download events
     case downloadStarted(modelId: String)
     case downloadProgress(modelId: String, progress: Double, bytesDownloaded: Int64, totalBytes: Int64)
     case downloadCompleted(modelId: String, durationMs: Double, sizeBytes: Int64)
     case downloadFailed(modelId: String, error: String)
     case downloadCancelled(modelId: String)
+
+    // Extraction events (for archive-based models)
+    case extractionStarted(modelId: String, archiveType: String)
+    case extractionProgress(modelId: String, progress: Double)
+    case extractionCompleted(modelId: String, durationMs: Double)
+    case extractionFailed(modelId: String, error: String)
+
+    // Deletion events
     case deleted(modelId: String)
 
     public var type: String {
@@ -64,6 +73,10 @@ public enum ModelEvent: SDKEvent {
         case .downloadCompleted: return "model_download_completed"
         case .downloadFailed: return "model_download_failed"
         case .downloadCancelled: return "model_download_cancelled"
+        case .extractionStarted: return "model_extraction_started"
+        case .extractionProgress: return "model_extraction_progress"
+        case .extractionCompleted: return "model_extraction_completed"
+        case .extractionFailed: return "model_extraction_failed"
         case .deleted: return "model_deleted"
         }
     }
@@ -72,7 +85,7 @@ public enum ModelEvent: SDKEvent {
 
     public var destination: EventDestination {
         switch self {
-        case .downloadProgress:
+        case .downloadProgress, .extractionProgress:
             // Progress updates are analytics only (too chatty)
             return .analyticsOnly
         default:
@@ -105,6 +118,24 @@ public enum ModelEvent: SDKEvent {
 
         case .downloadCancelled(let modelId):
             return ["model_id": modelId]
+
+        case .extractionStarted(let modelId, let archiveType):
+            return ["model_id": modelId, "archive_type": archiveType]
+
+        case .extractionProgress(let modelId, let progress):
+            return [
+                "model_id": modelId,
+                "progress": String(format: "%.1f", progress)
+            ]
+
+        case .extractionCompleted(let modelId, let durationMs):
+            return [
+                "model_id": modelId,
+                "duration_ms": String(format: "%.1f", durationMs)
+            ]
+
+        case .extractionFailed(let modelId, let error):
+            return ["model_id": modelId, "error": error]
 
         case .deleted(let modelId):
             return ["model_id": modelId]
