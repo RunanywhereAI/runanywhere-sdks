@@ -1,3 +1,13 @@
+//
+//  ModelPathUtils.swift
+//  RunAnywhere SDK
+//
+//  Centralized utility for calculating model paths and directories.
+//  Located in ModelManagement as it deals with model-specific path logic.
+//
+//  Follows the structure: `Documents/RunAnywhere/Models/{framework.rawValue}/{modelId}/`
+//
+
 import Foundation
 
 /// Centralized utility for calculating model paths and directories.
@@ -203,7 +213,7 @@ public struct ModelPathUtils {
 
 // MARK: - ModelFormat Extensions
 
-extension ModelFormat {
+public extension ModelFormat {
     /// Whether this format represents a directory-based model
     var isDirectoryBased: Bool {
         switch self {

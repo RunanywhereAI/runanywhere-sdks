@@ -2,43 +2,65 @@
 //  ONNXModule.swift
 //  ONNXRuntime Module
 //
-//  Simple registration for ONNX Runtime STT and TTS services
+//  ONNX Runtime module providing STT and TTS capabilities.
 //
 
 import Foundation
 import RunAnywhere
 
-// MARK: - ONNX Module Registration
+// MARK: - ONNX Module
 
-/// ONNX module for STT and TTS
+/// ONNX Runtime module for STT and TTS services.
 ///
-/// Usage:
+/// Provides speech-to-text and text-to-speech capabilities using
+/// ONNX Runtime with models like Whisper and Piper.
+///
+/// ## Registration
+///
 /// ```swift
 /// import ONNXRuntime
 ///
-/// // Register at app startup
+/// // Option 1: Direct registration
 /// ONNX.register()
 ///
-/// // Then use via RunAnywhere
+/// // Option 2: Via ModuleRegistry
+/// ModuleRegistry.shared.register(ONNX.self)
+///
+/// // Option 3: Via RunAnywhere
+/// RunAnywhere.register(ONNX.self)
+/// ```
+///
+/// ## Usage
+///
+/// ```swift
 /// try await RunAnywhere.loadSTTModel("my-onnx-model")
 /// let text = try await RunAnywhere.transcribe(audioData)
 /// ```
-public enum ONNX {
+public enum ONNX: RunAnywhereModule {
     private static let logger = SDKLogger(category: "ONNX")
+
+    // MARK: - RunAnywhereModule Conformance
+
+    public static let moduleId = "onnx"
+    public static let moduleName = "ONNX Runtime"
+    public static let capabilities: Set<CapabilityType> = [.stt, .tts]
+    public static let defaultPriority: Int = 100
 
     /// Register all ONNX services with the SDK
     @MainActor
-    public static func register(priority: Int = 100) {
+    public static func register(priority: Int) {
         registerSTT(priority: priority)
         registerTTS(priority: priority)
         logger.info("ONNX module registered (STT + TTS)")
     }
 
+    // MARK: - Individual Service Registration
+
     /// Register only ONNX STT service
     @MainActor
     public static func registerSTT(priority: Int = 100) {
         ServiceRegistry.shared.registerSTT(
-            name: "ONNX Runtime",
+            name: moduleName,
             priority: priority,
             canHandle: { modelId in
                 canHandleSTT(modelId)
@@ -199,4 +221,14 @@ public enum ONNX {
 
         return service
     }
+}
+
+// MARK: - Auto-Discovery Registration
+
+extension ONNX {
+    /// Enable auto-discovery for this module.
+    /// Access this property to trigger registration.
+    public static let autoRegister: Void = {
+        ModuleDiscovery.register(ONNX.self)
+    }()
 }

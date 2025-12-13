@@ -18,6 +18,7 @@ public enum STTError: LocalizedError {
     case modelNotFound(String)
     case audioFormatNotSupported
     case insufficientAudioData
+    case insufficientMemory
     case noVoiceServiceAvailable
     case audioSessionNotConfigured
     case audioSessionActivationFailed
@@ -39,6 +40,8 @@ public enum STTError: LocalizedError {
             return "Audio format is not supported"
         case .insufficientAudioData:
             return "Insufficient audio data for transcription"
+        case .insufficientMemory:
+            return "Insufficient memory for voice processing"
         case .noVoiceServiceAvailable:
             return "No STT service available for transcription"
         case .audioSessionNotConfigured:

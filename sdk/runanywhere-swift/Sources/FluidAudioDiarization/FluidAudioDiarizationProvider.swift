@@ -1,37 +1,57 @@
 //
-//  FluidAudioDiarizationModule.swift
+//  FluidAudioModule.swift
 //  FluidAudioDiarization Module
 //
-//  Simple registration for FluidAudio Speaker Diarization services
+//  FluidAudio module providing speaker diarization capabilities.
 //
 
 import Foundation
 import RunAnywhere
 
-// MARK: - FluidAudio Module Registration
+// MARK: - FluidAudio Module
 
-/// FluidAudio module for Speaker Diarization
+/// FluidAudio module for Speaker Diarization.
 ///
-/// Usage:
+/// Provides speaker identification and diarization capabilities
+/// using FluidAudio's audio analysis technology.
+///
+/// ## Registration
+///
 /// ```swift
 /// import FluidAudioDiarization
 ///
-/// // Register at app startup
+/// // Option 1: Direct registration
 /// FluidAudio.register()
 ///
-/// // Then use via RunAnywhere
+/// // Option 2: Via ModuleRegistry
+/// ModuleRegistry.shared.register(FluidAudio.self)
+///
+/// // Option 3: Via RunAnywhere
+/// RunAnywhere.register(FluidAudio.self)
+/// ```
+///
+/// ## Usage
+///
+/// ```swift
 /// let capability = SpeakerDiarizationCapability()
 /// try await capability.initialize()
 /// let speaker = try await capability.processAudio(samples)
 /// ```
-public enum FluidAudio {
+public enum FluidAudio: RunAnywhereModule {
     private static let logger = SDKLogger(category: "FluidAudio")
+
+    // MARK: - RunAnywhereModule Conformance
+
+    public static let moduleId = "fluidaudio"
+    public static let moduleName = "FluidAudio"
+    public static let capabilities: Set<CapabilityType> = [.speakerDiarization]
+    public static let defaultPriority: Int = 100
 
     /// Register FluidAudio Speaker Diarization service with the SDK
     @MainActor
-    public static func register(priority: Int = 100) {
+    public static func register(priority: Int) {
         ServiceRegistry.shared.registerSpeakerDiarization(
-            name: "FluidAudio",
+            name: moduleName,
             priority: priority,
             canHandle: { _ in true }, // FluidAudio can handle all diarization requests
             factory: { config in
@@ -52,4 +72,14 @@ public enum FluidAudio {
         logger.info("FluidAudio service created successfully")
         return service
     }
+}
+
+// MARK: - Auto-Discovery Registration
+
+extension FluidAudio {
+    /// Enable auto-discovery for this module.
+    /// Access this property to trigger registration.
+    public static let autoRegister: Void = {
+        ModuleDiscovery.register(FluidAudio.self)
+    }()
 }

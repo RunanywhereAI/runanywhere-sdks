@@ -16,7 +16,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     // MARK: - Services
 
     /// Extraction service for handling archive extraction
-    private let extractionService: ExtractionServiceProtocol
+    private let extractionService: ModelExtractionServiceProtocol
 
     // MARK: - Custom Download Strategies
 
@@ -27,7 +27,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
 
     public init(
         configuration: DownloadConfiguration = DownloadConfiguration(),
-        extractionService: ExtractionServiceProtocol = DefaultExtractionService()
+        extractionService: ModelExtractionServiceProtocol = DefaultModelExtractionService()
     ) {
         self.extractionService = extractionService
         // Configure session

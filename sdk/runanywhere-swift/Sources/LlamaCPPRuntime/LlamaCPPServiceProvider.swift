@@ -2,35 +2,55 @@
 //  LlamaCPPModule.swift
 //  LlamaCPPRuntime Module
 //
-//  Simple registration for LlamaCPP LLM services
+//  LlamaCPP module providing LLM text generation capabilities.
 //
 
 import Foundation
 import RunAnywhere
 
-// MARK: - LlamaCPP Module Registration
+// MARK: - LlamaCPP Module
 
-/// LlamaCPP module for LLM text generation
+/// LlamaCPP module for LLM text generation.
 ///
-/// Usage:
+/// Provides large language model capabilities using llama.cpp
+/// with GGUF/GGML models and Metal acceleration.
+///
+/// ## Registration
+///
 /// ```swift
 /// import LlamaCPPRuntime
 ///
-/// // Register at app startup
+/// // Option 1: Direct registration
 /// LlamaCPP.register()
 ///
-/// // Then use via RunAnywhere
+/// // Option 2: Via ModuleRegistry
+/// ModuleRegistry.shared.register(LlamaCPP.self)
+///
+/// // Option 3: Via RunAnywhere
+/// RunAnywhere.register(LlamaCPP.self)
+/// ```
+///
+/// ## Usage
+///
+/// ```swift
 /// try await RunAnywhere.loadModel("my-model-id")
 /// let result = try await RunAnywhere.generate("Hello!")
 /// ```
-public enum LlamaCPP {
+public enum LlamaCPP: RunAnywhereModule {
     private static let logger = SDKLogger(category: "LlamaCPP")
+
+    // MARK: - RunAnywhereModule Conformance
+
+    public static let moduleId = "llamacpp"
+    public static let moduleName = "LlamaCPP"
+    public static let capabilities: Set<CapabilityType> = [.llm]
+    public static let defaultPriority: Int = 100
 
     /// Register LlamaCPP LLM service with the SDK
     @MainActor
-    public static func register(priority: Int = 100) {
+    public static func register(priority: Int) {
         ServiceRegistry.shared.registerLLM(
-            name: "LlamaCPP",
+            name: moduleName,
             priority: priority,
             canHandle: { modelId in
                 canHandleModel(modelId)
@@ -107,4 +127,14 @@ public enum LlamaCPP {
         logger.info("LlamaCPP service created successfully")
         return service
     }
+}
+
+// MARK: - Auto-Discovery Registration
+
+extension LlamaCPP {
+    /// Enable auto-discovery for this module.
+    /// Access this property to trigger registration.
+    public static let autoRegister: Void = {
+        ModuleDiscovery.register(LlamaCPP.self)
+    }()
 }

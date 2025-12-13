@@ -1,35 +1,55 @@
 //
-//  WhisperKitTranscription.swift
+//  WhisperKitModule.swift
 //  WhisperKitTranscription Module
 //
-//  Simple registration for WhisperKit STT services
+//  WhisperKit module providing STT capabilities using CoreML.
 //
 
 import Foundation
 import RunAnywhere
 
-// MARK: - WhisperKit Module Registration
+// MARK: - WhisperKit Module
 
-/// WhisperKit module for Speech-to-Text
+/// WhisperKit module for Speech-to-Text.
 ///
-/// Usage:
+/// Provides speech recognition capabilities using WhisperKit
+/// with CoreML acceleration on Apple devices.
+///
+/// ## Registration
+///
 /// ```swift
 /// import WhisperKitTranscription
 ///
-/// // Register at app startup
-/// WhisperKitModule.register()
+/// // Option 1: Direct registration
+/// WhisperKit.register()
 ///
-/// // Then use via RunAnywhere
+/// // Option 2: Via ModuleRegistry
+/// ModuleRegistry.shared.register(WhisperKit.self)
+///
+/// // Option 3: Via RunAnywhere
+/// RunAnywhere.register(WhisperKit.self)
+/// ```
+///
+/// ## Usage
+///
+/// ```swift
 /// let text = try await RunAnywhere.transcribe(audioData)
 /// ```
-public enum WhisperKitModule {
+public enum WhisperKit: RunAnywhereModule {
     private static let logger = SDKLogger(category: "WhisperKit")
+
+    // MARK: - RunAnywhereModule Conformance
+
+    public static let moduleId = "whisperkit"
+    public static let moduleName = "WhisperKit"
+    public static let capabilities: Set<CapabilityType> = [.stt]
+    public static let defaultPriority: Int = 100
 
     /// Register WhisperKit STT service with the SDK
     @MainActor
-    public static func register(priority: Int = 100) {
+    public static func register(priority: Int) {
         ServiceRegistry.shared.registerSTT(
-            name: "WhisperKit",
+            name: moduleName,
             priority: priority,
             canHandle: { modelId in
                 canHandleModel(modelId)
@@ -87,4 +107,20 @@ public enum WhisperKitModule {
         logger.info("WhisperKit service created successfully")
         return service
     }
+}
+
+// MARK: - Legacy Alias
+
+/// Legacy alias for backward compatibility
+@available(*, deprecated, renamed: "WhisperKit")
+public typealias WhisperKitModule = WhisperKit
+
+// MARK: - Auto-Discovery Registration
+
+extension WhisperKit {
+    /// Enable auto-discovery for this module.
+    /// Access this property to trigger registration.
+    public static let autoRegister: Void = {
+        ModuleDiscovery.register(WhisperKit.self)
+    }()
 }

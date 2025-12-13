@@ -1,3 +1,11 @@
+//
+//  ModelStorageStrategy.swift
+//  RunAnywhere SDK
+//
+//  Protocol for custom model storage strategies that handle file discovery and management.
+//  Located in ModelManagement as it deals with model-specific storage logic.
+//
+
 import Foundation
 
 /// Protocol for custom model storage strategies that handle file discovery and management
@@ -32,7 +40,7 @@ public protocol ModelStorageStrategy {
 }
 
 /// Information about model storage details
-public struct ModelStorageDetails {
+public struct ModelStorageDetails: Sendable {
     public let format: ModelFormat
     public let totalSize: Int64
     public let fileCount: Int
@@ -59,7 +67,11 @@ public extension ModelStorageStrategy {
 
     func findModelPath(modelId: String, in modelFolder: URL) -> URL? {
         // Default: look for a single file with the model ID
-        guard let files = try? FileOperationsUtilities.contentsOfDirectory(at: modelFolder) else {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: modelFolder,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
             return nil
         }
         for file in files {
@@ -73,7 +85,11 @@ public extension ModelStorageStrategy {
 
     func detectModel(in modelFolder: URL) -> (format: ModelFormat, size: Int64)? {
         // Default: detect single file models
-        guard let files = try? FileOperationsUtilities.contentsOfDirectory(at: modelFolder, includingPropertiesForKeys: [.fileSizeKey]) else {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: modelFolder,
+            includingPropertiesForKeys: [.fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else {
             return nil
         }
         for file in files {
@@ -94,7 +110,11 @@ public extension ModelStorageStrategy {
     func getModelStorageInfo(at modelFolder: URL) -> ModelStorageDetails? {
         guard let modelInfo = detectModel(in: modelFolder) else { return nil }
 
-        let files = (try? FileOperationsUtilities.contentsOfDirectory(at: modelFolder)) ?? []
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: modelFolder,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
 
         return ModelStorageDetails(
             format: modelInfo.format,
