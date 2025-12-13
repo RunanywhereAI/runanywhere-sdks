@@ -26,6 +26,9 @@ public class FoundationModelsService: LLMService {
     public var isReady: Bool { _isReady }
     public var currentModel: String? { _currentModel }
 
+    /// Apple Foundation Models does not support true token-by-token streaming
+    public var supportsStreaming: Bool { false }
+
     #if canImport(FoundationModels)
     /// Type-erased wrapper for SystemLanguageModel
     private struct LanguageModelWrapper {

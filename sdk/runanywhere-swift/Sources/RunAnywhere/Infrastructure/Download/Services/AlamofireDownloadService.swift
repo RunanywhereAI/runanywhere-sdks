@@ -312,7 +312,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     }
 
     /// Helper to get destination folder for a model
-    private func getDestinationFolder(for modelId: String, framework: LLMFramework? = nil) throws -> URL {
+    private func getDestinationFolder(for modelId: String, framework: InferenceFramework? = nil) throws -> URL {
         if let framework = framework {
             return try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
         } else {

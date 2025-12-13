@@ -90,7 +90,7 @@ public actor ModelAssignmentService {
     }
 
     /// Get model assignments for a specific framework
-    public func getModelsForFramework(_ framework: LLMFramework) async throws -> [ModelInfo] {
+    public func getModelsForFramework(_ framework: InferenceFramework) async throws -> [ModelInfo] {
         let allModels = try await fetchModelAssignments()
         return allModels.filter { $0.compatibleFrameworks.contains(framework) }
     }
@@ -185,9 +185,9 @@ extension ModelAssignment {
         // Convert string format to ModelFormat enum
         let modelFormat = ModelFormat(rawValue: format.lowercased()) ?? .gguf
 
-        // Convert string frameworks to LLMFramework enum
-        let frameworks = compatibleFrameworks.compactMap { LLMFramework(rawValue: $0.lowercased()) }
-        let preferred = preferredFramework.flatMap { LLMFramework(rawValue: $0.lowercased()) }
+        // Convert string frameworks to InferenceFramework enum
+        let frameworks = compatibleFrameworks.compactMap { InferenceFramework(rawValue: $0.lowercased()) }
+        let preferred = preferredFramework.flatMap { InferenceFramework(rawValue: $0.lowercased()) }
 
         // Extract tags and description from metadata
         let modelTags = metadata?.tags ?? []

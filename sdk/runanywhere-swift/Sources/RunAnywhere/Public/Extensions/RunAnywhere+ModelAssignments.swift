@@ -41,7 +41,7 @@ extension RunAnywhere {
     /// Get available models for a specific framework
     /// - Parameter framework: The LLM framework to filter models for
     /// - Returns: Array of ModelInfo objects compatible with the specified framework
-    public static func getModelsForFramework(_ framework: LLMFramework) async throws -> [ModelInfo] {
+    public static func getModelsForFramework(_ framework: InferenceFramework) async throws -> [ModelInfo] {
         // Ensure SDK is initialized
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized

@@ -32,7 +32,7 @@ public struct ModelPathUtils {
     /// - Parameter framework: The ML framework
     /// - Returns: URL to `Documents/RunAnywhere/Models/{framework.rawValue}/`
     /// - Throws: If models directory cannot be accessed
-    public static func getFrameworkDirectory(framework: LLMFramework) throws -> URL {
+    public static func getFrameworkDirectory(framework: InferenceFramework) throws -> URL {
         return try getModelsDirectory().appendingPathComponent(framework.rawValue, isDirectory: true)
     }
 
@@ -42,7 +42,7 @@ public struct ModelPathUtils {
     ///   - framework: The ML framework
     /// - Returns: URL to `Documents/RunAnywhere/Models/{framework.rawValue}/{modelId}/`
     /// - Throws: If framework directory cannot be accessed
-    public static func getModelFolder(modelId: String, framework: LLMFramework) throws -> URL {
+    public static func getModelFolder(modelId: String, framework: InferenceFramework) throws -> URL {
         return try getFrameworkDirectory(framework: framework)
             .appendingPathComponent(modelId, isDirectory: true)
     }
@@ -64,7 +64,7 @@ public struct ModelPathUtils {
     ///   - format: The model file format
     /// - Returns: URL to `Documents/RunAnywhere/Models/{framework.rawValue}/{modelId}/{modelId}.{format.rawValue}`
     /// - Throws: If model folder cannot be accessed
-    public static func getModelFilePath(modelId: String, framework: LLMFramework, format: ModelFormat) throws -> URL {
+    public static func getModelFilePath(modelId: String, framework: InferenceFramework, format: ModelFormat) throws -> URL {
         let fileName = "\(modelId).\(format.rawValue)"
         return try getModelFolder(modelId: modelId, framework: framework)
             .appendingPathComponent(fileName, isDirectory: false)
@@ -111,7 +111,7 @@ public struct ModelPathUtils {
     ///   - format: The model file format
     /// - Returns: URL to the expected model path
     /// - Throws: If model folder cannot be accessed
-    public static func getExpectedModelPath(modelId: String, framework: LLMFramework?, format: ModelFormat) throws -> URL {
+    public static func getExpectedModelPath(modelId: String, framework: InferenceFramework?, format: ModelFormat) throws -> URL {
         if let framework = framework {
             if format.isDirectoryBased {
                 return try getModelFolder(modelId: modelId, framework: framework)
@@ -163,7 +163,7 @@ public struct ModelPathUtils {
             let nextComponent = pathComponents[modelsIndex + 1]
 
             // Check if next component is a framework name
-            if LLMFramework.allCases.contains(where: { $0.rawValue == nextComponent }),
+            if InferenceFramework.allCases.contains(where: { $0.rawValue == nextComponent }),
                modelsIndex + 2 < pathComponents.count {
                 // Framework structure: Models/framework/modelId
                 return pathComponents[modelsIndex + 2]
@@ -179,7 +179,7 @@ public struct ModelPathUtils {
     /// Extract framework from a file path
     /// - Parameter path: The file path
     /// - Returns: The framework if found, nil otherwise
-    public static func extractFramework(from path: URL) -> LLMFramework? {
+    public static func extractFramework(from path: URL) -> InferenceFramework? {
         let pathComponents = path.pathComponents
 
         if let modelsIndex = pathComponents.firstIndex(of: "Models"),
@@ -187,7 +187,7 @@ public struct ModelPathUtils {
             let nextComponent = pathComponents[modelsIndex + 1]
 
             // Check if next component is a framework name
-            return LLMFramework.allCases.first(where: { $0.rawValue == nextComponent })
+            return InferenceFramework.allCases.first(where: { $0.rawValue == nextComponent })
         }
 
         return nil

@@ -26,7 +26,7 @@ public struct LLMGenerationResult: Sendable {
     public let latencyMs: TimeInterval
 
     /// Framework used for generation
-    public let framework: LLMFramework?
+    public let framework: InferenceFramework?
 
     /// Tokens generated per second
     public let tokensPerSecond: Double
@@ -49,7 +49,7 @@ public struct LLMGenerationResult: Sendable {
         tokensUsed: Int,
         modelUsed: String,
         latencyMs: TimeInterval,
-        framework: LLMFramework? = nil,
+        framework: InferenceFramework? = nil,
         tokensPerSecond: Double = 0,
         structuredOutputValidation: StructuredOutputValidation? = nil,
         thinkingTokens: Int? = nil,

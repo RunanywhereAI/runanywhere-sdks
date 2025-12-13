@@ -62,7 +62,7 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
 
     // MARK: - ModelMetadataRepository Protocol Implementation
 
-    public func fetchByFramework(_ framework: LLMFramework) async throws -> [ModelInfo] {
+    public func fetchByFramework(_ framework: InferenceFramework) async throws -> [ModelInfo] {
         return try await localDataSource.findByFramework(framework)
     }
 

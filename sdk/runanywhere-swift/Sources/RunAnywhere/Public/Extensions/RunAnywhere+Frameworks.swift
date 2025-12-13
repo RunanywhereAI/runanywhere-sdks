@@ -7,7 +7,7 @@ public extension RunAnywhere {
     /// Get models for a specific framework
     /// - Parameter framework: The framework to query
     /// - Returns: Array of models for the framework
-    static func getModelsForFramework(_ framework: LLMFramework) -> [ModelInfo] {
+    static func getModelsForFramework(_ framework: InferenceFramework) -> [ModelInfo] {
         Task {
             events.publish(SDKFrameworkEvent.modelsForFrameworkRequested(framework: framework))
         }
