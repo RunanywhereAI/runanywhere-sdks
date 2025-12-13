@@ -20,73 +20,67 @@ public final class VAD {
 
     // MARK: - Properties
 
-    private var vadService: VADService?
+    private var component: VADComponent?
     private let logger = SDKLogger(category: "VAD")
-    private var configuration: VADConfiguration
-
-    /// Whether the VAD is currently initialized and ready
-    public var isReady: Bool {
-        vadService != nil
-    }
-
-    /// Whether speech is currently active
-    public var isSpeechActive: Bool {
-        vadService?.isSpeechActive ?? false
-    }
-
-    /// Current energy threshold
-    public var energyThreshold: Float {
-        get { vadService?.energyThreshold ?? configuration.energyThreshold }
-        set { vadService?.energyThreshold = newValue }
-    }
 
     // MARK: - Initialization
 
-    /// Initialize with default configuration
-    public convenience init() {
-        self.init(configuration: VADConfiguration())
-    }
-
-    /// Initialize with custom configuration
-    /// - Parameter configuration: The VAD configuration to use
-    public init(configuration: VADConfiguration) {
-        self.configuration = configuration
-        logger.debug("VAD initialized with configuration")
-    }
-
-    /// Initialize with custom service (for testing or customization)
-    /// - Parameter service: The VAD service to use
-    internal init(service: VADService) {
-        self.vadService = service
-        self.configuration = VADConfiguration()
-        logger.debug("VAD initialized with custom service")
+    /// Initialize with default settings
+    public init() {
+        logger.debug("VAD initialized")
     }
 
     // MARK: - Public API
 
-    /// Access the underlying VAD service
+    /// Access the underlying component
     /// Provides low-level operations if needed
-    public var service: VADService? {
-        return vadService
+    public var underlyingComponent: VADComponent? {
+        return component
     }
 
-    /// Initialize the VAD service
+    /// Whether the VAD component is ready for detection
+    public var isReady: Bool {
+        return component?.isReady ?? false
+    }
+
+    /// Whether speech is currently active
+    public var isSpeechActive: Bool {
+        component?.getService()?.isSpeechActive ?? false
+    }
+
+    /// Current energy threshold
+    public var energyThreshold: Float {
+        get { component?.getService()?.energyThreshold ?? 0.0 }
+        set {
+            if let service = component?.getService() {
+                service.energyThreshold = newValue
+            }
+        }
+    }
+
+    // MARK: - Configuration
+
+    /// Configure the VAD capability with a specific configuration
+    /// - Parameter configuration: The VAD configuration to use
+    public func configure(with configuration: VADConfiguration) async throws {
+        logger.info("Configuring VAD")
+        let newComponent = VADComponent(configuration: configuration)
+        try await newComponent.initialize()
+        self.component = newComponent
+        logger.info("VAD configured successfully")
+    }
+
+    /// Initialize the VAD service (for backward compatibility)
     /// Must be called before using VAD operations
     public func initialize() async throws {
-        logger.info("Initializing VAD")
-
-        let service = DefaultVADService(configuration: configuration)
-        try await service.initialize()
-
-        self.vadService = service
-        logger.info("VAD initialized successfully")
+        let configuration = VADConfiguration()
+        try await configure(with: configuration)
     }
 
     /// Initialize with specific configuration
     /// - Parameter configuration: The VAD configuration
     public func initialize(with configuration: VADConfiguration) async throws {
-        self.configuration = configuration
-        try await initialize()
+        try await configure(with: configuration)
     }
 
     // MARK: - Convenience Methods
@@ -94,118 +88,91 @@ public final class VAD {
     /// Detect speech in audio buffer
     /// - Parameter buffer: AVAudioPCMBuffer containing audio data
     /// - Returns: VADOutput with detection result
-    public func detectSpeech(in buffer: AVAudioPCMBuffer) throws -> VADOutput {
-        guard let service = vadService else {
-            throw VADError.notInitialized
+    public func detectSpeech(in buffer: AVAudioPCMBuffer) async throws -> VADOutput {
+        guard let component = component else {
+            throw RunAnywhereError.componentNotInitialized("VAD not configured. Call configure() first.")
         }
-
-        service.processAudioBuffer(buffer)
-
-        return VADOutput(
-            isSpeechDetected: service.isSpeechActive,
-            energyLevel: service.energyThreshold
-        )
+        return try await component.detectSpeech(in: buffer)
     }
 
     /// Detect speech in audio samples
     /// - Parameter samples: Array of Float audio samples
     /// - Returns: VADOutput with detection result
-    public func detectSpeech(in samples: [Float]) throws -> VADOutput {
-        guard let service = vadService else {
-            throw VADError.notInitialized
+    public func detectSpeech(in samples: [Float]) async throws -> VADOutput {
+        guard let component = component else {
+            throw RunAnywhereError.componentNotInitialized("VAD not configured. Call configure() first.")
         }
-
-        let isSpeechDetected = service.processAudioData(samples)
-
-        return VADOutput(
-            isSpeechDetected: isSpeechDetected,
-            energyLevel: service.energyThreshold
-        )
+        return try await component.detectSpeech(in: samples)
     }
 
     /// Process VAD input (supports both buffer and samples)
     /// - Parameter input: The VAD input to process
     /// - Returns: VADOutput with detection result
-    public func process(_ input: VADInput) throws -> VADOutput {
-        try input.validate()
-
-        // Apply threshold override if provided
-        if let threshold = input.energyThresholdOverride {
-            vadService?.energyThreshold = threshold
+    public func process(_ input: VADInput) async throws -> VADOutput {
+        guard let component = component else {
+            throw RunAnywhereError.componentNotInitialized("VAD not configured. Call configure() first.")
         }
-
-        // Process based on input type
-        if let buffer = input.buffer {
-            return try detectSpeech(in: buffer)
-        } else if let samples = input.audioSamples {
-            return try detectSpeech(in: samples)
-        } else {
-            throw VADError.invalidInput(reason: "VADInput must contain either buffer or audioSamples")
-        }
+        return try await component.process(input)
     }
 
     /// Start VAD processing
     public func start() {
         logger.info("Starting VAD")
-        vadService?.start()
+        component?.start()
     }
 
     /// Stop VAD processing
     public func stop() {
         logger.info("Stopping VAD")
-        vadService?.stop()
+        component?.stop()
     }
 
     /// Reset VAD state
     public func reset() {
         logger.info("Resetting VAD")
-        vadService?.reset()
+        component?.reset()
     }
 
     /// Pause VAD processing
     public func pause() {
         logger.info("Pausing VAD")
-        vadService?.pause()
+        component?.pause()
     }
 
     /// Resume VAD processing
     public func resume() {
         logger.info("Resuming VAD")
-        vadService?.resume()
+        component?.resume()
     }
 
     /// Set speech activity callback
     /// - Parameter callback: Callback invoked when speech state changes
     public func setSpeechActivityCallback(_ callback: @escaping (SpeechActivityEvent) -> Void) {
-        vadService?.onSpeechActivity = callback
+        component?.setSpeechActivityCallback(callback)
     }
 
     /// Set audio buffer callback
     /// - Parameter callback: Callback invoked for processed audio buffers
     public func setAudioBufferCallback(_ callback: @escaping (Data) -> Void) {
-        vadService?.onAudioBuffer = callback
+        if let service = component?.getService() {
+            service.onAudioBuffer = callback
+        }
     }
 
     // MARK: - Calibration
 
     /// Start calibration to measure ambient noise
     public func startCalibration() async throws {
-        guard let service = vadService as? SimpleEnergyVADService else {
-            throw VADError.serviceNotAvailable
+        guard let component = component else {
+            throw RunAnywhereError.componentNotInitialized("VAD not configured. Call configure() first.")
         }
-
-        logger.info("Starting VAD calibration")
-        await service.startCalibration()
+        try await component.startCalibration()
     }
 
     /// Set calibration parameters
     /// - Parameter multiplier: Threshold multiplier (1.5 to 4.0)
     public func setCalibrationParameters(multiplier: Float) {
-        guard let service = vadService as? SimpleEnergyVADService else {
-            return
-        }
-
-        service.setCalibrationParameters(multiplier: multiplier)
+        component?.setCalibrationParameters(multiplier: multiplier)
     }
 
     // MARK: - Statistics
@@ -213,56 +180,40 @@ public final class VAD {
     /// Get current VAD statistics for debugging
     /// - Returns: VADStatistics with current state
     public func getStatistics() -> VADStatistics? {
-        guard let service = vadService as? SimpleEnergyVADService else {
-            return nil
-        }
-
-        return service.getStatistics()
+        return component?.getStatistics()
     }
 
     // MARK: - TTS Integration
 
     /// Notify VAD that TTS is about to start
     public func notifyTTSWillStart() {
-        guard let service = vadService as? SimpleEnergyVADService else {
-            return
+        if let service = component?.getService() as? SimpleEnergyVADService {
+            service.notifyTTSWillStart()
         }
-
-        service.notifyTTSWillStart()
     }
 
     /// Notify VAD that TTS has finished
     public func notifyTTSDidFinish() {
-        guard let service = vadService as? SimpleEnergyVADService else {
-            return
+        if let service = component?.getService() as? SimpleEnergyVADService {
+            service.notifyTTSDidFinish()
         }
-
-        service.notifyTTSDidFinish()
     }
 
     /// Set TTS threshold multiplier
     /// - Parameter multiplier: Multiplier to apply during TTS (2.0 to 5.0)
     public func setTTSThresholdMultiplier(_ multiplier: Float) {
-        guard let service = vadService as? SimpleEnergyVADService else {
-            return
+        if let service = component?.getService() as? SimpleEnergyVADService {
+            service.setTTSThresholdMultiplier(multiplier)
         }
-
-        service.setTTSThresholdMultiplier(multiplier)
     }
 
     // MARK: - Cleanup
 
     /// Clean up VAD resources
-    public func cleanup() async {
+    public func cleanup() async throws {
         logger.info("Cleaning up VAD")
-
-        if let service = vadService as? DefaultVADService {
-            await service.cleanup()
-        } else {
-            vadService?.stop()
-        }
-
-        vadService = nil
+        try await component?.cleanup()
+        component = nil
     }
 
     // MARK: - Static Convenience Methods
@@ -281,23 +232,14 @@ public final class VAD {
     /// Detect speech in buffer using shared instance
     /// - Parameter buffer: AVAudioPCMBuffer containing audio data
     /// - Returns: VADOutput with detection result
-    public static func detectSpeech(in buffer: AVAudioPCMBuffer) throws -> VADOutput {
-        try shared.detectSpeech(in: buffer)
+    public static func detectSpeech(in buffer: AVAudioPCMBuffer) async throws -> VADOutput {
+        try await shared.detectSpeech(in: buffer)
     }
 
     /// Detect speech in samples using shared instance
     /// - Parameter samples: Array of Float audio samples
     /// - Returns: VADOutput with detection result
-    public static func detectSpeech(in samples: [Float]) throws -> VADOutput {
-        try shared.detectSpeech(in: samples)
-    }
-}
-
-// MARK: - Additional Methods for Compatibility
-
-extension VAD {
-    /// Get the underlying VAD service (for compatibility with component pattern)
-    public func getService() -> VADService? {
-        return vadService
+    public static func detectSpeech(in samples: [Float]) async throws -> VADOutput {
+        try await shared.detectSpeech(in: samples)
     }
 }

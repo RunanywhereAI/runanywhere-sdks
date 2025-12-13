@@ -8,7 +8,7 @@
 import Foundation
 
 /// Helper struct to provide device information for telemetry events
-public struct TelemetryDeviceInfo: Sendable {
+public struct TelemetryDeviceInfo: Sendable, Codable {
     /// Device model identifier (e.g., "iPhone", "Mac")
     public let device: String
 

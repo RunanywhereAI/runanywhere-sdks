@@ -11,6 +11,7 @@ import Foundation
 public class LLMGenerationService {
 
     private let modelLoadingService: ModelLoadingService
+    private let analyticsService: DevAnalyticsSubmissionService
     private let optionsResolver = LLMOptionsResolver()
     private let logger = SDKLogger(category: "LLMGenerationService")
 
@@ -18,9 +19,11 @@ public class LLMGenerationService {
     private var currentLoadedModel: LoadedModel?
 
     public init(
-        modelLoadingService: ModelLoadingService? = nil
+        modelLoadingService: ModelLoadingService? = nil,
+        analyticsService: DevAnalyticsSubmissionService? = nil
     ) {
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
+        self.analyticsService = analyticsService ?? DevAnalyticsSubmissionService.shared
     }
 
     /// Set the current loaded model for generation
@@ -114,13 +117,15 @@ public class LLMGenerationService {
 
             // Submit analytics for failed generation (non-blocking, silent failures)
             let latency = Date().timeIntervalSince(startTime) * 1000
+            let inputTokens = TokenCounter.estimateTokenCount(prompt)
+            let analyticsService = self.analyticsService
             Task.detached(priority: .background) {
-                await RunAnywhere.submitGenerationAnalytics(
+                await analyticsService.submitInternal(
                     generationId: UUID().uuidString,
                     modelId: loadedModel.model.id,
                     latencyMs: latency,
                     tokensPerSecond: 0,
-                    inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                    inputTokens: inputTokens,
                     outputTokens: 0,
                     success: false
                 )
@@ -200,13 +205,15 @@ public class LLMGenerationService {
         )
 
         // Submit analytics (non-blocking, silent failures)
+        let inputTokenCount = TokenCounter.estimateTokenCount(prompt)
+        let analyticsService = self.analyticsService
         Task.detached(priority: .background) {
-            await RunAnywhere.submitGenerationAnalytics(
+            await analyticsService.submitInternal(
                 generationId: UUID().uuidString,
                 modelId: result.modelUsed,
                 latencyMs: result.latencyMs,
                 tokensPerSecond: result.tokensPerSecond,
-                inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                inputTokens: inputTokenCount,
                 outputTokens: result.tokensUsed,
                 success: true
             )

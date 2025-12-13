@@ -19,12 +19,4 @@ public enum LLMConstants {
 
     /// Default context length for models
     public static let defaultContextLength: Int = 4096
-
-    // MARK: - Session Types
-
-    /// Session type constants
-    public enum SessionType: String {
-        case chat = "chat"
-        case completion = "completion"
-    }
 }

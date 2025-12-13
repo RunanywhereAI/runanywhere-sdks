@@ -11,8 +11,4 @@ public protocol DownloadService {
     /// Cancel a download
     /// - Parameter taskId: The ID of the task to cancel
     func cancelDownload(taskId: String)
-
-    /// Get all active downloads
-    /// - Returns: Array of active download tasks
-    func activeDownloads() -> [DownloadTask]
 }

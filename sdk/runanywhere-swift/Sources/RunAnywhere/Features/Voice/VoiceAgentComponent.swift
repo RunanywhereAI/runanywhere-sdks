@@ -1,18 +1,11 @@
 import Foundation
 
-// MARK: - Voice Agent Service
-
-/// Service wrapper for voice agent since it doesn't have an external service
-public final class VoiceAgentService: @unchecked Sendable {
-    public init() {}
-}
-
 // MARK: - Voice Agent Component
 
 /// Voice Agent component that orchestrates VAD, STT, LLM, and TTS components
-/// Can be used as a complete pipeline or with individual components
+/// Follows the canonical BaseComponent<ServiceWrapper> architecture pattern
 @MainActor
-public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unchecked Sendable {
+public final class VoiceAgentComponent: BaseComponent<VoiceServiceWrapper>, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -26,6 +19,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
 
     // Configuration
     private let agentParams: VoiceAgentConfiguration
+    private let logger = SDKLogger(category: "VoiceAgentComponent")
 
     // MARK: - Initialization
 
@@ -36,167 +30,192 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
 
     // MARK: - Service Creation
 
-    public override func createService() async throws -> VoiceAgentService {
-        // Voice agent doesn't need an external service, it orchestrates other components
-        return VoiceAgentService()
+    public override func createService() async throws -> VoiceServiceWrapper {
+        logger.info("Creating Voice Agent service")
+
+        // Initialize all components
+        try await initializeComponents()
+
+        // Create the voice service with initialized components
+        let voiceService = DefaultVoiceService(
+            vadComponent: vadComponent,
+            sttComponent: sttComponent,
+            llmComponent: llmComponent,
+            ttsComponent: ttsComponent,
+            eventBus: eventBus
+        )
+
+        return VoiceServiceWrapper(voiceService)
     }
 
     public override func initializeService() async throws {
-        // Initialize all components
-        try await initializeComponents()
+        // Service initialization is handled in createService
         eventBus.publish(SDKVoiceEvent.pipelineStarted)
     }
 
     private func initializeComponents() async throws {
+        logger.debug("Initializing voice pipeline components")
+
         // Initialize VAD (required)
         vadComponent = VADComponent(configuration: agentParams.vadConfig)
         try await vadComponent?.initialize()
+        logger.debug("VAD component initialized")
 
         // Initialize STT (required)
         sttComponent = STTComponent(configuration: agentParams.sttConfig)
         try await sttComponent?.initialize()
+        logger.debug("STT component initialized")
 
         // Initialize LLM (required)
         llmComponent = LLMComponent(configuration: agentParams.llmConfig)
         try await llmComponent?.initialize()
+        logger.debug("LLM component initialized")
 
         // Initialize TTS (required)
         ttsComponent = TTSComponent(configuration: agentParams.ttsConfig)
         try await ttsComponent?.initialize()
+        logger.debug("TTS component initialized")
+
+        logger.info("All voice pipeline components initialized successfully")
+    }
+
+    // MARK: - Helper Methods
+
+    private var voiceService: (any VoiceService)? {
+        return service?.wrappedService
     }
 
     // MARK: - Pipeline Processing
 
     /// Process audio through the full pipeline
     public func processAudio(_ audioData: Data) async throws -> VoiceAgentResult {
-        guard state == .ready else {
-            throw RunAnywhereError.notInitialized
+        try ensureReady()
+
+        guard let voiceService = voiceService else {
+            throw RunAnywhereError.componentNotReady("Voice service not available")
         }
 
-        var result = VoiceAgentResult()
+        let startTime = Date()
+        logger.info("Processing audio through voice pipeline")
 
-        // VAD Processing
-        if let vad = vadComponent?.getService() {
-            let floatData = audioData.toFloatArray()
-            let isSpeech = vad.processAudioData(floatData)
-            result.speechDetected = isSpeech
+        // Submit analytics event for pipeline start
+        Task.detached(priority: .background) {
+            await self.trackPipelineEvent(.pipelineStarted, processingTime: nil)
+        }
 
-            if !isSpeech {
-                return result // No speech, return early
+        do {
+            let result = try await voiceService.processAudio(audioData)
+            let processingTime = Date().timeIntervalSince(startTime)
+
+            // Submit success analytics
+            Task.detached(priority: .background) {
+                await self.trackPipelineEvent(.pipelineCompleted, processingTime: processingTime, success: true)
             }
 
-            eventBus.publish(SDKVoiceEvent.speechDetected)
-        }
+            logger.info("Audio processed successfully in \(String(format: "%.2f", processingTime))s")
+            return result
+        } catch {
+            let processingTime = Date().timeIntervalSince(startTime)
 
-        // STT Processing
-        if let stt = sttComponent?.getService() {
-            let transcription = try await stt.transcribe(
-                audioData: audioData,
-                options: STTOptions()
-            )
-            result.transcription = transcription.transcript
-            eventBus.publish(SDKVoiceEvent.transcriptionFinal(text: transcription.transcript))
-        }
-
-        // LLM Processing
-        if let llm = llmComponent?.getService(),
-           let transcript = result.transcription {
-            let response = try await llm.generate(
-                prompt: transcript,
-                options: LLMGenerationOptions(
-                    maxTokens: agentParams.llmConfig.maxTokens,
-                    temperature: Float(agentParams.llmConfig.temperature),
-                    preferredFramework: agentParams.llmConfig.preferredFramework
+            // Submit failure analytics
+            Task.detached(priority: .background) {
+                await self.trackPipelineEvent(
+                    .pipelineFailed,
+                    processingTime: processingTime,
+                    success: false,
+                    errorMessage: error.localizedDescription
                 )
-            )
-            result.response = response
-            eventBus.publish(SDKVoiceEvent.responseGenerated(text: response))
-        }
+            }
 
-        // TTS Processing
-        if let tts = ttsComponent?.getService(),
-           let responseText = result.response {
-            let audioData = try await tts.synthesize(
-                text: responseText,
-                options: TTSOptions()
-            )
-            result.synthesizedAudio = audioData
-            eventBus.publish(SDKVoiceEvent.audioGenerated(data: audioData))
+            logger.error("Audio processing failed: \(error.localizedDescription)")
+            throw error
         }
-
-        return result
     }
 
     /// Process audio stream for continuous conversation
     public func processStream(_ audioStream: AsyncStream<Data>) -> AsyncThrowingStream<VoiceAgentEvent, Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    for await audioData in audioStream {
-                        let result = try await processAudio(audioData)
-                        continuation.yield(.processed(result))
-                    }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
+        guard let voiceService = voiceService else {
+            return AsyncThrowingStream { continuation in
+                continuation.finish(throwing: RunAnywhereError.componentNotReady("Voice service not available"))
             }
         }
+        return voiceService.processStream(audioStream)
     }
 
     // MARK: - Individual Component Access
 
     /// Process only through VAD
     public func detectVoiceActivity(_ audioData: Data) -> Bool {
-        guard let vad = vadComponent?.getService() else { return true }
-        let floatData = audioData.toFloatArray()
-        return vad.processAudioData(floatData)
+        guard let voiceService = voiceService else { return true }
+        return voiceService.detectVoiceActivity(audioData)
     }
 
     /// Process only through STT
     public func transcribe(_ audioData: Data) async throws -> String? {
-        guard let stt = sttComponent?.getService() else { return nil }
-        let result = try await stt.transcribe(audioData: audioData, options: STTOptions())
-        return result.transcript
+        try ensureReady()
+        guard let voiceService = voiceService else { return nil }
+        return try await voiceService.transcribe(audioData)
     }
 
     /// Process only through LLM
     public func generateResponse(_ prompt: String) async throws -> String? {
-        guard let llm = llmComponent?.getService() else { return nil }
-        let result = try await llm.generate(
-            prompt: prompt,
-            options: LLMGenerationOptions(
-                maxTokens: agentParams.llmConfig.maxTokens,
-                temperature: Float(agentParams.llmConfig.temperature),
-                preferredFramework: agentParams.llmConfig.preferredFramework
-            )
-        )
-        return result
+        try ensureReady()
+        guard let voiceService = voiceService else { return nil }
+        return try await voiceService.generateResponse(prompt)
     }
 
     /// Process only through TTS
     public func synthesizeSpeech(_ text: String) async throws -> Data? {
-        guard let tts = ttsComponent?.getService() else { return nil }
-        return try await tts.synthesize(text: text, options: TTSOptions())
+        try ensureReady()
+        guard let voiceService = voiceService else { return nil }
+        return try await voiceService.synthesizeSpeech(text)
+    }
+
+    // MARK: - Analytics
+
+    private func trackPipelineEvent(
+        _ eventType: VoiceEventType,
+        processingTime: TimeInterval?,
+        success: Bool = true,
+        errorMessage: String? = nil
+    ) async {
+        let deviceInfo = TelemetryDeviceInfo.current
+        let eventData = VoicePipelineEventData(
+            eventType: eventType,
+            timestamp: Date(),
+            sessionId: nil,
+            vadEnabled: vadComponent != nil,
+            sttModelId: agentParams.sttConfig.modelId,
+            llmModelId: agentParams.llmConfig.modelId,
+            ttsEnabled: ttsComponent != nil,
+            processingTimeMs: processingTime.map { $0 * 1000 },
+            success: success,
+            errorMessage: errorMessage,
+            deviceInfo: deviceInfo
+        )
+
+        let event = VoiceEvent(type: eventType, eventData: eventData)
+        await AnalyticsQueueManager.shared.enqueue(event)
+        await AnalyticsQueueManager.shared.flush()
     }
 
     // MARK: - Cleanup
 
     public override func performCleanup() async throws {
-        try? await vadComponent?.cleanup()
-        try? await sttComponent?.cleanup()
-        try? await llmComponent?.cleanup()
-        try? await ttsComponent?.cleanup()
+        logger.info("Cleaning up voice pipeline components")
 
+        // Cleanup service
+        try? await voiceService?.cleanup()
+
+        // Clear component references
         vadComponent = nil
         sttComponent = nil
         llmComponent = nil
         ttsComponent = nil
+
+        logger.info("Voice pipeline cleanup complete")
     }
 }
-
-// VoiceAgentInitParameters has been replaced by VoiceAgentConfiguration
-// which is defined in ComponentInitializationParameters.swift
 
 // MARK: - Voice Agent Result
 
@@ -230,19 +249,4 @@ public enum VoiceAgentEvent: Sendable {
     case responseGenerated(String)
     case audioSynthesized(Data)
     case error(Error)
-}
-
-// MARK: - Helper Extensions
-
-private extension Data {
-    func toFloatArray() -> [Float] {
-        // Convert Data to Float array for VAD processing
-        let count = self.count / MemoryLayout<Float>.size
-        return self.withUnsafeBytes { bytes in
-            Array(UnsafeBufferPointer(
-                start: bytes.bindMemory(to: Float.self).baseAddress,
-                count: count
-            ))
-        }
-    }
 }

@@ -483,6 +483,52 @@ public actor TelemetryService { // swiftlint:disable:this type_body_length
         ])
     }
 
+    // MARK: - Speaker Diarization Tracking
+
+    /// Track speaker diarization completion with full metrics
+    public func trackSpeakerDiarizationCompleted(  // swiftlint:disable:this function_parameter_count
+        modelId: String?,
+        modelName: String?,
+        framework: String?,
+        processingTimeMs: Double,
+        audioDurationMs: Double,
+        speakerCount: Int,
+        segmentCount: Int,
+        averageConfidence: Double,
+        maxSpeakers: Int,
+        device: String,
+        osVersion: String,
+        success: Bool,
+        errorMessage: String? = nil
+    ) async throws {
+        var properties: [String: String] = [
+            "processing_time_ms": String(format: "%.1f", processingTimeMs),
+            "audio_duration_ms": String(format: "%.1f", audioDurationMs),
+            "speaker_count": String(speakerCount),
+            "segment_count": String(segmentCount),
+            "average_confidence": String(format: "%.3f", averageConfidence),
+            "max_speakers": String(maxSpeakers),
+            "device": device,
+            "os_version": osVersion,
+            "success": String(success)
+        ]
+
+        if let modelId = modelId {
+            properties["model_id"] = modelId
+        }
+        if let modelName = modelName {
+            properties["model_name"] = modelName
+        }
+        if let framework = framework {
+            properties["framework"] = framework
+        }
+        if let errorMessage = errorMessage {
+            properties["error_message"] = errorMessage
+        }
+
+        try await trackEvent(.speakerDiarizationCompleted, properties: properties)
+    }
+
     // MARK: - Error Tracking
 
     /// Track error

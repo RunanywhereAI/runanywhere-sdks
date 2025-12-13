@@ -61,7 +61,7 @@ public final class LLM {
     ) async throws -> LLMGenerationResult {
         logger.info("Generating text with prompt length: \(prompt.count)")
 
-        let generationService = RunAnywhere.serviceContainer.generationService
+        let generationService = ServiceContainer.shared.generationService
         let resolvedOptions = options ?? LLMGenerationOptions()
 
         return try await generationService.generate(
@@ -81,7 +81,7 @@ public final class LLM {
     ) -> LLMStreamingResult {
         logger.info("Starting streaming generation with prompt length: \(prompt.count)")
 
-        let streamingService = RunAnywhere.serviceContainer.streamingService
+        let streamingService = ServiceContainer.shared.streamingService
         let resolvedOptions = options ?? LLMGenerationOptions()
 
         return streamingService.generateStreamWithMetrics(
@@ -101,7 +101,7 @@ public final class LLM {
     ) -> AsyncThrowingStream<StreamingToken, Error> {
         logger.info("Starting token stream generation with prompt length: \(prompt.count)")
 
-        let streamingService = RunAnywhere.serviceContainer.streamingService
+        let streamingService = ServiceContainer.shared.streamingService
         let resolvedOptions = options ?? LLMGenerationOptions()
 
         return streamingService.generateTokenStream(

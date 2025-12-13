@@ -11,7 +11,7 @@ import Foundation
 /// Voice Activity Detection component following the clean architecture
 /// Extends BaseComponent to integrate with the SDK's component lifecycle system
 @MainActor
-public final class VADComponent: BaseComponent<SimpleEnergyVADService>, @unchecked Sendable {
+public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -19,6 +19,8 @@ public final class VADComponent: BaseComponent<SimpleEnergyVADService>, @uncheck
 
     private let vadConfiguration: VADConfiguration
     private var isPaused: Bool = false
+    private let logger = SDKLogger(category: "VADComponent")
+    private let analyticsService = VADAnalyticsService()
 
     // MARK: - Initialization
 
@@ -29,14 +31,31 @@ public final class VADComponent: BaseComponent<SimpleEnergyVADService>, @uncheck
 
     // MARK: - Service Creation
 
-    public override func createService() async throws -> SimpleEnergyVADService {
-        let vad = SimpleEnergyVADService(
+    public override func createService() async throws -> VADServiceWrapper {
+        // Create default SimpleEnergyVADService
+        // Note: VAD currently uses SimpleEnergyVADService directly
+        // Future enhancement: Support VAD provider pattern via ModuleRegistry like STT/TTS
+        logger.info("Creating SimpleEnergyVADService")
+        let vadService = SimpleEnergyVADService(
             sampleRate: vadConfiguration.sampleRate,
             frameLength: vadConfiguration.frameLength,
             energyThreshold: vadConfiguration.energyThreshold
         )
-        try await vad.initialize()
-        return vad
+        try await vadService.initialize()
+
+        // Wrap the service
+        let wrapper = VADServiceWrapper(vadService)
+        return wrapper
+    }
+
+    public override func performCleanup() async throws {
+        // No specific cleanup needed for VAD
+    }
+
+    // MARK: - Helper Methods
+
+    private var vadService: (any VADService)? {
+        return service?.wrappedService
     }
 
     // MARK: - Pause and Resume
@@ -44,13 +63,13 @@ public final class VADComponent: BaseComponent<SimpleEnergyVADService>, @uncheck
     /// Pause VAD processing
     public func pause() {
         isPaused = true
-        service?.pause()
+        vadService?.pause()
     }
 
     /// Resume VAD processing
     public func resume() {
         isPaused = false
-        service?.resume()
+        vadService?.resume()
     }
 
     // MARK: - Public API
@@ -59,7 +78,7 @@ public final class VADComponent: BaseComponent<SimpleEnergyVADService>, @uncheck
     public func detectSpeech(in buffer: AVAudioPCMBuffer) async throws -> VADOutput {
         try ensureReady()
 
-        guard let vadService = service else {
+        guard let vadService = vadService else {
             throw VADError.serviceNotAvailable
         }
 
@@ -74,6 +93,12 @@ public final class VADComponent: BaseComponent<SimpleEnergyVADService>, @uncheck
         // Get current state
         let isSpeechDetected = vadService.isSpeechActive
 
+        // Track detection
+        await analyticsService.trackDetection(
+            isSpeechDetected: isSpeechDetected,
+            energyLevel: vadService.energyThreshold
+        )
+
         return VADOutput(
             isSpeechDetected: isSpeechDetected,
             energyLevel: vadService.energyThreshold
@@ -84,12 +109,18 @@ public final class VADComponent: BaseComponent<SimpleEnergyVADService>, @uncheck
     public func detectSpeech(in samples: [Float]) async throws -> VADOutput {
         try ensureReady()
 
-        guard let vadService = service else {
+        guard let vadService = vadService else {
             throw VADError.serviceNotAvailable
         }
 
         // Process samples and get result
         let isSpeechDetected = vadService.processAudioData(samples)
+
+        // Track detection
+        await analyticsService.trackDetection(
+            isSpeechDetected: isSpeechDetected,
+            energyLevel: vadService.energyThreshold
+        )
 
         return VADOutput(
             isSpeechDetected: isSpeechDetected,
@@ -101,7 +132,7 @@ public final class VADComponent: BaseComponent<SimpleEnergyVADService>, @uncheck
     public func process(_ input: VADInput) async throws -> VADOutput {
         // Apply threshold override if provided
         if let threshold = input.energyThresholdOverride,
-           let vadService = service {
+           let vadService = vadService {
             vadService.energyThreshold = threshold
         }
 
@@ -135,47 +166,96 @@ public final class VADComponent: BaseComponent<SimpleEnergyVADService>, @uncheck
 
     /// Reset VAD state
     public func reset() {
-        service?.reset()
+        vadService?.reset()
     }
 
     /// Set speech activity callback
     public func setSpeechActivityCallback(_ callback: @escaping (SpeechActivityEvent) -> Void) {
-        service?.onSpeechActivity = callback
+        vadService?.onSpeechActivity = { [weak self] event in
+            callback(event)
+
+            // Track speech activity events
+            Task { [weak self] in
+                guard let self = self else { return }
+                switch event {
+                case .started:
+                    await self.analyticsService.trackSpeechActivityStarted()
+                case .ended:
+                    // We don't have duration info from the event, pass 0
+                    await self.analyticsService.trackSpeechActivityEnded(duration: 0)
+                }
+            }
+        }
     }
 
     /// Start VAD processing
     public func start() {
-        service?.start()
+        vadService?.start()
     }
 
     /// Stop VAD processing
     public func stop() {
-        service?.stop()
+        vadService?.stop()
     }
 
     /// Get the underlying VAD service
     public func getService() -> VADService? {
-        return service
+        return vadService
     }
 
     /// Start calibration of the VAD
     public func startCalibration() async throws {
         try ensureReady()
 
-        guard let vadService = service else {
+        guard let vadService = vadService else {
             throw VADError.serviceNotAvailable
         }
 
-        await vadService.startCalibration()
+        // These methods are specific to SimpleEnergyVADService
+        guard let energyVAD = vadService as? SimpleEnergyVADService else {
+            logger.warning("Calibration is only supported for SimpleEnergyVADService")
+            return
+        }
+
+        let startTime = Date()
+        let thresholdBefore = vadService.energyThreshold
+
+        // Track calibration started
+        await analyticsService.trackCalibrationStarted(currentThreshold: thresholdBefore)
+
+        await energyVAD.startCalibration()
+
+        let duration = Date().timeIntervalSince(startTime)
+        let thresholdAfter = vadService.energyThreshold
+
+        // Track calibration completed
+        await analyticsService.trackCalibrationCompleted(
+            thresholdBefore: thresholdBefore,
+            thresholdAfter: thresholdAfter,
+            samplesCollected: 20, // Based on SimpleEnergyVADService default
+            duration: duration * 1000 // Convert to ms
+        )
     }
 
     /// Get current VAD statistics for debugging
     public func getStatistics() -> VADStatistics? {
-        return service?.getStatistics()
+        guard let energyVAD = vadService as? SimpleEnergyVADService else {
+            return nil
+        }
+        return energyVAD.getStatistics()
     }
 
     /// Set calibration parameters
     public func setCalibrationParameters(multiplier: Float) {
-        service?.setCalibrationParameters(multiplier: multiplier)
+        guard let energyVAD = vadService as? SimpleEnergyVADService else {
+            logger.warning("setCalibrationParameters is only supported for SimpleEnergyVADService")
+            return
+        }
+        energyVAD.setCalibrationParameters(multiplier: multiplier)
+    }
+
+    /// Get analytics service for advanced tracking
+    public func getAnalyticsService() -> VADAnalyticsService {
+        return analyticsService
     }
 }
