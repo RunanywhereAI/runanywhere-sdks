@@ -209,7 +209,7 @@ public actor TTSAnalyticsService: AnalyticsService {
         totalCharactersPerSecond += eventData.charactersPerSecond
     }
 
-    /// Track error (local analytics)
+    /// Track error
     public func trackError(error: Error, context: AnalyticsContext) async {
         let eventData = ErrorEventData(
             error: error.localizedDescription,
@@ -223,160 +223,48 @@ public actor TTSAnalyticsService: AnalyticsService {
         await track(event: event)
     }
 
-    // MARK: - Enterprise Telemetry Methods
-
-    /// Track TTS model load with full enterprise metrics
-    public func trackModelLoad(
-        modelId: String,
-        modelName: String,
-        framework: InferenceFramework,
-        loadTimeMs: Double,
-        modelSizeBytes: Int64? = nil,
-        success: Bool,
-        errorMessage: String? = nil
-    ) async {
-        logger.info("📊 trackModelLoad called - modelId: \(modelId), modelName: \(modelName)")
-        let deviceInfo = TelemetryDeviceInfo.current
-        let telemetryService = await ServiceContainer.shared.telemetryService
-
-        do {
-            try await telemetryService.trackTTSModelLoad(
-                modelId: modelId,
-                modelName: modelName,
-                framework: framework.rawValue,
-                loadTimeMs: loadTimeMs,
-                modelSizeBytes: modelSizeBytes,
-                device: deviceInfo.device,
-                osVersion: deviceInfo.osVersion,
-                success: success,
-                errorMessage: errorMessage
-            )
-            logger.info("✅ Tracked TTS model load: \(modelName)")
-        } catch {
-            logger.error("❌ Failed to track TTS model load: \(error)")
-        }
-    }
-
-    /// Track TTS synthesis start with full enterprise metrics
-    public func trackSynthesisStarted(
-        synthesisId: String,
-        modelId: String,
-        modelName: String,
-        framework: InferenceFramework,
-        language: String,
-        voice: String,
-        characterCount: Int,
-        speakingRate: Float = 1.0,
-        pitch: Float = 1.0
-    ) async {
-        logger.info("📊 trackSynthesisStarted called - synthesisId: \(synthesisId)")
-        let deviceInfo = TelemetryDeviceInfo.current
-        let telemetryService = await ServiceContainer.shared.telemetryService
-
-        do {
-            try await telemetryService.trackTTSSynthesisStarted(
-                synthesisId: synthesisId,
-                modelId: modelId,
-                modelName: modelName,
-                framework: framework.rawValue,
-                language: language,
-                voice: voice,
-                characterCount: characterCount,
-                speakingRate: speakingRate,
-                pitch: pitch,
-                device: deviceInfo.device,
-                osVersion: deviceInfo.osVersion
-            )
-            logger.info("✅ Tracked TTS synthesis started: \(synthesisId)")
-        } catch {
-            logger.error("❌ Failed to track TTS synthesis started: \(error)")
-        }
-    }
-
-    /// Track TTS synthesis completion with full enterprise metrics
-    public func trackSynthesisCompleted(
-        synthesisId: String,
-        modelId: String,
-        modelName: String,
-        framework: InferenceFramework,
-        language: String,
-        characterCount: Int,
-        audioDurationMs: Double,
-        audioSizeBytes: Int,
-        sampleRate: Int,
-        processingTimeMs: Double
-    ) async {
-        logger.info("📊 trackSynthesisCompleted called - synthesisId: \(synthesisId)")
-        let deviceInfo = TelemetryDeviceInfo.current
-        let telemetryService = await ServiceContainer.shared.telemetryService
-
-        // Calculate performance metrics
-        let charactersPerSecond = processingTimeMs > 0 ? Double(characterCount) / (processingTimeMs / 1000.0) : 0
-        let realTimeFactor = audioDurationMs > 0 ? processingTimeMs / audioDurationMs : 0
-
-        do {
-            try await telemetryService.trackTTSSynthesisCompleted(
-                synthesisId: synthesisId,
-                modelId: modelId,
-                modelName: modelName,
-                framework: framework.rawValue,
-                language: language,
-                characterCount: characterCount,
-                audioDurationMs: audioDurationMs,
-                audioSizeBytes: audioSizeBytes,
-                sampleRate: sampleRate,
-                processingTimeMs: processingTimeMs,
-                charactersPerSecond: charactersPerSecond,
-                realTimeFactor: realTimeFactor,
-                device: deviceInfo.device,
-                osVersion: deviceInfo.osVersion
-            )
-            logger.info("✅ Tracked TTS synthesis completed: \(synthesisId), CPS: \(String(format: "%.1f", charactersPerSecond))")
-        } catch {
-            logger.error("❌ Failed to track TTS synthesis completed: \(error)")
-        }
-
-        // Update local metrics
-        synthesisCount += 1
-        totalCharacters += characterCount
-        totalProcessingTime += processingTimeMs
-        totalCharactersPerSecond += charactersPerSecond
-    }
-
-    /// Track TTS synthesis failure with full enterprise metrics
+    /// Track synthesis failure
     public func trackSynthesisFailed(
         synthesisId: String,
-        modelId: String,
-        modelName: String,
-        framework: InferenceFramework,
-        language: String,
         characterCount: Int,
         processingTimeMs: Double,
         errorMessage: String
     ) async {
-        let deviceInfo = TelemetryDeviceInfo.current
-        let telemetryService = await ServiceContainer.shared.telemetryService
-
-        do {
-            try await telemetryService.trackTTSSynthesisFailed(
-                synthesisId: synthesisId,
-                modelId: modelId,
-                modelName: modelName,
-                framework: framework.rawValue,
-                language: language,
-                characterCount: characterCount,
-                processingTimeMs: processingTimeMs,
-                errorMessage: errorMessage,
-                device: deviceInfo.device,
-                osVersion: deviceInfo.osVersion
-            )
-            logger.debug("Tracked TTS synthesis failed: \(synthesisId)")
-        } catch {
-            logger.error("Failed to track TTS synthesis failed: \(error)")
-        }
+        let eventData = TTSSynthesisFailureData(
+            synthesisId: synthesisId,
+            characterCount: characterCount,
+            processingTimeMs: processingTimeMs,
+            errorMessage: errorMessage
+        )
+        let event = TTSEvent(
+            type: .error,
+            sessionId: currentSession?.id,
+            eventData: eventData
+        )
+        await track(event: event)
 
         // Clean up any active tracker
         activeSyntheses.removeValue(forKey: synthesisId)
+    }
+
+    /// Track model loading
+    public func trackModelLoading(
+        modelId: String,
+        loadTime: TimeInterval,
+        success: Bool
+    ) async {
+        let eventData = TTSModelLoadingData(
+            modelId: modelId,
+            loadTimeMs: loadTime * 1000,
+            success: success
+        )
+        let event = TTSEvent(
+            type: success ? .modelLoaded : .modelLoadFailed,
+            sessionId: currentSession?.id,
+            eventData: eventData
+        )
+
+        await track(event: event)
     }
 
     // MARK: - Private Methods

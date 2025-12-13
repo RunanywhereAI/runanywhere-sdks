@@ -119,19 +119,6 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         _configurationService = service
     }
 
-    /// Telemetry service
-    private var _telemetryService: TelemetryService?
-    public var telemetryService: TelemetryService {
-        guard let service = _telemetryService else {
-            fatalError("TelemetryService not initialized. Call RunAnywhere.initialize() first.")
-        }
-        return service
-    }
-
-    internal func setTelemetryService(_ service: TelemetryService) {
-        _telemetryService = service
-    }
-
     /// Model info service
     private var _modelInfoService: ModelInfoService?
     public var modelInfoService: ModelInfoService {
@@ -233,7 +220,6 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         networkService = nil
         _syncCoordinator = nil
         _configurationService = nil
-        _telemetryService = nil
         _modelInfoService = nil
         _modelAssignmentService = nil
         _deviceRegistrationService = nil

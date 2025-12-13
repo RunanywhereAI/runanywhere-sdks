@@ -208,16 +208,11 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             )
             serviceContainer.setConfigurationService(configService)
 
-            // Create TelemetryService
+            // Create TelemetryRepository (used by AnalyticsQueueManager)
             let telemetryRepo = TelemetryRepositoryImpl(
                 databaseManager: DatabaseManager.shared,
                 apiClient: apiClient
             )
-            let telemetryService = TelemetryService(
-                telemetryRepository: telemetryRepo,
-                syncCoordinator: syncCoordinator
-            )
-            serviceContainer.setTelemetryService(telemetryService)
 
             // Create ModelInfoService
             let modelRepo = ModelInfoRepositoryImpl(

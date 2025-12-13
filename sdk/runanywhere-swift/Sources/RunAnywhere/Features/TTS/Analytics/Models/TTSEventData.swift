@@ -114,6 +114,26 @@ public struct TTSSynthesisTelemetryData: AnalyticsEventData {
     }
 }
 
+/// TTS synthesis failure event data
+public struct TTSSynthesisFailureData: AnalyticsEventData {
+    public let synthesisId: String
+    public let characterCount: Int
+    public let processingTimeMs: Double
+    public let errorMessage: String
+
+    public init(
+        synthesisId: String,
+        characterCount: Int,
+        processingTimeMs: Double,
+        errorMessage: String
+    ) {
+        self.synthesisId = synthesisId
+        self.characterCount = characterCount
+        self.processingTimeMs = processingTimeMs
+        self.errorMessage = errorMessage
+    }
+}
+
 /// TTS model loading event data
 public struct TTSModelLoadingData: AnalyticsEventData {
     public let modelId: String
