@@ -73,7 +73,7 @@ public class WhisperKitService: STTService {
         } catch {
             logger.error("❌ Failed to initialize WhisperKit: \(error)")
             logger.error("Error details: \(error.localizedDescription)")
-            throw VoiceError.transcriptionFailed(error)
+            throw STTError.transcriptionFailed(error)
         }
     }
 
@@ -106,12 +106,12 @@ public class WhisperKitService: STTService {
 
         guard isInitialized, self.whisperKit != nil else {
             logger.error("❌ Service not initialized!")
-            throw VoiceError.serviceNotInitialized
+            throw STTError.serviceNotInitialized
         }
 
         guard !samples.isEmpty else {
             logger.error("❌ No audio samples to transcribe!")
-            throw VoiceError.unsupportedAudioFormat
+            throw STTError.audioFormatNotSupported
         }
 
         let duration = Double(samples.count) / 16000.0
@@ -157,7 +157,7 @@ public class WhisperKitService: STTService {
         originalDuration: Double
     ) async throws -> STTResult {
         guard let whisperKit = whisperKit else {
-            throw VoiceError.serviceNotInitialized
+            throw STTError.serviceNotInitialized
         }
 
         logger.info("Starting WhisperKit transcription with \(audioSamples.count) samples...")
@@ -346,13 +346,13 @@ public class WhisperKitService: STTService {
         }
 
         if isInitialized {
-            throw VoiceError.serviceNotInitialized
+            throw STTError.serviceNotInitialized
         }
 
         try await initialize(modelPath: nil)
 
         guard let whisperKit = self.whisperKit else {
-            throw VoiceError.serviceNotInitialized
+            throw STTError.serviceNotInitialized
         }
 
         return whisperKit

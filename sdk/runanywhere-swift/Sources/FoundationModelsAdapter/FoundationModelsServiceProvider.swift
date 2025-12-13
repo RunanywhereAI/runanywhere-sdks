@@ -2,38 +2,56 @@
 //  FoundationModelsModule.swift
 //  FoundationModelsAdapter Module
 //
-//  Simple registration for Apple Foundation Models LLM services
+//  Apple Foundation Models module providing LLM capabilities via Apple Intelligence.
 //
 
 import Foundation
 import OSLog
 import RunAnywhere
 
-// MARK: - Foundation Models Module Registration
+// MARK: - Foundation Models Module
 
-/// Foundation Models module for LLM text generation using Apple's built-in models
+/// Apple Foundation Models module for LLM text generation.
 ///
-/// Usage:
+/// Provides large language model capabilities using Apple's
+/// built-in Foundation Models (Apple Intelligence) on iOS 26+ / macOS 26+.
+///
+/// ## Registration
+///
 /// ```swift
 /// import FoundationModelsAdapter
 ///
-/// // Register at app startup (iOS 26+ / macOS 26+ only):
+/// // Only available on iOS 26+ / macOS 26+
 /// if #available(iOS 26.0, macOS 26.0, *) {
-///     FoundationModels.register()
+///     // Option 1: Direct registration
+///     AppleAI.register()
+///
+///     // Option 2: Via ModuleRegistry
+///     ModuleRegistry.shared.register(AppleAI.self)
+///
+///     // Option 3: Via RunAnywhere
+///     RunAnywhere.register(AppleAI.self)
 /// }
 /// ```
 @available(iOS 26.0, macOS 26.0, *)
-public enum FoundationModels {
+public enum AppleAI: RunAnywhereModule {
     private static let logger = Logger(
         subsystem: "com.runanywhere.FoundationModels",
         category: "FoundationModels"
     )
 
+    // MARK: - RunAnywhereModule Conformance
+
+    public static let moduleId = "appleai"
+    public static let moduleName = "Apple Foundation Models"
+    public static let capabilities: Set<CapabilityType> = [.llm]
+    public static let defaultPriority: Int = 50 // Lower priority - prefer local models
+
     /// Register Foundation Models LLM service with the SDK
     @MainActor
-    public static func register(priority: Int = 50) {
+    public static func register(priority: Int) {
         ServiceRegistry.shared.registerLLM(
-            name: "Apple Foundation Models",
+            name: moduleName,
             priority: priority,
             canHandle: { modelId in
                 canHandleModel(modelId)
@@ -72,4 +90,22 @@ public enum FoundationModels {
         logger.info("Foundation Models service created successfully")
         return service
     }
+}
+
+// MARK: - Legacy Alias
+
+/// Legacy alias for backward compatibility
+@available(iOS 26.0, macOS 26.0, *)
+@available(*, deprecated, renamed: "AppleAI")
+public typealias FoundationModels = AppleAI
+
+// MARK: - Auto-Discovery Registration
+
+@available(iOS 26.0, macOS 26.0, *)
+extension AppleAI {
+    /// Enable auto-discovery for this module.
+    /// Access this property to trigger registration.
+    public static let autoRegister: Void = {
+        ModuleDiscovery.register(AppleAI.self)
+    }()
 }

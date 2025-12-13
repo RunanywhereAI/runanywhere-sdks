@@ -1,11 +1,33 @@
+//
+//  AudioCaptureManager.swift
+//  RunAnywhere SDK
+//
+//  Shared audio capture utility for STT features.
+//  Can be used with any STT backend (ONNX, WhisperKit, etc.)
+//
+
 import AVFoundation
 import Foundation
-import RunAnywhere
 
-/// Manages audio capture from microphone for STT
-/// Works on iOS, tvOS, and macOS using AVAudioEngine
-/// NOTE: watchOS is NOT supported - AVAudioEngine inputNode tap does not work reliably on watchOS.
-/// watchOS typically requires AVAudioRecorder or watch-specific APIs for audio recording.
+/// Manages audio capture from microphone for STT services.
+///
+/// This is a shared utility that works with any STT backend (ONNX, WhisperKit, etc.).
+/// It captures audio at 16kHz mono Int16 format, which is the standard input format
+/// for speech recognition models like Whisper.
+///
+/// - Works on: iOS, tvOS, and macOS using AVAudioEngine
+/// - NOT supported on: watchOS (AVAudioEngine inputNode tap doesn't work reliably)
+///
+/// ## Usage
+/// ```swift
+/// let capture = AudioCaptureManager()
+/// let granted = await capture.requestPermission()
+/// if granted {
+///     try capture.startRecording { audioData in
+///         // Feed audioData to your STT service
+///     }
+/// }
+/// ```
 public class AudioCaptureManager: ObservableObject {
     private let logger = SDKLogger(category: "AudioCapture")
 

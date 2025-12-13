@@ -2,14 +2,6 @@
 import Files
 import Foundation
 
-/// Individual model file information (distinct from aggregate ModelStorageInfo)
-public struct ModelFileInfo {
-    let modelId: String
-    let format: ModelFormat
-    let size: Int64
-    let framework: InferenceFramework?
-}
-
 /// Simplified file manager using Files library for all file operations
 /// Implements FileManagementService protocol
 public class SimplifiedFileManager: FileManagementService { // swiftlint:disable:this type_body_length
