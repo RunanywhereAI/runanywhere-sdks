@@ -14,9 +14,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
     /// Unique identifier for this configuration
     public let id: String
 
-    /// Generation configuration
-    public var generation: LLMGenerationConfig
-
     /// Storage configuration (includes memory threshold)
     public var storage: StorageConfiguration
 
@@ -45,7 +42,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
 
     public init(
         id: String = "default",
-        generation: LLMGenerationConfig = LLMGenerationConfig(),
         storage: StorageConfiguration = StorageConfiguration(),
         api: APIConfiguration = APIConfiguration(),
         download: DownloadConfiguration = DownloadConfiguration(),
@@ -58,7 +54,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
         syncPending: Bool = false
     ) {
         self.id = id
-        self.generation = generation
         self.storage = storage
         self.api = api
         self.download = download

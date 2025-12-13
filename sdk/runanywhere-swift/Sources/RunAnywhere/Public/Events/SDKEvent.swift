@@ -46,7 +46,6 @@ public enum SDKConfigurationEvent: SDKEvent {
 
     // Configuration read events
     case settingsRequested
-    case settingsRetrieved(settings: DefaultGenerationSettings)
     case analyticsStatusRequested
     case analyticsStatusRetrieved(enabled: Bool)
     case syncRequested
@@ -185,17 +184,8 @@ public enum SDKStorageEvent: SDKEvent {
 
 /// SDK Framework Events for public API
 public enum SDKFrameworkEvent: SDKEvent {
-    case adapterRegistered(framework: LLMFramework, name: String)
-    case adaptersRequested
-    case adaptersRetrieved(count: Int)
-    case frameworksRequested
-    case frameworksRetrieved(frameworks: [LLMFramework])
-    case availabilityRequested
-    case availabilityRetrieved(availability: [FrameworkAvailability])
     case modelsForFrameworkRequested(framework: LLMFramework)
     case modelsForFrameworkRetrieved(framework: LLMFramework, models: [ModelInfo])
-    case frameworksForModalityRequested(modality: FrameworkModality)
-    case frameworksForModalityRetrieved(modality: FrameworkModality, frameworks: [LLMFramework])
 
     public var timestamp: Date { Date() }
     public var eventType: SDKEventType { .framework }
@@ -209,49 +199,4 @@ public enum SDKDeviceEvent: SDKEvent {
 
     public var timestamp: Date { Date() }
     public var eventType: SDKEventType { .device }
-}
-
-/// Events for component initialization lifecycle
-public enum ComponentInitializationEvent: SDKEvent {
-    // Overall initialization
-    case initializationStarted(components: [SDKComponent])
-    case initializationCompleted(result: InitializationResult)
-
-    // Component-specific events
-    case componentStateChanged(component: SDKComponent, oldState: ComponentState, newState: ComponentState)
-    case componentChecking(component: SDKComponent, modelId: String?)
-    case componentDownloadRequired(component: SDKComponent, modelId: String, sizeBytes: Int64)
-    case componentDownloadStarted(component: SDKComponent, modelId: String)
-    case componentDownloadProgress(component: SDKComponent, modelId: String, progress: Double)
-    case componentDownloadCompleted(component: SDKComponent, modelId: String)
-    case componentInitializing(component: SDKComponent, modelId: String?)
-    case componentReady(component: SDKComponent, modelId: String?)
-    case componentFailed(component: SDKComponent, error: Error)
-
-    // Batch events
-    case parallelInitializationStarted(components: [SDKComponent])
-    case sequentialInitializationStarted(components: [SDKComponent])
-    case allComponentsReady
-    case someComponentsReady(ready: [SDKComponent], pending: [SDKComponent])
-
-    public var timestamp: Date { Date() }
-    public var eventType: SDKEventType { .initialization }
-
-    /// Extract component from event if applicable
-    public var component: SDKComponent? {
-        switch self {
-        case .componentStateChanged(let component, _, _),
-             .componentChecking(let component, _),
-             .componentDownloadRequired(let component, _, _),
-             .componentDownloadStarted(let component, _),
-             .componentDownloadProgress(let component, _, _),
-             .componentDownloadCompleted(let component, _),
-             .componentInitializing(let component, _),
-             .componentReady(let component, _),
-             .componentFailed(let component, _):
-            return component
-        default:
-            return nil
-        }
-    }
 }

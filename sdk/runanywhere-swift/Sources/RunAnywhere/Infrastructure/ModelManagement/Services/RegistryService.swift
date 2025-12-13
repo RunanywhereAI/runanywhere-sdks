@@ -263,38 +263,18 @@ public class RegistryService: ModelRegistry {
         // First, try to load models from configuration (remote or cached)
         _ = await ServiceContainer.shared.configurationService.getConfiguration()
 
-        // Model catalog removed from configuration for simplicity
+        // Load stored models from service
+        let modelInfoService = await ServiceContainer.shared.modelInfoService
         do {
-            logger.debug("No models in configuration, falling back to stored models")
+            let storedModels = try await modelInfoService.loadStoredModels()
+            logger.info("Loading \(storedModels.count) stored models")
 
-            // Fallback: Load models from repository
-            // Only load models for frameworks that have registered adapters
-            let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
-            logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
-
-            // Load stored models from service
-            let modelInfoService = await ServiceContainer.shared.modelInfoService
-            do {
-                // Load all stored models and filter later
-                var storedModels = try await modelInfoService.loadStoredModels()
-
-                if !availableFrameworks.isEmpty {
-                    // Filter for available frameworks
-                    storedModels = storedModels.filter { model in
-                        model.compatibleFrameworks.contains { availableFrameworks.contains($0) }
-                    }
-                    logger.info("Loading \(storedModels.count) models for available frameworks")
-                } else {
-                    logger.info("No framework adapters registered, loading all \(storedModels.count) stored models")
-                }
-
-                for model in storedModels {
-                    logger.debug("Registering stored model: \(model.id) with localPath: \(model.localPath?.path ?? "nil")")
-                    registerModel(model)
-                }
-            } catch {
-                logger.error("Failed to load stored models: \(error)")
+            for model in storedModels {
+                logger.debug("Registering stored model: \(model.id) with localPath: \(model.localPath?.path ?? "nil")")
+                registerModel(model)
             }
+        } catch {
+            logger.error("Failed to load stored models: \(error)")
         }
     }
 

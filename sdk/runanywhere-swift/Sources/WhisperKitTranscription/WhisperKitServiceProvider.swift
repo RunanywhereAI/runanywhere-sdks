@@ -17,12 +17,12 @@ import RunAnywhere
 /// import WhisperKitTranscription
 ///
 /// // Register at app startup
-/// WhisperKit.register()
+/// WhisperKitModule.register()
 ///
 /// // Then use via RunAnywhere
 /// let text = try await RunAnywhere.transcribe(audioData)
 /// ```
-public enum WhisperKit {
+public enum WhisperKitModule {
     private static let logger = SDKLogger(category: "WhisperKit")
 
     /// Register WhisperKit STT service with the SDK

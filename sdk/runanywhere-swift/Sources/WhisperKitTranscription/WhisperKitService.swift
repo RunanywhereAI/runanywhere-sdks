@@ -45,7 +45,7 @@ public class WhisperKitService: STTService {
                 whisperKit = try await WhisperKit(
                     model: whisperKitModelName,
                     verbose: true,
-                    logLevel: .info,
+                    logLevel: Logging.LogLevel.info,
                     prewarm: true
                 )
                 logger.info("✅ WhisperKit initialized successfully with model: \(whisperKitModelName)")
@@ -55,7 +55,7 @@ public class WhisperKitService: STTService {
                 whisperKit = try await WhisperKit(
                     model: "openai_whisper-base",
                     verbose: true,
-                    logLevel: .info,
+                    logLevel: Logging.LogLevel.info,
                     prewarm: true
                 )
                 logger.info("✅ WhisperKit initialized with fallback base model")
@@ -99,7 +99,7 @@ public class WhisperKitService: STTService {
         logger.info("transcribe() called with \(samples.count) samples")
         logger.debug("Options - Language: \(options.language)")
 
-        guard isInitialized, let whisperKit = whisperKit else {
+        guard isInitialized, self.whisperKit != nil else {
             logger.error("❌ Service not initialized!")
             throw VoiceError.serviceNotInitialized
         }

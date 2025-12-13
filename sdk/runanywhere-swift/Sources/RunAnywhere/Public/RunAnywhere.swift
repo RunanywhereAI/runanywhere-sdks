@@ -557,30 +557,6 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         return await serviceContainer.llmCapability.currentModelId
     }
 
-    // MARK: - Multi-Adapter Support (NEW)
-
-    /// Register a framework adapter with optional priority
-    /// Higher priority adapters are preferred when multiple can handle the same model
-    /// - Parameters:
-    ///   - adapter: The framework adapter to register
-    ///   - priority: Priority level (higher = preferred, default: 100)
-    public static func registerFrameworkAdapter(_ adapter: FrameworkAdapter, priority: Int = 100) {
-        // Note: Adapter registration can happen before SDK initialization
-        // This allows registering adapters during app setup
-        serviceContainer.adapterRegistry.register(adapter, priority: priority)
-    }
-
-    /// Get all adapters capable of handling a specific model
-    /// - Parameter modelId: The model identifier
-    /// - Returns: Array of framework types that can handle this model
-    public static func availableAdapters(for modelId: String) async -> [LLMFramework] {
-        guard isInitialized,
-              let model = serviceContainer.modelRegistry.getModel(by: modelId) else { return [] }
-
-        let adapters = await serviceContainer.adapterRegistry.findAllAdapters(for: model)
-        return adapters.map(\.framework)
-    }
-
     // MARK: - Authentication Info
 
     /// Get current user ID

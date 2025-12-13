@@ -9,6 +9,12 @@ public final class DatabaseManager {
 
     public static let shared = DatabaseManager()
 
+    // MARK: - Database Disabled Flag
+
+    /// Database is currently disabled - all operations are no-ops
+    /// Set to `true` to enable database functionality when needed
+    public static var isEnabled: Bool = false
+
     // MARK: - Properties
 
     private var databaseQueue: DatabaseQueue?
@@ -31,6 +37,11 @@ public final class DatabaseManager {
     /// Initialize the database
     /// - Throws: DatabaseError if initialization fails
     public func setup() throws {
+        guard Self.isEnabled else {
+            logger.info("Database is disabled - skipping setup")
+            return
+        }
+
         logger.info("Setting up database at: \(databaseURL.path)")
 
         do {
@@ -116,6 +127,9 @@ public final class DatabaseManager {
     /// - Returns: The result of the block
     /// - Throws: DatabaseError if database is not initialized or operation fails
     public func read<T>(_ block: (Database) throws -> T) throws -> T {
+        guard Self.isEnabled else {
+            throw DatabaseError.notInitialized
+        }
         guard let dbQueue = databaseQueue else {
             throw DatabaseError.notInitialized
         }
@@ -128,6 +142,9 @@ public final class DatabaseManager {
     /// - Returns: The result of the block
     /// - Throws: DatabaseError if database is not initialized or operation fails
     public func write<T>(_ block: (Database) throws -> T) throws -> T {
+        guard Self.isEnabled else {
+            throw DatabaseError.notInitialized
+        }
         guard let dbQueue = databaseQueue else {
             throw DatabaseError.notInitialized
         }
