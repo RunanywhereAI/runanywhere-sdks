@@ -283,7 +283,7 @@ public class StructuredOutputHandler {
 }
 
 /// Structured output validation result
-public struct StructuredOutputValidation {
+public struct StructuredOutputValidation: Sendable {
     public let isValid: Bool
     public let containsJSON: Bool
     public let error: String?

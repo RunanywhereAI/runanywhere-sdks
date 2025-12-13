@@ -3,63 +3,59 @@ import Foundation
 import Pulse
 
 /// Service container for dependency injection
+/// Provides centralized access to all SDK capabilities and services
 public class ServiceContainer { // swiftlint:disable:this type_body_length
     /// Shared instance
     public static let shared = ServiceContainer()
-    // MARK: - Core Services
 
-    /// Model registry
+    // MARK: - Core Registries
+
+    /// Model registry for managing model information
     private(set) lazy var modelRegistry: ModelRegistry = {
         RegistryService()
     }()
 
-    /// Single adapter registry for all frameworks (text and voice)
+    /// Unified adapter registry for all frameworks (LLM, STT, TTS, etc.)
     internal let adapterRegistry = AdapterRegistry()
 
-    // MARK: - Capability Services
+    // MARK: - Simplified Capabilities (New Architecture)
 
-    /// Model loading service
-    private(set) lazy var modelLoadingService: ModelLoadingService = {
-        ModelLoadingService(
-            registry: modelRegistry,
-            adapterRegistry: adapterRegistry
+    /// LLM capability - handles all text generation operations
+    private(set) lazy var llmCapability: LLMCapability = {
+        LLMCapability()
+    }()
+
+    /// STT capability - handles speech-to-text operations
+    private(set) lazy var sttCapability: STTCapability = {
+        STTCapability()
+    }()
+
+    /// TTS capability - handles text-to-speech operations
+    private(set) lazy var ttsCapability: TTSCapability = {
+        TTSCapability()
+    }()
+
+    /// VAD capability - handles voice activity detection
+    private(set) lazy var vadCapability: VADCapability = {
+        VADCapability()
+    }()
+
+    /// Speaker Diarization capability - handles speaker identification
+    private(set) lazy var speakerDiarizationCapability: SpeakerDiarizationCapability = {
+        SpeakerDiarizationCapability()
+    }()
+
+    /// Voice Agent capability - composes STT, LLM, TTS, VAD for full voice pipeline
+    private(set) lazy var voiceAgentCapability: VoiceAgentCapability = {
+        VoiceAgentCapability(
+            llm: llmCapability,
+            stt: sttCapability,
+            tts: ttsCapability,
+            vad: vadCapability
         )
     }()
 
-    /// Model loading orchestrator for unified model loading with lifecycle, telemetry, and analytics
-    private var _modelLoadingOrchestrator: ModelLoadingOrchestrator?
-    public var modelLoadingOrchestrator: ModelLoadingOrchestrator {
-        guard let orchestrator = _modelLoadingOrchestrator else {
-            fatalError("ModelLoadingOrchestrator not initialized. Call RunAnywhere.initialize() first.")
-        }
-        return orchestrator
-    }
-
-    internal func setModelLoadingOrchestrator(_ orchestrator: ModelLoadingOrchestrator) {
-        _modelLoadingOrchestrator = orchestrator
-    }
-
-    /// Generation service
-    private(set) lazy var generationService: LLMGenerationService = {
-        LLMGenerationService(
-            modelLoadingService: modelLoadingService
-        )
-    }()
-
-    /// Streaming service
-    private(set) lazy var streamingService: LLMStreamingService = {
-        LLMStreamingService(generationService: generationService, modelLoadingService: modelLoadingService)
-    }()
-
-    /// Voice capability service
-    private(set) lazy var voiceCapabilityService: VoiceCapabilityService = {
-        VoiceCapabilityService()
-    }()
-
-    /// Voice orchestrator for voice pipeline operations
-    private(set) lazy var voiceOrchestrator: VoiceOrchestrator = {
-        VoiceOrchestrator()
-    }()
+    // MARK: - Infrastructure Services
 
     /// Download service
     private(set) lazy var downloadService: AlamofireDownloadService = {
@@ -165,63 +161,11 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         _modelAssignmentService = service
     }
 
-    /// Generation analytics service - using unified pattern
-    private var _generationAnalytics: GenerationAnalyticsService?
-    public var generationAnalytics: GenerationAnalyticsService {
-        get async {
-            if let service = _generationAnalytics {
-                return service
-            }
-            let service = GenerationAnalyticsService(queueManager: analyticsQueueManager)
-            _generationAnalytics = service
-            return service
-        }
-    }
-
-    // MARK: - Unified Analytics Services
+    // MARK: - Analytics Services
 
     /// Analytics queue manager - centralized queue for all analytics
     public var analyticsQueueManager: AnalyticsQueueManager {
         AnalyticsQueueManager.shared
-    }
-
-    /// STT Analytics Service - using unified pattern
-    private var _sttAnalytics: STTAnalyticsService?
-    public var sttAnalytics: STTAnalyticsService {
-        get async {
-            if let service = _sttAnalytics {
-                return service
-            }
-            let service = STTAnalyticsService(queueManager: analyticsQueueManager)
-            _sttAnalytics = service
-            return service
-        }
-    }
-
-    /// Voice Analytics Service - using unified pattern
-    private var _voiceAnalytics: VoiceAnalyticsService?
-    public var voiceAnalytics: VoiceAnalyticsService {
-        get async {
-            if let service = _voiceAnalytics {
-                return service
-            }
-            let service = VoiceAnalyticsService(queueManager: analyticsQueueManager)
-            _voiceAnalytics = service
-            return service
-        }
-    }
-
-    /// TTS Analytics Service - using unified pattern
-    private var _ttsAnalytics: TTSAnalyticsService?
-    public var ttsAnalytics: TTSAnalyticsService {
-        get async {
-            if let service = _ttsAnalytics {
-                return service
-            }
-            let service = TTSAnalyticsService(queueManager: analyticsQueueManager)
-            _ttsAnalytics = service
-            return service
-        }
     }
 
     // MARK: - Device Services
@@ -295,12 +239,7 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         _telemetryService = nil
         _modelInfoService = nil
         _modelAssignmentService = nil
-        _generationAnalytics = nil
-        _sttAnalytics = nil
-        _voiceAnalytics = nil
-        _ttsAnalytics = nil
         _deviceRegistrationService = nil
         _structuredOutputService = nil
-        _modelLoadingOrchestrator = nil
     }
 }

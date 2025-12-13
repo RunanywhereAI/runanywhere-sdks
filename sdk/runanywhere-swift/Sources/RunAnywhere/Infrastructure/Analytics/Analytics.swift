@@ -23,20 +23,6 @@ public final class Analytics {
     private let logger = SDKLogger(category: "Analytics")
     private var configuration: AnalyticsConfiguration
 
-    // MARK: - Capability-Specific Analytics
-
-    /// STT-specific analytics service
-    public private(set) var stt: STTAnalyticsService?
-
-    /// TTS-specific analytics service
-    public private(set) var tts: TTSAnalyticsService?
-
-    /// Generation-specific analytics service
-    public private(set) var generation: GenerationAnalyticsService?
-
-    /// Voice-specific analytics service
-    public private(set) var voice: VoiceAnalyticsService?
-
     // MARK: - Initialization
 
     /// Initialize with default configuration
@@ -87,36 +73,6 @@ public final class Analytics {
     public func flush() async {
         logger.info("Flushing pending analytics events")
         await queueManager.flush()
-    }
-
-    // MARK: - Capability Registration
-
-    /// Register STT analytics service
-    /// - Parameter service: The STT analytics service instance
-    public func registerSTTAnalytics(_ service: STTAnalyticsService) {
-        self.stt = service
-        logger.debug("STT analytics service registered")
-    }
-
-    /// Register TTS analytics service
-    /// - Parameter service: The TTS analytics service instance
-    public func registerTTSAnalytics(_ service: TTSAnalyticsService) {
-        self.tts = service
-        logger.debug("TTS analytics service registered")
-    }
-
-    /// Register Generation analytics service
-    /// - Parameter service: The Generation analytics service instance
-    public func registerGenerationAnalytics(_ service: GenerationAnalyticsService) {
-        self.generation = service
-        logger.debug("Generation analytics service registered")
-    }
-
-    /// Register Voice analytics service
-    /// - Parameter service: The Voice analytics service instance
-    public func registerVoiceAnalytics(_ service: VoiceAnalyticsService) {
-        self.voice = service
-        logger.debug("Voice analytics service registered")
     }
 
     // MARK: - Configuration
