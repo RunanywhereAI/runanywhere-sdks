@@ -61,7 +61,7 @@ public extension RunAnywhere {
         events.publish(SDKModelEvent.downloadStarted(modelId: modelIdentifier))
 
         do {
-            let modelService = await serviceContainer.modelInfoService
+            let modelService = serviceContainer.modelInfoService
 
             // Try to get model from database or registry
             var modelInfo = try await modelService.getModel(by: modelIdentifier)

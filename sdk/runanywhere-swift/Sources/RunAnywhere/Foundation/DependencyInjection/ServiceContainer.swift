@@ -26,23 +26,17 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         )
     }()
 
-    /// Model loading orchestrator - caches instance to avoid recreating
-    private var _modelLoadingOrchestrator: ModelLoadingOrchestrator?
-
     /// Model loading orchestrator for unified model loading with lifecycle, telemetry, and analytics
+    private var _modelLoadingOrchestrator: ModelLoadingOrchestrator?
     public var modelLoadingOrchestrator: ModelLoadingOrchestrator {
-        get async {
-            if let orchestrator = _modelLoadingOrchestrator {
-                return orchestrator
-            }
-            let orchestrator = ModelLoadingOrchestrator(
-                modelLoadingService: modelLoadingService,
-                telemetryService: await telemetryService,
-                modelRegistry: modelRegistry
-            )
-            _modelLoadingOrchestrator = orchestrator
-            return orchestrator
+        guard let orchestrator = _modelLoadingOrchestrator else {
+            fatalError("ModelLoadingOrchestrator not initialized. Call RunAnywhere.initialize() first.")
         }
+        return orchestrator
+    }
+
+    internal func setModelLoadingOrchestrator(_ orchestrator: ModelLoadingOrchestrator) {
+        _modelLoadingOrchestrator = orchestrator
     }
 
     /// Generation service
@@ -94,115 +88,81 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
     }()
 
     /// Database manager
-    private lazy var databaseManager: DatabaseManager = {
+    internal lazy var databaseManager: DatabaseManager = {
         DatabaseManager.shared
     }()
 
     /// Network service (environment-based: mock or real)
-    public private(set) var networkService: (any NetworkService)?
+    public var networkService: (any NetworkService)?
 
     /// Authentication service
-    public private(set) var authenticationService: AuthenticationService?
+    public var authenticationService: AuthenticationService?
 
     /// API client for sync operations
-    private var apiClient: APIClient?
+    public var apiClient: APIClient?
 
     /// Sync coordinator for centralized sync management
     private var _syncCoordinator: SyncCoordinator?
     public var syncCoordinator: SyncCoordinator? {
-        get async {
-            if _syncCoordinator == nil {
-                _syncCoordinator = SyncCoordinator(
-                    enableAutoSync: false // Disabled: No backend currently available
-                )
-            }
-            return _syncCoordinator
-        }
+        _syncCoordinator
+    }
+
+    internal func setSyncCoordinator(_ coordinator: SyncCoordinator?) {
+        _syncCoordinator = coordinator
     }
 
     // MARK: - Data Services
 
     /// Configuration service
     private var _configurationService: ConfigurationService?
-    public var configurationService: ConfigurationServiceProtocol {
-        get async {
-            if let service = _configurationService {
-                return service
-            }
-            let configRepo = ConfigurationRepositoryImpl(
-                databaseManager: databaseManager,
-                apiClient: apiClient
-            )
-            let service = ConfigurationService(
-                configRepository: configRepo,
-                syncCoordinator: await syncCoordinator
-            )
-            _configurationService = service
-            return service
+    public var configurationService: ConfigurationService {
+        guard let service = _configurationService else {
+            fatalError("ConfigurationService not initialized. Call RunAnywhere.initialize() first.")
         }
+        return service
+    }
+
+    internal func setConfigurationService(_ service: ConfigurationService) {
+        _configurationService = service
     }
 
     /// Telemetry service
     private var _telemetryService: TelemetryService?
     public var telemetryService: TelemetryService {
-        get async {
-            if let service = _telemetryService {
-                return service
-            }
-            let telemetryRepo = TelemetryRepositoryImpl(
-                databaseManager: databaseManager,
-                apiClient: apiClient
-            )
-            let service = TelemetryService(
-                telemetryRepository: telemetryRepo,
-                syncCoordinator: await syncCoordinator
-            )
-            _telemetryService = service
-            return service
+        guard let service = _telemetryService else {
+            fatalError("TelemetryService not initialized. Call RunAnywhere.initialize() first.")
         }
+        return service
+    }
+
+    internal func setTelemetryService(_ service: TelemetryService) {
+        _telemetryService = service
     }
 
     /// Model info service
     private var _modelInfoService: ModelInfoService?
     public var modelInfoService: ModelInfoService {
-        get async {
-            if let service = _modelInfoService {
-                return service
-            }
-            let modelRepo = ModelInfoRepositoryImpl(
-                databaseManager: databaseManager,
-                apiClient: apiClient
-            )
-            let service = ModelInfoService(
-                modelInfoRepository: modelRepo,
-                syncCoordinator: await syncCoordinator
-            )
-            _modelInfoService = service
-            return service
+        guard let service = _modelInfoService else {
+            fatalError("ModelInfoService not initialized. Call RunAnywhere.initialize() first.")
         }
+        return service
     }
 
-    /// Model assignment service - lazy initialization
+    internal func setModelInfoService(_ service: ModelInfoService) {
+        _modelInfoService = service
+    }
+
+    /// Model assignment service
     private var _modelAssignmentService: ModelAssignmentService?
     public var modelAssignmentService: ModelAssignmentService {
-        get async {
-            if let service = _modelAssignmentService {
-                return service
-            }
-
-            // Require network service to be initialized
-            guard let networkService = networkService else {
-                fatalError("Network service must be initialized before accessing modelAssignmentService")
-            }
-
-            let modelInfoService = await self.modelInfoService
-            let service = ModelAssignmentService(
-                networkService: networkService,
-                modelInfoService: modelInfoService
-            )
-            _modelAssignmentService = service
-            return service
+        guard let service = _modelAssignmentService else {
+            fatalError("ModelAssignmentService not initialized. Call RunAnywhere.initialize() first.")
         }
+        return service
+    }
+
+    internal func setModelAssignmentService(_ service: ModelAssignmentService) {
+        _modelAssignmentService = service
     }
 
     /// Generation analytics service - using unified pattern
@@ -308,250 +268,21 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         // Container is ready for lazy initialization
     }
 
-    /**
-     * Initialize all SDK services and sync with backend
-     *
-     * This method performs complete SDK service initialization:
-     *
-     * 1. **Network Services**: Store authentication service and API client
-     * 2. **Configuration Service**: Load configuration from backend/cache/defaults
-     * 3. **Model Catalog**: Sync model information from backend
-     * 4. **Model Registry**: Initialize for model discovery and management
-     * 5. **Voice Services**: Initialize voice capability (optional)
-     * 6. **Analytics**: Setup telemetry and analytics tracking
-     *
-     * - Parameters:
-     *   - params: SDK initialization parameters
-     *   - authService: Configured authentication service
-     *   - apiClient: Configured API client for backend communication
-     *
-     * - Returns: Loaded configuration data
-     * - Throws: SDKError if critical service initialization fails
-     */
-    public func bootstrap(with params: SDKInitParams, authService: AuthenticationService, apiClient: APIClient) async throws -> ConfigurationData { // swiftlint:disable:this function_body_length
-        // Step 1: Create and store network service based on environment
-        self.networkService = NetworkServiceFactory.createNetworkService(
-            for: params.environment,
-            params: params
-        )
+    // MARK: - Internal Setters (for bootstrap services)
 
-        // Store auth service and API client if provided
-        self.authenticationService = authService
-        self.apiClient = apiClient
-
-        logger.debug("Network services configured for \(params.environment.description)")
-
-        // Step 2: Initialize configuration service and load configuration
-        let configRepository = ConfigurationRepositoryImpl(
-            databaseManager: databaseManager,
-            apiClient: apiClient
-        )
-        _configurationService = ConfigurationService(
-            configRepository: configRepository,
-            syncCoordinator: await syncCoordinator
-        )
-
-        // Load configuration from backend/cache/defaults
-        var loadedConfig: ConfigurationData?
-        if let configService = _configurationService {
-            let effectiveConfig = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
-            loadedConfig = effectiveConfig
-            eventBus.publish(SDKConfigurationEvent.loaded(configuration: effectiveConfig))
-            logger.info("Configuration loaded (source: \(effectiveConfig.source))")
-        }
-
-        // Step 3: Sync model catalog from backend
-        logger.debug("Syncing model catalog")
-        let modelInfoService = await self.modelInfoService
-
-        // Trigger sync to fetch latest models from backend
-        try? await modelInfoService.syncModelInfo()
-
-        // Load stored models (now includes synced data)
-        let storedModels = try? await modelInfoService.loadStoredModels()
-        if let models = storedModels {
-            logger.info("Model catalog synced: \(models.count) models available")
-            eventBus.publish(SDKModelEvent.catalogLoaded(models: models))
-        }
-
-        // Step 4: Initialize model registry
-        await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
-        logger.debug("Model registry initialized")
-
-        // Step 5: Initialize optional voice services
-        do {
-            try await voiceCapabilityService.initialize()
-            logger.info("Voice capability service initialized")
-        } catch {
-            logger.warning("Voice service initialization failed (optional): \(error)")
-        }
-
-        // Step 6: Initialize analytics
-        if let client = self.apiClient {
-            let telemetryRepo = TelemetryRepositoryImpl(
-                databaseManager: databaseManager,
-                apiClient: client
-            )
-            await analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
-            logger.info("Analytics initialized with remote data source")
-        } else {
-            logger.warning("Analytics not initialized - API client is nil")
-        }
-
-        // Return the loaded configuration or create a default one
-        if let config = loadedConfig {
-            return config
-        } else {
-            // Create default configuration if none was loaded
-            let defaultConfig = ConfigurationData(
-                id: "default-\(UUID().uuidString)",
-                apiKey: params.apiKey,
-                source: .defaults
-            )
-            return defaultConfig
-        }
+    /// Set the network service (internal use only)
+    internal func setNetworkService(_ service: any NetworkService) {
+        self.networkService = service
     }
 
-    /**
-     * Initialize SDK services for development mode (no API authentication)
-     *
-     * This method performs local-only SDK service initialization:
-     *
-     * 1. **Configuration Service**: Load configuration from defaults only
-     * 2. **Model Catalog**: Use mock model data
-     * 3. **Model Registry**: Initialize for model discovery and management
-     * 4. **Voice Services**: Initialize voice capability (optional)
-     * 5. **Analytics**: Setup with local-only tracking
-     *
-     * - Parameters:
-     *   - params: SDK initialization parameters
-     *
-     * - Returns: Loaded configuration data
-     * - Throws: SDKError if critical service initialization fails
-     */
-    public func bootstrapDevelopmentMode(with params: SDKInitParams) async throws -> ConfigurationData {
-        logger.info("🚀 Bootstrapping SDK in DEVELOPMENT mode")
-
-        // Create mock network service for development
-        self.networkService = NetworkServiceFactory.createNetworkService(
-            for: .development,
-            params: params
-        )
-        logger.info("🔧 Mock network service initialized")
-
-        // Step 1: Create default configuration (no API needed)
-        let defaultConfig = ConfigurationData(
-            id: "dev-\(UUID().uuidString)",
-            apiKey: params.apiKey.isEmpty ? "dev-mode" : params.apiKey,
-            source: .defaults
-        )
-
-        _configurationService = ConfigurationService(
-            configRepository: nil, // No repository in dev mode
-            syncCoordinator: nil // No sync in dev mode
-        )
-
-        eventBus.publish(SDKConfigurationEvent.loaded(configuration: defaultConfig))
-        logger.info("Configuration loaded (source: defaults for development)")
-
-        // Step 2: Model catalog
-        logger.debug("Models will be loaded from network")
-
-        // Step 3: Initialize model registry
-        await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
-        logger.debug("Model registry initialized")
-
-        // Step 4: Initialize optional voice services
-        do {
-            try await voiceCapabilityService.initialize()
-            logger.info("Voice capability service initialized")
-        } catch {
-            logger.warning("Voice service initialization failed (optional): \(error)")
-        }
-
-        // Step 5: Skip analytics initialization in development mode
-        logger.info("Analytics disabled in development mode")
-
-        logger.info("✅ Development mode bootstrap completed")
-
-        // Return the default configuration
-        return defaultConfig
+    /// Set the API client (internal use only)
+    internal func setAPIClient(_ client: APIClient) {
+        self.apiClient = client
     }
 
-    // MARK: - Local Setup
-
-    /// Setup only local services (no network calls)
-    /// Called during fast initialization
-    /// - Parameter params: SDK initialization parameters
-    /// - Throws: SDKError if local setup fails
-    public func setupLocalServices(with params: SDKInitParams) throws {
-        let logger = SDKLogger(category: "ServiceContainer.LocalSetup")
-        logger.info("Setting up local services...")
-
-        // Step 1: Initialize model registry for local discovery
-        // This needs to happen even in fast initialization to discover cached models
-        Task {
-            await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
-            logger.debug("Model registry initialized for local discovery")
-        }
-
-        // Step 2: Setup analytics for local queuing (no network submission yet)
-        // Analytics will be initialized when network services are available
-        logger.debug("Analytics queue ready for lazy initialization")
-
-        logger.info("✅ Local services setup completed")
-    }
-
-    /// Initialize network services lazily when first needed
-    /// - Parameter params: SDK initialization parameters
-    /// - Throws: SDKError if network initialization fails
-    public func initializeNetworkServices(with params: SDKInitParams) async throws {
-        // Skip if already initialized
-        if authenticationService != nil {
-            return
-        }
-
-        let logger = SDKLogger(category: "ServiceContainer.NetworkSetup")
-        logger.info("Initializing network services...")
-
-        // Step 1: Create and store network service based on environment
-        self.networkService = NetworkServiceFactory.createNetworkService(
-            for: params.environment,
-            params: params
-        )
-
-        // Step 2: Create API client and authentication service for production/staging
-        if params.environment != .development {
-            let apiClient = APIClient(
-                baseURL: params.baseURL,
-                apiKey: params.apiKey
-            )
-
-            let authService = AuthenticationService(apiClient: apiClient)
-            await apiClient.setAuthenticationService(authService)
-
-            // Store for later use
-            self.authenticationService = authService
-            self.apiClient = apiClient
-
-            // Authenticate with backend
-            let authResponse = try await authService.authenticate(apiKey: params.apiKey)
-            logger.info("Authentication successful, token expires in \(authResponse.expiresIn) seconds")
-        }
-
-        // Step 3: Initialize analytics with API client
-        if let client = self.apiClient {
-            let telemetryRepo = TelemetryRepositoryImpl(
-                databaseManager: databaseManager,
-                apiClient: client
-            )
-            await analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
-            logger.info("Analytics initialized with remote data source")
-        } else {
-            logger.warning("Analytics not initialized - API client is nil")
-        }
-
-        logger.info("Network services initialization completed")
+    /// Set the authentication service (internal use only)
+    internal func setAuthenticationService(_ service: AuthenticationService) {
+        self.authenticationService = service
     }
 
     /// Reset service container state (for testing)

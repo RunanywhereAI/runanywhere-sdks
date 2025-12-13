@@ -125,4 +125,18 @@ public actor ConfigurationService: ConfigurationServiceProtocol {
             try await syncCoordinator.sync(repository)
         }
     }
+
+    // MARK: - Factory Methods
+
+    /// Create default configuration for development mode (no backend sync)
+    /// - Parameter apiKey: The API key (can be empty for dev mode)
+    /// - Returns: Default configuration data
+    public func createDevelopmentModeConfig(apiKey: String) -> ConfigurationData {
+        let config = ConfigurationData(
+            id: "dev-\(UUID().uuidString)",
+            apiKey: apiKey.isEmpty ? "dev-mode" : apiKey,
+            source: .defaults
+        )
+        return config
+    }
 }

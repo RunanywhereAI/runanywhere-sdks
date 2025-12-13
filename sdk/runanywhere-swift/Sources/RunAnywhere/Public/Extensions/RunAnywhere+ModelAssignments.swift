@@ -17,10 +17,8 @@ extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        // Ensure network services are initialized (lazy initialization)
-        if let params = initParams {
-            try await serviceContainer.initializeNetworkServices(with: params)
-        }
+        // Ensure network services are initialized (lazy initialization via device registration)
+        try await ensureDeviceRegistered()
 
         logger.info("Fetching model assignments...")
 
@@ -49,10 +47,8 @@ extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        // Ensure network services are initialized
-        if let params = initParams {
-            try await serviceContainer.initializeNetworkServices(with: params)
-        }
+        // Ensure network services are initialized (lazy initialization via device registration)
+        try await ensureDeviceRegistered()
 
         // Delegate to service container's model assignment service
         return try await serviceContainer.modelAssignmentService.getModelsForFramework(framework)
@@ -67,10 +63,8 @@ extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        // Ensure network services are initialized
-        if let params = initParams {
-            try await serviceContainer.initializeNetworkServices(with: params)
-        }
+        // Ensure network services are initialized (lazy initialization via device registration)
+        try await ensureDeviceRegistered()
 
         // Delegate to service container's model assignment service
         return try await serviceContainer.modelAssignmentService.getModelsForCategory(category)
