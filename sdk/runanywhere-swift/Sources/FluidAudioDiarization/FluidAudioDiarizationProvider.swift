@@ -1,65 +1,55 @@
+//
+//  FluidAudioDiarizationModule.swift
+//  FluidAudioDiarization Module
+//
+//  Simple registration for FluidAudio Speaker Diarization services
+//
+
 import Foundation
 import RunAnywhere
 
-/// FluidAudioDiarization provider for Speaker Diarization services
+// MARK: - FluidAudio Module Registration
+
+/// FluidAudio module for Speaker Diarization
 ///
 /// Usage:
 /// ```swift
 /// import FluidAudioDiarization
 ///
-/// // In your app initialization:
-/// FluidAudioDiarizationProvider.register()
+/// // Register at app startup
+/// FluidAudio.register()
+///
+/// // Then use via RunAnywhere
+/// let capability = SpeakerDiarizationCapability()
+/// try await capability.initialize()
+/// let speaker = try await capability.processAudio(samples)
 /// ```
-public final class FluidAudioDiarizationProvider: SpeakerDiarizationServiceProvider {
-    private let logger = SDKLogger(category: "FluidAudioDiarizationProvider")
+public enum FluidAudio {
+    private static let logger = SDKLogger(category: "FluidAudio")
 
-    // MARK: - Singleton for easy registration
-
-    public static let shared = FluidAudioDiarizationProvider()
-
-    /// Super simple registration - just call this in your app
+    /// Register FluidAudio Speaker Diarization service with the SDK
     @MainActor
-    public static func register() {
-        ModuleRegistry.shared.registerSpeakerDiarization(shared)
+    public static func register(priority: Int = 100) {
+        ServiceRegistry.shared.registerSpeakerDiarization(
+            name: "FluidAudio",
+            priority: priority,
+            canHandle: { _ in true }, // FluidAudio can handle all diarization requests
+            factory: { config in
+                try await createService(config: config)
+            }
+        )
+        logger.info("FluidAudio Speaker Diarization registered")
     }
 
-    // MARK: - SpeakerDiarizationServiceProvider Protocol
+    // MARK: - Private Helpers
 
-    public var name: String {
-        "FluidAudioDiarization"
-    }
+    private static func createService(config: SpeakerDiarizationConfiguration) async throws -> SpeakerDiarizationService {
+        logger.info("Creating FluidAudio diarization service")
 
-    public func canHandle(modelId: String?) -> Bool {
-        // FluidAudioDiarization can handle any speaker diarization request
-        // It doesn't require specific model IDs
-        return true
-    }
-
-    public func createSpeakerDiarizationService(configuration: SpeakerDiarizationConfiguration) async throws -> SpeakerDiarizationService {
-        logger.info("Creating FluidAudioDiarization service")
-
-        // Create FluidAudioDiarization service directly
-        let threshold: Float = 0.65  // Default threshold
+        let threshold: Float = 0.65 // Default threshold
         let service = try await FluidAudioDiarization(threshold: threshold)
 
-        logger.info("FluidAudioDiarization service created successfully")
+        logger.info("FluidAudio service created successfully")
         return service
-    }
-
-    // MARK: - Private initializer to enforce singleton
-
-    private init() {
-        logger.info("FluidAudioDiarizationProvider initialized")
-    }
-}
-
-// MARK: - Auto Registration Support
-
-/// Automatic registration when module is imported
-public enum FluidAudioDiarizationModule {
-    /// Call this to automatically register FluidAudioDiarization with the SDK
-    @MainActor
-    public static func autoRegister() {
-        FluidAudioDiarizationProvider.register()
     }
 }

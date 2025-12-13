@@ -10,11 +10,21 @@ import Foundation
 /// Registry for all framework adapters (text, voice, image, etc.)
 /// Manages adapter registration, retrieval, and model-to-adapter matching
 public final class AdapterRegistry {
-    private let registry = UnifiedServiceRegistry()
 
-    // Legacy storage for backward compatibility
-    private var adapters: [LLMFramework: FrameworkAdapter] = [:]
+    // MARK: - Storage
+
+    /// Prioritized adapter storage
+    private struct PrioritizedAdapter {
+        let adapter: FrameworkAdapter
+        let priority: Int
+    }
+
+    private var adapters: [LLMFramework: PrioritizedAdapter] = [:]
     private let queue = DispatchQueue(label: "com.runanywhere.adapterRegistry", attributes: .concurrent)
+
+    // MARK: - Initialization
+
+    public init() {}
 
     // MARK: - Registration
 
@@ -24,14 +34,8 @@ public final class AdapterRegistry {
     ///   - adapter: The adapter to register
     ///   - priority: Priority level (higher = preferred)
     public func register(_ adapter: FrameworkAdapter, priority: Int = 100) {
-        // Register in new unified registry
-        Task {
-            await registry.register(adapter, priority: priority)
-        }
-
-        // Also register in legacy storage for backward compatibility
         queue.async(flags: .barrier) {
-            self.adapters[adapter.framework] = adapter
+            self.adapters[adapter.framework] = PrioritizedAdapter(adapter: adapter, priority: priority)
         }
 
         // Call external services outside of the queue to prevent deadlocks
@@ -59,21 +63,18 @@ public final class AdapterRegistry {
     /// - Returns: The adapter if registered
     public func getAdapter(for framework: LLMFramework) -> FrameworkAdapter? {
         queue.sync {
-            return adapters[framework]
+            return adapters[framework]?.adapter
         }
     }
 
-    /// Find best adapter for a model (uses unified registry)
+    /// Find best adapter for a model
     /// - Parameters:
     ///   - model: The model to find an adapter for
     ///   - modality: Optional modality filter
     /// - Returns: The best matching adapter
     public func findBestAdapter(for model: ModelInfo, modality: FrameworkModality? = nil) async -> FrameworkAdapter? {
-        // Determine modality if not provided
-        let targetModality = modality ?? determineModality(for: model)
-
-        // Use unified registry
-        return await registry.findBestAdapter(for: model, modality: targetModality)
+        let allAdapters = await findAllAdapters(for: model, modality: modality)
+        return allAdapters.first
     }
 
     /// Find all adapters capable of handling a model
@@ -82,11 +83,26 @@ public final class AdapterRegistry {
     ///   - modality: Optional modality filter
     /// - Returns: Array of capable adapters in priority order
     public func findAllAdapters(for model: ModelInfo, modality: FrameworkModality? = nil) async -> [FrameworkAdapter] {
-        // Determine modality if not provided
         let targetModality = modality ?? determineModality(for: model)
 
-        // Use unified registry
-        return await registry.findAdapters(for: model, modality: targetModality)
+        return queue.sync {
+            var matching: [(adapter: FrameworkAdapter, priority: Int)] = []
+
+            for (_, prioritized) in adapters {
+                let adapter = prioritized.adapter
+
+                // Check modality support
+                guard adapter.supportedModalities.contains(targetModality) else { continue }
+
+                // Check if adapter can handle this model
+                guard adapter.canHandle(model: model) else { continue }
+
+                matching.append((adapter, prioritized.priority))
+            }
+
+            // Sort by priority (higher first)
+            return matching.sorted { $0.priority > $1.priority }.map(\.adapter)
+        }
     }
 
     /// Synchronous version for backward compatibility
@@ -96,14 +112,14 @@ public final class AdapterRegistry {
         return queue.sync {
             // First try preferred framework
             if let preferred = model.preferredFramework,
-               let adapter = adapters[preferred],
+               let adapter = adapters[preferred]?.adapter,
                adapter.canHandle(model: model) {
                 return adapter
             }
 
             // Then try compatible frameworks
             for framework in model.compatibleFrameworks {
-                if let adapter = adapters[framework],
+                if let adapter = adapters[framework]?.adapter,
                    adapter.canHandle(model: model) {
                     return adapter
                 }
@@ -119,7 +135,7 @@ public final class AdapterRegistry {
     /// - Returns: Dictionary of frameworks to adapters
     public func getRegisteredAdapters() -> [LLMFramework: FrameworkAdapter] {
         queue.sync {
-            return adapters
+            return adapters.mapValues(\.adapter)
         }
     }
 
@@ -136,8 +152,8 @@ public final class AdapterRegistry {
     /// - Returns: Array of frameworks supporting that modality
     public func getFrameworks(for modality: FrameworkModality) -> [LLMFramework] {
         queue.sync {
-            return adapters.compactMap { framework, adapter in
-                adapter.supportedModalities.contains(modality) ? framework : nil
+            return adapters.compactMap { framework, prioritized in
+                prioritized.adapter.supportedModalities.contains(modality) ? framework : nil
             }
         }
     }
@@ -150,7 +166,7 @@ public final class AdapterRegistry {
 
             return LLMFramework.allCases.map { framework in
                 let isAvailable = registeredFrameworks.contains(framework)
-                let adapter = adapters[framework]
+                let adapter = adapters[framework]?.adapter
                 return FrameworkAvailability(
                     framework: framework,
                     isAvailable: isAvailable,

@@ -237,14 +237,6 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             )
             serviceContainer.setModelAssignmentService(modelAssignmentService)
 
-            // Create ModelLoadingOrchestrator
-            let orchestrator = ModelLoadingOrchestrator(
-                modelLoadingService: serviceContainer.modelLoadingService,
-                telemetryService: telemetryService,
-                modelRegistry: serviceContainer.modelRegistry
-            )
-            serviceContainer.setModelLoadingOrchestrator(orchestrator)
-
             logger.info("Core services created and injected")
 
             // Step 4: Load configuration
@@ -261,15 +253,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
             logger.debug("Model registry initialized")
 
-            // Step 7: Initialize voice capability (optional)
-            do {
-                try await serviceContainer.voiceCapabilityService.initialize()
-                logger.info("Voice capability service initialized")
-            } catch {
-                logger.warning("Voice service initialization failed: \(error)")
-            }
-
-            // Step 8: Initialize analytics
+            // Step 7: Initialize analytics
             await serviceContainer.analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
             logger.info("Analytics initialized with remote data source")
 
@@ -295,14 +279,6 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             // Step 3: Initialize model registry
             await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
             logger.debug("Model registry initialized")
-
-            // Step 4: Initialize voice capability (optional)
-            do {
-                try await serviceContainer.voiceCapabilityService.initialize()
-                logger.info("Voice capability service initialized")
-            } catch {
-                logger.warning("Voice service initialization failed: \(error)")
-            }
 
             logger.info("✅ Development mode bootstrap completed")
             // Skip analytics in development mode
@@ -357,11 +333,6 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         return result.text
     }
 
-    /// Text generation with options
-    /// - Parameters:
-    ///   - prompt: The text prompt
-    ///   - options: Generation options (optional, defaults to maxTokens: 100)
-    /// - Returns: Generated response
     /// Generate text with full metrics and analytics
     /// - Parameters:
     ///   - prompt: The text prompt
@@ -383,9 +354,9 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             // Lazy device registration on first API call (O(1) after first call)
             try await ensureDeviceRegistered()
 
-            // Use options directly or defaults
-            let result = try await serviceContainer.generationService.generate(
-                prompt: prompt,
+            // Use the new LLMCapability
+            let result = try await serviceContainer.llmCapability.generate(
+                prompt,
                 options: options ?? LLMGenerationOptions()
             )
 
@@ -442,8 +413,9 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         // Lazy device registration on first API call (O(1) after first call)
         try await ensureDeviceRegistered()
 
-        return serviceContainer.streamingService.generateStreamWithMetrics(
-            prompt: prompt,
+        // Use the new LLMCapability
+        return try await serviceContainer.llmCapability.generateStream(
+            prompt,
             options: options ?? LLMGenerationOptions()
         )
     }
@@ -453,7 +425,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// Simple voice transcription using default model
     /// - Parameter audioData: Audio data to transcribe
     /// - Returns: Transcribed text
-    /// - Note: For more control over model/options, use `RunAnywhere.transcribe(audio:modelId:options:)` in the Voice extension
+    /// - Note: For more control, use `RunAnywhere.transcribe(_:options:)` in RunAnywhere+STT
     public static func transcribe(_ audioData: Data) async throws -> String {
         guard isInitialized else { throw RunAnywhereError.notInitialized }
         try await ensureDeviceRegistered()
@@ -462,7 +434,8 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         events.publishAsync(SDKVoiceEvent.transcriptionStarted)
 
         do {
-            let result = try await serviceContainer.voiceOrchestrator.transcribe(audio: audioData)
+            // Use the new STTCapability
+            let result = try await serviceContainer.sttCapability.transcribe(audioData)
             events.publishAsync(SDKVoiceEvent.transcriptionFinal(text: result.text))
             return result.text
         } catch {
@@ -473,7 +446,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
     // MARK: - Model Management
 
-    /// Load a model by ID
+    /// Load an LLM model by ID
     /// - Parameter modelId: The model identifier
     public static func loadModel(_ modelId: String) async throws {
         // Ensure initialized
@@ -484,18 +457,46 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         // Lazy device registration on first API call
         try await ensureDeviceRegistered()
 
-        // Delegate to orchestrator which handles lifecycle, telemetry, analytics, and events
-        let result = try await serviceContainer.modelLoadingOrchestrator.loadLLMModel(modelId)
+        events.publishAsync(SDKModelEvent.loadStarted(modelId: modelId))
 
-        // Set the loaded model in the generation service
-        if let loadedModel = result.loadedModel {
-            serviceContainer.generationService.setCurrentModel(loadedModel)
+        do {
+            // Use the new LLMCapability
+            try await serviceContainer.llmCapability.loadModel(modelId)
+            events.publishAsync(SDKModelEvent.loadCompleted(modelId: modelId))
+        } catch {
+            events.publishAsync(SDKModelEvent.loadFailed(modelId: modelId, error: error))
+            throw error
+        }
+    }
+
+    /// Unload the currently loaded LLM model
+    public static func unloadModel() async throws {
+        guard isInitialized else {
+            throw RunAnywhereError.notInitialized
+        }
+
+        events.publishAsync(SDKModelEvent.unloadStarted)
+
+        do {
+            try await serviceContainer.llmCapability.unload()
+            events.publishAsync(SDKModelEvent.unloadCompleted)
+        } catch {
+            events.publishAsync(SDKModelEvent.unloadFailed(error))
+            throw error
+        }
+    }
+
+    /// Check if an LLM model is loaded
+    public static var isModelLoaded: Bool {
+        get async {
+            await serviceContainer.llmCapability.isModelLoaded
         }
     }
 
     /// Load an STT (Speech-to-Text) model by ID
-    /// This initializes the STT component and loads the model into memory
-    /// - Parameter modelId: The model identifier
+    /// This loads the model into the STT capability
+    /// - Parameter modelId: The model identifier (e.g., "whisper-base")
+    /// - Note: Use `loadSTTModel` from RunAnywhere+STT for the same functionality
     public static func loadSTTModel(_ modelId: String) async throws {
         // Ensure initialized
         guard isInitialized else {
@@ -505,21 +506,23 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         // Lazy device registration on first API call
         try await ensureDeviceRegistered()
 
-        // Delegate to orchestrator which handles lifecycle, telemetry, analytics, and events
-        let result = try await serviceContainer.modelLoadingOrchestrator.loadSTTModel(modelId)
+        events.publishAsync(SDKModelEvent.loadStarted(modelId: modelId))
 
-        // Store the component for later use
-        if let sttComponent = result.sttComponent {
-            await MainActor.run {
-                _loadedSTTComponent = sttComponent
-            }
+        do {
+            // Use the new STTCapability
+            try await serviceContainer.sttCapability.loadModel(modelId)
+            events.publishAsync(SDKModelEvent.loadCompleted(modelId: modelId))
+        } catch {
+            events.publishAsync(SDKModelEvent.loadFailed(modelId: modelId, error: error))
+            throw error
         }
     }
 
-    /// Load a TTS (Text-to-Speech) model by ID
-    /// This initializes the TTS component and loads the model into memory
-    /// - Parameter modelId: The model identifier (voice name)
-    public static func loadTTSModel(_ modelId: String) async throws {
+    /// Load a TTS (Text-to-Speech) voice by ID
+    /// This loads the voice into the TTS capability
+    /// - Parameter voiceId: The voice identifier
+    /// - Note: Use `loadTTSVoice` from RunAnywhere+TTS for the same functionality
+    public static func loadTTSModel(_ voiceId: String) async throws {
         // Ensure initialized
         guard isInitialized else {
             throw RunAnywhereError.notInitialized
@@ -528,31 +531,16 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         // Lazy device registration on first API call
         try await ensureDeviceRegistered()
 
-        // Delegate to orchestrator which handles lifecycle, telemetry, analytics, and events
-        let result = try await serviceContainer.modelLoadingOrchestrator.loadTTSModel(modelId)
+        events.publishAsync(SDKModelEvent.loadStarted(modelId: voiceId))
 
-        // Store the component for later use
-        if let ttsComponent = result.ttsComponent {
-            await MainActor.run {
-                _loadedTTSComponent = ttsComponent
-            }
+        do {
+            // Use the new TTSCapability
+            try await serviceContainer.ttsCapability.loadVoice(voiceId)
+            events.publishAsync(SDKModelEvent.loadCompleted(modelId: voiceId))
+        } catch {
+            events.publishAsync(SDKModelEvent.loadFailed(modelId: voiceId, error: error))
+            throw error
         }
-    }
-
-    // MARK: - Loaded Component Storage
-
-    @MainActor private static var _loadedSTTComponent: STTComponent?
-
-    @MainActor private static var _loadedTTSComponent: TTSComponent?
-
-    /// Get the currently loaded STT component
-    @MainActor public static var loadedSTTComponent: STTComponent? {
-        return _loadedSTTComponent
-    }
-
-    /// Get the currently loaded TTS component
-    @MainActor public static var loadedTTSComponent: TTSComponent? {
-        return _loadedTTSComponent
     }
 
     /// Get available models
@@ -562,11 +550,11 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         return await serviceContainer.modelRegistry.discoverModels()
     }
 
-    /// Get currently loaded model
-    /// - Returns: Currently loaded model info
-    public static func getCurrentModel() async -> ModelInfo? {
+    /// Get currently loaded LLM model ID
+    /// - Returns: Currently loaded model ID if any
+    public static func getCurrentModelId() async -> String? {
         guard isInitialized else { return nil }
-        return await serviceContainer.generationService.getCurrentModel()?.model
+        return await serviceContainer.llmCapability.currentModelId
     }
 
     // MARK: - Multi-Adapter Support (NEW)
@@ -673,21 +661,12 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     }
 }
 
-// MARK: - Factory Methods
-
-extension RunAnywhere {
-    /// Create a new conversation for multi-turn dialogues
-    public static func conversation() -> Conversation {
-        Conversation()
-    }
-}
-
 // MARK: - Utilities
 
 extension RunAnywhere {
     /// Estimate token count in text
     ///
-    /// Uses improved heuristics for accurate token estimation.
+    /// Uses simple heuristics (~4 characters per token) for estimation.
     ///
     /// Example:
     /// ```swift
@@ -699,6 +678,7 @@ extension RunAnywhere {
     /// - Parameter text: The text to analyze
     /// - Returns: Estimated number of tokens
     public static func estimateTokenCount(_ text: String) -> Int {
-        return TokenCounter.estimateTokenCount(text)
+        // Simple estimation: ~4 characters per token on average
+        return max(1, text.count / 4)
     }
 }

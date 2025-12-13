@@ -1,53 +1,61 @@
+//
+//  FoundationModelsModule.swift
+//  FoundationModelsAdapter Module
+//
+//  Simple registration for Apple Foundation Models LLM services
+//
+
 import Foundation
 import OSLog
 import RunAnywhere
 
-/// Foundation Models provider for Language Model services (Apple's built-in LLM)
+// MARK: - Foundation Models Module Registration
+
+/// Foundation Models module for LLM text generation using Apple's built-in models
 ///
 /// Usage:
 /// ```swift
-/// import FoundationModels
+/// import FoundationModelsAdapter
 ///
-/// // In your app initialization (iOS 26+ / macOS 26+ only):
+/// // Register at app startup (iOS 26+ / macOS 26+ only):
 /// if #available(iOS 26.0, macOS 26.0, *) {
-///     FoundationModelsServiceProvider.register()
+///     FoundationModels.register()
 /// }
 /// ```
 @available(iOS 26.0, macOS 26.0, *)
-public final class FoundationModelsServiceProvider: LLMServiceProvider {
-    private let logger = Logger(
+public enum FoundationModels {
+    private static let logger = Logger(
         subsystem: "com.runanywhere.FoundationModels",
-        category: "FoundationModelsServiceProvider"
+        category: "FoundationModels"
     )
 
-    // MARK: - Singleton for easy registration
-
-    public static let shared = FoundationModelsServiceProvider()
-
-    /// Super simple registration - just call this in your app
+    /// Register Foundation Models LLM service with the SDK
     @MainActor
-    public static func register() {
-        ModuleRegistry.shared.registerLLM(shared)
+    public static func register(priority: Int = 50) {
+        ServiceRegistry.shared.registerLLM(
+            name: "Apple Foundation Models",
+            priority: priority,
+            canHandle: { modelId in
+                canHandleModel(modelId)
+            },
+            factory: { config in
+                try await createService(config: config)
+            }
+        )
+        logger.info("Foundation Models LLM registered")
     }
 
-    // MARK: - LLMServiceProvider Protocol
+    // MARK: - Private Helpers
 
-    public var name: String {
-        "Apple Foundation Models"
-    }
-
-    public func canHandle(modelId: String?) -> Bool {
-        // Check if we're running on iOS 26+ or macOS 26+
+    private static func canHandleModel(_ modelId: String?) -> Bool {
         guard #available(iOS 26.0, macOS 26.0, *) else {
             return false
         }
 
-        // Accept nil or empty modelId (will use default Foundation Model)
         guard let modelId = modelId, !modelId.isEmpty else {
-            return false // Don't claim nil/empty - let other providers handle those
+            return false
         }
 
-        // Handle Foundation Models specific identifiers
         let lowercasedId = modelId.lowercased()
         return lowercasedId.contains("foundation")
             || lowercasedId.contains("apple")
@@ -55,35 +63,13 @@ public final class FoundationModelsServiceProvider: LLMServiceProvider {
             || modelId == "foundation-models-native"
     }
 
-    public func createLLMService(configuration: LLMConfiguration) async throws -> LLMService {
+    private static func createService(config: LLMConfiguration) async throws -> LLMService {
         logger.info("Creating Foundation Models service")
 
-        // Create the service
         let service = FoundationModelsService()
-
-        // Initialize the service (Foundation Models doesn't need a model path)
-        logger.info("Initializing Foundation Models service")
         try await service.initialize(modelPath: "built-in")
 
         logger.info("Foundation Models service created successfully")
         return service
-    }
-
-    // MARK: - Private initializer to enforce singleton
-
-    private init() {
-        logger.info("FoundationModelsServiceProvider initialized")
-    }
-}
-
-// MARK: - Auto Registration Support
-
-/// Automatic registration when module is imported
-@available(iOS 26.0, macOS 26.0, *)
-public enum FoundationModelsModule {
-    /// Call this to automatically register Foundation Models with the SDK
-    @MainActor
-    public static func autoRegister() {
-        FoundationModelsServiceProvider.register()
     }
 }

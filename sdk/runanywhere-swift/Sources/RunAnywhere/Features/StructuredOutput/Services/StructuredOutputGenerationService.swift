@@ -20,13 +20,13 @@ public final class StructuredOutputGenerationService {
     ///   - type: The type to generate (must conform to Generatable)
     ///   - prompt: The prompt to generate from
     ///   - options: Generation options (structured output config will be added automatically)
-    ///   - generationService: The LLM generation service to use
+    ///   - llmCapability: The LLM capability to use for generation
     /// - Returns: The generated object of the specified type
     public func generateStructured<T: Generatable>(
         _ type: T.Type,
         prompt: String,
         options: LLMGenerationOptions?,
-        generationService: LLMGenerationService
+        llmCapability: LLMCapability
     ) async throws -> T {
         // Get system prompt for structured output
         let systemPrompt = handler.getSystemPrompt(for: type)
@@ -49,9 +49,9 @@ public final class StructuredOutputGenerationService {
         // Build user prompt
         let userPrompt = handler.buildUserPrompt(for: type, content: prompt)
 
-        // Generate the text
-        let generationResult = try await generationService.generate(
-            prompt: userPrompt,
+        // Generate the text using LLMCapability
+        let generationResult = try await llmCapability.generate(
+            userPrompt,
             options: effectiveOptions
         )
 
@@ -178,13 +178,13 @@ public final class StructuredOutputGenerationService {
     ///   - prompt: The prompt to generate from
     ///   - structuredOutput: Structured output configuration
     ///   - options: Generation options
-    ///   - generationService: The LLM generation service to use
+    ///   - llmCapability: The LLM capability to use for generation
     /// - Returns: Generation result with structured data
     public func generateWithStructuredOutput(
         prompt: String,
         structuredOutput: StructuredOutputConfig,
         options: LLMGenerationOptions?,
-        generationService: LLMGenerationService
+        llmCapability: LLMCapability
     ) async throws -> LLMGenerationResult {
         // Generate using regular generation with structured config in options
         let baseOptions = options ?? LLMGenerationOptions()
@@ -199,8 +199,8 @@ public final class StructuredOutputGenerationService {
             systemPrompt: baseOptions.systemPrompt
         )
 
-        return try await generationService.generate(
-            prompt: prompt,
+        return try await llmCapability.generate(
+            prompt,
             options: internalOptions
         )
     }

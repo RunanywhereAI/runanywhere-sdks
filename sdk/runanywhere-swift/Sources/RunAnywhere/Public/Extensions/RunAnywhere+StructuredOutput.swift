@@ -22,7 +22,7 @@ public extension RunAnywhere {
                 type,
                 prompt: prompt,
                 options: options,
-                generationService: serviceContainer.generationService
+                llmCapability: serviceContainer.llmCapability
             )
 
             events.publish(SDKGenerationEvent.completed(
@@ -54,8 +54,8 @@ public extension RunAnywhere {
             content: content,
             options: options,
             streamGenerator: { prompt, opts in
-                serviceContainer.streamingService.generateStreamWithMetrics(
-                    prompt: prompt,
+                try await serviceContainer.llmCapability.generateStream(
+                    prompt,
                     options: opts
                 )
             }
@@ -80,7 +80,7 @@ public extension RunAnywhere {
                 prompt: prompt,
                 structuredOutput: structuredOutput,
                 options: options,
-                generationService: serviceContainer.generationService
+                llmCapability: serviceContainer.llmCapability
             )
 
             events.publish(SDKGenerationEvent.completed(

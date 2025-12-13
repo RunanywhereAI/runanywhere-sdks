@@ -1,96 +1,202 @@
+//
+//  ONNXModule.swift
+//  ONNXRuntime Module
+//
+//  Simple registration for ONNX Runtime STT and TTS services
+//
+
 import Foundation
 import RunAnywhere
 
-/// Service provider for ONNX Runtime STT capabilities
-public struct ONNXSTTServiceProvider: STTServiceProvider {
-    private static let logger = SDKLogger(category: "ONNXServiceProvider")
+// MARK: - ONNX Module Registration
 
-    public let name: String = "ONNX Runtime"
-    public let version: String = "1.23.2"
+/// ONNX module for STT and TTS
+///
+/// Usage:
+/// ```swift
+/// import ONNXRuntime
+///
+/// // Register at app startup
+/// ONNX.register()
+///
+/// // Then use via RunAnywhere
+/// try await RunAnywhere.loadSTTModel("my-onnx-model")
+/// let text = try await RunAnywhere.transcribe(audioData)
+/// ```
+public enum ONNX {
+    private static let logger = SDKLogger(category: "ONNX")
 
-    public init() {}
+    /// Register all ONNX services with the SDK
+    @MainActor
+    public static func register(priority: Int = 100) {
+        registerSTT(priority: priority)
+        registerTTS(priority: priority)
+        logger.info("ONNX module registered (STT + TTS)")
+    }
 
-    public func createSTTService(configuration: STTConfiguration) async throws -> STTService {
-        Self.logger.info("Creating ONNX Runtime STT service for model: \(configuration.modelId ?? "unknown")")
+    /// Register only ONNX STT service
+    @MainActor
+    public static func registerSTT(priority: Int = 100) {
+        ServiceRegistry.shared.registerSTT(
+            name: "ONNX Runtime",
+            priority: priority,
+            canHandle: { modelId in
+                canHandleSTT(modelId)
+            },
+            factory: { config in
+                try await createSTTService(config: config)
+            }
+        )
+        logger.info("ONNX STT registered")
+    }
 
-        // Get the actual model file path from the model registry
+    /// Register only ONNX TTS service
+    @MainActor
+    public static func registerTTS(priority: Int = 100) {
+        ServiceRegistry.shared.registerTTS(
+            name: "ONNX TTS",
+            priority: priority,
+            canHandle: { modelId in
+                canHandleTTS(modelId)
+            },
+            factory: { config in
+                try await createTTSService(config: config)
+            }
+        )
+        logger.info("ONNX TTS registered")
+    }
+
+    // MARK: - STT Helpers
+
+    private static func canHandleSTT(_ modelId: String?) -> Bool {
+        guard let modelId = modelId else { return false }
+
+        let lowercased = modelId.lowercased()
+
+        // Check model info cache first
+        if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
+            if modelInfo.preferredFramework == .onnx && modelInfo.category == .speechRecognition {
+                return true
+            }
+            if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechRecognition {
+                return true
+            }
+            if modelInfo.format == .onnx && modelInfo.category == .speechRecognition {
+                return true
+            }
+            return false
+        }
+
+        // Fallback: Pattern-based matching
+        if lowercased.contains("onnx") || lowercased.hasSuffix(".onnx") {
+            return true
+        }
+        if lowercased.contains("zipformer") || lowercased.contains("sherpa") {
+            return true
+        }
+
+        return false
+    }
+
+    private static func createSTTService(config: STTConfiguration) async throws -> STTService {
+        logger.info("Creating ONNX STT service for model: \(config.modelId ?? "unknown")")
+
         var modelPath: String?
-        if let modelId = configuration.modelId {
-            // Query all available models and find the one we need
+        if let modelId = config.modelId {
             let allModels = try await RunAnywhere.availableModels()
             let modelInfo = allModels.first { $0.id == modelId }
 
-            // Check if model is downloaded and has a local path
             if let localPath = modelInfo?.localPath {
                 modelPath = localPath.path
-                Self.logger.info("Found local model path: \(modelPath ?? "nil")")
+                logger.info("Found local model path: \(modelPath ?? "nil")")
             } else {
-                // Model not downloaded yet
-                Self.logger.error("Model '\(modelId)' is not downloaded. Please download the model first.")
-                throw SDKError.modelNotFound("Model '\(modelId)' is not downloaded. Please download the model before using it.")
+                logger.error("Model '\(modelId)' is not downloaded")
+                throw SDKError.modelNotFound("Model '\(modelId)' is not downloaded. Please download the model first.")
             }
         }
 
         let service = ONNXSTTService()
         try await service.initialize(modelPath: modelPath)
+        logger.info("ONNX STT service created successfully")
         return service
     }
 
-    public func canHandle(modelId: String?) -> Bool {
+    // MARK: - TTS Helpers
+
+    private static func canHandleTTS(_ modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
 
-        Self.logger.debug("Checking if can handle STT model: \(modelId)")
+        let lowercased = modelId.lowercased()
 
-        // PRIMARY CHECK: Use cached model info from the registry (most reliable)
+        // Check model info cache first
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            // Check if ONNX is the preferred framework for STT
-            if modelInfo.preferredFramework == .onnx && modelInfo.category == .speechRecognition {
-                Self.logger.debug("Model \(modelId) has ONNX as preferred framework for STT")
+            if modelInfo.preferredFramework == .onnx && modelInfo.category == .speechSynthesis {
                 return true
             }
-
-            // Check if ONNX is in compatible frameworks for speech models
-            if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechRecognition {
-                Self.logger.debug("Model \(modelId) has ONNX in compatible frameworks for STT")
+            if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechSynthesis {
                 return true
             }
-
-            // Check if format is ONNX
-            if modelInfo.format == .onnx && modelInfo.category == .speechRecognition {
-                Self.logger.debug("Model \(modelId) has ONNX format for STT")
+            if modelInfo.format == .onnx && modelInfo.category == .speechSynthesis {
                 return true
             }
-
-            // Model info exists but doesn't indicate ONNX STT compatibility
-            Self.logger.debug("Model \(modelId) found in cache but not ONNX STT compatible")
             return false
         }
 
-        // FALLBACK: Pattern-based matching for models not yet in cache
-        let lowercased = modelId.lowercased()
-
-        // Explicitly handle ONNX models
-        if lowercased.contains("onnx") || lowercased.hasSuffix(".onnx") {
-            Self.logger.debug("Model \(modelId) matches ONNX pattern (fallback)")
+        // Fallback: Pattern-based matching
+        if lowercased.contains("piper") {
+            return true
+        }
+        if lowercased.contains("vits") {
+            return true
+        }
+        if lowercased.contains("tts") && lowercased.contains("onnx") {
             return true
         }
 
-        // Handle Sherpa-ONNX models (zipformer, sherpa-whisper)
-        if lowercased.contains("zipformer") || lowercased.contains("sherpa") {
-            Self.logger.debug("Model \(modelId) matches Sherpa-ONNX pattern (fallback)")
-            return true
-        }
-
-        Self.logger.debug("Model \(modelId) does not match any ONNX STT patterns")
         return false
     }
 
-    /// Register this provider with the ModuleRegistry
-    @MainActor
-    public static func register(priority: Int = 100) async {
-        logger.info("Registering ONNX Runtime STT provider with priority \(priority)")
-        let provider = ONNXSTTServiceProvider()
-        ModuleRegistry.shared.registerSTT(provider, priority: priority)
-        logger.info("ONNX Runtime STT provider registered")
+    private static func createTTSService(config: TTSConfiguration) async throws -> TTSService {
+        logger.info("Creating ONNX TTS service for voice: \(config.voice)")
+
+        let modelId = config.voice
+
+        // Get the actual model file path from the model registry
+        var modelPath: String?
+
+        let allModels: [ModelInfo]
+        do {
+            allModels = try await RunAnywhere.availableModels()
+        } catch {
+            logger.error("Failed to fetch available models: \(error)")
+            throw SDKError.modelNotFound("Failed to query available models: \(error.localizedDescription)")
+        }
+
+        let modelInfo = allModels.first { $0.id == modelId }
+
+        if let localPath = modelInfo?.localPath {
+            modelPath = localPath.path
+            logger.info("Found local model path: \(modelPath ?? "nil")")
+        } else {
+            logger.error("TTS Model '\(modelId)' is not downloaded")
+            throw SDKError.modelNotFound("TTS Model '\(modelId)' is not downloaded. Please download the model first.")
+        }
+
+        guard let path = modelPath else {
+            throw SDKError.modelNotFound("Could not find model path for: \(modelId)")
+        }
+
+        logger.info("Creating ONNXTTSService with path: \(path)")
+        let service = ONNXTTSService(modelPath: path)
+
+        do {
+            try await service.initialize()
+            logger.info("ONNX TTS service initialized successfully")
+        } catch {
+            logger.error("Failed to initialize ONNX TTS service: \(error)")
+            throw error
+        }
+
+        return service
     }
 }
