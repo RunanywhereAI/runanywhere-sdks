@@ -58,31 +58,6 @@ public struct GenerationCompletionData: AnalyticsEventData {
     public let temperature: Double?
     public let maxTokens: Int?
 
-    /// Legacy initializer for backward compatibility
-    public init(generationId: String, modelId: String, executionTarget: String, inputTokens: Int, outputTokens: Int, totalTimeMs: Double, timeToFirstTokenMs: Double, tokensPerSecond: Double) {
-        self.modelId = modelId
-        self.modelName = nil
-        self.framework = nil
-        self.device = nil
-        self.osVersion = nil
-        self.platform = nil
-        self.sdkVersion = nil
-        self.processingTimeMs = totalTimeMs
-        self.success = true
-        self.errorMessage = nil
-        self.errorCode = nil
-        self.inputTokens = inputTokens
-        self.outputTokens = outputTokens
-        self.totalTokens = inputTokens + outputTokens
-        self.tokensPerSecond = tokensPerSecond
-        self.timeToFirstTokenMs = timeToFirstTokenMs
-        self.promptEvalTimeMs = nil
-        self.generationTimeMs = totalTimeMs
-        self.contextLength = nil
-        self.temperature = nil
-        self.maxTokens = nil
-    }
-
     /// Full initializer with all telemetry fields
     public init(
         modelId: String,

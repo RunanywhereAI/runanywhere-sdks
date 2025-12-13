@@ -11,7 +11,7 @@ import Foundation
 /// Voice Activity Detection component following the clean architecture
 /// Extends BaseComponent to integrate with the SDK's component lifecycle system
 @MainActor
-public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Sendable {
+public final class VADComponent: BaseComponent<any VADService>, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -31,7 +31,7 @@ public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Se
 
     // MARK: - Service Creation
 
-    public override func createService() async throws -> VADServiceWrapper {
+    public override func createService() async throws -> any VADService {
         // Create default SimpleEnergyVADService
         // Note: VAD currently uses SimpleEnergyVADService directly
         // Future enhancement: Support VAD provider pattern via ModuleRegistry like STT/TTS
@@ -43,19 +43,11 @@ public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Se
         )
         try await vadService.initialize()
 
-        // Wrap the service
-        let wrapper = VADServiceWrapper(vadService)
-        return wrapper
+        return vadService
     }
 
     public override func performCleanup() async throws {
         // No specific cleanup needed for VAD
-    }
-
-    // MARK: - Helper Methods
-
-    private var vadService: (any VADService)? {
-        return service?.wrappedService
     }
 
     // MARK: - Pause and Resume
@@ -63,13 +55,13 @@ public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Se
     /// Pause VAD processing
     public func pause() {
         isPaused = true
-        vadService?.pause()
+        service?.pause()
     }
 
     /// Resume VAD processing
     public func resume() {
         isPaused = false
-        vadService?.resume()
+        service?.resume()
     }
 
     // MARK: - Public API
@@ -78,7 +70,7 @@ public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Se
     public func detectSpeech(in buffer: AVAudioPCMBuffer) async throws -> VADOutput {
         try ensureReady()
 
-        guard let vadService = vadService else {
+        guard let vadService = service else {
             throw VADError.serviceNotAvailable
         }
 
@@ -109,7 +101,7 @@ public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Se
     public func detectSpeech(in samples: [Float]) async throws -> VADOutput {
         try ensureReady()
 
-        guard let vadService = vadService else {
+        guard let vadService = service else {
             throw VADError.serviceNotAvailable
         }
 
@@ -132,7 +124,7 @@ public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Se
     public func process(_ input: VADInput) async throws -> VADOutput {
         // Apply threshold override if provided
         if let threshold = input.energyThresholdOverride,
-           let vadService = vadService {
+           let vadService = service {
             vadService.energyThreshold = threshold
         }
 
@@ -166,12 +158,12 @@ public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Se
 
     /// Reset VAD state
     public func reset() {
-        vadService?.reset()
+        service?.reset()
     }
 
     /// Set speech activity callback
     public func setSpeechActivityCallback(_ callback: @escaping (SpeechActivityEvent) -> Void) {
-        vadService?.onSpeechActivity = { [weak self] event in
+        service?.onSpeechActivity = { [weak self] event in
             callback(event)
 
             // Track speech activity events
@@ -190,24 +182,24 @@ public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Se
 
     /// Start VAD processing
     public func start() {
-        vadService?.start()
+        service?.start()
     }
 
     /// Stop VAD processing
     public func stop() {
-        vadService?.stop()
+        service?.stop()
     }
 
     /// Get the underlying VAD service
     public func getService() -> VADService? {
-        return vadService
+        return service
     }
 
     /// Start calibration of the VAD
     public func startCalibration() async throws {
         try ensureReady()
 
-        guard let vadService = vadService else {
+        guard let vadService = service else {
             throw VADError.serviceNotAvailable
         }
 
@@ -239,7 +231,7 @@ public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Se
 
     /// Get current VAD statistics for debugging
     public func getStatistics() -> VADStatistics? {
-        guard let energyVAD = vadService as? SimpleEnergyVADService else {
+        guard let energyVAD = service as? SimpleEnergyVADService else {
             return nil
         }
         return energyVAD.getStatistics()
@@ -247,7 +239,7 @@ public final class VADComponent: BaseComponent<VADServiceWrapper>, @unchecked Se
 
     /// Set calibration parameters
     public func setCalibrationParameters(multiplier: Float) {
-        guard let energyVAD = vadService as? SimpleEnergyVADService else {
+        guard let energyVAD = service as? SimpleEnergyVADService else {
             logger.warning("setCalibrationParameters is only supported for SimpleEnergyVADService")
             return
         }

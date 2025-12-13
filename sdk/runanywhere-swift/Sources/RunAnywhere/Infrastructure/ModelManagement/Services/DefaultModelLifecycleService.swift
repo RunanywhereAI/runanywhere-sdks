@@ -187,10 +187,11 @@ public actor DefaultModelLifecycleService: ModelLifecycleService {
     // MARK: - ModelLifecycleService - Service Access
 
     public func getLLMService(for modelId: String) async -> (any LLMService)? {
-        // First check the tracker cache
-        let cached = await MainActor.run {
-            ModelLifecycleTracker.shared.llmService(for: modelId)
+        // Query from ModelLifecycleTracker (which queries ModelLoadingService)
+        let tracker = await MainActor.run {
+            ModelLifecycleTracker.shared
         }
+        let cached = await tracker.llmService(for: modelId)
         if let cached = cached {
             return cached
         }

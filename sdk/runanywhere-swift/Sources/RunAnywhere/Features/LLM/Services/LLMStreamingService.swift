@@ -73,7 +73,6 @@ public class LLMStreamingService { // swiftlint:disable:this type_body_length
         )
         let event = GenerationEvent(type: .generationCompleted, eventData: eventData)
         await AnalyticsQueueManager.shared.enqueue(event)
-        await AnalyticsQueueManager.shared.flush()
     }
 
     /// Submit success analytics for completed generation
@@ -124,7 +123,6 @@ public class LLMStreamingService { // swiftlint:disable:this type_body_length
         )
         let event = GenerationEvent(type: .generationCompleted, eventData: eventData)
         await AnalyticsQueueManager.shared.enqueue(event)
-        await AnalyticsQueueManager.shared.flush()
     }
 
     /// Generate streaming text with metrics tracking
@@ -296,7 +294,7 @@ public class LLMStreamingService { // swiftlint:disable:this type_body_length
                     )
 
                     // Get the current loaded model
-                    guard let loadedModel = generationService.getCurrentModel() else {
+                    guard let loadedModel = await generationService.getCurrentModel() else {
                         throw RunAnywhereError.modelNotFound("No model is currently loaded")
                     }
 
@@ -415,7 +413,7 @@ public class LLMStreamingService { // swiftlint:disable:this type_body_length
                     )
 
                     // Get the current loaded model from generation service
-                    guard let loadedModel = generationService.getCurrentModel() else {
+                    guard let loadedModel = await generationService.getCurrentModel() else {
                         throw RunAnywhereError.modelNotFound("No model is currently loaded")
                     }
 

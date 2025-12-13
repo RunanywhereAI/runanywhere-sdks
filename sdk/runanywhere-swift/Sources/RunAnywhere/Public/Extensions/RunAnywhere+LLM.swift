@@ -13,31 +13,33 @@ public extension RunAnywhere {
     /// - Returns: Information about the loaded model
     @discardableResult
     static func loadModelWithInfo(_ modelIdentifier: String) async throws -> ModelInfo {
-        events.publish(SDKModelEvent.loadStarted(modelId: modelIdentifier))
+        // Non-blocking event publish
+        events.publishAsync(SDKModelEvent.loadStarted(modelId: modelIdentifier))
 
         do {
             let loadedModel = try await serviceContainer.modelLoadingService.loadModel(modelIdentifier)
             serviceContainer.generationService.setCurrentModel(loadedModel)
-            events.publish(SDKModelEvent.loadCompleted(modelId: modelIdentifier))
+            events.publishAsync(SDKModelEvent.loadCompleted(modelId: modelIdentifier))
             return loadedModel.model
         } catch {
-            events.publish(SDKModelEvent.loadFailed(modelId: modelIdentifier, error: error))
+            events.publishAsync(SDKModelEvent.loadFailed(modelId: modelIdentifier, error: error))
             throw error
         }
     }
 
     /// Unload the currently loaded LLM model
     static func unloadLLMModel() async throws {
-        events.publish(SDKModelEvent.unloadStarted)
+        // Non-blocking event publish
+        events.publishAsync(SDKModelEvent.unloadStarted)
 
         do {
-            if let currentModel = serviceContainer.generationService.getCurrentModel() {
+            if let currentModel = await serviceContainer.generationService.getCurrentModel() {
                 try await serviceContainer.modelLoadingService.unloadModel(currentModel.model.id)
-                serviceContainer.generationService.setCurrentModel(nil)
+                serviceContainer.generationService.setCurrentModel(nil as String?)
             }
-            events.publish(SDKModelEvent.unloadCompleted)
+            events.publishAsync(SDKModelEvent.unloadCompleted)
         } catch {
-            events.publish(SDKModelEvent.unloadFailed(error))
+            events.publishAsync(SDKModelEvent.unloadFailed(error))
             throw error
         }
     }

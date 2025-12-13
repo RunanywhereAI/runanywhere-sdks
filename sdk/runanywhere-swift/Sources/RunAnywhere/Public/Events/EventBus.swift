@@ -168,6 +168,53 @@ public final class EventBus: @unchecked Sendable {
     }
 }
 
+// MARK: - Non-Blocking Event Publishing
+
+extension EventBus {
+    /// Publish an event asynchronously without blocking the caller
+    /// Use this for hot paths where event publishing shouldn't add latency
+    public func publishAsync(_ event: SDKInitializationEvent) {
+        Task.detached { [self] in
+            self.publish(event)
+        }
+    }
+
+    /// Publish a generation event asynchronously without blocking the caller
+    public func publishAsync(_ event: SDKGenerationEvent) {
+        Task.detached { [self] in
+            self.publish(event)
+        }
+    }
+
+    /// Publish a model event asynchronously without blocking the caller
+    public func publishAsync(_ event: SDKModelEvent) {
+        Task.detached { [self] in
+            self.publish(event)
+        }
+    }
+
+    /// Publish a voice event asynchronously without blocking the caller
+    public func publishAsync(_ event: SDKVoiceEvent) {
+        Task.detached { [self] in
+            self.publish(event)
+        }
+    }
+
+    /// Publish a configuration event asynchronously without blocking the caller
+    public func publishAsync(_ event: SDKConfigurationEvent) {
+        Task.detached { [self] in
+            self.publish(event)
+        }
+    }
+
+    /// Publish a component event asynchronously without blocking the caller
+    public func publishAsync(_ event: ComponentInitializationEvent) {
+        Task.detached { [self] in
+            self.publish(event)
+        }
+    }
+}
+
 // MARK: - Convenience Extensions
 
 extension EventBus {

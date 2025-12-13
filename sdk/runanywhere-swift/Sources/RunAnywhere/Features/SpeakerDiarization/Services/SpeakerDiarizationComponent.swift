@@ -11,7 +11,7 @@ import Foundation
 // MARK: - SpeakerDiarization Component
 
 /// Speaker Diarization component following the clean architecture
-public final class SpeakerDiarizationComponent: BaseComponent<SpeakerDiarizationServiceWrapper>, @unchecked Sendable {
+public final class SpeakerDiarizationComponent: BaseComponent<any SpeakerDiarizationService>, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -32,7 +32,7 @@ public final class SpeakerDiarizationComponent: BaseComponent<SpeakerDiarization
 
     // MARK: - Service Creation
 
-    public override func createService() async throws -> SpeakerDiarizationServiceWrapper {
+    public override func createService() async throws -> any SpeakerDiarizationService {
         let modelId = diarizationConfiguration.modelId ?? "default"
 
         // Try to get a registered SpeakerDiarization provider from central registry
@@ -46,7 +46,7 @@ public final class SpeakerDiarizationComponent: BaseComponent<SpeakerDiarization
             let defaultService = DefaultSpeakerDiarizationService()
             try await defaultService.initialize()
             self.providerName = "Default"
-            return SpeakerDiarizationServiceWrapper(defaultService)
+            return defaultService
         }
 
         do {
@@ -61,12 +61,9 @@ public final class SpeakerDiarizationComponent: BaseComponent<SpeakerDiarization
             // Initialize the service
             try await diarizationService.initialize()
 
-            // Wrap the service
-            let wrapper = SpeakerDiarizationServiceWrapper(diarizationService)
-
             logger.info("SpeakerDiarization service created with provider: \(provider.name)")
 
-            return wrapper
+            return diarizationService
         } catch {
             logger.error("Failed to create SpeakerDiarization service: \(error)")
             throw error
@@ -74,13 +71,7 @@ public final class SpeakerDiarizationComponent: BaseComponent<SpeakerDiarization
     }
 
     public override func performCleanup() async throws {
-        await service?.wrappedService?.cleanup()
-    }
-
-    // MARK: - Helper Methods
-
-    private var diarizationService: (any SpeakerDiarizationService)? {
-        return service?.wrappedService
+        await service?.cleanup()
     }
 
     // MARK: - Core Operations
@@ -91,14 +82,14 @@ public final class SpeakerDiarizationComponent: BaseComponent<SpeakerDiarization
     public func processAudio(_ samples: [Float]) async throws -> SpeakerDiarizationSpeakerInfo {
         try ensureReady()
 
-        guard let service = diarizationService else {
+        guard let diarizationService = service else {
             throw RunAnywhereError.componentNotReady("SpeakerDiarization service not available")
         }
 
         let startTime = Date()
 
         // Process audio
-        let speakerInfo = service.processAudio(samples)
+        let speakerInfo = diarizationService.processAudio(samples)
 
         let processingTime = Date().timeIntervalSince(startTime)
 
@@ -137,7 +128,6 @@ public final class SpeakerDiarizationComponent: BaseComponent<SpeakerDiarization
                 eventData: eventData
             )
             await AnalyticsQueueManager.shared.enqueue(event)
-            await AnalyticsQueueManager.shared.flush()
         }
 
         return speakerInfo
@@ -148,11 +138,11 @@ public final class SpeakerDiarizationComponent: BaseComponent<SpeakerDiarization
     public func getAllSpeakers() throws -> [SpeakerDiarizationSpeakerInfo] {
         try ensureReady()
 
-        guard let service = diarizationService else {
+        guard let diarizationService = service else {
             throw RunAnywhereError.componentNotReady("SpeakerDiarization service not available")
         }
 
-        return service.getAllSpeakers()
+        return diarizationService.getAllSpeakers()
     }
 
     /// Update speaker name
@@ -162,16 +152,16 @@ public final class SpeakerDiarizationComponent: BaseComponent<SpeakerDiarization
     public func updateSpeakerName(speakerId: String, name: String) async throws {
         try ensureReady()
 
-        guard let service = diarizationService else {
+        guard let diarizationService = service else {
             throw RunAnywhereError.componentNotReady("SpeakerDiarization service not available")
         }
 
         // Get old name for analytics
-        let oldName = service.getAllSpeakers()
+        let oldName = diarizationService.getAllSpeakers()
             .first { $0.id == speakerId }?
             .name
 
-        service.updateSpeakerName(speakerId: speakerId, name: name)
+        diarizationService.updateSpeakerName(speakerId: speakerId, name: name)
 
         // Track analytics
         await analytics.trackSpeakerNameUpdate(
@@ -186,17 +176,17 @@ public final class SpeakerDiarizationComponent: BaseComponent<SpeakerDiarization
     public func reset() throws {
         try ensureReady()
 
-        guard let service = diarizationService else {
+        guard let diarizationService = service else {
             throw RunAnywhereError.componentNotReady("SpeakerDiarization service not available")
         }
 
-        service.reset()
+        diarizationService.reset()
         logger.info("SpeakerDiarization state reset")
     }
 
     /// Get service for compatibility
     public func getService() -> (any SpeakerDiarizationService)? {
-        return diarizationService
+        return service
     }
 
     // MARK: - Analytics Access

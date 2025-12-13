@@ -83,7 +83,7 @@ public class VoiceLLMHandler {
         var firstTokenReceived = false
 
         // Get current loaded model to check if it supports thinking
-        let loadedModel = ServiceContainer.shared.generationService.getCurrentModel()
+        let loadedModel = await ServiceContainer.shared.generationService.getCurrentModel()
         let shouldParseThinking = loadedModel?.model.supportsThinking ?? false
         let thinkingPattern = loadedModel?.model.thinkingPattern ?? ThinkingTagPattern.defaultPattern
 

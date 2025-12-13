@@ -28,12 +28,12 @@ extension RunAnywhere {
             logger.info("Successfully fetched \(models.count) model assignments")
 
             // Publish event for model assignments fetched
-            events.publish(ModelAssignmentsFetchedEvent(models: models))
+            events.publish(SDKModelEvent.assignmentsFetched(models: models))
 
             return models
         } catch {
             logger.error("Failed to fetch model assignments: \(error)")
-            events.publish(ModelAssignmentsFetchFailedEvent(error: error))
+            events.publish(SDKModelEvent.assignmentsFetchFailed(error: error))
             throw error
         }
     }

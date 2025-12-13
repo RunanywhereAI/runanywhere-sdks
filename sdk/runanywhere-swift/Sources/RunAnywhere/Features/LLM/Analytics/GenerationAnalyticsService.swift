@@ -193,14 +193,21 @@ public actor GenerationAnalyticsService: AnalyticsService {
         totalOutputTokens += outputTokens
 
         let eventData = GenerationCompletionData(
-            generationId: generationId,
             modelId: modelId,
-            executionTarget: executionTarget,
+            modelName: nil,
+            framework: nil,
+            device: nil,
+            osVersion: nil,
+            platform: nil,
+            sdkVersion: nil,
+            processingTimeMs: totalTime * 1000,
+            success: true,
             inputTokens: inputTokens,
             outputTokens: outputTokens,
-            totalTimeMs: totalTime * 1000,
+            totalTokens: inputTokens + outputTokens,
+            tokensPerSecond: tokensPerSecond,
             timeToFirstTokenMs: timeToFirstToken * 1000,
-            tokensPerSecond: tokensPerSecond
+            generationTimeMs: totalTime * 1000
         )
         let event = GenerationEvent(
             type: .generationCompleted,
@@ -273,48 +280,6 @@ public actor GenerationAnalyticsService: AnalyticsService {
         let event = GenerationEvent(
             type: .error,
             sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-    }
-
-    // MARK: - Session Management Override
-
-    /// Start a generation session
-    public func startGenerationSession(modelId: String, type: String = "text") async -> String {
-        let metadata = SessionMetadata(
-            modelId: modelId,
-            type: type
-        )
-
-        let sessionId = await startSession(metadata: metadata)
-
-        let eventData = SessionStartedData(
-            modelId: modelId,
-            sessionType: type
-        )
-        let event = GenerationEvent(
-            type: .sessionStarted,
-            sessionId: sessionId,
-            eventData: eventData
-        )
-
-        await track(event: event)
-        return sessionId
-    }
-
-    /// End a generation session
-    public func endGenerationSession(sessionId: String) async {
-        await endSession(sessionId: sessionId)
-
-        let eventData = SessionEndedData(
-            sessionId: sessionId,
-            duration: 0 // Duration tracking would need session start time
-        )
-        let event = GenerationEvent(
-            type: .sessionEnded,
-            sessionId: sessionId,
             eventData: eventData
         )
 

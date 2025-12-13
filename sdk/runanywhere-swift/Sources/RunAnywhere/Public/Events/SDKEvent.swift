@@ -79,6 +79,7 @@ public enum SDKGenerationEvent: SDKEvent {
 
 /// SDK Model Events for public API
 public enum SDKModelEvent: SDKEvent {
+    // Model loading/unloading
     case loadStarted(modelId: String)
     case loadProgress(modelId: String, progress: Double)
     case loadCompleted(modelId: String)
@@ -86,19 +87,31 @@ public enum SDKModelEvent: SDKEvent {
     case unloadStarted
     case unloadCompleted
     case unloadFailed(Error)
+
+    // Model downloads
     case downloadStarted(modelId: String)
     case downloadProgress(modelId: String, progress: Double)
     case downloadCompleted(modelId: String)
     case downloadFailed(modelId: String, error: Error)
+
+    // Model listing/catalog
     case listRequested
     case listCompleted(models: [ModelInfo])
     case listFailed(Error)
     case catalogLoaded(models: [ModelInfo])
+
+    // Model deletion
     case deleteStarted(modelId: String)
     case deleteCompleted(modelId: String)
     case deleteFailed(modelId: String, error: Error)
+
+    // Model registration
     case customModelAdded(name: String, url: String)
     case builtInModelRegistered(modelId: String)
+
+    // Model assignments (from backend)
+    case assignmentsFetched(models: [ModelInfo])
+    case assignmentsFetchFailed(error: Error)
 
     public var timestamp: Date { Date() }
     public var eventType: SDKEventType { .model }
