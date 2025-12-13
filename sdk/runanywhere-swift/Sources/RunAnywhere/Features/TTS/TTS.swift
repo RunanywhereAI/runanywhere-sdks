@@ -14,17 +14,16 @@ import Foundation
 ///
 /// Example usage:
 /// ```swift
-/// // Using shared instance
-/// let audio = try await TTS.shared.synthesize("Hello, world!")
+/// // Configure TTS with a specific voice
+/// try await TTS.shared.configure(with: TTSConfiguration(voice: "en-GB"))
 ///
-/// // Using convenience methods
-/// let output = try await TTS.synthesize("Hello, world!")
+/// // Synthesize text
+/// let output = try await TTS.shared.synthesize("Hello, world!")
 ///
-/// // With custom configuration
-/// let config = TTSConfiguration(voice: "en-GB", speakingRate: 1.2)
-/// let tts = TTS(configuration: config)
-/// let audio = try await tts.synthesize("Hello from Britain!")
+/// // Using static convenience methods
+/// let audio = try await TTS.synthesize("Hello, world!")
 /// ```
+@MainActor
 public final class TTS {
 
     // MARK: - Shared Instance
@@ -34,49 +33,49 @@ public final class TTS {
 
     // MARK: - Properties
 
-    private let ttsService: TTSService
-    private let configuration: TTSConfiguration
+    private var component: TTSComponent?
     private let logger = SDKLogger(category: "TTS")
 
     // MARK: - Initialization
 
-    /// Initialize with default configuration
-    public convenience init() {
-        let configuration = TTSConfiguration()
-        self.init(configuration: configuration)
-    }
-
-    /// Initialize with custom configuration
-    /// - Parameter configuration: TTS configuration
-    public convenience init(configuration: TTSConfiguration) {
-        let service = SystemTTSService()
-        self.init(configuration: configuration, service: service)
-    }
-
-    /// Initialize with custom service (for testing or customization)
-    /// - Parameters:
-    ///   - configuration: TTS configuration
-    ///   - service: The TTS service to use
-    internal init(configuration: TTSConfiguration, service: TTSService) {
-        self.configuration = configuration
-        self.ttsService = service
-        logger.debug("TTS initialized with voice: \(configuration.voice)")
+    /// Initialize with default settings
+    public init() {
+        logger.debug("TTS initialized")
     }
 
     // MARK: - Public API
 
-    /// Access the underlying TTS service
+    /// Access the underlying component
     /// Provides low-level operations if needed
-    public var service: TTSService {
-        return ttsService
+    public var underlyingComponent: TTSComponent? {
+        return component
     }
 
-    /// Current configuration
-    public var currentConfiguration: TTSConfiguration {
-        return configuration
+    /// Whether the TTS component is ready for synthesis
+    public var isReady: Bool {
+        return component?.isReady ?? false
     }
 
-    // MARK: - Convenience Methods
+    // MARK: - Configuration
+
+    /// Configure the TTS capability with a specific configuration
+    /// - Parameter configuration: The TTS configuration to use
+    public func configure(with configuration: TTSConfiguration) async throws {
+        logger.info("Configuring TTS with voice: \(configuration.voice)")
+        let newComponent = TTSComponent(configuration: configuration)
+        try await newComponent.initialize()
+        self.component = newComponent
+        logger.info("TTS configured successfully")
+    }
+
+    /// Configure the TTS capability with a voice ID
+    /// - Parameter voice: The voice identifier to use
+    public func configure(voice: String) async throws {
+        let configuration = TTSConfiguration(voice: voice)
+        try await configure(with: configuration)
+    }
+
+    // MARK: - Synthesis Methods
 
     /// Synthesize text to speech
     /// - Parameters:
@@ -89,42 +88,11 @@ public final class TTS {
         voice: String? = nil,
         language: String? = nil
     ) async throws -> TTSOutput {
-        logger.info("Synthesizing text: '\(text.prefix(50))...'")
-
-        let startTime = Date()
-
-        let options = TTSOptions(
-            voice: voice ?? configuration.voice,
-            language: language ?? configuration.language,
-            rate: configuration.speakingRate,
-            pitch: configuration.pitch,
-            volume: configuration.volume,
-            audioFormat: configuration.audioFormat,
-            sampleRate: configuration.audioFormat == .pcm ? 16000 : 44100,
-            useSSML: configuration.enableSSML
-        )
-
-        let audioData = try await ttsService.synthesize(text: text, options: options)
-
-        let processingTime = Date().timeIntervalSince(startTime)
-        let duration = estimateAudioDuration(dataSize: audioData.count, format: configuration.audioFormat)
-
-        let metadata = TTSSynthesisMetadata(
-            voice: options.voice ?? configuration.voice,
-            language: options.language,
-            processingTime: processingTime,
-            characterCount: text.count
-        )
-
-        logger.info("Synthesis completed in \(String(format: "%.2f", processingTime))s")
-
-        return TTSOutput(
-            audioData: audioData,
-            format: configuration.audioFormat,
-            duration: duration,
-            phonemeTimestamps: nil,
-            metadata: metadata
-        )
+        guard let component = component else {
+            throw RunAnywhereError.componentNotInitialized("TTS not configured. Call configure() first.")
+        }
+        logger.info("Starting synthesis")
+        return try await component.synthesize(text, voice: voice, language: language)
     }
 
     /// Synthesize SSML markup to speech
@@ -138,38 +106,11 @@ public final class TTS {
         voice: String? = nil,
         language: String? = nil
     ) async throws -> TTSOutput {
-        logger.info("Synthesizing SSML")
-
-        let options = TTSOptions(
-            voice: voice ?? configuration.voice,
-            language: language ?? configuration.language,
-            rate: configuration.speakingRate,
-            pitch: configuration.pitch,
-            volume: configuration.volume,
-            audioFormat: configuration.audioFormat,
-            sampleRate: configuration.audioFormat == .pcm ? 16000 : 44100,
-            useSSML: true
-        )
-
-        let startTime = Date()
-        let audioData = try await ttsService.synthesize(text: ssml, options: options)
-        let processingTime = Date().timeIntervalSince(startTime)
-        let duration = estimateAudioDuration(dataSize: audioData.count, format: configuration.audioFormat)
-
-        let metadata = TTSSynthesisMetadata(
-            voice: options.voice ?? configuration.voice,
-            language: options.language,
-            processingTime: processingTime,
-            characterCount: ssml.count
-        )
-
-        return TTSOutput(
-            audioData: audioData,
-            format: configuration.audioFormat,
-            duration: duration,
-            phonemeTimestamps: nil,
-            metadata: metadata
-        )
+        guard let component = component else {
+            throw RunAnywhereError.componentNotInitialized("TTS not configured. Call configure() first.")
+        }
+        logger.info("Starting SSML synthesis")
+        return try await component.synthesizeSSML(ssml, voice: voice, language: language)
     }
 
     /// Stream synthesis for long text
@@ -183,49 +124,28 @@ public final class TTS {
         voice: String? = nil,
         language: String? = nil
     ) -> AsyncThrowingStream<Data, Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    let options = TTSOptions(
-                        voice: voice ?? configuration.voice,
-                        language: language ?? configuration.language,
-                        rate: configuration.speakingRate,
-                        pitch: configuration.pitch,
-                        volume: configuration.volume,
-                        audioFormat: configuration.audioFormat,
-                        sampleRate: 16000,
-                        useSSML: false
-                    )
-
-                    try await ttsService.synthesizeStream(
-                        text: text,
-                        options: options
-                    ) { chunk in
-                        continuation.yield(chunk)
-                    }
-
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
+        guard let component = component else {
+            return AsyncThrowingStream { continuation in
+                continuation.finish(throwing: RunAnywhereError.componentNotInitialized("TTS not configured. Call configure() first."))
             }
         }
+        return component.streamSynthesize(text, voice: voice, language: language)
     }
 
     /// Get available voices
     public func getAvailableVoices() -> [String] {
-        return ttsService.availableVoices
+        return component?.getAvailableVoices() ?? []
     }
 
     /// Stop current synthesis
     public func stop() {
         logger.info("Stopping synthesis")
-        ttsService.stop()
+        component?.stopSynthesis()
     }
 
     /// Check if currently synthesizing
     public var isSynthesizing: Bool {
-        return ttsService.isSynthesizing
+        return component?.isSynthesizing ?? false
     }
 
     // MARK: - Static Convenience Methods
@@ -249,20 +169,12 @@ public final class TTS {
         shared.stop()
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Cleanup
 
-    private func estimateAudioDuration(dataSize: Int, format: AudioFormat) -> TimeInterval {
-        // Rough estimation based on format and typical bitrates
-        let bytesPerSecond: Int
-        switch format {
-        case .pcm, .wav:
-            bytesPerSecond = 32000 // 16-bit PCM at 16kHz
-        case .mp3:
-            bytesPerSecond = 16000 // 128kbps MP3
-        default:
-            bytesPerSecond = 32000
-        }
-
-        return TimeInterval(dataSize) / TimeInterval(bytesPerSecond)
+    /// Cleanup resources
+    public func cleanup() async throws {
+        logger.info("Cleaning up TTS")
+        try await component?.cleanup()
+        component = nil
     }
 }

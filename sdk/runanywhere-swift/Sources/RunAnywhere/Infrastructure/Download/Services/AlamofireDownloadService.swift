@@ -217,12 +217,6 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         }
     }
 
-    public func activeDownloads() -> [DownloadTask] {
-        // Note: We can't return the actual DownloadTask objects as they're created asynchronously
-        // This would need refactoring to maintain a proper task registry
-        return []
-    }
-
     // MARK: - Custom Strategy Support
 
     /// Register a custom download strategy from host app

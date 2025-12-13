@@ -19,7 +19,6 @@ public final class Analytics {
 
     // MARK: - Properties
 
-    private let telemetryService: TelemetryService?
     private let queueManager: AnalyticsQueueManager
     private let logger = SDKLogger(category: "Analytics")
     private var configuration: AnalyticsConfiguration
@@ -50,7 +49,6 @@ public final class Analytics {
     public init(configuration: AnalyticsConfiguration) {
         self.configuration = configuration
         self.queueManager = AnalyticsQueueManager.shared
-        self.telemetryService = nil  // Will be set via initialize()
         logger.debug("Analytics initialized with configuration")
     }
 

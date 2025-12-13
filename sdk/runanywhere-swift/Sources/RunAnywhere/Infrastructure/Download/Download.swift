@@ -71,12 +71,6 @@ public final class Download {
         downloadService.cancelDownload(taskId: taskId)
     }
 
-    /// Get all active downloads
-    /// - Returns: Array of active download tasks
-    public func activeDownloads() -> [DownloadTask] {
-        return downloadService.activeDownloads()
-    }
-
     // MARK: - Strategy Management
 
     /// Register a custom download strategy (if using AlamofireDownloadService)

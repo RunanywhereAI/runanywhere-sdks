@@ -151,483 +151,23 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         }
     }
 
-    // MARK: - Lazy Device Registration
-
-    /// Actor for managing device registration state in a thread-safe manner
-    private actor RegistrationState {
-        var cachedDeviceId: String?
-        var isRegistering: Bool = false
-
-        func getCachedDeviceId() -> String? {
-            return cachedDeviceId
-        }
-
-        func setCachedDeviceId(_ deviceId: String?) {
-            self.cachedDeviceId = deviceId
-        }
-
-        func checkAndSetRegistering() -> Bool {
-            if isRegistering {
-                return false // Already registering
-            }
-            isRegistering = true
-            return true // Successfully set to registering
-        }
-
-        func clearRegistering() {
-            isRegistering = false
-        }
-
-        func getIsRegistering() -> Bool {
-            return isRegistering
-        }
-    }
-
-    private static let registrationState = RegistrationState()
-
-    /// Maximum number of registration retry attempts
-    private static let maxRegistrationRetries = 3
-    /// Delay between retry attempts (in nanoseconds)
-    private static let retryDelayNanoseconds: UInt64 = 2_000_000_000 // 2 seconds
+    // MARK: - Device Registration (Delegated to Service)
 
     /// Ensure device is registered with backend (lazy registration)
-    /// Only registers if device ID doesn't exist locally
-    /// - Throws: SDKError if registration fails
-    private static func ensureDeviceRegistered() async throws { // swiftlint:disable:this function_body_length cyclomatic_complexity
-        let logger = SDKLogger(category: "RunAnywhere.DeviceReg")
-
-        // IMPORTANT: Always ensure network services are initialized for production/staging
-        // This is needed for analytics/telemetry to work, even if device is already registered
-        if currentEnvironment != .development, let params = initParams {
-            if serviceContainer.authenticationService == nil {
-                try await serviceContainer.initializeNetworkServices(with: params)
-                logger.debug("Network services initialized")
-            }
-        }
-
-        // Check if we have a cached device ID
-        let cachedId = await registrationState.getCachedDeviceId()
-        if let cachedId = cachedId, !cachedId.isEmpty {
-            logger.debug("Device already registered (cached): \(cachedId.prefix(8))...")
-            return
-        }
-
-        // Check if device is already registered in local storage
-        let storedDeviceId = getStoredDeviceId()
-        if let storedDeviceId = storedDeviceId, !storedDeviceId.isEmpty {
-            logger.debug("Found stored device ID: \(storedDeviceId.prefix(8))...")
-            await registrationState.setCachedDeviceId(storedDeviceId)
-
-            // In development mode, still need to check if registered to Supabase
-            let isDevRegistered = isDevDeviceRegistered()
-            if currentEnvironment == .development && !isDevRegistered {
-                logger.debug("Device ID exists but not registered - will register now")
-                // Device ID exists but not registered to Supabase yet - continue with registration
-            } else {
-                logger.debug("Device already fully registered (devRegistered=\(isDevRegistered))")
-                // Already fully registered (or not in dev mode)
-                return
-            }
-        } else {
-            logger.debug("No device ID found - will create and register")
-        }
-
-        // Try to set registering flag - if already registering, wait for completion
-        let canRegister = await registrationState.checkAndSetRegistering()
-        if !canRegister {
-            // Wait for registration to complete with timeout
-            var waitAttempts = 0
-            let maxWaitAttempts = 50 // 5 seconds total timeout
-            while await registrationState.getIsRegistering() && waitAttempts < maxWaitAttempts {
-                try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                waitAttempts += 1
-            }
-
-            // Check if we have a device ID after waiting
-            if let deviceId = await registrationState.getCachedDeviceId(), !deviceId.isEmpty {
-                return
-            } else if waitAttempts >= maxWaitAttempts {
-                throw RunAnywhereError.timeout("Device registration timeout")
-            }
-            return
-        }
-
-        logger.debug("Starting device registration...")
-
-        // In development mode, register to Supabase (dev analytics)
-        if currentEnvironment == .development {
-            logger.debug("Development mode - registering device for dev analytics...")
-
-            do {
-                // Call dev registration with Supabase
-                // This will throw if registration fails, and will store device ID if it succeeds
-                try await registerDevDevice()
-
-                // Get the device ID that was just registered (must exist now)
-                guard let deviceId = getStoredDeviceId() else {
-                    throw RunAnywhereError.storageError("Device ID not found after successful registration")
-                }
-
-                await registrationState.setCachedDeviceId(deviceId)
-
-                // Mark as registered ONLY after successful Supabase registration
-                markDevDeviceAsRegistered()
-
-                logger.info("✅ Dev device registration successful")
-                await registrationState.clearRegistering()
-                return
-            } catch {
-                // Non-critical error - create mock device ID and continue
-                logger.warning("Dev device registration failed (non-critical): \(error.localizedDescription)")
-
-                let mockDeviceId = "dev-" + generateDeviceIdentifier()
-                do {
-                    try storeDeviceId(mockDeviceId)
-                    await registrationState.setCachedDeviceId(mockDeviceId)
-                    logger.info("Using mock device ID for development: \(mockDeviceId.prefix(8))...")
-                    await registrationState.clearRegistering()
-                    return
-                } catch {
-                    logger.error("Failed to store mock device ID: \(error.localizedDescription)")
-                    await registrationState.clearRegistering()
-                    throw RunAnywhereError.storageError("Failed to store device ID: \(error.localizedDescription)")
-                }
-            }
-        }
-
-        // Ensure we have network services initialized
-        guard let params = initParams else {
+    /// Delegates to DeviceRegistrationService
+    private static func ensureDeviceRegistered() async throws {
+        guard let params = initParams, let environment = currentEnvironment else {
             throw RunAnywhereError.notInitialized
         }
 
-        // Registration with retry logic
-        var lastError: Error?
-
-        for attempt in 1...maxRegistrationRetries {
-            do {
-                logger.info("Device registration attempt \(attempt) of \(maxRegistrationRetries)")
-
-                // Initialize API client and auth service if needed
-                if serviceContainer.authenticationService == nil {
-                    try await serviceContainer.initializeNetworkServices(with: params)
-                }
-
-                guard let authService = serviceContainer.authenticationService else {
-                    throw RunAnywhereError.invalidState("Authentication service not available")
-                }
-
-                // Register device with backend
-                let deviceRegistration = try await authService.registerDevice()
-
-                // Store device ID locally
-                try storeDeviceId(deviceRegistration.deviceId)
-                await registrationState.setCachedDeviceId(deviceRegistration.deviceId)
-
-                logger.info("Device registered successfully: \(deviceRegistration.deviceId.prefix(8))...")
-                logger.debug("Device registration completed")
-                await registrationState.clearRegistering()
-                return // Success!
-
-            } catch {
-                lastError = error
-                logger.error("Device registration attempt \(attempt) failed: \(error.localizedDescription)")
-
-                // Check if error is retryable
-                if !isRetryableError(error) {
-                    logger.error("Non-retryable error, stopping registration attempts")
-                    await registrationState.clearRegistering()
-                    throw error
-                }
-
-                // Wait before retrying (except on last attempt)
-                if attempt < maxRegistrationRetries {
-                    logger.info("Waiting \(retryDelayNanoseconds / 1_000_000_000) seconds before retry...")
-                    try? await Task.sleep(nanoseconds: retryDelayNanoseconds)
-                }
-            }
-        }
-
-        // All retries exhausted
-        let finalError = lastError ?? RunAnywhereError.networkError("Device registration failed after \(maxRegistrationRetries) attempts")
-        logger.error("Device registration failed after all retries: \(finalError.localizedDescription)")
-        await registrationState.clearRegistering()
-        throw finalError
-    }
-
-    /// Determine if an error is retryable
-    /// - Parameter error: The error to check
-    /// - Returns: true if the error is retryable (network issues, timeouts, etc.)
-    private static func isRetryableError(_ error: Error) -> Bool {
-        // Check for common retryable errors
-        if let sdkError = error as? SDKError {
-            switch sdkError {
-            case .networkError, .timeout, .serverError:
-                return true
-            case .invalidAPIKey, .notInitialized, .invalidState, .validationFailed, .storageError:
-                return false
-            default:
-                return false
-            }
-        }
-
-        // Check for NSError codes
-        if let nsError = error as NSError? {
-            // Common network error codes that are retryable
-            let retryableCodes = [
-                NSURLErrorTimedOut,
-                NSURLErrorCannotFindHost,
-                NSURLErrorCannotConnectToHost,
-                NSURLErrorNetworkConnectionLost,
-                NSURLErrorNotConnectedToInternet,
-                NSURLErrorDNSLookupFailed
-            ]
-            return retryableCodes.contains(nsError.code)
-        }
-
-        return false
-    }
-
-    // MARK: - Development Device Registration
-
-    private static let devDeviceRegisteredKey = "com.runanywhere.sdk.devDeviceRegistered"
-
-    /// Check if device is already registered in development mode
-    private static func isDevDeviceRegistered() -> Bool {
-        // Check Keychain first
-        if let registered = try? KeychainManager.shared.retrieve(for: devDeviceRegisteredKey),
-           registered == "true" {
-            return true
-        }
-
-        // Fallback to UserDefaults for development
-        return UserDefaults.standard.bool(forKey: devDeviceRegisteredKey)
-    }
-
-    /// Mark device as registered in development mode
-    private static func markDevDeviceAsRegistered() {
-        // Store in both Keychain and UserDefaults
-        try? KeychainManager.shared.store("true", for: devDeviceRegisteredKey)
-        UserDefaults.standard.set(true, forKey: devDeviceRegisteredKey)
-    }
-
-    /// Register device for development mode (non-blocking, silent failures)
-    private static func registerDevDeviceIfNeeded() async {
-        let logger = SDKLogger(category: "RunAnywhere.DevRegistration")
-
-        // Check opt-out environment variable
-        if ProcessInfo.processInfo.environment["RUNANYWHERE_DISABLE_DEV_REGISTRATION"] == "1" {
-            logger.info("Dev device registration disabled via environment variable")
-            return
-        }
-
-        // Check if already registered
-        if isDevDeviceRegistered() {
-            logger.info("✅ Device already registered in development mode (skipping)")
-            return
-        }
-
-        logger.info("📝 Registering device in development mode...")
-
-        do {
-            try await registerDevDevice()
-            markDevDeviceAsRegistered()
-            logger.info("✅ Dev device registration successful")
-        } catch {
-            // Silent failure - don't block SDK initialization
-            logger.warning("Dev device registration failed (non-critical): \(error.localizedDescription)")
-        }
-    }
-
-    /// Perform the actual dev device registration
-    private static func registerDevDevice() async throws {
-        guard let params = initParams else {
-            throw RunAnywhereError.notInitialized
-        }
-
-        // Collect simple device info
-        let deviceInfo = DeviceInfo.current
-
-        // Get or generate device ID (but DON'T store it yet - only after successful registration)
-        let deviceId = getStoredDeviceId() ?? generateDeviceIdentifier()
-        let isNewDevice = getStoredDeviceId() == nil
-
-        // Create registration request with current timestamp for UPSERT
-        let now = ISO8601DateFormatter().string(from: Date())
-        let request = DevDeviceRegistrationRequest(
-            deviceId: deviceId,
-            deviceModel: deviceInfo.model,
-            osVersion: deviceInfo.osVersion,
-            architecture: deviceInfo.architecture,
-            platform: deviceInfo.platform,
-            sdkVersion: SDKConstants.version,
-            buildToken: BuildToken.token,
-            lastSeenAt: now  // Will be updated on every registration via UPSERT
+        try await serviceContainer.deviceRegistrationService.ensureDeviceRegistered(
+            params: params,
+            environment: environment,
+            serviceContainer: serviceContainer
         )
-
-        // Choose registration method based on configuration
-        // IMPORTANT: Only proceed with storage if registration succeeds (throws on failure)
-        if let supabaseConfig = params.supabaseConfig {
-            // Use Supabase REST API (automatic in development mode)
-            try await registerDevDeviceViaSupabase(request: request, config: supabaseConfig)
-        } else {
-            // Use traditional backend (production/staging)
-            try await registerDevDeviceViaBackend(request: request, baseURL: params.baseURL)
-        }
-
-        // ✅ Registration succeeded! Now store device ID if it was newly generated
-        if isNewDevice {
-            try storeDeviceId(deviceId)
-        }
     }
 
-    /// Register device via traditional backend
-    private static func registerDevDeviceViaBackend(request: DevDeviceRegistrationRequest, baseURL: URL) async throws {
-        let url = baseURL.appendingPathComponent(APIEndpoint.devDeviceRegistration.path)
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let encoder = JSONEncoder()
-        urlRequest.httpBody = try encoder.encode(request)
-
-        // Perform request
-        let (data, response) = try await URLSession.shared.data(for: urlRequest)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw RunAnywhereError.networkError("Invalid response from server")
-        }
-
-        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
-            throw RunAnywhereError.networkError("Registration failed with status code: \(httpResponse.statusCode)")
-        }
-
-        // Parse response (optional, for validation)
-        let decoder = JSONDecoder()
-        _ = try decoder.decode(DevDeviceRegistrationResponse.self, from: data)
-    }
-
-    /// Register device via Supabase REST API
-    private static func registerDevDeviceViaSupabase(request: DevDeviceRegistrationRequest, config: SupabaseConfig) async throws {
-        let logger = SDKLogger(category: "RunAnywhere.DevRegistration")
-
-        // Supabase REST API endpoint: POST /rest/v1/sdk_devices
-        let url = config.projectURL
-            .appendingPathComponent("rest")
-            .appendingPathComponent("v1")
-            .appendingPathComponent("sdk_devices")
-
-        logger.debug("Sending device registration)")
-        logger.debug("Device ID: \(request.deviceId)")
-
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue(config.anonKey, forHTTPHeaderField: "apikey")
-        urlRequest.setValue("Bearer \(config.anonKey)", forHTTPHeaderField: "Authorization")
-        // Use UPSERT: resolution=merge-duplicates updates existing record based on unique constraint
-        urlRequest.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        urlRequest.httpBody = try encoder.encode(request)
-
-        // Perform request
-        let (data, response) = try await URLSession.shared.data(for: urlRequest)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            logger.error("❌ Invalid response from Supabase")
-            throw RunAnywhereError.networkError("Invalid response from Supabase")
-        }
-
-        logger.debug("Supabase response: HTTP \(httpResponse.statusCode)")
-
-        // Supabase returns 201 for successful inserts
-        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
-            // Try to extract error message from Supabase response
-            var errorMessage = "Registration failed with status code: \(httpResponse.statusCode)"
-            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any], // swiftlint:disable:this avoid_any_type
-               let message = errorData["message"] as? String {
-                errorMessage = message
-                logger.error("❌ Supabase error: \(message)")
-            }
-
-            // Also log the raw response for debugging
-            if let responseString = String(data: data, encoding: .utf8) {
-                logger.debug("Response body: \(responseString)")
-            }
-
-            throw RunAnywhereError.networkError(errorMessage)
-        }
-
-        logger.info("✅ Device successfully registered with Supabase!")
-    }
-
-    // MARK: - Analytics Submission
-
-    /// Submit generation analytics via Supabase (development mode)
-    private static func submitAnalyticsViaSupabase(
-        request: DevAnalyticsSubmissionRequest,
-        config: SupabaseConfig
-    ) async throws {
-        let logger = SDKLogger(category: "RunAnywhere.Analytics")
-
-        let url = config.projectURL
-            .appendingPathComponent("rest")
-            .appendingPathComponent("v1")
-            .appendingPathComponent("sdk_generation_analytics")
-
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue(config.anonKey, forHTTPHeaderField: "apikey")
-        urlRequest.setValue("Bearer \(config.anonKey)", forHTTPHeaderField: "Authorization")
-
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        urlRequest.httpBody = try encoder.encode(request)
-
-        let (data, response) = try await URLSession.shared.data(for: urlRequest)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw RunAnywhereError.networkError("Invalid response from Supabase")
-        }
-
-        logger.debug("Analytics HTTP Response: \(httpResponse.statusCode)")
-
-        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
-            var errorMessage = "Analytics submission failed: \(httpResponse.statusCode)"
-            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { // swiftlint:disable:this avoid_any_type
-                logger.debug("error response: \(errorData)")
-                if let message = errorData["message"] as? String {
-                    errorMessage = message
-                }
-            }
-            throw RunAnywhereError.networkError(errorMessage)
-        }
-
-        logger.debug("Analytics submission successful")
-    }
-
-    /// Submit generation analytics via backend (production mode - future)
-    private static func submitAnalyticsViaBackend(
-        request: DevAnalyticsSubmissionRequest,
-        baseURL: URL
-    ) async throws {
-        let url = baseURL.appendingPathComponent(APIEndpoint.devAnalytics.path)
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let encoder = JSONEncoder()
-        urlRequest.httpBody = try encoder.encode(request)
-
-        let (_, response) = try await URLSession.shared.data(for: urlRequest)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
-            throw RunAnywhereError.networkError("Analytics submission failed")
-        }
-    }
+    // MARK: - Analytics Submission (Delegated to Service)
 
     /// Submit generation analytics (public API)
     /// - Note: Only submits in development mode; fails silently on errors
@@ -641,120 +181,18 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         success: Bool
     ) async {
         guard let params = initParams else { return }
-        guard params.environment == .development else { return }
 
-        // Non-blocking background submission
-        Task.detached(priority: .background) {
-            do {
-                let deviceId = getStoredDeviceId() ?? "unknown"
-
-                // Capture host app information
-                let hostAppIdentifier = Bundle.main.bundleIdentifier
-                let hostAppName = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
-                    ?? Bundle.main.infoDictionary?["CFBundleName"] as? String
-                let hostAppVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-
-                let request = DevAnalyticsSubmissionRequest(
-                    generationId: generationId,
-                    deviceId: deviceId,
-                    modelId: modelId,
-                    tokensPerSecond: tokensPerSecond,
-                    totalGenerationTimeMs: latencyMs,
-                    inputTokens: inputTokens,
-                    outputTokens: outputTokens,
-                    success: success,
-                    buildToken: BuildToken.token,
-                    sdkVersion: SDKConstants.version,
-                    timestamp: ISO8601DateFormatter().string(from: Date()),
-                    hostAppIdentifier: hostAppIdentifier,
-                    hostAppName: hostAppName,
-                    hostAppVersion: hostAppVersion
-                )
-
-                if let supabaseConfig = params.supabaseConfig {
-                    try await submitAnalyticsViaSupabase(request: request, config: supabaseConfig)
-                } else {
-                    try await submitAnalyticsViaBackend(request: request, baseURL: params.baseURL)
-                }
-            } catch {
-                // Fail silently - analytics should never break the SDK
-                SDKLogger(category: "RunAnywhere.Analytics").debug("Analytics submission failed (non-critical): \(error.localizedDescription)")
-            }
-        }
-    }
-
-    // MARK: - Device ID Management
-
-    private static let deviceIdKey = "com.runanywhere.sdk.deviceId"
-
-    /// Get stored device ID from local persistence
-    private static func getStoredDeviceId() -> String? {
-        let logger = SDKLogger(category: "RunAnywhere.DeviceID")
-
-        // Try keychain first (survives app reinstalls)
-        if let keychainId = KeychainManager.shared.retrieveDeviceUUID() {
-            logger.info("📱 Retrieved device ID from Keychain: \(keychainId)")
-            return keychainId
-        }
-
-        // Fallback to UserDefaults (does NOT survive app uninstall)
-        if let userDefaultsId = UserDefaults.standard.string(forKey: deviceIdKey) {
-            logger.debug("Retrieved device ID from UserDefaults: \(userDefaultsId)")
-            return userDefaultsId
-        }
-
-        logger.debug("No stored device ID found")
-        return nil
-    }
-
-    /// Store device ID in local persistence
-    private static func storeDeviceId(_ deviceId: String) throws {
-        guard !deviceId.isEmpty else {
-            throw RunAnywhereError.validationFailed("Device ID cannot be empty")
-        }
-
-        let logger = SDKLogger(category: "RunAnywhere.DeviceID")
-
-        // ALWAYS store in keychain (persists across app reinstalls)
-        try KeychainManager.shared.storeDeviceUUID(deviceId)
-        logger.debug("Stored device ID in Keychain: \(deviceId)")
-
-        // Also store in UserDefaults as fallback for quick access
-        UserDefaults.standard.set(deviceId, forKey: deviceIdKey)
-        UserDefaults.standard.synchronize()
-        logger.debug("Stored device ID in UserDefaults: \(deviceId)")
-    }
-
-    /// Clear stored device ID
-    private static func clearStoredDeviceId() {
-        // Clear from keychain using the deviceUUID key
-        try? KeychainManager.shared.delete(for: "com.runanywhere.sdk.device.uuid")
-
-        // Clear from UserDefaults
-        UserDefaults.standard.removeObject(forKey: deviceIdKey)
-        UserDefaults.standard.synchronize()
-
-        // Clear cache
-        Task {
-            await registrationState.setCachedDeviceId(nil)
-        }
-    }
-
-    /// Generate a unique device identifier
-    private static func generateDeviceIdentifier() -> String {
-        let logger = SDKLogger(category: "RunAnywhere.DeviceID")
-
-        #if os(iOS) || os(tvOS) || os(watchOS)
-        if let vendorId = UIDevice.current.identifierForVendor?.uuidString {
-            logger.debug("Generated device ID from identifierForVendor: \(vendorId)")
-            return vendorId
-        }
-        #endif
-
-        // Fallback to random UUID
-        let randomId = UUID().uuidString
-        logger.debug("Using random UUID (identifierForVendor unavailable): \(randomId)")
-        return randomId
+        await serviceContainer.devAnalyticsService.submit(
+            generationId: generationId,
+            modelId: modelId,
+            latencyMs: latencyMs,
+            tokensPerSecond: tokensPerSecond,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            success: success,
+            serviceContainer: serviceContainer,
+            params: params
+        )
     }
 
     // MARK: - Text Generation (Clean Async/Await Interface)
@@ -857,34 +295,22 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
     // MARK: - Voice Operations
 
-    /// Simple voice transcription
+    /// Simple voice transcription using default model
     /// - Parameter audioData: Audio data to transcribe
     /// - Returns: Transcribed text
+    /// - Note: For more control over model/options, use `RunAnywhere.transcribe(audio:modelId:options:)` in the Voice extension
     public static func transcribe(_ audioData: Data) async throws -> String {
-        EventBus.shared.publish(SDKVoiceEvent.transcriptionStarted)
+        guard isInitialized else { throw RunAnywhereError.notInitialized }
+        try await ensureDeviceRegistered()
+
+        events.publish(SDKVoiceEvent.transcriptionStarted)
 
         do {
-            // Ensure initialized
-            guard isInitialized else {
-                throw RunAnywhereError.notInitialized
-            }
-
-            // Lazy device registration on first API call
-            try await ensureDeviceRegistered()
-
-            // Use voice capability service directly
-            // Find voice service and transcribe
-            guard let voiceService = await serviceContainer.voiceCapabilityService.findVoiceService(for: "whisper-base") else {
-                throw STTError.noVoiceServiceAvailable
-            }
-
-            try await voiceService.initialize(modelPath: "whisper-base")
-            let result = try await voiceService.transcribe(audioData: audioData, options: STTOptions())
-
-            EventBus.shared.publish(SDKVoiceEvent.transcriptionFinal(text: result.transcript))
-            return result.transcript
+            let result = try await serviceContainer.voiceOrchestrator.transcribe(audio: audioData)
+            events.publish(SDKVoiceEvent.transcriptionFinal(text: result.text))
+            return result.text
         } catch {
-            EventBus.shared.publish(SDKVoiceEvent.pipelineError(error))
+            events.publish(SDKVoiceEvent.pipelineError(error))
             throw error
         }
     }
@@ -893,456 +319,67 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
     /// Load a model by ID
     /// - Parameter modelId: The model identifier
-    public static func loadModel(_ modelId: String) async throws { // swiftlint:disable:this function_body_length
-        EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
+    public static func loadModel(_ modelId: String) async throws {
+        // Ensure initialized
+        guard isInitialized else {
+            throw RunAnywhereError.notInitialized
+        }
 
-        let startTime = Date()
+        // Lazy device registration on first API call
+        try await ensureDeviceRegistered()
 
-        do {
-            // Ensure initialized
-            guard isInitialized else {
-                throw RunAnywhereError.notInitialized
-            }
+        // Delegate to orchestrator which handles lifecycle, telemetry, analytics, and events
+        let result = try await serviceContainer.modelLoadingOrchestrator.loadLLMModel(modelId)
 
-            // Lazy device registration on first API call
-            try await ensureDeviceRegistered()
-
-            // Get model info for lifecycle tracking
-            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
-            let framework = modelInfo?.preferredFramework ?? .llamaCpp
-            let modelName = modelInfo?.name ?? modelId
-
-            // Notify lifecycle manager
-            await MainActor.run {
-                ModelLifecycleTracker.shared.modelWillLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework,
-                    modality: .llm
-                )
-            }
-
-            let loadedModel = try await serviceContainer.modelLoadingService.loadModel(modelId)
-
-            // IMPORTANT: Set the loaded model in the generation service
+        // Set the loaded model in the generation service
+        if let loadedModel = result.loadedModel {
             serviceContainer.generationService.setCurrentModel(loadedModel)
-
-            // Calculate load time
-            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
-
-            // Notify lifecycle manager of successful load with the service for caching
-            await MainActor.run {
-                ModelLifecycleTracker.shared.modelDidLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework,
-                    modality: .llm,
-                    memoryUsage: modelInfo?.memoryRequired,
-                    llmService: loadedModel.service
-                )
-            }
-
-            // Track telemetry for LLM model load
-            let deviceInfo = TelemetryDeviceInfo.current
-            do {
-                try await serviceContainer.telemetryService.trackModelLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    modality: "llm",
-                    loadTimeMs: loadTimeMs,
-                    modelSizeBytes: modelInfo?.downloadSize,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    success: true,
-                    errorMessage: nil
-                )
-
-                // Also enqueue via AnalyticsQueueManager for backend transmission
-                let eventData = ModelLoadingData(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    platform: deviceInfo.platform,
-                    sdkVersion: SDKConstants.version,
-                    processingTimeMs: loadTimeMs,
-                    success: true
-                )
-                let event = GenerationEvent(type: .modelLoaded, eventData: eventData)
-                await AnalyticsQueueManager.shared.enqueue(event)
-
-                // Force flush to send immediately
-                await AnalyticsQueueManager.shared.flush()
-            } catch {
-                // Telemetry failure is non-critical, continue
-            }
-
-            EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
-        } catch {
-            // Calculate load time even for failures
-            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
-
-            // Track telemetry for failed LLM model load
-            let deviceInfo = TelemetryDeviceInfo.current
-            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
-            let framework = modelInfo?.preferredFramework ?? .llamaCpp
-            let modelName = modelInfo?.name ?? modelId
-
-            do {
-                try await serviceContainer.telemetryService.trackModelLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    modality: "llm",
-                    loadTimeMs: loadTimeMs,
-                    modelSizeBytes: modelInfo?.downloadSize,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    success: false,
-                    errorMessage: error.localizedDescription
-                )
-
-                // Also enqueue via AnalyticsQueueManager for backend transmission
-                let eventData = ModelLoadingData(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    platform: deviceInfo.platform,
-                    sdkVersion: SDKConstants.version,
-                    processingTimeMs: loadTimeMs,
-                    success: false,
-                    errorMessage: error.localizedDescription,
-                    errorCode: error.localizedDescription
-                )
-                let event = GenerationEvent(type: .modelLoadFailed, eventData: eventData)
-                await AnalyticsQueueManager.shared.enqueue(event)
-                await AnalyticsQueueManager.shared.flush()
-            } catch {
-                // Telemetry failure is non-critical, continue
-            }
-
-            // Notify lifecycle manager of failure
-            await MainActor.run {
-                ModelLifecycleTracker.shared.modelLoadFailed(
-                    modelId: modelId,
-                    modality: .llm,
-                    error: error.localizedDescription
-                )
-            }
-            EventBus.shared.publish(SDKModelEvent.loadFailed(modelId: modelId, error: error))
-            throw error
         }
     }
 
     /// Load an STT (Speech-to-Text) model by ID
     /// This initializes the STT component and loads the model into memory
     /// - Parameter modelId: The model identifier
-    public static func loadSTTModel(_ modelId: String) async throws { // swiftlint:disable:this function_body_length
-        EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
+    public static func loadSTTModel(_ modelId: String) async throws {
+        // Ensure initialized
+        guard isInitialized else {
+            throw RunAnywhereError.notInitialized
+        }
 
-        let startTime = Date()
+        // Lazy device registration on first API call
+        try await ensureDeviceRegistered()
 
-        do {
-            // Ensure initialized
-            guard isInitialized else {
-                throw RunAnywhereError.notInitialized
-            }
+        // Delegate to orchestrator which handles lifecycle, telemetry, analytics, and events
+        let result = try await serviceContainer.modelLoadingOrchestrator.loadSTTModel(modelId)
 
-            // Lazy device registration and network services initialization
-            try await ensureDeviceRegistered()
-
-            // Get model info for lifecycle tracking
-            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
-            let framework = modelInfo?.preferredFramework ?? .whisperKit
-            let modelName = modelInfo?.name ?? modelId
-
-            // Notify lifecycle manager
-            await MainActor.run {
-                ModelLifecycleTracker.shared.modelWillLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework,
-                    modality: .stt
-                )
-            }
-
-            // Create STT configuration
-            let sttConfig = STTConfiguration(modelId: modelId)
-
-            // Create and initialize STT component on MainActor
-            let sttComponent = await MainActor.run {
-                STTComponent(configuration: sttConfig)
-            }
-            try await sttComponent.initialize()
-
-            // Store the component for later use
+        // Store the component for later use
+        if let sttComponent = result.sttComponent {
             await MainActor.run {
                 _loadedSTTComponent = sttComponent
             }
-
-            // Calculate load time
-            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
-
-            // Notify lifecycle manager of successful load
-            await MainActor.run {
-                ModelLifecycleTracker.shared.modelDidLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework,
-                    modality: .stt,
-                    memoryUsage: modelInfo?.memoryRequired
-                )
-            }
-
-            // Track telemetry for STT model load
-            let deviceInfo = TelemetryDeviceInfo.current
-            do {
-                try await serviceContainer.telemetryService.trackSTTModelLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    loadTimeMs: loadTimeMs,
-                    modelSizeBytes: modelInfo?.downloadSize,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    success: true,
-                    errorMessage: nil
-                )
-
-                // Also enqueue via AnalyticsQueueManager for backend transmission
-                let eventData = ModelLoadingData(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    platform: deviceInfo.platform,
-                    sdkVersion: SDKConstants.version,
-                    processingTimeMs: loadTimeMs,
-                    success: true
-                )
-                let event = STTEvent(type: .modelLoaded, eventData: eventData)
-                await AnalyticsQueueManager.shared.enqueue(event)
-
-                // Force flush to send immediately
-                await AnalyticsQueueManager.shared.flush()
-            } catch {
-                // Telemetry failure is non-critical, continue
-            }
-
-            EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
-        } catch {
-            // Calculate load time even for failures
-            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
-
-            // Track telemetry for failed STT model load
-            let deviceInfo = TelemetryDeviceInfo.current
-            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
-            let framework = modelInfo?.preferredFramework ?? .whisperKit
-            let modelName = modelInfo?.name ?? modelId
-
-            do {
-                try await serviceContainer.telemetryService.trackSTTModelLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    loadTimeMs: loadTimeMs,
-                    modelSizeBytes: modelInfo?.downloadSize,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    success: false,
-                    errorMessage: error.localizedDescription
-                )
-
-                // Also enqueue via AnalyticsQueueManager for backend transmission
-                let eventData = ModelLoadingData(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    platform: deviceInfo.platform,
-                    sdkVersion: SDKConstants.version,
-                    processingTimeMs: loadTimeMs,
-                    success: false,
-                    errorMessage: error.localizedDescription,
-                    errorCode: error.localizedDescription
-                )
-                let event = STTEvent(type: .modelLoadFailed, eventData: eventData)
-                await AnalyticsQueueManager.shared.enqueue(event)
-                await AnalyticsQueueManager.shared.flush()
-            } catch {
-                // Telemetry failure is non-critical, continue
-            }
-
-            // Notify lifecycle manager of failure
-            await MainActor.run {
-                ModelLifecycleTracker.shared.modelLoadFailed(
-                    modelId: modelId,
-                    modality: .stt,
-                    error: error.localizedDescription
-                )
-            }
-            EventBus.shared.publish(SDKModelEvent.loadFailed(modelId: modelId, error: error))
-            throw error
         }
     }
 
     /// Load a TTS (Text-to-Speech) model by ID
     /// This initializes the TTS component and loads the model into memory
     /// - Parameter modelId: The model identifier (voice name)
-    public static func loadTTSModel(_ modelId: String) async throws { // swiftlint:disable:this function_body_length
-        EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
+    public static func loadTTSModel(_ modelId: String) async throws {
+        // Ensure initialized
+        guard isInitialized else {
+            throw RunAnywhereError.notInitialized
+        }
 
-        let startTime = Date()
+        // Lazy device registration on first API call
+        try await ensureDeviceRegistered()
 
-        do {
-            // Ensure initialized
-            guard isInitialized else {
-                throw RunAnywhereError.notInitialized
-            }
+        // Delegate to orchestrator which handles lifecycle, telemetry, analytics, and events
+        let result = try await serviceContainer.modelLoadingOrchestrator.loadTTSModel(modelId)
 
-            // Lazy device registration and network services initialization
-            try await ensureDeviceRegistered()
-
-            // Get model info for lifecycle tracking
-            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
-            let framework = modelInfo?.preferredFramework ?? .onnx
-            let modelName = modelInfo?.name ?? modelId
-
-            // Notify lifecycle manager
-            await MainActor.run {
-                ModelLifecycleTracker.shared.modelWillLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework,
-                    modality: .tts
-                )
-            }
-
-            // Create TTS configuration
-            let ttsConfig = TTSConfiguration(voice: modelId)
-
-            // Create and initialize TTS component on MainActor
-            let ttsComponent = await MainActor.run {
-                TTSComponent(configuration: ttsConfig)
-            }
-            try await ttsComponent.initialize()
-
-            // Store the component for later use
+        // Store the component for later use
+        if let ttsComponent = result.ttsComponent {
             await MainActor.run {
                 _loadedTTSComponent = ttsComponent
             }
-
-            // Calculate load time
-            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
-
-            // Notify lifecycle manager of successful load
-            await MainActor.run {
-                ModelLifecycleTracker.shared.modelDidLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework,
-                    modality: .tts,
-                    memoryUsage: modelInfo?.memoryRequired
-                )
-            }
-
-            // Track telemetry for TTS model load
-            let deviceInfo = TelemetryDeviceInfo.current
-            do {
-                try await serviceContainer.telemetryService.trackTTSModelLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    loadTimeMs: loadTimeMs,
-                    modelSizeBytes: modelInfo?.downloadSize,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    success: true,
-                    errorMessage: nil
-                )
-
-                // Also enqueue via AnalyticsQueueManager for backend transmission
-                let eventData = ModelLoadingData(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    platform: deviceInfo.platform,
-                    sdkVersion: SDKConstants.version,
-                    processingTimeMs: loadTimeMs,
-                    success: true
-                )
-                let event = TTSEvent(type: .modelLoaded, eventData: eventData)
-                await AnalyticsQueueManager.shared.enqueue(event)
-
-                // Force flush to send immediately
-                await AnalyticsQueueManager.shared.flush()
-            } catch {
-                // Telemetry failure is non-critical, continue
-            }
-
-            EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
-        } catch {
-            // Calculate load time even for failures
-            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
-
-            // Track telemetry for failed TTS model load
-            let deviceInfo = TelemetryDeviceInfo.current
-            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
-            let framework = modelInfo?.preferredFramework ?? .onnx
-            let modelName = modelInfo?.name ?? modelId
-
-            do {
-                try await serviceContainer.telemetryService.trackTTSModelLoad(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    loadTimeMs: loadTimeMs,
-                    modelSizeBytes: modelInfo?.downloadSize,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    success: false,
-                    errorMessage: error.localizedDescription
-                )
-
-                // Also enqueue via AnalyticsQueueManager for backend transmission
-                let eventData = ModelLoadingData(
-                    modelId: modelId,
-                    modelName: modelName,
-                    framework: framework.rawValue,
-                    device: deviceInfo.device,
-                    osVersion: deviceInfo.osVersion,
-                    platform: deviceInfo.platform,
-                    sdkVersion: SDKConstants.version,
-                    processingTimeMs: loadTimeMs,
-                    success: false,
-                    errorMessage: error.localizedDescription,
-                    errorCode: error.localizedDescription
-                )
-                let event = TTSEvent(type: .modelLoadFailed, eventData: eventData)
-                await AnalyticsQueueManager.shared.enqueue(event)
-                await AnalyticsQueueManager.shared.flush()
-            } catch {
-                // Telemetry failure is non-critical, continue
-            }
-
-            // Notify lifecycle manager of failure
-            await MainActor.run {
-                ModelLifecycleTracker.shared.modelLoadFailed(
-                    modelId: modelId,
-                    modality: .tts,
-                    error: error.localizedDescription
-                )
-            }
-            EventBus.shared.publish(SDKModelEvent.loadFailed(modelId: modelId, error: error))
-            throw error
         }
     }
 
@@ -1365,28 +402,14 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// Get available models
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
-        guard isInitialized else {
-            throw RunAnywhereError.notInitialized
-        }
-
-        // Use model registry to get available models
-        let models = await serviceContainer.modelRegistry.discoverModels()
-
-        // Cache models for synchronous lookup by providers
-        // This allows providers to check framework compatibility without async calls
-        ModelInfoCache.shared.cacheModels(models)
-
-        return models
+        guard isInitialized else { throw RunAnywhereError.notInitialized }
+        return await serviceContainer.modelRegistry.discoverModels()
     }
 
     /// Get currently loaded model
     /// - Returns: Currently loaded model info
     public static var currentModel: ModelInfo? {
-        guard isInitialized else {
-            return nil
-        }
-
-        // Get the current model from the generation service
+        guard isInitialized else { return nil }
         return serviceContainer.generationService.getCurrentModel()?.model
     }
 
@@ -1407,25 +430,10 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// - Parameter modelId: The model identifier
     /// - Returns: Array of framework types that can handle this model
     public static func availableAdapters(for modelId: String) async -> [LLMFramework] {
-        guard isInitialized else {
-            return []
-        }
+        guard isInitialized,
+              let model = serviceContainer.modelRegistry.getModel(by: modelId) else { return [] }
 
-        // Get model info
-        guard let model = serviceContainer.modelRegistry.getModel(by: modelId) else {
-            return []
-        }
-
-        // Determine modality
-        let modality: FrameworkModality
-        if model.category == .speechRecognition || model.preferredFramework == .whisperKit {
-            modality = .voiceToText
-        } else {
-            modality = .textToText
-        }
-
-        // Get all capable adapters
-        let adapters = await serviceContainer.adapterRegistry.findAllAdapters(for: model, modality: modality)
+        let adapters = await serviceContainer.adapterRegistry.findAllAdapters(for: model)
         return adapters.map(\.framework)
     }
 
@@ -1453,21 +461,8 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
     /// Get current device ID
     public static func getDeviceId() async -> String? {
-        guard isInitialized else {
-            return nil
-        }
-
-        // Try to get from local storage first
-        if let deviceId = getStoredDeviceId() {
-            return deviceId
-        }
-
-        // Fallback to auth service if available
-        if let authService = serviceContainer.authenticationService {
-            return await authService.getDeviceId()
-        }
-
-        return nil
+        guard isInitialized else { return nil }
+        return await serviceContainer.deviceRegistrationService.getDeviceId()
     }
 
     // MARK: - SDK State Management
@@ -1496,10 +491,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         currentEnvironment = nil
         configurationData = nil
 
-        // Clear device registration
-        clearStoredDeviceId()
-
-        // Reset service container if needed
+        // Reset service container (includes device registration cleanup)
         serviceContainer.reset()
 
         logger.info("SDK state reset completed")
@@ -1508,7 +500,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     /// Get current SDK version
     /// - Returns: SDK version string
     public static func getSDKVersion() -> String {
-        return "1.0.0" // Note: Get from build configuration
+        SDKConstants.version
     }
 
     /// Get current environment
@@ -1519,46 +511,15 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
     /// Check if device is registered
     /// - Returns: true if device has been registered with backend
-    public static func isDeviceRegistered() -> Bool {
-        return getStoredDeviceId() != nil
-    }
-}
-
-
-// MARK: - Conversation Management
-
-/// Simple conversation manager
-public class Conversation {
-    private var messages: [String] = []
-
-    public init() {}
-
-    /// Send a message and get response
-    public func send(_ message: String) async throws -> String {
-        messages.append("User: \(message)")
-
-        let contextPrompt = messages.joined(separator: "\n") + "\nAssistant:"
-        let result = try await RunAnywhere.generate(contextPrompt)
-
-        messages.append("Assistant: \(result.text)")
-        return result.text
-    }
-
-    /// Get conversation history
-    public var history: [String] {
-        messages
-    }
-
-    /// Clear conversation
-    public func clear() {
-        messages.removeAll()
+    public static func isDeviceRegistered() async -> Bool {
+        return await serviceContainer.deviceRegistrationService.isRegistered()
     }
 }
 
 // MARK: - Factory Methods
 
 extension RunAnywhere {
-    /// Create a new conversation
+    /// Create a new conversation for multi-turn dialogues
     public static func conversation() -> Conversation {
         Conversation()
     }

@@ -7,86 +7,6 @@
 
 import Foundation
 
-// MARK: - Voice Event
-
-/// Voice-specific analytics event
-public struct VoiceEvent: AnalyticsEvent {
-    public let id: String
-    public let type: String
-    public let timestamp: Date
-    public let sessionId: String?
-    public let eventData: any AnalyticsEventData
-
-    public init(
-        type: VoiceEventType,
-        sessionId: String? = nil,
-        eventData: any AnalyticsEventData
-    ) {
-        self.id = UUID().uuidString
-        self.type = type.rawValue
-        self.timestamp = Date()
-        self.sessionId = sessionId
-        self.eventData = eventData
-    }
-}
-
-/// Voice event types
-public enum VoiceEventType: String {
-    case pipelineCreated = "voice_pipeline_created"
-    case pipelineStarted = "voice_pipeline_started"
-    case pipelineCompleted = "voice_pipeline_completed"
-    case transcriptionStarted = "voice_transcription_started"
-    case transcriptionCompleted = "voice_transcription_completed"
-    case stageExecuted = "voice_stage_executed"
-    case error = "voice_error"
-}
-
-// MARK: - Voice Metrics
-
-/// Voice-specific metrics
-public struct VoiceMetrics: AnalyticsMetrics {
-    public let totalEvents: Int
-    public let startTime: Date
-    public let lastEventTime: Date?
-    public let totalTranscriptions: Int
-    public let totalPipelineExecutions: Int
-    public let averageTranscriptionDuration: TimeInterval
-    public let averagePipelineDuration: TimeInterval
-    public let averageRealTimeFactor: Double
-
-    public init() {
-        self.totalEvents = 0
-        self.startTime = Date()
-        self.lastEventTime = nil
-        self.totalTranscriptions = 0
-        self.totalPipelineExecutions = 0
-        self.averageTranscriptionDuration = 0
-        self.averagePipelineDuration = 0
-        self.averageRealTimeFactor = 0
-    }
-
-    public init(
-        totalEvents: Int,
-        startTime: Date,
-        lastEventTime: Date?,
-        totalTranscriptions: Int,
-        totalPipelineExecutions: Int,
-        averageTranscriptionDuration: TimeInterval,
-        averagePipelineDuration: TimeInterval,
-        averageRealTimeFactor: Double
-    ) {
-        self.totalEvents = totalEvents
-        self.startTime = startTime
-        self.lastEventTime = lastEventTime
-        self.totalTranscriptions = totalTranscriptions
-        self.totalPipelineExecutions = totalPipelineExecutions
-        self.averageTranscriptionDuration = averageTranscriptionDuration
-        self.averagePipelineDuration = averagePipelineDuration
-        self.averageRealTimeFactor = averageRealTimeFactor
-    }
-
-}
-
 // MARK: - Voice Analytics Service
 
 /// Voice analytics service using unified pattern
@@ -195,22 +115,6 @@ public actor VoiceAnalyticsService: AnalyticsService {
         await track(event: event)
     }
 
-    /// Track pipeline start
-    public func trackPipelineStarted(stages: [String]) async {
-        let eventData = PipelineStartedData(
-            stageCount: stages.count,
-            stages: stages,
-            startTimestamp: Date().timeIntervalSince1970
-        )
-        let event = VoiceEvent(
-            type: .pipelineStarted,
-            sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-    }
-
     /// Track transcription start
     public func trackTranscriptionStarted(audioLength: TimeInterval) async {
         let eventData = TranscriptionStartData(
@@ -219,28 +123,6 @@ public actor VoiceAnalyticsService: AnalyticsService {
         )
         let event = VoiceEvent(
             type: .transcriptionStarted,
-            sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-    }
-
-    /// Track pipeline execution
-    public func trackPipelineExecution(
-        stages: [String],
-        totalTime: TimeInterval
-    ) async {
-        totalPipelineExecutions += 1
-        totalPipelineDuration += totalTime
-
-        let eventData = PipelineCompletionData(
-            stageCount: stages.count,
-            stages: stages,
-            totalTimeMs: totalTime * 1000
-        )
-        let event = VoiceEvent(
-            type: .pipelineCompleted,
             sessionId: currentSession?.id,
             eventData: eventData
         )
@@ -268,24 +150,6 @@ public actor VoiceAnalyticsService: AnalyticsService {
         )
         let event = VoiceEvent(
             type: .transcriptionCompleted,
-            sessionId: currentSession?.id,
-            eventData: eventData
-        )
-
-        await track(event: event)
-    }
-
-    /// Track stage execution
-    public func trackStageExecution(
-        stage: String,
-        duration: TimeInterval
-    ) async {
-        let eventData = StageExecutionData(
-            stageName: stage,
-            durationMs: duration * 1000
-        )
-        let event = VoiceEvent(
-            type: .stageExecuted,
             sessionId: currentSession?.id,
             eventData: eventData
         )

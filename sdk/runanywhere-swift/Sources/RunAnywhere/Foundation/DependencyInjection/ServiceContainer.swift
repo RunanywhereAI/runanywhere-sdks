@@ -26,6 +26,25 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         )
     }()
 
+    /// Model loading orchestrator - caches instance to avoid recreating
+    private var _modelLoadingOrchestrator: ModelLoadingOrchestrator?
+
+    /// Model loading orchestrator for unified model loading with lifecycle, telemetry, and analytics
+    public var modelLoadingOrchestrator: ModelLoadingOrchestrator {
+        get async {
+            if let orchestrator = _modelLoadingOrchestrator {
+                return orchestrator
+            }
+            let orchestrator = ModelLoadingOrchestrator(
+                modelLoadingService: modelLoadingService,
+                telemetryService: await telemetryService,
+                modelRegistry: modelRegistry
+            )
+            _modelLoadingOrchestrator = orchestrator
+            return orchestrator
+        }
+    }
+
     /// Generation service
     private(set) lazy var generationService: LLMGenerationService = {
         LLMGenerationService(
@@ -43,6 +62,10 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         VoiceCapabilityService()
     }()
 
+    /// Voice orchestrator for voice pipeline operations
+    private(set) lazy var voiceOrchestrator: VoiceOrchestrator = {
+        VoiceOrchestrator()
+    }()
 
     /// Download service
     private(set) lazy var downloadService: AlamofireDownloadService = {
@@ -159,17 +182,27 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         }
     }
 
-    /// Model assignment service storage (using Any to avoid circular dependency)
-    private var _modelAssignmentService: Any? // swiftlint:disable:this avoid_any_type
+    /// Model assignment service - lazy initialization
+    private var _modelAssignmentService: ModelAssignmentService?
+    public var modelAssignmentService: ModelAssignmentService {
+        get async {
+            if let service = _modelAssignmentService {
+                return service
+            }
 
-    /// Set the model assignment service (called from extension)
-    public func setModelAssignmentService(_ service: Any) { // swiftlint:disable:this avoid_any_type
-        _modelAssignmentService = service
-    }
+            // Require network service to be initialized
+            guard let networkService = networkService else {
+                fatalError("Network service must be initialized before accessing modelAssignmentService")
+            }
 
-    /// Get the stored model assignment service
-    public func getModelAssignmentService() -> Any? {
-        return _modelAssignmentService
+            let modelInfoService = await self.modelInfoService
+            let service = ModelAssignmentService(
+                networkService: networkService,
+                modelInfoService: modelInfoService
+            )
+            _modelAssignmentService = service
+            return service
+        }
     }
 
     /// Generation analytics service - using unified pattern
@@ -231,6 +264,44 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         }
     }
 
+    // MARK: - Device Services
+
+    /// Device registration service - handles device registration with backend
+    private var _deviceRegistrationService: DeviceRegistrationService?
+    public var deviceRegistrationService: DeviceRegistrationService {
+        if let service = _deviceRegistrationService {
+            return service
+        }
+        let service = DeviceRegistrationService()
+        _deviceRegistrationService = service
+        return service
+    }
+
+    /// Dev analytics submission service - handles analytics in dev mode
+    public var devAnalyticsService: DevAnalyticsSubmissionService {
+        DevAnalyticsSubmissionService.shared
+    }
+
+    // MARK: - Event Services
+
+    /// Event bus for publishing and subscribing to SDK events
+    public var eventBus: EventBus {
+        EventBus.shared
+    }
+
+    // MARK: - Structured Output Services
+
+    /// Structured output generation service
+    private var _structuredOutputService: StructuredOutputGenerationService?
+    public var structuredOutputService: StructuredOutputGenerationService {
+        if let service = _structuredOutputService {
+            return service
+        }
+        let service = StructuredOutputGenerationService()
+        _structuredOutputService = service
+        return service
+    }
+
     // MARK: - Initialization
 
     public init() {
@@ -285,7 +356,7 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         if let configService = _configurationService {
             let effectiveConfig = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
             loadedConfig = effectiveConfig
-            EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: effectiveConfig))
+            eventBus.publish(SDKConfigurationEvent.loaded(configuration: effectiveConfig))
             logger.info("Configuration loaded (source: \(effectiveConfig.source))")
         }
 
@@ -300,7 +371,7 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         let storedModels = try? await modelInfoService.loadStoredModels()
         if let models = storedModels {
             logger.info("Model catalog synced: \(models.count) models available")
-            EventBus.shared.publish(SDKModelEvent.catalogLoaded(models: models))
+            eventBus.publish(SDKModelEvent.catalogLoaded(models: models))
         }
 
         // Step 4: Initialize model registry
@@ -380,7 +451,7 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
             syncCoordinator: nil // No sync in dev mode
         )
 
-        EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: defaultConfig))
+        eventBus.publish(SDKConfigurationEvent.loaded(configuration: defaultConfig))
         logger.info("Configuration loaded (source: defaults for development)")
 
         // Step 2: Model catalog
@@ -497,5 +568,8 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         _sttAnalytics = nil
         _voiceAnalytics = nil
         _ttsAnalytics = nil
+        _deviceRegistrationService = nil
+        _structuredOutputService = nil
+        _modelLoadingOrchestrator = nil
     }
 }

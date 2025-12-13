@@ -83,7 +83,7 @@ public class VoiceLLMHandler {
         var firstTokenReceived = false
 
         // Get current loaded model to check if it supports thinking
-        let loadedModel = RunAnywhere.serviceContainer.generationService.getCurrentModel()
+        let loadedModel = ServiceContainer.shared.generationService.getCurrentModel()
         let shouldParseThinking = loadedModel?.model.supportsThinking ?? false
         let thinkingPattern = loadedModel?.model.thinkingPattern ?? ThinkingTagPattern.defaultPattern
 
@@ -196,7 +196,7 @@ public class VoiceLLMHandler {
         } else {
             // Use the SDK's generation service directly
             logger.debug("Using GenerationService directly for LLM processing")
-            let generationService = RunAnywhere.serviceContainer.generationService
+            let generationService = ServiceContainer.shared.generationService
             let result = try await generationService.generate(
                 prompt: transcript,
                 options: options

@@ -13,15 +13,18 @@ public class LLMStreamingService { // swiftlint:disable:this type_body_length
 
     private let generationService: LLMGenerationService
     private let modelLoadingService: ModelLoadingService
+    private let analyticsService: DevAnalyticsSubmissionService
     private let optionsResolver = LLMOptionsResolver()
     private let logger = SDKLogger(category: "LLMStreamingService")
 
     public init(
         generationService: LLMGenerationService,
-        modelLoadingService: ModelLoadingService? = nil
+        modelLoadingService: ModelLoadingService? = nil,
+        analyticsService: DevAnalyticsSubmissionService? = nil
     ) {
         self.generationService = generationService
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
+        self.analyticsService = analyticsService ?? DevAnalyticsSubmissionService.shared
     }
 
     // MARK: - Helper Methods
@@ -33,12 +36,14 @@ public class LLMStreamingService { // swiftlint:disable:this type_body_length
         prompt: String,
         options: LLMGenerationOptions
     ) async {
-        await RunAnywhere.submitGenerationAnalytics(
+        let inputTokens = TokenCounter.estimateTokenCount(prompt)
+
+        await analyticsService.submitInternal(
             generationId: UUID().uuidString,
             modelId: modelName,
             latencyMs: 0,
             tokensPerSecond: 0,
-            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+            inputTokens: inputTokens,
             outputTokens: 0,
             success: false
         )
@@ -57,9 +62,9 @@ public class LLMStreamingService { // swiftlint:disable:this type_body_length
             processingTimeMs: nil,
             success: false,
             errorMessage: error.localizedDescription,
-            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+            inputTokens: inputTokens,
             outputTokens: 0,
-            totalTokens: RunAnywhere.estimateTokenCount(prompt),
+            totalTokens: inputTokens,
             tokensPerSecond: nil,
             timeToFirstTokenMs: nil,
             generationTimeMs: nil,
@@ -80,13 +85,15 @@ public class LLMStreamingService { // swiftlint:disable:this type_body_length
         contextLength: Int?,
         framework: LLMFramework?
     ) async {
+        let inputTokens = TokenCounter.estimateTokenCount(prompt)
+
         // Dev analytics
-        await RunAnywhere.submitGenerationAnalytics(
+        await analyticsService.submitInternal(
             generationId: UUID().uuidString,
             modelId: result.modelUsed,
             latencyMs: result.latencyMs,
             tokensPerSecond: result.tokensPerSecond,
-            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+            inputTokens: inputTokens,
             outputTokens: result.tokensUsed,
             success: true
         )
@@ -105,9 +112,9 @@ public class LLMStreamingService { // swiftlint:disable:this type_body_length
             sdkVersion: SDKConstants.version,
             processingTimeMs: result.latencyMs,
             success: true,
-            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+            inputTokens: inputTokens,
             outputTokens: result.tokensUsed,
-            totalTokens: RunAnywhere.estimateTokenCount(prompt) + result.tokensUsed,
+            totalTokens: inputTokens + result.tokensUsed,
             tokensPerSecond: result.tokensPerSecond,
             timeToFirstTokenMs: nil,
             generationTimeMs: result.latencyMs,

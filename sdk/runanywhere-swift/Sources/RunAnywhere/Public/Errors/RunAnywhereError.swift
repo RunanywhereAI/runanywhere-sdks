@@ -70,7 +70,7 @@ public enum RunAnywhereError: LocalizedError, SDKErrorProtocol {
 
     // MARK: - Framework Errors
 
-    case frameworkNotAvailable(LLMFramework)
+    case frameworkNotAvailable(String)
     case databaseInitializationFailed(Error)
 
     // MARK: - Feature Errors
@@ -256,7 +256,7 @@ public enum RunAnywhereError: LocalizedError, SDKErrorProtocol {
 
         // Framework errors
         case .frameworkNotAvailable(let framework):
-            return "Framework \(framework.rawValue) not available"
+            return "Framework \(framework) not available"
         case .databaseInitializationFailed(let error):
             return "Database initialization failed: \(error.localizedDescription)"
 

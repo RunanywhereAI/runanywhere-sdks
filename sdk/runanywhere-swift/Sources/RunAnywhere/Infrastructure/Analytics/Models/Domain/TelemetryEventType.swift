@@ -34,6 +34,11 @@ public enum TelemetryEventType: String, Codable {
     case ttsSynthesisCompleted = "tts_synthesis_completed"
     case ttsSynthesisFailed = "tts_synthesis_failed"
 
+    // MARK: - Speaker Diarization Events
+    case speakerDiarizationStarted = "speaker_diarization_started"
+    case speakerDiarizationCompleted = "speaker_diarization_completed"
+    case speakerDiarizationFailed = "speaker_diarization_failed"
+
     // MARK: - System Events
     case error = "error"
     case performance = "performance"

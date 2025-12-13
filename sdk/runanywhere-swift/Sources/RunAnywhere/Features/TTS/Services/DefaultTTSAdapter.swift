@@ -27,7 +27,7 @@ public final class DefaultTTSAdapter: ComponentAdapter {
         return try await createTTSService(configuration: ttsConfig)
     }
 
-    // MARK: - TTSFrameworkAdapter
+    // MARK: - TTS Service Creation
 
     public func createTTSService(configuration: TTSConfiguration) async throws -> SystemTTSService {
         let service = SystemTTSService()
