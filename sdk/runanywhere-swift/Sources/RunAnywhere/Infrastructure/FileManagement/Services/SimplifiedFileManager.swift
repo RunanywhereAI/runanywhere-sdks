@@ -503,14 +503,8 @@ public class SimplifiedFileManager: FileManagementService { // swiftlint:disable
 
     /// Get storage strategy for a framework
     private func getStorageStrategy(for framework: LLMFramework) -> ModelStorageStrategy? {
-        // Access the adapter registry to get storage strategies
-        let adapterRegistry = ServiceContainer.shared.adapterRegistry
-        if let adapter = adapterRegistry.getAdapter(for: framework) {
-            // Try to get storage strategy from adapter
-            if let strategy = adapter.getDownloadStrategy() as? ModelStorageStrategy {
-                return strategy
-            }
-        }
+        // Storage strategies are now provided directly by service providers via download strategies
+        // Return nil to use default storage behavior
         return nil
     }
 

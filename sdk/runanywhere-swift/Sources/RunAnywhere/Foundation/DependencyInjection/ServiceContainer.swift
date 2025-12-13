@@ -15,9 +15,6 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         RegistryService()
     }()
 
-    /// Unified adapter registry for all frameworks (LLM, STT, TTS, etc.)
-    internal let adapterRegistry = AdapterRegistry()
-
     // MARK: - Simplified Capabilities (New Architecture)
 
     /// LLM capability - handles all text generation operations

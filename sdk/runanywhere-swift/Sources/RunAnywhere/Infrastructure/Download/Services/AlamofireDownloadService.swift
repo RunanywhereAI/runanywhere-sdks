@@ -230,29 +230,11 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         autoRegisterStrategies()
     }
 
-    /// Auto-discover and register strategies from framework adapters
+    /// Auto-discover and register strategies from service providers
     private func autoRegisterStrategies() {
-        let adapters = ServiceContainer.shared.adapterRegistry.getRegisteredAdapters()
-        var registeredCount = 0
-
-        logger.info("[DEBUG] Auto-registering strategies from \(adapters.count) adapters")
-
-        for (framework, adapter) in adapters {
-            if let strategy = adapter.getDownloadStrategy() {
-                // Auto-discovered strategies go after manually registered ones
-                customStrategies.append(strategy)
-                registeredCount += 1
-                logger.info("[DEBUG] Auto-registered download strategy \(type(of: strategy)) from \(framework.rawValue) adapter")
-            } else {
-                logger.info("[DEBUG] No download strategy from \(framework.rawValue) adapter")
-            }
-        }
-
-        if registeredCount > 0 {
-            logger.info("Auto-registered \(registeredCount) download strategies from adapters")
-        } else {
-            logger.info("[DEBUG] No strategies auto-registered")
-        }
+        // Download strategies are registered directly by service providers
+        // No auto-discovery needed since adapters are removed
+        logger.info("[DEBUG] Download strategies are registered directly by service providers")
     }
 
     /// Helper to download using a custom strategy

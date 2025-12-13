@@ -1,7 +1,6 @@
 import Foundation
 
 /// Defines the category/type of a model based on its input/output modality
-/// This aligns with FrameworkModality for consistency across the SDK
 public enum ModelCategory: String, CaseIterable, Codable, Sendable {
     case language = "language"              // Text-to-text models (LLMs)
     case speechRecognition = "speech-recognition"  // Voice-to-text models (ASR)
@@ -32,20 +31,8 @@ public enum ModelCategory: String, CaseIterable, Codable, Sendable {
     }
 }
 
-/// Extension to help adapters determine category from framework
+/// Extension to help determine model category
 public extension ModelCategory {
-    /// Determine category from a FrameworkModality (non-failable)
-    static func from(modality: FrameworkModality) -> ModelCategory {
-        switch modality {
-        case .textToText: return .language
-        case .voiceToText: return .speechRecognition
-        case .textToVoice: return .speechSynthesis
-        case .imageToText: return .vision
-        case .textToImage: return .imageGeneration
-        case .multimodal: return .multimodal
-        }
-    }
-
     /// Determine category from a framework
     static func from(framework: LLMFramework) -> ModelCategory {
         switch framework {
