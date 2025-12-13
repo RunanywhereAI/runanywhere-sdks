@@ -28,10 +28,13 @@ public actor VADCapability: ServiceBasedCapability {
     // MARK: - Dependencies
 
     private let logger = SDKLogger(category: "VADCapability")
+    private let analyticsService: VADAnalyticsService
 
     // MARK: - Initialization
 
-    public init() {}
+    public init(analyticsService: VADAnalyticsService = VADAnalyticsService()) {
+        self.analyticsService = analyticsService
+    }
 
     // MARK: - Configuration (Capability Protocol)
 
@@ -68,25 +71,37 @@ public actor VADCapability: ServiceBasedCapability {
         let vadService: VADService
         let hasVAD = await MainActor.run { ServiceRegistry.shared.hasVAD }
 
-        if hasVAD {
-            vadService = try await MainActor.run {
-                Task {
-                    try await ServiceRegistry.shared.createVAD(config: config)
-                }
-            }.value
-        } else {
-            // Fall back to built-in SimpleEnergyVADService
-            vadService = SimpleEnergyVADService(
-                sampleRate: config.sampleRate,
-                energyThreshold: config.energyThreshold
+        do {
+            if hasVAD {
+                vadService = try await MainActor.run {
+                    Task {
+                        try await ServiceRegistry.shared.createVAD(config: config)
+                    }
+                }.value
+            } else {
+                // Fall back to built-in SimpleEnergyVADService
+                vadService = SimpleEnergyVADService(
+                    sampleRate: config.sampleRate,
+                    energyThreshold: config.energyThreshold
+                )
+                try await vadService.initialize()
+            }
+
+            self.service = vadService
+            self.isConfigured = true
+
+            // Track initialization success
+            await analyticsService.trackInitialized(framework: vadService.inferenceFramework)
+
+            logger.info("VAD initialized successfully")
+        } catch {
+            // Track initialization failure
+            await analyticsService.trackInitializationFailed(
+                error: error.localizedDescription,
+                framework: .builtIn
             )
-            try await vadService.initialize()
+            throw error
         }
-
-        self.service = vadService
-        self.isConfigured = true
-
-        logger.info("VAD initialized successfully")
     }
 
     public func cleanup() async {
@@ -95,6 +110,9 @@ public actor VADCapability: ServiceBasedCapability {
         service?.stop()
         service = nil
         isConfigured = false
+
+        // Track cleanup
+        await analyticsService.trackCleanedUp()
     }
 
     // MARK: - Detection
@@ -136,15 +154,17 @@ public actor VADCapability: ServiceBasedCapability {
     // MARK: - Lifecycle Control
 
     /// Start VAD processing
-    public func start() {
+    public func start() async {
         logger.info("Starting VAD")
         service?.start()
+        await analyticsService.trackStarted()
     }
 
     /// Stop VAD processing
-    public func stop() {
+    public func stop() async {
         logger.info("Stopping VAD")
         service?.stop()
+        await analyticsService.trackStopped()
     }
 
     /// Reset VAD state
@@ -154,15 +174,17 @@ public actor VADCapability: ServiceBasedCapability {
     }
 
     /// Pause VAD processing
-    public func pause() {
+    public func pause() async {
         logger.info("Pausing VAD")
         service?.pause()
+        await analyticsService.trackPaused()
     }
 
     /// Resume VAD processing
-    public func resume() {
+    public func resume() async {
         logger.info("Resuming VAD")
         service?.resume()
+        await analyticsService.trackResumed()
     }
 
     // MARK: - Configuration Updates
@@ -199,5 +221,12 @@ public actor VADCapability: ServiceBasedCapability {
         if let simpleVAD = service as? SimpleEnergyVADService {
             simpleVAD.notifyTTSDidFinish()
         }
+    }
+
+    // MARK: - Analytics
+
+    /// Get current VAD analytics metrics
+    public func getAnalyticsMetrics() async -> VADMetrics {
+        await analyticsService.getMetrics()
     }
 }
