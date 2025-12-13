@@ -118,7 +118,7 @@ class ModelDiscovery {
             directories.append(modelsURL)
 
             // Add framework-specific subdirectories
-            for framework in LLMFramework.allCases {
+            for framework in InferenceFramework.allCases {
                 let frameworkURL = try ModelPathUtils.getFrameworkDirectory(framework: framework)
                 directories.append(frameworkURL)
             }
@@ -150,8 +150,8 @@ class ModelDiscovery {
         return models.isEmpty ? nil : models
     }
 
-    private func detectCompatibleFrameworks(format: ModelFormat) -> [LLMFramework] {
-        var frameworks: [LLMFramework] = []
+    private func detectCompatibleFrameworks(format: ModelFormat) -> [InferenceFramework] {
+        var frameworks: [InferenceFramework] = []
 
         switch format {
         case .mlmodel, .mlpackage:

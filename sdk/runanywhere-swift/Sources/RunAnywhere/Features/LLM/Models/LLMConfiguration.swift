@@ -49,7 +49,7 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters,
     public let streamingEnabled: Bool
 
     /// Preferred framework for generation
-    public let preferredFramework: LLMFramework?
+    public let preferredFramework: InferenceFramework?
 
     // MARK: - Initialization
 
@@ -63,7 +63,7 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters,
         maxTokens: Int = 100,
         systemPrompt: String? = nil,
         streamingEnabled: Bool = true,
-        preferredFramework: LLMFramework? = nil
+        preferredFramework: InferenceFramework? = nil
     ) {
         self.modelId = modelId
         self.contextLength = contextLength
@@ -207,7 +207,7 @@ extension LLMConfiguration {
             return self
         }
 
-        public func preferredFramework(_ framework: LLMFramework?) -> Builder {
+        public func preferredFramework(_ framework: InferenceFramework?) -> Builder {
             config = LLMConfiguration(
                 modelId: config.modelId,
                 contextLength: config.contextLength,

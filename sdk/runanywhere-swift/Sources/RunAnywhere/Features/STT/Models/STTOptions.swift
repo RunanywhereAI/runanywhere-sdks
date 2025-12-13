@@ -39,7 +39,7 @@ public struct STTOptions: Sendable {
     public let sampleRate: Int
 
     /// Preferred framework for transcription (WhisperKit, ONNX, etc.)
-    public let preferredFramework: LLMFramework?
+    public let preferredFramework: InferenceFramework?
 
     public init(
         language: String = "en",
@@ -51,7 +51,7 @@ public struct STTOptions: Sendable {
         vocabularyFilter: [String] = [],
         audioFormat: AudioFormat = .pcm,
         sampleRate: Int = 16000,
-        preferredFramework: LLMFramework? = nil
+        preferredFramework: InferenceFramework? = nil
     ) {
         self.language = language
         self.detectLanguage = detectLanguage

@@ -7,7 +7,7 @@ public struct StoredModel: Sendable {
     public let path: URL
     public let size: Int64
     public let format: ModelFormat
-    public let framework: LLMFramework?
+    public let framework: InferenceFramework?
     public let createdDate: Date
     public let lastUsed: Date?
     public let tags: [String]
@@ -21,7 +21,7 @@ public struct StoredModel: Sendable {
         path: URL,
         size: Int64,
         format: ModelFormat,
-        framework: LLMFramework?,
+        framework: InferenceFramework?,
         createdDate: Date,
         lastUsed: Date?,
         tags: [String] = [],

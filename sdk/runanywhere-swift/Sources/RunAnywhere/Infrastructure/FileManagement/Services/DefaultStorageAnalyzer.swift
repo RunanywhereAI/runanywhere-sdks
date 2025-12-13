@@ -47,7 +47,7 @@ public class DefaultStorageAnalyzer: StorageAnalyzer {
         let storedModelsData = fileManager.getAllStoredModels()
 
         // Count models by framework
-        var modelsByFramework: [LLMFramework: [StoredModel]] = [:]
+        var modelsByFramework: [InferenceFramework: [StoredModel]] = [:]
         let storedModels = await getStoredModelsList()
 
         for model in storedModels {

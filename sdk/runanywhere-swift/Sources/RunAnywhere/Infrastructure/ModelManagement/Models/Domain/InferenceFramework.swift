@@ -1,14 +1,14 @@
 //
-//  LLMFramework.swift
+//  InferenceFramework.swift
 //  RunAnywhere SDK
 //
-//  Supported LLM frameworks
+//  Supported inference frameworks/runtimes for running models
 //
 
 import Foundation
 
-/// Supported LLM frameworks
-public enum LLMFramework: String, CaseIterable, Codable, Sendable {
+/// Supported inference frameworks/runtimes for executing models
+public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     case coreML = "CoreML"
     case tensorFlowLite = "TFLite"
     case mlx = "MLX"

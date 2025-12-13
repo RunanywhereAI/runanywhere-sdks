@@ -34,7 +34,7 @@ public enum ModelCategory: String, CaseIterable, Codable, Sendable {
 /// Extension to help determine model category
 public extension ModelCategory {
     /// Determine category from a framework
-    static func from(framework: LLMFramework) -> ModelCategory {
+    static func from(framework: InferenceFramework) -> ModelCategory {
         switch framework {
         case .whisperKit, .openAIWhisper:
             return .speechRecognition
@@ -52,7 +52,7 @@ public extension ModelCategory {
     }
 
     /// Determine category from format and frameworks
-    static func from(format: ModelFormat, frameworks: [LLMFramework]) -> ModelCategory {
+    static func from(format: ModelFormat, frameworks: [InferenceFramework]) -> ModelCategory {
         // First check if we have framework hints
         if let firstFramework = frameworks.first {
             return from(framework: firstFramework)

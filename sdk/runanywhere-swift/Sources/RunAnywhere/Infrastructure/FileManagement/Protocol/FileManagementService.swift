@@ -35,7 +35,7 @@ public protocol FileManagementService: AnyObject {
     ///   - framework: The LLM framework
     /// - Returns: The model's folder
     /// - Throws: Error if folder cannot be created
-    func getModelFolder(for modelId: String, framework: LLMFramework) throws -> Folder
+    func getModelFolder(for modelId: String, framework: InferenceFramework) throws -> Folder
 
     /// Store model data to storage
     /// - Parameters:
@@ -54,7 +54,7 @@ public protocol FileManagementService: AnyObject {
     ///   - framework: The LLM framework
     /// - Returns: URL to the stored model
     /// - Throws: Error if storage fails
-    func storeModel(data: Data, modelId: String, format: ModelFormat, framework: LLMFramework) throws -> URL
+    func storeModel(data: Data, modelId: String, format: ModelFormat, framework: InferenceFramework) throws -> URL
 
     /// Load model data from storage
     /// - Parameters:

@@ -13,6 +13,9 @@ import RunAnywhere
 extension LlamaCPPService: LLMService {
     // Note: isReady, currentModel, and initialize(modelPath:) are already defined in LlamaCPPService
 
+    /// LlamaCPP supports true token-by-token streaming
+    public var supportsStreaming: Bool { true }
+
     public func generate(prompt: String, options: LLMGenerationOptions) async throws -> String {
         let config = LlamaCPPGenerationConfig(
             maxTokens: options.maxTokens,

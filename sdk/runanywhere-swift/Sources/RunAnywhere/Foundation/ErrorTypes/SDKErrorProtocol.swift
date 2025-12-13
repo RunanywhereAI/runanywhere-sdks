@@ -31,12 +31,7 @@ extension SDKErrorProtocol {
         ErrorEventData(
             error: errorDescription ?? "Unknown error",
             context: context,
-            errorCode: String(code.rawValue),
-            category: category.rawValue,
-            stackTrace: errorContext?.formattedStackTrace,
-            file: errorContext?.file,
-            line: errorContext?.line,
-            function: errorContext?.function
+            errorCode: String(code.rawValue)
         )
     }
 }

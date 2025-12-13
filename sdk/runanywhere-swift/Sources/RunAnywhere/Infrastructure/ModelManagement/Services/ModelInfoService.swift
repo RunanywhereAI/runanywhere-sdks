@@ -50,7 +50,7 @@ public actor ModelInfoService {
     }
 
     /// Load models for specific frameworks
-    public func loadModels(for frameworks: [LLMFramework]) async throws -> [ModelInfo] {
+    public func loadModels(for frameworks: [InferenceFramework]) async throws -> [ModelInfo] {
         var models: [ModelInfo] = []
         for framework in frameworks {
             let frameworkModels = try await modelInfoRepository.fetchByFramework(framework)
@@ -89,7 +89,7 @@ public actor ModelInfoService {
     }
 
     /// Get models by framework
-    public func getModels(for framework: LLMFramework) async throws -> [ModelInfo] {
+    public func getModels(for framework: InferenceFramework) async throws -> [ModelInfo] {
         return try await modelInfoRepository.fetchByFramework(framework)
     }
 

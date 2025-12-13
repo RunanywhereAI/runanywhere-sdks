@@ -24,11 +24,13 @@ public actor LLMCapability: ModelLoadableCapability {
     // MARK: - Dependencies
 
     private let logger = SDKLogger(category: "LLMCapability")
+    private let analyticsService: GenerationAnalyticsService
 
     // MARK: - Initialization
 
-    public init() {
+    public init(analyticsService: GenerationAnalyticsService = GenerationAnalyticsService()) {
         self.lifecycle = ModelLifecycleManager.forLLM()
+        self.analyticsService = analyticsService
     }
 
     // MARK: - Configuration (Capability Protocol)
@@ -49,10 +51,23 @@ public actor LLMCapability: ModelLoadableCapability {
     }
 
     public func loadModel(_ modelId: String) async throws {
-        try await lifecycle.load(modelId)
+        let startTime = Date()
+
+        do {
+            try await lifecycle.load(modelId)
+            let loadTime = Date().timeIntervalSince(startTime)
+            await analyticsService.trackModelLoading(modelId: modelId, loadTime: loadTime, success: true)
+        } catch {
+            let loadTime = Date().timeIntervalSince(startTime)
+            await analyticsService.trackModelLoading(modelId: modelId, loadTime: loadTime, success: false)
+            throw error
+        }
     }
 
     public func unload() async throws {
+        if let modelId = await lifecycle.currentResourceId {
+            await analyticsService.trackModelUnloading(modelId: modelId)
+        }
         await lifecycle.unload()
     }
 
@@ -73,12 +88,17 @@ public actor LLMCapability: ModelLoadableCapability {
     ) async throws -> LLMGenerationResult {
         let service = try await lifecycle.requireService()
         let modelId = await lifecycle.currentResourceId ?? "unknown"
-        let startTime = Date()
 
         logger.info("Generating with model: \(modelId)")
 
         // Apply configuration defaults if not specified in options
         let effectiveOptions = mergeOptions(options)
+
+        // Start generation tracking
+        let generationId = await analyticsService.startGeneration(
+            modelId: modelId,
+            executionTarget: "local"
+        )
 
         // Generate text
         let generatedText: String
@@ -86,13 +106,25 @@ public actor LLMCapability: ModelLoadableCapability {
             generatedText = try await service.generate(prompt: prompt, options: effectiveOptions)
         } catch {
             logger.error("Generation failed: \(error)")
+            await analyticsService.trackError(error: error, context: .generation)
             throw CapabilityError.operationFailed("Generation", error)
         }
 
-        let latencyMs = Date().timeIntervalSince(startTime) * 1000
-
         // Simple token estimation (~4 chars per token)
+        let inputTokens = max(1, prompt.count / 4)
         let outputTokens = max(1, generatedText.count / 4)
+
+        // Complete generation tracking
+        await analyticsService.completeGeneration(
+            generationId: generationId,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            modelId: modelId,
+            executionTarget: "local"
+        )
+
+        let metrics = await analyticsService.getMetrics()
+        let latencyMs = metrics.lastEventTime.map { $0.timeIntervalSince(metrics.startTime) * 1000 } ?? 0
         let tokensPerSecond = latencyMs > 0 ? Double(outputTokens) / (latencyMs / 1000.0) : 0
 
         logger.info("Generation completed: \(outputTokens) tokens in \(Int(latencyMs))ms")
@@ -110,23 +142,53 @@ public actor LLMCapability: ModelLoadableCapability {
         )
     }
 
+    /// Whether the currently loaded service supports true streaming generation
+    /// - Returns: `true` if streaming is supported, `false` otherwise
+    /// - Note: Returns `false` if no model is loaded
+    public var supportsStreaming: Bool {
+        get async {
+            guard let service = try? await lifecycle.requireService() else {
+                return false
+            }
+            return service.supportsStreaming
+        }
+    }
+
     /// Generate text with streaming
     /// - Parameters:
     ///   - prompt: The input prompt
     ///   - options: Generation options
     /// - Returns: Streaming result with token stream and final metrics
+    /// - Throws: `LLMError.streamingNotSupported` if the service doesn't support streaming
     public func generateStream(
         _ prompt: String,
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) async throws -> LLMStreamingResult {
         let service = try await lifecycle.requireService()
+
+        // Check if streaming is supported by this service
+        guard service.supportsStreaming else {
+            logger.error("Streaming not supported by current service")
+            throw LLMError.streamingNotSupported
+        }
+
         let modelId = await lifecycle.currentResourceId ?? "unknown"
         let effectiveOptions = mergeOptions(options)
 
         logger.info("Starting streaming generation with model: \(modelId)")
 
+        // Start generation tracking
+        let generationId = await analyticsService.startGeneration(
+            modelId: modelId,
+            executionTarget: "local"
+        )
+
         // Create metrics collector
-        let collector = StreamingMetricsCollector(modelId: modelId)
+        let collector = StreamingMetricsCollector(
+            modelId: modelId,
+            generationId: generationId,
+            analyticsService: analyticsService
+        )
 
         // Create the token stream
         let stream = AsyncThrowingStream<String, Error> { continuation in
@@ -162,6 +224,13 @@ public actor LLMCapability: ModelLoadableCapability {
         return LLMStreamingResult(stream: stream, result: resultTask)
     }
 
+    // MARK: - Analytics
+
+    /// Get current generation analytics metrics
+    public func getAnalyticsMetrics() async -> GenerationMetrics {
+        await analyticsService.getMetrics()
+    }
+
     // MARK: - Private Methods
 
     private func mergeOptions(_ options: LLMGenerationOptions) -> LLMGenerationOptions {
@@ -185,36 +254,62 @@ public actor LLMCapability: ModelLoadableCapability {
 /// Internal actor for collecting streaming metrics
 private actor StreamingMetricsCollector {
     private let modelId: String
+    private let generationId: String
+    private let analyticsService: GenerationAnalyticsService
     private var startTime: Date?
     private var fullText = ""
     private var tokenCount = 0
+    private var firstTokenRecorded = false
     private var isComplete = false
     private var error: Error?
     private var resultContinuation: CheckedContinuation<LLMGenerationResult, Error>?
 
-    init(modelId: String) {
+    init(modelId: String, generationId: String, analyticsService: GenerationAnalyticsService) {
         self.modelId = modelId
+        self.generationId = generationId
+        self.analyticsService = analyticsService
     }
 
     func markStart() {
         startTime = Date()
     }
 
-    func recordToken(_ token: String) {
+    func recordToken(_ token: String) async {
         fullText += token
         tokenCount += 1
+
+        // Track first token
+        if !firstTokenRecorded {
+            firstTokenRecorded = true
+            await analyticsService.trackFirstToken(generationId: generationId)
+        }
     }
 
-    func markComplete() {
+    func markComplete() async {
         isComplete = true
+
+        // Simple token estimation (~4 chars per token)
+        let inputTokens = 0 // We don't have access to prompt here
+        let outputTokens = max(1, fullText.count / 4)
+
+        await analyticsService.completeGeneration(
+            generationId: generationId,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            modelId: modelId,
+            executionTarget: "local"
+        )
+
         if let continuation = resultContinuation {
             continuation.resume(returning: buildResult())
             resultContinuation = nil
         }
     }
 
-    func markFailed(_ error: Error) {
+    func markFailed(_ error: Error) async {
         self.error = error
+        await analyticsService.trackError(error: error, context: .generation)
+
         if let continuation = resultContinuation {
             continuation.resume(throwing: error)
             resultContinuation = nil

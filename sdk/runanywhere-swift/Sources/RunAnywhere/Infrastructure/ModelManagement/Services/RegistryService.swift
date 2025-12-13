@@ -222,7 +222,7 @@ public class RegistryService: ModelRegistry {
     public func addModelFromURL(
         name: String,
         url: URL,
-        framework: LLMFramework,
+        framework: InferenceFramework,
         estimatedSize: Int64? = nil,
         supportsThinking: Bool = false
     ) -> ModelInfo {

@@ -26,7 +26,7 @@ public struct LLMGenerationOptions: Sendable {
     public let streamingEnabled: Bool
 
     /// Preferred framework for generation
-    public let preferredFramework: LLMFramework?
+    public let preferredFramework: InferenceFramework?
 
     /// Structured output configuration (optional)
     public let structuredOutput: StructuredOutputConfig?
@@ -50,7 +50,7 @@ public struct LLMGenerationOptions: Sendable {
         topP: Float = 1.0,
         stopSequences: [String] = [],
         streamingEnabled: Bool = false,
-        preferredFramework: LLMFramework? = nil,
+        preferredFramework: InferenceFramework? = nil,
         structuredOutput: StructuredOutputConfig? = nil,
         systemPrompt: String? = nil
     ) {

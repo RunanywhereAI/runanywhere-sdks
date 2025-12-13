@@ -184,8 +184,8 @@ public enum SDKStorageEvent: SDKEvent {
 
 /// SDK Framework Events for public API
 public enum SDKFrameworkEvent: SDKEvent {
-    case modelsForFrameworkRequested(framework: LLMFramework)
-    case modelsForFrameworkRetrieved(framework: LLMFramework, models: [ModelInfo])
+    case modelsForFrameworkRequested(framework: InferenceFramework)
+    case modelsForFrameworkRetrieved(framework: InferenceFramework, models: [ModelInfo])
 
     public var timestamp: Date { Date() }
     public var eventType: SDKEventType { .framework }

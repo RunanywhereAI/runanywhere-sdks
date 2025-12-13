@@ -112,7 +112,7 @@ public actor LocalModelInfoDataSource: LocalDataSource {
     // MARK: - Model-specific methods
 
     /// Find models by framework
-    public func findByFramework(_ framework: LLMFramework) async throws -> [ModelInfo] {
+    public func findByFramework(_ framework: InferenceFramework) async throws -> [ModelInfo] {
         return try databaseManager.read { db in
             try ModelInfo
                 .filter(sql: "compatibleFrameworks LIKE ?", arguments: ["%\"\(framework.rawValue)\"%"])

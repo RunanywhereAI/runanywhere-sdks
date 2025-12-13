@@ -7,7 +7,7 @@ public struct ModelFileInfo {
     let modelId: String
     let format: ModelFormat
     let size: Int64
-    let framework: LLMFramework?
+    let framework: InferenceFramework?
 }
 
 /// Simplified file manager using Files library for all file operations
@@ -56,7 +56,7 @@ public class SimplifiedFileManager: FileManagementService { // swiftlint:disable
     }
 
     /// Get or create folder for a specific model with framework
-    public func getModelFolder(for modelId: String, framework: LLMFramework) throws -> Folder {
+    public func getModelFolder(for modelId: String, framework: InferenceFramework) throws -> Folder {
         let modelFolderURL = try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
         return try createFolderIfNeeded(at: modelFolderURL)
     }
@@ -85,7 +85,7 @@ public class SimplifiedFileManager: FileManagementService { // swiftlint:disable
     }
 
     /// Store model file with framework
-    public func storeModel(data: Data, modelId: String, format: ModelFormat, framework: LLMFramework) throws -> URL {
+    public func storeModel(data: Data, modelId: String, format: ModelFormat, framework: InferenceFramework) throws -> URL {
         let modelFolder = try getModelFolder(for: modelId, framework: framework)
         let fileName = "\(modelId).\(format.rawValue)"
 
@@ -121,7 +121,7 @@ public class SimplifiedFileManager: FileManagementService { // swiftlint:disable
         let modelsFolder = try Folder(path: modelsFolderURL.path)
 
         // Check framework-specific folders
-        for frameworkFolder in modelsFolder.subfolders where LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) {
+        for frameworkFolder in modelsFolder.subfolders where InferenceFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) {
             if frameworkFolder.containsSubfolder(named: modelId) {
                 let modelFolder = try frameworkFolder.subfolder(named: modelId)
                 try modelFolder.delete()
@@ -264,7 +264,7 @@ public class SimplifiedFileManager: FileManagementService { // swiftlint:disable
         // First check direct model folders (legacy structure)
         for modelFolder in modelsFolder.subfolders {
             // Skip framework folders
-            if LLMFramework.allCases.contains(where: { $0.rawValue == modelFolder.name }) {
+            if InferenceFramework.allCases.contains(where: { $0.rawValue == modelFolder.name }) {
                 continue
             }
 
@@ -283,7 +283,7 @@ public class SimplifiedFileManager: FileManagementService { // swiftlint:disable
         // Then check framework-specific folders
         for frameworkFolder in modelsFolder.subfolders {
             // Only process framework folders
-            guard let frameworkType = LLMFramework.allCases.first(where: { $0.rawValue == frameworkFolder.name }) else {
+            guard let frameworkType = InferenceFramework.allCases.first(where: { $0.rawValue == frameworkFolder.name }) else {
                 continue
             }
 
@@ -441,7 +441,7 @@ public class SimplifiedFileManager: FileManagementService { // swiftlint:disable
 
         // Search in framework-specific folders first
         for frameworkFolder in modelsFolder.subfolders {
-            if let frameworkType = LLMFramework.allCases.first(where: { $0.rawValue == frameworkFolder.name }) {
+            if let frameworkType = InferenceFramework.allCases.first(where: { $0.rawValue == frameworkFolder.name }) {
                 if frameworkFolder.containsSubfolder(named: modelId) {
                     if let modelFolder = try? frameworkFolder.subfolder(named: modelId) {
                         let folderURL = URL(fileURLWithPath: modelFolder.path)
@@ -502,7 +502,7 @@ public class SimplifiedFileManager: FileManagementService { // swiftlint:disable
     }
 
     /// Get storage strategy for a framework
-    private func getStorageStrategy(for framework: LLMFramework) -> ModelStorageStrategy? {
+    private func getStorageStrategy(for framework: InferenceFramework) -> ModelStorageStrategy? {
         // Storage strategies are now provided directly by service providers via download strategies
         // Return nil to use default storage behavior
         return nil

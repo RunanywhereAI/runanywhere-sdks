@@ -25,11 +25,13 @@ public actor STTCapability: ModelLoadableCapability {
     // MARK: - Dependencies
 
     private let logger = SDKLogger(category: "STTCapability")
+    private let analyticsService: STTAnalyticsService
 
     // MARK: - Initialization
 
-    public init() {
+    public init(analyticsService: STTAnalyticsService = STTAnalyticsService()) {
         self.lifecycle = ModelLifecycleManager.forSTT()
+        self.analyticsService = analyticsService
     }
 
     // MARK: - Configuration (Capability Protocol)
@@ -58,7 +60,30 @@ public actor STTCapability: ModelLoadableCapability {
     }
 
     public func loadModel(_ modelId: String) async throws {
-        try await lifecycle.load(modelId)
+        let startTime = Date()
+
+        do {
+            try await lifecycle.load(modelId)
+            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000
+            await analyticsService.trackModelLoad(
+                modelId: modelId,
+                modelName: modelId,
+                framework: .whisperKit,
+                loadTimeMs: loadTimeMs,
+                success: true
+            )
+        } catch {
+            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000
+            await analyticsService.trackModelLoad(
+                modelId: modelId,
+                modelName: modelId,
+                framework: .whisperKit,
+                loadTimeMs: loadTimeMs,
+                success: false,
+                errorMessage: error.localizedDescription
+            )
+            throw error
+        }
     }
 
     public func unload() async throws {
@@ -81,7 +106,6 @@ public actor STTCapability: ModelLoadableCapability {
         options: STTOptions = STTOptions()
     ) async throws -> STTOutput {
         let service = try await lifecycle.requireService()
-        let metrics = CapabilityMetrics(resourceId: await lifecycle.currentResourceId ?? "unknown")
         let modelId = await lifecycle.currentResourceId ?? "unknown"
 
         logger.info("Transcribing audio with model: \(modelId)")
@@ -89,16 +113,48 @@ public actor STTCapability: ModelLoadableCapability {
         // Merge options with config defaults
         let effectiveOptions = mergeOptions(options)
 
+        // Estimate audio length
+        let audioLengthMs = estimateAudioLength(dataSize: audioData.count) * 1000
+
+        // Start transcription tracking
+        let transcriptionId = await analyticsService.startTranscription(
+            audioLengthMs: audioLengthMs,
+            language: effectiveOptions.language
+        )
+
+        let startTime = Date()
+
         // Perform transcription
         let result: STTTranscriptionResult
         do {
             result = try await service.transcribe(audioData: audioData, options: effectiveOptions)
         } catch {
             logger.error("Transcription failed: \(error)")
+            let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
+            await analyticsService.trackTranscriptionFailed(
+                sessionId: transcriptionId,
+                modelId: modelId,
+                modelName: modelId,
+                framework: .whisperKit,
+                language: effectiveOptions.language,
+                audioDurationMs: audioLengthMs,
+                processingTimeMs: processingTimeMs,
+                errorMessage: error.localizedDescription
+            )
             throw CapabilityError.operationFailed("Transcription", error)
         }
 
-        logger.info("Transcription completed in \(Int(metrics.elapsedMs))ms")
+        // Complete transcription tracking
+        await analyticsService.completeTranscription(
+            transcriptionId: transcriptionId,
+            text: result.transcript,
+            confidence: result.confidence ?? 0.9
+        )
+
+        let metrics = await analyticsService.getMetrics()
+        let processingTime = metrics.lastEventTime.map { $0.timeIntervalSince(metrics.startTime) } ?? 0
+
+        logger.info("Transcription completed in \(Int(processingTime * 1000))ms")
 
         // Convert to output
         return STTOutput(
@@ -118,8 +174,8 @@ public actor STTCapability: ModelLoadableCapability {
             },
             metadata: TranscriptionMetadata(
                 modelId: modelId,
-                processingTime: metrics.elapsedMs / 1000.0,
-                audioLength: estimateAudioLength(dataSize: audioData.count)
+                processingTime: processingTime,
+                audioLength: audioLengthMs / 1000
             )
         )
     }
@@ -160,25 +216,75 @@ public actor STTCapability: ModelLoadableCapability {
                     return
                 }
 
+                let modelId = await self.lifecycle.currentResourceId ?? "unknown"
                 let effectiveOptions = self.mergeOptions(options)
+
+                // Start transcription tracking
+                let transcriptionId = await self.analyticsService.startTranscription(
+                    audioLengthMs: 0, // Unknown for streaming
+                    language: effectiveOptions.language
+                )
+
+                let startTime = Date()
+                var lastPartialWordCount = 0
 
                 do {
                     let result = try await service.streamTranscribe(
                         audioStream: audioStream,
                         options: effectiveOptions,
                         onPartial: { partial in
+                            // Track streaming update
+                            let elapsedMs = Date().timeIntervalSince(startTime) * 1000
+                            let wordCount = partial.split(separator: " ").count
+                            if wordCount > lastPartialWordCount {
+                                Task {
+                                    await self.analyticsService.trackStreamingUpdate(
+                                        sessionId: transcriptionId,
+                                        modelId: modelId,
+                                        framework: .whisperKit,
+                                        partialWordCount: wordCount,
+                                        elapsedMs: elapsedMs
+                                    )
+                                }
+                                lastPartialWordCount = wordCount
+                            }
                             continuation.yield(partial)
                         }
+                    )
+
+                    // Complete transcription tracking
+                    await self.analyticsService.completeTranscription(
+                        transcriptionId: transcriptionId,
+                        text: result.transcript,
+                        confidence: result.confidence ?? 0.9
                     )
 
                     // Yield final result
                     continuation.yield(result.transcript)
                     continuation.finish()
                 } catch {
+                    let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
+                    await self.analyticsService.trackTranscriptionFailed(
+                        sessionId: transcriptionId,
+                        modelId: modelId,
+                        modelName: modelId,
+                        framework: .whisperKit,
+                        language: effectiveOptions.language,
+                        audioDurationMs: 0,
+                        processingTimeMs: processingTimeMs,
+                        errorMessage: error.localizedDescription
+                    )
                     continuation.finish(throwing: error)
                 }
             }
         }
+    }
+
+    // MARK: - Analytics
+
+    /// Get current STT analytics metrics
+    public func getAnalyticsMetrics() async -> STTMetrics {
+        await analyticsService.getMetrics()
     }
 
     // MARK: - Private Methods

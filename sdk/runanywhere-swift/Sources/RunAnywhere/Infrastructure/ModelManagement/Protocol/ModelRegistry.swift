@@ -39,7 +39,7 @@ public protocol ModelRegistry {
     func addModelFromURL(
         name: String,
         url: URL,
-        framework: LLMFramework,
+        framework: InferenceFramework,
         estimatedSize: Int64?,
         supportsThinking: Bool
     ) -> ModelInfo

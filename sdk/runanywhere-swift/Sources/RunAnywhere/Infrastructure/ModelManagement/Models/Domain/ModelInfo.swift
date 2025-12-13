@@ -18,8 +18,8 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     public let memoryRequired: Int64?  // RAM needed to run the model
 
     // Framework compatibility
-    public let compatibleFrameworks: [LLMFramework]
-    public let preferredFramework: LLMFramework?
+    public let compatibleFrameworks: [InferenceFramework]
+    public let preferredFramework: InferenceFramework?
 
     // Model-specific capabilities (optional based on category)
     public let contextLength: Int?  // For language models
@@ -86,8 +86,8 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         localPath: URL? = nil,
         downloadSize: Int64? = nil,
         memoryRequired: Int64? = nil,
-        compatibleFrameworks: [LLMFramework] = [],
-        preferredFramework: LLMFramework? = nil,
+        compatibleFrameworks: [InferenceFramework] = [],
+        preferredFramework: InferenceFramework? = nil,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
         thinkingPattern: ThinkingTagPattern? = nil,

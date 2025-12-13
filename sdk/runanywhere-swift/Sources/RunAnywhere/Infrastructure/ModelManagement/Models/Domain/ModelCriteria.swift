@@ -2,14 +2,14 @@ import Foundation
 
 /// Model criteria for filtering
 public struct ModelCriteria {
-    public let framework: LLMFramework?
+    public let framework: InferenceFramework?
     public let format: ModelFormat?
     public let maxSize: Int64?
     public let tags: [String]
     public let search: String?
 
     public init(
-        framework: LLMFramework? = nil,
+        framework: InferenceFramework? = nil,
         format: ModelFormat? = nil,
         maxSize: Int64? = nil,
         tags: [String] = [],

@@ -24,11 +24,13 @@ public actor TTSCapability: ModelLoadableCapability {
     // MARK: - Dependencies
 
     private let logger = SDKLogger(category: "TTSCapability")
+    private let analyticsService: TTSAnalyticsService
 
     // MARK: - Initialization
 
-    public init() {
+    public init(analyticsService: TTSAnalyticsService = TTSAnalyticsService()) {
         self.lifecycle = ModelLifecycleManager.forTTS()
+        self.analyticsService = analyticsService
     }
 
     // MARK: - Configuration (Capability Protocol)
@@ -83,7 +85,30 @@ public actor TTSCapability: ModelLoadableCapability {
     /// - Parameter voiceId: The voice identifier
     /// - Throws: Error if loading fails
     public func loadVoice(_ voiceId: String) async throws {
-        try await lifecycle.load(voiceId)
+        let startTime = Date()
+
+        do {
+            try await lifecycle.load(voiceId)
+            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000
+            await analyticsService.trackModelLoad(
+                modelId: voiceId,
+                modelName: voiceId,
+                framework: .systemTTS,
+                loadTimeMs: loadTimeMs,
+                success: true
+            )
+        } catch {
+            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000
+            await analyticsService.trackModelLoad(
+                modelId: voiceId,
+                modelName: voiceId,
+                framework: .systemTTS,
+                loadTimeMs: loadTimeMs,
+                success: false,
+                errorMessage: error.localizedDescription
+            )
+            throw error
+        }
     }
 
     public func unload() async throws {
@@ -106,7 +131,6 @@ public actor TTSCapability: ModelLoadableCapability {
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSOutput {
         let service = try await lifecycle.requireService()
-        let metrics = CapabilityMetrics(resourceId: await lifecycle.currentResourceId ?? "unknown")
         let voiceId = await lifecycle.currentResourceId ?? "unknown"
 
         logger.info("Synthesizing text with voice: \(voiceId)")
@@ -114,28 +138,60 @@ public actor TTSCapability: ModelLoadableCapability {
         // Merge options with config defaults
         let effectiveOptions = mergeOptions(options)
 
+        // Start synthesis tracking
+        let synthesisId = await analyticsService.startSynthesis(
+            text: text,
+            voice: effectiveOptions.voice ?? voiceId,
+            language: effectiveOptions.language
+        )
+
+        let startTime = Date()
+
         // Perform synthesis
         let audioData: Data
         do {
             audioData = try await service.synthesize(text: text, options: effectiveOptions)
         } catch {
             logger.error("Synthesis failed: \(error)")
+            let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
+            await analyticsService.trackSynthesisFailed(
+                synthesisId: synthesisId,
+                modelId: voiceId,
+                modelName: voiceId,
+                framework: .systemTTS,
+                language: effectiveOptions.language,
+                characterCount: text.count,
+                processingTimeMs: processingTimeMs,
+                errorMessage: error.localizedDescription
+            )
             throw CapabilityError.operationFailed("Synthesis", error)
         }
 
-        logger.info("Synthesis completed in \(Int(metrics.elapsedMs))ms, \(audioData.count) bytes")
+        let audioDuration = estimateAudioDuration(dataSize: audioData.count, sampleRate: effectiveOptions.sampleRate)
+
+        // Complete synthesis tracking
+        await analyticsService.completeSynthesis(
+            synthesisId: synthesisId,
+            audioDurationMs: audioDuration * 1000,
+            audioSizeBytes: audioData.count
+        )
+
+        let metrics = await analyticsService.getMetrics()
+        let processingTime = metrics.lastEventTime.map { $0.timeIntervalSince(metrics.startTime) } ?? 0
+
+        logger.info("Synthesis completed in \(Int(processingTime * 1000))ms, \(audioData.count) bytes")
 
         let metadata = TTSSynthesisMetadata(
             voice: effectiveOptions.voice ?? voiceId,
             language: effectiveOptions.language,
-            processingTime: metrics.elapsedMs / 1000.0,
+            processingTime: processingTime,
             characterCount: text.count
         )
 
         return TTSOutput(
             audioData: audioData,
             format: effectiveOptions.audioFormat,
-            duration: estimateAudioDuration(dataSize: audioData.count, sampleRate: effectiveOptions.sampleRate),
+            duration: audioDuration,
             phonemeTimestamps: nil,
             metadata: metadata
         )
@@ -159,18 +215,50 @@ public actor TTSCapability: ModelLoadableCapability {
                     return
                 }
 
+                let voiceId = await self.lifecycle.currentResourceId ?? "unknown"
                 let effectiveOptions = self.mergeOptions(options)
+
+                // Start synthesis tracking
+                let synthesisId = await self.analyticsService.startSynthesis(
+                    text: text,
+                    voice: effectiveOptions.voice ?? voiceId,
+                    language: effectiveOptions.language
+                )
+
+                var totalBytes = 0
+                let startTime = Date()
 
                 do {
                     try await service.synthesizeStream(
                         text: text,
                         options: effectiveOptions,
                         onChunk: { chunk in
+                            totalBytes += chunk.count
                             continuation.yield(chunk)
                         }
                     )
+
+                    // Complete synthesis tracking
+                    let audioDuration = self.estimateAudioDuration(dataSize: totalBytes, sampleRate: effectiveOptions.sampleRate)
+                    await self.analyticsService.completeSynthesis(
+                        synthesisId: synthesisId,
+                        audioDurationMs: audioDuration * 1000,
+                        audioSizeBytes: totalBytes
+                    )
+
                     continuation.finish()
                 } catch {
+                    let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
+                    await self.analyticsService.trackSynthesisFailed(
+                        synthesisId: synthesisId,
+                        modelId: voiceId,
+                        modelName: voiceId,
+                        framework: .systemTTS,
+                        language: effectiveOptions.language,
+                        characterCount: text.count,
+                        processingTimeMs: processingTimeMs,
+                        errorMessage: error.localizedDescription
+                    )
                     continuation.finish(throwing: error)
                 }
             }
@@ -181,6 +269,13 @@ public actor TTSCapability: ModelLoadableCapability {
     public func stop() async {
         logger.info("Stopping synthesis")
         await lifecycle.currentService?.stop()
+    }
+
+    // MARK: - Analytics
+
+    /// Get current TTS analytics metrics
+    public func getAnalyticsMetrics() async -> TTSMetrics {
+        await analyticsService.getMetrics()
     }
 
     // MARK: - Private Methods
