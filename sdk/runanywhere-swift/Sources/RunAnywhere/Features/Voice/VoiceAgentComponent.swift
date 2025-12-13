@@ -3,9 +3,8 @@ import Foundation
 // MARK: - Voice Agent Component
 
 /// Voice Agent component that orchestrates VAD, STT, LLM, and TTS components
-/// Follows the canonical BaseComponent<ServiceWrapper> architecture pattern
 @MainActor
-public final class VoiceAgentComponent: BaseComponent<VoiceServiceWrapper>, @unchecked Sendable {
+public final class VoiceAgentComponent: BaseComponent<any VoiceService>, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -30,7 +29,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceServiceWrapper>, @unc
 
     // MARK: - Service Creation
 
-    public override func createService() async throws -> VoiceServiceWrapper {
+    public override func createService() async throws -> any VoiceService {
         logger.info("Creating Voice Agent service")
 
         // Initialize all components
@@ -45,7 +44,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceServiceWrapper>, @unc
             eventBus: eventBus
         )
 
-        return VoiceServiceWrapper(voiceService)
+        return voiceService
     }
 
     public override func initializeService() async throws {
@@ -79,19 +78,13 @@ public final class VoiceAgentComponent: BaseComponent<VoiceServiceWrapper>, @unc
         logger.info("All voice pipeline components initialized successfully")
     }
 
-    // MARK: - Helper Methods
-
-    private var voiceService: (any VoiceService)? {
-        return service?.wrappedService
-    }
-
     // MARK: - Pipeline Processing
 
     /// Process audio through the full pipeline
     public func processAudio(_ audioData: Data) async throws -> VoiceAgentResult {
         try ensureReady()
 
-        guard let voiceService = voiceService else {
+        guard let voiceService = service else {
             throw RunAnywhereError.componentNotReady("Voice service not available")
         }
 
@@ -134,7 +127,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceServiceWrapper>, @unc
 
     /// Process audio stream for continuous conversation
     public func processStream(_ audioStream: AsyncStream<Data>) -> AsyncThrowingStream<VoiceAgentEvent, Error> {
-        guard let voiceService = voiceService else {
+        guard let voiceService = service else {
             return AsyncThrowingStream { continuation in
                 continuation.finish(throwing: RunAnywhereError.componentNotReady("Voice service not available"))
             }
@@ -146,28 +139,28 @@ public final class VoiceAgentComponent: BaseComponent<VoiceServiceWrapper>, @unc
 
     /// Process only through VAD
     public func detectVoiceActivity(_ audioData: Data) -> Bool {
-        guard let voiceService = voiceService else { return true }
+        guard let voiceService = service else { return true }
         return voiceService.detectVoiceActivity(audioData)
     }
 
     /// Process only through STT
     public func transcribe(_ audioData: Data) async throws -> String? {
         try ensureReady()
-        guard let voiceService = voiceService else { return nil }
+        guard let voiceService = service else { return nil }
         return try await voiceService.transcribe(audioData)
     }
 
     /// Process only through LLM
     public func generateResponse(_ prompt: String) async throws -> String? {
         try ensureReady()
-        guard let voiceService = voiceService else { return nil }
+        guard let voiceService = service else { return nil }
         return try await voiceService.generateResponse(prompt)
     }
 
     /// Process only through TTS
     public func synthesizeSpeech(_ text: String) async throws -> Data? {
         try ensureReady()
-        guard let voiceService = voiceService else { return nil }
+        guard let voiceService = service else { return nil }
         return try await voiceService.synthesizeSpeech(text)
     }
 
@@ -196,7 +189,6 @@ public final class VoiceAgentComponent: BaseComponent<VoiceServiceWrapper>, @unc
 
         let event = VoiceEvent(type: eventType, eventData: eventData)
         await AnalyticsQueueManager.shared.enqueue(event)
-        await AnalyticsQueueManager.shared.flush()
     }
 
     // MARK: - Cleanup
@@ -205,7 +197,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceServiceWrapper>, @unc
         logger.info("Cleaning up voice pipeline components")
 
         // Cleanup service
-        try? await voiceService?.cleanup()
+        try? await service?.cleanup()
 
         // Clear component references
         vadComponent = nil

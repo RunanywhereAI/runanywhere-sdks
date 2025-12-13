@@ -12,7 +12,7 @@ import Foundation
 // MARK: - STT Component
 
 /// Speech-to-Text component following the clean architecture
-public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Sendable { // swiftlint:disable:this type_body_length
+public final class STTComponent: BaseComponent<any STTService>, @unchecked Sendable { // swiftlint:disable:this type_body_length
 
     // MARK: - Properties
 
@@ -33,7 +33,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
 
     // MARK: - Service Creation
 
-    public override func createService() async throws -> STTServiceWrapper {
+    public override func createService() async throws -> any STTService {
         let modelId = sttConfiguration.modelId ?? "unknown"
         let modelName = modelId
 
@@ -41,7 +41,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         if let cachedService = await ModelLifecycleTracker.shared.sttService(for: modelId) {
             logger.info("Reusing cached STT service for model: \(modelId)")
             isModelLoaded = true
-            return STTServiceWrapper(cachedService)
+            return cachedService
         }
 
         // Notify lifecycle manager
@@ -81,9 +81,6 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             // Store provider name for telemetry
             self.providerName = provider.name
 
-            // Wrap the service
-            let wrapper = STTServiceWrapper(sttService)
-
             // Service is already initialized by the provider
             isModelLoaded = true
 
@@ -98,7 +95,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
                 )
             }
 
-            return wrapper
+            return sttService
         } catch {
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelLoadFailed(
@@ -112,15 +109,9 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     }
 
     public override func performCleanup() async throws {
-        await service?.wrappedService?.cleanup()
+        await service?.cleanup()
         isModelLoaded = false
         modelPath = nil
-    }
-
-    // MARK: - Helper Methods
-
-    private var sttService: (any STTService)? {
-        return service?.wrappedService
     }
 
     // MARK: - Capabilities
@@ -128,7 +119,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     /// Whether the underlying service supports live/streaming transcription
     /// If false, `liveTranscribe` will internally fall back to batch processing
     public var supportsStreaming: Bool {
-        sttService?.supportsStreaming ?? false
+        service?.supportsStreaming ?? false
     }
 
     /// Get the recommended transcription mode based on service capabilities
@@ -211,7 +202,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     public func process(_ input: STTInput) async throws -> STTOutput { // swiftlint:disable:this function_body_length
         try ensureReady()
 
-        guard let service = sttService else {
+        guard let sttService = service else {
             throw RunAnywhereError.componentNotReady("STT service not available")
         }
 
@@ -256,7 +247,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         // Perform transcription with error telemetry
         let result: STTTranscriptionResult
         do {
-            result = try await service.transcribe(audioData: audioData, options: options)
+            result = try await sttService.transcribe(audioData: audioData, options: options)
         } catch {
             // Submit failure telemetry
             let processingTime = Date().timeIntervalSince(startTime)
@@ -282,7 +273,6 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
                 )
                 let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
                 await AnalyticsQueueManager.shared.enqueue(event)
-                await AnalyticsQueueManager.shared.flush()
             }
             throw error
         }
@@ -345,7 +335,6 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             )
             let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
             await AnalyticsQueueManager.shared.enqueue(event)
-            await AnalyticsQueueManager.shared.flush()
         }
 
         return output
@@ -365,7 +354,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
                 do {
                     try ensureReady()
 
-                    guard let service = sttService else {
+                    guard let sttService = service else {
                         continuation.finish(throwing: RunAnywhereError.componentNotReady("STT service not available"))
                         return
                     }
@@ -380,7 +369,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
                         audioFormat: .pcm
                     )
 
-                    let result = try await service.streamTranscribe(
+                    let result = try await sttService.streamTranscribe(
                         audioStream: audioStream,
                         options: options
                     ) { partial in
@@ -414,7 +403,6 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
                         )
                         let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
                         await AnalyticsQueueManager.shared.enqueue(event)
-                        await AnalyticsQueueManager.shared.flush()
                     }
 
                     continuation.finish()
@@ -443,7 +431,6 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
                         )
                         let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
                         await AnalyticsQueueManager.shared.enqueue(event)
-                        await AnalyticsQueueManager.shared.flush()
                     }
                     continuation.finish(throwing: error)
                 }
@@ -453,7 +440,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
 
     /// Get service for compatibility
     public func getService() -> (any STTService)? {
-        return sttService
+        return service
     }
 
     // MARK: - Private Helpers

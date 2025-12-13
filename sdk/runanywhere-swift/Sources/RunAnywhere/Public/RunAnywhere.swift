@@ -17,6 +17,9 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     internal static var currentEnvironment: SDKEnvironment?
     private static var isInitialized = false
 
+    /// Track if network bootstrap is complete (makes ensureDeviceRegistered O(1) after first call)
+    private static var isBootstrapped = false
+
     /// Access to service container (through the shared instance for now)
     internal static var serviceContainer: ServiceContainer {
         ServiceContainer.shared
@@ -155,7 +158,13 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
     /// Ensure device is registered with backend (lazy registration)
     /// Orchestrates service initialization directly
+    /// Note: This is O(1) after first successful call due to isBootstrapped flag
     internal static func ensureDeviceRegistered() async throws {
+        // Fast path: already bootstrapped, return immediately (O(1))
+        if isBootstrapped {
+            return
+        }
+
         guard let params = initParams, let environment = currentEnvironment else {
             throw RunAnywhereError.notInitialized
         }
@@ -305,6 +314,9 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             environment: environment,
             serviceContainer: serviceContainer
         )
+
+        // Mark bootstrap as complete - subsequent calls will be O(1)
+        isBootstrapped = true
     }
 
     // MARK: - Analytics Submission (Delegated to Service)
@@ -359,7 +371,8 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         _ prompt: String,
         options: LLMGenerationOptions? = nil
     ) async throws -> LLMGenerationResult {
-        EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
+        // Non-blocking event publish
+        events.publishAsync(SDKGenerationEvent.started(prompt: prompt))
 
         do {
             // Ensure initialized
@@ -367,7 +380,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
                 throw RunAnywhereError.notInitialized
             }
 
-            // Lazy device registration on first API call
+            // Lazy device registration on first API call (O(1) after first call)
             try await ensureDeviceRegistered()
 
             // Use options directly or defaults
@@ -376,7 +389,8 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
                 options: options ?? LLMGenerationOptions()
             )
 
-            EventBus.shared.publish(SDKGenerationEvent.completed(
+            // Non-blocking event publish
+            events.publishAsync(SDKGenerationEvent.completed(
                 response: result.text,
                 tokensUsed: result.tokensUsed,
                 latencyMs: result.latencyMs
@@ -384,7 +398,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
             return result
         } catch {
-            EventBus.shared.publish(SDKGenerationEvent.failed(error))
+            events.publishAsync(SDKGenerationEvent.failed(error))
             throw error
         }
     }
@@ -417,14 +431,15 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         _ prompt: String,
         options: LLMGenerationOptions? = nil
     ) async throws -> LLMStreamingResult {
-        EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
+        // Non-blocking event publish
+        events.publishAsync(SDKGenerationEvent.started(prompt: prompt))
 
         // Ensure initialized
         guard isInitialized else {
             throw RunAnywhereError.notInitialized
         }
 
-        // Lazy device registration on first API call
+        // Lazy device registration on first API call (O(1) after first call)
         try await ensureDeviceRegistered()
 
         return serviceContainer.streamingService.generateStreamWithMetrics(
@@ -443,14 +458,15 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         guard isInitialized else { throw RunAnywhereError.notInitialized }
         try await ensureDeviceRegistered()
 
-        events.publish(SDKVoiceEvent.transcriptionStarted)
+        // Non-blocking event publish
+        events.publishAsync(SDKVoiceEvent.transcriptionStarted)
 
         do {
             let result = try await serviceContainer.voiceOrchestrator.transcribe(audio: audioData)
-            events.publish(SDKVoiceEvent.transcriptionFinal(text: result.text))
+            events.publishAsync(SDKVoiceEvent.transcriptionFinal(text: result.text))
             return result.text
         } catch {
-            events.publish(SDKVoiceEvent.pipelineError(error))
+            events.publishAsync(SDKVoiceEvent.pipelineError(error))
             throw error
         }
     }
@@ -548,9 +564,9 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
     /// Get currently loaded model
     /// - Returns: Currently loaded model info
-    public static var currentModel: ModelInfo? {
+    public static func getCurrentModel() async -> ModelInfo? {
         guard isInitialized else { return nil }
-        return serviceContainer.generationService.getCurrentModel()?.model
+        return await serviceContainer.generationService.getCurrentModel()?.model
     }
 
     // MARK: - Multi-Adapter Support (NEW)
@@ -627,6 +643,7 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
         // Clear initialization state
         isInitialized = false
+        isBootstrapped = false
         initParams = nil
         currentEnvironment = nil
         configurationData = nil

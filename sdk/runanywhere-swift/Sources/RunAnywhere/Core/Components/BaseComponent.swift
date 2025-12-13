@@ -3,7 +3,7 @@ import Foundation
 /// Simplified base component for all SDK components
 /// Using @unchecked Sendable as we manage thread safety with @MainActor
 @MainActor
-open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable { // swiftlint:disable:this avoid_any_object
+open class BaseComponent<TService>: Component, @unchecked Sendable {
     // MARK: - Core Properties
 
     /// Component type identifier - must be overridden in subclass

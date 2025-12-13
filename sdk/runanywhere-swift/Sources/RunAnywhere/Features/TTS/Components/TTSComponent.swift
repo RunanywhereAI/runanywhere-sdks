@@ -14,7 +14,7 @@ import Foundation
 /// This component integrates with the SDK's lifecycle management system
 /// and provides analytics tracking for TTS operations.
 @MainActor
-public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Sendable {
+public final class TTSComponent: BaseComponent<any TTSService>, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -33,7 +33,7 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
     // MARK: - Service Creation
 
     // swiftlint:disable:next function_body_length
-    public override func createService() async throws -> TTSServiceWrapper {
+    public override func createService() async throws -> any TTSService {
         let modelId = ttsConfiguration.voice
         let modelName = modelId
 
@@ -42,7 +42,7 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
         // Check if we already have a cached service via the lifecycle tracker
         if let cachedService = await ModelLifecycleTracker.shared.ttsService(for: modelId) {
             logger.info("Reusing cached TTS service for model: \(modelId)")
-            return TTSServiceWrapper(cachedService)
+            return cachedService
         }
 
         // Try to get a registered TTS provider from central registry
@@ -84,9 +84,6 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
                 logger.info("TTS service created successfully via DefaultTTSAdapter")
             }
 
-            // Wrap the service
-            let wrapper = TTSServiceWrapper(ttsService)
-
             // Store service in lifecycle tracker for reuse
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelDidLoad(
@@ -99,7 +96,7 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
             }
 
             logger.info("TTS component service creation completed successfully")
-            return wrapper
+            return ttsService
         } catch {
             logger.error("TTS service creation failed: \(error)")
             await MainActor.run {
@@ -114,7 +111,7 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
     }
 
     public override func initializeService() async throws {
-        guard let wrappedService = service?.wrappedService else { return }
+        guard let ttsService = service else { return }
 
         // Track initialization
         eventBus.publish(ComponentInitializationEvent.componentInitializing(
@@ -122,7 +119,7 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
             modelId: nil
         ))
 
-        try await wrappedService.initialize()
+        try await ttsService.initialize()
     }
 
     // MARK: - Public API
@@ -156,7 +153,7 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
     public func process(_ input: TTSInput) async throws -> TTSOutput { // swiftlint:disable:this function_body_length
         try ensureReady()
 
-        guard let ttsService = service?.wrappedService else {
+        guard let ttsService = service else {
             throw TTSError.notInitialized
         }
 
@@ -210,7 +207,6 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
                 )
                 let event = TTSEvent(type: .synthesisCompleted, eventData: eventData)
                 await AnalyticsQueueManager.shared.enqueue(event)
-                await AnalyticsQueueManager.shared.flush()
             }
             throw error
         }
@@ -260,7 +256,6 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
             )
             let event = TTSEvent(type: .synthesisCompleted, eventData: eventData)
             await AnalyticsQueueManager.shared.enqueue(event)
-            await AnalyticsQueueManager.shared.flush()
         }
 
         return output
@@ -277,7 +272,7 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
                 do {
                     try ensureReady()
 
-                    guard let ttsService = service?.wrappedService else {
+                    guard let ttsService = service else {
                         continuation.finish(throwing: TTSError.notInitialized)
                         return
                     }
@@ -310,29 +305,29 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
 
     /// Get available voices
     public func getAvailableVoices() -> [String] {
-        return service?.wrappedService?.availableVoices ?? []
+        return service?.availableVoices ?? []
     }
 
     /// Stop current synthesis
     public func stopSynthesis() {
-        service?.wrappedService?.stop()
+        service?.stop()
     }
 
     /// Check if currently synthesizing
     public var isSynthesizing: Bool {
-        return service?.wrappedService?.isSynthesizing ?? false
+        return service?.isSynthesizing ?? false
     }
 
     /// Get service for compatibility
     public func getService() -> (any TTSService)? {
-        return service?.wrappedService
+        return service
     }
 
     // MARK: - Cleanup
 
     public override func performCleanup() async throws {
-        service?.wrappedService?.stop()
-        await service?.wrappedService?.cleanup()
+        service?.stop()
+        await service?.cleanup()
     }
 
     // MARK: - Private Helpers

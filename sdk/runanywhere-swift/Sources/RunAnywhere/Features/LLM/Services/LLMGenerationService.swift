@@ -8,6 +8,7 @@
 import Foundation
 
 /// Main service for text generation
+/// Simplified architecture: direct generation without unnecessary wrappers
 public class LLMGenerationService {
 
     private let modelLoadingService: ModelLoadingService
@@ -15,8 +16,8 @@ public class LLMGenerationService {
     private let optionsResolver = LLMOptionsResolver()
     private let logger = SDKLogger(category: "LLMGenerationService")
 
-    // Current loaded model
-    private var currentLoadedModel: LoadedModel?
+    // Track the current model ID for generation
+    private var currentModelId: String?
 
     public init(
         modelLoadingService: ModelLoadingService? = nil,
@@ -26,16 +27,25 @@ public class LLMGenerationService {
         self.analyticsService = analyticsService ?? DevAnalyticsSubmissionService.shared
     }
 
-    /// Set the current loaded model for generation
+    /// Set the current model ID for generation
+    public func setCurrentModel(_ modelId: String?) {
+        self.currentModelId = modelId
+    }
+
+    /// Set the current model for generation (compatibility overload)
     public func setCurrentModel(_ model: LoadedModel?) {
-        self.currentLoadedModel = model
+        self.currentModelId = model?.model.id
     }
 
-    /// Get the current loaded model
-    public func getCurrentModel() -> LoadedModel? {
-        return currentLoadedModel
+    /// Get the current loaded model from ModelLoadingService
+    public func getCurrentModel() async -> LoadedModel? {
+        guard let modelId = currentModelId else {
+            return nil
+        }
+        return await modelLoadingService.getLoadedModel(modelId)
     }
 
+    // swiftlint:disable:next function_body_length
     /// Generate text using the loaded model
     ///
     /// Priority for settings resolution:
@@ -46,153 +56,74 @@ public class LLMGenerationService {
         prompt: String,
         options: LLMGenerationOptions
     ) async throws -> LLMGenerationResult {
-        // Start performance tracking
-        _ = Date() // Will be used for performance metrics in future
-
-        // Get remote configuration
-        let remoteConfig = RunAnywhere.configurationData?.generation
-
-        // Apply remote constraints to options (respecting priority: Runtime > Remote > SDK Defaults)
-        let resolvedOptions = optionsResolver.resolve(
-            options: options,
-            remoteConfig: remoteConfig
-        )
-
-        // Prepare prompt with system prompt and structured output formatting
-        let effectivePrompt = optionsResolver.preparePrompt(prompt, withOptions: resolvedOptions)
-
-        // Always use on-device generation
-        let result = try await generateOnDevice(
-            prompt: effectivePrompt,
-            options: resolvedOptions,
-            framework: nil
-        )
-
-        // Validate structured output if configured
-        if let structuredConfig = resolvedOptions.structuredOutput {
-            let validation = StructuredOutputHandler().validateStructuredOutput(
-                text: result.text,
-                config: structuredConfig
-            )
-
-            // Add validation info to result metadata
-            var updatedResult = result
-            updatedResult.structuredOutputValidation = validation
-
-            return updatedResult
-        }
-
-        return result
-    }
-
-    // swiftlint:disable:next function_body_length
-    private func generateOnDevice(
-        prompt: String,
-        options: LLMGenerationOptions,
-        framework: LLMFramework?
-    ) async throws -> LLMGenerationResult {
-        logger.info("🚀 Starting on-device generation")
         let startTime = Date()
 
-        // Use the current loaded model
-        guard let loadedModel = currentLoadedModel else {
+        // Get remote configuration and resolve options
+        let remoteConfig = RunAnywhere.configurationData?.generation
+        let resolvedOptions = optionsResolver.resolve(options: options, remoteConfig: remoteConfig)
+        let effectivePrompt = optionsResolver.preparePrompt(prompt, withOptions: resolvedOptions)
+
+        // Verify model is loaded - query ModelLoadingService
+        guard let loadedModel = await getCurrentModel() else {
             logger.error("❌ No model is currently loaded")
             throw RunAnywhereError.modelNotFound("No model is currently loaded")
         }
 
-        logger.info("✅ Using loaded model: \(loadedModel.model.name)")
+        logger.info("🚀 Generating with model: \(loadedModel.model.name)")
 
-        logger.debug("🚀 Calling service.generate() with graceful error handling")
-
-        // Generate text using the actual loaded model's service with enhanced error handling
+        // Generate text with error handling
         let generatedText: String
         do {
             generatedText = try await loadedModel.service.generate(
-                prompt: prompt,
-                options: options
+                prompt: effectivePrompt,
+                options: resolvedOptions
             )
-            logger.info("✅ Got response from service: \(generatedText.prefix(100))...")
+            logger.info("✅ Got response: \(generatedText.prefix(100))...")
         } catch {
-            logger.error("❌ Generation failed with error: \(error)")
+            logger.error("❌ Generation failed: \(error)")
 
-            // Submit analytics for failed generation (non-blocking, silent failures)
-            let latency = Date().timeIntervalSince(startTime) * 1000
-            let inputTokens = TokenCounter.estimateTokenCount(prompt)
-            let analyticsService = self.analyticsService
-            Task.detached(priority: .background) {
-                await analyticsService.submitInternal(
-                    generationId: UUID().uuidString,
-                    modelId: loadedModel.model.id,
-                    latencyMs: latency,
-                    tokensPerSecond: 0,
-                    inputTokens: inputTokens,
-                    outputTokens: 0,
-                    success: false
-                )
-            }
+            // Submit failure analytics (non-blocking)
+            submitAnalytics(
+                modelId: loadedModel.model.id,
+                startTime: startTime,
+                prompt: effectivePrompt,
+                outputTokens: 0,
+                success: false
+            )
 
-            // Enhanced error handling - if it's a timeout or framework error, provide helpful fallback
+            // Convert framework errors to user-friendly messages
             if let frameworkError = error as? FrameworkError {
-                logger.warning("🔄 Framework error detected: \(frameworkError)")
-
-                // For timeout errors, check the error message for timeout indicators
                 let errorMessage = frameworkError.localizedDescription.lowercased()
                 if errorMessage.contains("timeout") || errorMessage.contains("timed out") {
-                    let message = "Text generation timed out. The model may be too large for this device or " +
-                        "the prompt too complex. Try using a smaller model or simpler prompt."
-                    throw RunAnywhereError.generationTimeout(message)
+                    throw RunAnywhereError.generationTimeout(
+                        "Text generation timed out. Try a smaller model or simpler prompt."
+                    )
                 }
             }
 
-            // Re-throw the original error with additional context
-            throw RunAnywhereError.generationFailed("On-device generation failed: \(error.localizedDescription)")
+            throw RunAnywhereError.generationFailed("Generation failed: \(error.localizedDescription)")
         }
 
         // Parse thinking content if model supports it
         let modelInfo = loadedModel.model
-        let (finalText, thinkingContent): (String, String?)
-        var thinkingTimeMs: TimeInterval?
+        let (finalText, thinkingContent) = parseThinkingContent(
+            generatedText: generatedText,
+            modelInfo: modelInfo
+        )
 
-        logger.debug("Model \(modelInfo.name) supports thinking: \(modelInfo.supportsThinking)")
-        if modelInfo.supportsThinking {
-            // Use model-specific pattern or fall back to default
-            let pattern = modelInfo.thinkingPattern ?? ThinkingTagPattern.defaultPattern
-            logger.debug("Using thinking pattern: \(pattern.openingTag)...\(pattern.closingTag)")
-            logger.debug("Raw generated text length: \(generatedText.count) chars")
-
-            let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
-            finalText = parseResult.content
-            thinkingContent = parseResult.thinkingContent
-
-            logger.debug("Parsed content length: \(finalText.count) chars")
-            if let thinking = thinkingContent {
-                logger.debug("Thinking content length: \(thinking.count) chars")
-            }
-
-            // For non-streaming, we can estimate thinking took ~60% of generation time if present
-            if let thinking = thinkingContent, !thinking.isEmpty {
-                let totalLatency = Date().timeIntervalSince(startTime) * 1000
-                thinkingTimeMs = totalLatency * 0.6
-            }
-        } else {
-            finalText = generatedText
-            thinkingContent = nil
-        }
-
-        // Calculate metrics using improved token counting
-        let latency = Date().timeIntervalSince(startTime) * 1000 // Convert to milliseconds
+        // Calculate metrics
+        let latency = Date().timeIntervalSince(startTime) * 1000
         let tokenCounts = TokenCounter.splitTokenCounts(
             fullText: generatedText,
             thinkingContent: thinkingContent,
             responseContent: finalText
         )
-
         let tokensPerSecond = TokenCounter.calculateTokensPerSecond(
             tokenCount: tokenCounts.totalTokens,
             elapsedSeconds: latency / 1000.0
         )
 
-        let result = LLMGenerationResult(
+        var result = LLMGenerationResult(
             text: finalText,
             thinkingContent: thinkingContent,
             tokensUsed: tokenCounts.totalTokens,
@@ -204,21 +135,68 @@ public class LLMGenerationService {
             responseTokens: tokenCounts.responseTokens
         )
 
-        // Submit analytics (non-blocking, silent failures)
-        let inputTokenCount = TokenCounter.estimateTokenCount(prompt)
-        let analyticsService = self.analyticsService
-        Task.detached(priority: .background) {
-            await analyticsService.submitInternal(
-                generationId: UUID().uuidString,
-                modelId: result.modelUsed,
-                latencyMs: result.latencyMs,
-                tokensPerSecond: result.tokensPerSecond,
-                inputTokens: inputTokenCount,
-                outputTokens: result.tokensUsed,
-                success: true
+        // Validate structured output if configured
+        if let structuredConfig = resolvedOptions.structuredOutput {
+            result.structuredOutputValidation = StructuredOutputHandler().validateStructuredOutput(
+                text: result.text,
+                config: structuredConfig
             )
         }
 
+        // Submit success analytics (non-blocking)
+        submitAnalytics(
+            modelId: result.modelUsed,
+            startTime: startTime,
+            prompt: effectivePrompt,
+            outputTokens: result.tokensUsed,
+            success: true,
+            tokensPerSecond: result.tokensPerSecond
+        )
+
         return result
+    }
+
+    // MARK: - Private Helpers
+
+    /// Parse thinking content from generated text if model supports it
+    private func parseThinkingContent(
+        generatedText: String,
+        modelInfo: ModelInfo
+    ) -> (finalText: String, thinkingContent: String?) {
+        guard modelInfo.supportsThinking else {
+            return (generatedText, nil)
+        }
+
+        let pattern = modelInfo.thinkingPattern ?? ThinkingTagPattern.defaultPattern
+        logger.debug("Parsing thinking with pattern: \(pattern.openingTag)...\(pattern.closingTag)")
+
+        let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
+        return (parseResult.content, parseResult.thinkingContent)
+    }
+
+    /// Submit analytics in background (non-blocking)
+    private func submitAnalytics(
+        modelId: String,
+        startTime: Date,
+        prompt: String,
+        outputTokens: Int,
+        success: Bool,
+        tokensPerSecond: Double = 0
+    ) {
+        let latency = Date().timeIntervalSince(startTime) * 1000
+        let inputTokens = TokenCounter.estimateTokenCount(prompt)
+        let analyticsService = self.analyticsService
+
+        Task.detached(priority: .background) {
+            await analyticsService.submitInternal(
+                generationId: UUID().uuidString,
+                modelId: modelId,
+                latencyMs: latency,
+                tokensPerSecond: tokensPerSecond,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                success: success
+            )
+        }
     }
 }

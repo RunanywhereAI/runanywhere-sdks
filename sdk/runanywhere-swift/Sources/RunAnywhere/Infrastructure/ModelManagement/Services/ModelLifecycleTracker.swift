@@ -20,7 +20,8 @@ public final class ModelLifecycleTracker: ObservableObject {
 
     // MARK: - Published Properties
 
-    /// Current state of all models, keyed by modality
+    /// Current state of non-LLM models (STT, TTS) keyed by modality
+    /// LLM state is queried from ModelLoadingService
     @Published public private(set) var modelsByModality: [Modality: LoadedModelState] = [:]
 
     /// Event publisher for lifecycle changes
@@ -29,6 +30,11 @@ public final class ModelLifecycleTracker: ObservableObject {
     // MARK: - Private Properties
 
     private let logger = SDKLogger(category: "ModelLifecycleTracker")
+
+    // Reference to ModelLoadingService for querying LLM state
+    private var modelLoadingService: ModelLoadingService {
+        ServiceContainer.shared.modelLoadingService
+    }
 
     // MARK: - Initialization
 
@@ -42,6 +48,8 @@ public final class ModelLifecycleTracker: ObservableObject {
     /// - Parameter modality: The modality to query
     /// - Returns: The loaded model state, or nil if no model is loaded
     public func loadedModel(for modality: Modality) -> LoadedModelState? {
+        // For LLM modality, return the cached state (still needed for UI updates)
+        // The actual service is queried from ModelLoadingService
         return modelsByModality[modality]
     }
 
@@ -135,7 +143,7 @@ public final class ModelLifecycleTracker: ObservableObject {
     ///   - framework: The framework used
     ///   - modality: The modality
     ///   - memoryUsage: Optional memory usage in bytes
-    ///   - llmService: Optional LLM service to cache
+    ///   - llmService: Optional LLM service (ignored - queried from ModelLoadingService)
     ///   - sttService: Optional STT service to cache
     ///   - ttsService: Optional TTS service to cache
     public func modelDidLoad(
@@ -150,6 +158,8 @@ public final class ModelLifecycleTracker: ObservableObject {
     ) {
         logger.info("Model loaded: \(modelName) [\(modality.rawValue)] with \(framework.rawValue)")
 
+        // For LLM modality, don't cache the service - it's queried from ModelLoadingService
+        // For STT/TTS, cache the service since they're not managed by ModelLoadingService
         let state = LoadedModelState(
             modelId: modelId,
             modelName: modelName,
@@ -158,7 +168,7 @@ public final class ModelLifecycleTracker: ObservableObject {
             state: .loaded,
             loadedAt: Date(),
             memoryUsage: memoryUsage,
-            llmService: llmService,
+            llmService: nil,  // Always nil - query from ModelLoadingService instead
             sttService: sttService,
             ttsService: ttsService
         )
@@ -232,19 +242,18 @@ public final class ModelLifecycleTracker: ObservableObject {
 
     // MARK: - Service Access
 
-    /// Get cached LLM service for a model ID
+    /// Get LLM service for a model ID
+    /// Queries ModelLoadingService as the single source of truth
     /// - Parameter modelId: The model identifier
-    /// - Returns: The LLM service if available and cached
-    public func llmService(for modelId: String) -> (any LLMService)? {
-        guard let state = modelsByModality[.llm],
-              state.modelId == modelId,
-              state.state.isLoaded else {
+    /// - Returns: The LLM service if available and loaded
+    public func llmService(for modelId: String) async -> (any LLMService)? {
+        // Query ModelLoadingService for the actual loaded model
+        guard let loadedModel = await modelLoadingService.getLoadedModel(modelId) else {
             return nil
         }
-        if state.llmService != nil {
-            logger.info("Found cached LLM service for model: \(modelId)")
-        }
-        return state.llmService
+
+        logger.info("Found LLM service for model: \(modelId) from ModelLoadingService")
+        return loadedModel.service
     }
 
     /// Get cached STT service for a model ID
