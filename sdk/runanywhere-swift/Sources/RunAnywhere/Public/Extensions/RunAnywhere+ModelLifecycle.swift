@@ -55,7 +55,7 @@ public extension RunAnywhere {
     @MainActor
     static func loadModelWithTracking(_ modelId: String, modality: Modality = .llm) async throws {
         // Get orchestrator and delegate to internal service
-        let orchestrator = await serviceContainer.modelLoadingOrchestrator
+        let orchestrator = serviceContainer.modelLoadingOrchestrator
 
         do {
             switch modality {

@@ -113,8 +113,8 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
             // Step 4: Initialize database (keep this as it's local only)
             try DatabaseManager.shared.setup()
 
-            // Step 5: Setup local services only (no network calls)
-            try serviceContainer.setupLocalServices(with: params)
+            // Step 5: Services are lazily initialized when first accessed
+            // No additional setup needed here
 
             // Mark as initialized
             isInitialized = true
@@ -151,15 +151,155 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         }
     }
 
-    // MARK: - Device Registration (Delegated to Service)
+    // MARK: - Device Registration (Direct Service Orchestration)
 
     /// Ensure device is registered with backend (lazy registration)
-    /// Delegates to DeviceRegistrationService
-    private static func ensureDeviceRegistered() async throws {
+    /// Orchestrates service initialization directly
+    internal static func ensureDeviceRegistered() async throws {
         guard let params = initParams, let environment = currentEnvironment else {
             throw RunAnywhereError.notInitialized
         }
 
+        let logger = SDKLogger(category: "RunAnywhere.Bootstrap")
+
+        // Check if we need to initialize network services
+        // For production/staging: Initialize network services if not already initialized
+        if environment != .development && serviceContainer.authenticationService == nil {
+            logger.info("Initializing network and authentication services...")
+
+            // Step 1: Setup network service
+            let networkService = NetworkServiceFactory.createNetworkService(for: environment, params: params)
+            serviceContainer.networkService = networkService
+            logger.debug("Network service configured for \(environment.description)")
+
+            // Step 2: Create API client and authentication service
+            let (apiClient, authService) = try await AuthenticationService.createAndAuthenticate(
+                baseURL: params.baseURL,
+                apiKey: params.apiKey
+            )
+            serviceContainer.authenticationService = authService
+            serviceContainer.apiClient = apiClient
+            logger.info("Authentication successful")
+
+            // Step 3: Create and inject core services
+            logger.debug("Creating core services...")
+
+            // Create SyncCoordinator
+            let syncCoordinator = SyncCoordinator(enableAutoSync: false)
+            serviceContainer.setSyncCoordinator(syncCoordinator)
+
+            // Create ConfigurationService
+            let configRepo = ConfigurationRepositoryImpl(
+                databaseManager: DatabaseManager.shared,
+                apiClient: apiClient
+            )
+            let configService = ConfigurationService(
+                configRepository: configRepo,
+                syncCoordinator: syncCoordinator
+            )
+            serviceContainer.setConfigurationService(configService)
+
+            // Create TelemetryService
+            let telemetryRepo = TelemetryRepositoryImpl(
+                databaseManager: DatabaseManager.shared,
+                apiClient: apiClient
+            )
+            let telemetryService = TelemetryService(
+                telemetryRepository: telemetryRepo,
+                syncCoordinator: syncCoordinator
+            )
+            serviceContainer.setTelemetryService(telemetryService)
+
+            // Create ModelInfoService
+            let modelRepo = ModelInfoRepositoryImpl(
+                databaseManager: DatabaseManager.shared,
+                apiClient: apiClient
+            )
+            let modelInfoService = ModelInfoService(
+                modelInfoRepository: modelRepo,
+                syncCoordinator: syncCoordinator
+            )
+            serviceContainer.setModelInfoService(modelInfoService)
+
+            // Create ModelAssignmentService (needs networkService and modelInfoService)
+            let modelAssignmentService = ModelAssignmentService(
+                networkService: networkService,
+                modelInfoService: modelInfoService
+            )
+            serviceContainer.setModelAssignmentService(modelAssignmentService)
+
+            // Create ModelLoadingOrchestrator
+            let orchestrator = ModelLoadingOrchestrator(
+                modelLoadingService: serviceContainer.modelLoadingService,
+                telemetryService: telemetryService,
+                modelRegistry: serviceContainer.modelRegistry
+            )
+            serviceContainer.setModelLoadingOrchestrator(orchestrator)
+
+            logger.info("Core services created and injected")
+
+            // Step 4: Load configuration
+            let config = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
+            EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: config))
+            logger.info("Configuration loaded (source: \(config.source))")
+
+            // Step 5: Sync model catalog (events are now published inside loadStoredModels)
+            try? await modelInfoService.syncModelInfo()
+            let _ = try? await modelInfoService.loadStoredModels()
+            logger.debug("Model catalog synced")
+
+            // Step 6: Initialize model registry
+            await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
+            logger.debug("Model registry initialized")
+
+            // Step 7: Initialize voice capability (optional)
+            do {
+                try await serviceContainer.voiceCapabilityService.initialize()
+                logger.info("Voice capability service initialized")
+            } catch {
+                logger.warning("Voice service initialization failed: \(error)")
+            }
+
+            // Step 8: Initialize analytics
+            await serviceContainer.analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
+            logger.info("Analytics initialized with remote data source")
+
+            logger.info("✅ Production/staging bootstrap completed")
+        } else if environment == .development && serviceContainer.networkService == nil {
+            // Development mode bootstrap
+            logger.info("Initializing development mode services...")
+
+            // Step 1: Setup mock network service
+            let networkService = NetworkServiceFactory.createNetworkService(for: .development, params: params)
+            serviceContainer.networkService = networkService
+            logger.debug("Mock network service initialized")
+
+            // Step 2: Create development config
+            let config = ConfigurationData(
+                id: "dev-\(UUID().uuidString)",
+                apiKey: params.apiKey.isEmpty ? "dev-mode" : params.apiKey,
+                source: .defaults
+            )
+            EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: config))
+            logger.info("Configuration loaded (source: defaults for development)")
+
+            // Step 3: Initialize model registry
+            await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
+            logger.debug("Model registry initialized")
+
+            // Step 4: Initialize voice capability (optional)
+            do {
+                try await serviceContainer.voiceCapabilityService.initialize()
+                logger.info("Voice capability service initialized")
+            } catch {
+                logger.warning("Voice service initialization failed: \(error)")
+            }
+
+            logger.info("✅ Development mode bootstrap completed")
+            // Skip analytics in development mode
+        }
+
+        // Now perform actual device registration
         try await serviceContainer.deviceRegistrationService.ensureDeviceRegistered(
             params: params,
             environment: environment,

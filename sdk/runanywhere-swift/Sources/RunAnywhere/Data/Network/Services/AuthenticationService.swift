@@ -20,6 +20,26 @@ public actor AuthenticationService {
         self.apiClient = apiClient
     }
 
+    /// Create and configure authentication services for production/staging
+    /// - Parameters:
+    ///   - baseURL: The API base URL
+    ///   - apiKey: The API key for authentication
+    /// - Returns: Tuple of configured (APIClient, AuthenticationService)
+    /// - Throws: If authentication fails
+    public static func createAndAuthenticate(
+        baseURL: URL,
+        apiKey: String
+    ) async throws -> (apiClient: APIClient, authService: AuthenticationService) {
+        let apiClient = APIClient(baseURL: baseURL, apiKey: apiKey)
+        let authService = AuthenticationService(apiClient: apiClient)
+        await apiClient.setAuthenticationService(authService)
+
+        // Authenticate with backend
+        let _ = try await authService.authenticate(apiKey: apiKey)
+
+        return (apiClient, authService)
+    }
+
     // MARK: - Public Methods
 
     /// Authenticate with the backend and obtain access token

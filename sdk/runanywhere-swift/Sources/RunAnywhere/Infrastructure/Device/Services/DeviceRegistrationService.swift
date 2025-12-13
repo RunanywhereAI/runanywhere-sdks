@@ -59,13 +59,8 @@ public actor DeviceRegistrationService {
         environment: SDKEnvironment,
         serviceContainer: ServiceContainer
     ) async throws {
-        // Initialize network services for production/staging
-        if environment != .development {
-            if serviceContainer.authenticationService == nil {
-                try await serviceContainer.initializeNetworkServices(with: params)
-                logger.debug("Network services initialized")
-            }
-        }
+        // Network services should already be initialized by RunAnywhere.ensureDeviceRegistered()
+        // This method now only handles the device registration logic itself
 
         // Check cached device ID
         if let cachedId = cachedDeviceId, !cachedId.isEmpty {
@@ -190,12 +185,9 @@ public actor DeviceRegistrationService {
             do {
                 logger.info("Device registration attempt \(attempt) of \(Self.maxRetries)")
 
-                if serviceContainer.authenticationService == nil {
-                    try await serviceContainer.initializeNetworkServices(with: params)
-                }
-
+                // Authentication service should already be initialized by RunAnywhere.ensureDeviceRegistered()
                 guard let authService = serviceContainer.authenticationService else {
-                    throw RunAnywhereError.invalidState("Authentication service not available")
+                    throw RunAnywhereError.invalidState("Authentication service not available - should be initialized before calling device registration")
                 }
 
                 let registration = try await authService.registerDevice()
