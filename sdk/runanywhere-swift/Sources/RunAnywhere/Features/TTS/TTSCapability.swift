@@ -89,23 +89,18 @@ public actor TTSCapability: ModelLoadableCapability {
 
         do {
             try await lifecycle.load(voiceId)
-            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000
-            await analyticsService.trackModelLoad(
+            let loadTime = Date().timeIntervalSince(startTime)
+            await analyticsService.trackModelLoading(
                 modelId: voiceId,
-                modelName: voiceId,
-                framework: .systemTTS,
-                loadTimeMs: loadTimeMs,
+                loadTime: loadTime,
                 success: true
             )
         } catch {
-            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000
-            await analyticsService.trackModelLoad(
+            let loadTime = Date().timeIntervalSince(startTime)
+            await analyticsService.trackModelLoading(
                 modelId: voiceId,
-                modelName: voiceId,
-                framework: .systemTTS,
-                loadTimeMs: loadTimeMs,
-                success: false,
-                errorMessage: error.localizedDescription
+                loadTime: loadTime,
+                success: false
             )
             throw error
         }
@@ -156,10 +151,6 @@ public actor TTSCapability: ModelLoadableCapability {
             let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
             await analyticsService.trackSynthesisFailed(
                 synthesisId: synthesisId,
-                modelId: voiceId,
-                modelName: voiceId,
-                framework: .systemTTS,
-                language: effectiveOptions.language,
                 characterCount: text.count,
                 processingTimeMs: processingTimeMs,
                 errorMessage: error.localizedDescription
@@ -251,10 +242,6 @@ public actor TTSCapability: ModelLoadableCapability {
                     let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
                     await self.analyticsService.trackSynthesisFailed(
                         synthesisId: synthesisId,
-                        modelId: voiceId,
-                        modelName: voiceId,
-                        framework: .systemTTS,
-                        language: effectiveOptions.language,
                         characterCount: text.count,
                         processingTimeMs: processingTimeMs,
                         errorMessage: error.localizedDescription

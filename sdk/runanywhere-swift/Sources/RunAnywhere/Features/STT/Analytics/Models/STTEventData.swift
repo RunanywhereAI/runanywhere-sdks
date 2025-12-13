@@ -186,6 +186,26 @@ public struct STTTranscriptionTelemetryData: AnalyticsEventData {
     }
 }
 
+/// STT transcription failure event data
+public struct STTTranscriptionFailureData: AnalyticsEventData {
+    public let transcriptionId: String
+    public let audioLengthMs: Double
+    public let processingTimeMs: Double
+    public let errorMessage: String
+
+    public init(
+        transcriptionId: String,
+        audioLengthMs: Double,
+        processingTimeMs: Double,
+        errorMessage: String
+    ) {
+        self.transcriptionId = transcriptionId
+        self.audioLengthMs = audioLengthMs
+        self.processingTimeMs = processingTimeMs
+        self.errorMessage = errorMessage
+    }
+}
+
 /// STT model loading event data
 public struct STTModelLoadingData: AnalyticsEventData {
     public let modelId: String

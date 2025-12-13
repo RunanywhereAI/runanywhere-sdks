@@ -64,23 +64,18 @@ public actor STTCapability: ModelLoadableCapability {
 
         do {
             try await lifecycle.load(modelId)
-            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000
-            await analyticsService.trackModelLoad(
+            let loadTime = Date().timeIntervalSince(startTime)
+            await analyticsService.trackModelLoading(
                 modelId: modelId,
-                modelName: modelId,
-                framework: .whisperKit,
-                loadTimeMs: loadTimeMs,
+                loadTime: loadTime,
                 success: true
             )
         } catch {
-            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000
-            await analyticsService.trackModelLoad(
+            let loadTime = Date().timeIntervalSince(startTime)
+            await analyticsService.trackModelLoading(
                 modelId: modelId,
-                modelName: modelId,
-                framework: .whisperKit,
-                loadTimeMs: loadTimeMs,
-                success: false,
-                errorMessage: error.localizedDescription
+                loadTime: loadTime,
+                success: false
             )
             throw error
         }
@@ -132,12 +127,8 @@ public actor STTCapability: ModelLoadableCapability {
             logger.error("Transcription failed: \(error)")
             let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
             await analyticsService.trackTranscriptionFailed(
-                sessionId: transcriptionId,
-                modelId: modelId,
-                modelName: modelId,
-                framework: .whisperKit,
-                language: effectiveOptions.language,
-                audioDurationMs: audioLengthMs,
+                transcriptionId: transcriptionId,
+                audioLengthMs: audioLengthMs,
                 processingTimeMs: processingTimeMs,
                 errorMessage: error.localizedDescription
             )
@@ -234,17 +225,10 @@ public actor STTCapability: ModelLoadableCapability {
                         options: effectiveOptions,
                         onPartial: { partial in
                             // Track streaming update
-                            let elapsedMs = Date().timeIntervalSince(startTime) * 1000
                             let wordCount = partial.split(separator: " ").count
                             if wordCount > lastPartialWordCount {
                                 Task {
-                                    await self.analyticsService.trackStreamingUpdate(
-                                        sessionId: transcriptionId,
-                                        modelId: modelId,
-                                        framework: .whisperKit,
-                                        partialWordCount: wordCount,
-                                        elapsedMs: elapsedMs
-                                    )
+                                    await self.analyticsService.trackPartialTranscript(text: partial)
                                 }
                                 lastPartialWordCount = wordCount
                             }
@@ -265,12 +249,8 @@ public actor STTCapability: ModelLoadableCapability {
                 } catch {
                     let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
                     await self.analyticsService.trackTranscriptionFailed(
-                        sessionId: transcriptionId,
-                        modelId: modelId,
-                        modelName: modelId,
-                        framework: .whisperKit,
-                        language: effectiveOptions.language,
-                        audioDurationMs: 0,
+                        transcriptionId: transcriptionId,
+                        audioLengthMs: 0,
                         processingTimeMs: processingTimeMs,
                         errorMessage: error.localizedDescription
                     )

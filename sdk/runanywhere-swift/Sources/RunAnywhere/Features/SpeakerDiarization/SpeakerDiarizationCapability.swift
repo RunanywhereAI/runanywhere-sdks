@@ -26,10 +26,13 @@ public actor SpeakerDiarizationCapability: ServiceBasedCapability {
     // MARK: - Dependencies
 
     private let logger = SDKLogger(category: "SpeakerDiarizationCapability")
+    private let analyticsService: SpeakerDiarizationAnalyticsService
 
     // MARK: - Initialization
 
-    public init() {}
+    public init(analyticsService: SpeakerDiarizationAnalyticsService = SpeakerDiarizationAnalyticsService()) {
+        self.analyticsService = analyticsService
+    }
 
     // MARK: - Configuration (Capability Protocol)
 
@@ -62,11 +65,22 @@ public actor SpeakerDiarizationCapability: ServiceBasedCapability {
         self.service = diarizationService
         self.isConfigured = true
 
+        // Track session start via analytics service
+        _ = await analyticsService.startDiarizationSession(maxSpeakers: config.maxSpeakers)
+
         logger.info("Speaker Diarization initialized successfully")
     }
 
     public func cleanup() async {
         logger.info("Cleaning up Speaker Diarization")
+
+        // Track session completed before cleanup
+        let speakers = (try? getAllSpeakers()) ?? []
+        await analyticsService.completeDiarizationSession(
+            speakerCount: speakers.count,
+            segmentCount: 0,
+            averageConfidence: 0.0
+        )
 
         await service?.cleanup()
         service = nil
@@ -112,12 +126,22 @@ public actor SpeakerDiarizationCapability: ServiceBasedCapability {
 
     /// Reset the diarization state
     /// Clears all speaker profiles and resets tracking
-    public func reset() throws {
+    public func reset() async throws {
         guard let service = service else {
             throw CapabilityError.notInitialized("Speaker Diarization")
         }
 
         logger.info("Resetting speaker diarization state")
         service.reset()
+
+        // Start new analytics session
+        _ = await analyticsService.startDiarizationSession(maxSpeakers: config?.maxSpeakers ?? 10)
+    }
+
+    // MARK: - Analytics
+
+    /// Get current analytics metrics
+    public func getAnalyticsMetrics() async -> SpeakerDiarizationMetrics {
+        await analyticsService.getMetrics()
     }
 }

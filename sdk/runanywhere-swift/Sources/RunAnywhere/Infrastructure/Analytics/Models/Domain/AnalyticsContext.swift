@@ -16,5 +16,7 @@ public enum AnalyticsContext: String, CaseIterable {
     case modelLoading = "model_loading"
     case audioProcessing = "audio_processing"
     case textGeneration = "text_generation"
+    case generation = "generation"
     case speakerDiarization = "speaker_diarization"
+    case synthesis = "synthesis"
 }
