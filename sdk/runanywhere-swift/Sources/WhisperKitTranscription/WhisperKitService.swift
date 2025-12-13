@@ -7,6 +7,11 @@ import WhisperKit
 public class WhisperKitService: STTService {
     private let logger = SDKLogger(category: "WhisperKitService")
 
+    // MARK: - Framework Identification
+
+    /// WhisperKit uses the WhisperKit inference framework (built on Core ML)
+    public let inferenceFramework: InferenceFrameworkType = .whisperKit
+
     // MARK: - Properties
 
     private var currentModelPath: String?

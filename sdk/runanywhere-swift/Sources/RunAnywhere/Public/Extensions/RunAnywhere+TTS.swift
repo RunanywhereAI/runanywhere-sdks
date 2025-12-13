@@ -2,7 +2,8 @@
 //  RunAnywhere+TTS.swift
 //  RunAnywhere SDK
 //
-//  Public API for Text-to-Speech operations
+//  Public API for Text-to-Speech operations.
+//  Events are tracked via EventPublisher.
 //
 
 import Foundation
@@ -16,23 +17,17 @@ public extension RunAnywhere {
     /// Load a TTS voice
     /// - Parameter voiceId: The voice identifier
     /// - Throws: Error if loading fails
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func loadTTSVoice(_ voiceId: String) async throws {
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized
         }
 
-        events.publishAsync(SDKModelEvent.loadStarted(modelId: voiceId))
-
-        do {
-            try await serviceContainer.ttsCapability.loadVoice(voiceId)
-            events.publishAsync(SDKModelEvent.loadCompleted(modelId: voiceId))
-        } catch {
-            events.publishAsync(SDKModelEvent.loadFailed(modelId: voiceId, error: error))
-            throw error
-        }
+        try await serviceContainer.ttsCapability.loadVoice(voiceId)
     }
 
     /// Unload the currently loaded TTS voice
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func unloadTTSVoice() async throws {
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized
@@ -62,6 +57,7 @@ public extension RunAnywhere {
     ///   - text: Text to synthesize
     ///   - options: Synthesis options
     /// - Returns: TTS output with audio data
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func synthesize(
         _ text: String,
         options: TTSOptions = TTSOptions()
@@ -70,14 +66,7 @@ public extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        do {
-            let result = try await serviceContainer.ttsCapability.synthesize(text, options: options)
-            events.publishAsync(SDKVoiceEvent.audioGenerated(data: result.audioData))
-            return result
-        } catch {
-            events.publishAsync(SDKVoiceEvent.pipelineError(error))
-            throw error
-        }
+        return try await serviceContainer.ttsCapability.synthesize(text, options: options)
     }
 
     /// Stream synthesis for long text

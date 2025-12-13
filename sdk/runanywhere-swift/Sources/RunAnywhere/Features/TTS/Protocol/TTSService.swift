@@ -9,6 +9,13 @@ import Foundation
 
 /// Protocol for text-to-speech services
 public protocol TTSService: AnyObject { // swiftlint:disable:this avoid_any_object
+
+    // MARK: - Framework Identification
+
+    /// The inference framework used by this service.
+    /// Required for analytics and performance tracking.
+    var inferenceFramework: InferenceFrameworkType { get }
+
     /// Initialize the TTS service
     func initialize() async throws
 

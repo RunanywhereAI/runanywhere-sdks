@@ -14,6 +14,11 @@ import Foundation
 /// It supports all iOS/macOS system voices and provides real-time speech playback.
 public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
 
+    // MARK: - Framework Identification
+
+    /// System TTS uses Apple's built-in speech synthesis (AVSpeechSynthesizer)
+    public let inferenceFramework: InferenceFrameworkType = .builtIn
+
     // MARK: - Properties
 
     private let synthesizer = AVSpeechSynthesizer()

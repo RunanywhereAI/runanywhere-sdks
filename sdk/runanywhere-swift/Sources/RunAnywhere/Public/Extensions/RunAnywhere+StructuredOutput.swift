@@ -1,3 +1,10 @@
+//
+//  RunAnywhere+StructuredOutput.swift
+//  RunAnywhere SDK
+//
+//  Public API for structured output generation.
+//
+
 import Foundation
 
 // MARK: - Structured Output Extensions
@@ -10,32 +17,18 @@ public extension RunAnywhere {
     ///   - prompt: The prompt to generate from
     ///   - options: Generation options (structured output config will be added automatically)
     /// - Returns: The generated object of the specified type
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func generateStructured<T: Generatable>(
         _ type: T.Type,
         prompt: String,
         options: LLMGenerationOptions? = nil
     ) async throws -> T {
-        events.publish(SDKGenerationEvent.started(prompt: prompt))
-
-        do {
-            let result = try await serviceContainer.structuredOutputService.generateStructured(
-                type,
-                prompt: prompt,
-                options: options,
-                llmCapability: serviceContainer.llmCapability
-            )
-
-            events.publish(SDKGenerationEvent.completed(
-                response: "Structured output generated for \(String(describing: type))",
-                tokensUsed: 0,
-                latencyMs: 0
-            ))
-
-            return result
-        } catch {
-            events.publish(SDKGenerationEvent.failed(error))
-            throw error
-        }
+        return try await serviceContainer.structuredOutputService.generateStructured(
+            type,
+            prompt: prompt,
+            options: options,
+            llmCapability: serviceContainer.llmCapability
+        )
     }
 
     /// Generate structured output with streaming support
@@ -68,31 +61,17 @@ public extension RunAnywhere {
     ///   - structuredOutput: Structured output configuration
     ///   - options: Generation options
     /// - Returns: Generation result with structured data
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func generateWithStructuredOutput(
         prompt: String,
         structuredOutput: StructuredOutputConfig,
         options: LLMGenerationOptions? = nil
     ) async throws -> LLMGenerationResult {
-        events.publish(SDKGenerationEvent.started(prompt: prompt))
-
-        do {
-            let result = try await serviceContainer.structuredOutputService.generateWithStructuredOutput(
-                prompt: prompt,
-                structuredOutput: structuredOutput,
-                options: options,
-                llmCapability: serviceContainer.llmCapability
-            )
-
-            events.publish(SDKGenerationEvent.completed(
-                response: result.text,
-                tokensUsed: result.tokensUsed,
-                latencyMs: result.latencyMs
-            ))
-
-            return result
-        } catch {
-            events.publish(SDKGenerationEvent.failed(error))
-            throw error
-        }
+        return try await serviceContainer.structuredOutputService.generateWithStructuredOutput(
+            prompt: prompt,
+            structuredOutput: structuredOutput,
+            options: options,
+            llmCapability: serviceContainer.llmCapability
+        )
     }
 }

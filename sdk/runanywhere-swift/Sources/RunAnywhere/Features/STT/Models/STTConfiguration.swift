@@ -9,8 +9,8 @@ import Foundation
 
 // MARK: - STT Configuration
 
-/// Configuration for STT component (conforms to ComponentConfiguration and ComponentInitParameters protocols)
-public struct STTConfiguration: ComponentConfiguration, ComponentInitParameters {
+/// Configuration for STT component
+public struct STTConfiguration: ComponentConfiguration, Sendable {
     /// Component type
     public var componentType: SDKComponent { .stt }
 

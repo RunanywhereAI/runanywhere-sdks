@@ -2,21 +2,24 @@
 //  TTSCapability.swift
 //  RunAnywhere SDK
 //
-//  Actor-based TTS capability that owns voice lifecycle and synthesis
+//  Actor-based TTS capability that owns voice lifecycle and synthesis.
+//  Uses ManagedLifecycle for unified lifecycle + analytics handling.
 //
 
 import Foundation
 
-/// Actor-based TTS capability that provides a simplified interface for text-to-speech
-/// Owns the voice lifecycle and provides thread-safe access to synthesis operations
+/// Actor-based TTS capability that provides a simplified interface for text-to-speech.
+/// Owns the voice lifecycle and provides thread-safe access to synthesis operations.
+///
+/// Uses `ManagedLifecycle` to handle voice loading/unloading with automatic analytics tracking.
 public actor TTSCapability: ModelLoadableCapability {
     public typealias Configuration = TTSConfiguration
     public typealias Service = TTSService
 
     // MARK: - State
 
-    /// Unified model lifecycle manager (uses "voice" as resource type)
-    private let lifecycle: ModelLifecycleManager<TTSService>
+    /// Managed lifecycle with integrated event tracking
+    private let managedLifecycle: ManagedLifecycle<TTSService>
 
     /// Current configuration
     private var config: TTSConfiguration?
@@ -29,42 +32,42 @@ public actor TTSCapability: ModelLoadableCapability {
     // MARK: - Initialization
 
     public init(analyticsService: TTSAnalyticsService = TTSAnalyticsService()) {
-        self.lifecycle = ModelLifecycleManager.forTTS()
         self.analyticsService = analyticsService
+        self.managedLifecycle = ManagedLifecycle.forTTS()
     }
 
     // MARK: - Configuration (Capability Protocol)
 
     public func configure(_ config: TTSConfiguration) {
         self.config = config
-        Task { await lifecycle.configure(config) }
+        Task { await managedLifecycle.configure(config) }
     }
 
     // MARK: - Voice Lifecycle (ModelLoadableCapability Protocol)
-    // Note: TTS uses "voice" instead of "model" but follows same lifecycle pattern
+    // All lifecycle operations are delegated to ManagedLifecycle which handles analytics automatically
 
     public var isModelLoaded: Bool {
-        get async { await lifecycle.isLoaded }
+        get async { await managedLifecycle.isLoaded }
     }
 
     /// Alias for voice-specific naming
     public var isVoiceLoaded: Bool {
-        get async { await lifecycle.isLoaded }
+        get async { await managedLifecycle.isLoaded }
     }
 
     public var currentModelId: String? {
-        get async { await lifecycle.currentResourceId }
+        get async { await managedLifecycle.currentResourceId }
     }
 
     /// Alias for voice-specific naming
     public var currentVoiceId: String? {
-        get async { await lifecycle.currentResourceId }
+        get async { await managedLifecycle.currentResourceId }
     }
 
     /// Get available voices
     public var availableVoices: [String] {
         get async {
-            guard let service = await lifecycle.currentService else { return [] }
+            guard let service = await managedLifecycle.currentService else { return [] }
             return service.availableVoices
         }
     }
@@ -72,7 +75,7 @@ public actor TTSCapability: ModelLoadableCapability {
     /// Whether currently synthesizing
     public var isSynthesizing: Bool {
         get async {
-            guard let service = await lifecycle.currentService else { return false }
+            guard let service = await managedLifecycle.currentService else { return false }
             return service.isSynthesizing
         }
     }
@@ -85,33 +88,15 @@ public actor TTSCapability: ModelLoadableCapability {
     /// - Parameter voiceId: The voice identifier
     /// - Throws: Error if loading fails
     public func loadVoice(_ voiceId: String) async throws {
-        let startTime = Date()
-
-        do {
-            try await lifecycle.load(voiceId)
-            let loadTime = Date().timeIntervalSince(startTime)
-            await analyticsService.trackModelLoading(
-                modelId: voiceId,
-                loadTime: loadTime,
-                success: true
-            )
-        } catch {
-            let loadTime = Date().timeIntervalSince(startTime)
-            await analyticsService.trackModelLoading(
-                modelId: voiceId,
-                loadTime: loadTime,
-                success: false
-            )
-            throw error
-        }
+        try await managedLifecycle.load(voiceId)
     }
 
     public func unload() async throws {
-        await lifecycle.unload()
+        await managedLifecycle.unload()
     }
 
     public func cleanup() async {
-        await lifecycle.reset()
+        await managedLifecycle.reset()
     }
 
     // MARK: - Synthesis
@@ -125,8 +110,8 @@ public actor TTSCapability: ModelLoadableCapability {
         _ text: String,
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSOutput {
-        let service = try await lifecycle.requireService()
-        let voiceId = await lifecycle.currentResourceId ?? "unknown"
+        let service = try await managedLifecycle.requireService()
+        let voiceId = await managedLifecycle.resourceIdOrUnknown()
 
         logger.info("Synthesizing text with voice: \(voiceId)")
 
@@ -155,6 +140,7 @@ public actor TTSCapability: ModelLoadableCapability {
                 processingTimeMs: processingTimeMs,
                 errorMessage: error.localizedDescription
             )
+            await managedLifecycle.trackOperationError(error, operation: "synthesize")
             throw CapabilityError.operationFailed("Synthesis", error)
         }
 
@@ -199,14 +185,14 @@ public actor TTSCapability: ModelLoadableCapability {
     ) -> AsyncThrowingStream<Data, Error> {
         AsyncThrowingStream { continuation in
             Task {
-                guard let service = await self.lifecycle.currentService else {
+                guard let service = await self.managedLifecycle.currentService else {
                     continuation.finish(
                         throwing: CapabilityError.resourceNotLoaded("TTS voice")
                     )
                     return
                 }
 
-                let voiceId = await self.lifecycle.currentResourceId ?? "unknown"
+                let voiceId = await self.managedLifecycle.resourceIdOrUnknown()
                 let effectiveOptions = self.mergeOptions(options)
 
                 // Start synthesis tracking
@@ -255,7 +241,7 @@ public actor TTSCapability: ModelLoadableCapability {
     /// Stop current synthesis
     public func stop() async {
         logger.info("Stopping synthesis")
-        await lifecycle.currentService?.stop()
+        await managedLifecycle.currentService?.stop()
     }
 
     // MARK: - Analytics

@@ -12,6 +12,11 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
     private var _isSynthesizing: Bool = false
     private var _isReady: Bool = false
 
+    // MARK: - Framework Identification
+
+    /// ONNX Runtime inference framework
+    public let inferenceFramework: InferenceFrameworkType = .onnx
+
     // MARK: - Initialization
 
     public override init() {

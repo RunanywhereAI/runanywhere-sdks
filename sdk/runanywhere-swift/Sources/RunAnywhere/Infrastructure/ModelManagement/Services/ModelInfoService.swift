@@ -41,12 +41,7 @@ public actor ModelInfoService {
 
     /// Load all stored models
     public func loadStoredModels() async throws -> [ModelInfo] {
-        let models = try await modelInfoRepository.fetchAll()
-
-        // Publish catalog loaded event
-        ServiceContainer.shared.eventBus.publish(SDKModelEvent.catalogLoaded(models: models))
-
-        return models
+        return try await modelInfoRepository.fetchAll()
     }
 
     /// Load models for specific frameworks

@@ -15,6 +15,11 @@ import os
 /// This provides basic speaker tracking functionality without external dependencies
 public class DefaultSpeakerDiarizationService: SpeakerDiarizationService {
 
+    // MARK: - Framework Identification
+
+    /// This is a built-in simple implementation, no external framework required
+    public let inferenceFramework: InferenceFrameworkType = .builtIn
+
     // MARK: - Internal State
 
     /// Internal state protected by lock (Swift 6 concurrency pattern)

@@ -10,6 +10,12 @@ import Foundation
 /// Protocol for language model services
 public protocol LLMService: AnyObject {
 
+    // MARK: - Framework Identification
+
+    /// The inference framework used by this service.
+    /// Required for analytics and performance tracking.
+    var inferenceFramework: InferenceFrameworkType { get }
+
     // MARK: - Initialization
 
     /// Initialize the LLM service with optional model path

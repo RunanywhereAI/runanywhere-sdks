@@ -189,8 +189,8 @@ public struct SessionEndedData: AnalyticsEventData {
 
 // MARK: - Generic Error Data (Shared)
 
-/// Generic error event data
-public struct ErrorEventData: AnalyticsEventData {
+/// Generic error event data (for legacy analytics)
+public struct LegacyErrorEventData: AnalyticsEventData {
     public let error: String
     public let context: String
     public let errorCode: String?
