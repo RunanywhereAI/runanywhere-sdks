@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+lib/
+dist/
+
+# Nitrogen/Nitro generated files (auto-generated bridge code)
+nitrogen/generated/
+
+# iOS
+ios/Frameworks/
+ios/build/
+*.xcframework
+*.xcframework.zip
+
+# Xcode environment (machine-specific Node.js paths)
+.xcode.env
+.xcode.env.local
+
+# Android
+android/build/
+android/.gradle/
+android/.cxx/
+android/libs/
+android/src/main/jniLibs/
+*.aar
+
+# TypeScript
+*.tsbuildinfo
+
+# Metro
+.metro-health-check*
+
+# Testing
+coverage/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+tmp/
+
+# Lock files (use yarn.lock or package-lock.json, not both)
+# Uncomment the one you don't use:
+# yarn.lock
+# package-lock.json
+
+# Yarn PnP
+.pnp.cjs
+.pnp.loader.mjs
+.yarn/
+
+# Package artifacts
+package.tgz
