@@ -7,7 +7,6 @@
 
 import SwiftUI
 import RunAnywhere
-import WhisperKitTranscription
 import FluidAudioDiarization
 import ONNXRuntime
 import LlamaCPPRuntime
@@ -42,9 +41,7 @@ struct RunAnywhereAIApp: App {
         )
         memoryPressureSource.setEventHandler { [logger] in
             logger.warning("⚠️ macOS memory pressure detected, cleaning up cached services")
-            Task {
-                await WhisperKitAdapter.shared.forceCleanup()
-            }
+            // Memory cleanup handled by SDK
         }
         memoryPressureSource.resume()
         #endif
@@ -77,9 +74,7 @@ struct RunAnywhereAIApp: App {
             #if os(iOS)
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
                 logger.warning("⚠️ Memory warning received, cleaning up cached services")
-                Task {
-                    await WhisperKitAdapter.shared.forceCleanup()
-                }
+                // Memory cleanup handled by SDK
             }
             #endif
         }
@@ -235,32 +230,6 @@ struct RunAnywhereAIApp: App {
         )
         logger.info("✅ LlamaCPP Core registered (runanywhere-core backend)")
 
-        // Register WhisperKit with STT models
-        await RunAnywhere.registerFramework(
-            WhisperKitAdapter.shared,
-            models: [
-                try! ModelRegistration(
-                    url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-tiny.en",
-                    framework: .whisperKit,
-                    modality: .voiceToText,
-                    id: "whisper-tiny",
-                    name: "Whisper Tiny",
-                    format: .mlmodel,
-                    memoryRequirement: 39_000_000
-                ),
-                try! ModelRegistration(
-                    url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base",
-                    framework: .whisperKit,
-                    modality: .voiceToText,
-                    id: "whisper-base",
-                    name: "Whisper Base",
-                    format: .mlmodel,
-                    memoryRequirement: 74_000_000
-                )
-            ]
-        )
-        logger.info("✅ WhisperKit registered")
-
         // Register ONNX Runtime with STT and TTS models
         await RunAnywhere.registerFramework(
             ONNXAdapter.shared,
@@ -274,7 +243,7 @@ struct RunAnywhereAIApp: App {
                     framework: .onnx,
                     modality: .voiceToText,
                     id: "sherpa-whisper-tiny-onnx",
-                    name: "Sherpa Whisper Tiny (ONNX) [macOS only]",
+                    name: "Sherpa Whisper Tiny (ONNX)",
                     format: .onnx,
                     memoryRequirement: 75_000_000
                 ),
@@ -283,7 +252,7 @@ struct RunAnywhereAIApp: App {
                     framework: .onnx,
                     modality: .voiceToText,
                     id: "sherpa-whisper-small-onnx",
-                    name: "Sherpa Whisper Small (ONNX) [macOS only]",
+                    name: "Sherpa Whisper Small (ONNX)",
                     format: .onnx,
                     memoryRequirement: 250_000_000
                 ),
@@ -385,32 +354,6 @@ struct RunAnywhereAIApp: App {
         )
         logger.info("✅ LlamaCPP Core registered with hardcoded models")
 
-        // Register WhisperKit with hardcoded models (same as development)
-        await RunAnywhere.registerFramework(
-            WhisperKitAdapter.shared,
-            models: [
-                try! ModelRegistration(
-                    url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-tiny.en",
-                    framework: .whisperKit,
-                    modality: .voiceToText,
-                    id: "whisper-tiny",
-                    name: "Whisper Tiny",
-                    format: .mlmodel,
-                    memoryRequirement: 39_000_000
-                ),
-                try! ModelRegistration(
-                    url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base",
-                    framework: .whisperKit,
-                    modality: .voiceToText,
-                    id: "whisper-base",
-                    name: "Whisper Base",
-                    format: .mlmodel,
-                    memoryRequirement: 74_000_000
-                )
-            ]
-        )
-        logger.info("✅ WhisperKit registered with hardcoded models")
-
         // Register ONNX Runtime with hardcoded models (same as development)
         await RunAnywhere.registerFramework(
             ONNXAdapter.shared,
@@ -420,7 +363,7 @@ struct RunAnywhereAIApp: App {
                     framework: .onnx,
                     modality: .voiceToText,
                     id: "sherpa-whisper-tiny-onnx",
-                    name: "Sherpa Whisper Tiny (ONNX) [macOS only]",
+                    name: "Sherpa Whisper Tiny (ONNX)",
                     format: .onnx,
                     memoryRequirement: 75_000_000
                 ),
@@ -429,7 +372,7 @@ struct RunAnywhereAIApp: App {
                     framework: .onnx,
                     modality: .voiceToText,
                     id: "sherpa-whisper-small-onnx",
-                    name: "Sherpa Whisper Small (ONNX) [macOS only]",
+                    name: "Sherpa Whisper Small (ONNX)",
                     format: .onnx,
                     memoryRequirement: 250_000_000
                 ),

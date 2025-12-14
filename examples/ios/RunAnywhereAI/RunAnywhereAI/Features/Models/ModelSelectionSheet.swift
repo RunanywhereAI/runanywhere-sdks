@@ -162,12 +162,16 @@ struct ModelSelectionSheet: View {
     }
 
     private func loadAvailableFrameworks() async {
-        let allFrameworks = RunAnywhere.getAvailableFrameworks()
-
+        // Get framework availability (shows all frameworks, including unavailable ones)
+        let allAvailability = RunAnywhere.getFrameworkAvailability()
+        
         // Filter frameworks based on context by checking if they have relevant models
-        var filteredFrameworks = allFrameworks.filter { framework in
-            shouldShowFramework(framework)
-        }
+        // Only include available frameworks for actual use, but show unavailable ones too
+        var filteredFrameworks = allAvailability
+            .filter { availability in
+                availability.isAvailable && shouldShowFramework(availability.framework)
+            }
+            .map { $0.framework }
 
         // For TTS context, always include System TTS as an option
         if context == .tts {
