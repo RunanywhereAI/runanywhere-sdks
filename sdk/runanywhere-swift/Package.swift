@@ -159,12 +159,15 @@ let package = Package(
                 .linkedLibrary("bz2"),
                 .unsafeFlags(["-ObjC", "-all_load"]),
                 // macOS requires linking against ONNX Runtime dylib (not statically included)
-                // The bundled dylib in Binaries/onnxruntime-macos/ includes CoreML provider
-                // For production: embed libonnxruntime.dylib in YourApp.app/Contents/Frameworks/
+                // Note: Homebrew version may not include CoreML provider
+                // For production: embed libonnxruntime.dylib with CoreML support in YourApp.app/Contents/Frameworks/
                 .unsafeFlags([
                     "-L\(onnxRuntimeMacOSPath)",
                     "-lonnxruntime",
-                    "-Wl,-rpath,\(onnxRuntimeMacOSPath)"
+                    "-Wl,-rpath,\(onnxRuntimeMacOSPath)",
+                    // Allow undefined symbols to be resolved at runtime (for optional CoreML provider)
+                    // This prevents linker errors when CoreML provider is not available
+                    "-Wl,-undefined,dynamic_lookup"
                 ], .when(platforms: [.macOS])),
             ]
         ),

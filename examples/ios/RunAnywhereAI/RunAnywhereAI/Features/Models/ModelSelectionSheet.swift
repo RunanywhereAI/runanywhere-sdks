@@ -7,6 +7,9 @@
 
 import SwiftUI
 import RunAnywhere
+#if os(macOS)
+import AppKit
+#endif
 
 // MARK: - Model Selection Context
 
@@ -51,6 +54,8 @@ struct ModelSelectionSheet: View {
     @State private var showingAddModelSheet = false
     @State private var isLoadingModel = false
     @State private var loadingProgress: String = ""
+    @State private var showErrorAlert = false
+    @State private var errorMessage: String = ""
 
     /// The modality context for filtering frameworks and models
     let context: ModelSelectionContext
@@ -75,6 +80,25 @@ struct ModelSelectionSheet: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .alert("Error Loading Model", isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) {
+                    showErrorAlert = false
+                }
+                #if os(macOS)
+                Button("Open System Settings") {
+                    // Open System Settings to Apple Intelligence & Siri
+                    // Try the modern System Settings URL first
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Intelligence") {
+                        NSWorkspace.shared.open(url)
+                    } else {
+                        // Fallback: open System Settings app
+                        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Library/PreferencePanes/Security.prefPane"))
+                    }
+                }
+                #endif
+            } message: {
+                Text(errorMessage)
+            }
             .toolbar {
                 #if os(iOS)
                 ToolbarItemGroup(placement: .navigationBarLeading) {
@@ -537,7 +561,33 @@ struct ModelSelectionSheet: View {
                 isLoadingModel = false
                 loadingProgress = ""
                 selectedModel = nil
-                // Could show error alert here
+                
+                // Extract error message and show alert
+                var message = error.localizedDescription
+                
+                // Check if this is an Apple Intelligence error
+                if let nsError = error as NSError?,
+                   nsError.domain == "FoundationModels",
+                   nsError.code == -3 {
+                    // This is the Apple Intelligence not enabled error
+                    message = nsError.localizedDescription
+                } else if let llmError = error as? LLMServiceError {
+                    switch llmError {
+                    case .generationFailed(let underlyingError):
+                        if let nsError = underlyingError as NSError?,
+                           nsError.domain == "FoundationModels",
+                           nsError.code == -3 {
+                            message = nsError.localizedDescription
+                        } else {
+                            message = underlyingError.localizedDescription
+                        }
+                    default:
+                        message = llmError.localizedDescription
+                    }
+                }
+                
+                errorMessage = message
+                showErrorAlert = true
             }
             print("Failed to load model: \(error)")
         }
