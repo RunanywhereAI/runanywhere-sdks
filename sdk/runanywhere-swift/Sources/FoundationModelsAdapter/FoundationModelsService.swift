@@ -8,7 +8,7 @@ import FoundationModels
 #endif
 
 /// Service implementation for Apple's Foundation Models
-@available(iOS 26.0, macOS 26.0, *)
+@available(iOS 18.0, macOS 26.0, *)
 public class FoundationModelsService: LLMService {
     private var hardwareConfig: HardwareConfiguration?
     private var _currentModel: String?
@@ -29,15 +29,25 @@ public class FoundationModelsService: LLMService {
     }
 
     public func initialize(modelPath: String?) async throws {
-        logger.info("Initializing Apple Foundation Models (iOS 26+/macOS 26+)")
+        logger.info("🚀 Initializing Apple Foundation Models (iOS 18+/macOS 26+)")
+        
+        // Log system information for debugging
+        #if os(iOS)
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        logger.info("Running on iOS \(osVersion)")
+        #elseif os(macOS)
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        logger.info("Running on macOS \(osVersion)")
+        #endif
 
         #if canImport(FoundationModels)
-        guard #available(iOS 26.0, macOS 26.0, *) else {
-            logger.error("iOS 26.0+ or macOS 26.0+ not available")
-            throw LLMServiceError.notInitialized
+        guard #available(iOS 18.0, macOS 26.0, *) else {
+            let errorMsg = "iOS 18.0+ or macOS 26.0+ required. Current: \(ProcessInfo.processInfo.operatingSystemVersionString)"
+            logger.error("❌ \(errorMsg)")
+            throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -1, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
         }
 
-        logger.info("FoundationModels framework is available, proceeding with initialization")
+        logger.info("✅ FoundationModels framework is available, proceeding with initialization")
 
         do {
             // Create the system language model using the default property
@@ -62,33 +72,118 @@ public class FoundationModelsService: LLMService {
                 logger.info("LanguageModelSession created successfully")
 
             case .unavailable(.deviceNotEligible):
-                logger.error("Device not eligible for Apple Intelligence")
-                throw LLMServiceError.notInitialized
+                let errorMsg = "Device not eligible for Apple Intelligence. This feature requires a compatible Apple device with Apple Silicon (M1 or later) or A17 Pro or later chip."
+                logger.error("\(errorMsg)")
+                throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -2, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
             case .unavailable(.appleIntelligenceNotEnabled):
-                logger.error("Apple Intelligence not enabled. Please enable it in Settings.")
-                throw LLMServiceError.notInitialized
+                #if os(iOS)
+                let errorMsg = """
+                Apple Intelligence not enabled. Please enable it in:
+                Settings > Apple Intelligence & Siri
+                
+                Requirements:
+                • Device must be eligible (A17 Pro or later, or M1 or later)
+                • System Language must be set to a supported language (English, etc.)
+                • Region must be set to a supported region
+                • You must be signed in with an Apple ID
+                """
+                #elseif os(macOS)
+                let errorMsg = """
+                Apple Intelligence not enabled. Please enable it in:
+                System Settings > Apple Intelligence & Siri
+                
+                Requirements:
+                • Device must be eligible (M1 or later)
+                • System Language must be set to a supported language (English, etc.)
+                • Region must be set to a supported region
+                • You must be signed in with an Apple ID
+                • Apple Intelligence must be enabled in System Settings
+                
+                To enable:
+                1. Open System Settings
+                2. Go to Apple Intelligence & Siri
+                3. Enable "Apple Intelligence"
+                4. Follow the setup prompts if any
+                """
+                #else
+                let errorMsg = "Apple Intelligence not enabled. Please enable it in Settings > Apple Intelligence & Siri."
+                #endif
+                logger.error("❌ \(errorMsg)")
+                
+                // Log diagnostic information
+                #if os(macOS)
+                let locale = Locale.current
+                logger.info("System Language: \(locale.languageCode ?? "unknown")")
+                logger.info("System Region: \(locale.regionCode ?? "unknown")")
+                logger.info("Locale Identifier: \(locale.identifier)")
+                #endif
+                
+                throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -3, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
             case .unavailable(.modelNotReady):
-                logger.error("Model not ready. It may be downloading or initializing.")
-                throw LLMServiceError.notInitialized
+                #if os(iOS)
+                let errorMsg = """
+                Apple Intelligence is not enabled. Please enable it to use this model.
+                
+                To enable:
+                1. Open Settings
+                2. Go to Apple Intelligence & Siri
+                3. Enable "Apple Intelligence"
+                4. Follow the setup prompts if any
+                
+                Requirements:
+                • Device must be eligible (A17 Pro or later, or M1 or later)
+                • System Language must be set to a supported language (English, etc.)
+                • Region must be set to a supported region
+                • You must be signed in with an Apple ID
+                """
+                #elseif os(macOS)
+                let errorMsg = """
+                Apple Intelligence is not enabled. Please enable it to use this model.
+                
+                To enable:
+                1. Open System Settings
+                2. Go to Apple Intelligence & Siri
+                3. Enable "Apple Intelligence"
+                4. Follow the setup prompts if any
+                
+                Requirements:
+                • Device must be eligible (M1 or later)
+                • System Language must be set to a supported language (English, etc.)
+                • Region must be set to a supported region
+                • You must be signed in with an Apple ID
+                """
+                #else
+                let errorMsg = "Apple Intelligence is not enabled. Please enable it in Settings > Apple Intelligence & Siri to use this model."
+                #endif
+                logger.error("❌ \(errorMsg)")
+                throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -4, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
             case .unavailable(let other):
-                logger.error("Foundation Models unavailable: \(String(describing: other))")
-                throw LLMServiceError.notInitialized
+                let errorMsg = "Foundation Models unavailable: \(String(describing: other))"
+                logger.error("\(errorMsg)")
+                throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -5, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
             @unknown default:
-                logger.error("Unknown availability status")
-                throw LLMServiceError.notInitialized
+                let errorMsg = "Unknown availability status"
+                logger.error("\(errorMsg)")
+                throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -6, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
             }
 
             _currentModel = "foundation-models-native"
             _isReady = true
             logger.info("Foundation Models initialized successfully")
+        } catch let error as LLMServiceError {
+            // Re-throw LLMServiceError as-is
+            logger.error("Failed to initialize Foundation Models: \(error.localizedDescription)")
+            throw error
         } catch {
-            logger.error("Failed to initialize Foundation Models: \(error)")
-            throw LLMServiceError.notInitialized
+            let errorMsg = "Failed to initialize Foundation Models: \(error.localizedDescription)"
+            logger.error("\(errorMsg)")
+            throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -7, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
         }
         #else
         // Foundation Models framework not available
-        logger.error("FoundationModels framework not available")
-        throw LLMServiceError.notInitialized
+        let errorMsg = "FoundationModels framework not available. This may be because:\n1. You're running on an unsupported OS version\n2. The framework is not linked in your project\n3. You're using a simulator that doesn't support Apple Intelligence"
+        logger.error("\(errorMsg)")
+        throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -8, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
         #endif
     }
 
