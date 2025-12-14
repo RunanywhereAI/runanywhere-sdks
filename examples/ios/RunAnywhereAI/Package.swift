@@ -43,7 +43,6 @@ let package = Package(
         // - Pulse 4.2.7 (logging)
         //
         // Via Optional Modules:
-        // - WhisperKit 0.13.1 (via RunAnywhereWhisperKit)
         // - FluidAudio (via RunAnywhereFluidAudio)
         // - ONNX Runtime binary (via RunAnywhereONNX)
         // - LlamaCPP binary (via RunAnywhereLlamaCPP)
@@ -59,7 +58,6 @@ let package = Package(
                 // Optional modules - pick what you need:
                 .product(name: "RunAnywhereONNX", package: "runanywhere-swift"),           // ONNX STT/TTS/VAD
                 .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-swift"),       // LlamaCPP LLM (runanywhere-core backend)
-                .product(name: "RunAnywhereWhisperKit", package: "runanywhere-swift"),     // CoreML STT
                 .product(name: "RunAnywhereFluidAudio", package: "runanywhere-swift"),     // Speaker Diarization
                 .product(name: "RunAnywhereAppleAI", package: "runanywhere-swift"),        // Apple Intelligence (iOS 26+)
             ],

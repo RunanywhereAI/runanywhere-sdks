@@ -159,12 +159,15 @@ let package = Package(
                 .linkedLibrary("bz2"),
                 .unsafeFlags(["-ObjC", "-all_load"]),
                 // macOS requires linking against ONNX Runtime dylib (not statically included)
-                // The bundled dylib in Binaries/onnxruntime-macos/ includes CoreML provider
-                // For production: embed libonnxruntime.dylib in YourApp.app/Contents/Frameworks/
+                // Note: Homebrew version may not include CoreML provider
+                // For production: embed libonnxruntime.dylib with CoreML support in YourApp.app/Contents/Frameworks/
                 .unsafeFlags([
                     "-L\(onnxRuntimeMacOSPath)",
                     "-lonnxruntime",
-                    "-Wl,-rpath,\(onnxRuntimeMacOSPath)"
+                    "-Wl,-rpath,\(onnxRuntimeMacOSPath)",
+                    // Allow undefined symbols to be resolved at runtime (for optional CoreML provider)
+                    // This prevents linker errors when CoreML provider is not available
+                    "-Wl,-undefined,dynamic_lookup"
                 ], .when(platforms: [.macOS])),
             ]
         ),
@@ -251,7 +254,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RunAnywhereCoreBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.e6b7a2f/RunAnywhereCore.xcframework.zip",
-                checksum: "0c2da2bacb4931cdbe77eb0686ed20351ffe4ea1a66384f4522a61e1e4efa7aa"
+                checksum: "0786d494553226820a3a19ba5ee573d4bedf4096b9ebfae9010b621952bb617b"
             )
         ]
     }
