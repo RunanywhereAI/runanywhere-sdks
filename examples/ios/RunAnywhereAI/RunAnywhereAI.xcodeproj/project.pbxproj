@@ -7,12 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 541C59D92E63772A00DD7839 /* RunAnywhere */; };
-		54760D392E57E06100A03191 /* RunAnywhereWhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 54760D382E57E06100A03191 /* RunAnywhereWhisperKit */; };
-		548CA0772E56D0DC0061CCF5 /* RunAnywhereFluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 548CA0762E56D0DC0061CCF5 /* RunAnywhereFluidAudio */; };
-		54EADC0B2ED965F500705E74 /* RunAnywhereAppleAI in Frameworks */ = {isa = PBXBuildFile; productRef = 54EADC0A2ED965F500705E74 /* RunAnywhereAppleAI */; };
-		58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */; };
-		58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = 58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */; };
+		D6AA04372EEDE7FB0010833E /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = D6AA01D02EEDE6410010833F /* RunAnywhere */; };
+		D6AA04382EEDE7FB0010833E /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = D6AA01D12EEDE64100108340 /* RunAnywhereONNX */; };
+		D6AA04392EEDE7FB0010833E /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = D6AA01D22EEDE64100108341 /* RunAnywhereLlamaCPP */; };
+		D6AA043B2EEDE7FB0010833E /* RunAnywhereFluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = D6AA01D42EEDE64100108343 /* RunAnywhereFluidAudio */; };
+		D6AA043C2EEDE7FB0010833E /* RunAnywhereAppleAI in Frameworks */ = {isa = PBXBuildFile; productRef = D6AA01D52EEDE64100108344 /* RunAnywhereAppleAI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,12 +64,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				54EADC0B2ED965F500705E74 /* RunAnywhereAppleAI in Frameworks */,
-				58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */,
-				548CA0772E56D0DC0061CCF5 /* RunAnywhereFluidAudio in Frameworks */,
-				541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */,
-				54760D392E57E06100A03191 /* RunAnywhereWhisperKit in Frameworks */,
-				58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */,
+				D6AA043C2EEDE7FB0010833E /* RunAnywhereAppleAI in Frameworks */,
+				D6AA043B2EEDE7FB0010833E /* RunAnywhereFluidAudio in Frameworks */,
+				D6AA04392EEDE7FB0010833E /* RunAnywhereLlamaCPP in Frameworks */,
+				D6AA04382EEDE7FB0010833E /* RunAnywhereONNX in Frameworks */,
+				D6AA04372EEDE7FB0010833E /* RunAnywhere in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -143,12 +141,11 @@
 			);
 			name = RunAnywhereAI;
 			packageProductDependencies = (
-				548CA0762E56D0DC0061CCF5 /* RunAnywhereFluidAudio */,
-				54760D382E57E06100A03191 /* RunAnywhereWhisperKit */,
-				541C59D92E63772A00DD7839 /* RunAnywhere */,
-				58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */,
-				54EADC0A2ED965F500705E74 /* RunAnywhereAppleAI */,
-				58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */,
+				D6AA01D02EEDE6410010833F /* RunAnywhere */,
+				D6AA01D12EEDE64100108340 /* RunAnywhereONNX */,
+				D6AA01D22EEDE64100108341 /* RunAnywhereLlamaCPP */,
+				D6AA01D42EEDE64100108343 /* RunAnywhereFluidAudio */,
+				D6AA01D52EEDE64100108344 /* RunAnywhereAppleAI */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -231,7 +228,7 @@
 			mainGroup = 5480A1E72E2F250200337F2F;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */,
+				D6AA01CF2EEDE6410010833E /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -479,8 +476,8 @@
 				CODE_SIGN_ENTITLEMENTS = RunAnywhereAI/RunAnywhereAI.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = AFAL2647U9;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = L86FH3K93L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhere;
@@ -498,10 +495,13 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"@executable_path/../Frameworks",
+					"/opt/homebrew/lib",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
-				MARKETING_VERSION = 0.13.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhereAI;
+				MARKETING_VERSION = 0.14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -521,8 +521,8 @@
 				CODE_SIGN_ENTITLEMENTS = RunAnywhereAI/RunAnywhereAI.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = AFAL2647U9;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = L86FH3K93L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhere;
@@ -540,10 +540,13 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"@executable_path/../Frameworks",
+					"/opt/homebrew/lib",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
-				MARKETING_VERSION = 0.13.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhereAI;
+				MARKETING_VERSION = 0.14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -685,42 +688,37 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */ = {
+		D6AA01CF2EEDE6410010833E /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../../sdk/runanywhere-swift";
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		541C59D92E63772A00DD7839 /* RunAnywhere */ = {
+		D6AA01D02EEDE6410010833F /* RunAnywhere */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
+			package = D6AA01CF2EEDE6410010833E /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
 			productName = RunAnywhere;
 		};
-		54760D382E57E06100A03191 /* RunAnywhereWhisperKit */ = {
+		D6AA01D12EEDE64100108340 /* RunAnywhereONNX */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
-			productName = RunAnywhereWhisperKit;
-		};
-		548CA0762E56D0DC0061CCF5 /* RunAnywhereFluidAudio */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
-			productName = RunAnywhereFluidAudio;
-		};
-		54EADC0A2ED965F500705E74 /* RunAnywhereAppleAI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
-			productName = RunAnywhereAppleAI;
-		};
-		58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
+			package = D6AA01CF2EEDE6410010833E /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
 			productName = RunAnywhereONNX;
 		};
-		58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */ = {
+		D6AA01D22EEDE64100108341 /* RunAnywhereLlamaCPP */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
+			package = D6AA01CF2EEDE6410010833E /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
 			productName = RunAnywhereLlamaCPP;
+		};
+		D6AA01D42EEDE64100108343 /* RunAnywhereFluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D6AA01CF2EEDE6410010833E /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
+			productName = RunAnywhereFluidAudio;
+		};
+		D6AA01D52EEDE64100108344 /* RunAnywhereAppleAI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D6AA01CF2EEDE6410010833E /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
+			productName = RunAnywhereAppleAI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

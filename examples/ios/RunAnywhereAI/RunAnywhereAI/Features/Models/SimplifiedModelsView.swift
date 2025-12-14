@@ -15,6 +15,7 @@ struct SimplifiedModelsView: View {
     @State private var selectedModel: ModelInfo?
     @State private var expandedFramework: LLMFramework?
     @State private var availableFrameworks: [LLMFramework] = []
+    @State private var frameworkAvailability: [FrameworkAvailability] = []
     @State private var showingAddModelSheet = false
 
     var body: some View {
@@ -63,10 +64,12 @@ struct SimplifiedModelsView: View {
     }
 
     private func loadAvailableFrameworks() async {
-        // Get available frameworks from SDK
-        let frameworks = RunAnywhere.getAvailableFrameworks()
+        // Get framework availability from SDK (shows all frameworks, including unavailable ones)
+        let availability = RunAnywhere.getFrameworkAvailability()
         await MainActor.run {
-            self.availableFrameworks = frameworks
+            self.frameworkAvailability = availability
+            // Extract available frameworks for backward compatibility
+            self.availableFrameworks = availability.filter { $0.isAvailable }.map { $0.framework }
         }
     }
 
@@ -121,7 +124,7 @@ struct SimplifiedModelsView: View {
 
     private var frameworksSection: some View {
         Section("Available Frameworks") {
-            if availableFrameworks.isEmpty {
+            if frameworkAvailability.isEmpty {
                 VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                     HStack {
                         ProgressView()
@@ -135,12 +138,22 @@ struct SimplifiedModelsView: View {
                         .padding(.top, AppSpacing.xSmall)
                 }
             } else {
-                ForEach(availableFrameworks, id: \.self) { framework in
-                    FrameworkRow(
-                        framework: framework,
-                        isExpanded: expandedFramework == framework,
-                        onTap: { toggleFramework(framework) }
-                    )
+                ForEach(frameworkAvailability, id: \.framework) { availability in
+                    VStack(alignment: .leading, spacing: 4) {
+                        FrameworkRow(
+                            framework: availability.framework,
+                            isExpanded: expandedFramework == availability.framework,
+                            onTap: { toggleFramework(availability.framework) }
+                        )
+                        
+                        // Show unavailability reason if framework is not available
+                        if !availability.isAvailable, let reason = availability.unavailabilityReason {
+                            Text(reason)
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.statusOrange)
+                                .padding(.leading, 16)
+                        }
+                    }
                 }
             }
         }
