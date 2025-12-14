@@ -1,0 +1,68 @@
+/**
+ * TTSService.ts
+ *
+ * Protocol for TTS service implementations
+ */
+
+import type { TTSConfiguration } from '../../Models/Configuration/TTSConfiguration';
+import type { TTSResult } from '../../Models/TTS/TTSResult';
+
+/**
+ * Voice information for TTS
+ */
+export interface VoiceInfo {
+  /** Voice identifier */
+  readonly id: string;
+  /** Voice name */
+  readonly name: string;
+  /** Language code */
+  readonly language: string;
+  /** Voice gender */
+  readonly gender?: 'male' | 'female' | 'neutral';
+  /** Whether this is a neural voice */
+  readonly isNeural?: boolean;
+  /** Quality level */
+  readonly quality?: 'low' | 'medium' | 'high' | 'enhanced';
+  /** Sample preview URL */
+  readonly sampleUrl?: string;
+}
+
+/**
+ * Protocol for TTS service implementations
+ */
+export interface TTSService {
+  /**
+   * Initialize the TTS service with model path
+   */
+  initialize(modelPath?: string | null): Promise<void>;
+
+  /**
+   * Synthesize text to speech
+   */
+  synthesize(text: string, configuration?: TTSConfiguration): Promise<TTSResult>;
+
+  /**
+   * Get available voices
+   */
+  getAvailableVoices?(): Promise<string[]>;
+
+  /**
+   * Get detailed voice info
+   */
+  getVoiceInfo?(): Promise<VoiceInfo[]>;
+
+  /**
+   * Check if service is ready
+   */
+  readonly isReady: boolean;
+
+  /**
+   * Current model identifier
+   */
+  readonly currentModel: string | null;
+
+  /**
+   * Clean up and release resources
+   */
+  cleanup(): Promise<void>;
+}
