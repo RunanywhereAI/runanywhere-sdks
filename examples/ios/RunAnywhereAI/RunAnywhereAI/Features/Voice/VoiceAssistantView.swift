@@ -8,7 +8,7 @@ import AppKit
 #endif
 
 struct VoiceAssistantView: View {
-    @StateObject private var viewModel = VoiceAssistantViewModel()
+    @StateObject private var viewModel = VoiceAgentViewModel()
     @State private var showModelInfo = false
     @State private var showModelSelection = false
     @State private var showSTTModelSelection = false
@@ -35,9 +35,9 @@ struct VoiceAssistantView: View {
                 // Status indicator
                 HStack(spacing: AppSpacing.small) {
                     Circle()
-                        .fill(statusColor)
+                        .fill(viewModel.statusColor.swiftUIColor)
                         .frame(width: 8, height: 8)
-                    Text(statusText)
+                    Text(viewModel.sessionState.displayName)
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.textSecondary)
                 }
@@ -64,9 +64,9 @@ struct VoiceAssistantView: View {
             if showModelInfo {
                 VStack(spacing: 8) {
                     HStack(spacing: 15) {
-                        ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel.isEmpty ? "Loading..." : viewModel.currentLLMModel, color: .blue)
-                        ModelBadge(icon: "waveform", label: "STT", value: viewModel.whisperModel, color: .green)
-                        ModelBadge(icon: "speaker.wave.2", label: "TTS", value: "System", color: .purple)
+                        ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel, color: .blue)
+                        ModelBadge(icon: "waveform", label: "STT", value: viewModel.currentSTTModel, color: .green)
+                        ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.currentTTSModel, color: .purple)
                     }
                     .padding(.horizontal, 20)
 
@@ -149,18 +149,15 @@ struct VoiceAssistantView: View {
                     Spacer()
 
                     AdaptiveMicButton(
-                        isActive: viewModel.sessionState == .listening,
+                        isActive: viewModel.isListening,
                         isPulsing: viewModel.isSpeechDetected,
                         isLoading: viewModel.sessionState == .connecting || (viewModel.isProcessing && !viewModel.isListening),
-                        activeColor: micButtonColor,
-                        inactiveColor: micButtonColor,
-                        icon: micButtonIcon
+                        activeColor: viewModel.micButtonColor.swiftUIColor,
+                        inactiveColor: viewModel.micButtonColor.swiftUIColor,
+                        icon: viewModel.micButtonIcon
                     ) {
                         Task {
-                            if viewModel.sessionState == .listening ||
-                               viewModel.sessionState == .speaking ||
-                               viewModel.sessionState == .processing ||
-                               viewModel.sessionState == .connecting {
+                            if viewModel.isActive {
                                 await viewModel.stopConversation()
                             } else {
                                 await viewModel.startConversation()
@@ -172,7 +169,7 @@ struct VoiceAssistantView: View {
                 }
 
                 // Subtle instruction text
-                Text(instructionText)
+                Text(viewModel.instructionText)
                     .font(.caption2)
                     .foregroundColor(.secondary.opacity(0.7))
                     .multilineTextAlignment(.center)
@@ -238,9 +235,9 @@ struct VoiceAssistantView: View {
                         // Status indicator - minimal
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(statusColor)
+                                .fill(viewModel.statusColor.swiftUIColor)
                                 .frame(width: 8, height: 8)
-                            Text(statusText)
+                            Text(viewModel.sessionState.displayName)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -270,9 +267,9 @@ struct VoiceAssistantView: View {
                         VStack(spacing: 8) {
                             HStack(spacing: 15) {
                                 // Compact model badges
-                                ModelBadge(icon: "brain", label: "LLM", value: viewModel.llmModel?.name ?? "Not set", color: .blue)
-                                ModelBadge(icon: "waveform", label: "STT", value: viewModel.sttModel?.name ?? "Not set", color: .green)
-                                ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.ttsModel?.name ?? "Not set", color: .purple)
+                                ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel, color: .blue)
+                                ModelBadge(icon: "waveform", label: "STT", value: viewModel.currentSTTModel, color: .green)
+                                ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.currentTTSModel, color: .purple)
                             }
                             .padding(.horizontal, 20)
 
@@ -379,18 +376,15 @@ struct VoiceAssistantView: View {
                             Spacer()
 
                             AdaptiveMicButton(
-                                isActive: viewModel.sessionState == .listening,
+                                isActive: viewModel.isListening,
                                 isPulsing: viewModel.isSpeechDetected,
                                 isLoading: viewModel.sessionState == .connecting || (viewModel.isProcessing && !viewModel.isListening),
-                                activeColor: micButtonColor,
-                                inactiveColor: micButtonColor,
-                                icon: micButtonIcon
+                                activeColor: viewModel.micButtonColor.swiftUIColor,
+                                inactiveColor: viewModel.micButtonColor.swiftUIColor,
+                                icon: viewModel.micButtonIcon
                             ) {
                                 Task {
-                                    if viewModel.sessionState == .listening ||
-                                       viewModel.sessionState == .speaking ||
-                                       viewModel.sessionState == .processing ||
-                                       viewModel.sessionState == .connecting {
+                                    if viewModel.isActive {
                                         await viewModel.stopConversation()
                                     } else {
                                         await viewModel.startConversation()
@@ -402,7 +396,7 @@ struct VoiceAssistantView: View {
                         }
 
                         // Subtle instruction text
-                        Text(instructionText)
+                        Text(viewModel.instructionText)
                             .font(.caption2)
                             .foregroundColor(.secondary.opacity(0.7))
                             .multilineTextAlignment(.center)
@@ -511,64 +505,6 @@ struct VoiceAssistantView: View {
         }
     }
 
-    // Helper computed properties
-    private var micButtonColor: Color {
-        switch viewModel.sessionState {
-        case .connecting: return .orange
-        case .listening: return .red
-        case .processing: return .blue
-        case .speaking: return .green
-        default: return .blue
-        }
-    }
-
-    private var micButtonIcon: String {
-        switch viewModel.sessionState {
-        case .listening: return "mic.fill"
-        case .speaking: return "speaker.wave.2.fill"
-        case .processing: return "waveform"
-        default: return "mic"
-        }
-    }
-
-    private var statusColor: Color {
-        switch viewModel.sessionState {
-        case .disconnected: return .gray
-        case .connecting: return .orange
-        case .connected: return .green
-        case .listening: return .red
-        case .processing: return .blue
-        case .speaking: return .green
-        case .error: return .red
-        }
-    }
-
-    private var statusText: String {
-        switch viewModel.sessionState {
-        case .disconnected: return "Ready"
-        case .connecting: return "Connecting"
-        case .connected: return "Ready"
-        case .listening: return "Listening"
-        case .processing: return "Thinking"
-        case .speaking: return "Speaking"
-        case .error: return "Error"
-        }
-    }
-
-    private var instructionText: String {
-        switch viewModel.sessionState {
-        case .listening:
-            return "Listening... Pause to send"
-        case .processing:
-            return "Processing your message..."
-        case .speaking:
-            return "Speaking..."
-        case .connecting:
-            return "Connecting..."
-        default:
-            return "Tap to start conversation"
-        }
-    }
 }
 
 // Conversation bubble component

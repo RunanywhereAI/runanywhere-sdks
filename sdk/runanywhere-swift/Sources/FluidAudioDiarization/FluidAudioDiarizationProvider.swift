@@ -20,8 +20,11 @@ import RunAnywhere
 /// ```swift
 /// import FluidAudioDiarization
 ///
-/// // Option 1: Direct registration
+/// // Option 1: Direct registration (uses default priority)
 /// FluidAudio.register()
+///
+/// // Option 1b: With custom priority
+/// FluidAudio.register(priority: 50)
 ///
 /// // Option 2: Via ModuleRegistry
 /// ModuleRegistry.shared.register(FluidAudio.self)
@@ -49,8 +52,9 @@ public enum FluidAudio: RunAnywhereModule {
     public static let defaultPriority: Int = 100
 
     /// Register FluidAudio Speaker Diarization service with the SDK
+    /// - Parameter priority: Registration priority (default: `defaultPriority`)
     @MainActor
-    public static func register(priority: Int) {
+    public static func register(priority: Int = defaultPriority) {
         ServiceRegistry.shared.registerSpeakerDiarization(
             name: moduleName,
             priority: priority,
@@ -67,7 +71,7 @@ public enum FluidAudio: RunAnywhereModule {
     private static func createService(config: SpeakerDiarizationConfiguration) async throws -> SpeakerDiarizationService {
         logger.info("Creating FluidAudio diarization service")
 
-        let threshold: Float = 0.65 // Default threshold
+        let threshold: Float = config.speakerChangeThreshold ?? 0.65
         let service = try await FluidAudioDiarization(threshold: threshold)
 
         logger.info("FluidAudio service created successfully")

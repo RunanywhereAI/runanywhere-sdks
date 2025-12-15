@@ -20,7 +20,7 @@ extension LlamaCPPService: LLMService {
         let config = LlamaCPPGenerationConfig(
             maxTokens: options.maxTokens,
             temperature: options.temperature,
-            systemPrompt: nil
+            systemPrompt: options.systemPrompt
         )
         return try await generate(prompt: prompt, config: config)
     }
@@ -33,7 +33,7 @@ extension LlamaCPPService: LLMService {
         let config = LlamaCPPGenerationConfig(
             maxTokens: options.maxTokens,
             temperature: options.temperature,
-            systemPrompt: nil
+            systemPrompt: options.systemPrompt
         )
 
         for try await token in generateStream(prompt: prompt, config: config) {

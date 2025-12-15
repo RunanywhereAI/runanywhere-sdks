@@ -76,13 +76,16 @@ public final class DefaultLoggingService: LoggingService {
         // Check if local logging is enabled
         guard currentConfig.enableLocalLogging else { return }
 
+        // Sanitize metadata to prevent logging sensitive information
+        let sanitizedMetadata = sanitizeMetadata(metadata)
+
         // Create log entry
         let entry = LogEntry(
             timestamp: Date(),
             level: level,
             category: category,
             message: message,
-            metadata: metadata,
+            metadata: sanitizedMetadata,
             deviceInfo: currentConfig.includeDeviceMetadata ? DeviceInfo.current : nil
         )
 
@@ -113,6 +116,45 @@ public final class DefaultLoggingService: LoggingService {
         for destination in currentDestinations {
             destination.flush()
         }
+    }
+
+    // MARK: - Private Helpers
+
+    /// Keys that contain sensitive information and should be redacted
+    private static let sensitiveKeys: Set<String> = [
+        "apikey", "api_key", "apiKey",
+        "password", "passwd", "pwd",
+        "secret", "secretkey", "secret_key", "secretKey",
+        "token", "accesstoken", "access_token", "accessToken",
+        "refreshtoken", "refresh_token", "refreshToken",
+        "authorization", "auth",
+        "bearer", "credential", "credentials",
+        "privatekey", "private_key", "privateKey"
+    ]
+
+    /// Sanitize metadata dictionary to redact sensitive values
+    /// - Parameter metadata: Original metadata dictionary
+    /// - Returns: Sanitized metadata with sensitive values redacted
+    private func sanitizeMetadata(_ metadata: [String: Any]?) -> [String: Any]? { // swiftlint:disable:this prefer_concrete_types avoid_any_type
+        guard let metadata = metadata else { return nil }
+
+        var sanitized: [String: Any] = [:] // swiftlint:disable:this prefer_concrete_types avoid_any_type
+        for (key, value) in metadata {
+            let lowercasedKey = key.lowercased()
+            if Self.sensitiveKeys.contains(lowercasedKey) ||
+               lowercasedKey.contains("key") ||
+               lowercasedKey.contains("secret") ||
+               lowercasedKey.contains("password") ||
+               lowercasedKey.contains("token") ||
+               lowercasedKey.contains("auth") {
+                sanitized[key] = "[REDACTED]"
+            } else if let nestedDict = value as? [String: Any] { // swiftlint:disable:this prefer_concrete_types avoid_any_type
+                sanitized[key] = sanitizeMetadata(nestedDict) ?? [:]
+            } else {
+                sanitized[key] = value
+            }
+        }
+        return sanitized
     }
 }
 

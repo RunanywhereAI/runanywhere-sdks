@@ -7,7 +7,7 @@ default_language_version:
 repos:
   # Swift linting with SwiftLint
   - repo: https://github.com/realm/SwiftLint
-    rev: 0.57.0
+    rev: 0.57.1
     hooks:
       - id: swiftlint
         name: SwiftLint
