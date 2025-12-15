@@ -505,6 +505,19 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         }
     }
 
+    /// Check if the currently loaded LLM model supports streaming generation
+    ///
+    /// Some models (like Apple Foundation Models) don't support streaming and require
+    /// non-streaming generation via `generate()` instead of `generateStream()`.
+    ///
+    /// - Returns: `true` if streaming is supported, `false` if you should use `generate()` instead
+    /// - Note: Returns `false` if no model is loaded
+    public static var supportsLLMStreaming: Bool {
+        get async {
+            await serviceContainer.llmCapability.supportsStreaming
+        }
+    }
+
     /// Load an STT (Speech-to-Text) model by ID
     /// This loads the model into the STT capability
     /// - Parameter modelId: The model identifier (e.g., "whisper-base")

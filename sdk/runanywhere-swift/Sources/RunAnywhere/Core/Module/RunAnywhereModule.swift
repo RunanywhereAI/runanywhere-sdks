@@ -96,6 +96,7 @@ public extension RunAnywhereModule {
 
     /// Add a model to this module (uses the module's inferenceFramework automatically)
     /// - Parameters:
+    ///   - id: Explicit model ID. If nil, a stable ID is generated from the URL filename.
     ///   - name: Display name for the model
     ///   - url: Download URL string for the model
     ///   - modality: Model category (inferred from module capabilities if not specified)
@@ -106,6 +107,7 @@ public extension RunAnywhereModule {
     @MainActor
     @discardableResult
     static func addModel(
+        id: String? = nil,
         name: String,
         url: String,
         modality: ModelCategory? = nil,
@@ -123,6 +125,7 @@ public extension RunAnywhereModule {
 
         // Register the model with this module's framework
         let modelInfo = ServiceContainer.shared.modelRegistry.addModelFromURL(
+            id: id,
             name: name,
             url: downloadURL,
             framework: inferenceFramework,

@@ -217,6 +217,7 @@ public class RegistryService: ModelRegistry {
 
     /// Create and register a model from URL
     /// - Parameters:
+    ///   - id: Explicit model ID. If nil, a stable ID is generated from the URL filename.
     ///   - name: Display name for the model
     ///   - url: Download URL for the model
     ///   - framework: Target framework for the model
@@ -225,6 +226,7 @@ public class RegistryService: ModelRegistry {
     ///   - estimatedSize: Estimated memory usage (optional)
     /// - Returns: The created model info
     public func addModelFromURL(
+        id: String? = nil,
         name: String,
         url: URL,
         framework: InferenceFramework,
@@ -233,7 +235,7 @@ public class RegistryService: ModelRegistry {
         estimatedSize: Int64? = nil,
         supportsThinking: Bool = false
     ) -> ModelInfo {
-        let modelId = generateModelId(from: url)
+        let modelId = id ?? generateModelId(from: url)
 
         // Detect format from URL
         let format = detectFormatFromURL(url)
@@ -290,9 +292,16 @@ public class RegistryService: ModelRegistry {
 
     // MARK: - URL Helper Methods
 
+    /// Generate a stable model ID from URL
+    /// Uses just the filename without extension - simple and predictable
     private func generateModelId(from url: URL) -> String {
-        let nameWithoutExtension = url.deletingPathExtension().lastPathComponent
-        return "user-\(nameWithoutExtension)-\(abs(url.absoluteString.hashValue))"
+        // Remove all extensions (handles .tar.gz, .tar.bz2, etc.)
+        var filename = url.lastPathComponent
+        while let ext = filename.split(separator: ".").last,
+              ["gz", "bz2", "tar", "zip", "gguf", "onnx", "mlmodel", "mlpackage", "tflite", "safetensors", "pte", "bin"].contains(String(ext).lowercased()) {
+            filename = String(filename.dropLast(ext.count + 1))
+        }
+        return filename
     }
 
     private func detectFormatFromURL(_ url: URL) -> ModelFormat {

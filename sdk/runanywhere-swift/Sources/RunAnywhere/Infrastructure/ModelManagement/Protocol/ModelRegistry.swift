@@ -30,6 +30,7 @@ public protocol ModelRegistry {
 
     /// Add a custom model from URL
     /// - Parameters:
+    ///   - id: Explicit model ID. If nil, a stable ID is generated from the URL filename.
     ///   - name: Display name for the model
     ///   - url: Download URL for the model
     ///   - framework: Target framework for the model
@@ -39,6 +40,7 @@ public protocol ModelRegistry {
     ///   - supportsThinking: Whether the model supports thinking/reasoning
     /// - Returns: The created model info
     func addModelFromURL(
+        id: String?,
         name: String,
         url: URL,
         framework: InferenceFramework,

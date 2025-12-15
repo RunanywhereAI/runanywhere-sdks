@@ -171,6 +171,7 @@ class ChatViewModel: ObservableObject {
     @Published var isModelLoaded = false
     @Published var loadedModelName: String?
     @Published var useStreaming = true  // Enable streaming for real-time token display
+    @Published var modelSupportsStreaming = true  // Whether the loaded model supports streaming
 
     // SDK reference removed - use RunAnywhere static methods directly
     private let conversationStore = ConversationStore.shared
@@ -446,9 +447,18 @@ class ChatViewModel: ObservableObject {
                     temperature: Float(effectiveSettings.temperature)
                 )
 
-                logger.info("📝 Generation options created, useStreaming: \(self.useStreaming)")
+                // Check if the model actually supports streaming
+                // Some models (like Apple Foundation Models) don't support streaming
+                let modelSupportsStreaming = await RunAnywhere.supportsLLMStreaming
+                let effectiveUseStreaming = useStreaming && modelSupportsStreaming
 
-                if useStreaming {
+                if !modelSupportsStreaming && useStreaming {
+                    logger.info("⚠️ Model doesn't support streaming, falling back to non-streaming mode")
+                }
+
+                logger.info("📝 Generation options created, useStreaming: \(self.useStreaming), modelSupportsStreaming: \(modelSupportsStreaming), effectiveUseStreaming: \(effectiveUseStreaming)")
+
+                if effectiveUseStreaming {
                     // Use streaming generation with SDK metrics tracking
                     var fullResponse = ""
                     var isInThinkingMode = false
@@ -722,6 +732,13 @@ class ChatViewModel: ObservableObject {
                     do {
                         try await RunAnywhere.loadModel(currentModel.id)
                         self.logger.info("✅ Verified model '\(currentModel.name)' is loaded in SDK")
+
+                        // Check if model supports streaming
+                        let supportsStreaming = await RunAnywhere.supportsLLMStreaming
+                        await MainActor.run {
+                            self.modelSupportsStreaming = supportsStreaming
+                            self.logger.info("📡 Model streaming support: \(supportsStreaming)")
+                        }
                     } catch {
                         self.logger.error("❌ Failed to verify model is loaded: \(error)")
                         await MainActor.run {
@@ -751,10 +768,16 @@ class ChatViewModel: ObservableObject {
     @objc private func modelLoaded(_ notification: Notification) {
         Task {
             if let model = notification.object as? ModelInfo {
+                // Check streaming support
+                let supportsStreaming = await RunAnywhere.supportsLLMStreaming
+
                 await MainActor.run {
                     self.isModelLoaded = true
                     self.loadedModelName = model.name
                     self.selectedFramework = model.preferredFramework
+                    self.modelSupportsStreaming = supportsStreaming
+                    self.logger.info("📡 Model '\(model.name)' streaming support: \(supportsStreaming)")
+
                     // Update system message to reflect loaded model
                     if self.messages.first?.role == .system {
                         self.messages.removeFirst()
