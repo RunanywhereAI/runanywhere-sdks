@@ -1,22 +1,14 @@
-<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- RunAnywhere Logo Concept 9: Cube Perspective -->
-  <!-- Cube faces -->
-  <!-- Top face -->
-  <path d="M25 25 L40 15 L55 25 L40 35 Z"
-        fill="#3B82F6" fill-opacity="0.8"/>
-  <!-- Left face -->
-  <path d="M25 25 L25 45 L40 55 L40 35 Z"
-        fill="#3B82F6" fill-opacity="0.6"/>
-  <!-- Right face -->
-  <path d="M40 35 L40 55 L55 45 L55 25 Z"
-        fill="#3B82F6" fill-opacity="1"/>
-
-  <!-- Connection lines -->
-  <path d="M40 55 L40 65 M25 45 L15 50 M55 45 L65 50"
-        stroke="#3B82F6" stroke-width="2" stroke-linecap="round"/>
-
-  <!-- Small nodes -->
-  <circle cx="40" cy="65" r="3" fill="#3B82F6"/>
-  <circle cx="15" cy="50" r="3" fill="#3B82F6"/>
-  <circle cx="65" cy="50" r="3" fill="#3B82F6"/>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M769 797L668.631 737.392C621.495 771.306 564.931 789.549 506.905 789.549H352.652C352.679 789.4 358.703 756.03 365.663 735.531C372.568 715.195 387.949 685.269 387.966 685.235H557.109C618.7 685.234 668.631 635.195 668.631 573.469V411.413C668.631 411.413 695.339 380.194 715.099 362.98C734.671 345.931 768.849 323.96 769 323.863V797Z" fill="url(#paint0_linear_144_25)"/>
+<path d="M356.369 286.608C403.505 252.694 460.069 234.451 518.095 234.451H672.348C672.322 234.595 666.297 267.971 659.337 288.472C652.428 308.82 637.034 338.765 637.034 338.765H467.891C406.3 338.766 356.369 388.805 356.369 450.531V612.587C356.369 612.587 329.661 643.806 309.901 661.02C290.328 678.07 256.148 700.042 256 700.137V227L356.369 286.608Z" fill="url(#paint1_linear_144_25)"/>
+<defs>
+<linearGradient id="paint0_linear_144_25" x1="256" y1="227" x2="822.851" y2="737.166" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FF6900"/>
+<stop offset="1" stop-color="#FB2C36"/>
+</linearGradient>
+<linearGradient id="paint1_linear_144_25" x1="256" y1="227" x2="822.851" y2="737.166" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FF6900"/>
+<stop offset="1" stop-color="#FB2C36"/>
+</linearGradient>
+</defs>
 </svg>
