@@ -8,6 +8,7 @@ import os
 class VoiceAssistantViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VoiceAssistantViewModel")
     private let audioCapture = AudioCaptureManager()
+    private let audioPlayback = AudioPlaybackManager()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Published Properties
@@ -23,9 +24,10 @@ class VoiceAssistantViewModel: ObservableObject {
     @Published var audioLevel: Float = 0.0
 
     // MARK: - Model Selection State (for Voice Pipeline Setup)
-    @Published var sttModel: (framework: InferenceFramework, name: String)?
-    @Published var llmModel: (framework: InferenceFramework, name: String)?
-    @Published var ttsModel: (framework: InferenceFramework, name: String)?
+    // Store both name (for display) and ID (for SDK operations)
+    @Published var sttModel: (framework: InferenceFramework, name: String, id: String)?
+    @Published var llmModel: (framework: InferenceFramework, name: String, id: String)?
+    @Published var ttsModel: (framework: InferenceFramework, name: String, id: String)?
 
     // MARK: - Model Loading State (using ModelLoadState for UI compatibility)
     @Published var sttModelState: ModelLoadState = .notLoaded
@@ -88,6 +90,10 @@ class VoiceAssistantViewModel: ObservableObject {
     // MARK: - Pipeline State
     private var pipelineTask: Task<Void, Never>?
     private var recordedAudioData: Data = Data()
+    private var isCapturingAudio = false
+    private var lastSpeechTime: Date?
+    private let silenceThreshold: TimeInterval = 1.5 // seconds of silence to end turn
+    private var speechDetectionTimer: Timer?
 
     // MARK: - Initialization
 
@@ -161,12 +167,12 @@ class VoiceAssistantViewModel: ObservableObject {
             sttModelState = toModelLoadState(componentStates.stt)
             if case .loaded(let modelId) = componentStates.stt {
                 if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
-                    sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name)
+                    sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name, id: modelId)
                     whisperModel = model.name
-                    logger.info("STT model loaded: \(model.name)")
+                    logger.info("STT model loaded: \(model.name) (id: \(modelId))")
                 } else {
                     // Model ID exists but not in our list - still mark as loaded
-                    sttModel = (framework: .whisperKit, name: modelId)
+                    sttModel = (framework: .whisperKit, name: modelId, id: modelId)
                     whisperModel = modelId
                     logger.info("STT model loaded (external): \(modelId)")
                 }
@@ -176,11 +182,11 @@ class VoiceAssistantViewModel: ObservableObject {
             llmModelState = toModelLoadState(componentStates.llm)
             if case .loaded(let modelId) = componentStates.llm {
                 if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
-                    llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
+                    llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name, id: modelId)
                     currentLLMModel = model.name
-                    logger.info("LLM model loaded: \(model.name)")
+                    logger.info("LLM model loaded: \(model.name) (id: \(modelId))")
                 } else {
-                    llmModel = (framework: .llamaCpp, name: modelId)
+                    llmModel = (framework: .llamaCpp, name: modelId, id: modelId)
                     currentLLMModel = modelId
                     logger.info("LLM model loaded (external): \(modelId)")
                 }
@@ -191,11 +197,11 @@ class VoiceAssistantViewModel: ObservableObject {
             if case .loaded(let voiceId) = componentStates.tts {
                 // For TTS, the voice ID might be a system voice or a custom model
                 if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == voiceId }) {
-                    ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
-                    logger.info("TTS model loaded: \(model.name)")
+                    ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name, id: voiceId)
+                    logger.info("TTS model loaded: \(model.name) (id: \(voiceId))")
                 } else {
                     // System voice or external voice
-                    ttsModel = (framework: .onnx, name: voiceId)
+                    ttsModel = (framework: .onnx, name: voiceId, id: voiceId)
                     logger.info("TTS voice loaded: \(voiceId)")
                 }
             }
@@ -211,10 +217,10 @@ class VoiceAssistantViewModel: ObservableObject {
             case .modelLoadCompleted(let modelId, _, _):
                 llmModelState = .loaded
                 if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
-                    llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
+                    llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name, id: modelId)
                     currentLLMModel = model.name
                 } else {
-                    llmModel = (framework: .llamaCpp, name: modelId)
+                    llmModel = (framework: .llamaCpp, name: modelId, id: modelId)
                     currentLLMModel = modelId
                 }
                 logger.info("LLM model load completed: \(modelId)")
@@ -240,10 +246,10 @@ class VoiceAssistantViewModel: ObservableObject {
             case .modelLoadCompleted(let modelId, _, _):
                 sttModelState = .loaded
                 if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
-                    sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name)
+                    sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name, id: modelId)
                     whisperModel = model.name
                 } else {
-                    sttModel = (framework: .whisperKit, name: modelId)
+                    sttModel = (framework: .whisperKit, name: modelId, id: modelId)
                     whisperModel = modelId
                 }
                 logger.info("STT model load completed: \(modelId)")
@@ -269,9 +275,9 @@ class VoiceAssistantViewModel: ObservableObject {
             case .modelLoadCompleted(let voiceId, _, _):
                 ttsModelState = .loaded
                 if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == voiceId }) {
-                    ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
+                    ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name, id: voiceId)
                 } else {
-                    ttsModel = (framework: .onnx, name: voiceId)
+                    ttsModel = (framework: .onnx, name: voiceId, id: voiceId)
                 }
                 logger.info("TTS voice load completed: \(voiceId)")
             case .modelUnloaded:
@@ -300,7 +306,7 @@ class VoiceAssistantViewModel: ObservableObject {
     /// Set the STT model for voice pipeline
     /// Note: This sets the selection, but the actual load state comes from SDK events
     func setSTTModel(_ model: ModelInfo) {
-        sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name)
+        sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name, id: model.id)
         whisperModel = model.name
         logger.info("Selected STT model: \(model.name) (id: \(model.id))")
 
@@ -320,7 +326,7 @@ class VoiceAssistantViewModel: ObservableObject {
     /// Set the LLM model for voice pipeline
     /// Note: This sets the selection, but the actual load state comes from SDK events
     func setLLMModel(_ model: ModelInfo) {
-        llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
+        llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name, id: model.id)
         currentLLMModel = model.name
         logger.info("Selected LLM model: \(model.name) (id: \(model.id))")
 
@@ -339,7 +345,7 @@ class VoiceAssistantViewModel: ObservableObject {
     /// Set the TTS model for voice pipeline
     /// Note: This sets the selection, but the actual load state comes from SDK events
     func setTTSModel(_ model: ModelInfo) {
-        ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
+        ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name, id: model.id)
         logger.info("Selected TTS model: \(model.name) (id: \(model.id))")
 
         // Check if this model/voice is already loaded in SDK
@@ -360,11 +366,12 @@ class VoiceAssistantViewModel: ObservableObject {
     func startConversation() async {
         logger.info("Starting conversation with VoiceAgent...")
 
-        guard allModelsReady else {
-            sessionState = .error("All models must be selected before starting")
+        // Check if all models are loaded (not just selected)
+        guard allModelsLoaded else {
+            sessionState = .error("All models must be loaded before starting")
             currentStatus = "Error"
-            errorMessage = "Please select all required models (STT, LLM, TTS) before starting"
-            logger.error("Cannot start conversation: not all models selected")
+            errorMessage = "Please ensure all models (STT, LLM, TTS) are loaded before starting"
+            logger.error("Cannot start conversation: not all models loaded. STT: \(self.sttModelState.isLoaded), LLM: \(self.llmModelState.isLoaded), TTS: \(self.ttsModelState.isLoaded)")
             return
         }
 
@@ -372,20 +379,19 @@ class VoiceAssistantViewModel: ObservableObject {
         currentStatus = "Initializing voice agent..."
 
         do {
-            // Initialize the voice agent with selected models
-            // Use model names/IDs for initialization
-            try await RunAnywhere.initializeVoiceAgent(
-                sttModelId: sttModel?.name ?? "",
-                llmModelId: llmModel?.name ?? "",
-                ttsVoice: ttsModel?.name ?? "com.apple.ttsbundle.siri_female_en-US_compact"
-            )
+            // Since all models are already loaded, use the new API that reuses them
+            // This avoids reloading and uses the pre-loaded models
+            try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
+
+            // Start audio capture immediately after initialization
+            try startAudioCapture()
 
             sessionState = .listening
             isListening = true
             currentStatus = "Listening..."
             errorMessage = nil
 
-            logger.info("Voice agent initialized and listening")
+            logger.info("Voice agent initialized with pre-loaded models and listening")
         } catch {
             sessionState = .error("Failed to initialize: \(error.localizedDescription)")
             currentStatus = "Error"
@@ -394,39 +400,90 @@ class VoiceAssistantViewModel: ObservableObject {
         }
     }
 
-    /// Start recording audio for voice turn
-    func startRecording() async throws {
-        guard isListening || sessionState == .connected else {
-            throw NSError(domain: "VoiceAssistant", code: 1, userInfo: [NSLocalizedDescriptionKey: "Voice agent not started"])
+    /// Start capturing audio from microphone
+    private func startAudioCapture() throws {
+        guard !isCapturingAudio else {
+            logger.warning("Already capturing audio")
+            return
         }
 
-        sessionState = .listening
-        currentStatus = "Listening..."
-        isSpeechDetected = true
         recordedAudioData = Data()
+        lastSpeechTime = nil
+        isSpeechDetected = false
 
         // Start capturing audio
         try audioCapture.startRecording { [weak self] audioData in
+            guard let self = self else { return }
+
             Task { @MainActor in
-                self?.recordedAudioData.append(audioData)
+                // Accumulate audio data
+                self.recordedAudioData.append(audioData)
+
+                // Simple energy-based speech detection using audio level
+                // The AudioCaptureManager already calculates and publishes audioLevel
+                let currentLevel = self.audioLevel
+
+                // Threshold for speech detection (adjust based on testing)
+                let speechThreshold: Float = 0.1
+
+                if currentLevel > speechThreshold {
+                    // Speech detected
+                    if !self.isSpeechDetected {
+                        self.logger.info("Speech started (level: \(currentLevel))")
+                        self.isSpeechDetected = true
+                    }
+                    self.lastSpeechTime = Date()
+                } else if self.isSpeechDetected {
+                    // Check if silence duration exceeded threshold
+                    if let lastSpeech = self.lastSpeechTime,
+                       Date().timeIntervalSince(lastSpeech) > self.silenceThreshold {
+                        // Speech ended - process the turn
+                        self.logger.info("Speech ended after \(self.silenceThreshold)s silence")
+                        self.isSpeechDetected = false
+
+                        // Only process if we have enough audio data
+                        if self.recordedAudioData.count > 16000 * 2 { // at least ~0.5s of 16kHz mono int16 audio
+                            Task {
+                                await self.processCurrentAudio()
+                            }
+                        } else {
+                            self.logger.info("Not enough audio data to process: \(self.recordedAudioData.count) bytes")
+                            self.recordedAudioData = Data()
+                        }
+                    }
+                }
             }
         }
 
-        logger.info("Recording started")
+        isCapturingAudio = true
+        logger.info("Audio capture started")
     }
 
-    /// Stop recording and process the voice turn
-    func stopRecordingAndProcess() async throws {
-        logger.info("Stopping recording and processing...")
+    /// Stop audio capture
+    private func stopAudioCapture() {
+        guard isCapturingAudio else { return }
 
-        // Stop audio capture
         audioCapture.stopRecording()
+        isCapturingAudio = false
         isSpeechDetected = false
+        lastSpeechTime = nil
+        speechDetectionTimer?.invalidate()
+        speechDetectionTimer = nil
 
-        guard !recordedAudioData.isEmpty else {
-            logger.warning("No audio data captured")
+        logger.info("Audio capture stopped")
+    }
+
+    /// Process the currently accumulated audio
+    private func processCurrentAudio() async {
+        let audioToProcess = recordedAudioData
+        recordedAudioData = Data() // Clear for next turn
+
+        guard !audioToProcess.isEmpty else {
+            logger.warning("No audio data to process")
             return
         }
+
+        logger.info("Processing \(audioToProcess.count) bytes of audio")
 
         sessionState = .processing
         currentStatus = "Processing..."
@@ -434,7 +491,7 @@ class VoiceAssistantViewModel: ObservableObject {
 
         do {
             // Process the voice turn through SDK
-            let result = try await RunAnywhere.processVoiceTurn(recordedAudioData)
+            let result = try await RunAnywhere.processVoiceTurn(audioToProcess)
 
             if result.speechDetected {
                 currentTranscript = result.transcription ?? ""
@@ -444,27 +501,49 @@ class VoiceAssistantViewModel: ObservableObject {
                 logger.info("Response: \(result.response ?? "")")
 
                 // Handle synthesized audio if available
-                if result.synthesizedAudio != nil {
+                if let audioData = result.synthesizedAudio, !audioData.isEmpty {
                     sessionState = .speaking
                     currentStatus = "Speaking..."
-                    // Audio playback would be handled here
+                    logger.info("Synthesized audio: \(audioData.count) bytes")
+
+                    // Stop audio capture while playing to avoid feedback
+                    stopAudioCapture()
+
+                    // Play the synthesized audio
+                    await playAudio(audioData)
+
+                    // Resume audio capture after playback
+                    try? startAudioCapture()
                 }
             } else {
                 logger.info("No speech detected in audio")
             }
 
+            // Return to listening state
             sessionState = .listening
             currentStatus = "Listening..."
             isProcessing = false
 
         } catch {
-            sessionState = .error(error.localizedDescription)
-            currentStatus = "Error"
-            errorMessage = error.localizedDescription
-            isProcessing = false
             logger.error("Voice processing error: \(error)")
-            throw error
+            // Don't set error state, just log and continue listening
+            sessionState = .listening
+            currentStatus = "Listening..."
+            isProcessing = false
         }
+    }
+
+    /// Manually trigger processing of current audio (for push-to-talk mode)
+    /// This can be called when user wants to send their message manually
+    func sendCurrentAudio() async {
+        guard isCapturingAudio else {
+            logger.warning("Not capturing audio")
+            return
+        }
+
+        // Force process whatever audio we have
+        isSpeechDetected = false
+        await processCurrentAudio()
     }
 
     /// Stop conversation
@@ -479,8 +558,8 @@ class VoiceAssistantViewModel: ObservableObject {
         pipelineTask?.cancel()
         pipelineTask = nil
 
-        // Stop audio capture
-        audioCapture.stopRecording()
+        // Stop audio capture using our helper method
+        stopAudioCapture()
 
         // Cleanup voice agent
         await RunAnywhere.cleanupVoiceAgent()
@@ -490,6 +569,7 @@ class VoiceAssistantViewModel: ObservableObject {
         sessionState = .disconnected
         errorMessage = nil
         recordedAudioData = Data()
+        audioLevel = 0.0
 
         logger.info("Conversation stopped")
     }
@@ -505,10 +585,33 @@ class VoiceAssistantViewModel: ObservableObject {
 
         do {
             let audioData = try await RunAnywhere.voiceAgentSynthesizeSpeech(text)
-            // Play the audio data using AVAudioPlayer or similar
             logger.info("Speech synthesized, \(audioData.count) bytes")
+            await playAudio(audioData)
         } catch {
             logger.error("TTS error: \(error)")
         }
+    }
+
+    /// Play audio data using SDK's AudioPlaybackManager
+    /// The TTS output from the SDK is already a proper WAV file (16-bit PCM with headers)
+    private func playAudio(_ audioData: Data) async {
+        guard !audioData.isEmpty else {
+            logger.warning("Empty audio data, skipping playback")
+            return
+        }
+
+        logger.info("Playing audio: \(audioData.count) bytes")
+
+        do {
+            try await audioPlayback.play(audioData)
+            logger.info("Audio playback completed")
+        } catch {
+            logger.error("Failed to play audio: \(error)")
+        }
+    }
+
+    /// Stop any ongoing audio playback
+    func stopPlayback() {
+        audioPlayback.stop()
     }
 }

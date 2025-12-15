@@ -201,11 +201,37 @@ public class LlamaCPPService {
             throw LlamaCPPError.generationFailed(errorMsg)
         }
 
-        let result = String(cString: resultPtr)
+        let rawResult = String(cString: resultPtr)
         ra_free_string(resultPtr)
 
-        logger.info("Generated \(result.count) characters")
-        return result
+        // The C function returns JSON with format: {"text": "...", "finish_reason": "...", ...}
+        // Parse the JSON and extract the "text" field
+        let generatedText = extractTextFromJSON(rawResult)
+
+        logger.info("Generated \(generatedText.count) characters")
+        return generatedText
+    }
+
+    /// Extract the "text" field from JSON result returned by ra_text_generate
+    /// Falls back to raw result if parsing fails
+    private func extractTextFromJSON(_ jsonString: String) -> String {
+        // Try to parse as JSON and extract "text" field
+        guard let data = jsonString.data(using: .utf8) else {
+            logger.warning("Failed to convert result to data, returning raw result")
+            return jsonString
+        }
+
+        do {
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let text = json["text"] as? String {
+                return text
+            }
+        } catch {
+            logger.warning("Failed to parse JSON result: \(error.localizedDescription)")
+        }
+
+        // Return raw result as fallback (may already be plain text in some cases)
+        return jsonString
     }
 
     /// Generate text with streaming output
