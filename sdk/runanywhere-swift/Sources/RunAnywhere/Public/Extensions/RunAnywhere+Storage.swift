@@ -3,7 +3,6 @@
 //  RunAnywhere SDK
 //
 //  Public API for storage and download operations.
-//  Events are tracked via EventPublisher.
 //
 
 import Foundation
@@ -14,18 +13,11 @@ public extension RunAnywhere {
 
     /// Download a model by ID with progress tracking
     ///
-    /// Convenience method that looks up the model and downloads it.
-    ///
-    /// Example:
     /// ```swift
     /// for await progress in try await RunAnywhere.downloadModel("my-model-id") {
     ///     print("Progress: \(Int(progress.overallProgress * 100))%")
     /// }
     /// ```
-    ///
-    /// - Parameter modelId: The model identifier to download
-    /// - Returns: AsyncStream of download progress updates
-    /// - Throws: RunAnywhereError.modelNotFound if model ID doesn't exist
     static func downloadModel(_ modelId: String) async throws -> AsyncStream<DownloadProgress> {
         let models = try await availableModels()
         guard let model = models.first(where: { $0.id == modelId }) else {
@@ -37,11 +29,6 @@ public extension RunAnywhere {
     }
 
     /// Download a model with a completion handler
-    ///
-    /// - Parameters:
-    ///   - modelId: The model identifier to download
-    ///   - progressHandler: Called with progress updates (0.0 to 1.0)
-    /// - Throws: RunAnywhereError.modelNotFound if model ID doesn't exist
     static func downloadModel(
         _ modelId: String,
         progressHandler: @escaping (Double) -> Void
@@ -69,51 +56,44 @@ public extension RunAnywhere {
 
     /// Clear cache
     static func clearCache() async throws {
-        do {
-            let fileManager = RunAnywhere.serviceContainer.fileManager
-            try fileManager.clearCache()
-            EventPublisher.shared.track(StorageEvent.cacheCleared(freedBytes: 0))
-        } catch {
-            EventPublisher.shared.track(StorageEvent.cacheClearFailed(error: error.localizedDescription))
-            throw error
-        }
+        let fileManager = RunAnywhere.serviceContainer.fileManager
+        try fileManager.clearCache()
+        EventPublisher.shared.track(StorageEvent.cacheCleared(freedBytes: 0))
     }
 
     /// Clean temporary files
     static func cleanTempFiles() async throws {
-        do {
-            let fileManager = RunAnywhere.serviceContainer.fileManager
-            try fileManager.cleanTempFiles()
-            EventPublisher.shared.track(StorageEvent.tempFilesCleaned(freedBytes: 0))
-        } catch {
-            EventPublisher.shared.track(ErrorEvent.error(
-                operation: "cleanTempFiles",
-                message: error.localizedDescription,
-                code: nil
-            ))
-            throw error
-        }
+        let fileManager = RunAnywhere.serviceContainer.fileManager
+        try fileManager.cleanTempFiles()
+        EventPublisher.shared.track(StorageEvent.tempFilesCleaned(freedBytes: 0))
     }
 
-    /// Delete stored model
-    static func deleteStoredModel(_ modelId: String) async throws {
-        do {
-            let fileManager = RunAnywhere.serviceContainer.fileManager
-            try fileManager.deleteModel(modelId: modelId)
-            EventPublisher.shared.track(ModelEvent.deleted(modelId: modelId))
-        } catch {
-            EventPublisher.shared.track(ErrorEvent.error(
-                operation: "deleteModel",
-                message: error.localizedDescription,
-                code: nil
-            ))
-            throw error
-        }
+    /// Delete a stored model
+    /// - Parameters:
+    ///   - modelId: The model identifier
+    ///   - framework: The framework the model belongs to
+    static func deleteStoredModel(_ modelId: String, framework: InferenceFramework) async throws {
+        let fileManager = RunAnywhere.serviceContainer.fileManager
+        try fileManager.deleteModel(modelId: modelId, framework: framework)
+        EventPublisher.shared.track(ModelEvent.deleted(modelId: modelId))
     }
 
     /// Get base directory URL
     static func getBaseDirectoryURL() -> URL {
         let fileManager = RunAnywhere.serviceContainer.fileManager
-        return fileManager.getBaseFolder().url
+        return fileManager.getBaseDirectoryURL()
+    }
+
+    /// Get all downloaded models
+    static func getDownloadedModels() -> [InferenceFramework: [String]] {
+        let fileManager = RunAnywhere.serviceContainer.fileManager
+        return fileManager.getDownloadedModels()
+    }
+
+    /// Check if a model is downloaded
+    @MainActor
+    static func isModelDownloaded(_ modelId: String, framework: InferenceFramework) -> Bool {
+        let fileManager = RunAnywhere.serviceContainer.fileManager
+        return fileManager.isModelDownloaded(modelId: modelId, framework: framework)
     }
 }

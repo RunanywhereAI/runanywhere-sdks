@@ -207,7 +207,7 @@ struct StorageView: View {
             } else {
                 ForEach(viewModel.storedModels, id: \.id) { model in
                     StoredModelRow(model: model) {
-                        await viewModel.deleteModel(model.id)
+                        await viewModel.deleteModel(model)
                     }
                     if model.id != viewModel.storedModels.last?.id {
                         Divider()
@@ -228,7 +228,7 @@ struct StorageView: View {
             } else {
                 ForEach(viewModel.storedModels, id: \.id) { model in
                     StoredModelRow(model: model) {
-                        await viewModel.deleteModel(model.id)
+                        await viewModel.deleteModel(model)
                     }
                 }
             }

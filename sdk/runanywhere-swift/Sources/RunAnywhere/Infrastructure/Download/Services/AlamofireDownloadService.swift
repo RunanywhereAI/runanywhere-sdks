@@ -61,7 +61,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         // Custom strategies take priority for backwards compatibility
         if case .custom(let strategyId) = model.artifactType {
             logger.info("Model \(model.id) requires custom strategy: \(strategyId)")
-            if let strategy = findCustomStrategy(for: model) {
+            if let strategy = await MainActor.run(body: { findCustomStrategy(for: model) }) {
                 return try await downloadModelWithCustomStrategy(model, strategy: strategy)
             }
         }
@@ -110,14 +110,13 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
                 }
 
                 do {
-                    // Get destination folder
-                    let fileManager = ServiceContainer.shared.fileManager
-                    let modelFolder: Folder
-                    if let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
-                        modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
-                    } else {
-                        modelFolder = try fileManager.getModelFolder(for: model.id)
+                    // Get destination folder (framework is required)
+                    guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
+                        self.logger.error("Model has no associated framework: \(model.id)")
+                        throw DownloadError.invalidURL
                     }
+                    let fileManager = ServiceContainer.shared.fileManager
+                    let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
                     let modelFolderURL = URL(fileURLWithPath: modelFolder.path)
 
                     // Determine download destination
@@ -365,11 +364,20 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         }
     }
 
-    /// Find a custom strategy by ID
+    /// Find a custom strategy for the model
+    /// Checks both manually registered strategies and ModuleRegistry strategies
+    @MainActor
     private func findCustomStrategy(for model: ModelInfo) -> DownloadStrategy? {
+        // First check manually registered custom strategies (host app priority)
         for strategy in customStrategies where strategy.canHandle(model: model) {
             return strategy
         }
+
+        // Then check ModuleRegistry for module-provided strategies
+        if let strategy = ModuleRegistry.shared.downloadStrategy(for: model) {
+            return strategy
+        }
+
         return nil
     }
 
@@ -606,15 +614,13 @@ extension AlamofireDownloadService {
                 }
 
                 do {
-                    // Use SimplifiedFileManager for destination path
-                    let fileManager = ServiceContainer.shared.fileManager
-                    // Use framework-specific folder if available
-                    let modelFolder: Folder
-                    if let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
-                        modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
-                    } else {
-                        modelFolder = try fileManager.getModelFolder(for: model.id)
+                    // Get destination folder (framework is required)
+                    guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
+                        self.logger.error("Model has no associated framework: \(model.id)")
+                        throw DownloadError.invalidURL
                     }
+                    let fileManager = ServiceContainer.shared.fileManager
+                    let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
                     let destinationURL = URL(fileURLWithPath: modelFolder.path).appendingPathComponent("\(model.id).\(model.format.rawValue)")
 
                     let destination: DownloadRequest.Destination = { _, _ in

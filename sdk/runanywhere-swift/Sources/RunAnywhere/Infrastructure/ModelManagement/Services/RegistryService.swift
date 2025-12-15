@@ -78,14 +78,15 @@ public class RegistryService: ModelRegistry {
             return
         }
 
-        // Check if model file exists locally and update localPath
+        // Check if model is downloaded and update localPath
         var updatedModel = model
-        let fileManager = ServiceContainer.shared.fileManager
-        // Try to find the model file if localPath is not already set
-        if updatedModel.localPath == nil {
-            if let modelFile = fileManager.findModelFile(modelId: model.id) {
-                updatedModel.localPath = modelFile
-                logger.info("Found local file for model \(model.id): \(modelFile.path)")
+        if updatedModel.localPath == nil, let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
+            let fileManager = ServiceContainer.shared.fileManager
+            if fileManager.modelFolderExists(modelId: model.id, framework: framework) {
+                if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: framework) {
+                    updatedModel.localPath = folderURL
+                    logger.info("Found downloaded model \(model.id) at: \(folderURL.path)")
+                }
             }
         }
 
@@ -108,17 +109,19 @@ public class RegistryService: ModelRegistry {
             return
         }
 
-        // Check if model file exists locally and update localPath
+        // Check if model is downloaded and update localPath
         var updatedModel = model
-        let fileManager = ServiceContainer.shared.fileManager
-        // Try to find the model file
-        if let modelFile = fileManager.findModelFile(modelId: model.id) {
-            updatedModel.localPath = modelFile
-            logger.info("Found local file for model \(model.id): \(modelFile.path)")
-        } else {
-            // Clear localPath if file doesn't exist
-            updatedModel.localPath = nil
-            logger.debug("No local file found for model \(model.id)")
+        if let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
+            let fileManager = ServiceContainer.shared.fileManager
+            if fileManager.modelFolderExists(modelId: model.id, framework: framework) {
+                if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: framework) {
+                    updatedModel.localPath = folderURL
+                    logger.info("Found downloaded model \(model.id) at: \(folderURL.path)")
+                }
+            } else {
+                updatedModel.localPath = nil
+                logger.debug("Model not downloaded: \(model.id)")
+            }
         }
 
         // Register the updated model in memory

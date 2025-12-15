@@ -46,6 +46,15 @@ public enum WhisperKit: RunAnywhereModule {
     public static let capabilities: Set<CapabilityType> = [.stt]
     public static let defaultPriority: Int = 100
 
+    /// Shared strategy instance for both storage and download
+    private static let sharedStrategy = WhisperKitStorageStrategy()
+
+    /// Storage strategy for WhisperKit models (handles mlmodelc directories)
+    public static var storageStrategy: ModelStorageStrategy? { sharedStrategy }
+
+    /// Download strategy for WhisperKit models (handles multi-file HuggingFace downloads)
+    public static var downloadStrategy: DownloadStrategy? { sharedStrategy }
+
     /// Register WhisperKit STT service with the SDK
     @MainActor
     public static func register(priority: Int) {

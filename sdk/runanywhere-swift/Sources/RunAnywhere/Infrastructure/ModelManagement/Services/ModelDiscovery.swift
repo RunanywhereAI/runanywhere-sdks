@@ -13,18 +13,10 @@ class ModelDiscovery {
     func discoverLocalModels() async -> [ModelInfo] {
         logger.info("Starting local model discovery...")
         var models: [ModelInfo] = []
-        let modelExtensions = ["mlmodel", "mlmodelc", "mlpackage", "tflite", "onnx", "gguf", "ggml", "mlx", "pte", "safetensors"]
 
-        let directories = getDefaultModelDirectories()
-        logger.info("Searching in \(directories.count) directories for cached models")
-
-        for directory in directories {
-            logger.debug("Checking directory: \(directory.path)")
-            // Search for model files recursively
-            await searchForModelsRecursively(in: directory, modelExtensions: modelExtensions) { model in
-                models.append(model)
-            }
-        }
+        // Discover models in framework-specific directories (directory-based models)
+        let frameworkModels = await discoverFrameworkModels()
+        models.append(contentsOf: frameworkModels)
 
         // Also check for models in app bundle
         if let bundleModels = discoverBundleModels() {
@@ -40,94 +32,124 @@ class ModelDiscovery {
         return models
     }
 
-    private func searchForModelsRecursively(in directory: URL, modelExtensions: [String], onModelFound: (ModelInfo) async -> Void) async {
-        guard FileOperationsUtilities.exists(at: directory) else {
-            logger.debug("Directory does not exist: \(directory.path)")
-            return
+    /// Discover models by checking model folders within framework directories
+    /// This approach respects directory-based models (ONNX, WhisperKit, etc.)
+    /// instead of finding individual files which creates duplicate entries
+    @MainActor
+    private func discoverFrameworkModels() async -> [ModelInfo] {
+        var models: [ModelInfo] = []
+
+        guard let modelsURL = try? ModelPathUtils.getModelsDirectory() else {
+            logger.error("Failed to get models directory")
+            return []
         }
 
-        guard let enumerator = FileOperationsUtilities.enumerateDirectory(
-            at: directory,
-            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            logger.warning("Failed to create enumerator for: \(directory.path)")
-            return
+        let fm = FileManager.default
+        guard let frameworkFolders = try? fm.contentsOfDirectory(at: modelsURL, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            return []
         }
 
-        while let fileURL = enumerator.nextObject() as? URL {
-            // Check if it's a file with a model extension
-            let fileExtension = fileURL.pathExtension.lowercased()
-            if modelExtensions.contains(fileExtension) {
-                logger.debug("Found model file: \(fileURL.lastPathComponent)")
-                if let model = await detectModel(at: fileURL) {
-                    logger.info("Successfully detected model: \(model.name)")
-                    await onModelFound(model)
+        for frameworkFolder in frameworkFolders {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: frameworkFolder.path, isDirectory: &isDir), isDir.boolValue else {
+                continue
+            }
+
+            // Check if this is a known framework folder
+            guard let framework = InferenceFramework.allCases.first(where: { $0.rawValue == frameworkFolder.lastPathComponent }) else {
+                continue
+            }
+
+            // Get model folders within this framework folder
+            guard let modelFolders = try? fm.contentsOfDirectory(at: frameworkFolder, includingPropertiesForKeys: [.isDirectoryKey]) else {
+                continue
+            }
+
+            for modelFolder in modelFolders {
+                var isModelDir: ObjCBool = false
+                guard fm.fileExists(atPath: modelFolder.path, isDirectory: &isModelDir), isModelDir.boolValue else {
+                    continue
+                }
+
+                let modelId = modelFolder.lastPathComponent
+
+                // Try to use framework-specific storage strategy first
+                if let storageStrategy = ModuleRegistry.shared.storageStrategy(for: framework) {
+                    if let (format, size) = storageStrategy.detectModel(in: modelFolder) {
+                        // Use the folder path as the model path for directory-based models
+                        let modelPath = storageStrategy.findModelPath(modelId: modelId, in: modelFolder) ?? modelFolder
+
+                        let category = ModelCategory.from(format: format, frameworks: [framework])
+                        let modelInfo = ModelInfo(
+                            id: modelId,
+                            name: generateModelName(from: modelFolder),
+                            category: category,
+                            format: format,
+                            localPath: modelPath,
+                            downloadSize: size,
+                            memoryRequired: estimateMemoryUsage(fileSize: size, format: format),
+                            compatibleFrameworks: [framework],
+                            preferredFramework: framework,
+                            contextLength: category == .language ? 2048 : nil,
+                            supportsThinking: false,
+                            tags: [],
+                            description: nil
+                        )
+                        models.append(modelInfo)
+                        logger.info("Discovered \(framework.rawValue) model: \(modelId) using storage strategy")
+                        continue
+                    }
+                }
+
+                // Fallback: Generic detection for single-file models
+                if let modelInfo = await detectModelInFolder(modelFolder, framework: framework) {
+                    models.append(modelInfo)
+                    logger.info("Discovered \(framework.rawValue) model: \(modelId) using generic detection")
                 }
             }
         }
+
+        return models
     }
 
-    private func detectModel(at url: URL) async -> ModelInfo? {
-        // Skip hidden files and directories
-        if url.lastPathComponent.hasPrefix(".") {
+    /// Detect a single-file model in a folder (for non-directory-based models like GGUF)
+    private func detectModelInFolder(_ folder: URL, framework: InferenceFramework) async -> ModelInfo? {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey]) else {
             return nil
         }
 
-        // Detect format from file extension
-        guard let format = detectFormatFromExtension(url.pathExtension) else {
-            return nil
-        }
+        // Find model files in this folder
+        let modelExtensions = ["gguf", "ggml", "onnx", "mlmodel", "mlpackage", "tflite", "safetensors", "pte"]
+        for file in files {
+            let ext = file.pathExtension.lowercased()
+            if modelExtensions.contains(ext), let format = detectFormatFromExtension(ext) {
+                let fileSize = FileOperationsUtilities.fileSize(at: file) ?? 0
+                let modelId = folder.lastPathComponent
+                let category = ModelCategory.from(format: format, frameworks: [framework])
 
-        // Determine compatible frameworks
-        let frameworks = detectCompatibleFrameworks(format: format)
-
-        // Get file size
-        let fileSize = FileOperationsUtilities.fileSize(at: url) ?? 0
-
-        // Create model info
-        let modelId = generateModelId(from: url)
-        let modelName = generateModelName(from: url)
-
-        // Determine category based on format and frameworks
-        let category = ModelCategory.from(format: format, frameworks: frameworks)
-
-        return ModelInfo(
-            id: modelId,
-            name: modelName,
-            category: category,
-            format: format,
-            localPath: url,
-            downloadSize: fileSize,
-            memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
-            compatibleFrameworks: frameworks,
-            preferredFramework: frameworks.first,
-            contextLength: category == .language ? 2048 : nil,
-            supportsThinking: false,
-            tags: [],
-            description: nil
-        )
-    }
-
-    private func getDefaultModelDirectories() -> [URL] {
-        var directories: [URL] = []
-
-        do {
-            // Add the base Models directory
-            let modelsURL = try ModelPathUtils.getModelsDirectory()
-            directories.append(modelsURL)
-
-            // Add framework-specific subdirectories
-            for framework in InferenceFramework.allCases {
-                let frameworkURL = try ModelPathUtils.getFrameworkDirectory(framework: framework)
-                directories.append(frameworkURL)
+                return ModelInfo(
+                    id: modelId,
+                    name: generateModelName(from: folder),
+                    category: category,
+                    format: format,
+                    localPath: file,
+                    downloadSize: fileSize,
+                    memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
+                    compatibleFrameworks: [framework],
+                    preferredFramework: framework,
+                    contextLength: category == .language ? 2048 : nil,
+                    supportsThinking: false,
+                    tags: [],
+                    description: nil
+                )
             }
-        } catch {
-            logger.error("Failed to get default model directories: \(error)")
         }
 
-        return directories
+        return nil
     }
+
+    // MARK: - Bundle Models
 
     private func discoverBundleModels() -> [ModelInfo]? {
         var models: [ModelInfo] = []
@@ -138,11 +160,29 @@ class ModelDiscovery {
         for ext in modelExtensions {
             if let urls = bundle.urls(forResourcesWithExtension: ext, subdirectory: nil) {
                 for url in urls {
-                    Task {
-                        if let model = await detectModel(at: url) {
-                            models.append(model)
-                        }
-                    }
+                    guard let format = detectFormatFromExtension(ext) else { continue }
+
+                    let fileSize = FileOperationsUtilities.fileSize(at: url) ?? 0
+                    let modelId = url.deletingPathExtension().lastPathComponent
+                    let frameworks = detectCompatibleFrameworks(for: format)
+                    let category = ModelCategory.from(format: format, frameworks: frameworks)
+
+                    let modelInfo = ModelInfo(
+                        id: modelId,
+                        name: generateModelName(from: url),
+                        category: category,
+                        format: format,
+                        localPath: url,
+                        downloadSize: fileSize,
+                        memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
+                        compatibleFrameworks: frameworks,
+                        preferredFramework: frameworks.first,
+                        contextLength: category == .language ? 2048 : nil,
+                        supportsThinking: false,
+                        tags: ["bundled"],
+                        description: nil
+                    )
+                    models.append(modelInfo)
                 }
             }
         }
@@ -150,40 +190,25 @@ class ModelDiscovery {
         return models.isEmpty ? nil : models
     }
 
-    private func detectCompatibleFrameworks(format: ModelFormat) -> [InferenceFramework] {
-        var frameworks: [InferenceFramework] = []
+    // MARK: - Helper Methods
 
+    private func detectCompatibleFrameworks(for format: ModelFormat) -> [InferenceFramework] {
         switch format {
         case .mlmodel, .mlpackage:
-            frameworks.append(.coreML)
+            return [.coreML]
         case .tflite:
-            frameworks.append(.tensorFlowLite)
+            return [.tensorFlowLite]
         case .onnx, .ort:
-            frameworks.append(.onnx)
+            return [.onnx]
         case .safetensors:
-            frameworks.append(.mlx)
+            return [.mlx]
         case .gguf, .ggml:
-            frameworks.append(.llamaCpp)
+            return [.llamaCpp]
         case .pte:
-            frameworks.append(.execuTorch)
+            return [.execuTorch]
         default:
-            break
+            return []
         }
-
-        return frameworks
-    }
-
-    private func generateModelId(from url: URL) -> String {
-        // Use centralized path utility to extract model ID
-        if let modelId = ModelPathUtils.extractModelId(from: url) {
-            logger.debug("Generated model ID from path structure: '\(modelId)' from path: \(url.path)")
-            return modelId
-        }
-
-        // Fallback to filename-based ID for other cases
-        let filename = url.deletingPathExtension().lastPathComponent
-        logger.debug("Generated model ID from filename fallback: '\(filename)' from path: \(url.path)")
-        return filename
     }
 
     private func generateModelName(from url: URL) -> String {
