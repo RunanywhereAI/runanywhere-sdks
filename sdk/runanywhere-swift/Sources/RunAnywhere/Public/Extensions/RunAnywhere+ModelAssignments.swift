@@ -7,6 +7,7 @@ public extension RunAnywhere {
     /// Register a model from a download URL
     /// Use this to add models for development or offline use
     /// - Parameters:
+    ///   - id: Explicit model ID. If nil, a stable ID is generated from the URL filename.
     ///   - name: Display name for the model
     ///   - url: Download URL for the model (e.g., HuggingFace)
     ///   - framework: Target inference framework
@@ -18,6 +19,7 @@ public extension RunAnywhere {
     @MainActor
     @discardableResult
     static func registerModel(
+        id: String? = nil,
         name: String,
         url: URL,
         framework: InferenceFramework,
@@ -27,6 +29,7 @@ public extension RunAnywhere {
         supportsThinking: Bool = false
     ) -> ModelInfo {
         return serviceContainer.modelRegistry.addModelFromURL(
+            id: id,
             name: name,
             url: url,
             framework: framework,
@@ -39,6 +42,7 @@ public extension RunAnywhere {
 
     /// Register a model from a URL string
     /// - Parameters:
+    ///   - id: Explicit model ID. If nil, a stable ID is generated from the URL filename.
     ///   - name: Display name for the model
     ///   - urlString: Download URL string for the model
     ///   - framework: Target inference framework
@@ -50,6 +54,7 @@ public extension RunAnywhere {
     @MainActor
     @discardableResult
     static func registerModel(
+        id: String? = nil,
         name: String,
         urlString: String,
         framework: InferenceFramework,
@@ -63,6 +68,7 @@ public extension RunAnywhere {
             return nil
         }
         return registerModel(
+            id: id,
             name: name,
             url: url,
             framework: framework,

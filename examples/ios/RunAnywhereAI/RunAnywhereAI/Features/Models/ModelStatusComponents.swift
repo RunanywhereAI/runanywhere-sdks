@@ -38,7 +38,16 @@ struct ModelStatusBanner: View {
     let framework: InferenceFramework?
     let modelName: String?
     let isLoading: Bool
+    let supportsStreaming: Bool
     let onSelectModel: () -> Void
+
+    init(framework: InferenceFramework?, modelName: String?, isLoading: Bool, supportsStreaming: Bool = true, onSelectModel: @escaping () -> Void) {
+        self.framework = framework
+        self.modelName = modelName
+        self.isLoading = isLoading
+        self.supportsStreaming = supportsStreaming
+        self.onSelectModel = onSelectModel
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -59,9 +68,14 @@ struct ModelStatusBanner: View {
                         .font(.system(size: 14, weight: .semibold))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(framework.displayName)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 6) {
+                            Text(framework.displayName)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+
+                            // Streaming mode indicator
+                            streamingModeIndicator
+                        }
                         Text(modelName)
                             .font(.subheadline)
                             .fontWeight(.medium)
@@ -111,6 +125,24 @@ struct ModelStatusBanner: View {
         .background(Color(NSColor.controlBackgroundColor))
         #endif
         .cornerRadius(12)
+    }
+
+    /// Streaming mode indicator badge
+    @ViewBuilder
+    private var streamingModeIndicator: some View {
+        HStack(spacing: 3) {
+            Image(systemName: supportsStreaming ? "bolt.fill" : "square.fill")
+                .font(.system(size: 8))
+            Text(supportsStreaming ? "Streaming" : "Batch")
+                .font(.system(size: 9, weight: .medium))
+        }
+        .foregroundColor(supportsStreaming ? .green : .orange)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 2)
+        .background(
+            Capsule()
+                .fill(supportsStreaming ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+        )
     }
 
     private func frameworkIcon(for framework: InferenceFramework) -> String {

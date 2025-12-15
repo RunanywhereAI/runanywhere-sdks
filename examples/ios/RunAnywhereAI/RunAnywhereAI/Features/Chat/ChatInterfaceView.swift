@@ -63,6 +63,7 @@ struct ChatInterfaceView: View {
                         framework: viewModel.selectedFramework,
                         modelName: viewModel.loadedModelName,
                         isLoading: viewModel.isGenerating && !hasModelSelected,
+                        supportsStreaming: viewModel.modelSupportsStreaming,
                         onSelectModel: { showingModelSelection = true }
                     )
                     .padding(.horizontal)
@@ -98,6 +99,7 @@ struct ChatInterfaceView: View {
                         framework: viewModel.selectedFramework,
                         modelName: viewModel.loadedModelName,
                         isLoading: viewModel.isGenerating && !hasModelSelected,
+                        supportsStreaming: viewModel.modelSupportsStreaming,
                         onSelectModel: { showingModelSelection = true }
                     )
                     .padding(.horizontal)
