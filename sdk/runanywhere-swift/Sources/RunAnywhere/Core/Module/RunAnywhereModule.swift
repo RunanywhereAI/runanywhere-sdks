@@ -62,6 +62,14 @@ public protocol RunAnywhereModule {
     /// Default priority for service registration (higher = preferred)
     static var defaultPriority: Int { get }
 
+    /// Optional storage strategy for detecting downloaded models
+    /// Modules with directory-based models (like ONNX) should provide this
+    static var storageStrategy: ModelStorageStrategy? { get }
+
+    /// Optional download strategy for custom download handling
+    /// Modules with special download requirements (like WhisperKit) should provide this
+    static var downloadStrategy: DownloadStrategy? { get }
+
     /// Register all services provided by this module with the ServiceRegistry
     /// - Parameter priority: Registration priority (higher values are preferred)
     @MainActor
@@ -73,6 +81,12 @@ public protocol RunAnywhereModule {
 public extension RunAnywhereModule {
     /// Default priority is 100
     static var defaultPriority: Int { 100 }
+
+    /// Default storage strategy is nil (uses generic file detection)
+    static var storageStrategy: ModelStorageStrategy? { nil }
+
+    /// Default download strategy is nil (uses standard download flow)
+    static var downloadStrategy: DownloadStrategy? { nil }
 
     /// Convenience registration with default priority
     @MainActor

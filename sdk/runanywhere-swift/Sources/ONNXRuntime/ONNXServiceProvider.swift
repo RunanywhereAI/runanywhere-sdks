@@ -49,6 +49,9 @@ public enum ONNX: RunAnywhereModule {
     /// ONNX uses the ONNX Runtime inference framework
     public static let inferenceFramework: InferenceFramework = .onnx
 
+    /// Storage strategy for ONNX models (handles nested directory structures)
+    public static let storageStrategy: ModelStorageStrategy? = ONNXModelStorageStrategy()
+
     /// Register all ONNX services with the SDK
     @MainActor
     public static func register(priority: Int) {

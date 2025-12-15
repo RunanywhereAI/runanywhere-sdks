@@ -53,6 +53,8 @@ public final class ModuleRegistry {
 
     private var registeredModules: [String: ModuleMetadata] = [:]
     private var moduleTypes: [String: any RunAnywhereModule.Type] = [:]
+    private var storageStrategies: [InferenceFramework: ModelStorageStrategy] = [:]
+    private var downloadStrategies: [InferenceFramework: DownloadStrategy] = [:]
     private let logger = SDKLogger(category: "ModuleRegistry")
 
     private init() {}
@@ -89,6 +91,18 @@ public final class ModuleRegistry {
         registeredModules[M.moduleId] = metadata
         moduleTypes[M.moduleId] = module
 
+        // Store storage strategy if provided
+        if let strategy = M.storageStrategy {
+            storageStrategies[M.inferenceFramework] = strategy
+            logger.info("Storage strategy registered for \(M.inferenceFramework.rawValue)")
+        }
+
+        // Store download strategy if provided
+        if let strategy = M.downloadStrategy {
+            downloadStrategies[M.inferenceFramework] = strategy
+            logger.info("Download strategy registered for \(M.inferenceFramework.rawValue)")
+        }
+
         logger.info("Module registered: \(M.moduleName) [\(M.moduleId)] with capabilities: \(M.capabilities.map(\.rawValue).joined(separator: ", "))")
     }
 
@@ -113,6 +127,18 @@ public final class ModuleRegistry {
                 moduleType.register(priority: moduleType.defaultPriority)
                 registeredModules[moduleType.moduleId] = metadata
                 moduleTypes[moduleType.moduleId] = moduleType
+
+                // Store storage strategy if provided
+                if let strategy = moduleType.storageStrategy {
+                    storageStrategies[moduleType.inferenceFramework] = strategy
+                    logger.info("Storage strategy registered for \(moduleType.inferenceFramework.rawValue)")
+                }
+
+                // Store download strategy if provided
+                if let strategy = moduleType.downloadStrategy {
+                    downloadStrategies[moduleType.inferenceFramework] = strategy
+                    logger.info("Download strategy registered for \(moduleType.inferenceFramework.rawValue)")
+                }
 
                 logger.info("Auto-registered module: \(moduleType.moduleName)")
             }
@@ -158,12 +184,69 @@ public final class ModuleRegistry {
         registeredModules.values.contains { $0.capabilities.contains(capability) }
     }
 
+    // MARK: - Storage Strategies
+
+    /// Get the storage strategy for a framework
+    /// - Parameter framework: The inference framework
+    /// - Returns: The registered storage strategy, or nil if none
+    public func storageStrategy(for framework: InferenceFramework) -> ModelStorageStrategy? {
+        storageStrategies[framework]
+    }
+
+    /// Check if a storage strategy is registered for a framework
+    public func hasStorageStrategy(for framework: InferenceFramework) -> Bool {
+        storageStrategies[framework] != nil
+    }
+
+    // MARK: - Download Strategies
+
+    /// Get the download strategy for a framework
+    /// - Parameter framework: The inference framework
+    /// - Returns: The registered download strategy, or nil if none
+    public func downloadStrategy(for framework: InferenceFramework) -> DownloadStrategy? {
+        downloadStrategies[framework]
+    }
+
+    /// Get all registered download strategies
+    public var allDownloadStrategies: [DownloadStrategy] {
+        Array(downloadStrategies.values)
+    }
+
+    /// Find a download strategy that can handle the given model
+    /// - Parameter model: The model to find a strategy for
+    /// - Returns: A download strategy that can handle the model, or nil
+    public func downloadStrategy(for model: ModelInfo) -> DownloadStrategy? {
+        // First try the model's preferred framework
+        if let framework = model.preferredFramework,
+           let strategy = downloadStrategies[framework],
+           strategy.canHandle(model: model) {
+            return strategy
+        }
+
+        // Then try compatible frameworks
+        for framework in model.compatibleFrameworks {
+            if let strategy = downloadStrategies[framework],
+               strategy.canHandle(model: model) {
+                return strategy
+            }
+        }
+
+        return nil
+    }
+
+    /// Check if a download strategy is registered for a framework
+    public func hasDownloadStrategy(for framework: InferenceFramework) -> Bool {
+        downloadStrategies[framework] != nil
+    }
+
     // MARK: - Reset
 
     /// Reset all module registrations (useful for testing)
     public func reset() {
         registeredModules.removeAll()
         moduleTypes.removeAll()
+        storageStrategies.removeAll()
+        downloadStrategies.removeAll()
         ServiceRegistry.shared.reset()
         logger.info("Module registry reset")
     }

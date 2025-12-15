@@ -169,7 +169,10 @@ class ModelListViewModel: ObservableObject {
     }
 
     func deleteModel(_ model: ModelInfo) async throws {
-        try await RunAnywhere.deleteStoredModel(model.id)
+        guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
+            throw RunAnywhereError.modelNotFound("Model has no associated framework")
+        }
+        try await RunAnywhere.deleteStoredModel(model.id, framework: framework)
         // Reload models after deletion
         await loadModelsFromRegistry()
     }

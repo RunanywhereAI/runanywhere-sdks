@@ -113,7 +113,7 @@ struct CombinedSettingsView: View {
                 } else {
                     ForEach(storageViewModel.storedModels, id: \.id) { model in
                         StoredModelRow(model: model) {
-                            await storageViewModel.deleteModel(model.id)
+                            await storageViewModel.deleteModel(model)
                         }
                     }
                 }
@@ -282,7 +282,7 @@ struct CombinedSettingsView: View {
                         } else {
                             ForEach(storageViewModel.storedModels, id: \.id) { model in
                                 StoredModelRow(model: model) {
-                                    await storageViewModel.deleteModel(model.id)
+                                    await storageViewModel.deleteModel(model)
                                 }
                                 if model.id != storageViewModel.storedModels.last?.id {
                                     Divider()
