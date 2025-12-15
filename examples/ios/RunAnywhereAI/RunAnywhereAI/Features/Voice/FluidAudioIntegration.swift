@@ -1,54 +1,64 @@
 import Foundation
 import RunAnywhere
 import os
-import FluidAudioDiarization  // Direct import since it's added to the project
 
 /// Helper class to integrate FluidAudioDiarization with the app
 @MainActor
 class FluidAudioIntegration {
     private static let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "FluidAudioIntegration")
 
-    /// Create FluidAudioDiarization service
-    static func createDiarizationService() async -> SpeakerDiarizationService? {
+    /// Initialize speaker diarization using the SDK
+    static func initializeDiarization() async -> Bool {
         do {
-            // Use a threshold between standard (0.65) and measured distance (0.26)
-            // 0.45 provides good balance for similar speakers while avoiding over-segmentation
-            let diarization = try await FluidAudioDiarization(threshold: 0.45)
-            logger.info("FluidAudioDiarization initialized successfully")
-            return diarization
+            try await RunAnywhere.initializeSpeakerDiarization()
+            logger.info("Speaker diarization initialized successfully")
+            return true
         } catch {
-            logger.error("Failed to initialize FluidAudioDiarization: \(error)")
+            logger.error("Failed to initialize speaker diarization: \(error)")
+            return false
+        }
+    }
+
+    /// Identify speaker from audio samples
+    static func identifySpeaker(_ samples: [Float]) async -> SpeakerDiarizationSpeakerInfo? {
+        do {
+            let speakerInfo = try await RunAnywhere.identifySpeaker(samples)
+            return speakerInfo
+        } catch {
+            logger.error("Failed to identify speaker: \(error)")
             return nil
         }
     }
 
-    /// Create a voice pipeline with FluidAudio diarization
-    static func createVoicePipelineWithDiarization(
-        config: ModularPipelineConfig
-    ) async -> ModularVoicePipeline? {
-        // Try to create FluidAudio diarization
-        let diarizationService = await createDiarizationService()
-
+    /// Get all detected speakers
+    static func getAllSpeakers() async -> [SpeakerDiarizationSpeakerInfo] {
         do {
-            // Create pipeline with diarization service
-            if let diarization = diarizationService {
-                logger.info("Creating voice pipeline with FluidAudio diarization")
-                let pipeline = try await ModularVoicePipeline(
-                    config: config,
-                    speakerDiarization: diarization
-                )
-
-                // Enable speaker diarization
-                pipeline.enableSpeakerDiarization(true)
-
-                return pipeline
-            } else {
-                logger.info("Creating standard voice pipeline (diarization not available)")
-                return try await RunAnywhere.createVoicePipeline(config: config)
-            }
+            return try await RunAnywhere.getAllSpeakers()
         } catch {
-            logger.error("Failed to create voice pipeline: \(error)")
-            return nil
+            logger.error("Failed to get speakers: \(error)")
+            return []
+        }
+    }
+
+    /// Update speaker name
+    static func updateSpeakerName(speakerId: String, name: String) async -> Bool {
+        do {
+            try await RunAnywhere.updateSpeakerName(speakerId: speakerId, name: name)
+            logger.info("Updated speaker name: \(name)")
+            return true
+        } catch {
+            logger.error("Failed to update speaker name: \(error)")
+            return false
+        }
+    }
+
+    /// Reset speaker diarization
+    static func resetDiarization() async {
+        do {
+            try await RunAnywhere.resetSpeakerDiarization()
+            logger.info("Speaker diarization reset")
+        } catch {
+            logger.error("Failed to reset speaker diarization: \(error)")
         }
     }
 }

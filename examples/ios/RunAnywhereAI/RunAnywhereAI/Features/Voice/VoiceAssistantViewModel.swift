@@ -27,10 +27,10 @@ class VoiceAssistantViewModel: ObservableObject {
     @Published var llmModel: (framework: InferenceFramework, name: String)?
     @Published var ttsModel: (framework: InferenceFramework, name: String)?
 
-    // MARK: - Model Loading State (simplified - just track if models are set)
-    @Published var sttModelLoaded: Bool = false
-    @Published var llmModelLoaded: Bool = false
-    @Published var ttsModelLoaded: Bool = false
+    // MARK: - Model Loading State (using ModelLoadState for UI compatibility)
+    @Published var sttModelState: ModelLoadState = .notLoaded
+    @Published var llmModelState: ModelLoadState = .notLoaded
+    @Published var ttsModelState: ModelLoadState = .notLoaded
 
     /// Check if all required models are selected for the voice pipeline
     var allModelsReady: Bool {
@@ -39,7 +39,7 @@ class VoiceAssistantViewModel: ObservableObject {
 
     /// Check if all models are actually loaded in memory
     var allModelsLoaded: Bool {
-        sttModelLoaded && llmModelLoaded && ttsModelLoaded
+        sttModelState.isLoaded && llmModelState.isLoaded && ttsModelState.isLoaded
     }
 
     // Session state for UI
@@ -132,7 +132,8 @@ class VoiceAssistantViewModel: ObservableObject {
 
         // Check initial model states
         Task {
-            llmModelLoaded = await RunAnywhere.isModelLoaded
+            let isLoaded = await RunAnywhere.isModelLoaded
+            llmModelState = isLoaded ? .loaded : .notLoaded
             if let modelId = await RunAnywhere.getCurrentModelId(),
                let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
                 llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
@@ -145,13 +146,15 @@ class VoiceAssistantViewModel: ObservableObject {
         if let llmEvent = event as? LLMEvent {
             switch llmEvent {
             case .modelLoadCompleted(let modelId, _, _):
-                llmModelLoaded = true
+                llmModelState = .loaded
                 if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
                     llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
                     currentLLMModel = model.name
                 }
             case .modelUnloaded:
-                llmModelLoaded = false
+                llmModelState = .notLoaded
+            case .modelLoadStarted:
+                llmModelState = .loading
             default:
                 break
             }
@@ -163,12 +166,12 @@ class VoiceAssistantViewModel: ObservableObject {
             if let modelId = await RunAnywhere.getCurrentModelId(),
                let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
                 currentLLMModel = model.name
-                llmModelLoaded = true
+                llmModelState = .loaded
                 llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
                 logger.info("Using LLM model: \(self.currentLLMModel)")
             } else {
                 currentLLMModel = "No model loaded"
-                llmModelLoaded = false
+                llmModelState = .notLoaded
                 logger.info("No LLM model currently loaded")
             }
         }
@@ -180,7 +183,7 @@ class VoiceAssistantViewModel: ObservableObject {
     func setSTTModel(_ model: ModelInfo) {
         sttModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
         whisperModel = model.name
-        sttModelLoaded = model.isDownloaded
+        sttModelState = model.isDownloaded ? .loaded : .notLoaded
         logger.info("Set STT model: \(model.name)")
     }
 
@@ -194,7 +197,7 @@ class VoiceAssistantViewModel: ObservableObject {
     /// Set the TTS model for voice pipeline
     func setTTSModel(_ model: ModelInfo) {
         ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
-        ttsModelLoaded = model.isDownloaded
+        ttsModelState = model.isDownloaded ? .loaded : .notLoaded
         logger.info("Set TTS model: \(model.name)")
     }
 
