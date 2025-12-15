@@ -11,6 +11,26 @@ import RunAnywhere
 import AppKit
 #endif
 
+// MARK: - Model Load State (Local UI type)
+
+/// Simple enum to track model loading state in the UI
+enum ModelLoadState: Equatable {
+    case notLoaded
+    case loading
+    case loaded
+    case error(String)
+
+    var isLoaded: Bool {
+        if case .loaded = self { return true }
+        return false
+    }
+
+    var isLoading: Bool {
+        if case .loading = self { return true }
+        return false
+    }
+}
+
 // MARK: - Model Status Banner
 
 /// A banner that shows the current model status (framework + model name) or prompts to select a model
