@@ -301,10 +301,11 @@ class STTViewModel: ObservableObject {
         subscribeToSDKEvents()
 
         // Check initial STT model state
-        if let modelId = await RunAnywhere.currentSTTModelId {
-            selectedModelId = modelId
-            selectedModelName = modelId
-            logger.info("STT model already loaded: \(modelId)")
+        if let model = await RunAnywhere.currentSTTModel {
+            selectedModelId = model.id
+            selectedModelName = model.name
+            selectedFramework = model.preferredFramework
+            logger.info("STT model already loaded: \(model.name)")
         }
     }
 

@@ -239,7 +239,26 @@ class ChatViewModel: ObservableObject {
         }
     }
 
-    /// Handle SDK events to update model state
+    // MARK: - Performance Metrics from SDK Events
+
+    /// Tracks time-to-first-token for the current generation (keyed by generationId)
+    private var firstTokenLatencies: [String: Double] = [:]
+
+    /// Tracks generation completion metrics (keyed by generationId)
+    private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
+
+    /// Performance metrics captured from SDK events
+    struct GenerationMetricsFromSDK {
+        let generationId: String
+        let modelId: String
+        let inputTokens: Int
+        let outputTokens: Int
+        let durationMs: Double
+        let tokensPerSecond: Double
+        let timeToFirstTokenMs: Double?
+    }
+
+    /// Handle SDK events to update model state and capture performance metrics
     private func handleSDKEvent(_ event: any SDKEvent) {
         // Check for LLM model load/unload events
         if let llmEvent = event as? LLMEvent {
@@ -268,13 +287,46 @@ class ChatViewModel: ObservableObject {
                 self.loadedModelName = nil
                 self.selectedFramework = nil
 
-            case .modelLoadStarted(let modelId):
+            case .modelLoadStarted(let modelId, _):
                 self.logger.info("⏳ LLM model loading: \(modelId)")
+
+            case .firstToken(let generationId, let latencyMs):
+                // Capture time-to-first-token from SDK event
+                self.firstTokenLatencies[generationId] = latencyMs
+                self.logger.info("⚡ First token received: \(latencyMs)ms (generationId: \(generationId))")
+
+            case .generationCompleted(let generationId, let modelId, let inputTokens, let outputTokens, let durationMs, let tokensPerSecond, _):
+                // Capture generation metrics from SDK event
+                let ttft = self.firstTokenLatencies[generationId]
+                let metrics = GenerationMetricsFromSDK(
+                    generationId: generationId,
+                    modelId: modelId,
+                    inputTokens: inputTokens,
+                    outputTokens: outputTokens,
+                    durationMs: durationMs,
+                    tokensPerSecond: tokensPerSecond,
+                    timeToFirstTokenMs: ttft
+                )
+                self.generationMetrics[generationId] = metrics
+                self.logger.info("📊 Generation completed via SDK event - Tokens: \(outputTokens), Speed: \(tokensPerSecond) tok/s, TTFT: \(ttft ?? 0)ms")
+
+                // Clean up old entries (keep last 10)
+                if self.firstTokenLatencies.count > 10 {
+                    self.firstTokenLatencies.removeAll()
+                }
+                if self.generationMetrics.count > 10 {
+                    self.generationMetrics.removeAll()
+                }
 
             default:
                 break
             }
         }
+    }
+
+    /// Get the latest generation metrics from SDK events for a given generationId
+    func getMetricsFromSDKEvents(generationId: String) -> GenerationMetricsFromSDK? {
+        return generationMetrics[generationId]
     }
 
     /// Check model status from SDK
@@ -440,8 +492,8 @@ class ChatViewModel: ObservableObject {
                     // Get metrics from SDK
                     let sdkResult = try await metricsTask.value
                     logger.info("📊 SDK Metrics - Tokens: \(sdkResult.tokensUsed), Thinking: \(sdkResult.thinkingTokens ?? 0), Response: \(sdkResult.responseTokens)")
-                    logger.info("⏱️ SDK Timing - Total: \(sdkResult.latencyMs)ms, Thinking: \(sdkResult.performanceMetrics.thinkingTimeMs ?? 0)ms")
-                    logger.info("🚀 SDK Performance - Speed: \(sdkResult.performanceMetrics.tokensPerSecond) tok/s")
+                    logger.info("⏱️ SDK Timing - Total: \(sdkResult.latencyMs)ms")
+                    logger.info("🚀 SDK Performance - Speed: \(sdkResult.tokensPerSecond) tok/s")
 
                     // Update final message with SDK-provided thinking content
                     await MainActor.run {
@@ -504,7 +556,7 @@ class ChatViewModel: ObservableObject {
 
                     logger.info("✅ Generation completed: \(result.text.prefix(100))...")
                     logger.info("📊 SDK Metrics - Tokens: \(result.tokensUsed), Thinking: \(result.thinkingTokens ?? 0), Response: \(result.responseTokens)")
-                    logger.info("⏱️ SDK Timing - Total: \(result.latencyMs)ms, Thinking: \(result.performanceMetrics.thinkingTimeMs ?? 0)ms")
+                    logger.info("⏱️ SDK Timing - Total: \(result.latencyMs)ms")
 
                     // Update the assistant message with response from SDK
                     await MainActor.run {
@@ -889,7 +941,8 @@ class ChatViewModel: ObservableObject {
         startTime: Date,
         inputText: String,
         wasInterrupted: Bool = false,
-        options: LLMGenerationOptions
+        options: LLMGenerationOptions,
+        generationId: String? = nil
     ) -> MessageAnalytics? {
         guard let modelName = loadedModelName,
               let currentModel = ModelListViewModel.shared.currentModel else {
@@ -899,9 +952,12 @@ class ChatViewModel: ObservableObject {
 
         // SDK provides timing metrics (convert ms to seconds)
         let totalGenerationTime = result.latencyMs / 1000.0
-        let timeToFirstToken = result.performanceMetrics.timeToFirstTokenMs.map { $0 / 1000.0 }
-        let thinkingTime = result.performanceMetrics.thinkingTimeMs.map { $0 / 1000.0 }
-        let responseTime = result.performanceMetrics.responseTimeMs.map { $0 / 1000.0 }
+
+        // Get time-to-first-token from SDK events if available
+        var timeToFirstToken: TimeInterval? = nil
+        if let genId = generationId, let ttftMs = firstTokenLatencies[genId] {
+            timeToFirstToken = ttftMs / 1000.0
+        }
 
         // SDK provides accurate token counts
         let inputTokens = RunAnywhere.estimateTokenCount(inputText) // Use SDK's token counter via RunAnywhere namespace
@@ -910,7 +966,7 @@ class ChatViewModel: ObservableObject {
         let responseTokens = result.responseTokens
 
         // SDK provides tokens per second
-        let averageTokensPerSecond = result.performanceMetrics.tokensPerSecond
+        let averageTokensPerSecond = result.tokensPerSecond
 
         // Determine completion status
         let completionStatus: MessageAnalytics.CompletionStatus = wasInterrupted ? .interrupted : .complete
@@ -923,9 +979,9 @@ class ChatViewModel: ObservableObject {
             topK: nil
         )
 
-        logger.info("📊 Creating analytics from SDK result:")
+        logger.info("📊 Creating analytics from SDK result and events:")
         logger.info("  - Total tokens: \(outputTokens) (thinking: \(thinkingTokens ?? 0), response: \(responseTokens))")
-        logger.info("  - Timing: total=\(totalGenerationTime)s, thinking=\(thinkingTime ?? 0)s, response=\(responseTime ?? 0)s")
+        logger.info("  - Timing: total=\(totalGenerationTime)s, TTFT=\(timeToFirstToken ?? 0)s")
         logger.info("  - Speed: \(averageTokensPerSecond) tok/s")
 
         return MessageAnalytics(
@@ -937,8 +993,8 @@ class ChatViewModel: ObservableObject {
             timestamp: startTime,
             timeToFirstToken: timeToFirstToken,
             totalGenerationTime: totalGenerationTime,
-            thinkingTime: thinkingTime,
-            responseTime: responseTime,
+            thinkingTime: nil,
+            responseTime: nil,
             inputTokens: inputTokens,
             outputTokens: outputTokens,
             thinkingTokens: thinkingTokens,

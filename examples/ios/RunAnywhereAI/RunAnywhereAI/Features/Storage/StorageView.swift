@@ -410,63 +410,31 @@ private struct StoredModelRow: View {
                         }
                     }
 
-                    // Context Length
-                    if let contextLength = model.contextLength {
-                        HStack {
-                            Text("Context Length:")
+                    // Description
+                    if let description = model.description {
+                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
+                            Text("Description:")
                                 .font(AppTypography.caption2Medium)
-                            Text("\(contextLength) tokens")
+                            Text(description)
                                 .font(AppTypography.caption2)
                                 .foregroundColor(AppColors.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
 
-                    // Metadata
-                    if let metadata = model.metadata {
-                        if let author = metadata.author {
-                            HStack {
-                                Text("Author:")
-                                    .font(AppTypography.caption2Medium)
-                                Text(author)
-                                    .font(AppTypography.caption2)
-                                    .foregroundColor(AppColors.textSecondary)
-                            }
-                        }
-
-                        if let license = metadata.license {
-                            HStack {
-                                Text("License:")
-                                    .font(AppTypography.caption2Medium)
-                                Text(license)
-                                    .font(AppTypography.caption2)
-                                    .foregroundColor(AppColors.textSecondary)
-                            }
-                        }
-
-                        if let description = metadata.description {
-                            VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                                Text("Description:")
-                                    .font(AppTypography.caption2Medium)
-                                Text(description)
-                                    .font(AppTypography.caption2)
-                                    .foregroundColor(AppColors.textSecondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-
-                        if !metadata.tags.isEmpty {
-                            VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                                Text("Tags:")
-                                    .font(AppTypography.caption2Medium)
-                                HStack(spacing: AppSpacing.xSmall) {
-                                    ForEach(metadata.tags, id: \.self) { tag in
-                                        Text(tag)
-                                            .font(AppTypography.caption2)
-                                            .padding(.horizontal, AppSpacing.small)
-                                            .padding(.vertical, AppSpacing.xxSmall)
-                                            .background(AppColors.badgeBlue)
-                                            .cornerRadius(AppSpacing.cornerRadiusSmall)
-                                    }
+                    // Tags
+                    if !model.tags.isEmpty {
+                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
+                            Text("Tags:")
+                                .font(AppTypography.caption2Medium)
+                            HStack(spacing: AppSpacing.xSmall) {
+                                ForEach(model.tags, id: \.self) { tag in
+                                    Text(tag)
+                                        .font(AppTypography.caption2)
+                                        .padding(.horizontal, AppSpacing.small)
+                                        .padding(.vertical, AppSpacing.xxSmall)
+                                        .background(AppColors.badgeBlue)
+                                        .cornerRadius(AppSpacing.cornerRadiusSmall)
                                 }
                             }
                         }
