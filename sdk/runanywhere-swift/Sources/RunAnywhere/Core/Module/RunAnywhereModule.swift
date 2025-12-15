@@ -29,30 +29,22 @@ public enum CapabilityType: String, CaseIterable, Sendable {
 /// ## Implementing a Module
 ///
 /// ```swift
-/// import RunAnywhere
-///
 /// public enum MyModule: RunAnywhereModule {
 ///     public static let moduleId = "my-module"
 ///     public static let moduleName = "My Custom Module"
+///     public static let inferenceFramework: InferenceFramework = .onnx
 ///     public static let capabilities: Set<CapabilityType> = [.stt, .tts]
 ///
 ///     @MainActor
-///     public static func register(priority: Int) {
-///         ServiceRegistry.shared.registerSTT(
-///             name: moduleName,
-///             priority: priority,
-///             canHandle: { modelId in ... },
-///             factory: { config in ... }
-///         )
-///     }
+///     public static func register(priority: Int) { ... }
 /// }
 /// ```
 ///
-/// ## Registration
+/// ## Registration with Models
 ///
-/// Modules are registered via `ModuleRegistry`:
 /// ```swift
-/// ModuleRegistry.shared.register(MyModule.self)
+/// LlamaCPP.register()
+/// LlamaCPP.addModel(name: "Llama 2 7B", url: "...", memoryRequirement: 4_000_000_000)
 /// ```
 public protocol RunAnywhereModule {
     /// Unique identifier for this module (e.g., "onnx", "llamacpp", "whisperkit")
@@ -60,6 +52,9 @@ public protocol RunAnywhereModule {
 
     /// Human-readable display name (e.g., "ONNX Runtime", "LlamaCPP")
     static var moduleName: String { get }
+
+    /// The inference framework this module provides (required)
+    static var inferenceFramework: InferenceFramework { get }
 
     /// Set of capabilities this module provides
     static var capabilities: Set<CapabilityType> { get }
@@ -83,6 +78,61 @@ public extension RunAnywhereModule {
     @MainActor
     static func register() {
         register(priority: defaultPriority)
+    }
+
+    /// Add a model to this module (uses the module's inferenceFramework automatically)
+    /// - Parameters:
+    ///   - name: Display name for the model
+    ///   - url: Download URL string for the model
+    ///   - modality: Model category (inferred from module capabilities if not specified)
+    ///   - artifactType: How the model is packaged (inferred from URL if not specified)
+    ///   - memoryRequirement: Estimated memory usage in bytes
+    ///   - supportsThinking: Whether the model supports reasoning/thinking
+    /// - Returns: The created ModelInfo, or nil if URL is invalid
+    @MainActor
+    @discardableResult
+    static func addModel(
+        name: String,
+        url: String,
+        modality: ModelCategory? = nil,
+        artifactType: ModelArtifactType? = nil,
+        memoryRequirement: Int64? = nil,
+        supportsThinking: Bool = false
+    ) -> ModelInfo? {
+        guard let downloadURL = URL(string: url) else {
+            SDKLogger(category: "Module.\(moduleId)").error("Invalid URL for model '\(name)': \(url)")
+            return nil
+        }
+
+        // Determine modality from parameter or infer from module capabilities
+        let category = modality ?? inferModalityFromCapabilities()
+
+        // Register the model with this module's framework
+        let modelInfo = ServiceContainer.shared.modelRegistry.addModelFromURL(
+            name: name,
+            url: downloadURL,
+            framework: inferenceFramework,
+            category: category,
+            artifactType: artifactType,
+            estimatedSize: memoryRequirement,
+            supportsThinking: supportsThinking
+        )
+
+        return modelInfo
+    }
+
+    /// Infer the primary modality from module capabilities
+    private static func inferModalityFromCapabilities() -> ModelCategory {
+        if capabilities.contains(.llm) {
+            return .language
+        } else if capabilities.contains(.stt) {
+            return .speechRecognition
+        } else if capabilities.contains(.tts) {
+            return .speechSynthesis
+        } else if capabilities.contains(.vad) || capabilities.contains(.speakerDiarization) {
+            return .audio
+        }
+        return .language // Default
     }
 }
 

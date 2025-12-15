@@ -262,29 +262,79 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
             logger.info("✅ Production/staging bootstrap completed")
         } else if environment == .development && serviceContainer.networkService == nil {
-            // Development mode bootstrap
-            logger.info("Initializing development mode services...")
+            // Development mode bootstrap - initialize ALL services just like production
+            // Development mode uses the same services but points to dev/Supabase endpoints
+            logger.info("Initializing development mode services (full service stack)...")
 
-            // Step 1: Setup mock network service
+            // Step 1: Setup network service and API client for development
             let networkService = NetworkServiceFactory.createNetworkService(for: .development, params: params)
             serviceContainer.networkService = networkService
-            logger.debug("Mock network service initialized")
 
-            // Step 2: Create development config
-            let config = ConfigurationData(
-                id: "dev-\(UUID().uuidString)",
-                apiKey: params.apiKey.isEmpty ? "dev-mode" : params.apiKey,
-                source: .defaults
+            // The networkService IS an APIClient, cast it for use with repositories
+            let apiClient = networkService as? APIClient
+            serviceContainer.apiClient = apiClient
+            logger.debug("Network service and API client initialized (development mode)")
+
+            // Step 2: Create SyncCoordinator (disabled auto-sync for dev)
+            let syncCoordinator = SyncCoordinator(enableAutoSync: false)
+            serviceContainer.setSyncCoordinator(syncCoordinator)
+            logger.debug("SyncCoordinator initialized")
+
+            // Step 3: Create ConfigurationService (with local DB and API client)
+            let configRepo = ConfigurationRepositoryImpl(
+                databaseManager: DatabaseManager.shared,
+                apiClient: apiClient
             )
+            let configService = ConfigurationService(
+                configRepository: configRepo,
+                syncCoordinator: syncCoordinator
+            )
+            serviceContainer.setConfigurationService(configService)
+            let config = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
             EventPublisher.shared.track(SDKLifecycleEvent.configLoaded(source: config.source.rawValue))
-            logger.info("Configuration loaded (source: defaults for development)")
+            logger.info("ConfigurationService initialized (development mode)")
 
-            // Step 3: Initialize model registry
+            // Step 4: Create TelemetryRepository for analytics
+            let telemetryRepo = TelemetryRepositoryImpl(
+                databaseManager: DatabaseManager.shared,
+                apiClient: apiClient
+            )
+            logger.debug("TelemetryRepository initialized")
+
+            // Step 5: Create ModelInfoService (with local DB and API client)
+            let modelRepo = ModelInfoRepositoryImpl(
+                databaseManager: DatabaseManager.shared,
+                apiClient: apiClient
+            )
+            let modelInfoService = ModelInfoService(
+                modelInfoRepository: modelRepo,
+                syncCoordinator: syncCoordinator
+            )
+            serviceContainer.setModelInfoService(modelInfoService)
+            logger.info("ModelInfoService initialized (development mode)")
+
+            // Step 6: Create ModelAssignmentService
+            let modelAssignmentService = ModelAssignmentService(
+                networkService: networkService,
+                modelInfoService: modelInfoService
+            )
+            serviceContainer.setModelAssignmentService(modelAssignmentService)
+            logger.debug("ModelAssignmentService initialized")
+
+            // Step 7: Load stored models from local DB
+            let _ = try? await modelInfoService.loadStoredModels()
+            logger.debug("Stored models loaded from local DB")
+
+            // Step 8: Initialize model registry
             await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
             logger.debug("Model registry initialized")
 
-            logger.info("✅ Development mode bootstrap completed")
-            // Skip analytics in development mode
+            // Step 9: Initialize analytics and event publisher
+            await serviceContainer.analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
+            EventPublisher.shared.initialize(analyticsQueue: serviceContainer.analyticsQueueManager)
+            logger.info("Analytics and event publisher initialized")
+
+            logger.info("✅ Development mode bootstrap completed (all services active)")
         }
 
         // Now perform actual device registration

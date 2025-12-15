@@ -23,6 +23,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     case whisperKit = "WhisperKit"
     case openAIWhisper = "OpenAIWhisper"
     case systemTTS = "SystemTTS"
+    case fluidAudio = "FluidAudio"
 
     /// Human-readable display name for the framework
     public var displayName: String {
@@ -41,6 +42,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .whisperKit: return "WhisperKit"
         case .openAIWhisper: return "OpenAI Whisper"
         case .systemTTS: return "System TTS"
+        case .fluidAudio: return "FluidAudio"
         }
     }
 

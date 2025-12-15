@@ -46,6 +46,9 @@ public enum LlamaCPP: RunAnywhereModule {
     public static let capabilities: Set<CapabilityType> = [.llm]
     public static let defaultPriority: Int = 100
 
+    /// LlamaCPP uses the llama.cpp inference framework
+    public static let inferenceFramework: InferenceFramework = .llamaCpp
+
     /// Register LlamaCPP LLM service with the SDK
     @MainActor
     public static func register(priority: Int) {

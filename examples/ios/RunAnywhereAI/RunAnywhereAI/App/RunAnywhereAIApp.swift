@@ -143,22 +143,67 @@ struct RunAnywhereAIApp: App {
         await initializeSDK()
     }
 
-    /// Register modules using the new module-based pattern
+    /// Register modules with their associated models
+    /// Each module explicitly owns its models - the framework is determined by the module
     @MainActor
     private func registerModulesAndModels() async {
-        logger.info("📦 Registering modules and models...")
+        logger.info("📦 Registering modules with their models...")
 
-        // Step 1: Register modules (they provide capability implementations)
+        // LlamaCPP module with LLM models
         LlamaCPP.register()
-        logger.info("✅ LlamaCPP module registered (LLM capability)")
+        LlamaCPP.addModel(name: "SmolLM2 360M Q8_0",
+                          url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+                          memoryRequirement: 500_000_000)
+        LlamaCPP.addModel(name: "Llama 2 7B Chat Q4_K_M",
+                          url: "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
+                          memoryRequirement: 4_000_000_000)
+        LlamaCPP.addModel(name: "Mistral 7B Instruct Q4_K_M",
+                          url: "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
+                          memoryRequirement: 4_000_000_000)
+        LlamaCPP.addModel(name: "Qwen 2.5 0.5B Instruct Q6_K",
+                          url: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                          memoryRequirement: 600_000_000)
+        LlamaCPP.addModel(name: "LiquidAI LFM2 350M Q4_K_M",
+                          url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                          memoryRequirement: 250_000_000)
+        LlamaCPP.addModel(name: "LiquidAI LFM2 350M Q8_0",
+                          url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                          memoryRequirement: 400_000_000)
+        logger.info("✅ LlamaCPP module registered with LLM models")
 
+        // ONNX module with STT and TTS models
+        // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
         ONNX.register()
-        logger.info("✅ ONNX module registered (STT/TTS capabilities)")
+        // STT Models (Sherpa-ONNX Whisper)
+        ONNX.addModel(name: "Sherpa Whisper Tiny (ONNX)",
+                      url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
+                      modality: .speechRecognition,
+                      artifactType: .tarGzArchive(structure: .nestedDirectory),
+                      memoryRequirement: 75_000_000)
+        ONNX.addModel(name: "Sherpa Whisper Small (ONNX)",
+                      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
+                      modality: .speechRecognition,
+                      artifactType: .tarBz2Archive(structure: .nestedDirectory),
+                      memoryRequirement: 250_000_000)
+        // TTS Models (Piper VITS)
+        ONNX.addModel(name: "Piper TTS (US English - Medium)",
+                      url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
+                      modality: .speechSynthesis,
+                      artifactType: .tarGzArchive(structure: .nestedDirectory),
+                      memoryRequirement: 65_000_000)
+        ONNX.addModel(name: "Piper TTS (British English)",
+                      url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
+                      modality: .speechSynthesis,
+                      artifactType: .tarGzArchive(structure: .nestedDirectory),
+                      memoryRequirement: 65_000_000)
+        logger.info("✅ ONNX module registered with STT/TTS models")
 
+        // FluidAudio module (no models - provides speaker diarization service)
         FluidAudio.register()
         logger.info("✅ FluidAudio module registered (Speaker Diarization)")
 
-        // Register Foundation Models for iOS 26+ and macOS 26+
+        // Foundation Models for iOS 26+ and macOS 26+
+        // Built-in model is automatically registered by the module
         #if canImport(FoundationModelsAdapter)
         if #available(iOS 26.0, macOS 26.0, *) {
             AppleAI.register()
@@ -166,96 +211,7 @@ struct RunAnywhereAIApp: App {
         }
         #endif
 
-        // Step 2: Register development models using the new API
-        registerDevelopmentModels()
-
         logger.info("🎉 All modules and models registered")
-    }
-
-    /// Register development models using the new RunAnywhere.registerModel() API
-    @MainActor
-    private func registerDevelopmentModels() {
-        logger.info("📦 Registering development models...")
-
-        // LLM Models (LlamaCPP)
-        RunAnywhere.registerModel(
-            name: "SmolLM2 360M Q8_0",
-            urlString: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-            framework: .llamaCpp,
-            memoryRequirement: 500_000_000
-        )
-
-        RunAnywhere.registerModel(
-            name: "Llama 2 7B Chat Q4_K_M",
-            urlString: "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
-            framework: .llamaCpp,
-            memoryRequirement: 4_000_000_000
-        )
-
-        RunAnywhere.registerModel(
-            name: "Mistral 7B Instruct Q4_K_M",
-            urlString: "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
-            framework: .llamaCpp,
-            memoryRequirement: 4_000_000_000
-        )
-
-        RunAnywhere.registerModel(
-            name: "Qwen 2.5 0.5B Instruct Q6_K",
-            urlString: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
-            framework: .llamaCpp,
-            memoryRequirement: 600_000_000
-        )
-
-        RunAnywhere.registerModel(
-            name: "LiquidAI LFM2 350M Q4_K_M",
-            urlString: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
-            framework: .llamaCpp,
-            memoryRequirement: 250_000_000
-        )
-
-        RunAnywhere.registerModel(
-            name: "LiquidAI LFM2 350M Q8_0",
-            urlString: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
-            framework: .llamaCpp,
-            memoryRequirement: 400_000_000
-        )
-
-        // STT Models (ONNX)
-        // NOTE: tar.bz2 extraction may not work on iOS due to lack of native bz2 library
-        RunAnywhere.registerModel(
-            name: "Sherpa Whisper Tiny (ONNX) [macOS only]",
-            urlString: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
-            framework: .onnx,
-            modality: .speechRecognition,
-            memoryRequirement: 75_000_000
-        )
-
-        RunAnywhere.registerModel(
-            name: "Sherpa Whisper Small (ONNX) [macOS only]",
-            urlString: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
-            framework: .onnx,
-            modality: .speechRecognition,
-            memoryRequirement: 250_000_000
-        )
-
-        // TTS Models (ONNX)
-        RunAnywhere.registerModel(
-            name: "Piper TTS (US English - Medium)",
-            urlString: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
-            framework: .onnx,
-            modality: .speechSynthesis,
-            memoryRequirement: 65_000_000
-        )
-
-        RunAnywhere.registerModel(
-            name: "Piper TTS (British English)",
-            urlString: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
-            framework: .onnx,
-            modality: .speechSynthesis,
-            memoryRequirement: 65_000_000
-        )
-
-        logger.info("✅ All development models registered")
     }
 }
 

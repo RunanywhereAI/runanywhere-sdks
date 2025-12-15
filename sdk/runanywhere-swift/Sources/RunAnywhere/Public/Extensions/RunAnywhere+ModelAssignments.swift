@@ -11,6 +11,7 @@ public extension RunAnywhere {
     ///   - url: Download URL for the model (e.g., HuggingFace)
     ///   - framework: Target inference framework
     ///   - modality: Model category (default: .language for LLMs)
+    ///   - artifactType: How the model is packaged (archive, single file, etc.). If nil, inferred from URL.
     ///   - memoryRequirement: Estimated memory usage in bytes
     ///   - supportsThinking: Whether the model supports reasoning/thinking
     /// - Returns: The created ModelInfo
@@ -21,6 +22,7 @@ public extension RunAnywhere {
         url: URL,
         framework: InferenceFramework,
         modality: ModelCategory = .language,
+        artifactType: ModelArtifactType? = nil,
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false
     ) -> ModelInfo {
@@ -28,6 +30,8 @@ public extension RunAnywhere {
             name: name,
             url: url,
             framework: framework,
+            category: modality,
+            artifactType: artifactType,
             estimatedSize: memoryRequirement,
             supportsThinking: supportsThinking
         )
@@ -39,6 +43,7 @@ public extension RunAnywhere {
     ///   - urlString: Download URL string for the model
     ///   - framework: Target inference framework
     ///   - modality: Model category (default: .language for LLMs)
+    ///   - artifactType: How the model is packaged (archive, single file, etc.). If nil, inferred from URL.
     ///   - memoryRequirement: Estimated memory usage in bytes
     ///   - supportsThinking: Whether the model supports reasoning/thinking
     /// - Returns: The created ModelInfo, or nil if URL is invalid
@@ -49,6 +54,7 @@ public extension RunAnywhere {
         urlString: String,
         framework: InferenceFramework,
         modality: ModelCategory = .language,
+        artifactType: ModelArtifactType? = nil,
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false
     ) -> ModelInfo? {
@@ -61,6 +67,7 @@ public extension RunAnywhere {
             url: url,
             framework: framework,
             modality: modality,
+            artifactType: artifactType,
             memoryRequirement: memoryRequirement,
             supportsThinking: supportsThinking
         )

@@ -33,6 +33,8 @@ public protocol ModelRegistry {
     ///   - name: Display name for the model
     ///   - url: Download URL for the model
     ///   - framework: Target framework for the model
+    ///   - category: Model category (e.g., .language, .speechRecognition). If nil, inferred from framework.
+    ///   - artifactType: How the model is packaged (archive, single file, etc.). If nil, inferred from URL.
     ///   - estimatedSize: Estimated memory usage (optional)
     ///   - supportsThinking: Whether the model supports thinking/reasoning
     /// - Returns: The created model info
@@ -40,6 +42,8 @@ public protocol ModelRegistry {
         name: String,
         url: URL,
         framework: InferenceFramework,
+        category: ModelCategory?,
+        artifactType: ModelArtifactType?,
         estimatedSize: Int64?,
         supportsThinking: Bool
     ) -> ModelInfo

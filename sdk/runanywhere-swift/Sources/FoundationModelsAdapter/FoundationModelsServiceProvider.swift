@@ -47,6 +47,9 @@ public enum AppleAI: RunAnywhereModule {
     public static let capabilities: Set<CapabilityType> = [.llm]
     public static let defaultPriority: Int = 50 // Lower priority - prefer local models
 
+    /// Apple AI uses the Foundation Models inference framework
+    public static let inferenceFramework: InferenceFramework = .foundationModels
+
     /// Register Foundation Models LLM service with the SDK
     @MainActor
     public static func register(priority: Int) {
@@ -61,6 +64,34 @@ public enum AppleAI: RunAnywhereModule {
             }
         )
         logger.info("Foundation Models LLM registered")
+
+        // Register the built-in Foundation Models as a model entry so it appears in model lists
+        registerBuiltInModel()
+    }
+
+    /// Register the built-in Foundation Models as a model entry
+    @MainActor
+    private static func registerBuiltInModel() {
+        let modelInfo = ModelInfo(
+            id: "foundation-models-default",
+            name: "Apple Intelligence (Foundation Models)",
+            category: .language,
+            format: .unknown,
+            downloadURL: nil,
+            localPath: URL(string: "builtin://foundation-models"),  // Special builtin scheme
+            artifactType: .builtIn,
+            downloadSize: nil,
+            memoryRequired: nil,  // System managed
+            compatibleFrameworks: [.foundationModels],
+            preferredFramework: .foundationModels,
+            contextLength: 4096,
+            supportsThinking: false,
+            tags: ["apple", "foundation-models", "built-in", "on-device"],
+            description: "Apple's built-in Foundation Models powered by Apple Intelligence. Requires iOS 26+ / macOS 26+ and an Apple Intelligence capable device."
+        )
+
+        ServiceContainer.shared.modelRegistry.registerModel(modelInfo)
+        logger.info("Foundation Models model entry registered: \(modelInfo.id)")
     }
 
     // MARK: - Private Helpers
@@ -91,13 +122,6 @@ public enum AppleAI: RunAnywhereModule {
         return service
     }
 }
-
-// MARK: - Legacy Alias
-
-/// Legacy alias for backward compatibility
-@available(iOS 26.0, macOS 26.0, *)
-@available(*, deprecated, renamed: "AppleAI")
-public typealias FoundationModels = AppleAI
 
 // MARK: - Auto-Discovery Registration
 

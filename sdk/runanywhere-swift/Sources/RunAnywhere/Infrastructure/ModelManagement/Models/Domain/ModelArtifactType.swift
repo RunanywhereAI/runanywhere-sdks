@@ -41,7 +41,7 @@ public enum ArchiveType: String, CaseIterable, Codable, Sendable {
 // MARK: - Archive Structure
 
 /// Describes the internal structure of an archive after extraction
-public enum ArchiveStructure: Codable, Sendable, Equatable {
+public enum ArchiveStructure: String, Codable, Sendable, Equatable {
     /// Archive contains a single model file at root or nested in one directory
     case singleFileNested
 
@@ -53,6 +53,34 @@ public enum ArchiveStructure: Codable, Sendable, Equatable {
 
     /// Unknown structure - will be detected after extraction
     case unknown
+}
+
+// MARK: - Expected Model Files
+
+/// Describes what files are expected after model extraction/download
+/// Used for validation and to understand model requirements
+public struct ExpectedModelFiles: Codable, Sendable, Equatable {
+    /// File patterns that must be present (e.g., "*.onnx", "encoder*.onnx")
+    public let requiredPatterns: [String]
+
+    /// File patterns that may be present but are optional
+    public let optionalPatterns: [String]
+
+    /// Description of the model files for documentation
+    public let description: String?
+
+    public init(
+        requiredPatterns: [String] = [],
+        optionalPatterns: [String] = [],
+        description: String? = nil
+    ) {
+        self.requiredPatterns = requiredPatterns
+        self.optionalPatterns = optionalPatterns
+        self.description = description
+    }
+
+    /// No specific file expectations
+    public static let none = ExpectedModelFiles()
 }
 
 // MARK: - Multi-File Descriptor
@@ -83,30 +111,44 @@ public enum ModelArtifactType: Codable, Sendable, Equatable {
 
     /// A single model file (e.g., .gguf, .onnx, .mlmodel)
     /// No extraction needed - just download and use
-    case singleFile
+    case singleFile(expectedFiles: ExpectedModelFiles = .none)
 
     /// An archive that needs extraction
     /// - archiveType: The archive format (zip, tar.bz2, etc.)
     /// - structure: What's inside the archive
-    case archive(ArchiveType, structure: ArchiveStructure)
+    /// - expectedFiles: What files to expect after extraction
+    case archive(ArchiveType, structure: ArchiveStructure, expectedFiles: ExpectedModelFiles = .none)
 
     /// Multiple files that need to be downloaded separately
-    /// Used for models where files are fetched individually from a repository
     case multiFile([ModelFileDescriptor])
 
     /// Use a custom download strategy identified by string
-    /// Framework modules can register their own strategies
     case custom(strategyId: String)
+
+    /// Built-in model that doesn't require download
+    case builtIn
 
     // MARK: - Computed Properties
 
     /// Whether this artifact type requires extraction after download
     public var requiresExtraction: Bool {
+        if case .archive = self { return true }
+        return false
+    }
+
+    /// Whether this artifact type requires downloading
+    public var requiresDownload: Bool {
+        if case .builtIn = self { return false }
+        return true
+    }
+
+    /// Get the expected files for this artifact type
+    public var expectedFiles: ExpectedModelFiles {
         switch self {
-        case .archive:
-            return true
-        case .singleFile, .multiFile, .custom:
-            return false
+        case .singleFile(let expected), .archive(_, _, let expected):
+            return expected
+        default:
+            return .none
         }
     }
 
@@ -115,12 +157,14 @@ public enum ModelArtifactType: Codable, Sendable, Equatable {
         switch self {
         case .singleFile:
             return "Single File"
-        case .archive(let type, _):
+        case .archive(let type, _, _):
             return "\(type.rawValue.uppercased()) Archive"
         case .multiFile(let files):
             return "Multi-File (\(files.count) files)"
         case .custom(let strategyId):
             return "Custom (\(strategyId))"
+        case .builtIn:
+            return "Built-in"
         }
     }
 }
@@ -130,34 +174,31 @@ public enum ModelArtifactType: Codable, Sendable, Equatable {
 public extension ModelArtifactType {
 
     /// Infer artifact type from download URL
-    /// This is a convenience for when the artifact type isn't explicitly specified
     static func infer(from url: URL?, format: ModelFormat) -> ModelArtifactType {
         guard let url = url else {
-            return .singleFile
+            return .singleFile(expectedFiles: .none)
         }
 
-        // Check for archive extensions
         if let archiveType = ArchiveType.from(url: url) {
-            return .archive(archiveType, structure: .unknown)
+            return .archive(archiveType, structure: .unknown, expectedFiles: .none)
         }
 
-        // Otherwise assume single file
-        return .singleFile
+        return .singleFile(expectedFiles: .none)
     }
 
     /// Create a ZIP archive type
-    static func zipArchive(structure: ArchiveStructure = .directoryBased) -> ModelArtifactType {
-        .archive(.zip, structure: structure)
+    static func zipArchive(structure: ArchiveStructure = .directoryBased, expectedFiles: ExpectedModelFiles = .none) -> ModelArtifactType {
+        .archive(.zip, structure: structure, expectedFiles: expectedFiles)
     }
 
     /// Create a tar.bz2 archive type
-    static func tarBz2Archive(structure: ArchiveStructure = .nestedDirectory) -> ModelArtifactType {
-        .archive(.tarBz2, structure: structure)
+    static func tarBz2Archive(structure: ArchiveStructure = .nestedDirectory, expectedFiles: ExpectedModelFiles = .none) -> ModelArtifactType {
+        .archive(.tarBz2, structure: structure, expectedFiles: expectedFiles)
     }
 
     /// Create a tar.gz archive type
-    static func tarGzArchive(structure: ArchiveStructure = .nestedDirectory) -> ModelArtifactType {
-        .archive(.tarGz, structure: structure)
+    static func tarGzArchive(structure: ArchiveStructure = .nestedDirectory, expectedFiles: ExpectedModelFiles = .none) -> ModelArtifactType {
+        .archive(.tarGz, structure: structure, expectedFiles: expectedFiles)
     }
 }
 
@@ -165,11 +206,7 @@ public extension ModelArtifactType {
 
 extension ModelArtifactType {
     private enum CodingKeys: String, CodingKey {
-        case type
-        case archiveType
-        case structure
-        case files
-        case strategyId
+        case type, archiveType, structure, expectedFiles, files, strategyId
     }
 
     public init(from decoder: Decoder) throws {
@@ -178,19 +215,23 @@ extension ModelArtifactType {
 
         switch type {
         case "singleFile":
-            self = .singleFile
+            let expected = try container.decodeIfPresent(ExpectedModelFiles.self, forKey: .expectedFiles) ?? .none
+            self = .singleFile(expectedFiles: expected)
         case "archive":
             let archiveType = try container.decode(ArchiveType.self, forKey: .archiveType)
             let structure = try container.decode(ArchiveStructure.self, forKey: .structure)
-            self = .archive(archiveType, structure: structure)
+            let expected = try container.decodeIfPresent(ExpectedModelFiles.self, forKey: .expectedFiles) ?? .none
+            self = .archive(archiveType, structure: structure, expectedFiles: expected)
         case "multiFile":
             let files = try container.decode([ModelFileDescriptor].self, forKey: .files)
             self = .multiFile(files)
         case "custom":
             let strategyId = try container.decode(String.self, forKey: .strategyId)
             self = .custom(strategyId: strategyId)
+        case "builtIn":
+            self = .builtIn
         default:
-            self = .singleFile
+            self = .singleFile()
         }
     }
 
@@ -198,18 +239,26 @@ extension ModelArtifactType {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
-        case .singleFile:
+        case .singleFile(let expected):
             try container.encode("singleFile", forKey: .type)
-        case .archive(let archiveType, let structure):
+            if expected != .none {
+                try container.encode(expected, forKey: .expectedFiles)
+            }
+        case .archive(let archiveType, let structure, let expected):
             try container.encode("archive", forKey: .type)
             try container.encode(archiveType, forKey: .archiveType)
             try container.encode(structure, forKey: .structure)
+            if expected != .none {
+                try container.encode(expected, forKey: .expectedFiles)
+            }
         case .multiFile(let files):
             try container.encode("multiFile", forKey: .type)
             try container.encode(files, forKey: .files)
         case .custom(let strategyId):
             try container.encode("custom", forKey: .type)
             try container.encode(strategyId, forKey: .strategyId)
+        case .builtIn:
+            try container.encode("builtIn", forKey: .type)
         }
     }
 }

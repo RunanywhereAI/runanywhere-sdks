@@ -217,12 +217,16 @@ public class RegistryService: ModelRegistry {
     ///   - name: Display name for the model
     ///   - url: Download URL for the model
     ///   - framework: Target framework for the model
+    ///   - category: Model category (e.g., .language, .speechRecognition, .speechSynthesis). If nil, inferred from framework.
+    ///   - artifactType: How the model is packaged (archive, single file, etc.). If nil, inferred from URL.
     ///   - estimatedSize: Estimated memory usage (optional)
     /// - Returns: The created model info
     public func addModelFromURL(
         name: String,
         url: URL,
         framework: InferenceFramework,
+        category: ModelCategory? = nil,
+        artifactType: ModelArtifactType? = nil,
         estimatedSize: Int64? = nil,
         supportsThinking: Bool = false
     ) -> ModelInfo {
@@ -231,8 +235,8 @@ public class RegistryService: ModelRegistry {
         // Detect format from URL
         let format = detectFormatFromURL(url)
 
-        // Determine category based on framework
-        let category = ModelCategory.from(framework: framework)
+        // Use provided category or infer from framework
+        let category = category ?? ModelCategory.from(framework: framework)
 
         let modelInfo = ModelInfo(
             id: modelId,
@@ -241,6 +245,7 @@ public class RegistryService: ModelRegistry {
             format: format,
             downloadURL: url,
             localPath: nil,
+            artifactType: artifactType, // Pass through - ModelInfo will infer if nil
             downloadSize: nil, // Will be determined during download
             memoryRequired: estimatedSize ?? estimateMemoryFromURL(url),
             compatibleFrameworks: [framework],
@@ -260,11 +265,11 @@ public class RegistryService: ModelRegistry {
     private func loadPreconfiguredModels() async {
         logger.debug("Loading pre-configured models")
 
-        // First, try to load models from configuration (remote or cached)
+        // Load configuration from service
         _ = await ServiceContainer.shared.configurationService.getConfiguration()
 
         // Load stored models from service
-        let modelInfoService = await ServiceContainer.shared.modelInfoService
+        let modelInfoService = ServiceContainer.shared.modelInfoService
         do {
             let storedModels = try await modelInfoService.loadStoredModels()
             logger.info("Loading \(storedModels.count) stored models")

@@ -87,27 +87,8 @@ public class ONNXSTTService: STTService { // swiftlint:disable:this type_body_le
                 modelDir = (modelPath as NSString).deletingLastPathComponent
             }
 
-            // Handle tar.bz2 archives using platform-native ArchiveUtility
-            if modelPath.hasSuffix(".tar.bz2") {
-                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                let pathNS = modelPath as NSString
-                let modelName = ((pathNS.deletingPathExtension as NSString).deletingPathExtension as NSString).lastPathComponent
-                let extractURL = documentsPath.appendingPathComponent("sherpa-models/\(modelName)")
-
-                logger.info("Extracting model archive to: \(extractURL.path)")
-
-                do {
-                    try ArchiveUtility.extractTarBz2Archive(
-                        from: URL(fileURLWithPath: modelPath),
-                        to: extractURL
-                    )
-                } catch {
-                    logger.error("Failed to extract model archive: \(error.localizedDescription)")
-                    throw ONNXError.modelLoadFailed("Failed to extract archive: \(error.localizedDescription)")
-                }
-
-                modelDir = extractURL.path
-            }
+            // Note: Archive extraction is handled by the SDK during download based on artifactType.
+            // Models should already be extracted when they reach this point.
 
             // Load STT model
             let loadStatus = ra_stt_load_model(backendHandle, modelDir, modelType, nil)
@@ -244,13 +225,6 @@ public class ONNXSTTService: STTService { // swiftlint:disable:this type_body_le
             // Paraformer detection
             if contents.contains(where: { $0.contains("paraformer") }) {
                 return "paraformer"
-            }
-        }
-
-        // Archive detection
-        if path.hasSuffix(".tar.bz2") {
-            if path.contains("zipformer") || path.contains("sherpa") {
-                return "zipformer"
             }
         }
 
