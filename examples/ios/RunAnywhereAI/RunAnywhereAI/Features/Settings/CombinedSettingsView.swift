@@ -11,7 +11,6 @@ import Combine
 
 struct CombinedSettingsView: View {
     // Settings state
-    @State private var routingPolicy = RoutingPolicy.automatic
     @State private var defaultTemperature = 0.7
     @State private var defaultMaxTokens = 10000
     @State private var showApiKeyEntry = false
@@ -32,9 +31,6 @@ struct CombinedSettingsView: View {
             #else
             iOSSettingsView
             #endif
-        }
-        .onChange(of: routingPolicy) {
-            updateSDKConfiguration()
         }
         .onChange(of: defaultTemperature) {
             updateSDKConfiguration()
@@ -58,16 +54,6 @@ struct CombinedSettingsView: View {
 
     private var iOSSettingsView: some View {
         Form {
-            // SDK Configuration
-            Section("SDK Configuration") {
-                Picker("Routing Policy", selection: $routingPolicy) {
-                    Text("Automatic").tag(RoutingPolicy.automatic)
-                    Text("Device Only").tag(RoutingPolicy.deviceOnly)
-                    Text("Prefer Device").tag(RoutingPolicy.preferDevice)
-                    Text("Prefer Cloud").tag(RoutingPolicy.preferCloud)
-                }
-            }
-
             // Generation Settings
             Section("Generation Settings") {
                 VStack(alignment: .leading) {
@@ -204,24 +190,6 @@ struct CombinedSettingsView: View {
                 Text("Settings")
                     .font(AppTypography.largeTitleBold)
                     .padding(.bottom, AppSpacing.medium)
-
-                // SDK Configuration Section
-                settingsCard(title: "SDK Configuration") {
-                    VStack(alignment: .leading, spacing: AppSpacing.padding15) {
-                        HStack {
-                            Text("Routing Policy")
-                                .frame(width: 150, alignment: .leading)
-                            Picker("", selection: $routingPolicy) {
-                                Text("Automatic").tag(RoutingPolicy.automatic)
-                                Text("Device Only").tag(RoutingPolicy.deviceOnly)
-                                Text("Prefer Device").tag(RoutingPolicy.preferDevice)
-                                Text("Prefer Cloud").tag(RoutingPolicy.preferCloud)
-                            }
-                            .pickerStyle(.segmented)
-                            .frame(maxWidth: 400)
-                        }
-                    }
-                }
 
                 // Generation Settings Section
                 settingsCard(title: "Generation Settings") {
@@ -574,7 +542,6 @@ struct CombinedSettingsView: View {
     // MARK: - Configuration Methods
 
     private func updateSDKConfiguration() {
-        UserDefaults.standard.set(routingPolicy.rawValue, forKey: "routingPolicy")
         UserDefaults.standard.set(defaultTemperature, forKey: "defaultTemperature")
         UserDefaults.standard.set(defaultMaxTokens, forKey: "defaultMaxTokens")
 
@@ -587,12 +554,6 @@ struct CombinedSettingsView: View {
             apiKey = savedApiKey
         }
 
-        if let policyRaw = UserDefaults.standard.string(forKey: "routingPolicy"),
-           let policy = RoutingPolicy(rawValue: policyRaw) {
-            routingPolicy = policy
-        } else {
-            routingPolicy = .automatic
-        }
         defaultTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
         if defaultTemperature == 0 { defaultTemperature = 0.7 }
 

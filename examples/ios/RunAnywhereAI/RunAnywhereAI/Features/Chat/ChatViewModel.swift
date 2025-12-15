@@ -167,7 +167,7 @@ class ChatViewModel: ObservableObject {
     @Published var isGenerating = false
     @Published var currentInput = ""
     @Published var error: Error?
-    @Published var selectedFramework: LLMFramework?
+    @Published var selectedFramework: InferenceFramework?
     @Published var isModelLoaded = false
     @Published var loadedModelName: String?
     @Published var useStreaming = true  // Enable streaming for real-time token display
@@ -223,44 +223,73 @@ class ChatViewModel: ObservableObject {
         // Analytics will be initialized when the view appears or when first used
     }
 
-    /// Subscribe to SDK's model lifecycle tracker for real-time model state updates
+    /// Subscribe to SDK events for real-time model state updates
     private func subscribeToModelLifecycle() {
-        // Observe changes to loaded models via the SDK's lifecycle tracker
-        lifecycleCancellable = ModelLifecycleTracker.shared.$modelsByModality
+        // Subscribe to LLM events via EventBus
+        lifecycleCancellable = RunAnywhere.events.events
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] modelsByModality in
+            .sink { [weak self] event in
                 guard let self = self else { return }
-
-                // Check if LLM is loaded
-                if let llmState = modelsByModality[.llm] {
-                    let wasLoaded = self.isModelLoaded
-                    self.isModelLoaded = llmState.state.isLoaded
-                    self.loadedModelName = llmState.modelName
-                    self.selectedFramework = llmState.framework
-
-                    // Log state change
-                    if llmState.state.isLoaded && !wasLoaded {
-                        self.logger.info("✅ LLM model loaded via lifecycle tracker: \(llmState.modelName)")
-                        // Add system message when model becomes loaded
-                        if self.messages.first?.role != .system {
-                            self.addSystemMessage()
-                        }
-                    } else if llmState.state.isLoading {
-                        self.logger.info("⏳ LLM model loading: \(llmState.modelName)")
-                    }
-                } else {
-                    self.isModelLoaded = false
-                    self.loadedModelName = nil
-                    self.selectedFramework = nil
-                }
+                self.handleSDKEvent(event)
             }
 
-        // Also check initial state
-        if let llmState = ModelLifecycleTracker.shared.modelsByModality[.llm] {
-            isModelLoaded = llmState.state.isLoaded
-            loadedModelName = llmState.modelName
-            selectedFramework = llmState.framework
-            logger.info("📊 Initial LLM state: loaded=\(self.isModelLoaded), model=\(self.loadedModelName ?? "none")")
+        // Check initial state from SDK
+        Task {
+            await checkModelStatusFromSDK()
+        }
+    }
+
+    /// Handle SDK events to update model state
+    private func handleSDKEvent(_ event: any SDKEvent) {
+        // Check for LLM model load/unload events
+        if let llmEvent = event as? LLMEvent {
+            switch llmEvent {
+            case .modelLoadCompleted(let modelId, _, _):
+                let wasLoaded = self.isModelLoaded
+                self.isModelLoaded = true
+
+                // Get the model info from the view model
+                if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
+                    self.loadedModelName = matchingModel.name
+                    self.selectedFramework = matchingModel.preferredFramework
+                }
+
+                // Add system message when model becomes loaded
+                if !wasLoaded {
+                    self.logger.info("✅ LLM model loaded via SDK event: \(self.loadedModelName ?? modelId)")
+                    if self.messages.first?.role != .system {
+                        self.addSystemMessage()
+                    }
+                }
+
+            case .modelUnloaded(let modelId):
+                self.logger.info("ℹ️ LLM model unloaded: \(modelId)")
+                self.isModelLoaded = false
+                self.loadedModelName = nil
+                self.selectedFramework = nil
+
+            case .modelLoadStarted(let modelId):
+                self.logger.info("⏳ LLM model loading: \(modelId)")
+
+            default:
+                break
+            }
+        }
+    }
+
+    /// Check model status from SDK
+    private func checkModelStatusFromSDK() async {
+        let isLoaded = await RunAnywhere.isModelLoaded
+        let modelId = await RunAnywhere.getCurrentModelId()
+
+        await MainActor.run {
+            self.isModelLoaded = isLoaded
+            if let id = modelId,
+               let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == id }) {
+                self.loadedModelName = matchingModel.name
+                self.selectedFramework = matchingModel.preferredFramework
+            }
+            self.logger.info("📊 Initial LLM state: loaded=\(self.isModelLoaded), model=\(self.loadedModelName ?? "none")")
         }
     }
 
@@ -360,10 +389,9 @@ class ChatViewModel: ObservableObject {
                     maxTokens: savedMaxTokens != 0 ? savedMaxTokens : 1000  // Default to 1000 tokens for chat
                 )
 
-                let options = RunAnywhereGenerationOptions(
+                let options = LLMGenerationOptions(
                     maxTokens: effectiveSettings.maxTokens,
                     temperature: Float(effectiveSettings.temperature)
-                    // No context passed - it's all in the prompt now
                 )
 
                 logger.info("📝 Generation options created, useStreaming: \(self.useStreaming)")
@@ -597,6 +625,11 @@ class ChatViewModel: ObservableObject {
     func stopGeneration() {
         generationTask?.cancel()
         isGenerating = false
+
+        // Also cancel at SDK level
+        Task {
+            await RunAnywhere.cancelGeneration()
+        }
     }
 
     func loadModel(_ modelInfo: ModelInfo) async {
@@ -848,15 +881,15 @@ class ChatViewModel: ObservableObject {
 
     // MARK: - Analytics Service
 
-    /// Convert SDK's GenerationResult to MessageAnalytics (NEW - uses SDK metrics!)
+    /// Convert SDK's LLMGenerationResult to MessageAnalytics (uses SDK metrics)
     private func analyticsFromGenerationResult(
-        _ result: GenerationResult,
+        _ result: LLMGenerationResult,
         messageId: String,
         conversationId: String,
         startTime: Date,
         inputText: String,
         wasInterrupted: Bool = false,
-        options: RunAnywhereGenerationOptions
+        options: LLMGenerationOptions
     ) -> MessageAnalytics? {
         guard let modelName = loadedModelName,
               let currentModel = ModelListViewModel.shared.currentModel else {

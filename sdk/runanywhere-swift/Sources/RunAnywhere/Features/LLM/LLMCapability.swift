@@ -67,6 +67,17 @@ public actor LLMCapability: ModelLoadableCapability {
         await managedLifecycle.reset()
     }
 
+    /// Cancel the current generation operation
+    /// - Note: This is a best-effort cancellation; some backends may not support mid-generation cancellation
+    public func cancel() async {
+        // Get the current service if available
+        if let service = await managedLifecycle.currentService {
+            // Try to cancel if the service supports it
+            await service.cancel()
+        }
+        logger.info("Generation cancellation requested")
+    }
+
     // MARK: - Generation
 
     /// Generate text from a prompt

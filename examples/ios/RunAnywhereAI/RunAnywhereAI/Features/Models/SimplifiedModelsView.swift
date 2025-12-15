@@ -13,8 +13,8 @@ struct SimplifiedModelsView: View {
     @StateObject private var deviceInfo = DeviceInfoService.shared
 
     @State private var selectedModel: ModelInfo?
-    @State private var expandedFramework: LLMFramework?
-    @State private var availableFrameworks: [LLMFramework] = []
+    @State private var expandedFramework: InferenceFramework?
+    @State private var availableFrameworks: [InferenceFramework] = []
     @State private var showingAddModelSheet = false
 
     var body: some View {
@@ -63,8 +63,10 @@ struct SimplifiedModelsView: View {
     }
 
     private func loadAvailableFrameworks() async {
-        // Get available frameworks from SDK
-        let frameworks = RunAnywhere.getAvailableFrameworks()
+        // Get available frameworks from SDK - derived from registered models
+        let frameworks = await MainActor.run {
+            RunAnywhere.getRegisteredFrameworks()
+        }
         await MainActor.run {
             self.availableFrameworks = frameworks
         }
@@ -192,7 +194,7 @@ struct SimplifiedModelsView: View {
         }
     }
 
-    private func toggleFramework(_ framework: LLMFramework) {
+    private func toggleFramework(_ framework: InferenceFramework) {
         withAnimation {
             if expandedFramework == framework {
                 expandedFramework = nil
@@ -373,19 +375,18 @@ private struct ModelRow: View {
         }
 
         do {
-            // Use the progress-enabled download API
-            let progressStream = try await RunAnywhere.downloadModelWithProgress(model.id)
+            // Use the new convenience download API
+            let progressStream = try await RunAnywhere.downloadModel(model.id)
 
             // Process progress updates
             for await progress in progressStream {
                 await MainActor.run {
-                    self.downloadProgress = progress.percentage
-                    print("Download progress for \(model.name): \(Int(progress.percentage * 100))%")
+                    self.downloadProgress = progress.overallProgress
+                    print("Download progress for \(model.name): \(Int(progress.overallProgress * 100))%")
                 }
 
-                // Check if download completed or failed
-                switch progress.state {
-                case .completed:
+                // Check if download completed
+                if progress.stage == .completed {
                     await MainActor.run {
                         self.downloadProgress = 1.0
                         self.isDownloading = false
@@ -393,19 +394,14 @@ private struct ModelRow: View {
                         print("Model \(model.name) downloaded successfully")
                     }
                     return
-
-                case .failed(let error):
-                    await MainActor.run {
-                        self.downloadProgress = 0.0
-                        self.isDownloading = false
-                        print("Download failed for \(model.name): \(error.localizedDescription)")
-                    }
-                    return
-
-                default:
-                    // Continue processing progress updates
-                    continue
                 }
+            }
+
+            // If we exit the loop normally, download completed
+            await MainActor.run {
+                self.downloadProgress = 1.0
+                self.isDownloading = false
+                onDownloadCompleted()
             }
 
         } catch {

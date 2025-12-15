@@ -1,5 +1,72 @@
 import Foundation
 
+// MARK: - Model Registration API
+
+public extension RunAnywhere {
+
+    /// Register a model from a download URL
+    /// Use this to add models for development or offline use
+    /// - Parameters:
+    ///   - name: Display name for the model
+    ///   - url: Download URL for the model (e.g., HuggingFace)
+    ///   - framework: Target inference framework
+    ///   - modality: Model category (default: .language for LLMs)
+    ///   - memoryRequirement: Estimated memory usage in bytes
+    ///   - supportsThinking: Whether the model supports reasoning/thinking
+    /// - Returns: The created ModelInfo
+    @MainActor
+    @discardableResult
+    static func registerModel(
+        name: String,
+        url: URL,
+        framework: InferenceFramework,
+        modality: ModelCategory = .language,
+        memoryRequirement: Int64? = nil,
+        supportsThinking: Bool = false
+    ) -> ModelInfo {
+        return serviceContainer.modelRegistry.addModelFromURL(
+            name: name,
+            url: url,
+            framework: framework,
+            estimatedSize: memoryRequirement,
+            supportsThinking: supportsThinking
+        )
+    }
+
+    /// Register a model from a URL string
+    /// - Parameters:
+    ///   - name: Display name for the model
+    ///   - urlString: Download URL string for the model
+    ///   - framework: Target inference framework
+    ///   - modality: Model category (default: .language for LLMs)
+    ///   - memoryRequirement: Estimated memory usage in bytes
+    ///   - supportsThinking: Whether the model supports reasoning/thinking
+    /// - Returns: The created ModelInfo, or nil if URL is invalid
+    @MainActor
+    @discardableResult
+    static func registerModel(
+        name: String,
+        urlString: String,
+        framework: InferenceFramework,
+        modality: ModelCategory = .language,
+        memoryRequirement: Int64? = nil,
+        supportsThinking: Bool = false
+    ) -> ModelInfo? {
+        guard let url = URL(string: urlString) else {
+            SDKLogger(category: "RunAnywhere.Models").error("Invalid URL: \(urlString)")
+            return nil
+        }
+        return registerModel(
+            name: name,
+            url: url,
+            framework: framework,
+            modality: modality,
+            memoryRequirement: memoryRequirement,
+            supportsThinking: supportsThinking
+        )
+    }
+}
+
 // MARK: - Model Assignments API
 
 extension RunAnywhere {

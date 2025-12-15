@@ -46,8 +46,8 @@ struct ModelSelectionSheet: View {
     @Environment(\.dismiss) var dismiss
 
     @State private var selectedModel: ModelInfo?
-    @State private var expandedFramework: LLMFramework?
-    @State private var availableFrameworks: [LLMFramework] = []
+    @State private var expandedFramework: InferenceFramework?
+    @State private var availableFrameworks: [InferenceFramework] = []
     @State private var showingAddModelSheet = false
     @State private var isLoadingModel = false
     @State private var loadingProgress: String = ""
@@ -162,7 +162,9 @@ struct ModelSelectionSheet: View {
     }
 
     private func loadAvailableFrameworks() async {
-        let allFrameworks = RunAnywhere.getAvailableFrameworks()
+        let allFrameworks = await MainActor.run {
+            RunAnywhere.getRegisteredFrameworks()
+        }
 
         // Filter frameworks based on context by checking if they have relevant models
         var filteredFrameworks = allFrameworks.filter { framework in
@@ -170,7 +172,7 @@ struct ModelSelectionSheet: View {
         }
 
         // For TTS context, always include System TTS as an option
-        if context == .tts {
+        if context == .tts && !filteredFrameworks.contains(.systemTTS) {
             // Add System TTS at the beginning of the list
             filteredFrameworks.insert(.systemTTS, at: 0)
         }
@@ -181,7 +183,7 @@ struct ModelSelectionSheet: View {
     }
 
     /// Determines if a framework should be shown based on the current context
-    private func shouldShowFramework(_ framework: LLMFramework) -> Bool {
+    private func shouldShowFramework(_ framework: InferenceFramework) -> Bool {
         // Get models for this framework
         let modelsForFramework = viewModel.availableModels.filter { model in
             if framework == .foundationModels {
@@ -442,7 +444,7 @@ struct ModelSelectionSheet: View {
         }
     }
 
-    private func toggleFramework(_ framework: LLMFramework) {
+    private func toggleFramework(_ framework: InferenceFramework) {
         withAnimation {
             if expandedFramework == framework {
                 expandedFramework = nil
@@ -715,19 +717,18 @@ private struct SelectableModelRow: View {
         }
 
         do {
-            // Use the progress-enabled download API
-            let progressStream = try await RunAnywhere.downloadModelWithProgress(model.id)
+            // Use the Download service to download the model
+            let task = try await Download.shared.downloadModel(model)
 
             // Process progress updates
-            for await progress in progressStream {
+            for await progress in task.progress {
                 await MainActor.run {
-                    self.downloadProgress = progress.percentage
-                    print("Download progress for \(model.name): \(Int(progress.percentage * 100))%")
+                    self.downloadProgress = progress.overallProgress
+                    print("Download progress for \(model.name): \(Int(progress.overallProgress * 100))%")
                 }
 
-                // Check if download completed or failed
-                switch progress.state {
-                case .completed:
+                // Check if download completed
+                if progress.stage == .completed {
                     await MainActor.run {
                         self.downloadProgress = 1.0
                         self.isDownloading = false
@@ -735,19 +736,14 @@ private struct SelectableModelRow: View {
                         print("Model \(model.name) downloaded successfully")
                     }
                     return
-
-                case .failed(let error):
-                    await MainActor.run {
-                        self.downloadProgress = 0.0
-                        self.isDownloading = false
-                        print("Download failed for \(model.name): \(error.localizedDescription)")
-                    }
-                    return
-
-                default:
-                    // Continue processing progress updates
-                    continue
                 }
+            }
+
+            // If we exit the loop normally, download completed
+            await MainActor.run {
+                self.downloadProgress = 1.0
+                self.isDownloading = false
+                onDownloadCompleted()
             }
 
         } catch {

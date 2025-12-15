@@ -15,7 +15,7 @@ import AppKit
 
 /// A banner that shows the current model status (framework + model name) or prompts to select a model
 struct ModelStatusBanner: View {
-    let framework: LLMFramework?
+    let framework: InferenceFramework?
     let modelName: String?
     let isLoading: Bool
     let onSelectModel: () -> Void
@@ -93,7 +93,7 @@ struct ModelStatusBanner: View {
         .cornerRadius(12)
     }
 
-    private func frameworkIcon(for framework: LLMFramework) -> String {
+    private func frameworkIcon(for framework: InferenceFramework) -> String {
         switch framework {
         case .llamaCpp: return "cpu"
         case .whisperKit: return "waveform"
@@ -103,7 +103,7 @@ struct ModelStatusBanner: View {
         }
     }
 
-    private func frameworkColor(for framework: LLMFramework) -> Color {
+    private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .llamaCpp: return .blue
         case .whisperKit: return .green
@@ -196,9 +196,9 @@ struct ModelRequiredOverlay: View {
 
 /// A setup view specifically for Voice Assistant which requires 3 models
 struct VoicePipelineSetupView: View {
-    @Binding var sttModel: (framework: LLMFramework, name: String)?
-    @Binding var llmModel: (framework: LLMFramework, name: String)?
-    @Binding var ttsModel: (framework: LLMFramework, name: String)?
+    @Binding var sttModel: (framework: InferenceFramework, name: String)?
+    @Binding var llmModel: (framework: InferenceFramework, name: String)?
+    @Binding var ttsModel: (framework: InferenceFramework, name: String)?
 
     // Model loading states from SDK lifecycle tracker
     var sttLoadState: ModelLoadState = .notLoaded
@@ -325,7 +325,7 @@ struct ModelSetupCard: View {
     let subtitle: String
     let icon: String
     let color: Color
-    let selectedFramework: LLMFramework?
+    let selectedFramework: InferenceFramework?
     let selectedModel: String?
     var loadState: ModelLoadState = .notLoaded
     let onSelect: () -> Void
@@ -477,7 +477,7 @@ struct ModelSetupCard: View {
 
 /// A compact indicator showing current model status for use in navigation bars
 struct CompactModelIndicator: View {
-    let framework: LLMFramework?
+    let framework: InferenceFramework?
     let modelName: String?
     let isLoading: Bool
     let onTap: () -> Void
@@ -511,7 +511,7 @@ struct CompactModelIndicator: View {
         }
     }
 
-    private func frameworkColor(for framework: LLMFramework) -> Color {
+    private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .llamaCpp: return .blue
         case .whisperKit: return .green
