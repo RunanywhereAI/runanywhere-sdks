@@ -297,7 +297,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         model: ModelInfo,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        guard case .archive(let archiveType, _) = model.artifactType else {
+        guard case .archive(let archiveType, _, _) = model.artifactType else {
             throw DownloadError.extractionFailed("Model does not require extraction")
         }
 
@@ -375,7 +375,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
 
     /// Get archive extension from artifact type
     private func getArchiveExtension(for artifactType: ModelArtifactType) -> String {
-        guard case .archive(let archiveType, _) = artifactType else {
+        guard case .archive(let archiveType, _, _) = artifactType else {
             return "archive"
         }
         return archiveType.fileExtension

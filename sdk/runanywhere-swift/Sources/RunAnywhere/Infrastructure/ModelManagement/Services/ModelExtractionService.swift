@@ -3,6 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Centralized service for extracting model archives.
+//  Uses pure Swift extraction via SWCompression (no native C library dependency).
 //  Located in ModelManagement as it uses ModelArtifactType and is model-specific.
 //
 
@@ -54,6 +55,7 @@ public protocol ModelExtractionServiceProtocol: Sendable {
 // MARK: - Default Extraction Service
 
 /// Default implementation of the model extraction service
+/// Uses pure Swift extraction via SWCompression for all archive types
 public final class DefaultModelExtractionService: ModelExtractionServiceProtocol, @unchecked Sendable {
     private let logger = SDKLogger(category: "ModelExtractionService")
 
@@ -67,7 +69,7 @@ public final class DefaultModelExtractionService: ModelExtractionServiceProtocol
     ) async throws -> ExtractionResult {
         let startTime = Date()
 
-        guard case .archive(let archiveType, let structure) = artifactType else {
+        guard case .archive(let archiveType, let structure, _) = artifactType else {
             throw DownloadError.extractionFailed("Artifact type does not require extraction")
         }
 
@@ -83,12 +85,16 @@ public final class DefaultModelExtractionService: ModelExtractionServiceProtocol
         // Report starting
         progressHandler?(0.0)
 
-        // Perform extraction based on archive type
+        // Perform extraction based on archive type using pure Swift (SWCompression)
         switch archiveType {
         case .zip:
-            try await extractZip(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
-        case .tarBz2, .tarGz, .tarXz:
-            try await extractTar(from: archiveURL, to: destinationURL, type: archiveType, progressHandler: progressHandler)
+            try ArchiveUtility.extractZipArchive(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
+        case .tarBz2:
+            try ArchiveUtility.extractTarBz2Archive(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
+        case .tarGz:
+            try ArchiveUtility.extractTarGzArchive(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
+        case .tarXz:
+            try ArchiveUtility.extractTarXzArchive(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
         }
 
         // Find the actual model path based on structure
@@ -116,76 +122,10 @@ public final class DefaultModelExtractionService: ModelExtractionServiceProtocol
         )
     }
 
-    // MARK: - Private Extraction Methods
-
-    private func extractZip(
-        from archiveURL: URL,
-        to destinationURL: URL,
-        progressHandler: ((Double) -> Void)?
-    ) async throws {
-        logger.debug("Extracting ZIP archive")
-
-        // ZIP extraction via ZIPFoundation (wrapped in ArchiveUtility)
-        try ArchiveUtility.extractZipArchive(from: archiveURL, to: destinationURL)
-
-        // ZIP extraction doesn't provide granular progress, so just report completion
-        progressHandler?(1.0)
-    }
-
-    private func extractTar(
-        from archiveURL: URL,
-        to destinationURL: URL,
-        type: ArchiveType,
-        progressHandler: ((Double) -> Void)?
-    ) async throws {
-        logger.debug("Extracting tar archive: \(type.rawValue)")
-
-        // For tar archives, try native extraction first (via runanywhere-core C library)
-        // This is available when the xcframework includes libarchive support
-
-        #if canImport(CRunAnywhereCore)
-        try extractTarNative(from: archiveURL, to: destinationURL)
-        #else
-        // Fallback to Swift-based extraction (limited support)
-        switch type {
-        case .tarBz2:
-            try ArchiveUtility.extractTarBz2Archive(from: archiveURL, to: destinationURL)
-        default:
-            throw DownloadError.unsupportedArchive(type.rawValue)
-        }
-        #endif
-
-        progressHandler?(1.0)
-    }
-
-    #if canImport(CRunAnywhereCore)
-    private func extractTarNative(from archiveURL: URL, to destinationURL: URL) throws {
-        // Use the native C implementation from runanywhere-core
-        let result = archiveURL.path.withCString { archivePath in
-            destinationURL.path.withCString { destPath in
-                ra_extract_archive(archivePath, destPath)
-            }
-        }
-
-        switch result {
-        case RA_SUCCESS:
-            logger.debug("Native archive extraction succeeded")
-        case RA_ERROR_NOT_IMPLEMENTED:
-            throw DownloadError.extractionFailed("Archive extraction not available (libarchive not linked)")
-        case RA_ERROR_IO:
-            throw DownloadError.extractionFailed("Archive extraction failed: I/O error")
-        default:
-            throw DownloadError.extractionFailed("Archive extraction failed with code: \(result.rawValue)")
-        }
-    }
-    #endif
-
     // MARK: - Helper Methods
 
     /// Find the actual model path based on archive structure
     private func findModelPath(in extractedDir: URL, structure: ArchiveStructure) -> URL {
-        let fm = FileManager.default
-
         switch structure {
         case .singleFileNested:
             // Look for a single model file, possibly in a subdirectory
@@ -194,20 +134,36 @@ public final class DefaultModelExtractionService: ModelExtractionServiceProtocol
         case .nestedDirectory:
             // Common pattern: archive contains one subdirectory with all the files
             // e.g., sherpa-onnx archives extract to: extractedDir/vits-xxx/
-            if let contents = try? fm.contentsOfDirectory(at: extractedDir, includingPropertiesForKeys: [.isDirectoryKey]),
-               contents.count == 1,
-               let first = contents.first {
-                var isDir: ObjCBool = false
-                if fm.fileExists(atPath: first.path, isDirectory: &isDir), isDir.boolValue {
-                    return first
-                }
-            }
-            return extractedDir
+            return findNestedDirectory(in: extractedDir)
 
         case .directoryBased, .unknown:
             // Return the extraction directory itself
             return extractedDir
         }
+    }
+
+    /// Find nested directory (for archives that extract to a subdirectory)
+    private func findNestedDirectory(in extractedDir: URL) -> URL {
+        let fm = FileManager.default
+
+        guard let contents = try? fm.contentsOfDirectory(at: extractedDir, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            return extractedDir
+        }
+
+        // Filter out hidden files and macOS resource forks
+        let visibleContents = contents.filter {
+            !$0.lastPathComponent.hasPrefix(".") && !$0.lastPathComponent.hasPrefix("._")
+        }
+
+        // If there's a single visible subdirectory, return it
+        if visibleContents.count == 1, let first = visibleContents.first {
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: first.path, isDirectory: &isDir), isDir.boolValue {
+                return first
+            }
+        }
+
+        return extractedDir
     }
 
     /// Find a single model file in a directory (recursive, up to 2 levels)

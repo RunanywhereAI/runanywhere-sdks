@@ -11,7 +11,7 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
     // MARK: - Core Registries
 
     /// Model registry for managing model information
-    private(set) lazy var modelRegistry: ModelRegistry = {
+    public private(set) lazy var modelRegistry: ModelRegistry = {
         RegistryService()
     }()
 
@@ -106,8 +106,8 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
 
     // MARK: - Data Services
 
-    /// Configuration service
-    private var _configurationService: ConfigurationService?
+    /// Configuration service (internal access for optional checking in development mode)
+    internal var _configurationService: ConfigurationService?
     public var configurationService: ConfigurationService {
         guard let service = _configurationService else {
             fatalError("ConfigurationService not initialized. Call RunAnywhere.initialize() first.")
@@ -119,8 +119,8 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         _configurationService = service
     }
 
-    /// Model info service
-    private var _modelInfoService: ModelInfoService?
+    /// Model info service (internal access for optional checking in development mode)
+    internal var _modelInfoService: ModelInfoService?
     public var modelInfoService: ModelInfoService {
         guard let service = _modelInfoService else {
             fatalError("ModelInfoService not initialized. Call RunAnywhere.initialize() first.")

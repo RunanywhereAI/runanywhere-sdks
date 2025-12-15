@@ -44,6 +44,7 @@ public enum FluidAudio: RunAnywhereModule {
 
     public static let moduleId = "fluidaudio"
     public static let moduleName = "FluidAudio"
+    public static let inferenceFramework: InferenceFramework = .fluidAudio
     public static let capabilities: Set<CapabilityType> = [.speakerDiarization]
     public static let defaultPriority: Int = 100
 

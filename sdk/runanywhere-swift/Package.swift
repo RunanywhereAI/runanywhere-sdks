@@ -94,6 +94,8 @@ let package = Package(
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.57.1"),
         .package(url: "https://github.com/kean/Pulse", from: "4.0.0"),
+        // SWCompression for pure Swift tar.bz2/tar.gz extraction (replaces native C dependency)
+        .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
 
         // WhisperKit dependency
         .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.13.1"),
@@ -115,6 +117,8 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
                 .product(name: "Pulse", package: "Pulse"),
+                // SWCompression for pure Swift tar.bz2/tar.gz extraction
+                .product(name: "SWCompression", package: "SWCompression"),
             ],
             path: "Sources/RunAnywhere",
             exclude: [

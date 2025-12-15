@@ -240,34 +240,10 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
         var modelDir = modelPath
         var isDirectory: ObjCBool = false
 
+        // Note: Archive extraction is handled by the SDK during download based on artifactType.
+        // Models should already be extracted when they reach this point.
         if fileManager.fileExists(atPath: modelPath, isDirectory: &isDirectory) && !isDirectory.boolValue {
             modelDir = (modelPath as NSString).deletingLastPathComponent
-        }
-
-        // Handle tar.bz2 archives using platform-native ArchiveUtility
-        if modelPath.hasSuffix(".tar.bz2") {
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let pathNS = modelPath as NSString
-            let baseName = (pathNS.deletingPathExtension as NSString).deletingPathExtension as NSString
-            let modelName = baseName.lastPathComponent
-            let extractURL = documentsPath.appendingPathComponent("sherpa-models/tts/\(modelName)")
-
-            logger.info("Extracting TTS model archive to: \(extractURL.path)")
-
-            // Check if already extracted
-            if !fileManager.fileExists(atPath: extractURL.path) {
-                do {
-                    try ArchiveUtility.extractTarBz2Archive(
-                        from: URL(fileURLWithPath: modelPath),
-                        to: extractURL
-                    )
-                } catch {
-                    logger.error("Failed to extract TTS model archive: \(error.localizedDescription)")
-                    throw ONNXError.modelLoadFailed("Failed to extract archive: \(error.localizedDescription)")
-                }
-            }
-
-            modelDir = extractURL.path
         }
 
         return modelDir

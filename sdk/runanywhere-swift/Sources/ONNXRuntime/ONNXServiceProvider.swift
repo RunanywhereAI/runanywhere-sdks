@@ -46,6 +46,9 @@ public enum ONNX: RunAnywhereModule {
     public static let capabilities: Set<CapabilityType> = [.stt, .tts]
     public static let defaultPriority: Int = 100
 
+    /// ONNX uses the ONNX Runtime inference framework
+    public static let inferenceFramework: InferenceFramework = .onnx
+
     /// Register all ONNX services with the SDK
     @MainActor
     public static func register(priority: Int) {

@@ -42,6 +42,7 @@ public enum WhisperKit: RunAnywhereModule {
 
     public static let moduleId = "whisperkit"
     public static let moduleName = "WhisperKit"
+    public static let inferenceFramework: InferenceFramework = .whisperKit
     public static let capabilities: Set<CapabilityType> = [.stt]
     public static let defaultPriority: Int = 100
 

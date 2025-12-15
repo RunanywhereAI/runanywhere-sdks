@@ -101,29 +101,29 @@ public final class ModelBuilder {
 
     /// Mark as a single file download (no extraction needed)
     @discardableResult
-    public func singleFile() -> ModelBuilder {
-        self.artifactType = .singleFile
+    public func singleFile(expectedFiles: ExpectedModelFiles = .none) -> ModelBuilder {
+        self.artifactType = .singleFile(expectedFiles: expectedFiles)
         return self
     }
 
     /// Mark as a ZIP archive
     @discardableResult
-    public func zipArchive(structure: ArchiveStructure = .directoryBased) -> ModelBuilder {
-        self.artifactType = .archive(.zip, structure: structure)
+    public func zipArchive(structure: ArchiveStructure = .directoryBased, expectedFiles: ExpectedModelFiles = .none) -> ModelBuilder {
+        self.artifactType = .archive(.zip, structure: structure, expectedFiles: expectedFiles)
         return self
     }
 
     /// Mark as a tar.bz2 archive
     @discardableResult
-    public func tarBz2Archive(structure: ArchiveStructure = .nestedDirectory) -> ModelBuilder {
-        self.artifactType = .archive(.tarBz2, structure: structure)
+    public func tarBz2Archive(structure: ArchiveStructure = .nestedDirectory, expectedFiles: ExpectedModelFiles = .none) -> ModelBuilder {
+        self.artifactType = .archive(.tarBz2, structure: structure, expectedFiles: expectedFiles)
         return self
     }
 
     /// Mark as a tar.gz archive
     @discardableResult
-    public func tarGzArchive(structure: ArchiveStructure = .nestedDirectory) -> ModelBuilder {
-        self.artifactType = .archive(.tarGz, structure: structure)
+    public func tarGzArchive(structure: ArchiveStructure = .nestedDirectory, expectedFiles: ExpectedModelFiles = .none) -> ModelBuilder {
+        self.artifactType = .archive(.tarGz, structure: structure, expectedFiles: expectedFiles)
         return self
     }
 
