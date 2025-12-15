@@ -388,7 +388,7 @@ class TTSViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere", category: "TTS")
 
     // MARK: - Published Properties
-    @Published var selectedFramework: LLMFramework?
+    @Published var selectedFramework: InferenceFramework?
     @Published var selectedModelName: String?
     @Published var selectedModelId: String?
     @Published var isGenerating = false

@@ -9,7 +9,7 @@ import SwiftUI
 import RunAnywhere
 
 struct FrameworkRow: View {
-    let framework: LLMFramework
+    let framework: InferenceFramework
     let isExpanded: Bool
     let onTap: () -> Void
 

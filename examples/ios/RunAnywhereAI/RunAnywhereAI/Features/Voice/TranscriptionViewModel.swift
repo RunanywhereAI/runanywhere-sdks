@@ -30,7 +30,7 @@ class TranscriptionViewModel: ObservableObject {
 
     // MARK: - Model Loading State (from SDK lifecycle tracker)
     @Published var sttModelState: ModelLoadState = .notLoaded
-    @Published var selectedFramework: LLMFramework?
+    @Published var selectedFramework: InferenceFramework?
 
     /// Check if STT model is loaded
     var isModelLoaded: Bool {

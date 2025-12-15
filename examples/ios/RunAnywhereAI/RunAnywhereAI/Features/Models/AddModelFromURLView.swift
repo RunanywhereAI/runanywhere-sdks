@@ -13,7 +13,7 @@ struct AddModelFromURLView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var modelName: String = ""
     @State private var modelURL: String = ""
-    @State private var selectedFramework: LLMFramework = .llamaCpp
+    @State private var selectedFramework: InferenceFramework = .llamaCpp
     @State private var estimatedSize: String = ""
     @State private var supportsThinking = false
     @State private var thinkingOpenTag = "<thinking>"
@@ -21,7 +21,7 @@ struct AddModelFromURLView: View {
     @State private var useCustomThinkingTags = false
     @State private var isAdding = false
     @State private var errorMessage: String?
-    @State private var availableFrameworks: [LLMFramework] = []
+    @State private var availableFrameworks: [InferenceFramework] = []
 
     let onModelAdded: (ModelInfo) -> Void
 
@@ -159,7 +159,9 @@ struct AddModelFromURLView: View {
     }
 
     private func loadAvailableFrameworks() async {
-        let frameworks = RunAnywhere.getAvailableFrameworks()
+        let frameworks = await MainActor.run {
+            RunAnywhere.getRegisteredFrameworks()
+        }
         await MainActor.run {
             self.availableFrameworks = frameworks.isEmpty ? [.llamaCpp] : frameworks
             // Set default selection to first available framework
@@ -178,12 +180,16 @@ struct AddModelFromURLView: View {
         isAdding = true
         errorMessage = nil
 
-        // Use the simplified addModelFromURL API which doesn't throw
-        let modelInfo = await RunAnywhere.addModelFromURL(
-            url,
-            name: modelName,
-            type: selectedFramework.rawValue
-        )
+        // Use the new registerModel API
+        let modelInfo = await MainActor.run {
+            RunAnywhere.registerModel(
+                name: modelName,
+                url: url,
+                framework: selectedFramework,
+                memoryRequirement: Int64(estimatedSize) ?? nil,
+                supportsThinking: supportsThinking
+            )
+        }
 
         await MainActor.run {
             onModelAdded(modelInfo)

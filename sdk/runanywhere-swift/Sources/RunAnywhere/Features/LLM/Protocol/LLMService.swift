@@ -59,6 +59,10 @@ public protocol LLMService: AnyObject {
 
     /// Clean up resources
     func cleanup() async
+
+    /// Cancel any ongoing generation
+    /// This is a best-effort operation; not all backends support mid-generation cancellation
+    func cancel() async
 }
 
 // MARK: - Default Implementation
@@ -79,5 +83,11 @@ extension LLMService {
         // This is NOT true streaming - just a compatibility fallback
         let response = try await generate(prompt: prompt, options: options)
         onToken(response)
+    }
+
+    /// Default implementation: no-op cancellation
+    /// Services that support cancellation should override this
+    public func cancel() async {
+        // Default: no-op - most services don't support mid-generation cancellation
     }
 }

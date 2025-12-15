@@ -282,7 +282,7 @@ class STTViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere", category: "STT")
 
     // MARK: - Published Properties
-    @Published var selectedFramework: LLMFramework?
+    @Published var selectedFramework: InferenceFramework?
     @Published var selectedModelName: String?
     @Published var selectedModelId: String?
     @Published var transcription: String = ""

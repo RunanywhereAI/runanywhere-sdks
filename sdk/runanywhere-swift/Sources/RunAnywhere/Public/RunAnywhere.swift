@@ -503,6 +503,52 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         return await serviceContainer.llmCapability.currentModelId
     }
 
+    /// Get the currently loaded LLM model as ModelInfo
+    ///
+    /// This is a convenience property that combines `getCurrentModelId()` with
+    /// a lookup in the available models registry.
+    ///
+    /// - Returns: The currently loaded ModelInfo, or nil if no model is loaded
+    public static var currentLLMModel: ModelInfo? {
+        get async {
+            guard let modelId = await getCurrentModelId() else { return nil }
+            let models = (try? await availableModels()) ?? []
+            return models.first { $0.id == modelId }
+        }
+    }
+
+    /// Get the currently loaded STT model as ModelInfo
+    ///
+    /// - Returns: The currently loaded STT ModelInfo, or nil if no STT model is loaded
+    public static var currentSTTModel: ModelInfo? {
+        get async {
+            guard isInitialized else { return nil }
+            guard let modelId = await serviceContainer.sttCapability.currentModelId else { return nil }
+            let models = (try? await availableModels()) ?? []
+            return models.first { $0.id == modelId }
+        }
+    }
+
+    /// Get the currently loaded TTS voice ID
+    ///
+    /// Note: TTS uses voices (not models), so this returns the voice identifier string.
+    /// - Returns: The TTS voice ID if one is loaded, nil otherwise
+    public static var currentTTSVoiceId: String? {
+        get async {
+            guard isInitialized else { return nil }
+            return await serviceContainer.ttsCapability.currentVoiceId
+        }
+    }
+
+    /// Cancel the current text generation
+    ///
+    /// Use this to stop an ongoing generation when the user navigates away
+    /// or explicitly requests cancellation.
+    public static func cancelGeneration() async {
+        guard isInitialized else { return }
+        await serviceContainer.llmCapability.cancel()
+    }
+
     // MARK: - Authentication Info
 
     /// Get current user ID

@@ -23,9 +23,9 @@ class VoiceAssistantViewModel: ObservableObject {
     @Published var audioLevel: Float = 0.0  // For audio level visualization
 
     // MARK: - Model Selection State (for Voice Pipeline Setup)
-    @Published var sttModel: (framework: LLMFramework, name: String)?
-    @Published var llmModel: (framework: LLMFramework, name: String)?
-    @Published var ttsModel: (framework: LLMFramework, name: String)?
+    @Published var sttModel: (framework: InferenceFramework, name: String)?
+    @Published var llmModel: (framework: InferenceFramework, name: String)?
+    @Published var ttsModel: (framework: InferenceFramework, name: String)?
 
     // MARK: - Model Loading State (from SDK lifecycle tracker)
     @Published var sttModelState: ModelLoadState = .notLoaded
