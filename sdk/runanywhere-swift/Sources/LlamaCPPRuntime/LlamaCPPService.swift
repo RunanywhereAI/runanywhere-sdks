@@ -140,7 +140,7 @@ public class LlamaCPPService {
             throw LlamaCPPError.invalidHandle
         }
 
-        logger.info("Loading model: \(path)")
+        logger.info("Loading model from: \(path)")
 
         let status = ra_text_load_model(backend, path, config)
         guard status == RA_SUCCESS else {

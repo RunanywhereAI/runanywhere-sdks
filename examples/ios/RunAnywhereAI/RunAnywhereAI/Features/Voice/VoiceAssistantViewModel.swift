@@ -42,6 +42,20 @@ class VoiceAssistantViewModel: ObservableObject {
         sttModelState.isLoaded && llmModelState.isLoaded && ttsModelState.isLoaded
     }
 
+    /// Convert SDK ComponentLoadState to local ModelLoadState
+    private func toModelLoadState(_ state: ComponentLoadState) -> ModelLoadState {
+        switch state {
+        case .notLoaded:
+            return .notLoaded
+        case .loading:
+            return .loading
+        case .loaded:
+            return .loaded
+        case .error(let message):
+            return .error(message)
+        }
+    }
+
     // Session state for UI
     enum SessionState: Equatable {
         case disconnected
@@ -130,19 +144,68 @@ class VoiceAssistantViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Check initial model states
+        // Check initial model states from SDK
+        refreshComponentStatesFromSDK()
+    }
+
+    /// Refresh all component states from the SDK
+    /// Call this on init and when returning to the voice assistant view
+    func refreshComponentStatesFromSDK() {
         Task {
-            let isLoaded = await RunAnywhere.isModelLoaded
-            llmModelState = isLoaded ? .loaded : .notLoaded
-            if let modelId = await RunAnywhere.getCurrentModelId(),
-               let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
-                llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
-                currentLLMModel = model.name
+            logger.info("Refreshing component states from SDK...")
+
+            // Use the new unified SDK API to get all component states at once
+            let componentStates = await RunAnywhere.getVoiceAgentComponentStates()
+
+            // Update STT state
+            sttModelState = toModelLoadState(componentStates.stt)
+            if case .loaded(let modelId) = componentStates.stt {
+                if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
+                    sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name)
+                    whisperModel = model.name
+                    logger.info("STT model loaded: \(model.name)")
+                } else {
+                    // Model ID exists but not in our list - still mark as loaded
+                    sttModel = (framework: .whisperKit, name: modelId)
+                    whisperModel = modelId
+                    logger.info("STT model loaded (external): \(modelId)")
+                }
             }
+
+            // Update LLM state
+            llmModelState = toModelLoadState(componentStates.llm)
+            if case .loaded(let modelId) = componentStates.llm {
+                if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
+                    llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
+                    currentLLMModel = model.name
+                    logger.info("LLM model loaded: \(model.name)")
+                } else {
+                    llmModel = (framework: .llamaCpp, name: modelId)
+                    currentLLMModel = modelId
+                    logger.info("LLM model loaded (external): \(modelId)")
+                }
+            }
+
+            // Update TTS state
+            ttsModelState = toModelLoadState(componentStates.tts)
+            if case .loaded(let voiceId) = componentStates.tts {
+                // For TTS, the voice ID might be a system voice or a custom model
+                if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == voiceId }) {
+                    ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
+                    logger.info("TTS model loaded: \(model.name)")
+                } else {
+                    // System voice or external voice
+                    ttsModel = (framework: .onnx, name: voiceId)
+                    logger.info("TTS voice loaded: \(voiceId)")
+                }
+            }
+
+            logger.info("Component states refreshed - STT: \(self.sttModelState.isLoaded), LLM: \(self.llmModelState.isLoaded), TTS: \(self.ttsModelState.isLoaded)")
         }
     }
 
     private func handleSDKEvent(_ event: any SDKEvent) {
+        // Handle LLM events
         if let llmEvent = event as? LLMEvent {
             switch llmEvent {
             case .modelLoadCompleted(let modelId, _, _):
@@ -150,11 +213,77 @@ class VoiceAssistantViewModel: ObservableObject {
                 if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
                     llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
                     currentLLMModel = model.name
+                } else {
+                    llmModel = (framework: .llamaCpp, name: modelId)
+                    currentLLMModel = modelId
                 }
+                logger.info("LLM model load completed: \(modelId)")
             case .modelUnloaded:
                 llmModelState = .notLoaded
+                llmModel = nil
+                currentLLMModel = ""
+                logger.info("LLM model unloaded")
             case .modelLoadStarted:
                 llmModelState = .loading
+                logger.info("LLM model loading started")
+            case .modelLoadFailed(_, let error, _):
+                llmModelState = .error(error)
+                logger.error("LLM model load failed: \(error)")
+            default:
+                break
+            }
+        }
+
+        // Handle STT events
+        if let sttEvent = event as? STTEvent {
+            switch sttEvent {
+            case .modelLoadCompleted(let modelId, _, _):
+                sttModelState = .loaded
+                if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
+                    sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name)
+                    whisperModel = model.name
+                } else {
+                    sttModel = (framework: .whisperKit, name: modelId)
+                    whisperModel = modelId
+                }
+                logger.info("STT model load completed: \(modelId)")
+            case .modelUnloaded:
+                sttModelState = .notLoaded
+                sttModel = nil
+                whisperModel = ""
+                logger.info("STT model unloaded")
+            case .modelLoadStarted:
+                sttModelState = .loading
+                logger.info("STT model loading started")
+            case .modelLoadFailed(_, let error, _):
+                sttModelState = .error(error)
+                logger.error("STT model load failed: \(error)")
+            default:
+                break
+            }
+        }
+
+        // Handle TTS events
+        if let ttsEvent = event as? TTSEvent {
+            switch ttsEvent {
+            case .modelLoadCompleted(let voiceId, _, _):
+                ttsModelState = .loaded
+                if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == voiceId }) {
+                    ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
+                } else {
+                    ttsModel = (framework: .onnx, name: voiceId)
+                }
+                logger.info("TTS voice load completed: \(voiceId)")
+            case .modelUnloaded:
+                ttsModelState = .notLoaded
+                ttsModel = nil
+                logger.info("TTS voice unloaded")
+            case .modelLoadStarted:
+                ttsModelState = .loading
+                logger.info("TTS voice loading started")
+            case .modelLoadFailed(_, let error, _):
+                ttsModelState = .error(error)
+                logger.error("TTS voice load failed: \(error)")
             default:
                 break
             }
@@ -162,43 +291,67 @@ class VoiceAssistantViewModel: ObservableObject {
     }
 
     private func updateModelInfo() {
-        Task {
-            if let modelId = await RunAnywhere.getCurrentModelId(),
-               let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
-                currentLLMModel = model.name
-                llmModelState = .loaded
-                llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
-                logger.info("Using LLM model: \(self.currentLLMModel)")
-            } else {
-                currentLLMModel = "No model loaded"
-                llmModelState = .notLoaded
-                logger.info("No LLM model currently loaded")
-            }
-        }
+        // Refresh all component states from SDK to get accurate in-memory states
+        refreshComponentStatesFromSDK()
     }
 
     // MARK: - Model Selection for Voice Pipeline
 
     /// Set the STT model for voice pipeline
+    /// Note: This sets the selection, but the actual load state comes from SDK events
     func setSTTModel(_ model: ModelInfo) {
-        sttModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
+        sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name)
         whisperModel = model.name
-        sttModelState = model.isDownloaded ? .loaded : .notLoaded
-        logger.info("Set STT model: \(model.name)")
+        logger.info("Selected STT model: \(model.name) (id: \(model.id))")
+
+        // Check if this model is already loaded in SDK
+        Task {
+            let states = await RunAnywhere.getVoiceAgentComponentStates()
+            if case .loaded(let loadedId) = states.stt, loadedId == model.id {
+                sttModelState = .loaded
+                logger.info("STT model \(model.name) is already loaded in SDK")
+            } else {
+                // Model selected but not loaded yet - will need to be loaded when starting voice
+                sttModelState = .notLoaded
+            }
+        }
     }
 
     /// Set the LLM model for voice pipeline
+    /// Note: This sets the selection, but the actual load state comes from SDK events
     func setLLMModel(_ model: ModelInfo) {
         llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
         currentLLMModel = model.name
-        logger.info("Set LLM model: \(model.name)")
+        logger.info("Selected LLM model: \(model.name) (id: \(model.id))")
+
+        // Check if this model is already loaded in SDK
+        Task {
+            let states = await RunAnywhere.getVoiceAgentComponentStates()
+            if case .loaded(let loadedId) = states.llm, loadedId == model.id {
+                llmModelState = .loaded
+                logger.info("LLM model \(model.name) is already loaded in SDK")
+            } else {
+                llmModelState = .notLoaded
+            }
+        }
     }
 
     /// Set the TTS model for voice pipeline
+    /// Note: This sets the selection, but the actual load state comes from SDK events
     func setTTSModel(_ model: ModelInfo) {
         ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
-        ttsModelState = model.isDownloaded ? .loaded : .notLoaded
-        logger.info("Set TTS model: \(model.name)")
+        logger.info("Selected TTS model: \(model.name) (id: \(model.id))")
+
+        // Check if this model/voice is already loaded in SDK
+        Task {
+            let states = await RunAnywhere.getVoiceAgentComponentStates()
+            if case .loaded(let loadedId) = states.tts, loadedId == model.id {
+                ttsModelState = .loaded
+                logger.info("TTS model \(model.name) is already loaded in SDK")
+            } else {
+                ttsModelState = .notLoaded
+            }
+        }
     }
 
     // MARK: - Conversation Control

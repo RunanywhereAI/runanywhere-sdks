@@ -84,8 +84,9 @@ public class RegistryService: ModelRegistry {
             let fileManager = ServiceContainer.shared.fileManager
             if fileManager.modelFolderExists(modelId: model.id, framework: framework) {
                 if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: framework) {
-                    updatedModel.localPath = folderURL
-                    logger.info("Found downloaded model \(model.id) at: \(folderURL.path)")
+                    // Resolve actual model path (handles nested folders and single files)
+                    updatedModel.localPath = resolveModelPath(in: folderURL)
+                    logger.info("Found downloaded model \(model.id) at: \(updatedModel.localPath?.path ?? folderURL.path)")
                 }
             }
         }
@@ -115,8 +116,9 @@ public class RegistryService: ModelRegistry {
             let fileManager = ServiceContainer.shared.fileManager
             if fileManager.modelFolderExists(modelId: model.id, framework: framework) {
                 if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: framework) {
-                    updatedModel.localPath = folderURL
-                    logger.info("Found downloaded model \(model.id) at: \(folderURL.path)")
+                    // Resolve actual model path (handles nested folders and single files)
+                    updatedModel.localPath = resolveModelPath(in: folderURL)
+                    logger.info("Found downloaded model \(model.id) at: \(updatedModel.localPath?.path ?? folderURL.path)")
                 }
             } else {
                 updatedModel.localPath = nil
@@ -289,6 +291,24 @@ public class RegistryService: ModelRegistry {
     }
 
     // Provider discovery removed - no longer needed
+
+    // MARK: - Path Resolution
+
+    /// Resolve the actual model path from a folder
+    /// If the folder contains exactly one item (file or subfolder), use that item
+    /// This handles nested directories from archive extraction and single model files
+    private func resolveModelPath(in folderURL: URL) -> URL {
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: folderURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ), contents.count == 1, let singleItem = contents.first else {
+            return folderURL
+        }
+
+        logger.debug("Resolved model path: \(singleItem.lastPathComponent)")
+        return singleItem
+    }
 
     // MARK: - URL Helper Methods
 
