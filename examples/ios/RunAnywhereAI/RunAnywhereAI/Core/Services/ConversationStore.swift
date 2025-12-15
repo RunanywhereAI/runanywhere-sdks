@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 import RunAnywhere
 
-// Note: MessageAnalytics and ConversationAnalytics are defined in ChatViewModel.swift
+// Note: Message, MessageAnalytics and ConversationAnalytics are now in separate model files
 
 // MARK: - Conversation Store
 

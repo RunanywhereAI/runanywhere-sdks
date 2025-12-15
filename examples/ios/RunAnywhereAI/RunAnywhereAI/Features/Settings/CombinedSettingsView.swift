@@ -3,6 +3,7 @@
 //  RunAnywhereAI
 //
 //  Combined Settings and Storage view
+//  Refactored to use SettingsViewModel (MVVM pattern)
 //
 
 import SwiftUI
@@ -10,19 +11,8 @@ import RunAnywhere
 import Combine
 
 struct CombinedSettingsView: View {
-    // Settings state
-    @State private var defaultTemperature = 0.7
-    @State private var defaultMaxTokens = 10000
-    @State private var showApiKeyEntry = false
-    @State private var apiKey = ""
-    @State private var analyticsLogToLocal = false
-
-    // Storage state (using StorageViewModel)
-    @StateObject private var storageViewModel = StorageViewModel()
-
-    // Section expansion state
-    @State private var isStorageExpanded = true
-    @State private var isModelsExpanded = true
+    // ViewModel - all business logic is here
+    @StateObject private var viewModel = SettingsViewModel()
 
     var body: some View {
         Group {
@@ -32,21 +22,20 @@ struct CombinedSettingsView: View {
             iOSSettingsView
             #endif
         }
-        .onChange(of: defaultTemperature) {
-            updateSDKConfiguration()
-        }
-        .onChange(of: defaultMaxTokens) {
-            updateSDKConfiguration()
-        }
-        .sheet(isPresented: $showApiKeyEntry) {
+        .sheet(isPresented: $viewModel.showApiKeyEntry) {
             apiKeySheet
         }
-        .onAppear {
-            loadCurrentConfiguration()
-            syncWithSDKSettings()
-        }
         .task {
-            await storageViewModel.loadData()
+            await viewModel.loadStorageData()
+        }
+        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") {
+                viewModel.errorMessage = nil
+            }
+        } message: {
+            if let error = viewModel.errorMessage {
+                Text(error)
+            }
         }
     }
 
@@ -57,25 +46,25 @@ struct CombinedSettingsView: View {
             // Generation Settings
             Section("Generation Settings") {
                 VStack(alignment: .leading) {
-                    Text("Temperature: \(String(format: "%.2f", defaultTemperature))")
+                    Text("Temperature: \(String(format: "%.2f", viewModel.temperature))")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.textSecondary)
-                    Slider(value: $defaultTemperature, in: 0...2, step: 0.1)
+                    Slider(value: $viewModel.temperature, in: 0...2, step: 0.1)
                 }
 
-                Stepper("Max Tokens: \(defaultMaxTokens)",
-                       value: $defaultMaxTokens,
+                Stepper("Max Tokens: \(viewModel.maxTokens)",
+                       value: $viewModel.maxTokens,
                        in: 500...20000,
                        step: 500)
             }
 
             // API Configuration
             Section("API Configuration") {
-                Button(action: { showApiKeyEntry.toggle() }) {
+                Button(action: { viewModel.showApiKeySheet() }) {
                     HStack {
                         Text("API Key")
                         Spacer()
-                        if !apiKey.isEmpty {
+                        if viewModel.isApiKeyConfigured {
                             Text("Configured")
                                 .foregroundColor(AppColors.statusGreen)
                                 .font(AppTypography.caption)
@@ -97,7 +86,7 @@ struct CombinedSettingsView: View {
                     Spacer()
                     Button("Refresh") {
                         Task {
-                            await storageViewModel.refreshData()
+                            await viewModel.refreshStorageData()
                         }
                     }
                     .font(AppTypography.caption)
@@ -106,14 +95,14 @@ struct CombinedSettingsView: View {
 
             // Downloaded Models Section
             Section("Downloaded Models") {
-                if storageViewModel.storedModels.isEmpty {
+                if viewModel.storedModels.isEmpty {
                     Text("No models downloaded yet")
                         .foregroundColor(AppColors.textSecondary)
                         .font(AppTypography.caption)
                 } else {
-                    ForEach(storageViewModel.storedModels, id: \.id) { model in
+                    ForEach(viewModel.storedModels, id: \.id) { model in
                         StoredModelRow(model: model) {
-                            await storageViewModel.deleteModel(model)
+                            await viewModel.deleteModel(model)
                         }
                     }
                 }
@@ -123,7 +112,7 @@ struct CombinedSettingsView: View {
             Section("Storage Management") {
                 Button(action: {
                     Task {
-                        await storageViewModel.clearCache()
+                        await viewModel.clearCache()
                     }
                 }) {
                     HStack {
@@ -137,7 +126,7 @@ struct CombinedSettingsView: View {
 
                 Button(action: {
                     Task {
-                        await storageViewModel.cleanTempFiles()
+                        await viewModel.cleanTempFiles()
                     }
                 }) {
                     HStack {
@@ -152,10 +141,7 @@ struct CombinedSettingsView: View {
 
             // Logging Configuration
             Section("Logging Configuration") {
-                Toggle("Log Analytics Locally", isOn: $analyticsLogToLocal)
-                    .onChange(of: analyticsLogToLocal) { _, newValue in
-                        KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
-                    }
+                Toggle("Log Analytics Locally", isOn: $viewModel.analyticsLogToLocal)
 
                 Text("When enabled, analytics events will be logged locally for debugging purposes.")
                     .font(AppTypography.caption)
@@ -198,14 +184,14 @@ struct CombinedSettingsView: View {
                             HStack {
                                 Text("Temperature")
                                     .frame(width: 150, alignment: .leading)
-                                Text("\(String(format: "%.2f", defaultTemperature))")
+                                Text("\(String(format: "%.2f", viewModel.temperature))")
                                     .font(AppTypography.monospaced)
                                     .foregroundColor(AppColors.primaryAccent)
                             }
                             HStack {
                                 Text("")
                                     .frame(width: 150)
-                                Slider(value: $defaultTemperature, in: 0...2, step: 0.1)
+                                Slider(value: $viewModel.temperature, in: 0...2, step: 0.1)
                                     .frame(maxWidth: 400)
                             }
                         }
@@ -213,7 +199,7 @@ struct CombinedSettingsView: View {
                         HStack {
                             Text("Max Tokens")
                                 .frame(width: 150, alignment: .leading)
-                            Stepper("\(defaultMaxTokens)", value: $defaultMaxTokens, in: 500...20000, step: 500)
+                            Stepper("\(viewModel.maxTokens)", value: $viewModel.maxTokens, in: 500...20000, step: 500)
                                 .frame(maxWidth: 200)
                         }
                     }
@@ -226,7 +212,7 @@ struct CombinedSettingsView: View {
                             Text("API Key")
                                 .frame(width: 150, alignment: .leading)
 
-                            if !apiKey.isEmpty {
+                            if viewModel.isApiKeyConfigured {
                                 Text("Configured")
                                     .foregroundColor(AppColors.statusGreen)
                                     .font(AppTypography.caption)
@@ -239,7 +225,7 @@ struct CombinedSettingsView: View {
                             Spacer()
 
                             Button("Configure") {
-                                showApiKeyEntry = true
+                                viewModel.showApiKeySheet()
                             }
                             .buttonStyle(.bordered)
                         }
@@ -250,7 +236,7 @@ struct CombinedSettingsView: View {
                 settingsCard(title: "Storage", trailing: {
                     Button(action: {
                         Task {
-                            await storageViewModel.refreshData()
+                            await viewModel.refreshStorageData()
                         }
                     }) {
                         Label("Refresh", systemImage: "arrow.clockwise")
@@ -265,7 +251,7 @@ struct CombinedSettingsView: View {
                 // Downloaded Models Section
                 settingsCard(title: "Downloaded Models") {
                     VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
-                        if storageViewModel.storedModels.isEmpty {
+                        if viewModel.storedModels.isEmpty {
                             HStack {
                                 Spacer()
                                 VStack(spacing: AppSpacing.mediumLarge) {
@@ -280,11 +266,11 @@ struct CombinedSettingsView: View {
                                 Spacer()
                             }
                         } else {
-                            ForEach(storageViewModel.storedModels, id: \.id) { model in
+                            ForEach(viewModel.storedModels, id: \.id) { model in
                                 StoredModelRow(model: model) {
-                                    await storageViewModel.deleteModel(model)
+                                    await viewModel.deleteModel(model)
                                 }
-                                if model.id != storageViewModel.storedModels.last?.id {
+                                if model.id != viewModel.storedModels.last?.id {
                                     Divider()
                                         .padding(.vertical, AppSpacing.xSmall)
                                 }
@@ -302,7 +288,7 @@ struct CombinedSettingsView: View {
                             icon: "trash",
                             color: AppColors.primaryRed
                         ) {
-                            await storageViewModel.clearCache()
+                            await viewModel.clearCache()
                         }
 
                         storageManagementButton(
@@ -311,7 +297,7 @@ struct CombinedSettingsView: View {
                             icon: "trash",
                             color: AppColors.primaryOrange
                         ) {
-                            await storageViewModel.cleanTempFiles()
+                            await viewModel.cleanTempFiles()
                         }
                     }
                 }
@@ -323,16 +309,13 @@ struct CombinedSettingsView: View {
                             Text("Log Analytics Locally")
                                 .frame(width: 150, alignment: .leading)
 
-                            Toggle("", isOn: $analyticsLogToLocal)
-                                .onChange(of: analyticsLogToLocal) { _, newValue in
-                                    KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
-                                }
+                            Toggle("", isOn: $viewModel.analyticsLogToLocal)
 
                             Spacer()
 
-                            Text(analyticsLogToLocal ? "Enabled" : "Disabled")
+                            Text(viewModel.analyticsLogToLocal ? "Enabled" : "Disabled")
                                 .font(AppTypography.caption)
-                                .foregroundColor(analyticsLogToLocal ? AppColors.statusGreen : AppColors.textSecondary)
+                                .foregroundColor(viewModel.analyticsLogToLocal ? AppColors.statusGreen : AppColors.textSecondary)
                         }
 
                         Text("When enabled, analytics events will be logged locally instead of being sent to the server.")
@@ -381,28 +364,28 @@ struct CombinedSettingsView: View {
             HStack {
                 Label("Total Usage", systemImage: "externaldrive")
                 Spacer()
-                Text(ByteCountFormatter.string(fromByteCount: storageViewModel.totalStorageSize, countStyle: .file))
+                Text(viewModel.formatBytes(viewModel.totalStorageSize))
                     .foregroundColor(AppColors.textSecondary)
             }
 
             HStack {
                 Label("Available Space", systemImage: "externaldrive.badge.plus")
                 Spacer()
-                Text(ByteCountFormatter.string(fromByteCount: storageViewModel.availableSpace, countStyle: .file))
+                Text(viewModel.formatBytes(viewModel.availableSpace))
                     .foregroundColor(AppColors.primaryGreen)
             }
 
             HStack {
                 Label("Models Storage", systemImage: "cpu")
                 Spacer()
-                Text(ByteCountFormatter.string(fromByteCount: storageViewModel.modelStorageSize, countStyle: .file))
+                Text(viewModel.formatBytes(viewModel.modelStorageSize))
                     .foregroundColor(AppColors.primaryBlue)
             }
 
             HStack {
                 Label("Downloaded Models", systemImage: "number")
                 Spacer()
-                Text("\(storageViewModel.storedModels.count)")
+                Text("\(viewModel.storedModels.count)")
                     .foregroundColor(AppColors.textSecondary)
             }
         }
@@ -482,7 +465,7 @@ struct CombinedSettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    SecureField("Enter API Key", text: $apiKey)
+                    SecureField("Enter API Key", text: $viewModel.apiKey)
                         .textContentType(.password)
                         #if os(iOS)
                         .autocapitalization(.none)
@@ -506,29 +489,27 @@ struct CombinedSettingsView: View {
                 #if os(iOS)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
-                        showApiKeyEntry = false
+                        viewModel.cancelApiKeyEntry()
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        saveApiKey()
-                        showApiKeyEntry = false
+                        viewModel.saveApiKey()
                     }
-                    .disabled(apiKey.isEmpty)
+                    .disabled(viewModel.apiKey.isEmpty)
                 }
                 #else
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        showApiKeyEntry = false
+                        viewModel.cancelApiKeyEntry()
                     }
                     .keyboardShortcut(.escape)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        saveApiKey()
-                        showApiKeyEntry = false
+                        viewModel.saveApiKey()
                     }
-                    .disabled(apiKey.isEmpty)
+                    .disabled(viewModel.apiKey.isEmpty)
                     .keyboardShortcut(.return)
                 }
                 #endif
@@ -537,42 +518,6 @@ struct CombinedSettingsView: View {
         #if os(macOS)
         .padding(AppSpacing.large)
         #endif
-    }
-
-    // MARK: - Configuration Methods
-
-    private func updateSDKConfiguration() {
-        UserDefaults.standard.set(defaultTemperature, forKey: "defaultTemperature")
-        UserDefaults.standard.set(defaultMaxTokens, forKey: "defaultMaxTokens")
-
-        print("Configuration saved - Temperature: \(defaultTemperature), MaxTokens: \(defaultMaxTokens)")
-    }
-
-    private func loadCurrentConfiguration() {
-        if let savedApiKeyData = try? KeychainService.shared.retrieve(key: "runanywhere_api_key"),
-           let savedApiKey = String(data: savedApiKeyData, encoding: .utf8) {
-            apiKey = savedApiKey
-        }
-
-        defaultTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
-        if defaultTemperature == 0 { defaultTemperature = 0.7 }
-
-        defaultMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
-        if defaultMaxTokens == 0 { defaultMaxTokens = 10000 }
-
-        analyticsLogToLocal = KeychainHelper.loadBool(key: "analyticsLogToLocal", defaultValue: false)
-    }
-
-    private func syncWithSDKSettings() {
-        // Load settings from UserDefaults
-        // In the new architecture, these settings are applied per-request
-    }
-
-    private func saveApiKey() {
-        if let apiKeyData = apiKey.data(using: .utf8) {
-            try? KeychainService.shared.save(key: "runanywhere_api_key", data: apiKeyData)
-        }
-        updateSDKConfiguration()
     }
 }
 

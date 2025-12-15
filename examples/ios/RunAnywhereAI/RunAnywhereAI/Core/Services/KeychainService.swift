@@ -63,6 +63,22 @@ class KeychainService {
             throw KeychainError.deleteFailed
         }
     }
+
+    // MARK: - Boolean Helpers
+
+    /// Save a boolean value to keychain
+    func saveBool(key: String, value: Bool) throws {
+        let data = Data([value ? 1 : 0])
+        try save(key: key, data: data)
+    }
+
+    /// Load a boolean value from keychain
+    func loadBool(key: String, defaultValue: Bool = false) -> Bool {
+        guard let data = read(key: key) else {
+            return defaultValue
+        }
+        return data.first == 1
+    }
 }
 
 enum KeychainError: Error {

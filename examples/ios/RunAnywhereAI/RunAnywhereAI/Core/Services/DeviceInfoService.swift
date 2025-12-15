@@ -20,8 +20,6 @@ class DeviceInfoService: ObservableObject {
     @Published var deviceInfo: SystemDeviceInfo?
     @Published var isLoading = false
 
-    // SDK reference removed - use RunAnywhere static methods directly
-
     private init() {
         Task {
             await refreshDeviceInfo()

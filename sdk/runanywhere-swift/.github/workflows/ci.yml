@@ -25,18 +25,58 @@ jobs:
           ${{ runner.os }}-swiftlint-
 
     - name: Install SwiftLint
+      env:
+        SWIFTLINT_VERSION: "0.57.1"
       run: |
-        if ! which swiftlint >/dev/null; then
-          echo "Installing SwiftLint via Homebrew..."
-          brew install swiftlint
+        # Pin SwiftLint version for consistency with .pre-commit-config.yaml
+        INSTALLED_VERSION=$(swiftlint version 2>/dev/null || echo "none")
+        if [ "$INSTALLED_VERSION" != "$SWIFTLINT_VERSION" ]; then
+          echo "Installing SwiftLint $SWIFTLINT_VERSION..."
+          brew install swiftlint@$SWIFTLINT_VERSION 2>/dev/null || brew install swiftlint
+          echo "Installed: $(swiftlint version)"
         else
-          echo "SwiftLint already installed at $(which swiftlint)"
-          swiftlint version
+          echo "SwiftLint $SWIFTLINT_VERSION already installed"
         fi
 
     - name: Run SwiftLint
       run: |
         swiftlint --reporter github-actions-logging
+
+  swiftlint-analyze:
+    name: SwiftLint Analyzer
+    runs-on: macos-14
+    continue-on-error: true  # Analyzer rules are advisory initially
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Select Xcode
+      run: sudo xcode-select -s /Applications/Xcode_15.2.app
+
+    - name: Install SwiftLint
+      env:
+        SWIFTLINT_VERSION: "0.57.1"
+      run: |
+        brew install swiftlint 2>/dev/null || true
+
+    - name: Build for analyzer
+      run: |
+        # Build and capture compiler log for analyzer rules
+        xcodebuild build \
+          -scheme RunAnywhere \
+          -destination "platform=macOS" \
+          -configuration Debug \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          2>&1 | tee xcodebuild.log
+
+    - name: Run SwiftLint Analyzer
+      run: |
+        # Run analyzer rules (unused_import, unused_declaration, typesafe_array_init)
+        swiftlint analyze \
+          --compiler-log-path xcodebuild.log \
+          --reporter github-actions-logging || true
 
   test:
     name: Test on macOS

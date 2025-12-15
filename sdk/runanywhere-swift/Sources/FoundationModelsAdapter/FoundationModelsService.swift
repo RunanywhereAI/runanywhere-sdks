@@ -138,7 +138,7 @@ public class FoundationModelsService: LLMService {
         // Check if session is responding to another request
         guard !sessionObj.isResponding else {
             logger.warning("Session is already responding to another request")
-            throw LLMError.notInitialized
+            throw LLMError.generationFailed(NSError(domain: "FoundationModels", code: -1, userInfo: [NSLocalizedDescriptionKey: "Session is busy with another request"]))
         }
 
         do {
@@ -185,7 +185,7 @@ public class FoundationModelsService: LLMService {
         // Check if session is responding to another request
         guard !sessionObj.isResponding else {
             logger.warning("Session is already responding to another request")
-            throw LLMError.notInitialized
+            throw LLMError.generationFailed(NSError(domain: "FoundationModels", code: -1, userInfo: [NSLocalizedDescriptionKey: "Session is busy with another request"]))
         }
 
         do {
