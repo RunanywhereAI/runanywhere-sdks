@@ -248,9 +248,9 @@ struct ModelRequiredOverlay: View {
 
 /// A setup view specifically for Voice Assistant which requires 3 models
 struct VoicePipelineSetupView: View {
-    @Binding var sttModel: (framework: InferenceFramework, name: String)?
-    @Binding var llmModel: (framework: InferenceFramework, name: String)?
-    @Binding var ttsModel: (framework: InferenceFramework, name: String)?
+    @Binding var sttModel: (framework: InferenceFramework, name: String, id: String)?
+    @Binding var llmModel: (framework: InferenceFramework, name: String, id: String)?
+    @Binding var ttsModel: (framework: InferenceFramework, name: String, id: String)?
 
     // Model loading states from SDK lifecycle tracker
     var sttLoadState: ModelLoadState = .notLoaded

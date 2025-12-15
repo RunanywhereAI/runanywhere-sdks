@@ -65,6 +65,11 @@ public actor VoiceAgentCapability: CompositeCapability {
 
     /// Initialize the voice agent with configuration
     /// - Parameter config: Voice agent configuration
+    ///
+    /// This method is smart about reusing already-loaded models:
+    /// - If a model is already loaded with the same ID, it will be reused
+    /// - If a different model is loaded, it will be replaced
+    /// - If no model is loaded, the specified model will be loaded
     public func initialize(_ config: VoiceAgentConfiguration) async throws {
         logger.info("Initializing Voice Agent")
 
@@ -77,53 +82,168 @@ public actor VoiceAgentCapability: CompositeCapability {
             throw CapabilityError.compositeComponentFailed(component: "VAD", error)
         }
 
-        // Load STT model if specified
-        if let sttModelId = config.sttConfig.modelId {
-            logger.info("Loading STT model: \(sttModelId)")
-            do {
-                try await stt.loadModel(sttModelId)
-            } catch {
-                throw CapabilityError.compositeComponentFailed(component: "STT", error)
+        // Load STT model if specified and not already loaded
+        if let sttModelId = config.sttConfig.modelId, !sttModelId.isEmpty {
+            let currentSTTModelId = await stt.currentModelId
+            let sttAlreadyLoaded = await stt.isModelLoaded
+
+            if sttAlreadyLoaded && currentSTTModelId == sttModelId {
+                logger.info("STT model already loaded: \(sttModelId) - reusing")
+            } else {
+                logger.info("Loading STT model: \(sttModelId)")
+                do {
+                    try await stt.loadModel(sttModelId)
+                } catch {
+                    throw CapabilityError.compositeComponentFailed(component: "STT", error)
+                }
+            }
+        } else {
+            // No STT model specified - check if one is already loaded
+            let sttAlreadyLoaded = await stt.isModelLoaded
+            if !sttAlreadyLoaded {
+                logger.warning("No STT model specified and none loaded - STT will not work")
+            } else {
+                logger.info("Using already loaded STT model")
             }
         }
 
-        // Load LLM model if specified
-        if let llmModelId = config.llmConfig.modelId {
-            logger.info("Loading LLM model: \(llmModelId)")
-            do {
-                try await llm.loadModel(llmModelId)
-            } catch {
-                throw CapabilityError.compositeComponentFailed(component: "LLM", error)
+        // Load LLM model if specified and not already loaded
+        if let llmModelId = config.llmConfig.modelId, !llmModelId.isEmpty {
+            let currentLLMModelId = await llm.currentModelId
+            let llmAlreadyLoaded = await llm.isModelLoaded
+
+            if llmAlreadyLoaded && currentLLMModelId == llmModelId {
+                logger.info("LLM model already loaded: \(llmModelId) - reusing")
+            } else {
+                logger.info("Loading LLM model: \(llmModelId)")
+                do {
+                    try await llm.loadModel(llmModelId)
+                } catch {
+                    throw CapabilityError.compositeComponentFailed(component: "LLM", error)
+                }
+            }
+        } else {
+            // No LLM model specified - check if one is already loaded
+            let llmAlreadyLoaded = await llm.isModelLoaded
+            if !llmAlreadyLoaded {
+                logger.warning("No LLM model specified and none loaded - LLM will not work")
+            } else {
+                logger.info("Using already loaded LLM model")
             }
         }
 
-        // Load TTS voice
+        // Load TTS voice if specified and not already loaded
         let ttsVoice = config.ttsConfig.voice
-        logger.info("Loading TTS voice: \(ttsVoice)")
-        do {
-            try await tts.loadVoice(ttsVoice)
-        } catch {
-            throw CapabilityError.compositeComponentFailed(component: "TTS", error)
+        if !ttsVoice.isEmpty {
+            let currentTTSVoiceId = await tts.currentVoiceId
+            let ttsAlreadyLoaded = await tts.isVoiceLoaded
+
+            if ttsAlreadyLoaded && currentTTSVoiceId == ttsVoice {
+                logger.info("TTS voice already loaded: \(ttsVoice) - reusing")
+            } else {
+                logger.info("Loading TTS voice: \(ttsVoice)")
+                do {
+                    try await tts.loadVoice(ttsVoice)
+                } catch {
+                    throw CapabilityError.compositeComponentFailed(component: "TTS", error)
+                }
+            }
+        } else {
+            // No TTS voice specified - check if one is already loaded
+            let ttsAlreadyLoaded = await tts.isVoiceLoaded
+            if !ttsAlreadyLoaded {
+                logger.warning("No TTS voice specified and none loaded - TTS will not work")
+            } else {
+                logger.info("Using already loaded TTS voice")
+            }
+        }
+
+        // Verify all components are ready
+        let sttReady = await stt.isModelLoaded
+        let llmReady = await llm.isModelLoaded
+        let ttsReady = await tts.isVoiceLoaded
+
+        if !sttReady {
+            throw CapabilityError.compositeComponentFailed(
+                component: "STT",
+                CapabilityError.resourceNotLoaded("STT model not loaded")
+            )
+        }
+        if !llmReady {
+            throw CapabilityError.compositeComponentFailed(
+                component: "LLM",
+                CapabilityError.resourceNotLoaded("LLM model not loaded")
+            )
+        }
+        if !ttsReady {
+            throw CapabilityError.compositeComponentFailed(
+                component: "TTS",
+                CapabilityError.resourceNotLoaded("TTS voice not loaded")
+            )
         }
 
         self.isConfigured = true
-        logger.info("Voice Agent initialized successfully")
+        logger.info("Voice Agent initialized successfully - all components ready")
+    }
+
+    /// Initialize using already-loaded models (no model IDs needed)
+    ///
+    /// Use this when models are already loaded via the individual capability APIs
+    /// (e.g., RunAnywhere.loadModel(), RunAnywhere.loadSTTModel(), RunAnywhere.loadTTSVoice())
+    ///
+    /// This will verify all required components are loaded and mark the voice agent as ready.
+    public func initializeWithLoadedModels() async throws {
+        logger.info("Initializing Voice Agent with already-loaded models")
+
+        // Initialize VAD
+        do {
+            try await vad.initialize(VADConfiguration())
+        } catch {
+            throw CapabilityError.compositeComponentFailed(component: "VAD", error)
+        }
+
+        // Verify all components are ready
+        let sttReady = await stt.isModelLoaded
+        let llmReady = await llm.isModelLoaded
+        let ttsReady = await tts.isVoiceLoaded
+
+        guard sttReady else {
+            throw CapabilityError.compositeComponentFailed(
+                component: "STT",
+                CapabilityError.resourceNotLoaded("No STT model loaded. Load one first via RunAnywhere.loadSTTModel()")
+            )
+        }
+        guard llmReady else {
+            throw CapabilityError.compositeComponentFailed(
+                component: "LLM",
+                CapabilityError.resourceNotLoaded("No LLM model loaded. Load one first via RunAnywhere.loadModel()")
+            )
+        }
+        guard ttsReady else {
+            throw CapabilityError.compositeComponentFailed(
+                component: "TTS",
+                CapabilityError.resourceNotLoaded("No TTS voice loaded. Load one first via RunAnywhere.loadTTSVoice()")
+            )
+        }
+
+        self.isConfigured = true
+        logger.info("Voice Agent initialized with pre-loaded models - all components ready")
     }
 
     /// Initialize with individual model IDs (convenience)
     /// - Parameters:
-    ///   - sttModelId: STT model identifier
-    ///   - llmModelId: LLM model identifier
-    ///   - ttsVoice: TTS voice identifier
+    ///   - sttModelId: STT model identifier (pass empty string to use already-loaded model)
+    ///   - llmModelId: LLM model identifier (pass empty string to use already-loaded model)
+    ///   - ttsVoice: TTS voice identifier (pass empty string to use already-loaded voice)
     public func initialize(
         sttModelId: String,
         llmModelId: String,
-        ttsVoice: String = "com.apple.ttsbundle.siri_female_en-US_compact"
+        ttsVoice: String = ""
     ) async throws {
         let config = VoiceAgentConfiguration(
             vadConfig: VADConfiguration(),
-            sttConfig: STTConfiguration(modelId: sttModelId),
-            llmConfig: LLMConfiguration(modelId: llmModelId),
+            sttConfig: STTConfiguration(modelId: sttModelId.isEmpty ? nil : sttModelId),
+            llmConfig: LLMConfiguration(modelId: llmModelId.isEmpty ? nil : llmModelId),
             ttsConfig: TTSConfiguration(voice: ttsVoice)
         )
         try await initialize(config)

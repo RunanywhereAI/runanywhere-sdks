@@ -91,10 +91,17 @@ public extension RunAnywhere {
     }
 
     /// Initialize voice agent with individual model IDs
+    ///
+    /// Pass empty strings to reuse already-loaded models for that component.
+    ///
+    /// - Parameters:
+    ///   - sttModelId: STT model ID (empty string = use already loaded STT model)
+    ///   - llmModelId: LLM model ID (empty string = use already loaded LLM model)
+    ///   - ttsVoice: TTS voice ID (empty string = use already loaded TTS voice)
     static func initializeVoiceAgent(
-        sttModelId: String,
-        llmModelId: String,
-        ttsVoice: String = "com.apple.ttsbundle.siri_female_en-US_compact"
+        sttModelId: String = "",
+        llmModelId: String = "",
+        ttsVoice: String = ""
     ) async throws {
         guard isSDKInitialized else {
             throw RunAnywhereError.notInitialized
@@ -110,6 +117,43 @@ public extension RunAnywhere {
                 llmModelId: llmModelId,
                 ttsVoice: ttsVoice
             )
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
+        } catch {
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
+            throw error
+        }
+    }
+
+    /// Initialize voice agent using already-loaded models
+    ///
+    /// Use this when you've already loaded STT, LLM, and TTS models via the individual APIs:
+    /// - `RunAnywhere.loadSTTModel(_:)`
+    /// - `RunAnywhere.loadModel(_:)` (for LLM)
+    /// - `RunAnywhere.loadTTSVoice(_:)`
+    ///
+    /// This will verify all components are loaded and mark the voice agent as ready.
+    ///
+    /// Example:
+    /// ```swift
+    /// // Load models individually (maybe from different views)
+    /// try await RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
+    /// try await RunAnywhere.loadModel("lfm2-350m-q4_k_m")
+    /// try await RunAnywhere.loadTTSVoice("vits-piper-en_GB-alba-medium")
+    ///
+    /// // Then initialize voice agent with those pre-loaded models
+    /// try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
+    /// ```
+    static func initializeVoiceAgentWithLoadedModels() async throws {
+        guard isSDKInitialized else {
+            throw RunAnywhereError.notInitialized
+        }
+
+        try await ensureDeviceRegistered()
+
+        EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
+
+        do {
+            try await serviceContainer.voiceAgentCapability.initializeWithLoadedModels()
             EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
             EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
