@@ -500,7 +500,13 @@ struct VoiceAssistantView: View {
         }
         .onAppear {
             Task {
-                await viewModel.initialize()
+                if !viewModel.isInitialized {
+                    await viewModel.initialize()
+                } else {
+                    // Already initialized, just refresh component states
+                    // This handles the case where user loaded models in another tab
+                    viewModel.refreshComponentStatesFromSDK()
+                }
             }
         }
     }

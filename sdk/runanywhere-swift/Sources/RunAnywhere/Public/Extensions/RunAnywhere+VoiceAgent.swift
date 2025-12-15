@@ -12,6 +12,63 @@ import Foundation
 
 public extension RunAnywhere {
 
+    // MARK: - Component State Management
+
+    /// Get the current state of all voice agent components (STT, LLM, TTS)
+    ///
+    /// Use this to check which models are loaded and ready for the voice pipeline.
+    /// This is useful for UI that needs to show the setup state before starting voice.
+    ///
+    /// Example:
+    /// ```swift
+    /// let states = await RunAnywhere.getVoiceAgentComponentStates()
+    /// if states.isFullyReady {
+    ///     // All models loaded, can start voice assistant
+    /// } else {
+    ///     // Show which components are missing: states.missingComponents
+    /// }
+    /// ```
+    static func getVoiceAgentComponentStates() async -> VoiceAgentComponentStates {
+        guard isSDKInitialized else {
+            return VoiceAgentComponentStates()
+        }
+
+        // Query each capability for its current state
+        async let sttLoaded = serviceContainer.sttCapability.isModelLoaded
+        async let sttModelId = serviceContainer.sttCapability.currentModelId
+        async let llmLoaded = serviceContainer.llmCapability.isModelLoaded
+        async let llmModelId = serviceContainer.llmCapability.currentModelId
+        async let ttsLoaded = serviceContainer.ttsCapability.isVoiceLoaded
+        async let ttsVoiceId = serviceContainer.ttsCapability.currentVoiceId
+
+        let (sttIsLoaded, sttId, llmIsLoaded, llmId, ttsIsLoaded, ttsId) =
+            await (sttLoaded, sttModelId, llmLoaded, llmModelId, ttsLoaded, ttsVoiceId)
+
+        let sttState: ComponentLoadState = sttIsLoaded && sttId != nil
+            ? .loaded(modelId: sttId!)
+            : .notLoaded
+
+        let llmState: ComponentLoadState = llmIsLoaded && llmId != nil
+            ? .loaded(modelId: llmId!)
+            : .notLoaded
+
+        let ttsState: ComponentLoadState = ttsIsLoaded && ttsId != nil
+            ? .loaded(modelId: ttsId!)
+            : .notLoaded
+
+        return VoiceAgentComponentStates(stt: sttState, llm: llmState, tts: ttsState)
+    }
+
+    /// Check if all voice agent components are loaded and ready
+    ///
+    /// Convenience method that returns true only when STT, LLM, and TTS are all loaded.
+    static var areAllVoiceComponentsReady: Bool {
+        get async {
+            let states = await getVoiceAgentComponentStates()
+            return states.isFullyReady
+        }
+    }
+
     // MARK: - Initialization
 
     /// Initialize the voice agent with configuration
@@ -60,7 +117,7 @@ public extension RunAnywhere {
         }
     }
 
-    /// Check if voice agent is ready
+    /// Check if voice agent is ready (all components initialized via initializeVoiceAgent)
     static var isVoiceAgentReady: Bool {
         get async {
             await serviceContainer.voiceAgentCapability.isReady

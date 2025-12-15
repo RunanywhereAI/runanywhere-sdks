@@ -87,9 +87,6 @@ public class ONNXSTTService: STTService { // swiftlint:disable:this type_body_le
                 modelDir = (modelPath as NSString).deletingLastPathComponent
             }
 
-            // Note: Archive extraction is handled by the SDK during download based on artifactType.
-            // Models should already be extracted when they reach this point.
-
             // Load STT model
             let loadStatus = ra_stt_load_model(backendHandle, modelDir, modelType, nil)
             guard loadStatus == RA_SUCCESS else {
