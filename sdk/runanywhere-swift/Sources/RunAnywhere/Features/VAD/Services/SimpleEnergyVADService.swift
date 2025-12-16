@@ -1,4 +1,3 @@
-// swiftlint:disable file_length
 //
 //  SimpleEnergyVADService.swift
 //  RunAnywhere SDK
@@ -12,7 +11,7 @@ import Accelerate
 import Foundation
 
 /// Energy-based Voice Activity Detection implementation
-public class SimpleEnergyVADService: NSObject, VADService { // swiftlint:disable:this type_body_length
+public class SimpleEnergyVADService: NSObject, VADService {
 
     // MARK: - Framework Identification
 

@@ -44,17 +44,26 @@ public extension RunAnywhere {
         let (sttIsLoaded, sttId, llmIsLoaded, llmId, ttsIsLoaded, ttsId) =
             await (sttLoaded, sttModelId, llmLoaded, llmModelId, ttsLoaded, ttsVoiceId)
 
-        let sttState: ComponentLoadState = sttIsLoaded && sttId != nil
-            ? .loaded(modelId: sttId!)
-            : .notLoaded
+        let sttState: ComponentLoadState
+        if sttIsLoaded, let modelId = sttId {
+            sttState = .loaded(modelId: modelId)
+        } else {
+            sttState = .notLoaded
+        }
 
-        let llmState: ComponentLoadState = llmIsLoaded && llmId != nil
-            ? .loaded(modelId: llmId!)
-            : .notLoaded
+        let llmState: ComponentLoadState
+        if llmIsLoaded, let modelId = llmId {
+            llmState = .loaded(modelId: modelId)
+        } else {
+            llmState = .notLoaded
+        }
 
-        let ttsState: ComponentLoadState = ttsIsLoaded && ttsId != nil
-            ? .loaded(modelId: ttsId!)
-            : .notLoaded
+        let ttsState: ComponentLoadState
+        if ttsIsLoaded, let modelId = ttsId {
+            ttsState = .loaded(modelId: modelId)
+        } else {
+            ttsState = .notLoaded
+        }
 
         return VoiceAgentComponentStates(stt: sttState, llm: llmState, tts: ttsState)
     }

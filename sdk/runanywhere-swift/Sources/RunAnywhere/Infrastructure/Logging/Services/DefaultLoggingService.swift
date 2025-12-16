@@ -148,7 +148,7 @@ public final class DefaultLoggingService: LoggingService {
                lowercasedKey.contains("token") ||
                lowercasedKey.contains("auth") {
                 sanitized[key] = "[REDACTED]"
-            } else if let nestedDict = value as? [String: Any] { // swiftlint:disable:this prefer_concrete_types avoid_any_type
+            } else if let nestedDict = value as? [String: Any] { // swiftlint:disable:this avoid_any_type
                 sanitized[key] = sanitizeMetadata(nestedDict) ?? [:]
             } else {
                 sanitized[key] = value

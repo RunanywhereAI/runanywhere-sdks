@@ -8,7 +8,7 @@
 import Foundation
 
 /// Protocol for language model services
-public protocol LLMService: AnyObject {
+public protocol LLMService: AnyObject { // swiftlint:disable:this avoid_any_object
 
     // MARK: - Framework Identification
 

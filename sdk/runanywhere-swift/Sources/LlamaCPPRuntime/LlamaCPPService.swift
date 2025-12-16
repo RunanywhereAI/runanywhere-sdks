@@ -222,6 +222,7 @@ public class LlamaCPPService {
         }
 
         do {
+            // swiftlint:disable:next avoid_any_type
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let text = json["text"] as? String {
                 return text

@@ -114,34 +114,32 @@ public final class ModuleRegistry {
         let discovered = ModuleDiscovery.discoveredModules
         logger.info("Registering \(discovered.count) discovered modules")
 
-        for moduleType in discovered {
+        for moduleType in discovered where registeredModules[moduleType.moduleId] == nil {
             // Use the moduleId to check if already registered
-            if registeredModules[moduleType.moduleId] == nil {
-                let metadata = ModuleMetadata(
-                    moduleId: moduleType.moduleId,
-                    moduleName: moduleType.moduleName,
-                    capabilities: moduleType.capabilities,
-                    priority: moduleType.defaultPriority
-                )
+            let metadata = ModuleMetadata(
+                moduleId: moduleType.moduleId,
+                moduleName: moduleType.moduleName,
+                capabilities: moduleType.capabilities,
+                priority: moduleType.defaultPriority
+            )
 
-                moduleType.register(priority: moduleType.defaultPriority)
-                registeredModules[moduleType.moduleId] = metadata
-                moduleTypes[moduleType.moduleId] = moduleType
+            moduleType.register(priority: moduleType.defaultPriority)
+            registeredModules[moduleType.moduleId] = metadata
+            moduleTypes[moduleType.moduleId] = moduleType
 
-                // Store storage strategy if provided
-                if let strategy = moduleType.storageStrategy {
-                    storageStrategies[moduleType.inferenceFramework] = strategy
-                    logger.info("Storage strategy registered for \(moduleType.inferenceFramework.rawValue)")
-                }
-
-                // Store download strategy if provided
-                if let strategy = moduleType.downloadStrategy {
-                    downloadStrategies[moduleType.inferenceFramework] = strategy
-                    logger.info("Download strategy registered for \(moduleType.inferenceFramework.rawValue)")
-                }
-
-                logger.info("Auto-registered module: \(moduleType.moduleName)")
+            // Store storage strategy if provided
+            if let strategy = moduleType.storageStrategy {
+                storageStrategies[moduleType.inferenceFramework] = strategy
+                logger.info("Storage strategy registered for \(moduleType.inferenceFramework.rawValue)")
             }
+
+            // Store download strategy if provided
+            if let strategy = moduleType.downloadStrategy {
+                downloadStrategies[moduleType.inferenceFramework] = strategy
+                logger.info("Download strategy registered for \(moduleType.inferenceFramework.rawValue)")
+            }
+
+            logger.info("Auto-registered module: \(moduleType.moduleName)")
         }
     }
 
@@ -277,8 +275,7 @@ public extension RunAnywhere {
     }
 
     /// Get all registered modules
-    @MainActor
-    static var registeredModules: [ModuleMetadata] {
+    @MainActor static var registeredModules: [ModuleMetadata] {
         ModuleRegistry.shared.allModules
     }
 

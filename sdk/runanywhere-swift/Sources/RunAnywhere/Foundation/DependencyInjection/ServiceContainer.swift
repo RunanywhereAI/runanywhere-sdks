@@ -1,10 +1,9 @@
-// swiftlint:disable file_length
 import Foundation
 import Pulse
 
 /// Service container for dependency injection
 /// Provides centralized access to all SDK capabilities and services
-public class ServiceContainer { // swiftlint:disable:this type_body_length
+public class ServiceContainer {
     /// Shared instance
     public static let shared = ServiceContainer()
 
@@ -107,29 +106,29 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
     // MARK: - Data Services
 
     /// Configuration service (internal access for optional checking in development mode)
-    internal var _configurationService: ConfigurationService?
+    internal var backingConfigurationService: ConfigurationService?
     public var configurationService: ConfigurationService {
-        guard let service = _configurationService else {
+        guard let service = backingConfigurationService else {
             fatalError("ConfigurationService not initialized. Call RunAnywhere.initialize() first.")
         }
         return service
     }
 
     internal func setConfigurationService(_ service: ConfigurationService) {
-        _configurationService = service
+        backingConfigurationService = service
     }
 
     /// Model info service (internal access for optional checking in development mode)
-    internal var _modelInfoService: ModelInfoService?
+    internal var backingModelInfoService: ModelInfoService?
     public var modelInfoService: ModelInfoService {
-        guard let service = _modelInfoService else {
+        guard let service = backingModelInfoService else {
             fatalError("ModelInfoService not initialized. Call RunAnywhere.initialize() first.")
         }
         return service
     }
 
     internal func setModelInfoService(_ service: ModelInfoService) {
-        _modelInfoService = service
+        backingModelInfoService = service
     }
 
     /// Model assignment service
@@ -219,8 +218,8 @@ public class ServiceContainer { // swiftlint:disable:this type_body_length
         apiClient = nil
         networkService = nil
         _syncCoordinator = nil
-        _configurationService = nil
-        _modelInfoService = nil
+        backingConfigurationService = nil
+        backingModelInfoService = nil
         _modelAssignmentService = nil
         _deviceRegistrationService = nil
         _structuredOutputService = nil

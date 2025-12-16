@@ -59,7 +59,8 @@ public struct TTSOutput: ComponentOutput, Sendable {
 
     /// Whether the output has phoneme timing information
     public var hasPhonemeTimestamps: Bool {
-        phonemeTimestamps != nil && !phonemeTimestamps!.isEmpty
+        guard let timestamps = phonemeTimestamps else { return false }
+        return !timestamps.isEmpty
     }
 }
 

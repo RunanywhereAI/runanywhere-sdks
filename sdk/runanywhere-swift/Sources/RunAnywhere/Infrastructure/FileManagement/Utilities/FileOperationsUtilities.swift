@@ -120,7 +120,7 @@ public struct FileOperationsUtilities {
     /// - Parameter url: The file URL
     /// - Returns: Dictionary of file attributes
     /// - Throws: Error if attributes cannot be read
-    public static func attributes(at url: URL) throws -> [FileAttributeKey: Any] {
+    public static func attributes(at url: URL) throws -> [FileAttributeKey: Any] { // swiftlint:disable:this avoid_any_type
         return try FileManager.default.attributesOfItem(atPath: url.path)
     }
 

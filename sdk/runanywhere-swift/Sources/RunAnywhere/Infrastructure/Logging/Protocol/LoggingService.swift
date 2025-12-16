@@ -10,7 +10,7 @@ import Foundation
 
 /// Protocol defining logging service capabilities
 /// Implementations provide log routing, filtering, and destination management
-public protocol LoggingService: AnyObject {
+public protocol LoggingService: AnyObject { // swiftlint:disable:this avoid_any_object
 
     // MARK: - Configuration
 

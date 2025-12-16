@@ -1,5 +1,5 @@
-import Foundation
 import Compression
+import Foundation
 import SWCompression
 import ZIPFoundation
 
@@ -62,7 +62,12 @@ public final class ArchiveUtility {
         logger.info("✅ [TAR EXTRACT] Completed in \(String(format: "%.2f", extractTime))s")
 
         let totalTime = Date().timeIntervalSince(overallStart)
-        logger.info("🎉 [EXTRACTION COMPLETE] Total: \(String(format: "%.2f", totalTime))s (read: \(String(format: "%.2f", readTime))s, decompress: \(String(format: "%.2f", decompressTime))s, extract: \(String(format: "%.2f", extractTime))s)")
+        let timingInfo = """
+            read: \(String(format: "%.2f", readTime))s, \
+            decompress: \(String(format: "%.2f", decompressTime))s, \
+            extract: \(String(format: "%.2f", extractTime))s
+            """
+        logger.info("🎉 [EXTRACTION COMPLETE] Total: \(String(format: "%.2f", totalTime))s (\(timingInfo))")
         progressHandler?(1.0)
     }
 
@@ -119,7 +124,12 @@ public final class ArchiveUtility {
         logger.info("✅ [TAR EXTRACT] Completed in \(String(format: "%.2f", extractTime))s")
 
         let totalTime = Date().timeIntervalSince(overallStart)
-        logger.info("🎉 [EXTRACTION COMPLETE] Total: \(String(format: "%.2f", totalTime))s (read: \(String(format: "%.2f", readTime))s, decompress: \(String(format: "%.2f", decompressTime))s, extract: \(String(format: "%.2f", extractTime))s)")
+        let gzTimingInfo = """
+            read: \(String(format: "%.2f", readTime))s, \
+            decompress: \(String(format: "%.2f", decompressTime))s, \
+            extract: \(String(format: "%.2f", extractTime))s
+            """
+        logger.info("🎉 [EXTRACTION COMPLETE] Total: \(String(format: "%.2f", totalTime))s (\(gzTimingInfo))")
         progressHandler?(1.0)
     }
 
@@ -509,7 +519,9 @@ public final class ArchiveUtility {
         }
 
         let writeTime = Date().timeIntervalSince(writeStart)
-        logger.info("   ✅ [FILE WRITE] Wrote \(extractedFiles) files (\(formatBytes(Int(totalBytesWritten)))) and \(extractedDirs) directories in \(String(format: "%.2f", writeTime))s")
+        let bytesStr = formatBytes(Int(totalBytesWritten))
+        let timeStr = String(format: "%.2f", writeTime)
+        logger.info("   ✅ [FILE WRITE] Wrote \(extractedFiles) files (\(bytesStr)) and \(extractedDirs) dirs in \(timeStr)s")
     }
 
     /// Format bytes for logging

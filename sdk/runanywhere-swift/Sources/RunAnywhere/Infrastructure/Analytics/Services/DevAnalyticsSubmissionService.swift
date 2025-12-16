@@ -7,6 +7,37 @@
 
 import Foundation
 
+// MARK: - Parameter Structs
+
+/// Parameters for generation analytics submission
+public struct GenerationAnalyticsParams {
+    public let generationId: String
+    public let modelId: String
+    public let latencyMs: Double
+    public let tokensPerSecond: Double
+    public let inputTokens: Int
+    public let outputTokens: Int
+    public let success: Bool
+
+    public init(
+        generationId: String,
+        modelId: String,
+        latencyMs: Double,
+        tokensPerSecond: Double,
+        inputTokens: Int,
+        outputTokens: Int,
+        success: Bool
+    ) {
+        self.generationId = generationId
+        self.modelId = modelId
+        self.latencyMs = latencyMs
+        self.tokensPerSecond = tokensPerSecond
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.success = success
+    }
+}
+
 // MARK: - Dev Analytics Submission Service
 
 /// Service responsible for submitting analytics in development mode
@@ -28,27 +59,15 @@ public final class DevAnalyticsSubmissionService {
     /// Submit generation analytics using ServiceContainer for all dependencies
     /// Thin wrapper that fetches deviceId and params internally
     /// - Parameters:
-    ///   - generationId: Unique ID for this generation
-    ///   - modelId: Model identifier used
-    ///   - latencyMs: Total generation time in milliseconds
-    ///   - tokensPerSecond: Generation speed
-    ///   - inputTokens: Number of input tokens
-    ///   - outputTokens: Number of output tokens
-    ///   - success: Whether generation succeeded
+    ///   - analyticsParams: Generation analytics parameters
     ///   - serviceContainer: Service container for dependencies
-    ///   - params: SDK initialization parameters
-    public func submit( // swiftlint:disable:this function_parameter_count
-        generationId: String,
-        modelId: String,
-        latencyMs: Double,
-        tokensPerSecond: Double,
-        inputTokens: Int,
-        outputTokens: Int,
-        success: Bool,
+    ///   - sdkParams: SDK initialization parameters
+    public func submit(
+        analyticsParams: GenerationAnalyticsParams,
         serviceContainer: ServiceContainer,
-        params: SDKInitParams
+        sdkParams: SDKInitParams
     ) async {
-        guard params.environment == .development else { return }
+        guard sdkParams.environment == .development else { return }
 
         // Fetch deviceId from service
         let deviceId = await serviceContainer.deviceRegistrationService.getDeviceId()
@@ -56,14 +75,8 @@ public final class DevAnalyticsSubmissionService {
         // Non-blocking background submission
         Task.detached(priority: .background) { [weak self] in
             await self?.performSubmission(
-                generationId: generationId,
-                modelId: modelId,
-                latencyMs: latencyMs,
-                tokensPerSecond: tokensPerSecond,
-                inputTokens: inputTokens,
-                outputTokens: outputTokens,
-                success: success,
-                params: params,
+                analyticsParams: analyticsParams,
+                sdkParams: sdkParams,
                 deviceId: deviceId ?? "unknown"
             )
         }
@@ -72,18 +85,11 @@ public final class DevAnalyticsSubmissionService {
     /// Internal method for services to submit analytics without needing external dependencies
     /// Fetches all required context from ServiceContainer
     /// - Note: Only submits in development mode; fails silently on errors
-    internal func submitInternal( // swiftlint:disable:this function_parameter_count
-        generationId: String,
-        modelId: String,
-        latencyMs: Double,
-        tokensPerSecond: Double,
-        inputTokens: Int,
-        outputTokens: Int,
-        success: Bool
-    ) async {
+    /// - Parameter analyticsParams: Generation analytics parameters
+    internal func submitInternal(analyticsParams: GenerationAnalyticsParams) async {
         // Get params from RunAnywhere internal state
-        guard let params = RunAnywhere.initParams,
-              params.environment == .development else { return }
+        guard let sdkParams = RunAnywhere.initParams,
+              sdkParams.environment == .development else { return }
 
         let serviceContainer = ServiceContainer.shared
         let deviceId = await serviceContainer.deviceRegistrationService.getDeviceId()
@@ -91,14 +97,8 @@ public final class DevAnalyticsSubmissionService {
         // Non-blocking background submission
         Task.detached(priority: .background) { [weak self] in
             await self?.performSubmission(
-                generationId: generationId,
-                modelId: modelId,
-                latencyMs: latencyMs,
-                tokensPerSecond: tokensPerSecond,
-                inputTokens: inputTokens,
-                outputTokens: outputTokens,
-                success: success,
-                params: params,
+                analyticsParams: analyticsParams,
+                sdkParams: sdkParams,
                 deviceId: deviceId ?? "unknown"
             )
         }
@@ -106,39 +106,22 @@ public final class DevAnalyticsSubmissionService {
 
     /// Submit generation analytics (non-blocking, fails silently)
     /// - Parameters:
-    ///   - generationId: Unique ID for this generation
-    ///   - modelId: Model identifier used
-    ///   - latencyMs: Total generation time in milliseconds
-    ///   - tokensPerSecond: Generation speed
-    ///   - inputTokens: Number of input tokens
-    ///   - outputTokens: Number of output tokens
-    ///   - success: Whether generation succeeded
-    ///   - params: SDK initialization parameters
+    ///   - analyticsParams: Generation analytics parameters
+    ///   - sdkParams: SDK initialization parameters
+    ///   - deviceId: Optional device identifier
     @available(*, deprecated, message: "Use submit() instead which handles deviceId internally")
-    public func submitGenerationAnalytics( // swiftlint:disable:this function_parameter_count
-        generationId: String,
-        modelId: String,
-        latencyMs: Double,
-        tokensPerSecond: Double,
-        inputTokens: Int,
-        outputTokens: Int,
-        success: Bool,
-        params: SDKInitParams,
+    public func submitGenerationAnalytics(
+        analyticsParams: GenerationAnalyticsParams,
+        sdkParams: SDKInitParams,
         deviceId: String?
     ) {
-        guard params.environment == .development else { return }
+        guard sdkParams.environment == .development else { return }
 
         // Non-blocking background submission
         Task.detached(priority: .background) { [weak self] in
             await self?.performSubmission(
-                generationId: generationId,
-                modelId: modelId,
-                latencyMs: latencyMs,
-                tokensPerSecond: tokensPerSecond,
-                inputTokens: inputTokens,
-                outputTokens: outputTokens,
-                success: success,
-                params: params,
+                analyticsParams: analyticsParams,
+                sdkParams: sdkParams,
                 deviceId: deviceId ?? "unknown"
             )
         }
@@ -147,14 +130,8 @@ public final class DevAnalyticsSubmissionService {
     // MARK: - Private Implementation
 
     private func performSubmission(
-        generationId: String,
-        modelId: String,
-        latencyMs: Double,
-        tokensPerSecond: Double,
-        inputTokens: Int,
-        outputTokens: Int,
-        success: Bool,
-        params: SDKInitParams,
+        analyticsParams: GenerationAnalyticsParams,
+        sdkParams: SDKInitParams,
         deviceId: String
     ) async {
         do {
@@ -165,14 +142,14 @@ public final class DevAnalyticsSubmissionService {
             let hostAppVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
 
             let request = DevAnalyticsSubmissionRequest(
-                generationId: generationId,
+                generationId: analyticsParams.generationId,
                 deviceId: deviceId,
-                modelId: modelId,
-                tokensPerSecond: tokensPerSecond,
-                totalGenerationTimeMs: latencyMs,
-                inputTokens: inputTokens,
-                outputTokens: outputTokens,
-                success: success,
+                modelId: analyticsParams.modelId,
+                tokensPerSecond: analyticsParams.tokensPerSecond,
+                totalGenerationTimeMs: analyticsParams.latencyMs,
+                inputTokens: analyticsParams.inputTokens,
+                outputTokens: analyticsParams.outputTokens,
+                success: analyticsParams.success,
                 buildToken: BuildToken.token,
                 sdkVersion: SDKConstants.version,
                 timestamp: ISO8601DateFormatter().string(from: Date()),
@@ -181,10 +158,10 @@ public final class DevAnalyticsSubmissionService {
                 hostAppVersion: hostAppVersion
             )
 
-            if let supabaseConfig = params.supabaseConfig {
+            if let supabaseConfig = sdkParams.supabaseConfig {
                 try await submitViaSupabase(request: request, config: supabaseConfig)
             } else {
-                try await submitViaBackend(request: request, baseURL: params.baseURL)
+                try await submitViaBackend(request: request, baseURL: sdkParams.baseURL)
             }
         } catch {
             // Fail silently - analytics should never break the SDK
@@ -221,6 +198,7 @@ public final class DevAnalyticsSubmissionService {
 
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
             var errorMessage = "Analytics submission failed: \(httpResponse.statusCode)"
+            // swiftlint:disable:next avoid_any_type
             if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let message = errorData["message"] as? String {
                 errorMessage = message

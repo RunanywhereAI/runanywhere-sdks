@@ -195,7 +195,8 @@ public actor DeviceRegistrationService {
 
                 // Authentication service should already be initialized by RunAnywhere.ensureDeviceRegistered()
                 guard let authService = serviceContainer.authenticationService else {
-                    throw RunAnywhereError.invalidState("Authentication service not available - should be initialized before calling device registration")
+                    let errorMsg = "Authentication service not available - should be initialized before calling device registration"
+                    throw RunAnywhereError.invalidState(errorMsg)
                 }
 
                 let registration = try await authService.registerDevice()
@@ -257,6 +258,7 @@ public actor DeviceRegistrationService {
 
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
             var errorMessage = "Registration failed with status code: \(httpResponse.statusCode)"
+            // swiftlint:disable:next avoid_any_type
             if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let message = errorData["message"] as? String {
                 errorMessage = message

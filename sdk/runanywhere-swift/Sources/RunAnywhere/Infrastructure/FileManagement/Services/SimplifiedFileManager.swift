@@ -88,7 +88,11 @@ public class SimplifiedFileManager: FileManagementService {
             }
 
             // Get model folders within this framework
-            guard let modelFolders = try? FileManager.default.contentsOfDirectory(at: frameworkFolder, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            let dirContents = try? FileManager.default.contentsOfDirectory(
+                at: frameworkFolder,
+                includingPropertiesForKeys: [.isDirectoryKey]
+            )
+            guard let modelFolders = dirContents else {
                 continue
             }
 

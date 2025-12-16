@@ -122,7 +122,15 @@ public enum LLMEvent: SDKEvent {
                 "tokens_generated": String(tokensGenerated)
             ]
 
-        case .generationCompleted(let generationId, let modelId, let inputTokens, let outputTokens, let durationMs, let tokensPerSecond, let framework):
+        case .generationCompleted(
+            let generationId,
+            let modelId,
+            let inputTokens,
+            let outputTokens,
+            let durationMs,
+            let tokensPerSecond,
+            let framework
+        ):
             return [
                 "generation_id": generationId,
                 "model_id": modelId,

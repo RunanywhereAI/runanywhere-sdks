@@ -64,10 +64,11 @@ public actor GenerationAnalyticsService {
     /// Track first token (time-to-first-token metric)
     public func trackFirstToken(generationId: String) {
         guard var tracker = activeGenerations[generationId] else { return }
-        tracker.firstTokenTime = Date()
+        let firstTokenTime = Date()
+        tracker.firstTokenTime = firstTokenTime
         activeGenerations[generationId] = tracker
 
-        let latencyMs = tracker.firstTokenTime!.timeIntervalSince(tracker.startTime) * 1000
+        let latencyMs = firstTokenTime.timeIntervalSince(tracker.startTime) * 1000
 
         EventPublisher.shared.track(LLMEvent.firstToken(
             generationId: generationId,

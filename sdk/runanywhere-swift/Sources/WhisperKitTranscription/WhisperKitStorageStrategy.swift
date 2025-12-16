@@ -205,7 +205,6 @@ public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
         return total
     }
 
-    // swiftlint:disable:next function_parameter_count
     private func downloadMLModelcDirectories(
         baseURL: String,
         modelPath: String,
@@ -256,7 +255,6 @@ public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
         )
     }
 
-    // swiftlint:disable:next function_parameter_count
     private func downloadFilesInDirectory(
         files: [String],
         baseURL: String,
@@ -313,7 +311,6 @@ public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
         return count
     }
 
-    // swiftlint:disable:next function_parameter_count
     private func downloadConfigFiles(
         baseURL: String,
         modelPath: String,

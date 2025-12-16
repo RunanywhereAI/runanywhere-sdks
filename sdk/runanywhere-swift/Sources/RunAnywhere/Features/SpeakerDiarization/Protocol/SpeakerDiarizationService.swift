@@ -11,7 +11,7 @@ import Foundation
 
 /// Protocol for speaker diarization services
 /// Defines the contract for identifying and tracking speakers in audio
-public protocol SpeakerDiarizationService: AnyObject {
+public protocol SpeakerDiarizationService: AnyObject { // swiftlint:disable:this avoid_any_object
 
     // MARK: - Framework Identification
 
