@@ -59,7 +59,7 @@ public actor ManagedLifecycle<ServiceType> {
 
     // MARK: - Configuration
 
-    public func configure(_ config: Any?) async {
+    public func configure(_ config: (any ComponentConfiguration)?) async {
         await lifecycle.configure(config)
     }
 

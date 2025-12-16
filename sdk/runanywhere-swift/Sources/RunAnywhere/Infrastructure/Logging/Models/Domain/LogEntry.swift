@@ -33,10 +33,16 @@ public struct LogEntry: Encodable, Sendable {
     ///   - level: Severity level
     ///   - category: Category/subsystem
     ///   - message: Log message
-    ///   - metadata: Optional additional context
+    ///   - metadata: Optional additional context (uses dictionary for JSON flexibility)
     ///   - deviceInfo: Optional device information
-    // swiftlint:disable:next prefer_concrete_types avoid_any_type
-    public init(timestamp: Date, level: LogLevel, category: String, message: String, metadata: [String: Any]?, deviceInfo: DeviceInfo? = nil) {
+    public init(
+        timestamp: Date,
+        level: LogLevel,
+        category: String,
+        message: String,
+        metadata: [String: Any]?, // swiftlint:disable:this prefer_concrete_types avoid_any_type
+        deviceInfo: DeviceInfo? = nil
+    ) {
         self.timestamp = timestamp
         self.level = level
         self.category = category

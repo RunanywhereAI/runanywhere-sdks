@@ -35,7 +35,7 @@ public actor AuthenticationService {
         await apiClient.setAuthenticationService(authService)
 
         // Authenticate with backend
-        let _ = try await authService.authenticate(apiKey: apiKey)
+        _ = try await authService.authenticate(apiKey: apiKey)
 
         return (apiClient, authService)
     }

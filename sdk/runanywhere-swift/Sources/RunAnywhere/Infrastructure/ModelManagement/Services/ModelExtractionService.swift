@@ -179,10 +179,8 @@ public final class DefaultModelExtractionService: ModelExtractionServiceProtocol
         let modelExtensions = Set(["gguf", "ggml", "onnx", "mlmodel", "mlpackage", "tflite", "pte", "safetensors"])
 
         // Look for model files at this level
-        for item in contents {
-            if modelExtensions.contains(item.pathExtension.lowercased()) {
-                return item
-            }
+        for item in contents where modelExtensions.contains(item.pathExtension.lowercased()) {
+            return item
         }
 
         // Recursively check subdirectories

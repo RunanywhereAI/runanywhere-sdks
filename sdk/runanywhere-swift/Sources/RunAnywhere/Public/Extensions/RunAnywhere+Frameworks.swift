@@ -72,14 +72,12 @@ public extension RunAnywhere {
             relevantCategories = [.audio]
         }
 
-        for model in allModels {
-            if relevantCategories.contains(model.category) {
-                if let preferred = model.preferredFramework {
-                    frameworks.insert(preferred)
-                }
-                for framework in model.compatibleFrameworks {
-                    frameworks.insert(framework)
-                }
+        for model in allModels where relevantCategories.contains(model.category) {
+            if let preferred = model.preferredFramework {
+                frameworks.insert(preferred)
+            }
+            for framework in model.compatibleFrameworks {
+                frameworks.insert(framework)
             }
         }
 

@@ -59,7 +59,7 @@ public struct SDKLogger {
     ///   - file: Automatically captured source file
     ///   - line: Automatically captured line number
     ///   - function: Automatically captured function name
-    public func logError(  // swiftlint:disable:this function_body_length
+    public func logError(
         _ error: Error,
         additionalInfo: String? = nil,
         file: String = #file,

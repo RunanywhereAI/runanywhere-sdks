@@ -317,8 +317,12 @@ public class RegistryService: ModelRegistry {
     private func generateModelId(from url: URL) -> String {
         // Remove all extensions (handles .tar.gz, .tar.bz2, etc.)
         var filename = url.lastPathComponent
+        let knownExtensions = [
+            "gz", "bz2", "tar", "zip", "gguf", "onnx",
+            "mlmodel", "mlpackage", "tflite", "safetensors", "pte", "bin"
+        ]
         while let ext = filename.split(separator: ".").last,
-              ["gz", "bz2", "tar", "zip", "gguf", "onnx", "mlmodel", "mlpackage", "tflite", "safetensors", "pte", "bin"].contains(String(ext).lowercased()) {
+              knownExtensions.contains(String(ext).lowercased()) {
             filename = String(filename.dropLast(ext.count + 1))
         }
         return filename

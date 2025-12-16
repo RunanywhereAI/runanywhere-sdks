@@ -87,7 +87,10 @@ public enum AppleAI: RunAnywhereModule {
             contextLength: 4096,
             supportsThinking: false,
             tags: ["apple", "foundation-models", "built-in", "on-device"],
-            description: "Apple's built-in Foundation Models powered by Apple Intelligence. Requires iOS 26+ / macOS 26+ and an Apple Intelligence capable device."
+            description: """
+                Apple's built-in Foundation Models powered by Apple Intelligence. \
+                Requires iOS 26+ / macOS 26+ and an Apple Intelligence capable device.
+                """
         )
 
         ServiceContainer.shared.modelRegistry.registerModel(modelInfo)

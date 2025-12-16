@@ -25,12 +25,12 @@ public actor ModelLifecycleManager<ServiceType> {
     private var inflightTask: Task<ServiceType, Error>?
 
     /// Configuration for loading
-    private var configuration: Any?
+    private var configuration: (any ComponentConfiguration)?
 
     // MARK: - Dependencies
 
     private let logger: SDKLogger
-    private let loadResource: @Sendable (String, Any?) async throws -> ServiceType
+    private let loadResource: @Sendable (String, (any ComponentConfiguration)?) async throws -> ServiceType
     private let unloadResource: @Sendable (ServiceType) async -> Void
 
     // MARK: - Initialization
@@ -42,7 +42,7 @@ public actor ModelLifecycleManager<ServiceType> {
     ///   - unloadResource: Closure to unload a resource
     public init(
         category: String,
-        loadResource: @escaping @Sendable (String, Any?) async throws -> ServiceType,
+        loadResource: @escaping @Sendable (String, (any ComponentConfiguration)?) async throws -> ServiceType,
         unloadResource: @escaping @Sendable (ServiceType) async -> Void
     ) {
         self.logger = SDKLogger(category: category)
@@ -81,7 +81,7 @@ public actor ModelLifecycleManager<ServiceType> {
     // MARK: - Configuration
 
     /// Set configuration for loading
-    public func configure(_ config: Any?) {
+    public func configure(_ config: (any ComponentConfiguration)?) {
         self.configuration = config
     }
 

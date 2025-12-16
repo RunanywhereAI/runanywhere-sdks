@@ -9,7 +9,7 @@ import Foundation
 
 /// Protocol for log output destinations
 /// Implementations handle writing logs to specific backends (Pulse, Console, File, etc.)
-public protocol LogDestination: AnyObject {
+public protocol LogDestination: AnyObject { // swiftlint:disable:this avoid_any_object
 
     // MARK: - Identification
 

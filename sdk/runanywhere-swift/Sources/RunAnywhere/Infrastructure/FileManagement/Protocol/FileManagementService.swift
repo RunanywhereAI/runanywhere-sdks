@@ -12,11 +12,11 @@
 //    Downloads/
 //
 
-import Foundation
 import Files
+import Foundation
 
 /// Protocol defining file management capabilities
-public protocol FileManagementService: AnyObject {
+public protocol FileManagementService: AnyObject { // swiftlint:disable:this avoid_any_object
 
     // MARK: - Model Storage
 
@@ -36,7 +36,8 @@ public protocol FileManagementService: AnyObject {
     func getDownloadedModels() -> [InferenceFramework: [String]]
 
     /// Check if a specific model is downloaded (uses storage strategy if available)
-    @MainActor func isModelDownloaded(modelId: String, framework: InferenceFramework) -> Bool
+    @MainActor
+    func isModelDownloaded(modelId: String, framework: InferenceFramework) -> Bool
 
     // MARK: - Download Management
 

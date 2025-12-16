@@ -1,4 +1,3 @@
-// swiftlint:disable file_length
 import Combine
 import Foundation
 #if os(iOS) || os(tvOS) || os(watchOS)
@@ -7,7 +6,7 @@ import UIKit
 
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
-public enum RunAnywhere { // swiftlint:disable:this type_body_length
+public enum RunAnywhere {
 
     // MARK: - Internal State Management
 
@@ -163,6 +162,14 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
     // MARK: - Device Registration (Direct Service Orchestration)
 
+    /// Container for core services during initialization
+    private struct CoreServices {
+        let syncCoordinator: SyncCoordinator
+        let configService: ConfigurationService
+        let telemetryRepo: TelemetryRepositoryImpl
+        let modelInfoService: ModelInfoService
+    }
+
     /// Ensure device is registered with backend (lazy registration)
     /// Orchestrates service initialization directly
     /// Note: This is O(1) after first successful call due to isBootstrapped flag
@@ -178,163 +185,11 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
 
         let logger = SDKLogger(category: "RunAnywhere.Bootstrap")
 
-        // Check if we need to initialize network services
-        // For production/staging: Initialize network services if not already initialized
+        // Initialize services based on environment
         if environment != .development && serviceContainer.authenticationService == nil {
-            logger.info("Initializing network and authentication services...")
-
-            // Step 1: Setup network service
-            let networkService = NetworkServiceFactory.createNetworkService(for: environment, params: params)
-            serviceContainer.networkService = networkService
-            logger.debug("Network service configured for \(environment.description)")
-
-            // Step 2: Create API client and authentication service
-            let (apiClient, authService) = try await AuthenticationService.createAndAuthenticate(
-                baseURL: params.baseURL,
-                apiKey: params.apiKey
-            )
-            serviceContainer.authenticationService = authService
-            serviceContainer.apiClient = apiClient
-            logger.info("Authentication successful")
-
-            // Step 3: Create and inject core services
-            logger.debug("Creating core services...")
-
-            // Create SyncCoordinator
-            let syncCoordinator = SyncCoordinator(enableAutoSync: false)
-            serviceContainer.setSyncCoordinator(syncCoordinator)
-
-            // Create ConfigurationService
-            let configRepo = ConfigurationRepositoryImpl(
-                databaseManager: DatabaseManager.shared,
-                apiClient: apiClient
-            )
-            let configService = ConfigurationService(
-                configRepository: configRepo,
-                syncCoordinator: syncCoordinator
-            )
-            serviceContainer.setConfigurationService(configService)
-
-            // Create TelemetryRepository (used by AnalyticsQueueManager)
-            let telemetryRepo = TelemetryRepositoryImpl(
-                databaseManager: DatabaseManager.shared,
-                apiClient: apiClient
-            )
-
-            // Create ModelInfoService
-            let modelRepo = ModelInfoRepositoryImpl(
-                databaseManager: DatabaseManager.shared,
-                apiClient: apiClient
-            )
-            let modelInfoService = ModelInfoService(
-                modelInfoRepository: modelRepo,
-                syncCoordinator: syncCoordinator
-            )
-            serviceContainer.setModelInfoService(modelInfoService)
-
-            // Create ModelAssignmentService (needs networkService and modelInfoService)
-            let modelAssignmentService = ModelAssignmentService(
-                networkService: networkService,
-                modelInfoService: modelInfoService
-            )
-            serviceContainer.setModelAssignmentService(modelAssignmentService)
-
-            logger.info("Core services created and injected")
-
-            // Step 4: Load configuration
-            let config = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
-            EventPublisher.shared.track(SDKLifecycleEvent.configLoaded(source: config.source.rawValue))
-            logger.info("Configuration loaded (source: \(config.source))")
-
-            // Step 5: Sync model catalog (events are now published inside loadStoredModels)
-            try? await modelInfoService.syncModelInfo()
-            let _ = try? await modelInfoService.loadStoredModels()
-            logger.debug("Model catalog synced")
-
-            // Step 6: Initialize model registry
-            await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
-            logger.debug("Model registry initialized")
-
-            // Step 7: Initialize analytics and event publisher
-            await serviceContainer.analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
-            EventPublisher.shared.initialize(analyticsQueue: serviceContainer.analyticsQueueManager)
-            logger.info("Analytics and event publisher initialized")
-
-            logger.info("✅ Production/staging bootstrap completed")
+            try await initializeProductionServices(params: params, environment: environment, logger: logger)
         } else if environment == .development && serviceContainer.networkService == nil {
-            // Development mode bootstrap - initialize ALL services just like production
-            // Development mode uses the same services but points to dev/Supabase endpoints
-            logger.info("Initializing development mode services (full service stack)...")
-
-            // Step 1: Setup network service and API client for development
-            let networkService = NetworkServiceFactory.createNetworkService(for: .development, params: params)
-            serviceContainer.networkService = networkService
-
-            // The networkService IS an APIClient, cast it for use with repositories
-            let apiClient = networkService as? APIClient
-            serviceContainer.apiClient = apiClient
-            logger.debug("Network service and API client initialized (development mode)")
-
-            // Step 2: Create SyncCoordinator (disabled auto-sync for dev)
-            let syncCoordinator = SyncCoordinator(enableAutoSync: false)
-            serviceContainer.setSyncCoordinator(syncCoordinator)
-            logger.debug("SyncCoordinator initialized")
-
-            // Step 3: Create ConfigurationService (with local DB and API client)
-            let configRepo = ConfigurationRepositoryImpl(
-                databaseManager: DatabaseManager.shared,
-                apiClient: apiClient
-            )
-            let configService = ConfigurationService(
-                configRepository: configRepo,
-                syncCoordinator: syncCoordinator
-            )
-            serviceContainer.setConfigurationService(configService)
-            let config = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
-            EventPublisher.shared.track(SDKLifecycleEvent.configLoaded(source: config.source.rawValue))
-            logger.info("ConfigurationService initialized (development mode)")
-
-            // Step 4: Create TelemetryRepository for analytics
-            let telemetryRepo = TelemetryRepositoryImpl(
-                databaseManager: DatabaseManager.shared,
-                apiClient: apiClient
-            )
-            logger.debug("TelemetryRepository initialized")
-
-            // Step 5: Create ModelInfoService (with local DB and API client)
-            let modelRepo = ModelInfoRepositoryImpl(
-                databaseManager: DatabaseManager.shared,
-                apiClient: apiClient
-            )
-            let modelInfoService = ModelInfoService(
-                modelInfoRepository: modelRepo,
-                syncCoordinator: syncCoordinator
-            )
-            serviceContainer.setModelInfoService(modelInfoService)
-            logger.info("ModelInfoService initialized (development mode)")
-
-            // Step 6: Create ModelAssignmentService
-            let modelAssignmentService = ModelAssignmentService(
-                networkService: networkService,
-                modelInfoService: modelInfoService
-            )
-            serviceContainer.setModelAssignmentService(modelAssignmentService)
-            logger.debug("ModelAssignmentService initialized")
-
-            // Step 7: Load stored models from local DB
-            let _ = try? await modelInfoService.loadStoredModels()
-            logger.debug("Stored models loaded from local DB")
-
-            // Step 8: Initialize model registry
-            await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
-            logger.debug("Model registry initialized")
-
-            // Step 9: Initialize analytics and event publisher
-            await serviceContainer.analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
-            EventPublisher.shared.initialize(analyticsQueue: serviceContainer.analyticsQueueManager)
-            logger.info("Analytics and event publisher initialized")
-
-            logger.info("✅ Development mode bootstrap completed (all services active)")
+            try await initializeDevelopmentServices(params: params, logger: logger)
         }
 
         // Now perform actual device registration
@@ -348,11 +203,205 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
         isBootstrapped = true
     }
 
+    /// Initialize production/staging services
+    private static func initializeProductionServices(
+        params: SDKInitParams,
+        environment: SDKEnvironment,
+        logger: SDKLogger
+    ) async throws {
+        logger.info("Initializing network and authentication services...")
+
+        // Setup network and authentication
+        let (networkService, apiClient, _) = try await setupNetworkAndAuthentication(
+            params: params,
+            environment: environment,
+            logger: logger
+        )
+
+        // Create and inject core services
+        let coreServices = try await setupCoreServices(
+            apiClient: apiClient,
+            networkService: networkService,
+            logger: logger
+        )
+
+        // Load configuration and models
+        try await loadConfigurationAndModels(
+            configService: coreServices.configService,
+            modelInfoService: coreServices.modelInfoService,
+            apiKey: params.apiKey,
+            logger: logger
+        )
+
+        // Initialize analytics
+        try await initializeAnalytics(
+            telemetryRepository: coreServices.telemetryRepo,
+            apiKey: params.apiKey,
+            logger: logger
+        )
+
+        logger.info("✅ Production/staging bootstrap completed")
+    }
+
+    /// Initialize development mode services
+    private static func initializeDevelopmentServices(
+        params: SDKInitParams,
+        logger: SDKLogger
+    ) async throws {
+        logger.info("Initializing development mode services (full service stack)...")
+
+        // Setup network service and API client for development
+        let networkService = NetworkServiceFactory.createNetworkService(for: .development, params: params)
+        serviceContainer.networkService = networkService
+
+        let apiClient = networkService as? APIClient
+        serviceContainer.apiClient = apiClient
+        logger.debug("Network service and API client initialized (development mode)")
+
+        // Create and inject core services
+        let coreServices = try await setupCoreServices(
+            apiClient: apiClient,
+            networkService: networkService,
+            logger: logger
+        )
+
+        // Load configuration and models
+        try await loadConfigurationAndModels(
+            configService: coreServices.configService,
+            modelInfoService: coreServices.modelInfoService,
+            apiKey: params.apiKey,
+            logger: logger
+        )
+
+        // Initialize analytics
+        try await initializeAnalytics(
+            telemetryRepository: coreServices.telemetryRepo,
+            apiKey: params.apiKey,
+            logger: logger
+        )
+
+        logger.info("✅ Development mode bootstrap completed (all services active)")
+    }
+
+    /// Setup network service and authentication
+    private static func setupNetworkAndAuthentication(
+        params: SDKInitParams,
+        environment: SDKEnvironment,
+        logger: SDKLogger
+    ) async throws -> (NetworkService, APIClient, AuthenticationService) {
+        // Setup network service
+        let networkService = NetworkServiceFactory.createNetworkService(for: environment, params: params)
+        serviceContainer.networkService = networkService
+        logger.debug("Network service configured for \(environment.description)")
+
+        // Create API client and authentication service
+        let (apiClient, authService) = try await AuthenticationService.createAndAuthenticate(
+            baseURL: params.baseURL,
+            apiKey: params.apiKey
+        )
+        serviceContainer.authenticationService = authService
+        serviceContainer.apiClient = apiClient
+        logger.info("Authentication successful")
+
+        return (networkService, apiClient, authService)
+    }
+
+    /// Create and inject core services
+    private static func setupCoreServices(
+        apiClient: APIClient?,
+        networkService: NetworkService,
+        logger: SDKLogger
+    ) async throws -> CoreServices {
+        logger.debug("Creating core services...")
+
+        // Create SyncCoordinator
+        let syncCoordinator = SyncCoordinator(enableAutoSync: false)
+        serviceContainer.setSyncCoordinator(syncCoordinator)
+
+        // Create ConfigurationService
+        let configRepo = ConfigurationRepositoryImpl(
+            databaseManager: DatabaseManager.shared,
+            apiClient: apiClient
+        )
+        let configService = ConfigurationService(
+            configRepository: configRepo,
+            syncCoordinator: syncCoordinator
+        )
+        serviceContainer.setConfigurationService(configService)
+
+        // Create TelemetryRepository
+        let telemetryRepo = TelemetryRepositoryImpl(
+            databaseManager: DatabaseManager.shared,
+            apiClient: apiClient
+        )
+
+        // Create ModelInfoService
+        let modelRepo = ModelInfoRepositoryImpl(
+            databaseManager: DatabaseManager.shared,
+            apiClient: apiClient
+        )
+        let modelInfoService = ModelInfoService(
+            modelInfoRepository: modelRepo,
+            syncCoordinator: syncCoordinator
+        )
+        serviceContainer.setModelInfoService(modelInfoService)
+
+        // Create ModelAssignmentService
+        let modelAssignmentService = ModelAssignmentService(
+            networkService: networkService,
+            modelInfoService: modelInfoService
+        )
+        serviceContainer.setModelAssignmentService(modelAssignmentService)
+
+        logger.info("Core services created and injected")
+
+        return CoreServices(
+            syncCoordinator: syncCoordinator,
+            configService: configService,
+            telemetryRepo: telemetryRepo,
+            modelInfoService: modelInfoService
+        )
+    }
+
+    /// Load configuration and sync model catalog
+    private static func loadConfigurationAndModels(
+        configService: ConfigurationService,
+        modelInfoService: ModelInfoService,
+        apiKey: String,
+        logger: SDKLogger
+    ) async throws {
+        // Load configuration
+        let config = await configService.loadConfigurationOnLaunch(apiKey: apiKey)
+        EventPublisher.shared.track(SDKLifecycleEvent.configLoaded(source: config.source.rawValue))
+        logger.info("Configuration loaded (source: \(config.source))")
+
+        // Sync model catalog
+        try? await modelInfoService.syncModelInfo()
+        _ = try? await modelInfoService.loadStoredModels()
+        logger.debug("Model catalog synced")
+    }
+
+    /// Initialize analytics and event publisher
+    private static func initializeAnalytics(
+        telemetryRepository: TelemetryRepositoryImpl,
+        apiKey: String,
+        logger: SDKLogger
+    ) async throws {
+        // Initialize model registry
+        await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: apiKey)
+        logger.debug("Model registry initialized")
+
+        // Initialize analytics and event publisher
+        await serviceContainer.analyticsQueueManager.initialize(telemetryRepository: telemetryRepository)
+        EventPublisher.shared.initialize(analyticsQueue: serviceContainer.analyticsQueueManager)
+        logger.info("Analytics and event publisher initialized")
+    }
+
     // MARK: - Analytics Submission (Delegated to Service)
 
     /// Submit generation analytics (public API)
     /// - Note: Only submits in development mode; fails silently on errors
-    public static func submitGenerationAnalytics( // swiftlint:disable:this function_parameter_count
+    public static func submitGenerationAnalytics(
         generationId: String,
         modelId: String,
         latencyMs: Double,
@@ -363,16 +412,20 @@ public enum RunAnywhere { // swiftlint:disable:this type_body_length
     ) async {
         guard let params = initParams else { return }
 
-        await serviceContainer.devAnalyticsService.submit(
+        let analyticsParams = GenerationAnalyticsParams(
             generationId: generationId,
             modelId: modelId,
             latencyMs: latencyMs,
             tokensPerSecond: tokensPerSecond,
             inputTokens: inputTokens,
             outputTokens: outputTokens,
-            success: success,
+            success: success
+        )
+
+        await serviceContainer.devAnalyticsService.submit(
+            analyticsParams: analyticsParams,
             serviceContainer: serviceContainer,
-            params: params
+            sdkParams: params
         )
     }
 

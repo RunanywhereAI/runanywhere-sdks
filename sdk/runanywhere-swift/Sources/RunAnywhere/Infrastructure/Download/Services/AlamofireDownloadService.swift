@@ -1,4 +1,3 @@
-// swiftlint:disable file_length
 import Alamofire
 import Files
 import Foundation
@@ -18,6 +17,12 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     /// Extraction service for handling archive extraction
     private let extractionService: ModelExtractionServiceProtocol
 
+    /// Helper for managing download tasks
+    private let taskManager: DownloadTaskManager
+
+    /// Helper for handling download progress
+    private let progressHandler: DownloadProgressHandler
+
     // MARK: - Custom Download Strategies
 
     /// Storage for custom download strategies provided by host app
@@ -30,6 +35,9 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         extractionService: ModelExtractionServiceProtocol = DefaultModelExtractionService()
     ) {
         self.extractionService = extractionService
+        self.taskManager = DownloadTaskManager()
+        self.progressHandler = DownloadProgressHandler()
+
         // Configure session
         let sessionConfiguration = URLSessionConfiguration.default
         sessionConfiguration.timeoutIntervalForRequest = configuration.timeout
@@ -55,7 +63,6 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
 
     // MARK: - DownloadService Protocol
 
-    // swiftlint:disable:next function_body_length
     public func downloadModel(_ model: ModelInfo) async throws -> DownloadTask {
         // First, check if a custom strategy should handle this model
         // Custom strategies take priority for backwards compatibility
@@ -110,96 +117,14 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
                 }
 
                 do {
-                    // Get destination folder (framework is required)
-                    guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
-                        self.logger.error("Model has no associated framework: \(model.id)")
-                        throw DownloadError.invalidURL
-                    }
-                    let fileManager = ServiceContainer.shared.fileManager
-                    let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
-                    let modelFolderURL = URL(fileURLWithPath: modelFolder.path)
-
-                    // Determine download destination
-                    let downloadDestination: URL
-                    if requiresExtraction {
-                        // Download to temp location for archives
-                        downloadDestination = FileManager.default.temporaryDirectory
-                            .appendingPathComponent("\(model.id)_\(UUID().uuidString)")
-                            .appendingPathExtension(self.getArchiveExtension(for: model.artifactType))
-                    } else {
-                        // Download directly to model folder
-                        downloadDestination = modelFolderURL.appendingPathComponent("\(model.id).\(model.format.rawValue)")
-                    }
-
-                    // Log download start
-                    self.logger.info("Starting download", metadata: [
-                        "modelId": model.id,
-                        "url": downloadURL.absoluteString,
-                        "expectedSize": model.downloadSize ?? 0,
-                        "destination": downloadDestination.path,
-                        "requiresExtraction": requiresExtraction
-                    ])
-
-                    // Perform download
-                    let downloadedURL = try await self.performDownload(
-                        url: downloadURL,
-                        destination: downloadDestination,
+                    return try await self.executeArtifactDownload(
                         model: model,
+                        downloadURL: downloadURL,
                         taskId: taskId,
+                        requiresExtraction: requiresExtraction,
+                        downloadStartTime: downloadStartTime,
                         progressContinuation: progressContinuation
                     )
-
-                    // Handle extraction if needed
-                    let finalModelPath: URL
-                    if requiresExtraction {
-                        finalModelPath = try await self.performExtraction(
-                            archiveURL: downloadedURL,
-                            destinationFolder: modelFolderURL,
-                            model: model,
-                            progressContinuation: progressContinuation
-                        )
-
-                        // Clean up archive
-                        try? FileManager.default.removeItem(at: downloadedURL)
-                    } else {
-                        finalModelPath = downloadedURL
-                    }
-
-                    // Update model with local path
-                    var updatedModel = model
-                    updatedModel.localPath = finalModelPath
-                    ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
-
-                    // Save metadata persistently
-                    Task {
-                        do {
-                            let modelInfoService = await ServiceContainer.shared.modelInfoService
-                            try await modelInfoService.saveModel(updatedModel)
-                            self.logger.info("Model metadata saved successfully for: \(model.id)")
-                        } catch {
-                            self.logger.error("Failed to save model metadata for \(model.id): \(error)")
-                        }
-                    }
-
-                    // Track download completed
-                    let durationMs = Date().timeIntervalSince(downloadStartTime) * 1000
-                    let fileSize = FileOperationsUtilities.fileSize(at: finalModelPath) ?? model.downloadSize ?? 0
-                    EventPublisher.shared.track(ModelEvent.downloadCompleted(
-                        modelId: model.id,
-                        durationMs: durationMs,
-                        sizeBytes: fileSize
-                    ))
-
-                    // Report completion
-                    progressContinuation.yield(.completed(totalBytes: model.downloadSize ?? fileSize))
-
-                    self.logger.info("Download completed", metadata: [
-                        "modelId": model.id,
-                        "localPath": finalModelPath.path,
-                        "fileSize": fileSize
-                    ])
-
-                    return finalModelPath
                 } catch {
                     progressContinuation.yield(.failed(error, bytesDownloaded: 0, totalBytes: model.downloadSize ?? 0))
                     throw error
@@ -210,158 +135,154 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         return task
     }
 
-    /// Perform the actual download
-    private func performDownload(
-        url: URL,
-        destination: URL,
+    /// Execute the complete download workflow for artifact-based downloads
+    private func executeArtifactDownload(
         model: ModelInfo,
+        downloadURL: URL,
         taskId: String,
+        requiresExtraction: Bool,
+        downloadStartTime: Date,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        let destination: DownloadRequest.Destination = { _, _ in
-            return (destination, [.removePreviousFile, .createIntermediateDirectories])
+        // Get destination folder (framework is required)
+        guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
+            logger.error("Model has no associated framework: \(model.id)")
+            throw DownloadError.invalidURL
         }
+        let fileManager = ServiceContainer.shared.fileManager
+        let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
+        let modelFolderURL = URL(fileURLWithPath: modelFolder.path)
 
-        let downloadRequest = session.download(url, to: destination)
-            .downloadProgress { progress in
-                let downloadProgress = DownloadProgress(
-                    stage: .downloading,
-                    bytesDownloaded: progress.completedUnitCount,
-                    totalBytes: progress.totalUnitCount,
-                    stageProgress: progress.fractionCompleted,
-                    state: .downloading
-                )
+        // Determine download destination
+        let downloadDestination = determineDownloadDestination(
+            for: model,
+            modelFolderURL: modelFolderURL,
+            requiresExtraction: requiresExtraction
+        )
 
-                // Log progress at 10% intervals
-                let progressPercent = progress.fractionCompleted * 100
-                if progressPercent.truncatingRemainder(dividingBy: 10) < 0.1 {
-                    self.logger.debug("Download progress", metadata: [
-                        "modelId": model.id,
-                        "progress": progressPercent,
-                        "bytesDownloaded": progress.completedUnitCount,
-                        "totalBytes": progress.totalUnitCount,
-                        "speed": self.calculateDownloadSpeed(progress: progress)
-                    ])
+        // Log download start
+        logDownloadStart(model: model, url: downloadURL, destination: downloadDestination, requiresExtraction: requiresExtraction)
 
-                    EventPublisher.shared.track(ModelEvent.downloadProgress(
-                        modelId: model.id,
-                        progress: progress.fractionCompleted,
-                        bytesDownloaded: progress.completedUnitCount,
-                        totalBytes: progress.totalUnitCount
-                    ))
-                }
+        // Perform download
+        let downloadedURL = try await performDownload(
+            url: downloadURL,
+            destination: downloadDestination,
+            model: model,
+            taskId: taskId,
+            progressContinuation: progressContinuation
+        )
 
-                progressContinuation.yield(downloadProgress)
-            }
-            .validate()
+        // Handle extraction if needed
+        let finalModelPath = try await handlePostDownloadProcessing(
+            downloadedURL: downloadedURL,
+            modelFolderURL: modelFolderURL,
+            model: model,
+            requiresExtraction: requiresExtraction,
+            progressContinuation: progressContinuation
+        )
 
-        activeDownloadRequests[taskId] = downloadRequest
+        // Update and save model
+        try await updateModelMetadata(model: model, localPath: finalModelPath)
 
-        return try await withCheckedThrowingContinuation { continuation in
-            downloadRequest.response { response in
-                switch response.result {
-                case .success(let downloadedURL):
-                    if let downloadedURL = downloadedURL {
-                        continuation.resume(returning: downloadedURL)
-                    } else {
-                        EventPublisher.shared.track(ModelEvent.downloadFailed(
-                            modelId: model.id,
-                            error: "Invalid response - no URL returned"
-                        ))
-                        continuation.resume(throwing: DownloadError.invalidResponse)
-                    }
+        // Track completion
+        trackDownloadCompletion(model: model, finalPath: finalModelPath, startTime: downloadStartTime, progressContinuation: progressContinuation)
 
-                case .failure(let error):
-                    let downloadError = self.mapAlamofireError(error)
-                    EventPublisher.shared.track(ModelEvent.downloadFailed(
-                        modelId: model.id,
-                        error: error.localizedDescription
-                    ))
-                    self.logger.error("Download failed", metadata: [
-                        "modelId": model.id,
-                        "url": url.absoluteString,
-                        "error": error.localizedDescription,
-                        "statusCode": response.response?.statusCode ?? 0
-                    ])
-                    continuation.resume(throwing: downloadError)
-                }
+        return finalModelPath
+    }
+
+    /// Determine the download destination based on extraction requirements
+    private func determineDownloadDestination(
+        for model: ModelInfo,
+        modelFolderURL: URL,
+        requiresExtraction: Bool
+    ) -> URL {
+        if requiresExtraction {
+            // Download to temp location for archives
+            return FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(model.id)_\(UUID().uuidString)")
+                .appendingPathExtension(getArchiveExtension(for: model.artifactType))
+        } else {
+            // Download directly to model folder
+            return modelFolderURL.appendingPathComponent("\(model.id).\(model.format.rawValue)")
+        }
+    }
+
+    /// Log download start information
+    private func logDownloadStart(model: ModelInfo, url: URL, destination: URL, requiresExtraction: Bool) {
+        logger.info("Starting download", metadata: [
+            "modelId": model.id,
+            "url": url.absoluteString,
+            "expectedSize": model.downloadSize ?? 0,
+            "destination": destination.path,
+            "requiresExtraction": requiresExtraction
+        ])
+    }
+
+    /// Handle post-download processing (extraction if needed)
+    private func handlePostDownloadProcessing(
+        downloadedURL: URL,
+        modelFolderURL: URL,
+        model: ModelInfo,
+        requiresExtraction: Bool,
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation
+    ) async throws -> URL {
+        if requiresExtraction {
+            let finalPath = try await performExtraction(
+                archiveURL: downloadedURL,
+                destinationFolder: modelFolderURL,
+                model: model,
+                progressContinuation: progressContinuation
+            )
+            // Clean up archive
+            try? FileManager.default.removeItem(at: downloadedURL)
+            return finalPath
+        } else {
+            return downloadedURL
+        }
+    }
+
+    /// Update model metadata in registry and persistent storage
+    private func updateModelMetadata(model: ModelInfo, localPath: URL) async throws {
+        var updatedModel = model
+        updatedModel.localPath = localPath
+        ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+        // Save metadata persistently
+        Task {
+            do {
+                let modelInfoService = await ServiceContainer.shared.modelInfoService
+                try await modelInfoService.saveModel(updatedModel)
+                self.logger.info("Model metadata saved successfully for: \(model.id)")
+            } catch {
+                self.logger.error("Failed to save model metadata for \(model.id): \(error)")
             }
         }
     }
 
-    /// Perform extraction for archive models
-    private func performExtraction(
-        archiveURL: URL,
-        destinationFolder: URL,
+    /// Track download completion with analytics
+    private func trackDownloadCompletion(
         model: ModelInfo,
+        finalPath: URL,
+        startTime: Date,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
-    ) async throws -> URL {
-        guard case .archive(let archiveType, _, _) = model.artifactType else {
-            throw DownloadError.extractionFailed("Model does not require extraction")
-        }
+    ) {
+        let durationMs = Date().timeIntervalSince(startTime) * 1000
+        let fileSize = FileOperationsUtilities.fileSize(at: finalPath) ?? model.downloadSize ?? 0
 
-        let extractionStartTime = Date()
-
-        // Track extraction started
-        EventPublisher.shared.track(ModelEvent.extractionStarted(
+        EventPublisher.shared.track(ModelEvent.downloadCompleted(
             modelId: model.id,
-            archiveType: archiveType.rawValue
+            durationMs: durationMs,
+            sizeBytes: fileSize
         ))
 
-        logger.info("Starting extraction", metadata: [
+        // Report completion
+        progressContinuation.yield(.completed(totalBytes: model.downloadSize ?? fileSize))
+
+        logger.info("Download completed", metadata: [
             "modelId": model.id,
-            "archiveType": archiveType.rawValue,
-            "archiveURL": archiveURL.path,
-            "destination": destinationFolder.path
+            "localPath": finalPath.path,
+            "fileSize": fileSize
         ])
-
-        // Report extraction stage
-        progressContinuation.yield(.extraction(modelId: model.id, progress: 0.0))
-
-        do {
-            let result = try await extractionService.extract(
-                archiveURL: archiveURL,
-                to: destinationFolder,
-                artifactType: model.artifactType,
-                progressHandler: { progress in
-                    progressContinuation.yield(.extraction(
-                        modelId: model.id,
-                        progress: progress,
-                        totalBytes: model.downloadSize ?? 0
-                    ))
-
-                    // Track extraction progress
-                    EventPublisher.shared.track(ModelEvent.extractionProgress(
-                        modelId: model.id,
-                        progress: progress
-                    ))
-                }
-            )
-
-            let extractionDurationMs = Date().timeIntervalSince(extractionStartTime) * 1000
-
-            // Track extraction completed
-            EventPublisher.shared.track(ModelEvent.extractionCompleted(
-                modelId: model.id,
-                durationMs: extractionDurationMs
-            ))
-
-            logger.info("Extraction completed", metadata: [
-                "modelId": model.id,
-                "modelPath": result.modelPath.path,
-                "extractedSize": result.extractedSize,
-                "fileCount": result.fileCount,
-                "durationMs": extractionDurationMs
-            ])
-
-            return result.modelPath
-        } catch {
-            EventPublisher.shared.track(ModelEvent.extractionFailed(
-                modelId: model.id,
-                error: error.localizedDescription
-            ))
-            throw error
-        }
     }
 
     /// Find a custom strategy for the model
@@ -537,19 +458,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     // MARK: - Helper Methods
 
     private func calculateDownloadSpeed(progress: Progress) -> String {
-        // Simple speed calculation - could be enhanced with time-based tracking
-        guard progress.totalUnitCount > 0 else { return "0 B/s" }
-
-        // This is a simplified calculation - in production, you'd track time elapsed
-        let bytesPerSecond = Double(progress.completedUnitCount) / max(1, progress.estimatedTimeRemaining ?? 1)
-
-        if bytesPerSecond < 1024 {
-            return String(format: "%.0f B/s", bytesPerSecond)
-        } else if bytesPerSecond < 1024 * 1024 {
-            return String(format: "%.1f KB/s", bytesPerSecond / 1024)
-        } else {
-            return String(format: "%.1f MB/s", bytesPerSecond / (1024 * 1024))
-        }
+        return progressHandler.calculateSpeed(progress: progress)
     }
 
     private func mapAlamofireError(_ error: AFError) -> Error {
@@ -595,7 +504,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
 extension AlamofireDownloadService {
 
     /// Download with resume support
-    public func downloadModelWithResume(_ model: ModelInfo, resumeData: Data? = nil) async throws -> DownloadTask { // swiftlint:disable:this function_body_length
+    public func downloadModelWithResume(_ model: ModelInfo, resumeData: Data? = nil) async throws -> DownloadTask {
         guard let downloadURL = model.downloadURL else {
             throw DownloadError.invalidURL
         }
@@ -613,99 +522,184 @@ extension AlamofireDownloadService {
                     self.activeDownloadRequests.removeValue(forKey: taskId)
                 }
 
-                do {
-                    // Get destination folder (framework is required)
-                    guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
-                        self.logger.error("Model has no associated framework: \(model.id)")
-                        throw DownloadError.invalidURL
-                    }
-                    let fileManager = ServiceContainer.shared.fileManager
-                    let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
-                    let destinationURL = URL(fileURLWithPath: modelFolder.path).appendingPathComponent("\(model.id).\(model.format.rawValue)")
-
-                    let destination: DownloadRequest.Destination = { _, _ in
-                        return (destinationURL, [.removePreviousFile, .createIntermediateDirectories])
-                    }
-
-                    // Create download request (resume if data available)
-                    let downloadRequest: DownloadRequest
-                    if let resumeData = resumeData {
-                        downloadRequest = self.session.download(resumingWith: resumeData, to: destination)
-                    } else {
-                        downloadRequest = self.session.download(downloadURL, to: destination)
-                    }
-
-                    // Configure request
-                    downloadRequest
-                        .downloadProgress { progress in
-                            let downloadProgress = DownloadProgress(
-                                bytesDownloaded: progress.completedUnitCount,
-                                totalBytes: progress.totalUnitCount,
-                                state: .downloading
-                            )
-                            progressContinuation.yield(downloadProgress)
-                        }
-                        .validate()
-
-                    self.activeDownloadRequests[taskId] = downloadRequest
-
-                    // Handle response using continuation
-                    return try await withCheckedThrowingContinuation { continuation in
-                        downloadRequest.response { response in
-                            switch response.result {
-                            case .success(let url):
-                                if let url = url {
-                                    progressContinuation.yield(DownloadProgress(
-                                        bytesDownloaded: model.downloadSize ?? 0,
-                                        totalBytes: model.downloadSize ?? 0,
-                                        state: .completed
-                                    ))
-
-                                    // Update model with local path in registry
-                                    var updatedModel = model
-                                    updatedModel.localPath = url
-                                    ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
-
-                                    // Save metadata persistently in a Task
-                                    Task {
-                                        do {
-                                            let modelInfoService = await ServiceContainer.shared.modelInfoService
-                                            try await modelInfoService.saveModel(updatedModel)
-                                            self.logger.info("Model metadata saved successfully for: \(model.id)")
-                                        } catch {
-                                            self.logger.error("Failed to save model metadata for \(model.id): \(error)")
-                                        }
-                                    }
-
-                                    continuation.resume(returning: url)
-                                } else {
-                                    continuation.resume(throwing: DownloadError.invalidResponse)
-                                }
-
-                            case .failure(let error):
-                                // Save resume data if available
-                                if let resumeData = response.resumeData {
-                                    // Store resume data for later use
-                                    self.saveResumeData(resumeData, for: model.id)
-                                }
-
-                                let downloadError = self.mapAlamofireError(error)
-                                progressContinuation.yield(DownloadProgress(
-                                    bytesDownloaded: 0,
-                                    totalBytes: model.downloadSize ?? 0,
-                                    state: .failed(downloadError)
-                                ))
-                                continuation.resume(throwing: downloadError)
-                            }
-                        }
-                    }
-                } catch {
-                    throw error
-                }
+                return try await self.executeResumableDownload(
+                    model: model,
+                    downloadURL: downloadURL,
+                    taskId: taskId,
+                    resumeData: resumeData,
+                    progressContinuation: progressContinuation
+                )
             }
         )
 
         return task
+    }
+
+    /// Execute a resumable download
+    private func executeResumableDownload(
+        model: ModelInfo,
+        downloadURL: URL,
+        taskId: String,
+        resumeData: Data?,
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation
+    ) async throws -> URL {
+        // Get destination folder (framework is required)
+        guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
+            logger.error("Model has no associated framework: \(model.id)")
+            throw DownloadError.invalidURL
+        }
+        let fileManager = ServiceContainer.shared.fileManager
+        let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
+        let destinationURL = URL(fileURLWithPath: modelFolder.path).appendingPathComponent("\(model.id).\(model.format.rawValue)")
+
+        let destination: DownloadRequest.Destination = { _, _ in
+            return (destinationURL, [.removePreviousFile, .createIntermediateDirectories])
+        }
+
+        // Create download request (resume if data available)
+        let downloadRequest = createResumableDownloadRequest(
+            downloadURL: downloadURL,
+            resumeData: resumeData,
+            destination: destination
+        )
+
+        // Configure request
+        configureResumableDownloadRequest(
+            downloadRequest: downloadRequest,
+            progressContinuation: progressContinuation
+        )
+
+        activeDownloadRequests[taskId] = downloadRequest
+
+        // Handle response using continuation
+        return try await handleResumableDownloadResponse(
+            downloadRequest: downloadRequest,
+            model: model,
+            progressContinuation: progressContinuation
+        )
+    }
+
+    /// Create a resumable download request
+    private func createResumableDownloadRequest(
+        downloadURL: URL,
+        resumeData: Data?,
+        destination: @escaping DownloadRequest.Destination
+    ) -> DownloadRequest {
+        if let resumeData = resumeData {
+            return session.download(resumingWith: resumeData, to: destination)
+        } else {
+            return session.download(downloadURL, to: destination)
+        }
+    }
+
+    /// Configure the resumable download request with progress tracking
+    private func configureResumableDownloadRequest(
+        downloadRequest: DownloadRequest,
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation
+    ) {
+        downloadRequest
+            .downloadProgress { progress in
+                let downloadProgress = DownloadProgress(
+                    bytesDownloaded: progress.completedUnitCount,
+                    totalBytes: progress.totalUnitCount,
+                    state: .downloading
+                )
+                progressContinuation.yield(downloadProgress)
+            }
+            .validate()
+    }
+
+    /// Handle the resumable download response
+    private func handleResumableDownloadResponse(
+        downloadRequest: DownloadRequest,
+        model: ModelInfo,
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation
+    ) async throws -> URL {
+        return try await withCheckedThrowingContinuation { continuation in
+            downloadRequest.response { [weak self] response in
+                guard let self = self else {
+                    continuation.resume(throwing: DownloadError.unknown)
+                    return
+                }
+
+                switch response.result {
+                case .success(let url):
+                    self.handleResumableDownloadSuccess(
+                        url: url,
+                        model: model,
+                        progressContinuation: progressContinuation,
+                        continuation: continuation
+                    )
+
+                case .failure(let error):
+                    self.handleResumableDownloadFailure(
+                        error: error,
+                        model: model,
+                        response: response,
+                        progressContinuation: progressContinuation,
+                        continuation: continuation
+                    )
+                }
+            }
+        }
+    }
+
+    /// Handle successful resumable download
+    private func handleResumableDownloadSuccess(
+        url: URL?,
+        model: ModelInfo,
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation,
+        continuation: CheckedContinuation<URL, Error>
+    ) {
+        if let url = url {
+            progressContinuation.yield(DownloadProgress(
+                bytesDownloaded: model.downloadSize ?? 0,
+                totalBytes: model.downloadSize ?? 0,
+                state: .completed
+            ))
+
+            // Update model with local path in registry
+            var updatedModel = model
+            updatedModel.localPath = url
+            ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+            // Save metadata persistently in a Task
+            Task {
+                do {
+                    let modelInfoService = await ServiceContainer.shared.modelInfoService
+                    try await modelInfoService.saveModel(updatedModel)
+                    self.logger.info("Model metadata saved successfully for: \(model.id)")
+                } catch {
+                    self.logger.error("Failed to save model metadata for \(model.id): \(error)")
+                }
+            }
+
+            continuation.resume(returning: url)
+        } else {
+            continuation.resume(throwing: DownloadError.invalidResponse)
+        }
+    }
+
+    /// Handle failed resumable download
+    private func handleResumableDownloadFailure(
+        error: AFError,
+        model: ModelInfo,
+        response: DownloadResponse<URL?, AFError>,
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation,
+        continuation: CheckedContinuation<URL, Error>
+    ) {
+        // Save resume data if available
+        if let resumeData = response.resumeData {
+            saveResumeData(resumeData, for: model.id)
+        }
+
+        let downloadError = mapAlamofireError(error)
+        progressContinuation.yield(DownloadProgress(
+            bytesDownloaded: 0,
+            totalBytes: model.downloadSize ?? 0,
+            state: .failed(downloadError)
+        ))
+        continuation.resume(throwing: downloadError)
     }
 
     private func saveResumeData(_ data: Data, for modelId: String) {
@@ -724,6 +718,214 @@ extension AlamofireDownloadService {
         } catch {
             logger.error("Failed to load resume data for \(modelId): \(error)")
             return nil
+        }
+    }
+}
+
+// MARK: - Helper Classes
+
+/// Manages download task lifecycle and metadata
+private class DownloadTaskManager {
+    private let logger = SDKLogger(category: "DownloadTaskManager")
+
+    func createTaskId() -> String {
+        return UUID().uuidString
+    }
+
+    func logTaskCreation(taskId: String, modelId: String) {
+        logger.debug("Created download task", metadata: [
+            "taskId": taskId,
+            "modelId": modelId
+        ])
+    }
+
+    func logTaskCompletion(taskId: String, modelId: String) {
+        logger.debug("Completed download task", metadata: [
+            "taskId": taskId,
+            "modelId": modelId
+        ])
+    }
+}
+
+/// Handles download progress tracking and reporting
+private class DownloadProgressHandler {
+    private let logger = SDKLogger(category: "DownloadProgressHandler")
+
+    func calculateSpeed(progress: Progress) -> String {
+        guard progress.totalUnitCount > 0 else { return "0 B/s" }
+
+        // This is a simplified calculation - in production, you'd track time elapsed
+        let bytesPerSecond = Double(progress.completedUnitCount) / max(1, progress.estimatedTimeRemaining ?? 1)
+
+        if bytesPerSecond < 1024 {
+            return String(format: "%.0f B/s", bytesPerSecond)
+        } else if bytesPerSecond < 1024 * 1024 {
+            return String(format: "%.1f KB/s", bytesPerSecond / 1024)
+        } else {
+            return String(format: "%.1f MB/s", bytesPerSecond / (1024 * 1024))
+        }
+    }
+
+    func shouldReportProgress(currentProgress: Double) -> Bool {
+        // Report at 10% intervals
+        return currentProgress.truncatingRemainder(dividingBy: 10) < 0.1
+    }
+}
+
+// MARK: - Download Execution Extension
+
+extension AlamofireDownloadService {
+    /// Perform the actual download
+    func performDownload(
+        url: URL,
+        destination: URL,
+        model: ModelInfo,
+        taskId: String,
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation
+    ) async throws -> URL {
+        let destination: DownloadRequest.Destination = { _, _ in
+            return (destination, [.removePreviousFile, .createIntermediateDirectories])
+        }
+
+        let downloadRequest = session.download(url, to: destination)
+            .downloadProgress { progress in
+                let downloadProgress = DownloadProgress(
+                    stage: .downloading,
+                    bytesDownloaded: progress.completedUnitCount,
+                    totalBytes: progress.totalUnitCount,
+                    stageProgress: progress.fractionCompleted,
+                    state: .downloading
+                )
+
+                // Log progress at 10% intervals
+                let progressPercent = progress.fractionCompleted * 100
+                if progressPercent.truncatingRemainder(dividingBy: 10) < 0.1 {
+                    self.logger.debug("Download progress", metadata: [
+                        "modelId": model.id,
+                        "progress": progressPercent,
+                        "bytesDownloaded": progress.completedUnitCount,
+                        "totalBytes": progress.totalUnitCount,
+                        "speed": self.calculateDownloadSpeed(progress: progress)
+                    ])
+
+                    EventPublisher.shared.track(ModelEvent.downloadProgress(
+                        modelId: model.id,
+                        progress: progress.fractionCompleted,
+                        bytesDownloaded: progress.completedUnitCount,
+                        totalBytes: progress.totalUnitCount
+                    ))
+                }
+
+                progressContinuation.yield(downloadProgress)
+            }
+            .validate()
+
+        activeDownloadRequests[taskId] = downloadRequest
+
+        return try await withCheckedThrowingContinuation { continuation in
+            downloadRequest.response { response in
+                switch response.result {
+                case .success(let downloadedURL):
+                    if let downloadedURL = downloadedURL {
+                        continuation.resume(returning: downloadedURL)
+                    } else {
+                        EventPublisher.shared.track(ModelEvent.downloadFailed(
+                            modelId: model.id,
+                            error: "Invalid response - no URL returned"
+                        ))
+                        continuation.resume(throwing: DownloadError.invalidResponse)
+                    }
+
+                case .failure(let error):
+                    let downloadError = self.mapAlamofireError(error)
+                    EventPublisher.shared.track(ModelEvent.downloadFailed(
+                        modelId: model.id,
+                        error: error.localizedDescription
+                    ))
+                    self.logger.error("Download failed", metadata: [
+                        "modelId": model.id,
+                        "url": url.absoluteString,
+                        "error": error.localizedDescription,
+                        "statusCode": response.response?.statusCode ?? 0
+                    ])
+                    continuation.resume(throwing: downloadError)
+                }
+            }
+        }
+    }
+
+    /// Perform extraction for archive models
+    func performExtraction(
+        archiveURL: URL,
+        destinationFolder: URL,
+        model: ModelInfo,
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation
+    ) async throws -> URL {
+        guard case .archive(let archiveType, _, _) = model.artifactType else {
+            throw DownloadError.extractionFailed("Model does not require extraction")
+        }
+
+        let extractionStartTime = Date()
+
+        // Track extraction started
+        EventPublisher.shared.track(ModelEvent.extractionStarted(
+            modelId: model.id,
+            archiveType: archiveType.rawValue
+        ))
+
+        logger.info("Starting extraction", metadata: [
+            "modelId": model.id,
+            "archiveType": archiveType.rawValue,
+            "archiveURL": archiveURL.path,
+            "destination": destinationFolder.path
+        ])
+
+        // Report extraction stage
+        progressContinuation.yield(.extraction(modelId: model.id, progress: 0.0))
+
+        do {
+            let result = try await extractionService.extract(
+                archiveURL: archiveURL,
+                to: destinationFolder,
+                artifactType: model.artifactType,
+                progressHandler: { progress in
+                    progressContinuation.yield(.extraction(
+                        modelId: model.id,
+                        progress: progress,
+                        totalBytes: model.downloadSize ?? 0
+                    ))
+
+                    // Track extraction progress
+                    EventPublisher.shared.track(ModelEvent.extractionProgress(
+                        modelId: model.id,
+                        progress: progress
+                    ))
+                }
+            )
+
+            let extractionDurationMs = Date().timeIntervalSince(extractionStartTime) * 1000
+
+            // Track extraction completed
+            EventPublisher.shared.track(ModelEvent.extractionCompleted(
+                modelId: model.id,
+                durationMs: extractionDurationMs
+            ))
+
+            logger.info("Extraction completed", metadata: [
+                "modelId": model.id,
+                "modelPath": result.modelPath.path,
+                "extractedSize": result.extractedSize,
+                "fileCount": result.fileCount,
+                "durationMs": extractionDurationMs
+            ])
+
+            return result.modelPath
+        } catch {
+            EventPublisher.shared.track(ModelEvent.extractionFailed(
+                modelId: model.id,
+                error: error.localizedDescription
+            ))
+            throw error
         }
     }
 }
