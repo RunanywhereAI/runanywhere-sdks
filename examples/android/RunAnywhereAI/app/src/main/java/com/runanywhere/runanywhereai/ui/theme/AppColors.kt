@@ -6,70 +6,72 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 /**
- * iOS-matching color palette for RunAnywhere AI
- * All colors are exact matches to iOS sample app design system
- * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Core/DesignSystem/AppColors.swift
+ * RunAnywhere Brand Color Palette
+ * Color scheme matching RunAnywhere.ai website
+ * Primary accent: Vibrant orange-red (#FF5500) - matches website branding
+ * Dark theme backgrounds: Deep dark blue-gray matching website aesthetic
  */
 object AppColors {
     // ====================
-    // PRIMARY ACCENT COLORS
+    // PRIMARY ACCENT COLORS - RunAnywhere Brand Colors
     // ====================
-    val primaryAccent = Color(0xFF007AFF)  // System accent color
-    val primaryBlue = Color(0xFF007AFF)
-    val primaryGreen = Color(0xFF34C759)
-    val primaryRed = Color(0xFFFF3B30)
-    val primaryOrange = Color(0xFFFF9500)  // Fixed typo from 0x0FF9500
-    val primaryYellow = Color(0xFFFFCC00)
-    val primaryPurple = Color(0xFF9C27B0)  // Updated to match iOS thinking mode
+    // Primary brand color - vibrant orange/red from RunAnywhere.ai website
+    val primaryAccent = Color(0xFFFF5500)  // Vibrant orange-red - primary brand color
+    val primaryOrange = Color(0xFFFF5500)  // Same as primary accent
+    val primaryBlue = Color(0xFF3B82F6)   // Blue-500 - for secondary elements
+    val primaryGreen = Color(0xFF10B981)  // Emerald-500 - success green
+    val primaryRed = Color(0xFFEF4444)    // Red-500 - error red
+    val primaryYellow = Color(0xFFEAB308) // Yellow-500
+    val primaryPurple = Color(0xFF8B5CF6) // Violet-500 - purple accent
 
     // ====================
-    // TEXT COLORS (iOS semantic colors)
+    // TEXT COLORS - RunAnywhere Theme
     // ====================
-    val textPrimary = Color(0xFF000000)  // Light mode
-    val textSecondary = Color(0xFF3C3C43).copy(alpha = 0.6f)
-    val textTertiary = Color(0xFF3C3C43).copy(alpha = 0.3f)
+    val textPrimary = Color(0xFF0F172A)            // Slate-900 - dark text for light mode
+    val textSecondary = Color(0xFF475569)          // Slate-600 - secondary text
+    val textTertiary = Color(0xFF94A3B8)           // Slate-400 - tertiary text
     val textWhite = Color.White
 
     // ====================
-    // BACKGROUND COLORS
+    // BACKGROUND COLORS - RunAnywhere Theme
     // ====================
-    // Light mode
-    val backgroundPrimary = Color(0xFFFFFFFF)
-    val backgroundSecondary = Color(0xFFF2F2F7)
-    val backgroundTertiary = Color(0xFFFFFFFF)
-    val backgroundGrouped = Color(0xFFF2F2F7)
-    val backgroundGray5 = Color(0xFFE5E5EA)
-    val backgroundGray6 = Color(0xFFF2F2F7)
+    // Light mode - clean, modern backgrounds
+    val backgroundPrimary = Color(0xFFFFFFFF)      // Pure white
+    val backgroundSecondary = Color(0xFFF8FAFC)    // Slate-50 - very light gray
+    val backgroundTertiary = Color(0xFFFFFFFF)     // Pure white
+    val backgroundGrouped = Color(0xFFF1F5F9)      // Slate-100 - light grouped background
+    val backgroundGray5 = Color(0xFFE2E8F0)         // Slate-200 - light gray
+    val backgroundGray6 = Color(0xFFF1F5F9)        // Slate-100 - lighter gray
 
-    // Dark mode
-    val backgroundPrimaryDark = Color(0xFF000000)
-    val backgroundSecondaryDark = Color(0xFF1C1C1E)
-    val backgroundTertiaryDark = Color(0xFF2C2C2E)
-    val backgroundGroupedDark = Color(0xFF000000)
-    val backgroundGray5Dark = Color(0xFF2C2C2E)
-    val backgroundGray6Dark = Color(0xFF3A3A3C)
+    // Dark mode - matching RunAnywhere.ai website dark theme
+    val backgroundPrimaryDark = Color(0xFF0F172A)   // Deep dark blue-gray - main background
+    val backgroundSecondaryDark = Color(0xFF1A1F2E) // Slightly lighter dark surface
+    val backgroundTertiaryDark = Color(0xFF252B3A) // Medium dark surface
+    val backgroundGroupedDark = Color(0xFF0F172A)  // Deep dark - grouped background
+    val backgroundGray5Dark = Color(0xFF2A3142)     // Medium dark gray
+    val backgroundGray6Dark = Color(0xFF353B4A)    // Lighter dark gray
 
     // ====================
-    // MESSAGE BUBBLE COLORS
+    // MESSAGE BUBBLE COLORS - RunAnywhere Theme
     // ====================
-    // User bubbles (with gradient support)
-    val userBubbleGradientStart = primaryAccent
-    val userBubbleGradientEnd = primaryAccent.copy(alpha = 0.9f)
-    val messageBubbleUser = primaryBlue
+    // User bubbles (with gradient support) - using vibrant orange/red brand color
+    val userBubbleGradientStart = primaryAccent    // Vibrant orange-red
+    val userBubbleGradientEnd = Color(0xFFE64500)  // Slightly darker orange-red
+    val messageBubbleUser = primaryAccent          // Vibrant orange-red
 
-    // Assistant bubbles
-    val messageBubbleAssistant = backgroundGray5  // #E5E5EA
+    // Assistant bubbles - clean gray
+    val messageBubbleAssistant = backgroundGray5   // Slate-200
     val messageBubbleAssistantGradientStart = backgroundGray5
     val messageBubbleAssistantGradientEnd = backgroundGray6
 
     // Dark mode
-    val messageBubbleUserDark = Color(0xFF0A84FF)
-    val messageBubbleAssistantDark = backgroundGray5Dark
+    val messageBubbleUserDark = primaryAccent      // Vibrant orange-red - brand color
+    val messageBubbleAssistantDark = backgroundGray5Dark  // Dark gray
 
     // ====================
     // BADGE/TAG COLORS
     // ====================
-    val badgeBlue = primaryBlue.copy(alpha = 0.2f)
+    val badgeBlue = primaryAccent.copy(alpha = 0.2f)  // Brand primary
     val badgeGreen = primaryGreen.copy(alpha = 0.2f)
     val badgePurple = primaryPurple.copy(alpha = 0.2f)
     val badgeOrange = primaryOrange.copy(alpha = 0.2f)
@@ -78,34 +80,35 @@ object AppColors {
     val badgeGray = Color.Gray.copy(alpha = 0.2f)
 
     // ====================
-    // MODEL INFO COLORS
+    // MODEL INFO COLORS - RunAnywhere Theme
     // ====================
-    val modelFrameworkBg = primaryBlue.copy(alpha = 0.1f)
-    val modelThinkingBg = primaryPurple.copy(alpha = 0.1f)
+    val modelFrameworkBg = primaryAccent.copy(alpha = 0.1f)  // Brand primary orange-red
+    val modelThinkingBg = primaryAccent.copy(alpha = 0.1f)   // Brand primary orange-red
 
     // ====================
-    // THINKING MODE COLORS
+    // THINKING MODE COLORS - RunAnywhere Theme
     // ====================
-    val thinkingBackground = primaryPurple.copy(alpha = 0.1f)  // 10% purple
-    val thinkingBackgroundGradientStart = primaryPurple.copy(alpha = 0.1f)
-    val thinkingBackgroundGradientEnd = primaryPurple.copy(alpha = 0.05f)  // 5% purple
-    val thinkingBorder = primaryPurple.copy(alpha = 0.2f)
+    // Using brand orange for thinking mode to match website aesthetic
+    val thinkingBackground = primaryAccent.copy(alpha = 0.1f)  // 10% orange-red
+    val thinkingBackgroundGradientStart = primaryAccent.copy(alpha = 0.1f)
+    val thinkingBackgroundGradientEnd = primaryAccent.copy(alpha = 0.05f)  // 5% orange-red
+    val thinkingBorder = primaryAccent.copy(alpha = 0.2f)
     val thinkingContentBackground = backgroundGray6
-    val thinkingProgressBackground = primaryPurple.copy(alpha = 0.12f)
-    val thinkingProgressBackgroundGradientEnd = primaryPurple.copy(alpha = 0.06f)
+    val thinkingProgressBackground = primaryAccent.copy(alpha = 0.12f)
+    val thinkingProgressBackgroundGradientEnd = primaryAccent.copy(alpha = 0.06f)
 
     // Dark mode
-    val thinkingBackgroundDark = primaryPurple.copy(alpha = 0.15f)
+    val thinkingBackgroundDark = primaryAccent.copy(alpha = 0.15f)
     val thinkingContentBackgroundDark = backgroundGray6Dark
 
     // ====================
-    // STATUS COLORS
+    // STATUS COLORS - RunAnywhere Theme
     // ====================
     val statusGreen = primaryGreen
     val statusOrange = primaryOrange
     val statusRed = primaryRed
-    val statusGray = Color.Gray
-    val statusBlue = primaryBlue
+    val statusGray = Color(0xFF64748B)  // Slate-500 - modern gray
+    val statusBlue = primaryAccent      // Brand primary
 
     // Warning color - matches iOS orange for error states
     val warningOrange = primaryOrange
@@ -120,8 +123,8 @@ object AppColors {
 
     // Shadows for specific components
     val shadowBubble = shadowMedium  // 0.12 alpha
-    val shadowThinking = primaryPurple.copy(alpha = 0.2f)
-    val shadowModelBadge = primaryBlue.copy(alpha = 0.3f)
+    val shadowThinking = primaryAccent.copy(alpha = 0.2f)  // Orange-red glow
+    val shadowModelBadge = primaryAccent.copy(alpha = 0.3f)  // Brand primary
     val shadowTypingIndicator = shadowLight
 
     // ====================
@@ -132,17 +135,17 @@ object AppColors {
     val overlayDark = Color.Black.copy(alpha = 0.7f)
 
     // ====================
-    // BORDER COLORS
+    // BORDER COLORS - RunAnywhere Theme
     // ====================
     val borderLight = Color.White.copy(alpha = 0.3f)
     val borderMedium = Color.Black.copy(alpha = 0.05f)
-    val separator = Color(0x3C3C4336)  // iOS separator color with alpha
+    val separator = Color(0xFFE2E8F0)  // Slate-200 - modern separator
 
     // ====================
-    // DIVIDERS
+    // DIVIDERS - RunAnywhere Theme
     // ====================
-    val divider = Color(0xFFC6C6C8)
-    val dividerDark = Color(0xFF38383A)
+    val divider = Color(0xFFCBD5E1)    // Slate-300 - light divider
+    val dividerDark = Color(0xFF2A3142) // Dark divider matching website
 
     // ====================
     // CARDS & SURFACES
@@ -151,9 +154,9 @@ object AppColors {
     val cardBackgroundDark = backgroundSecondaryDark
 
     // ====================
-    // TYPING INDICATOR
+    // TYPING INDICATOR - RunAnywhere Theme
     // ====================
-    val typingIndicatorDots = primaryBlue.copy(alpha = 0.7f)
+    val typingIndicatorDots = primaryAccent.copy(alpha = 0.7f)  // Brand primary
     val typingIndicatorBackground = backgroundGray5
     val typingIndicatorBorder = borderLight
     val typingIndicatorText = textSecondary.copy(alpha = 0.8f)
@@ -163,7 +166,7 @@ object AppColors {
     // ====================
 
     /**
-     * User message bubble gradient (blue)
+     * User message bubble gradient (orange-red brand color)
      */
     fun userBubbleGradient() = Brush.linearGradient(
         colors = listOf(userBubbleGradientStart, userBubbleGradientEnd)
@@ -206,21 +209,21 @@ object AppColors {
     }
 
     /**
-     * Thinking section background gradient (purple)
+     * Thinking section background gradient (orange-red brand color)
      */
     fun thinkingBackgroundGradient() = Brush.linearGradient(
         colors = listOf(thinkingBackgroundGradientStart, thinkingBackgroundGradientEnd)
     )
 
     /**
-     * Model badge gradient (blue)
+     * Model badge gradient (brand primary)
      */
     fun modelBadgeGradient() = Brush.linearGradient(
-        colors = listOf(primaryBlue, primaryBlue.copy(alpha = 0.9f))
+        colors = listOf(primaryAccent, primaryAccent.copy(alpha = 0.9f))
     )
 
     /**
-     * Thinking progress gradient (purple)
+     * Thinking progress gradient (orange-red brand color)
      */
     fun thinkingProgressGradient() = Brush.linearGradient(
         colors = listOf(thinkingProgressBackground, thinkingProgressBackgroundGradientEnd)
@@ -235,11 +238,11 @@ object AppColors {
      */
     fun frameworkBadgeColor(framework: String): Color {
         return when (framework.uppercase()) {
-            "LLAMA_CPP", "LLAMACPP" -> badgeBlue
+            "LLAMA_CPP", "LLAMACPP" -> primaryAccent.copy(alpha = 0.2f)  // Brand primary
             "WHISPERKIT", "WHISPER" -> badgeGreen
             "MLKIT", "ML_KIT" -> badgePurple
             "COREML", "CORE_ML" -> badgeOrange
-            else -> badgeBlue
+            else -> primaryAccent.copy(alpha = 0.2f)
         }
     }
 
@@ -248,11 +251,11 @@ object AppColors {
      */
     fun frameworkTextColor(framework: String): Color {
         return when (framework.uppercase()) {
-            "LLAMA_CPP", "LLAMACPP" -> primaryBlue
+            "LLAMA_CPP", "LLAMACPP" -> primaryAccent  // Brand primary
             "WHISPERKIT", "WHISPER" -> primaryGreen
             "MLKIT", "ML_KIT" -> primaryPurple
             "COREML", "CORE_ML" -> primaryOrange
-            else -> primaryBlue
+            else -> primaryAccent
         }
     }
 }

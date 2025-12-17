@@ -111,8 +111,8 @@ fun SettingsScreen(
                     valueRange = 0f..2f,
                     steps = 19,
                     colors = SliderDefaults.colors(
-                        thumbColor = AppColors.primaryBlue,
-                        activeTrackColor = AppColors.primaryBlue
+                        thumbColor = AppColors.primaryAccent,
+                        activeTrackColor = AppColors.primaryAccent
                     )
                 )
             }
@@ -210,7 +210,7 @@ fun SettingsScreen(
                 icon = Icons.Outlined.Memory,
                 label = "Models Storage",
                 value = Formatter.formatFileSize(context, uiState.modelStorageSize),
-                valueColor = AppColors.primaryBlue
+                valueColor = AppColors.primaryAccent
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageOverviewRow(
@@ -279,8 +279,8 @@ fun SettingsScreen(
                     checked = uiState.analyticsLogToLocal,
                     onCheckedChange = { viewModel.updateAnalyticsLogging(it) },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = AppColors.primaryBlue,
-                        checkedTrackColor = AppColors.primaryBlue.copy(alpha = 0.5f)
+                        checkedThumbColor = AppColors.primaryAccent,
+                        checkedTrackColor = AppColors.primaryAccent.copy(alpha = 0.5f)
                     )
                 )
             }
@@ -301,7 +301,7 @@ fun SettingsScreen(
                 Icon(
                     Icons.Outlined.Widgets,
                     contentDescription = null,
-                    tint = AppColors.primaryBlue
+                    tint = AppColors.primaryAccent
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
@@ -333,13 +333,13 @@ fun SettingsScreen(
                 Icon(
                     Icons.Outlined.MenuBook,
                     contentDescription = null,
-                    tint = AppColors.primaryBlue
+                    tint = AppColors.primaryAccent
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "Documentation",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppColors.primaryBlue
+                    color = AppColors.primaryAccent
                 )
             }
         }
@@ -461,8 +461,8 @@ private fun RoutingPolicySelector(
                         )
                     },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AppColors.primaryBlue.copy(alpha = 0.2f),
-                        selectedLabelColor = AppColors.primaryBlue
+                        selectedContainerColor = AppColors.primaryAccent.copy(alpha = 0.2f),
+                        selectedLabelColor = AppColors.primaryAccent
                     )
                 )
             }
@@ -560,7 +560,7 @@ private fun StoredModelRow(
                             text = model.format.uppercase(),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = AppColors.primaryBlue
+                            color = AppColors.primaryAccent
                         )
                     }
                     // Framework badge if available

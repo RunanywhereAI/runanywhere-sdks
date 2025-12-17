@@ -138,9 +138,9 @@ fun RunAnywhereBottomNav(navController: NavController) {
                 label = { Text(item.label) },
                 selected = selected,
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = AppColors.primaryBlue,
-                    selectedTextColor = AppColors.primaryBlue,
-                    indicatorColor = AppColors.primaryBlue.copy(alpha = 0.1f),
+                    selectedIconColor = AppColors.primaryAccent,
+                    selectedTextColor = AppColors.primaryAccent,
+                    indicatorColor = AppColors.primaryAccent.copy(alpha = 0.1f),
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                 ),

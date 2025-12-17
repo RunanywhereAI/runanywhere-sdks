@@ -1,10 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- RunAnywhere Brand Colors -->
+    <color name="primary_accent">#FFFF5500</color>  <!-- Vibrant orange-red - Primary brand color -->
+    <color name="primary_blue">#FF3B82F6</color>    <!-- Blue-500 -->
+    <color name="primary_green">#FF10B981</color>  <!-- Emerald-500 -->
+    <color name="primary_red">#FFEF4444</color>     <!-- Red-500 -->
+    <color name="primary_orange">#FFFF5500</color> <!-- Vibrant orange-red - same as primary -->
+    <color name="primary_purple">#FF8B5CF6</color> <!-- Violet-500 -->
+    
+    <!-- Legacy colors for compatibility -->
     <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
+    <color name="purple_500">#FFFF5500</color>  <!-- Updated to brand primary orange-red -->
+    <color name="purple_700">#FFE64500</color>  <!-- Darker orange-red -->
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
+    
+    <!-- Standard colors -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="ic_launcher_background">#ffffff</color>
