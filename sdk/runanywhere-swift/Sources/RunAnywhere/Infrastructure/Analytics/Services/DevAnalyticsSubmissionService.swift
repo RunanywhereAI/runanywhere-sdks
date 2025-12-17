@@ -82,51 +82,6 @@ public final class DevAnalyticsSubmissionService {
         }
     }
 
-    /// Internal method for services to submit analytics without needing external dependencies
-    /// Fetches all required context from ServiceContainer
-    /// - Note: Only submits in development mode; fails silently on errors
-    /// - Parameter analyticsParams: Generation analytics parameters
-    internal func submitInternal(analyticsParams: GenerationAnalyticsParams) async {
-        // Get params from RunAnywhere internal state
-        guard let sdkParams = RunAnywhere.initParams,
-              sdkParams.environment == .development else { return }
-
-        let serviceContainer = ServiceContainer.shared
-        let deviceId = await serviceContainer.deviceRegistrationService.getDeviceId()
-
-        // Non-blocking background submission
-        Task.detached(priority: .background) { [weak self] in
-            await self?.performSubmission(
-                analyticsParams: analyticsParams,
-                sdkParams: sdkParams,
-                deviceId: deviceId ?? "unknown"
-            )
-        }
-    }
-
-    /// Submit generation analytics (non-blocking, fails silently)
-    /// - Parameters:
-    ///   - analyticsParams: Generation analytics parameters
-    ///   - sdkParams: SDK initialization parameters
-    ///   - deviceId: Optional device identifier
-    @available(*, deprecated, message: "Use submit() instead which handles deviceId internally")
-    public func submitGenerationAnalytics(
-        analyticsParams: GenerationAnalyticsParams,
-        sdkParams: SDKInitParams,
-        deviceId: String?
-    ) {
-        guard sdkParams.environment == .development else { return }
-
-        // Non-blocking background submission
-        Task.detached(priority: .background) { [weak self] in
-            await self?.performSubmission(
-                analyticsParams: analyticsParams,
-                sdkParams: sdkParams,
-                deviceId: deviceId ?? "unknown"
-            )
-        }
-    }
-
     // MARK: - Private Implementation
 
     private func performSubmission(

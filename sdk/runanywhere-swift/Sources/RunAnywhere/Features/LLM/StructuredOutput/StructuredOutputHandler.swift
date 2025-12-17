@@ -263,7 +263,7 @@ public class StructuredOutputHandler {
     /// Validate that generated text contains valid structured output
     public func validateStructuredOutput(
         text: String,
-        config: StructuredOutputConfig
+        config _: StructuredOutputConfig
     ) -> StructuredOutputValidation {
         do {
             _ = try extractJSON(from: text)

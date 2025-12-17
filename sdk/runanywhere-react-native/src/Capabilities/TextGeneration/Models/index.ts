@@ -7,4 +7,3 @@ export * from './GenerationResult';
 export * from './PerformanceMetrics';
 export * from './ThinkingTagPattern';
 export * from './InferenceRequest';
-

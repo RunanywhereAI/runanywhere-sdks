@@ -14,4 +14,3 @@ export enum ConfigurationSource {
   Consumer = 'consumer',
   Defaults = 'defaults',
 }
-

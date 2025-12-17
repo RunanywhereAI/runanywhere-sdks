@@ -105,4 +105,3 @@ export interface DiarizationMetadata {
   readonly speakerCount: number;
   readonly method: string; // "energy", "ml", "hybrid"
 }
-

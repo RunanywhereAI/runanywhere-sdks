@@ -4,7 +4,6 @@ import Foundation
 public class DefaultStorageAnalyzer: StorageAnalyzer {
     private let fileManager: SimplifiedFileManager
     private let modelRegistry: ModelRegistry
-    private let logger = SDKLogger(category: "StorageAnalyzer")
 
     public init(fileManager: SimplifiedFileManager, modelRegistry: ModelRegistry) {
         self.fileManager = fileManager

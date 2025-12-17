@@ -5,4 +5,3 @@
  */
 
 export { SDKError, SDKErrorCode } from './SDKError';
-

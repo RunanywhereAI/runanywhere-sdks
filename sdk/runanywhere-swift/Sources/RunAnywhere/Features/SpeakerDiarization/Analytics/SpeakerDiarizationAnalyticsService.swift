@@ -20,7 +20,6 @@ public actor SpeakerDiarizationAnalyticsService {
 
     private struct SessionInfo {
         let id: String
-        let maxSpeakers: Int
         let startTime: Date
     }
 
@@ -38,11 +37,10 @@ public actor SpeakerDiarizationAnalyticsService {
     // MARK: - Session Methods
 
     /// Start a diarization session
-    public func startDiarizationSession(maxSpeakers: Int) -> String {
+    public func startDiarizationSession(maxSpeakers _: Int) -> String {
         let sessionId = UUID().uuidString
         currentSession = SessionInfo(
             id: sessionId,
-            maxSpeakers: maxSpeakers,
             startTime: Date()
         )
 
@@ -52,7 +50,7 @@ public actor SpeakerDiarizationAnalyticsService {
     }
 
     /// Complete a diarization session
-    public func completeDiarizationSession(speakerCount: Int, segmentCount: Int, averageConfidence: Float) {
+    public func completeDiarizationSession(speakerCount: Int, segmentCount _: Int, averageConfidence _: Float) {
         guard let session = currentSession else { return }
 
         let processingTimeMs = Date().timeIntervalSince(session.startTime) * 1000

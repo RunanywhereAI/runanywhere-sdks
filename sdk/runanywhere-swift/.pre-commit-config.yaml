@@ -5,36 +5,40 @@ default_language_version:
   python: python3
 
 repos:
-  # Swift linting with SwiftLint
-  - repo: https://github.com/realm/SwiftLint
-    rev: 0.57.1
+  # SwiftLint with autofix then lint
+  - repo: local
     hooks:
-      - id: swiftlint
-        name: SwiftLint
-        description: Run SwiftLint on staged Swift files
-        entry: swiftlint lint
-        language: system
-        types: [swift]
-        files: \.(swift)$
-        exclude: ^(\.build|DerivedData|Package\.swift)
-        args:
-          - --strict
-          - --config
-          - .swiftlint.yml
-
       - id: swiftlint-fix
         name: SwiftLint AutoFix
-        description: Run SwiftLint with auto-fix on staged Swift files
-        entry: swiftlint
+        description: Auto-fix SwiftLint issues
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)/sdk/runanywhere-swift" && swiftlint --fix --quiet 2>/dev/null || true'
         language: system
         types: [swift]
-        files: \.(swift)$
-        exclude: ^(\.build|DerivedData|Package\.swift)
-        args:
-          - --fix
-          - --config
-          - .swiftlint.yml
-        stages: [manual]
+        files: ^sdk/runanywhere-swift/.*\.swift$
+        pass_filenames: false
+
+      - id: swiftlint
+        name: SwiftLint
+        description: Run SwiftLint on Swift files (fails on violations)
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)/sdk/runanywhere-swift" && swiftlint --strict'
+        language: system
+        types: [swift]
+        files: ^sdk/runanywhere-swift/.*\.swift$
+        pass_filenames: false
+
+      - id: periphery
+        name: Periphery (Unused Code)
+        description: Detect unused code with Periphery
+        entry: >-
+          bash -c '
+          OUTPUT=$(periphery scan --targets RunAnywhere --targets ONNXRuntime --targets LlamaCPPRuntime --targets FoundationModelsAdapter --targets FluidAudioDiarization 2>&1);
+          WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused");
+          if [ -n "$WARNINGS" ]; then echo "$WARNINGS"; echo "Periphery found unused code"; exit 1; fi;
+          exit 0'
+        language: system
+        types: [swift]
+        files: \.swift$
+        pass_filenames: false
 
   # General file hygiene hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks

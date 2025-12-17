@@ -1,5 +1,5 @@
 //
-//  LlamaCPPModule.swift
+//  LlamaCPPServiceProvider.swift
 //  LlamaCPPRuntime Module
 //
 //  LlamaCPP module providing LLM text generation capabilities.

@@ -73,4 +73,3 @@ export interface STTService {
    */
   cleanup(): Promise<void>;
 }
-

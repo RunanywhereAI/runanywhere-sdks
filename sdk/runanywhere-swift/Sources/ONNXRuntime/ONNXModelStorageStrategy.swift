@@ -16,7 +16,6 @@ import RunAnywhere
 /// Note: This class only handles post-download model detection and path resolution.
 /// All download and extraction is handled by the SDK automatically based on `ModelInfo.artifactType`.
 public final class ONNXModelStorageStrategy: ModelStorageStrategy {
-    private let logger = SDKLogger(category: "ONNXModelStorageStrategy")
 
     public init() {}
 

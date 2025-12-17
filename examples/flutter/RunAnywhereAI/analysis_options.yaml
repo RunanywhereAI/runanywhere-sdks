@@ -13,4 +13,3 @@ analyzer:
     - '**/*.g.dart'
   errors:
     invalid_annotation_target: ignore
-

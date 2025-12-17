@@ -6,11 +6,9 @@ import Foundation
 public final class StructuredOutputGenerationService {
 
     private let handler: StructuredOutputHandler
-    private let logger: SDKLogger
 
     public init() {
         self.handler = StructuredOutputHandler()
-        self.logger = SDKLogger(category: "StructuredOutputGeneration")
     }
 
     // MARK: - Non-Streaming Generation

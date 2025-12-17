@@ -25,4 +25,3 @@ export function compareRequestPriority(
 ): number {
   return lhs - rhs;
 }
-

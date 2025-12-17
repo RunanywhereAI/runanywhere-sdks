@@ -1,4 +1,3 @@
-import AVFoundation
 import Foundation
 import RunAnywhere
 import WhisperKit
@@ -300,20 +299,55 @@ public class WhisperKitService: STTService {
         true
     }
 
-    /// Transcribe audio stream in real-time
+    /// Stream transcription for real-time processing (protocol requirement)
+    /// Delegates to transcribeStream for actual implementation
     public func streamTranscribe<S: AsyncSequence>(
         audioStream: S,
         options: STTOptions,
         onPartial: @escaping (String) -> Void
     ) async throws -> STTTranscriptionResult where S.Element == Data {
-        // For now, return empty result - streaming needs proper implementation
-        return STTTranscriptionResult(
-            transcript: "",
-            confidence: 1.0,
-            timestamps: nil,
-            language: nil,
-            alternatives: nil
-        )
+        logger.info("streamTranscribe called, delegating to transcribeStream")
+
+        var finalTranscript = ""
+        var finalConfidence: Float = 0.0
+        var finalLanguage: String?
+
+        // Convert generic AsyncSequence to AsyncStream<VoiceAudioChunk>
+        let voiceChunkStream = AsyncStream<VoiceAudioChunk> { continuation in
+            Task {
+                do {
+                    for try await audioData in audioStream {
+                        // Convert Data to VoiceAudioChunk
+                        let chunk = VoiceAudioChunk(audioData: audioData, timestamp: Date())
+                        continuation.yield(chunk)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish()
+                }
+            }
+        }
+
+        // Process stream and collect results
+        do {
+            for try await segment in transcribeStream(audioStream: voiceChunkStream, options: options) {
+                onPartial(segment.text)
+                finalTranscript = segment.text
+                finalLanguage = segment.language
+                finalConfidence = segment.confidence ?? 0.0
+            }
+
+            return STTTranscriptionResult(
+                transcript: finalTranscript,
+                confidence: finalConfidence,
+                timestamps: nil,
+                language: finalLanguage,
+                alternatives: nil
+            )
+        } catch {
+            logger.error("Stream transcription failed: \(error)")
+            throw error
+        }
     }
 
     public func transcribeStream(

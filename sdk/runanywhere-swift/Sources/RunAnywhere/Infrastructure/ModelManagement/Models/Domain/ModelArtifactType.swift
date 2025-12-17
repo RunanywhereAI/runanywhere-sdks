@@ -174,7 +174,7 @@ public enum ModelArtifactType: Codable, Sendable, Equatable {
 public extension ModelArtifactType {
 
     /// Infer artifact type from download URL
-    static func infer(from url: URL?, format: ModelFormat) -> ModelArtifactType {
+    static func infer(from url: URL?, format _: ModelFormat) -> ModelArtifactType {
         guard let url = url else {
             return .singleFile(expectedFiles: .none)
         }

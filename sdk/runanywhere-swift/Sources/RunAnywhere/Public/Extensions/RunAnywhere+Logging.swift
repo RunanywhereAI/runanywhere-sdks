@@ -31,8 +31,8 @@ extension RunAnywhere {
     ///   - flushInterval: Time interval between automatic flushes
     /// - Note: Analytics endpoint is configured via the baseURL in SDK Configuration
     public static func configureAnalytics(
-        batchSize: Int = 50,
-        flushInterval: TimeInterval = 30.0
+        batchSize _: Int = 50,
+        flushInterval _: TimeInterval = 30.0
     ) {
         // Analytics uses the baseURL from Configuration
         // The endpoint is already configured via TelemetryRepository

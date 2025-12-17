@@ -84,4 +84,3 @@ export class VLMConfigurationImpl implements VLMConfiguration {
     }
   }
 }
-

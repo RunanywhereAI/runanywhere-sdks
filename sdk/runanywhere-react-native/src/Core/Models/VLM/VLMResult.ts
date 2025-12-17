@@ -32,4 +32,3 @@ export interface VLMBoundingBox {
   width: number;
   height: number;
 }
-

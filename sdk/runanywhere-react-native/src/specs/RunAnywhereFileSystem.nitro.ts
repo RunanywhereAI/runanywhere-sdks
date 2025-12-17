@@ -89,4 +89,3 @@ export interface RunAnywhereFileSystem
    */
   getTotalDiskSpace(): Promise<number>;
 }
-

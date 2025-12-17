@@ -17,4 +17,3 @@ export interface DownloadTask {
   readonly progress: AsyncGenerator<DownloadProgress, void, unknown>;
   readonly result: Promise<string>; // URL as string
 }
-

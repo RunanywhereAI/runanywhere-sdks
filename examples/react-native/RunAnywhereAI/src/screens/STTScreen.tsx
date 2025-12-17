@@ -406,7 +406,7 @@ export const STTScreen: React.FC = () => {
 
   /**
    * Start live transcription mode
-   * 
+   *
    * Implements pseudo-streaming for Whisper models (which are batch-only):
    * Records audio in intervals (3 seconds), transcribes each chunk, and
    * accumulates results for a live-like experience matching Swift SDK.

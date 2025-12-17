@@ -80,7 +80,7 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
 
             if (modelFile.exists()) {
                 Log.i(TAG, "Model already exists: $modelId")
-                
+
                 // If it's an archive that hasn't been extracted yet, extract it now
                 if (isArchive(modelId)) {
                     val archiveName = modelFile.nameWithoutExtension.removeSuffix(".tar")
@@ -92,7 +92,7 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
                         Log.i(TAG, "Archive already extracted to: ${extractDir.absolutePath}")
                     }
                 }
-                
+
                 callback?.invoke(1.0)
                 return@async
             }
@@ -116,7 +116,7 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
                     val existingBytes = if (tempFile.exists()) tempFile.length() else 0L
 
                     Log.i(TAG, "Download attempt $attempt/$MAX_RETRIES for $modelId (resuming from $existingBytes bytes)")
-                    
+
                     urlConnection = URL(url).openConnection() as HttpURLConnection
                     urlConnection.requestMethod = "GET"
                     urlConnection.connectTimeout = 30000
@@ -131,9 +131,9 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
                     urlConnection.connect()
 
                     val responseCode = urlConnection.responseCode
-                    
+
                     // 206 = Partial Content (resume), 200 = OK (fresh start)
-                    if (responseCode != HttpURLConnection.HTTP_OK && 
+                    if (responseCode != HttpURLConnection.HTTP_OK &&
                         responseCode != HttpURLConnection.HTTP_PARTIAL) {
                         throw Exception("HTTP error: $responseCode")
                     }
@@ -186,7 +186,7 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
                                             val downloadedThisSession = bytesDownloaded - startBytes
                                             val speedMBps = if (elapsed > 0) (downloadedThisSession / 1024.0 / 1024.0) / elapsed else 0.0
                                             Log.d(TAG, "Progress: ${(pct * 100).toInt()}% @ ${String.format("%.2f", speedMBps)} MB/s")
-                                            
+
                                             callback?.invoke(pct)
                                             lastPct = pct
                                         }
@@ -218,13 +218,13 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
                     val speedMBps = if (duration > 0) sizeMB / duration else 0.0
 
                     Log.i(TAG, "Download complete: $modelId (${String.format("%.1f", sizeMB)}MB in ${String.format("%.1f", duration)}s = ${String.format("%.2f", speedMBps)}MB/s)")
-                    
+
                     // Auto-extract archives (Android fallback since libarchive not linked in pre-built binaries)
                     if (isArchive(modelId)) {
                         Log.i(TAG, "Extracting archive: $modelId")
                         extractArchive(modelFile)
                     }
-                    
+
                     callback?.invoke(1.0)
                     return@async // Success!
 
@@ -312,8 +312,8 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
     // ==========================================================================
 
     private fun isArchive(fileName: String): Boolean {
-        return fileName.endsWith(".tar.bz2") || 
-               fileName.endsWith(".tar.gz") || 
+        return fileName.endsWith(".tar.bz2") ||
+               fileName.endsWith(".tar.gz") ||
                fileName.endsWith(".tgz")
     }
 
@@ -324,18 +324,18 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
     private fun extractArchive(archiveFile: File) {
         val archiveName = archiveFile.nameWithoutExtension.removeSuffix(".tar")
         val extractDir = File(archiveFile.parentFile, "sherpa-models/$archiveName")
-        
+
         if (extractDir.exists()) {
             Log.i(TAG, "Archive already extracted: ${extractDir.absolutePath}")
             return
         }
-        
+
         extractDir.mkdirs()
         Log.i(TAG, "Extracting ${archiveFile.name} to ${extractDir.absolutePath}")
-        
+
         val startTime = System.currentTimeMillis()
         var fileCount = 0
-        
+
         try {
             when {
                 archiveFile.name.endsWith(".tar.bz2") -> {
@@ -362,14 +362,14 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
                 }
                 else -> throw Error("Unsupported archive format: ${archiveFile.name}")
             }
-            
+
             val duration = (System.currentTimeMillis() - startTime) / 1000.0
             Log.i(TAG, "Extracted $fileCount files in ${String.format("%.1f", duration)}s")
-            
+
             // Delete archive after successful extraction to save space
             archiveFile.delete()
             Log.i(TAG, "Deleted archive: ${archiveFile.name}")
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Extraction failed: ${e.message}", e)
             extractDir.deleteRecursively()
@@ -381,16 +381,16 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
         var entry: TarArchiveEntry?
         var count = 0
         val buffer = ByteArray(BUFFER_SIZE)
-        
+
         while (tarIn.nextEntry.also { entry = it } != null) {
             val currentEntry = entry ?: continue
             val outputFile = File(destDir, currentEntry.name)
-            
+
             if (currentEntry.isDirectory) {
                 outputFile.mkdirs()
             } else {
                 outputFile.parentFile?.mkdirs()
-                
+
                 FileOutputStream(outputFile).use { output ->
                     var bytesRead: Int
                     while (tarIn.read(buffer).also { bytesRead = it } != -1) {
@@ -400,7 +400,7 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
                 count++
             }
         }
-        
+
         return count
     }
 }

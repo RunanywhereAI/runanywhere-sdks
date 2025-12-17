@@ -115,7 +115,7 @@ public enum AppleAI: RunAnywhereModule {
             || modelId == "foundation-models-native"
     }
 
-    private static func createService(config: LLMConfiguration) async throws -> LLMService {
+    private static func createService(config _: LLMConfiguration) async throws -> LLMService {
         logger.info("Creating Foundation Models service")
 
         let service = FoundationModelsService()

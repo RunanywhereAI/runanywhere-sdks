@@ -10,4 +10,3 @@ export interface STTConfiguration {
   enablePunctuation?: boolean;
   // Add all other properties from iOS STTConfiguration
 }
-

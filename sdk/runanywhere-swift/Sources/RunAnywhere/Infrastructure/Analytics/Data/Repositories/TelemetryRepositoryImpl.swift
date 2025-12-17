@@ -6,8 +6,6 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     public typealias Entity = TelemetryData
     public typealias RemoteDS = RemoteTelemetryDataSource
 
-    private let databaseManager: DatabaseManager
-    private let apiClient: APIClient?
     private let logger = SDKLogger(category: "TelemetryRepository")
 
     // Data sources for telemetry operations
@@ -22,8 +20,6 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     // MARK: - Initialization
 
     public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
-        self.databaseManager = databaseManager
-        self.apiClient = apiClient
         self.localDataSource = LocalTelemetryDataSource(databaseManager: databaseManager)
         self._remoteDataSource = RemoteTelemetryDataSource(apiClient: apiClient)
     }

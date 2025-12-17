@@ -21,7 +21,6 @@ public actor DeviceRegistrationService {
 
     private let logger = SDKLogger(category: "DeviceRegistration")
     private let keychainManager: KeychainManager
-    private let deviceService: DeviceService
 
     /// Registration state management
     private var cachedDeviceId: String?
@@ -39,10 +38,9 @@ public actor DeviceRegistrationService {
 
     public init(
         keychainManager: KeychainManager = .shared,
-        deviceService: DeviceService? = nil
+        deviceService _: DeviceService? = nil
     ) {
         self.keychainManager = keychainManager
-        self.deviceService = deviceService ?? DefaultDeviceService(keychainManager: keychainManager)
     }
 
     // MARK: - Public API
@@ -184,7 +182,7 @@ public actor DeviceRegistrationService {
     // MARK: - Production Mode Registration
 
     private func registerProductionDevice(
-        params: SDKInitParams,
+        params _: SDKInitParams,
         serviceContainer: ServiceContainer
     ) async throws {
         var lastError: Error?

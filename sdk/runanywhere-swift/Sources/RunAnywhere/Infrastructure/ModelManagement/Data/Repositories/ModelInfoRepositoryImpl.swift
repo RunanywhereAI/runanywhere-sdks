@@ -8,8 +8,6 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
     public typealias RemoteDS = RemoteModelInfoDataSource
 
     // Core dependencies
-    private let databaseManager: DatabaseManager
-    private let apiClient: APIClient?
     private let logger = SDKLogger(category: "ModelInfoRepository")
 
     // Data sources for model-specific operations
@@ -24,8 +22,6 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
     // MARK: - Initialization
 
     public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
-        self.databaseManager = databaseManager
-        self.apiClient = apiClient
         self._remoteDataSource = RemoteModelInfoDataSource(apiClient: apiClient)
         self.localDataSource = LocalModelInfoDataSource(databaseManager: databaseManager)
     }
