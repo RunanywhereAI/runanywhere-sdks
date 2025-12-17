@@ -159,7 +159,7 @@ struct ChatInterfaceView: View {
                 await viewModel.checkModelStatus()
             }
         }
-        .alert("Debug Info", isPresented: $showDebugAlert) {
+        .alert("Details", isPresented: $showDebugAlert) {
             Button("OK") { }
         } message: {
             Text(debugMessage)
