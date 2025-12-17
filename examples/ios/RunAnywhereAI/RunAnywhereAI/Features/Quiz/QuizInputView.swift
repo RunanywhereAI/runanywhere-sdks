@@ -25,28 +25,6 @@ struct QuizInputView: View {
                         }
 
                         Spacer()
-
-                        // Experimental badge
-                        VStack(spacing: 2) {
-                            HStack(spacing: 2) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.caption2)
-                                    .foregroundColor(.orange)
-                                Text("EXPERIMENTAL")
-                                    .font(.caption2)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.orange)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.15))
-                            .cornerRadius(8)
-
-                            Text("🚧 In Development")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .italic()
-                        }
                     }
                 }
                 .padding(.horizontal)
