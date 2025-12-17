@@ -40,28 +40,29 @@ public class WhisperKitService: STTService {
             let whisperKitModelName = mapModelIdToWhisperKitName(modelPath ?? "whisper-base")
             logger.info("Creating WhisperKit instance with model: \(whisperKitModelName)")
 
-            // Initialize WhisperKit with specific model
-            // Try with different initialization approach
+            // Initialize WhisperKit with specific model using WhisperKitConfig
             logger.info("🔧 Attempting WhisperKit initialization with model: \(whisperKitModelName)")
 
             // First try with just model name
             do {
-                whisperKit = try await WhisperKit(
+                let config = WhisperKitConfig(
                     model: whisperKitModelName,
                     verbose: true,
-                    logLevel: Logging.LogLevel.info,
+                    logLevel: .info,
                     prewarm: true
                 )
+                whisperKit = try await WhisperKit(config)
                 logger.info("✅ WhisperKit initialized successfully with model: \(whisperKitModelName)")
             } catch {
                 logger.warning("⚠️ Failed to initialize with specific model, trying with base model")
                 // Fallback to base model
-                whisperKit = try await WhisperKit(
+                let fallbackConfig = WhisperKitConfig(
                     model: "openai_whisper-base",
                     verbose: true,
-                    logLevel: Logging.LogLevel.info,
+                    logLevel: .info,
                     prewarm: true
                 )
+                whisperKit = try await WhisperKit(fallbackConfig)
                 logger.info("✅ WhisperKit initialized with fallback base model")
             }
 
@@ -317,8 +318,14 @@ public class WhisperKitService: STTService {
             Task {
                 do {
                     for try await audioData in audioStream {
-                        // Convert Data to VoiceAudioChunk
-                        let chunk = VoiceAudioChunk(audioData: audioData, timestamp: Date())
+                        // Convert Data to Float samples then to VoiceAudioChunk
+                        let samples = audioData.withUnsafeBytes { buffer in
+                            Array(buffer.bindMemory(to: Float.self))
+                        }
+                        let chunk = VoiceAudioChunk(
+                            samples: samples,
+                            timestamp: Date().timeIntervalSince1970
+                        )
                         continuation.yield(chunk)
                     }
                     continuation.finish()
@@ -333,8 +340,9 @@ public class WhisperKitService: STTService {
             for try await segment in transcribeStream(audioStream: voiceChunkStream, options: options) {
                 onPartial(segment.text)
                 finalTranscript = segment.text
-                finalLanguage = segment.language
-                finalConfidence = segment.confidence ?? 0.0
+                // Language comes from options, not from segment
+                finalLanguage = options.language
+                finalConfidence = segment.confidence
             }
 
             return STTTranscriptionResult(

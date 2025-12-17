@@ -21,13 +21,13 @@ import RunAnywhere
 /// import WhisperKitTranscription
 ///
 /// // Option 1: Direct registration
-/// WhisperKit.register()
+/// WhisperKitBackend.register()
 ///
 /// // Option 2: Via ModuleRegistry
-/// ModuleRegistry.shared.register(WhisperKit.self)
+/// ModuleRegistry.shared.register(WhisperKitBackend.self)
 ///
 /// // Option 3: Via RunAnywhere
-/// RunAnywhere.register(WhisperKit.self)
+/// RunAnywhere.register(WhisperKitBackend.self)
 /// ```
 ///
 /// ## Usage
@@ -35,7 +35,7 @@ import RunAnywhere
 /// ```swift
 /// let text = try await RunAnywhere.transcribe(audioData)
 /// ```
-public enum WhisperKit: RunAnywhereModule {
+public enum WhisperKitBackend: RunAnywhereModule {
     private static let logger = SDKLogger(category: "WhisperKit")
 
     // MARK: - RunAnywhereModule Conformance
@@ -119,18 +119,22 @@ public enum WhisperKit: RunAnywhereModule {
     }
 }
 
-// MARK: - Legacy Alias
+// MARK: - Legacy Aliases
 
 /// Legacy alias for backward compatibility
-@available(*, deprecated, renamed: "WhisperKit")
-public typealias WhisperKitModule = WhisperKit
+@available(*, deprecated, renamed: "WhisperKitBackend")
+public typealias WhisperKitModule = WhisperKitBackend
+
+/// Legacy alias - using WhisperKit name directly shadows the module, use WhisperKitBackend instead
+@available(*, deprecated, message: "Use WhisperKitBackend to avoid shadowing the WhisperKit module")
+public typealias WhisperKitProvider = WhisperKitBackend
 
 // MARK: - Auto-Discovery Registration
 
-extension WhisperKit {
+extension WhisperKitBackend {
     /// Enable auto-discovery for this module.
     /// Access this property to trigger registration.
     public static let autoRegister: Void = {
-        ModuleDiscovery.register(WhisperKit.self)
+        ModuleDiscovery.register(WhisperKitBackend.self)
     }()
 }
