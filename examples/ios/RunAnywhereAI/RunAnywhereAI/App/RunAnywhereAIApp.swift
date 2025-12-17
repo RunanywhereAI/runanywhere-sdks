@@ -97,7 +97,7 @@ struct RunAnywhereAIApp: App {
 
             } else {
                 // Production Mode - Real API key required
-                let apiKey = "testing_api_key"  // TODO: Get from secure storage
+                let apiKey = "prod_api_key"  // TODO: Get from secure storage
                 let baseURL = "https://api.runanywhere.ai"
 
                 try RunAnywhere.initialize(
