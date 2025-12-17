@@ -69,14 +69,6 @@ struct VoiceAssistantView: View {
                         ModelBadge(icon: "speaker.wave.2", label: "TTS", value: "System", color: .purple)
                     }
                     .padding(.horizontal, 20)
-
-                    Text("Experimental Feature")
-                        .font(.caption2)
-                        .foregroundColor(.orange)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(8)
                 }
                 .padding(.bottom, 15)
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -176,12 +168,6 @@ struct VoiceAssistantView: View {
                     .font(.caption2)
                     .foregroundColor(.secondary.opacity(0.7))
                     .multilineTextAlignment(.center)
-
-                Text("⚠️ This feature is under active development")
-                    .font(.caption2)
-                    .foregroundColor(.orange)
-                    .italic()
-                    .padding(.horizontal, 40)
             }
             .padding(.bottom, 30)
             }
@@ -275,14 +261,6 @@ struct VoiceAssistantView: View {
                                 ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.ttsModel?.name ?? "Not set", color: .purple)
                             }
                             .padding(.horizontal, 20)
-
-                            Text("Experimental Feature")
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 4)
-                                .background(Color.orange.opacity(0.1))
-                                .cornerRadius(8)
                         }
                         .padding(.bottom, 15)
                         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -406,12 +384,6 @@ struct VoiceAssistantView: View {
                             .font(.caption2)
                             .foregroundColor(.secondary.opacity(0.7))
                             .multilineTextAlignment(.center)
-
-                        Text("⚠️ This feature is under active development")
-                            .font(.caption2)
-                            .foregroundColor(.orange)
-                            .italic()
-                            .padding(.horizontal, 40)
                     }
                     .padding(.bottom, 30)
                 }
