@@ -7,8 +7,8 @@ import os
 import AppKit
 #endif
 
-/// Collection of funny sample texts for TTS demo
-private let funnyTTSSampleTexts: [String] = [
+/// Sample texts for text-to-speech demonstration
+private let sampleTTSTexts: [String] = [
     "I'm not saying I'm Batman, but have you ever seen me and Batman in the same room?",
     "According to my calculations, I should have been a millionaire by now. My calculations were wrong.",
     "I told my computer I needed a break, and now it won't stop sending me vacation ads.",
@@ -58,7 +58,7 @@ private let funnyTTSSampleTexts: [String] = [
 struct TextToSpeechView: View {
     @StateObject private var viewModel = TTSViewModel()
     @State private var showModelPicker = false
-    @State private var inputText: String = funnyTTSSampleTexts.randomElement()
+    @State private var inputText: String = sampleTTSTexts.randomElement()
         ?? "Hello! This is a text to speech test."
 
     private var hasModelSelected: Bool {
@@ -127,7 +127,7 @@ struct TextToSpeechView: View {
 
                             Button {
                                 withAnimation(.easeInOut(duration: 0.2)) {
-                                    inputText = funnyTTSSampleTexts.randomElement() ?? inputText
+                                    inputText = sampleTTSTexts.randomElement() ?? inputText
                                 }
                             } label: {
                                 HStack(spacing: 4) {
@@ -324,7 +324,7 @@ struct TextToSpeechView: View {
         .onChange(of: viewModel.selectedModelName) { oldValue, newValue in
             // Set a new random funny text when a model is loaded
             if oldValue == nil && newValue != nil {
-                inputText = funnyTTSSampleTexts.randomElement() ?? inputText
+                inputText = sampleTTSTexts.randomElement() ?? inputText
             }
         }
     }

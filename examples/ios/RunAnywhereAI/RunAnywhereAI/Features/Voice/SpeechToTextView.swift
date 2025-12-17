@@ -58,12 +58,6 @@ struct SpeechToTextView: View {
                         Text(viewModel.selectedMode.description)
                             .font(.caption)
                             .foregroundColor(.secondary)
-
-                        if !viewModel.supportsLiveMode && viewModel.selectedMode == .live {
-                            Text("(will use batch)")
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                        }
                     }
                     .padding(.horizontal)
                 }
