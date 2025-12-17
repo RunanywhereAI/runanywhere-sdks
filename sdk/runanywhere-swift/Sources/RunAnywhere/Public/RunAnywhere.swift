@@ -129,25 +129,3 @@ public enum RunAnywhere {
         return result.text
     }
 }
-
-// MARK: - Utilities
-
-extension RunAnywhere {
-    /// Estimate token count in text
-    ///
-    /// Uses simple heuristics (~4 characters per token) for estimation.
-    ///
-    /// Example:
-    /// ```swift
-    /// let prompt = "Explain quantum computing"
-    /// let tokenCount = RunAnywhere.estimateTokenCount(prompt)
-    /// print("Estimated tokens: \(tokenCount)")
-    /// ```
-    ///
-    /// - Parameter text: The text to analyze
-    /// - Returns: Estimated number of tokens
-    public static func estimateTokenCount(_ text: String) -> Int {
-        // Simple estimation: ~4 characters per token on average
-        return max(1, text.count / 4)
-    }
-}

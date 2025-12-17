@@ -494,7 +494,6 @@ final class LLMViewModel {
                 from: result,
                 messageId: currentMessage.id.uuidString,
                 conversationId: conversationId,
-                inputText: prompt,
                 wasInterrupted: wasInterrupted,
                 options: options
             )
@@ -570,7 +569,6 @@ final class LLMViewModel {
         from result: LLMGenerationResult,
         messageId: String,
         conversationId: String,
-        inputText: String,
         wasInterrupted: Bool,
         options: LLMGenerationOptions
     ) -> MessageAnalytics? {
@@ -581,7 +579,7 @@ final class LLMViewModel {
         }
 
         let totalGenerationTime = result.latencyMs / 1000.0
-        let inputTokens = RunAnywhere.estimateTokenCount(inputText)
+        let inputTokens = result.inputTokens
         let outputTokens = result.tokensUsed
         let thinkingTokens = result.thinkingTokens
         let responseTokens = result.responseTokens

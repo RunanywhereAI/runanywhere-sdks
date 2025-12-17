@@ -16,7 +16,10 @@ public struct LLMGenerationResult: Sendable {
     /// Thinking/reasoning content extracted from the response
     public let thinkingContent: String?
 
-    /// Number of tokens used
+    /// Number of input/prompt tokens (from tokenizer)
+    public let inputTokens: Int
+
+    /// Number of tokens used (output tokens)
     public let tokensUsed: Int
 
     /// Model used for generation
@@ -46,6 +49,7 @@ public struct LLMGenerationResult: Sendable {
     public init(
         text: String,
         thinkingContent: String? = nil,
+        inputTokens: Int = 0,
         tokensUsed: Int,
         modelUsed: String,
         latencyMs: TimeInterval,
@@ -57,6 +61,7 @@ public struct LLMGenerationResult: Sendable {
     ) {
         self.text = text
         self.thinkingContent = thinkingContent
+        self.inputTokens = inputTokens
         self.tokensUsed = tokensUsed
         self.modelUsed = modelUsed
         self.latencyMs = latencyMs
