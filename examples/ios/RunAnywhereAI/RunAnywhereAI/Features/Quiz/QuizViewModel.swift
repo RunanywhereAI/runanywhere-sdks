@@ -150,7 +150,7 @@ class QuizViewModel: ObservableObject {
     private var questionStartTime: Date?
     private var generationTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
-    private let logger = Logger(subsystem: "com.runanywhere.example", category: "QuizViewModel")
+    private let logger = Logger(subsystem: "com.runanywhere.app", category: "QuizViewModel")
 
     // Constants
     let maxInputCharacters: Int = 12000

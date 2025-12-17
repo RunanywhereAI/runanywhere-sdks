@@ -58,8 +58,8 @@ struct CombinedSettingsView: View {
 
     private var iOSSettingsView: some View {
         Form {
-            // SDK Configuration
-            Section("SDK Configuration") {
+            // AI Settings
+            Section("AI Settings") {
                 Picker("Routing Policy", selection: $routingPolicy) {
                     Text("Automatic").tag(RoutingPolicy.automatic)
                     Text("Device Only").tag(RoutingPolicy.deviceOnly)
@@ -205,8 +205,8 @@ struct CombinedSettingsView: View {
                     .font(AppTypography.largeTitleBold)
                     .padding(.bottom, AppSpacing.medium)
 
-                // SDK Configuration Section
-                settingsCard(title: "SDK Configuration") {
+                // AI Settings Section
+                settingsCard(title: "AI Settings") {
                     VStack(alignment: .leading, spacing: AppSpacing.padding15) {
                         HStack {
                             Text("Routing Policy")
