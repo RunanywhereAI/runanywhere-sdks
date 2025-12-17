@@ -13,9 +13,6 @@ public actor VoiceAgentCapability: CompositeCapability {
 
     // MARK: - State
 
-    /// Current configuration
-    private var config: VoiceAgentConfiguration?
-
     /// Whether the voice agent is initialized
     private var isConfigured = false
 
@@ -72,7 +69,6 @@ public actor VoiceAgentCapability: CompositeCapability {
     /// - If no model is loaded, the specified model will be loaded
     public func initialize(_ config: VoiceAgentConfiguration) async throws {
         logger.info("Initializing Voice Agent")
-        self.config = config
 
         try await initializeVAD(config.vadConfig)
         try await initializeSTTModel(config.sttConfig)

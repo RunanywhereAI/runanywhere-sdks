@@ -53,11 +53,6 @@ public class ServiceContainer {
 
     // MARK: - Infrastructure Services
 
-    /// Download service
-    private(set) lazy var downloadService: AlamofireDownloadService = {
-        AlamofireDownloadService()
-    }()
-
     /// Simplified file manager
     private(set) lazy var fileManager: SimplifiedFileManager = {
         do {
@@ -73,16 +68,6 @@ public class ServiceContainer {
     }()
 
     // MARK: - Infrastructure
-
-    /// Logger
-    private(set) lazy var logger: SDKLogger = {
-        SDKLogger()
-    }()
-
-    /// Database manager
-    internal lazy var databaseManager: DatabaseManager = {
-        DatabaseManager.shared
-    }()
 
     /// Network service (environment-based: mock or real)
     public var networkService: (any NetworkService)?
@@ -196,21 +181,6 @@ public class ServiceContainer {
     }
 
     // MARK: - Internal Setters (for bootstrap services)
-
-    /// Set the network service (internal use only)
-    internal func setNetworkService(_ service: any NetworkService) {
-        self.networkService = service
-    }
-
-    /// Set the API client (internal use only)
-    internal func setAPIClient(_ client: APIClient) {
-        self.apiClient = client
-    }
-
-    /// Set the authentication service (internal use only)
-    internal func setAuthenticationService(_ service: AuthenticationService) {
-        self.authenticationService = service
-    }
 
     /// Reset service container state (for testing)
     public func reset() {

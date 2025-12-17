@@ -8,5 +8,3 @@
 export type { RunAnywhere } from './RunAnywhere.nitro';
 export type { RunAnywhereFileSystem } from './RunAnywhereFileSystem.nitro';
 export type { RunAnywhereDeviceInfo } from './RunAnywhereDeviceInfo.nitro';
-
-

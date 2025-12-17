@@ -335,16 +335,4 @@ public class LlamaCPPService {
         ra_text_cancel(backend)
         logger.info("Generation cancelled")
     }
-
-    // MARK: - Model Info
-
-    /// Get information about the loaded model
-    /// - Returns: JSON string with model information
-    public func getModelInfo() -> String? {
-        guard let backend = backendHandle else { return nil }
-        guard let infoPtr = ra_get_backend_info(backend) else { return nil }
-        let info = String(cString: infoPtr)
-        ra_free_string(infoPtr)
-        return info
-    }
 }

@@ -224,4 +224,3 @@ export interface RunAnywhere
    */
   getMemoryUsage(): Promise<number>;
 }
-

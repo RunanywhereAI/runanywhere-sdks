@@ -7,4 +7,3 @@ export interface SpeakerDiarizationConfiguration {
   modelId?: string | null;
   // Add all other properties from iOS SpeakerDiarizationConfiguration
 }
-

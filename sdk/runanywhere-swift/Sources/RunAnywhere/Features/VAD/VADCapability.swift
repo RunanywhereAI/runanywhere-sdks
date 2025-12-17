@@ -19,9 +19,6 @@ public actor VADCapability: ServiceBasedCapability {
     /// Currently active VAD service
     private var service: VADService?
 
-    /// Current configuration
-    private var config: VADConfiguration?
-
     /// Whether VAD is initialized
     private var isConfigured = false
 
@@ -39,7 +36,7 @@ public actor VADCapability: ServiceBasedCapability {
     // MARK: - Configuration (Capability Protocol)
 
     public func configure(_ config: VADConfiguration) {
-        self.config = config
+        // Configuration is passed during initialize
     }
 
     // MARK: - Service Lifecycle (ServiceBasedCapability Protocol)
@@ -64,8 +61,6 @@ public actor VADCapability: ServiceBasedCapability {
 
     public func initialize(_ config: VADConfiguration) async throws {
         logger.info("Initializing VAD")
-
-        self.config = config
 
         // Try to get service from ServiceRegistry, fallback to built-in
         let vadService: VADService

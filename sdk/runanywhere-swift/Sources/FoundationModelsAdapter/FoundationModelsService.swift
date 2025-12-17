@@ -18,8 +18,7 @@ public class FoundationModelsService: LLMService {
     )
 
     #if canImport(FoundationModels)
-    // Type-erased wrappers for FoundationModels types
-    private var languageModel: LanguageModelWrapper?
+    // Type-erased wrapper for FoundationModels session
     private var session: LanguageSessionWrapper?
     #endif
 
@@ -35,11 +34,6 @@ public class FoundationModelsService: LLMService {
     public var supportsStreaming: Bool { false }
 
     #if canImport(FoundationModels)
-    /// Type-erased wrapper for SystemLanguageModel
-    private struct LanguageModelWrapper {
-        let model: SystemLanguageModel
-    }
-
     /// Type-erased wrapper for LanguageModelSession
     private struct LanguageSessionWrapper {
         let session: LanguageModelSession
@@ -81,7 +75,6 @@ public class FoundationModelsService: LLMService {
     private func initializeFoundationModel() async throws {
         logger.info("Getting SystemLanguageModel.default...")
         let model = SystemLanguageModel.default
-        languageModel = LanguageModelWrapper(model: model)
         logger.info("SystemLanguageModel.default obtained successfully")
 
         try checkModelAvailability(model)
@@ -265,14 +258,9 @@ public class FoundationModelsService: LLMService {
         #if canImport(FoundationModels)
         // Clean up the session
         session = nil
-        languageModel = nil
         #endif
 
         _isReady = false
         _currentModel = nil
-    }
-
-    public func getModelMemoryUsage() async throws -> Int64 {
-        500_000_000 // 500MB estimate for Foundation Models
     }
 }

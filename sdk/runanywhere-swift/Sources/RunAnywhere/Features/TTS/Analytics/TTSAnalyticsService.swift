@@ -33,7 +33,6 @@ public actor TTSAnalyticsService {
     // MARK: - Types
 
     private struct SynthesisTracker {
-        let id: String
         let startTime: Date
         let voiceId: String
         let text: String
@@ -46,10 +45,9 @@ public actor TTSAnalyticsService {
     // MARK: - Synthesis Tracking
 
     /// Start tracking a synthesis
-    public func startSynthesis(text: String, voice: String, language: String) -> String {
+    public func startSynthesis(text: String, voice: String, language _: String) -> String {
         let id = UUID().uuidString
         activeSyntheses[id] = SynthesisTracker(
-            id: id,
             startTime: Date(),
             voiceId: voice,
             text: text
@@ -74,7 +72,7 @@ public actor TTSAnalyticsService {
     }
 
     /// Complete a synthesis
-    public func completeSynthesis(synthesisId: String, audioDurationMs: Double, audioSizeBytes: Int) {
+    public func completeSynthesis(synthesisId: String, audioDurationMs _: Double, audioSizeBytes: Int) {
         guard let tracker = activeSyntheses.removeValue(forKey: synthesisId) else { return }
 
         let processingTimeMs = Date().timeIntervalSince(tracker.startTime) * 1000
@@ -102,8 +100,8 @@ public actor TTSAnalyticsService {
     /// Track synthesis failure
     public func trackSynthesisFailed(
         synthesisId: String,
-        characterCount: Int,
-        processingTimeMs: Double,
+        characterCount _: Int,
+        processingTimeMs _: Double,
         errorMessage: String
     ) {
         activeSyntheses.removeValue(forKey: synthesisId)

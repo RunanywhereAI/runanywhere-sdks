@@ -32,10 +32,8 @@ public actor STTAnalyticsService {
     // MARK: - Types
 
     private struct TranscriptionTracker {
-        let id: String
         let startTime: Date
         let audioLengthMs: Double
-        let language: String
     }
 
     // MARK: - Initialization
@@ -48,10 +46,8 @@ public actor STTAnalyticsService {
     public func startTranscription(audioLengthMs: Double, language: String) -> String {
         let id = UUID().uuidString
         activeTranscriptions[id] = TranscriptionTracker(
-            id: id,
             startTime: Date(),
-            audioLengthMs: audioLengthMs,
-            language: language
+            audioLengthMs: audioLengthMs
         )
 
         EventPublisher.shared.track(STTEvent.transcriptionStarted(
@@ -107,8 +103,8 @@ public actor STTAnalyticsService {
     /// Track transcription failure
     public func trackTranscriptionFailed(
         transcriptionId: String,
-        audioLengthMs: Double,
-        processingTimeMs: Double,
+        audioLengthMs _: Double,
+        processingTimeMs _: Double,
         errorMessage: String
     ) {
         activeTranscriptions.removeValue(forKey: transcriptionId)

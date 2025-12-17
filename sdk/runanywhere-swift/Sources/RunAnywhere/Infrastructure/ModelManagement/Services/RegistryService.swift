@@ -3,7 +3,6 @@ import Foundation
 /// Implementation of model registry
 public class RegistryService: ModelRegistry {
     private var models: [String: ModelInfo] = [:]
-    private var modelsByProvider: [String: [ModelInfo]] = [:]
     private let modelDiscovery: ModelDiscovery
     private let accessQueue = DispatchQueue(label: "com.runanywhere.registry", attributes: .concurrent)
     private let logger = SDKLogger(category: "RegistryService")
@@ -14,7 +13,7 @@ public class RegistryService: ModelRegistry {
     }
 
     /// Initialize registry with configuration
-    public func initialize(with apiKey: String) async {
+    public func initialize(with _: String) async {
         logger.info("Initializing registry with configuration")
 
         // Load pre-configured models

@@ -25,4 +25,3 @@ export class ResourceChecker {
     return capabilities.hasNeuralEngine || capabilities.hasGPU;
   }
 }
-

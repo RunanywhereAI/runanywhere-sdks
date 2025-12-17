@@ -33,7 +33,7 @@ interface NativeAudioModuleType {
   stopRecording(): Promise<RecordingResult>;
   cancelRecording(): Promise<RecordingResult>;
   getAudioLevel(): Promise<AudioLevelResult>;
-  
+
   // Playback
   playAudio(filePath: string): Promise<PlaybackResult>;
   stopPlayback(): Promise<PlaybackResult>;
@@ -44,7 +44,7 @@ interface NativeAudioModuleType {
 }
 
 // Only available on iOS
-const NativeAudio: NativeAudioModuleType | null = 
+const NativeAudio: NativeAudioModuleType | null =
   Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
 
 export const isNativeAudioAvailable = (): boolean => {
@@ -137,4 +137,3 @@ export default {
   getPlaybackStatus: getNativePlaybackStatus,
   setVolume: setNativeVolume,
 };
-

@@ -5,16 +5,13 @@ import Pulse
 /// Implements NetworkService protocol for real network calls
 public actor APIClient: NetworkService {
     private let baseURL: URL
-    private let apiKey: String
     private var authService: AuthenticationService?
     private let session: URLSession
-    private let logger = SDKLogger(category: "APIClient")
 
     // MARK: - Initialization
 
-    public init(baseURL: URL, apiKey: String) {
+    public init(baseURL: URL, apiKey _: String) {
         self.baseURL = baseURL
-        self.apiKey = apiKey
         self.authService = nil
 
         let config = URLSessionConfiguration.default

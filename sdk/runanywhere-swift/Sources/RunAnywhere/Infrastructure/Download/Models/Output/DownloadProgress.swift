@@ -139,7 +139,7 @@ public struct DownloadProgress: Sendable {
 
     /// Create progress for extraction stage
     public static func extraction(
-        modelId: String,
+        modelId _: String,
         progress: Double,
         totalBytes: Int64 = 0
     ) -> DownloadProgress {

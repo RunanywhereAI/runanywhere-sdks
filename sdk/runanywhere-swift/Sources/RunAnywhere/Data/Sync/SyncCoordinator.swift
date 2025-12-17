@@ -13,7 +13,6 @@ public actor SyncCoordinator {
 
     // Configuration
     private let batchSize: Int = 100
-    private let maxRetries: Int = 3
 
     // Track sync operations
     private var activeSyncs: Set<String> = []
@@ -133,19 +132,6 @@ public actor SyncCoordinator {
         // This will be called by individual services
         // Each service will call sync() with their repository
         logger.info("Manual sync all triggered")
-    }
-}
-
-// MARK: - Error Types
-
-enum SyncError: LocalizedError {
-    case syncInProgress
-
-    var errorDescription: String? {
-        switch self {
-        case .syncInProgress:
-            return "Sync already in progress"
-        }
     }
 }
 

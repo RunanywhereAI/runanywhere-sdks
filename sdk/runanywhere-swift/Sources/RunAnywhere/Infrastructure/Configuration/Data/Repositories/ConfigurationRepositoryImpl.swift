@@ -9,7 +9,6 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
 
     // Core dependencies
     private let databaseManager: DatabaseManager
-    private let apiClient: APIClient?
     private let logger = SDKLogger(category: "ConfigurationRepository")
 
     // Data sources for configuration-specific operations
@@ -25,7 +24,6 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
 
     public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
         self.databaseManager = databaseManager
-        self.apiClient = apiClient
         self._remoteDataSource = RemoteConfigurationDataSource(apiClient: apiClient)
         self.localDataSource = LocalConfigurationDataSource(databaseManager: databaseManager)
     }

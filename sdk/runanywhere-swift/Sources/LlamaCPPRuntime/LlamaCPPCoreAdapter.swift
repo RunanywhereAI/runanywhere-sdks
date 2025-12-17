@@ -1,5 +1,5 @@
 //
-//  LlamaCPPService+LLMService.swift
+//  LlamaCPPCoreAdapter.swift
 //  LlamaCPPRuntime Module
 //
 //  LLMService protocol conformance for LlamaCPPService

@@ -497,27 +497,8 @@ private struct TranscriptionResult: Codable {
     let text: String
     let confidence: Double?
     let language: String?
-    let metadata: TranscriptionMetadata?
-}
-
-private struct TranscriptionMetadata: Codable {
-    let processingTimeMs: Double?
-    let audioDurationMs: Double?
-    let realTimeFactor: Double?
-
-    enum CodingKeys: String, CodingKey {
-        case processingTimeMs = "processing_time_ms"
-        case audioDurationMs = "audio_duration_ms"
-        case realTimeFactor = "real_time_factor"
-    }
 }
 
 private struct PartialResult: Codable {
     let text: String
-    let isFinal: Bool?
-
-    enum CodingKeys: String, CodingKey {
-        case text
-        case isFinal = "is_final"
-    }
 }

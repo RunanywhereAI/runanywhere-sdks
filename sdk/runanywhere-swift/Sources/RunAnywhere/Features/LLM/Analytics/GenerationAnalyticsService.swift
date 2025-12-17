@@ -34,9 +34,7 @@ public actor GenerationAnalyticsService {
     // MARK: - Types
 
     private struct GenerationTracker {
-        let id: String
         let startTime: Date
-        let modelId: String
         var firstTokenTime: Date?
     }
 
@@ -47,9 +45,9 @@ public actor GenerationAnalyticsService {
     // MARK: - Generation Tracking
 
     /// Start tracking a generation
-    public func startGeneration(modelId: String, executionTarget: String) -> String {
+    public func startGeneration(modelId: String, executionTarget _: String) -> String {
         let id = UUID().uuidString
-        activeGenerations[id] = GenerationTracker(id: id, startTime: Date(), modelId: modelId)
+        activeGenerations[id] = GenerationTracker(startTime: Date())
 
         EventPublisher.shared.track(LLMEvent.generationStarted(
             generationId: id,
@@ -90,7 +88,7 @@ public actor GenerationAnalyticsService {
         inputTokens: Int,
         outputTokens: Int,
         modelId: String,
-        executionTarget: String
+        executionTarget _: String
     ) {
         guard let tracker = activeGenerations.removeValue(forKey: generationId) else { return }
 

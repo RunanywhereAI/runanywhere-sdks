@@ -140,4 +140,3 @@ export class ThinkingParser {
     return { tokenType: TokenType.Content, cleanToken: content.length > 0 ? content : null };
   }
 }
-

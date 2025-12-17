@@ -25,7 +25,6 @@ public class DefaultSpeakerDiarizationService: SpeakerDiarizationService {
     /// Internal state protected by lock (Swift 6 concurrency pattern)
     private struct State {
         var speakers: [String: SpeakerDiarizationSpeakerInfo] = [:]
-        var currentSpeaker: SpeakerDiarizationSpeakerInfo?
         var temporarySpeakerSegments: [String: Int] = [:]
         var nextSpeakerId: Int = 1
     }
@@ -37,9 +36,6 @@ public class DefaultSpeakerDiarizationService: SpeakerDiarizationService {
 
     /// Speaker change threshold (cosine similarity)
     private let speakerChangeThreshold: Float
-
-    /// Minimum segments before confirming new speaker
-    private let minSegmentsForNewSpeaker: Int = 2
 
     // MARK: - Logger
 
@@ -69,13 +65,11 @@ public class DefaultSpeakerDiarizationService: SpeakerDiarizationService {
         return state.withLock { state in
             // Try to match with existing speakers
             if let matchedSpeaker = findMatchingSpeaker(embedding: embedding, speakers: state.speakers) {
-                state.currentSpeaker = matchedSpeaker
                 return matchedSpeaker
             }
 
             // Create new speaker if no match found
             let newSpeaker = createNewSpeaker(embedding: embedding, state: &state)
-            state.currentSpeaker = newSpeaker
             logger.info("Detected new speaker: \(newSpeaker.id)")
             return newSpeaker
         }
@@ -100,7 +94,6 @@ public class DefaultSpeakerDiarizationService: SpeakerDiarizationService {
     public func reset() {
         state.withLock { state in
             state.speakers.removeAll()
-            state.currentSpeaker = nil
             state.temporarySpeakerSegments.removeAll()
             state.nextSpeakerId = 1
         }
