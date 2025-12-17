@@ -24,7 +24,7 @@ struct ContentView: View {
             SpeechToTextView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
-                    Label("STT", systemImage: "waveform")
+                    Label("Transcribe", systemImage: "waveform")
                 }
                 .tag(1)
 
@@ -32,7 +32,7 @@ struct ContentView: View {
             TextToSpeechView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
-                    Label("TTS", systemImage: "speaker.wave.2")
+                    Label("Speak", systemImage: "speaker.wave.2")
                 }
                 .tag(2)
 
