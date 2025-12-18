@@ -177,14 +177,6 @@ struct RunAnywhereAIApp: App {
             LlamaCPPCoreAdapter(),
             models: [
                 try! ModelRegistration(
-                    url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-                    framework: .llamaCpp,
-                    modality: .textToText,
-                    id: "smollm2-360m-q8-0",
-                    name: "Fast Assistant",
-                    memoryRequirement: 500_000_000
-                ),
-                try! ModelRegistration(
                     url: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
                     framework: .llamaCpp,
                     modality: .textToText,
@@ -199,7 +191,15 @@ struct RunAnywhereAIApp: App {
                     id: "lfm2-350m-q8-0",
                     name: "Quality Assistant",
                     memoryRequirement: 400_000_000
-                )
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "lfm2-350m-q4-k-m",
+                    name: "Balanced Assistant",
+                    memoryRequirement: 250_000_000
+                ),
             ]
         )
         logger.info("✅ LlamaCPP Core registered with curated models")
