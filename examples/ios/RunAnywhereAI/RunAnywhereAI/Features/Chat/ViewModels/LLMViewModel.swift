@@ -6,6 +6,8 @@
 //  All business logic for LLM inference, model management, and chat state
 //
 
+// swiftlint:disable type_body_length
+
 import Foundation
 import SwiftUI
 import RunAnywhere

@@ -37,7 +37,6 @@ public class RegistryService: ModelRegistry {
             }
         }
 
-        _ = await ServiceContainer.shared.configurationService.getConfiguration()
         logger.info("Registry initialization complete")
     }
 
@@ -168,7 +167,8 @@ public class RegistryService: ModelRegistry {
             contextLength: resolvedCategory == .language ? 2048 : nil,
             supportsThinking: supportsThinking,
             tags: ["user-added", framework.rawValue.lowercased()],
-            description: "User-added model"
+            description: "User-added model",
+            source: .local  // Models added via SDK input are always local source
         )
 
         registerModel(modelInfo)
@@ -178,8 +178,6 @@ public class RegistryService: ModelRegistry {
     // MARK: - Private: Preconfigured Models
 
     private func loadPreconfiguredModels() async {
-        _ = await ServiceContainer.shared.configurationService.getConfiguration()
-
         let modelInfoService = ServiceContainer.shared.modelInfoService
         do {
             let storedModels = try await modelInfoService.loadStoredModels()
@@ -244,7 +242,8 @@ public class RegistryService: ModelRegistry {
                         preferredFramework: framework,
                         contextLength: category == .language ? 2048 : nil,
                         supportsThinking: false,
-                        tags: []
+                        tags: [],
+                        source: .local  // Discovered locally on disk
                     ))
                     continue
                 }
@@ -283,7 +282,8 @@ public class RegistryService: ModelRegistry {
                 preferredFramework: framework,
                 contextLength: category == .language ? 2048 : nil,
                 supportsThinking: false,
-                tags: []
+                tags: [],
+                source: .local  // Discovered locally on disk
             )
         }
         return nil
@@ -316,7 +316,8 @@ public class RegistryService: ModelRegistry {
                     preferredFramework: frameworks.first,
                     contextLength: category == .language ? 2048 : nil,
                     supportsThinking: false,
-                    tags: ["bundled"]
+                    tags: ["bundled"],
+                    source: .local  // Bundled models are local
                 ))
             }
         }

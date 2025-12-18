@@ -19,7 +19,6 @@ public enum APIEndpoint: Equatable {
     case modelAssignments(deviceType: String, platform: String)
 
     // Core endpoints
-    case configuration
     case telemetry
     case models
     case deviceInfo
@@ -53,8 +52,6 @@ public enum APIEndpoint: Equatable {
             return "/api/v1/model-assignments/for-sdk?device_type=\(deviceType)&platform=\(platform)"
 
         // Core endpoints
-        case .configuration:
-            return "/api/v1/configuration"
         case .telemetry:
             return "/api/v1/sdk/telemetry"
         case .models:

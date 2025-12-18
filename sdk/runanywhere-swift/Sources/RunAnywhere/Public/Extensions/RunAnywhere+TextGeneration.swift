@@ -34,8 +34,8 @@ public extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        // Lazy device registration on first API call (O(1) after first call)
-        try await ensureDeviceRegistered()
+        // Ensure services are ready (O(1) after first call)
+        try await ensureServicesReady()
 
         // LLMCapability handles all event tracking automatically
         return try await serviceContainer.llmCapability.generate(
@@ -76,8 +76,8 @@ public extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        // Lazy device registration on first API call (O(1) after first call)
-        try await ensureDeviceRegistered()
+        // Ensure services are ready (O(1) after first call)
+        try await ensureServicesReady()
 
         // LLMCapability handles all event tracking automatically
         return try await serviceContainer.llmCapability.generateStream(

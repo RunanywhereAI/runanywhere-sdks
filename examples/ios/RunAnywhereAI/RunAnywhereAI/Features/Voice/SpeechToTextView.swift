@@ -190,7 +190,11 @@ struct SpeechToTextView: View {
                         .disabled(viewModel.selectedModelName == nil || viewModel.isProcessing || viewModel.isTranscribing)
                         .opacity(viewModel.selectedModelName == nil || viewModel.isProcessing || viewModel.isTranscribing ? 0.6 : 1.0)
 
-                        Text(viewModel.isTranscribing ? "Processing transcription..." : (viewModel.isRecording ? "Tap to stop recording" : "Tap to start recording"))
+                        Text(
+                            viewModel.isTranscribing
+                                ? "Processing transcription..."
+                                : (viewModel.isRecording ? "Tap to stop recording" : "Tap to start recording")
+                        )
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

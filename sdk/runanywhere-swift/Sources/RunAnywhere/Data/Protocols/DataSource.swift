@@ -49,7 +49,7 @@ public struct RemoteOperationHelper: Sendable {
 /// Protocol for remote data sources that fetch data from network APIs
 public protocol RemoteDataSource: DataSource {
     /// Fetch a single entity by identifier
-    func fetch(id: String) async throws -> Entity?
+    func fetch(id _: String) async throws -> Entity?
 
     /// Fetch multiple entities with optional filtering
     func fetchAll(_: [String: Any]?) async throws -> [Entity] // swiftlint:disable:this prefer_concrete_types avoid_any_type

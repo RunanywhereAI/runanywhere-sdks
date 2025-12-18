@@ -73,14 +73,12 @@ struct RunAnywhereAIApp: App {
 
             // Initialize SDK based on build configuration
             #if DEBUG
-            // Development Mode - No API key or URL required!
-            // Logs are stored locally
-            try RunAnywhere.initializeForDevelopment()
-            logger.info("✅ SDK initialized in DEVELOPMENT mode (no API key required)")
+            // Development mode - uses Supabase, no API key needed
+            try RunAnywhere.initialize()
+            logger.info("✅ SDK initialized in DEVELOPMENT mode")
             #else
-            // Production Mode - Real API key and HTTPS URL required
-            // Note: Production environment only works in Release builds
-            let apiKey = "prod_api_key"  // TODO: Get from secure storage
+            // Production mode - requires API key and backend URL
+            let apiKey = "prod_api_key"  // Production: Get from secure storage
             let baseURL = "https://api.runanywhere.ai"
 
             try RunAnywhere.initialize(
@@ -95,24 +93,20 @@ struct RunAnywhereAIApp: App {
             await registerModulesAndModels()
 
             let initTime = Date().timeIntervalSince(startTime)
-            logger.info("✅ SDK successfully initialized !")
-            logger.info("⚡ Initialization time: \(String(format: "%.3f", initTime * 1000), privacy: .public)ms (FAST!)")
-            logger.info("🎯 SDK Status: \(RunAnywhere.isActive() ? "Active" : "Inactive")")
-            logger.info("🔧 Environment: \(RunAnywhere.getCurrentEnvironment()?.description ?? "Unknown")")
-            logger.info("📱 Device registration: Will happen on first API call (lazy loading)")
-            logger.info("🚀 Ready for on-device AI inference with lazy device registration!")
+            logger.info("✅ SDK successfully initialized!")
+            logger.info("⚡ Initialization time: \(String(format: "%.3f", initTime * 1000), privacy: .public)ms")
+            logger.info("🎯 SDK Status: \(RunAnywhere.isActive ? "Active" : "Inactive")")
+            logger.info("🔧 Environment: \(RunAnywhere.environment?.description ?? "Unknown")")
+            logger.info("📱 Services will initialize on first API call")
 
             // Mark as initialized
             await MainActor.run {
                 isSDKInitialized = true
             }
 
-            // Don't auto-load models - let user select
             logger.info("💡 Models registered, user can now download and select models")
         } catch {
-            logger.error("❌ SDK initialization failed!")
-            logger.error("🔍 Error: \(error, privacy: .public)")
-            logger.error("💡 Tip: Check your API key and network connection")
+            logger.error("❌ SDK initialization failed: \(error, privacy: .public)")
             await MainActor.run {
                 initializationError = error
             }

@@ -35,7 +35,7 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
 
     // MARK: - RemoteDataSource Protocol
 
-    public func fetch(id: String) async throws -> TelemetryData? {
+    public func fetch(id _: String) async throws -> TelemetryData? {
         // Telemetry is write-only to remote
         throw DataSourceError.operationFailed(
             NSError(domain: "RemoteTelemetryDataSource", code: -1, userInfo: [

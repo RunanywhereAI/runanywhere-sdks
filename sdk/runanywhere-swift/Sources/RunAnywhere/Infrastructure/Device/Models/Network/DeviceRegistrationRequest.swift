@@ -104,7 +104,7 @@ extension DeviceRegistrationRequest {
         return DeviceRegistrationRequest(
             deviceInfo: DeviceInfo.current,
             sdkVersion: SDKConstants.version,
-            buildToken: BuildToken.token,
+            buildToken: DevelopmentNetworkConfig.token,
             lastSeenAt: Date()
         )
     }

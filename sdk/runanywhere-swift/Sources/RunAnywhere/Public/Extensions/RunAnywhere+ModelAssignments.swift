@@ -98,7 +98,7 @@ extension RunAnywhere {
         }
 
         // Ensure network services are initialized (lazy initialization via device registration)
-        try await ensureDeviceRegistered()
+        try await ensureServicesReady()
 
         logger.info("Fetching model assignments...")
 
@@ -124,7 +124,7 @@ extension RunAnywhere {
         }
 
         // Ensure network services are initialized (lazy initialization via device registration)
-        try await ensureDeviceRegistered()
+        try await ensureServicesReady()
 
         // Delegate to service container's model assignment service
         return try await serviceContainer.modelAssignmentService.getModelsForFramework(framework)
@@ -140,7 +140,7 @@ extension RunAnywhere {
         }
 
         // Ensure network services are initialized (lazy initialization via device registration)
-        try await ensureDeviceRegistered()
+        try await ensureServicesReady()
 
         // Delegate to service container's model assignment service
         return try await serviceContainer.modelAssignmentService.getModelsForCategory(category)

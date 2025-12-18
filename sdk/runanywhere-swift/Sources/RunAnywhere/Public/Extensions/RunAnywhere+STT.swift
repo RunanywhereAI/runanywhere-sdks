@@ -21,7 +21,7 @@ public extension RunAnywhere {
     /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func transcribe(_ audioData: Data) async throws -> String {
         guard isInitialized else { throw RunAnywhereError.notInitialized }
-        try await ensureDeviceRegistered()
+        try await ensureServicesReady()
 
         // STTCapability handles all event tracking automatically
         let result = try await serviceContainer.sttCapability.transcribe(audioData)

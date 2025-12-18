@@ -14,16 +14,14 @@ public enum SDKLifecycleEvent: SDKEvent {
     case initStarted
     case initCompleted(durationMs: Double)
     case initFailed(error: String)
-    case configLoaded(source: String)
-    case configSynced
+    case modelsLoaded(count: Int)
 
     public var type: String {
         switch self {
         case .initStarted: return "sdk_init_started"
         case .initCompleted: return "sdk_init_completed"
         case .initFailed: return "sdk_init_failed"
-        case .configLoaded: return "sdk_config_loaded"
-        case .configSynced: return "sdk_config_synced"
+        case .modelsLoaded: return "sdk_models_loaded"
         }
     }
 
@@ -37,10 +35,8 @@ public enum SDKLifecycleEvent: SDKEvent {
             return ["duration_ms": String(format: "%.1f", durationMs)]
         case .initFailed(let error):
             return ["error": error]
-        case .configLoaded(let source):
-            return ["source": source]
-        case .configSynced:
-            return [:]
+        case .modelsLoaded(let count):
+            return ["count": String(count)]
         }
     }
 }

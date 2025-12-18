@@ -6,37 +6,6 @@ struct Migration001_InitialSchema { // swiftlint:disable:this type_name
 
     // swiftlint:disable:next function_body_length
     static func migrate(_ db: Database) throws {
-        // MARK: - Configuration Table
-        // Using GRDB's built-in Codable support for nested structures
-        // Complex objects (routing, analytics, generation, storage) are stored as JSON
-
-        // swiftlint:disable:next identifier_name
-        try db.create(table: "configuration") { t in
-            t.primaryKey("id", .text)
-
-            // Complex nested structures stored as JSON blobs via Codable
-            t.column("routing", .blob).notNull()     // RoutingConfiguration as JSON
-            t.column("analytics", .blob).notNull()   // AnalyticsConfiguration as JSON
-            t.column("generation", .blob).notNull()  // GenerationConfiguration as JSON
-            t.column("storage", .blob).notNull()     // StorageConfiguration as JSON
-
-            // Simple fields
-            t.column("apiKey", .text)
-            t.column("allowUserOverride", .boolean).notNull().defaults(to: true)
-            t.column("source", .text).notNull().defaults(to: "defaults")
-
-            // Metadata
-            t.column("createdAt", .datetime).notNull()
-            t.column("updatedAt", .datetime).notNull()
-            t.column("syncPending", .boolean).notNull().defaults(to: false)
-        }
-
-        // Create index for source to quickly find consumer overrides
-        try db.create(index: "idx_configuration_source",
-                     on: "configuration",
-                     columns: ["source"])
-
-
         // MARK: - Models Table
 
         // swiftlint:disable:next identifier_name

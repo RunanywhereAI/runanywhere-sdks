@@ -90,19 +90,6 @@ public class ServiceContainer {
 
     // MARK: - Data Services
 
-    /// Configuration service (internal access for optional checking in development mode)
-    internal var backingConfigurationService: ConfigurationService?
-    public var configurationService: ConfigurationService {
-        guard let service = backingConfigurationService else {
-            fatalError("ConfigurationService not initialized. Call RunAnywhere.initialize() first.")
-        }
-        return service
-    }
-
-    internal func setConfigurationService(_ service: ConfigurationService) {
-        backingConfigurationService = service
-    }
-
     /// Model info service (internal access for optional checking in development mode)
     internal var backingModelInfoService: ModelInfoService?
     public var modelInfoService: ModelInfoService {
@@ -183,7 +170,6 @@ public class ServiceContainer {
         apiClient = nil
         networkService = nil
         _syncCoordinator = nil
-        backingConfigurationService = nil
         backingModelInfoService = nil
         _modelAssignmentService = nil
         _deviceRegistrationService = nil
