@@ -5,13 +5,15 @@ import Pulse
 /// Implements NetworkService protocol for real network calls
 public actor APIClient: NetworkService {
     private let baseURL: URL
+    private let apiKey: String
     private var authService: AuthenticationService?
     private let session: URLSession
 
     // MARK: - Initialization
 
-    public init(baseURL: URL, apiKey _: String) {
+    public init(baseURL: URL, apiKey: String) {
         self.baseURL = baseURL
+        self.apiKey = apiKey
         self.authService = nil
 
         let config = URLSessionConfiguration.default
@@ -20,7 +22,11 @@ public actor APIClient: NetworkService {
             "Content-Type": "application/json",
             "X-SDK-Client": "RunAnywhereSDK",
             "X-SDK-Version": SDKConstants.version,
-            "X-Platform": SDKConstants.platform
+            "X-Platform": SDKConstants.platform,
+            // Supabase-compatible headers (also works with standard backends)
+            "apikey": apiKey,
+            // Supabase: Request to return the created/updated row
+            "Prefer": "return=representation"
         ]
 
         // Configure URLSession with Pulse proxy for automatic network logging
@@ -48,12 +54,15 @@ public actor APIClient: NetworkService {
     ) async throws -> Data {
         let token: String?
         if requiresAuth {
-            guard let authService = authService else {
-                throw RunAnywhereError.notInitialized
+            if let authService = authService {
+                token = try await authService.getAccessToken()
+            } else {
+                // No auth service - use API key as bearer token (Supabase development mode)
+                token = apiKey
             }
-            token = try await authService.getAccessToken()
         } else {
-            token = nil
+            // For non-auth requests, still use API key as bearer for Supabase compatibility
+            token = apiKey
         }
 
         let url = baseURL.appendingPathComponent(endpoint.path)
@@ -61,13 +70,8 @@ public actor APIClient: NetworkService {
         request.httpMethod = "POST"
         request.httpBody = payload
 
-        // Set authorization header
-        if let token = token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        } else if endpoint == .authenticate {
-            // For authentication endpoint, API key is in the request body, not header
-            // No authorization header needed for authentication endpoint
-        }
+        // Set authorization header (always set for Supabase compatibility)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await session.data(for: request)
 
@@ -104,22 +108,23 @@ public actor APIClient: NetworkService {
     ) async throws -> Data {
         let token: String?
         if requiresAuth {
-            guard let authService = authService else {
-                throw RunAnywhereError.notInitialized
+            if let authService = authService {
+                token = try await authService.getAccessToken()
+            } else {
+                // No auth service - use API key as bearer token (Supabase development mode)
+                token = apiKey
             }
-            token = try await authService.getAccessToken()
         } else {
-            token = nil
+            // For non-auth requests, still use API key as bearer for Supabase compatibility
+            token = apiKey
         }
 
         let url = baseURL.appendingPathComponent(endpoint.path)
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
 
-        // Set authorization header
-        if let token = token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        // Set authorization header (always set for Supabase compatibility)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await session.data(for: request)
 

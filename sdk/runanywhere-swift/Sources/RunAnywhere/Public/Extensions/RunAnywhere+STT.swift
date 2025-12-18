@@ -13,8 +13,22 @@ import Foundation
 
 public extension RunAnywhere {
 
+    // MARK: - Simple Transcription
+
+    /// Simple voice transcription using default model
+    /// - Parameter audioData: Audio data to transcribe
+    /// - Returns: Transcribed text
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
+    static func transcribe(_ audioData: Data) async throws -> String {
+        guard isInitialized else { throw RunAnywhereError.notInitialized }
+        try await ensureDeviceRegistered()
+
+        // STTCapability handles all event tracking automatically
+        let result = try await serviceContainer.sttCapability.transcribe(audioData)
+        return result.text
+    }
+
     // MARK: - Model Loading
-    // Note: loadSTTModel is defined in RunAnywhere.swift
 
     /// Unload the currently loaded STT model
     /// - Note: Events are automatically dispatched to both EventBus and Analytics

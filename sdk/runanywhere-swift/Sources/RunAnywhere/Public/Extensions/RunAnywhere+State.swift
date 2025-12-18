@@ -24,10 +24,9 @@ extension RunAnywhere {
         return await authService.getOrganizationId()
     }
 
-    /// Get current device ID
-    public static func getDeviceId() async -> String? {
-        guard isInitialized else { return nil }
-        return await serviceContainer.deviceRegistrationService.getDeviceId()
+    /// Get current device ID (Keychain-persisted, survives reinstalls)
+    public static func getDeviceId() -> String {
+        DeviceIdentity.persistentUUID
     }
 }
 
@@ -81,6 +80,6 @@ extension RunAnywhere {
     /// Check if device is registered
     /// - Returns: true if device has been registered with backend
     public static func isDeviceRegistered() async -> Bool {
-        return await serviceContainer.deviceRegistrationService.isRegistered()
+        await serviceContainer.deviceRegistrationService.isRegistered
     }
 }

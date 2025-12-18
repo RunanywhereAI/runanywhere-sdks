@@ -24,7 +24,6 @@ public final class KeychainManager {
 
         // Device Identity
         case deviceUUID = "com.runanywhere.sdk.device.uuid"
-        case deviceFingerprint = "com.runanywhere.sdk.device.fingerprint"
     }
 
     // MARK: - Initialization
@@ -62,7 +61,7 @@ public final class KeychainManager {
         }
 
         logger.debug("Retrieved SDK parameters from keychain")
-        return SDKInitParams(apiKey: apiKey, baseURL: url, environment: environment)
+        return try? SDKInitParams(apiKey: apiKey, baseURL: url, environment: environment)
     }
 
     /// Clear stored SDK parameters
@@ -86,19 +85,6 @@ public final class KeychainManager {
     /// - Returns: Stored device UUID if available
     public func retrieveDeviceUUID() -> String? {
         return try? retrieve(for: KeychainKey.deviceUUID.rawValue)
-    }
-
-    /// Store device fingerprint
-    /// - Parameter fingerprint: Device fingerprint to store
-    public func storeDeviceFingerprint(_ fingerprint: String) throws {
-        try store(fingerprint, for: KeychainKey.deviceFingerprint.rawValue)
-        logger.debug("Device fingerprint stored in keychain")
-    }
-
-    /// Retrieve device fingerprint
-    /// - Returns: Stored device fingerprint if available
-    public func retrieveDeviceFingerprint() -> String? {
-        return try? retrieve(for: KeychainKey.deviceFingerprint.rawValue)
     }
 
     // MARK: - Generic Storage Methods

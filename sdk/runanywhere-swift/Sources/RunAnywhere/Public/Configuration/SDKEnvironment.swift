@@ -33,6 +33,37 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
         self == .development || self == .staging
     }
 
+    /// Check if this environment requires a valid backend URL
+    public var requiresBackendURL: Bool {
+        self != .development
+    }
+
+    // MARK: - Build Configuration Validation
+
+    /// Check if the current build configuration is compatible with this environment
+    /// Production environment is only allowed in Release builds
+    public var isCompatibleWithCurrentBuild: Bool {
+        switch self {
+        case .development, .staging:
+            return true
+        case .production:
+            #if DEBUG
+            return false
+            #else
+            return true
+            #endif
+        }
+    }
+
+    /// Returns true if we're running in a DEBUG build
+    public static var isDebugBuild: Bool {
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+
     // MARK: - Environment Settings (Delegated to EnvironmentSettings)
 
     /// Determine logging verbosity based on environment
@@ -66,88 +97,161 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
     }
 }
 
-/// Supabase configuration for development device analytics
-/// Internal - automatically configured based on environment
-internal struct SupabaseConfig: Sendable {
-    /// Supabase project URL
-    let projectURL: URL
-
-    /// Supabase anon/public API key (safe to expose in client apps)
-    let anonKey: String
-
-    /// Get Supabase configuration for the given environment
-    /// - Parameter environment: The SDK environment
-    /// - Returns: Supabase configuration if applicable for this environment
-    static func configuration(for environment: SDKEnvironment) -> SupabaseConfig? {
-        switch environment {
-        case .development:
-            // Development mode: Use RunAnywhere's public Supabase for dev analytics
-            // Note: Anon key is safe to include in client code - data access is controlled by RLS policies
-            guard let projectURL = URL(string: "https://fhtgjtxuoikwwouxqzrn.supabase.co") else {
-                // This should never fail for a valid hardcoded URL, but we handle it safely
-                assertionFailure("Invalid Supabase project URL configuration")
-                return nil
-            }
-            return SupabaseConfig(
-                projectURL: projectURL,
-                anonKey: """
-                eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodGdqdHh1b2lrd3dvdXhxenJuIiwic\
-                m9sZSI6ImFub24iLCJpYXQiOjE3NjExOTkwNzIsImV4cCI6MjA3Njc3NTA3Mn0.aIssX-t8CIqt8zoctNhMS8fm3wtH-DzsQiy9FunqD9E
-                """
-            )
-        case .staging, .production:
-            // Production/Staging: No Supabase, use traditional backend
-            return nil
-        }
-    }
-}
-
 /// SDK initialization parameters
 public struct SDKInitParams {
     /// API key for authentication
     public let apiKey: String
 
-    /// Base URL for API requests (required for cross-platform consistency)
-    /// Note: In development mode, this is accepted but Supabase is used internally for dev analytics
+    /// Base URL for API requests
+    /// - Required for staging and production environments
+    /// - Optional for development (uses placeholder if not provided)
     public let baseURL: URL
 
     /// Environment mode (development/staging/production)
     public let environment: SDKEnvironment
 
-    /// Internal Supabase configuration (auto-configured based on environment)
-    internal var supabaseConfig: SupabaseConfig? {
-        return SupabaseConfig.configuration(for: environment)
-    }
+    // MARK: - Default Development URL
 
-    /// Create initialization parameters
+    /// Placeholder URL used for development when no URL is provided.
+    /// Development mode uses local analytics, so this is just a placeholder.
+    private static let developmentPlaceholderURL: URL = {
+        guard let url = URL(string: "https://dev.runanywhere.local") else {
+            fatalError("Invalid hardcoded development URL")
+        }
+        return url
+    }()
+
+    // MARK: - Initializers
+
+    /// Create initialization parameters for staging or production
     /// - Parameters:
-    ///   - apiKey: Your RunAnywhere API key (can be empty for development)
-    ///   - baseURL: Base URL for API requests (required, even in development mode)
+    ///   - apiKey: Your RunAnywhere API key (required)
+    ///   - baseURL: Base URL for API requests (required, must be valid HTTPS URL)
     ///   - environment: Environment mode (default: production)
+    /// - Throws: RunAnywhereError if validation fails
     public init(
         apiKey: String,
         baseURL: URL,
         environment: SDKEnvironment = .production
-    ) {
+    ) throws {
         self.apiKey = apiKey
         self.baseURL = baseURL
         self.environment = environment
+
+        // Validate based on environment
+        try Self.validate(apiKey: apiKey, baseURL: baseURL, environment: environment)
     }
 
-    /// Convenience initializer with string URL
+    /// Convenience initializer with string URL for staging or production
     /// - Parameters:
     ///   - apiKey: Your RunAnywhere API key
     ///   - baseURL: Base URL string for API requests
     ///   - environment: Environment mode (default: production)
-    /// - Throws: SDKError if URL is invalid
+    /// - Throws: RunAnywhereError if URL is invalid or validation fails
     public init(
         apiKey: String,
         baseURL: String,
         environment: SDKEnvironment = .production
     ) throws {
         guard let url = URL(string: baseURL) else {
-            throw RunAnywhereError.validationFailed("Invalid base URL: \(baseURL)")
+            throw RunAnywhereError.validationFailed("Invalid base URL format: \(baseURL)")
         }
-        self.init(apiKey: apiKey, baseURL: url, environment: environment)
+        try self.init(apiKey: apiKey, baseURL: url, environment: environment)
+    }
+
+    /// Convenience initializer for development mode (no URL required)
+    /// - Parameter apiKey: Optional API key (not required for development)
+    /// - Note: Development mode uses Supabase internally for dev analytics
+    public init(forDevelopmentWithAPIKey apiKey: String = "") {
+        self.apiKey = apiKey
+        self.baseURL = Self.developmentPlaceholderURL
+        self.environment = .development
+    }
+
+    // MARK: - Validation
+
+    /// Validate initialization parameters based on environment
+    /// - Parameters:
+    ///   - apiKey: The API key to validate
+    ///   - baseURL: The base URL to validate
+    ///   - environment: The target environment
+    /// - Throws: RunAnywhereError if validation fails
+    private static func validate(
+        apiKey: String,
+        baseURL: URL,
+        environment: SDKEnvironment
+    ) throws {
+        let logger = SDKLogger(category: "SDKInitParams")
+
+        // 1. Check build configuration compatibility for production
+        if environment == .production {
+            #if DEBUG
+            throw RunAnywhereError.environmentMismatch(
+                "Production environment cannot be used in DEBUG builds. " +
+                "Use .development or .staging for testing, or build in Release mode for production."
+            )
+            #endif
+        }
+
+        // 2. Validate API key for staging and production
+        if environment.requiresAuthentication {
+            guard !apiKey.isEmpty else {
+                throw RunAnywhereError.invalidAPIKey("API key is required for \(environment.description)")
+            }
+
+            // Basic API key format validation (at least 10 characters)
+            guard apiKey.count >= 10 else {
+                throw RunAnywhereError.invalidAPIKey("API key appears to be invalid (too short)")
+            }
+        }
+
+        // 3. Validate URL for staging and production
+        if environment.requiresBackendURL {
+            // Check for valid scheme (must be HTTPS for production, HTTPS or HTTP for staging)
+            guard let scheme = baseURL.scheme?.lowercased() else {
+                throw RunAnywhereError.validationFailed("Base URL must have a valid scheme (https)")
+            }
+
+            if environment == .production {
+                guard scheme == "https" else {
+                    throw RunAnywhereError.validationFailed(
+                        "Production environment requires HTTPS. Got: \(scheme)"
+                    )
+                }
+            } else if environment == .staging {
+                guard scheme == "https" || scheme == "http" else {
+                    throw RunAnywhereError.validationFailed(
+                        "Staging environment requires HTTP or HTTPS. Got: \(scheme)"
+                    )
+                }
+
+                // Warn if using HTTP in staging
+                if scheme == "http" {
+                    logger.warning("⚠️ Using HTTP for staging environment. Consider using HTTPS for security.")
+                }
+            }
+
+            // Check for valid host
+            guard let host = baseURL.host, !host.isEmpty else {
+                throw RunAnywhereError.validationFailed("Base URL must have a valid host")
+            }
+
+            // Warn about localhost/example URLs
+            let lowercaseHost = host.lowercased()
+            if lowercaseHost.contains("localhost") ||
+               lowercaseHost.contains("127.0.0.1") ||
+               lowercaseHost.contains("example.com") ||
+               lowercaseHost.contains(".local") {
+                if environment == .production {
+                    throw RunAnywhereError.validationFailed(
+                        "Production environment cannot use localhost or example URLs: \(host)"
+                    )
+                } else {
+                    logger.warning("⚠️ Staging environment using local/example URL: \(host)")
+                }
+            }
+
+            logger.info("✅ URL validated for \(environment.description): \(baseURL.absoluteString)")
+        }
     }
 }

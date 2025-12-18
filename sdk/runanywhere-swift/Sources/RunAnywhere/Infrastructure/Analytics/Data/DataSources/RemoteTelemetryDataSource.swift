@@ -1,15 +1,18 @@
 import Foundation
 
 /// Remote data source for sending telemetry data to API server
+/// Routes to correct analytics endpoint based on environment
 public actor RemoteTelemetryDataSource: RemoteDataSource {
     public typealias Entity = TelemetryData
 
     private let apiClient: APIClient?
+    private let environment: SDKEnvironment
     private let logger = SDKLogger(category: "RemoteTelemetryDataSource")
     private let operationHelper = RemoteOperationHelper(timeout: 30.0)
 
-    public init(apiClient: APIClient?) {
+    public init(apiClient: APIClient?, environment: SDKEnvironment = .development) {
         self.apiClient = apiClient
+        self.environment = environment
     }
 
     // MARK: - DataSource Protocol
@@ -90,16 +93,17 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
 
         let batchRequest = TelemetryBatchRequest(
             events: typedEvents,
-            deviceId: Device.shared.persistentUUID,
+            deviceId: DeviceIdentity.persistentUUID,
             timestamp: Date()
         )
 
         do {
-            // POST typed batch to telemetry endpoint
+            // POST typed batch to analytics endpoint based on environment
+            let endpoint = APIEndpoint.analyticsEndpoint(for: environment)
             let response: TelemetryBatchResponse = try await apiClient.post(
-                .telemetry,
+                endpoint,
                 batchRequest,
-                requiresAuth: true
+                requiresAuth: environment != .development
             )
 
             if response.success {
@@ -144,15 +148,17 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
 
         let batchRequest = TelemetryBatchRequest(
             events: typedEvents,
-            deviceId: Device.shared.persistentUUID,
+            deviceId: DeviceIdentity.persistentUUID,
             timestamp: Date()
         )
 
+        // Use analytics endpoint based on environment
+        let endpoint = APIEndpoint.analyticsEndpoint(for: environment)
         let response: TelemetryBatchResponse = try await operationHelper.withTimeout {
             try await apiClient.post(
-                .telemetry,
+                endpoint,
                 batchRequest,
-                requiresAuth: true
+                requiresAuth: self.environment != .development
             )
         }
 

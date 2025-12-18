@@ -33,12 +33,13 @@ extension RunAnywhere {
             try await initializeDevelopmentServices(params: params, logger: logger)
         }
 
-        // Now perform actual device registration
-        try await serviceContainer.deviceRegistrationService.ensureDeviceRegistered(
-            params: params,
-            environment: environment,
-            serviceContainer: serviceContainer
-        )
+        // Perform device registration (non-blocking, doesn't throw)
+        if let networkService = serviceContainer.networkService {
+            await serviceContainer.deviceRegistrationService.registerIfNeeded(
+                networkService: networkService,
+                environment: environment
+            )
+        }
 
         // Mark bootstrap as complete - subsequent calls will be O(1)
         isBootstrapped = true
@@ -53,7 +54,7 @@ extension RunAnywhere {
         logger.info("Initializing network and authentication services...")
 
         // Setup network and authentication
-        let (networkService, apiClient, _) = try await setupNetworkAndAuthentication(
+        let apiClient = try await setupNetworkAndAuthentication(
             params: params,
             environment: environment,
             logger: logger
@@ -62,7 +63,7 @@ extension RunAnywhere {
         // Create and inject core services
         let coreServices = try await setupCoreServices(
             apiClient: apiClient,
-            networkService: networkService,
+            environment: environment,
             logger: logger
         )
 
@@ -91,18 +92,24 @@ extension RunAnywhere {
     ) async throws {
         logger.info("Initializing development mode services (full service stack)...")
 
-        // Setup network service and API client for development
-        let networkService = NetworkServiceFactory.createNetworkService(for: .development, params: params)
-        serviceContainer.networkService = networkService
-
-        let apiClient = networkService as? APIClient
+        // Create API client for development using Supabase config
+        let apiClient: APIClient
+        if let supabaseConfig = SupabaseConfig.configuration(for: .development) {
+            // Use Supabase for development analytics
+            apiClient = APIClient(baseURL: supabaseConfig.projectURL, apiKey: supabaseConfig.anonKey)
+            logger.debug("APIClient initialized for development with Supabase: \(supabaseConfig.projectURL.absoluteString)")
+        } else {
+            // Fallback to provided params if Supabase config unavailable
+            apiClient = APIClient(baseURL: params.baseURL, apiKey: params.apiKey)
+            logger.debug("APIClient initialized for development: \(params.baseURL.absoluteString)")
+        }
+        serviceContainer.networkService = apiClient
         serviceContainer.apiClient = apiClient
-        logger.debug("Network service and API client initialized (development mode)")
 
         // Create and inject core services
         let coreServices = try await setupCoreServices(
             apiClient: apiClient,
-            networkService: networkService,
+            environment: .development,
             logger: logger
         )
 
@@ -124,33 +131,31 @@ extension RunAnywhere {
         logger.info("✅ Development mode bootstrap completed (all services active)")
     }
 
-    /// Setup network service and authentication
+    /// Setup network and authentication for production/staging
     private static func setupNetworkAndAuthentication(
         params: SDKInitParams,
         environment: SDKEnvironment,
         logger: SDKLogger
-    ) async throws -> (NetworkService, APIClient, AuthenticationService) {
-        // Setup network service
-        let networkService = NetworkServiceFactory.createNetworkService(for: environment, params: params)
-        serviceContainer.networkService = networkService
-        logger.debug("Network service configured for \(environment.description)")
-
-        // Create API client and authentication service
+    ) async throws -> APIClient {
+        // Create and authenticate - AuthenticationService.createAndAuthenticate creates its own APIClient
         let (apiClient, authService) = try await AuthenticationService.createAndAuthenticate(
             baseURL: params.baseURL,
             apiKey: params.apiKey
         )
+
+        serviceContainer.networkService = apiClient
         serviceContainer.authenticationService = authService
         serviceContainer.apiClient = apiClient
+        logger.info("APIClient configured for \(environment.description)")
         logger.info("Authentication successful")
 
-        return (networkService, apiClient, authService)
+        return apiClient
     }
 
     /// Create and inject core services
     private static func setupCoreServices(
         apiClient: APIClient?,
-        networkService: NetworkService,
+        environment: SDKEnvironment,
         logger: SDKLogger
     ) async throws -> CoreServices {
         logger.debug("Creating core services...")
@@ -170,10 +175,11 @@ extension RunAnywhere {
         )
         serviceContainer.setConfigurationService(configService)
 
-        // Create TelemetryRepository
+        // Create TelemetryRepository with environment for correct endpoint routing
         let telemetryRepo = TelemetryRepositoryImpl(
             databaseManager: DatabaseManager.shared,
-            apiClient: apiClient
+            apiClient: apiClient,
+            environment: environment
         )
 
         // Create ModelInfoService
@@ -187,12 +193,14 @@ extension RunAnywhere {
         )
         serviceContainer.setModelInfoService(modelInfoService)
 
-        // Create ModelAssignmentService
-        let modelAssignmentService = ModelAssignmentService(
-            networkService: networkService,
-            modelInfoService: modelInfoService
-        )
-        serviceContainer.setModelAssignmentService(modelAssignmentService)
+        // Create ModelAssignmentService - use apiClient if available, otherwise skip
+        if let networkService = serviceContainer.networkService {
+            let modelAssignmentService = ModelAssignmentService(
+                networkService: networkService,
+                modelInfoService: modelInfoService
+            )
+            serviceContainer.setModelAssignmentService(modelAssignmentService)
+        }
 
         logger.info("Core services created and injected")
 
@@ -232,8 +240,10 @@ extension RunAnywhere {
         logger.debug("Model registry initialized")
 
         // Initialize analytics and event publisher
+        // Events flow: Feature Analytics → EventPublisher → AnalyticsQueueManager → TelemetryRepository → RemoteTelemetryDataSource
         await serviceContainer.analyticsQueueManager.initialize(telemetryRepository: telemetryRepository)
         EventPublisher.shared.initialize(analyticsQueue: serviceContainer.analyticsQueueManager)
+
         logger.info("Analytics and event publisher initialized")
     }
 }

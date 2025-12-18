@@ -44,7 +44,7 @@ public actor AuthenticationService {
 
     /// Authenticate with the backend and obtain access token
     public func authenticate(apiKey: String) async throws -> AuthenticationResponse {
-        let deviceId = Device.shared.persistentUUID
+        let deviceId = DeviceIdentity.persistentUUID
 
         let request = AuthenticationRequest(
             apiKey: apiKey,
@@ -224,40 +224,21 @@ public actor AuthenticationService {
     }
 
     /// Register device with backend
+    /// Uses unified DeviceRegistrationRequest for all environments
     public func registerDevice() async throws -> DeviceRegistrationResponse {
         logger.debug("Registering device with backend")
 
-        // Collect device information
-        let deviceInfo = collectDeviceInfo()
-        let request = DeviceRegistrationRequest(deviceInfo: deviceInfo)
+        // Create request from current device info
+        let request = DeviceRegistrationRequest.fromCurrentDevice()
 
         // Make API call with authentication
         let response: DeviceRegistrationResponse = try await apiClient.post(
-            .registerDevice,
+            .deviceRegistration,
             request,
             requiresAuth: true
         )
 
         logger.info("Device registration successful: \(response.deviceId)")
         return response
-    }
-
-    // MARK: - Device Info Collection
-
-    /// Collect device information using centralized DeviceInfo
-    private func collectDeviceInfo() -> DeviceRegistrationInfo {
-        let deviceInfo = DeviceInfo.current
-        let processInfo = ProcessInfo.processInfo
-        let deviceUUID = Device.shared.persistentUUID
-
-        return DeviceRegistrationInfo(
-            architecture: deviceInfo.architecture,
-            deviceModel: deviceInfo.model,
-            deviceUUID: deviceUUID,
-            formFactor: deviceInfo.formFactor,
-            osVersion: deviceInfo.osVersion,
-            platform: deviceInfo.platform,
-            totalMemory: Int64(processInfo.physicalMemory)
-        )
     }
 }

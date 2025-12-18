@@ -17,6 +17,7 @@ public enum RunAnywhereError: LocalizedError, SDKErrorProtocol {
     case alreadyInitialized
     case invalidConfiguration(String)
     case invalidAPIKey(String?)
+    case environmentMismatch(String)
 
     // MARK: - Model Errors
 
@@ -86,6 +87,7 @@ public enum RunAnywhereError: LocalizedError, SDKErrorProtocol {
         case .alreadyInitialized: return .alreadyInitialized
         case .invalidConfiguration: return .invalidInput
         case .invalidAPIKey: return .apiKeyInvalid
+        case .environmentMismatch: return .invalidInput
         case .modelNotFound: return .modelNotFound
         case .modelLoadFailed: return .modelLoadFailed
         case .loadingFailed: return .modelLoadFailed
@@ -121,7 +123,7 @@ public enum RunAnywhereError: LocalizedError, SDKErrorProtocol {
 
     public var category: ErrorCategory {
         switch self {
-        case .notInitialized, .alreadyInitialized, .invalidConfiguration, .invalidAPIKey:
+        case .notInitialized, .alreadyInitialized, .invalidConfiguration, .invalidAPIKey, .environmentMismatch:
             return .initialization
         case .modelNotFound, .modelLoadFailed, .loadingFailed, .modelValidationFailed, .modelIncompatible:
             return .model
@@ -172,6 +174,8 @@ public enum RunAnywhereError: LocalizedError, SDKErrorProtocol {
                 return "Invalid API key: \(reason)"
             }
             return "Invalid or missing API key."
+        case .environmentMismatch(let reason):
+            return "Environment configuration mismatch: \(reason)"
 
         // Model errors
         case .modelNotFound(let identifier):
@@ -278,6 +282,8 @@ public enum RunAnywhereError: LocalizedError, SDKErrorProtocol {
             return "Check your configuration settings and ensure all required fields are provided."
         case .invalidAPIKey:
             return "Provide a valid API key in the configuration."
+        case .environmentMismatch:
+            return "Use .development or .staging for DEBUG builds. Production environment requires a Release build."
 
         case .modelNotFound:
             return "Check the model identifier or download the model first."
