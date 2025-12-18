@@ -7,8 +7,11 @@ public enum APIEndpoint: Equatable {
     case refreshToken
     case healthCheck
 
-    // Device Management
-    case registerDevice
+    // Device Management - Production/Staging
+    case deviceRegistration
+    case analytics
+
+    // Device Management - Development
     case devDeviceRegistration
     case devAnalytics
 
@@ -33,13 +36,17 @@ public enum APIEndpoint: Equatable {
         case .healthCheck:
             return "/v1/health"
 
-        // Device Management
-        case .registerDevice:
+        // Device Management - Production/Staging
+        case .deviceRegistration:
             return "/api/v1/devices/register"
+        case .analytics:
+            return "/api/v1/analytics"
+
+        // Device Management - Development (Supabase REST API format)
         case .devDeviceRegistration:
-            return "/api/v1/devices/register/dev"
+            return "/rest/v1/device_registrations"
         case .devAnalytics:
-            return "/api/v1/analytics/dev"
+            return "/rest/v1/analytics_events"
 
         // Model Management
         case .modelAssignments(let deviceType, let platform):
@@ -58,6 +65,34 @@ public enum APIEndpoint: Equatable {
             return "/api/v1/history"
         case .userPreferences:
             return "/api/v1/preferences"
+        }
+    }
+}
+
+// MARK: - Environment-Based Endpoint Selection
+
+extension APIEndpoint {
+    /// Get the device registration endpoint for the given environment
+    /// - Parameter environment: The SDK environment
+    /// - Returns: The appropriate endpoint (dev or production)
+    public static func deviceRegistrationEndpoint(for environment: SDKEnvironment) -> APIEndpoint {
+        switch environment {
+        case .development:
+            return .devDeviceRegistration
+        case .staging, .production:
+            return .deviceRegistration
+        }
+    }
+
+    /// Get the analytics endpoint for the given environment
+    /// - Parameter environment: The SDK environment
+    /// - Returns: The appropriate endpoint (dev or production)
+    public static func analyticsEndpoint(for environment: SDKEnvironment) -> APIEndpoint {
+        switch environment {
+        case .development:
+            return .devAnalytics
+        case .staging, .production:
+            return .analytics
         }
     }
 }

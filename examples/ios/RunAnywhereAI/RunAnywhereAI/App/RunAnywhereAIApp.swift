@@ -71,45 +71,28 @@ struct RunAnywhereAIApp: App {
 
             let startTime = Date()
 
-            // Determine environment based on build configuration
+            // Initialize SDK based on build configuration
             #if DEBUG
-            let environment = SDKEnvironment.development
-            logger.info("🛠️ Using DEVELOPMENT mode - No API key required!")
+            // Development Mode - No API key or URL required!
+            // Logs are stored locally
+            try RunAnywhere.initializeForDevelopment()
+            logger.info("✅ SDK initialized in DEVELOPMENT mode (no API key required)")
             #else
-            let environment = SDKEnvironment.production
-            logger.info("🚀 Using PRODUCTION mode")
+            // Production Mode - Real API key and HTTPS URL required
+            // Note: Production environment only works in Release builds
+            let apiKey = "prod_api_key"  // TODO: Get from secure storage
+            let baseURL = "https://api.runanywhere.ai"
+
+            try RunAnywhere.initialize(
+                apiKey: apiKey,
+                baseURL: baseURL,
+                environment: .production
+            )
+            logger.info("✅ SDK initialized in PRODUCTION mode")
             #endif
 
-            // Initialize SDK based on environment
-            if environment == .development {
-                // Development Mode - No API key needed!
-                // Note: baseURL is required for cross-platform consistency with Kotlin SDK
-                // In development mode, dev analytics are automatically sent to Supabase internally
-                try RunAnywhere.initialize(
-                    apiKey: "dev",  // Any string works in dev mode
-                    baseURL: "localhost",  // Required but not used
-                    environment: .development
-                )
-                logger.info("✅ SDK initialized in DEVELOPMENT mode (dev analytics enabled)")
-
-                // Register modules and models for development
-                await registerModulesAndModels()
-
-            } else {
-                // Production Mode - Real API key required
-                let apiKey = "prod_api_key"  // TODO: Get from secure storage
-                let baseURL = "https://api.runanywhere.ai"
-
-                try RunAnywhere.initialize(
-                    apiKey: apiKey,
-                    baseURL: baseURL,
-                    environment: .production
-                )
-                logger.info("✅ SDK initialized in PRODUCTION mode")
-
-                // Register modules and models for production
-                await registerModulesAndModels()
-            }
+            // Register modules and models
+            await registerModulesAndModels()
 
             let initTime = Date().timeIntervalSince(startTime)
             logger.info("✅ SDK successfully initialized !")

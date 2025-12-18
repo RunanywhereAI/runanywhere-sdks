@@ -149,11 +149,6 @@ public class ServiceContainer {
         return service
     }
 
-    /// Dev analytics submission service - handles analytics in dev mode
-    public var devAnalyticsService: DevAnalyticsSubmissionService {
-        DevAnalyticsSubmissionService.shared
-    }
-
     // MARK: - Event Services
 
     /// Event bus for publishing and subscribing to SDK events

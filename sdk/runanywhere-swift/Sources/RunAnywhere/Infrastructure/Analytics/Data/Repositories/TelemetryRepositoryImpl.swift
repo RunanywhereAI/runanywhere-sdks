@@ -19,9 +19,9 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
 
     // MARK: - Initialization
 
-    public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
+    public init(databaseManager: DatabaseManager, apiClient: APIClient?, environment: SDKEnvironment = .development) {
         self.localDataSource = LocalTelemetryDataSource(databaseManager: databaseManager)
-        self._remoteDataSource = RemoteTelemetryDataSource(apiClient: apiClient)
+        self._remoteDataSource = RemoteTelemetryDataSource(apiClient: apiClient, environment: environment)
     }
 
     // MARK: - Repository Implementation
