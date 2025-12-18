@@ -7,7 +7,7 @@ import os
 import AppKit
 #endif
 
-/// Sample texts for text-to-speech demonstration
+/// Fun texts for text-to-speech
 private let sampleTTSTexts: [String] = [
     "I'm not saying I'm Batman, but have you ever seen me and Batman in the same room?",
     "According to my calculations, I should have been a millionaire by now. My calculations were wrong.",
