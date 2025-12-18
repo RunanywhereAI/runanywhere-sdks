@@ -63,8 +63,8 @@ struct ModelStatusBanner: View {
             } else if let framework = framework, let modelName = modelName {
                 // Model loaded state
                 HStack(spacing: 8) {
-                    Image(systemName: frameworkIcon(for: framework))
-                        .foregroundColor(frameworkColor(for: framework))
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
                         .font(.system(size: 14, weight: .semibold))
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -174,13 +174,29 @@ struct ModelRequiredOverlay: View {
     let onSelectModel: () -> Void
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: AppSpacing.xLarge) {
             Spacer()
 
-            // Icon
-            Image(systemName: modalityIcon)
-                .font(.system(size: 64))
-                .foregroundColor(.secondary.opacity(0.5))
+            // Friendly icon with gradient background
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [modalityColor.opacity(0.2), modalityColor.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 120, height: 120)
+
+                Image(systemName: modalityIcon)
+                    .font(.system(size: 48))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [modalityColor, modalityColor.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
 
             // Title
             Text(modalityTitle)
@@ -197,14 +213,25 @@ struct ModelRequiredOverlay: View {
             // Primary CTA
             Button(action: onSelectModel) {
                 HStack(spacing: 8) {
-                    Image(systemName: "cube.fill")
-                    Text("Select a Model")
+                    Image(systemName: "sparkles")
+                    Text("Get Started")
                 }
                 .font(.headline)
                 .frame(maxWidth: 280)
                 .padding(.vertical, 14)
             }
             .buttonStyle(.borderedProminent)
+            .tint(modalityColor)
+
+            // Privacy note
+            HStack(spacing: 6) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.caption2)
+                Text("100% Private • Runs on your device")
+                    .font(.caption)
+            }
+            .foregroundColor(.secondary)
+            .padding(.top, AppSpacing.small)
 
             Spacer()
         }
@@ -218,28 +245,37 @@ struct ModelRequiredOverlay: View {
 
     private var modalityIcon: String {
         switch modality {
-        case .llm: return "bubble.left.and.bubble.right"
+        case .llm: return "sparkles"
         case .stt: return "waveform"
-        case .tts: return "speaker.wave.2"
-        case .voice: return "mic.circle"
+        case .tts: return "speaker.wave.2.fill"
+        case .voice: return "mic.circle.fill"
+        }
+    }
+
+    private var modalityColor: Color {
+        switch modality {
+        case .llm: return AppColors.primaryBlue
+        case .stt: return .green
+        case .tts: return AppColors.primaryPurple
+        case .voice: return .orange
         }
     }
 
     private var modalityTitle: String {
         switch modality {
-        case .llm: return "Start a Conversation"
-        case .stt: return "Speech to Text"
-        case .tts: return "Text to Speech"
+        case .llm: return "Welcome!"
+        case .stt: return "Voice to Text"
+        case .tts: return "Read Aloud"
         case .voice: return "Voice Assistant"
         }
     }
 
     private var modalityDescription: String {
         switch modality {
-        case .llm: return "Select a language model to start chatting. Choose from llama.cpp, Foundation Models, or other frameworks."
-        case .stt: return "Select a speech recognition model to transcribe audio. Choose from WhisperKit or ONNX Runtime."
-        case .tts: return "Select a text-to-speech model to generate audio. Choose from Piper TTS models."
-        case .voice: return "Voice assistant requires multiple models. Let's set them up together."
+        case .llm: return "Choose your AI assistant and start chatting. Everything runs privately on your device."
+        case .stt: return "Transcribe your speech to text with powerful on-device voice recognition."
+        case .tts: return "Have any text read aloud with natural-sounding voices."
+        case .voice: return "Talk naturally with your AI assistant. Let's set up the components together."
         }
     }
 }
@@ -433,9 +469,9 @@ struct ModelSetupCard: View {
                             .foregroundColor(.primary)
                     }
 
-                    if let framework = selectedFramework, let model = selectedModel {
+                    if let model = selectedModel {
                         HStack(spacing: 4) {
-                            Text("\(framework.displayName) • \(model)")
+                            Text(model)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)

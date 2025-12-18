@@ -223,11 +223,11 @@ struct InitializationLoadingView: View {
                 .scaleEffect(isAnimating ? 1.2 : 1.0)
                 .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isAnimating)
 
-            Text("Initializing RunAnywhere AI")
+            Text("Setting Up Your AI")
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Setting up AI models and services...")
+            Text("Preparing your private AI assistant...")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
