@@ -66,7 +66,7 @@ public actor RemoteConfigurationDataSource: RemoteDataSource {
         )
     }
 
-    public func delete(id: String) async throws {
+    public func delete(id _: String) async throws {
         // Configuration deletion is typically not supported
         throw DataSourceError.operationFailed(
             NSError(domain: "RemoteConfigurationDataSource", code: -1, userInfo: [

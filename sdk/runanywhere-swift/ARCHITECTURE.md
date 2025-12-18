@@ -66,7 +66,7 @@ RunAnywhere/
 │   ├── Events/                   # EventPublisher, SDKEvent protocol
 │   ├── FileManagement/           # Storage and file operations
 │   ├── Logging/                  # SDKLogger, Pulse integration
-│   └── ModelManagement/          # RegistryService, ModelInfo, ModelDiscovery
+│   └── ModelManagement/          # RegistryService, ModelInfo
 │
 ├── Data/                         # Data layer
 │   ├── Network/                  # APIClient, AuthenticationService
@@ -245,8 +245,7 @@ public class ServiceContainer {
 
 **Key Types**:
 - `ModelInfo`: Immutable model metadata (ID, format, download URL, local path, etc.)
-- `RegistryService`: In-memory model registry implementing `ModelRegistry` protocol
-- `ModelDiscovery`: Local filesystem model discovery
+- `RegistryService`: In-memory model registry with integrated local model discovery
 - `ModelInfoService`: Persistent model metadata via database
 - `AlamofireDownloadService`: Model downloading with progress, extraction, and resume support
 
@@ -254,7 +253,7 @@ public class ServiceContainer {
 1. Models are registered via `RegistryService.registerModel(_:)`
 2. Downloads are handled by `AlamofireDownloadService.downloadModel(_:)`
 3. After download, `localPath` is set and model is saved to database
-4. On app restart, `ModelDiscovery` finds cached models and updates registry
+4. On app restart, `RegistryService` discovers cached models and updates registry
 
 **Artifact Types**:
 Models can be single files (`.gguf`, `.onnx`) or archives that need extraction (`.tar.bz2`, `.zip`).
