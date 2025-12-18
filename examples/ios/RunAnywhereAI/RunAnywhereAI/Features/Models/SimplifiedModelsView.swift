@@ -2,7 +2,7 @@
 //  SimplifiedModelsView.swift
 //  RunAnywhereAI
 //
-//  A simplified models view that demonstrates SDK usage
+//  A simplified models view for managing AI models
 //
 
 import SwiftUI
@@ -17,6 +17,18 @@ struct SimplifiedModelsView: View {
     @State private var availableFrameworks: [InferenceFramework] = []
     @State private var showingAddModelSheet = false
 
+    /// All available models sorted by availability (downloaded first)
+    private var sortedModels: [ModelInfo] {
+        viewModel.availableModels.sorted { model1, model2 in
+            let m1Priority = model1.preferredFramework == .foundationModels ? 0 : (model1.localPath != nil ? 1 : 2)
+            let m2Priority = model2.preferredFramework == .foundationModels ? 0 : (model2.localPath != nil ? 1 : 2)
+            if m1Priority != m2Priority {
+                return m1Priority < m2Priority
+            }
+            return model1.name < model2.name
+        }
+    }
+
     var body: some View {
         NavigationView {
             mainContentView
@@ -26,32 +38,9 @@ struct SimplifiedModelsView: View {
     private var mainContentView: some View {
         List {
             deviceStatusSection
-            frameworksSection
-            modelsSection
+            modelsListSection
         }
         .navigationTitle("Models")
-        .toolbar {
-            #if os(iOS)
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Add Model") {
-                    showingAddModelSheet = true
-                }
-            }
-            #else
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Model") {
-                    showingAddModelSheet = true
-                }
-            }
-            #endif
-        }
-        .sheet(isPresented: $showingAddModelSheet) {
-            AddModelFromURLView(onModelAdded: { modelInfo in
-                Task {
-                    await viewModel.addImportedModel(modelInfo)
-                }
-            })
-        }
         .task {
             await loadInitialData()
         }
@@ -121,48 +110,26 @@ struct SimplifiedModelsView: View {
         }
     }
 
-    private var frameworksSection: some View {
-        Section("Available Frameworks") {
-            if availableFrameworks.isEmpty {
-                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-                    HStack {
-                        ProgressView()
-                        Text("Loading frameworks...")
-                            .foregroundColor(AppColors.textSecondary)
-                    }
-
-                    Text("No framework adapters are currently registered. Register framework adapters to see available frameworks.")
-                        .font(AppTypography.caption2)
-                        .foregroundColor(AppColors.statusOrange)
-                        .padding(.top, AppSpacing.xSmall)
+    /// Flat list of all models with framework badges
+    private var modelsListSection: some View {
+        Section {
+            if sortedModels.isEmpty {
+                VStack(alignment: .center, spacing: AppSpacing.mediumLarge) {
+                    ProgressView()
+                    Text("Loading models...")
+                        .font(AppTypography.subheadline)
+                        .foregroundColor(AppColors.textSecondary)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, AppSpacing.xLarge)
             } else {
-                ForEach(availableFrameworks, id: \.self) { framework in
-                    FrameworkRow(
-                        framework: framework,
-                        isExpanded: expandedFramework == framework,
-                        onTap: { toggleFramework(framework) }
-                    )
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var modelsSection: some View {
-        if let expanded = expandedFramework {
-            let filteredModels = viewModel.availableModels.filter { $0.compatibleFrameworks.contains(expanded) }
-
-            Section("Models for \(expanded.displayName)") {
-                ForEach(filteredModels, id: \.id) { model in
-                    ModelRow(
+                ForEach(sortedModels, id: \.id) { model in
+                    SimplifiedModelRow(
                         model: model,
                         isSelected: selectedModel?.id == model.id,
                         onDownloadCompleted: {
                             Task {
-                                await viewModel.loadModels() // Refresh models list
-                                // Also refresh available frameworks in case new adapters were registered
-                                await loadAvailableFrameworks()
+                                await viewModel.loadModels()
                             }
                         },
                         onSelectModel: {
@@ -172,35 +139,18 @@ struct SimplifiedModelsView: View {
                         },
                         onModelUpdated: {
                             Task {
-                                await viewModel.loadModels() // Refresh models list after thinking update
-                                await loadAvailableFrameworks()
+                                await viewModel.loadModels()
                             }
                         }
                     )
                 }
-
-                if filteredModels.isEmpty {
-                    VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-                        Text("No models available for this framework")
-                            .foregroundColor(AppColors.textSecondary)
-                            .font(AppTypography.caption)
-
-                        Text("Tap 'Add Model' to add a model from URL")
-                            .foregroundColor(AppColors.statusBlue)
-                            .font(AppTypography.caption2)
-                    }
-                }
             }
-        }
-    }
-
-    private func toggleFramework(_ framework: InferenceFramework) {
-        withAnimation {
-            if expandedFramework == framework {
-                expandedFramework = nil
-            } else {
-                expandedFramework = framework
-            }
+        } header: {
+            Text("Available Models")
+        } footer: {
+            Text("All models run privately on your device. Downloaded models are ready to use.")
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.textSecondary)
         }
     }
 
@@ -214,7 +164,8 @@ struct SimplifiedModelsView: View {
 
 // MARK: - Supporting Views
 
-private struct ModelRow: View {
+/// Simplified model row with framework badge for flat list display
+private struct SimplifiedModelRow: View {
     let model: ModelInfo
     let isSelected: Bool
     let onDownloadCompleted: () -> Void
@@ -224,16 +175,56 @@ private struct ModelRow: View {
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
 
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
-                Text(model.name)
-                    .font(AppTypography.subheadline)
-                    .fontWeight(isSelected ? .semibold : .regular)
+    private var frameworkColor: Color {
+        guard let framework = model.preferredFramework else { return .gray }
+        switch framework {
+        case .llamaCpp: return .blue
+        case .onnx: return .purple
+        case .foundationModels: return .primary
+        case .whisperKit: return .green
+        default: return .gray
+        }
+    }
 
+    private var frameworkName: String {
+        guard let framework = model.preferredFramework else { return "Unknown" }
+        switch framework {
+        case .llamaCpp: return "Fast"
+        case .onnx: return "ONNX"
+        case .foundationModels: return "Apple"
+        case .whisperKit: return "Whisper"
+        default: return framework.displayName
+        }
+    }
+
+    private var isReady: Bool {
+        model.preferredFramework == .foundationModels || model.localPath != nil
+    }
+
+    var body: some View {
+        HStack(spacing: AppSpacing.mediumLarge) {
+            // Model info with framework badge
+            VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
+                // Name with framework badge
                 HStack(spacing: AppSpacing.smallMedium) {
-                    let size = model.memoryRequired ?? 0
-                    if size > 0 {
+                    Text(model.name)
+                        .font(AppTypography.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(AppColors.textPrimary)
+
+                    Text(frameworkName)
+                        .font(AppTypography.caption2)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, AppSpacing.small)
+                        .padding(.vertical, AppSpacing.xxSmall)
+                        .background(frameworkColor.opacity(0.15))
+                        .foregroundColor(frameworkColor)
+                        .cornerRadius(AppSpacing.cornerRadiusSmall)
+                }
+
+                // Size and status
+                HStack(spacing: AppSpacing.smallMedium) {
+                    if let size = model.memoryRequired, size > 0 {
                         Label(
                             ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
                             systemImage: "memorychip"
@@ -242,130 +233,93 @@ private struct ModelRow: View {
                         .foregroundColor(AppColors.textSecondary)
                     }
 
-                    let format = model.format
-                    Text(format.rawValue.uppercased())
-                        .font(AppTypography.caption2)
-                        .padding(.horizontal, AppSpacing.small)
-                        .padding(.vertical, AppSpacing.xxSmall)
-                        .background(AppColors.badgeGray)
-                        .cornerRadius(AppSpacing.cornerRadiusSmall)
+                    if isDownloading {
+                        HStack(spacing: AppSpacing.xSmall) {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                            Text("\(Int(downloadProgress * 100))%")
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    } else {
+                        HStack(spacing: AppSpacing.xxSmall) {
+                            Image(systemName: isReady ? "checkmark.circle.fill" : "arrow.down.circle")
+                                .foregroundColor(isReady ? AppColors.statusGreen : AppColors.statusBlue)
+                                .font(AppTypography.caption2)
+                            Text(model.preferredFramework == .foundationModels ? "Built-in" : (model.localPath != nil ? "Ready" : "Download"))
+                                .font(AppTypography.caption2)
+                                .foregroundColor(isReady ? AppColors.statusGreen : AppColors.statusBlue)
+                        }
+                    }
 
-                    // Show thinking indicator if model supports thinking
                     if model.supportsThinking {
                         HStack(spacing: AppSpacing.xxSmall) {
                             Image(systemName: "brain")
-                                .font(AppTypography.caption2)
-                            Text("THINKING")
-                                .font(AppTypography.caption2)
+                            Text("Smart")
                         }
+                        .font(AppTypography.caption2)
                         .padding(.horizontal, AppSpacing.small)
                         .padding(.vertical, AppSpacing.xxSmall)
                         .background(AppColors.badgePurple)
                         .foregroundColor(AppColors.primaryPurple)
                         .cornerRadius(AppSpacing.cornerRadiusSmall)
-                    } else if model.localPath != nil {
-                        // For downloaded models without thinking support, show option to enable it
-                        Button(action: {
-                            // Enable thinking support for this model
-                            Task {
-                                // Thinking support update not available in new API
-                                // Will be enabled when the model is loaded
-                                onModelUpdated()
-                            }
-                        }) {
-                            HStack(spacing: AppSpacing.xxSmall) {
-                                Image(systemName: "brain")
-                                    .font(AppTypography.caption2)
-                                Text("ENABLE")
-                                    .font(AppTypography.caption2)
-                            }
-                            .padding(.horizontal, AppSpacing.small)
-                            .padding(.vertical, AppSpacing.xxSmall)
-                            .background(AppColors.badgeOrange)
-                            .foregroundColor(AppColors.statusOrange)
-                            .cornerRadius(AppSpacing.cornerRadiusSmall)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                }
-
-                // Show download status
-                if let _ = model.downloadURL {
-                    if model.localPath == nil {
-                        HStack(spacing: AppSpacing.xSmall) {
-                            if isDownloading {
-                                ProgressView(value: downloadProgress)
-                                    .progressViewStyle(LinearProgressViewStyle())
-                                Text("\(Int(downloadProgress * 100))%")
-                                    .font(AppTypography.caption2)
-                                    .foregroundColor(AppColors.textSecondary)
-                            } else {
-                                Text("Available for download")
-                                    .font(AppTypography.caption2)
-                                    .foregroundColor(AppColors.statusBlue)
-                            }
-                        }
-                    } else {
-                        HStack(spacing: AppSpacing.xSmall) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(AppColors.statusGreen)
-                                .font(AppTypography.caption2)
-                            Text("Downloaded")
-                                .font(AppTypography.caption2)
-                                .foregroundColor(AppColors.statusGreen)
-                        }
                     }
                 }
             }
 
             Spacer()
 
-            // Action buttons based on model state
-            HStack(spacing: AppSpacing.smallMedium) {
-                if let _ = model.downloadURL, model.localPath == nil {
-                    // Model needs to be downloaded
-                    if isDownloading {
-                        VStack(spacing: AppSpacing.xSmall) {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            if downloadProgress > 0 {
-                                Text("\(Int(downloadProgress * 100))%")
-                                    .font(AppTypography.caption2)
-                                    .foregroundColor(AppColors.textSecondary)
-                            }
+            // Action button
+            if model.preferredFramework == .foundationModels {
+                Button("Use") {
+                    onSelectModel()
+                }
+                .font(AppTypography.caption)
+                .fontWeight(.semibold)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(isSelected)
+            } else if model.localPath == nil {
+                if isDownloading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Button {
+                        Task {
+                            await downloadModel()
                         }
-                    } else {
-                        Button("Download") {
-                            Task {
-                                await downloadModel()
-                            }
+                    } label: {
+                        HStack(spacing: AppSpacing.xxSmall) {
+                            Image(systemName: "arrow.down.circle.fill")
+                            Text("Get")
                         }
-                        .font(AppTypography.caption)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
                     }
-                } else if model.localPath != nil {
-                    // Model is downloaded - show select and load options
-                    if isSelected {
-                        HStack(spacing: AppSpacing.xSmall) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(AppColors.statusGreen)
-                            Text("Loaded")
-                                .font(AppTypography.caption2)
-                                .foregroundColor(AppColors.statusGreen)
-                        }
-                    } else {
-                        Button("Load") {
-                            onSelectModel()
-                        }
-                        .font(AppTypography.caption)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
+                    .font(AppTypography.caption)
+                    .fontWeight(.semibold)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            } else {
+                if isSelected {
+                    HStack(spacing: AppSpacing.xxSmall) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(AppColors.statusGreen)
+                        Text("Active")
+                            .font(AppTypography.caption2)
+                            .foregroundColor(AppColors.statusGreen)
                     }
+                } else {
+                    Button("Use") {
+                        onSelectModel()
+                    }
+                    .font(AppTypography.caption)
+                    .fontWeight(.semibold)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
                 }
             }
         }
-        .padding(.vertical, AppSpacing.xSmall)
+        .padding(.vertical, AppSpacing.smallMedium)
     }
 
     private func downloadModel() async {
@@ -378,7 +332,6 @@ private struct ModelRow: View {
             // Use the new convenience download API
             let progressStream = try await RunAnywhere.downloadModel(model.id)
 
-            // Process progress updates
             for await progress in progressStream {
                 await MainActor.run {
                     self.downloadProgress = progress.overallProgress
@@ -391,7 +344,6 @@ private struct ModelRow: View {
                         self.downloadProgress = 1.0
                         self.isDownloading = false
                         onDownloadCompleted()
-                        print("Model \(model.name) downloaded successfully")
                     }
                     return
                 }
@@ -405,7 +357,6 @@ private struct ModelRow: View {
             }
 
         } catch {
-            print("Download failed: \(error)")
             await MainActor.run {
                 downloadProgress = 0.0
                 isDownloading = false
