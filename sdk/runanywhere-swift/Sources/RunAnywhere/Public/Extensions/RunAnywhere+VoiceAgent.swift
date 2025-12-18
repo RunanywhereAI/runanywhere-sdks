@@ -86,7 +86,7 @@ public extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        try await ensureDeviceRegistered()
+        try await ensureServicesReady()
 
         EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
 
@@ -116,7 +116,7 @@ public extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        try await ensureDeviceRegistered()
+        try await ensureServicesReady()
 
         EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
 
@@ -157,7 +157,7 @@ public extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        try await ensureDeviceRegistered()
+        try await ensureServicesReady()
 
         EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
 

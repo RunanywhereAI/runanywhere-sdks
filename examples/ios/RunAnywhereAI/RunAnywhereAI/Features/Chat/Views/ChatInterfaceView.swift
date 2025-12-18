@@ -479,7 +479,8 @@ struct MessageBubbleView: View {
                     thinkingSection
                 }
 
-                if message.role == .assistant && message.content.isEmpty && message.thinkingContent != nil && !message.thinkingContent!.isEmpty && isGenerating {
+                if message.role == .assistant && message.content.isEmpty &&
+                    message.thinkingContent != nil && !message.thinkingContent!.isEmpty && isGenerating {
                     thinkingProgressIndicator
                 }
 
@@ -558,7 +559,8 @@ struct MessageBubbleView: View {
     private var thinkingSummary: String {
         guard let thinking = message.thinkingContent?.trimmingCharacters(in: .whitespacesAndNewlines) else { return "" }
 
-        let sentences = thinking.components(separatedBy: CharacterSet(charactersIn: ".!?")).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let sentences = thinking.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
         if sentences.count >= 2 {
             let firstSentence = sentences[0].trimmingCharacters(in: .whitespacesAndNewlines)

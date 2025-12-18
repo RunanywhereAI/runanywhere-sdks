@@ -13,8 +13,8 @@ extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        // Lazy device registration on first API call
-        try await ensureDeviceRegistered()
+        // Ensure services are ready (O(1) after first call)
+        try await ensureServicesReady()
 
         // LLMCapability handles all event tracking automatically
         try await serviceContainer.llmCapability.loadModel(modelId)
@@ -61,8 +61,8 @@ extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        // Lazy device registration on first API call
-        try await ensureDeviceRegistered()
+        // Ensure services are ready (O(1) after first call)
+        try await ensureServicesReady()
 
         // STTCapability handles all event tracking automatically
         try await serviceContainer.sttCapability.loadModel(modelId)
@@ -78,8 +78,8 @@ extension RunAnywhere {
             throw RunAnywhereError.notInitialized
         }
 
-        // Lazy device registration on first API call
-        try await ensureDeviceRegistered()
+        // Ensure services are ready (O(1) after first call)
+        try await ensureServicesReady()
 
         // TTSCapability handles all event tracking automatically
         try await serviceContainer.ttsCapability.loadVoice(voiceId)

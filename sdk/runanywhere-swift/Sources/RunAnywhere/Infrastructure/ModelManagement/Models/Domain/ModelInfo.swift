@@ -1,6 +1,15 @@
 import Foundation
 import GRDB
 
+/// Source of model data (where the model info came from)
+public enum ModelSource: String, Codable, Sendable {
+    /// Model info came from remote API (backend model catalog)
+    case remote
+
+    /// Model info was provided locally via SDK input (addModel calls)
+    case local
+}
+
 /// Information about a model - database entity with sync support
 public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, PersistableRecord, Sendable {
     // Essential identifiers
@@ -35,7 +44,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     public let description: String?
 
     // Tracking fields for sync and database
-    public let source: ConfigurationSource
+    public let source: ModelSource
     public let createdAt: Date
     public var updatedAt: Date
     public var syncPending: Bool
@@ -99,7 +108,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         thinkingPattern: ThinkingTagPattern? = nil,
         tags: [String] = [],
         description: String? = nil,
-        source: ConfigurationSource = .remote,
+        source: ModelSource = .remote,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         syncPending: Bool = false,

@@ -64,36 +64,35 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
         #endif
     }
 
-    // MARK: - Environment Settings (Delegated to EnvironmentSettings)
+    // MARK: - Environment-Specific Settings
 
     /// Determine logging verbosity based on environment
-    /// - Note: Delegates to EnvironmentSettings for business logic
     public var defaultLogLevel: LogLevel {
-        EnvironmentSettings.defaultLogLevel(for: self)
+        switch self {
+        case .development: return .debug
+        case .staging: return .info
+        case .production: return .warning
+        }
     }
 
-    /// Should send telemetry data
-    /// - Note: Delegates to EnvironmentSettings for business logic
+    /// Should send telemetry data (production only)
     public var shouldSendTelemetry: Bool {
-        EnvironmentSettings.shouldSendTelemetry(for: self)
+        self == .production
     }
 
-    /// Should use mock data sources
-    /// - Note: Delegates to EnvironmentSettings for business logic
+    /// Should use mock data sources (development only)
     public var useMockData: Bool {
-        EnvironmentSettings.useMockData(for: self)
+        self == .development
     }
 
-    /// Should sync with backend
-    /// - Note: Delegates to EnvironmentSettings for business logic
+    /// Should sync with backend (non-development)
     public var shouldSyncWithBackend: Bool {
-        EnvironmentSettings.shouldSyncWithBackend(for: self)
+        self != .development
     }
 
-    /// Requires API authentication
-    /// - Note: Delegates to EnvironmentSettings for business logic
+    /// Requires API authentication (non-development)
     public var requiresAuthentication: Bool {
-        EnvironmentSettings.requiresAuthentication(for: self)
+        self != .development
     }
 }
 

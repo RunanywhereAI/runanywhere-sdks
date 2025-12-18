@@ -26,7 +26,7 @@ public actor RemoteModelInfoDataSource: RemoteDataSource {
 
     // MARK: - RemoteDataSource Protocol (minimal implementation)
 
-    public func fetch(id: String) async throws -> ModelInfo? {
+    public func fetch(id _: String) async throws -> ModelInfo? {
         // Not implemented - model fetching is handled by ModelAssignmentService
         nil
     }
