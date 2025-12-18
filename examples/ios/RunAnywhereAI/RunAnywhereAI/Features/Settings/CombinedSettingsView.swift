@@ -171,7 +171,7 @@ struct CombinedSettingsView: View {
                         KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
                     }
 
-                Text("When enabled, analytics events will be logged locally for debugging purposes.")
+                Text("When enabled, analytics events will be saved locally on your device.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.textSecondary)
             }
@@ -631,23 +631,9 @@ private struct StoredModelRow: View {
                     Text(model.name)
                         .font(AppTypography.subheadlineMedium)
 
-                    HStack(spacing: AppSpacing.smallMedium) {
-                        Text(model.format.rawValue.uppercased())
-                            .font(AppTypography.caption2)
-                            .padding(.horizontal, AppSpacing.small)
-                            .padding(.vertical, AppSpacing.xxSmall)
-                            .background(AppColors.badgeBlue)
-                            .cornerRadius(AppSpacing.cornerRadiusSmall)
-
-                        if let framework = model.framework {
-                            Text(framework.displayName)
-                                .font(AppTypography.caption2)
-                                .padding(.horizontal, AppSpacing.small)
-                                .padding(.vertical, AppSpacing.xxSmall)
-                                .background(AppColors.badgeGreen)
-                                .cornerRadius(AppSpacing.cornerRadiusSmall)
-                        }
-                    }
+                    Text(ByteCountFormatter.string(fromByteCount: model.size, countStyle: .file))
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.textSecondary)
                 }
 
                 Spacer()
@@ -702,44 +688,7 @@ private struct StoredModelRow: View {
     private var modelDetailsView: some View {
         VStack(alignment: .leading, spacing: AppSpacing.small) {
             HStack {
-                Text("Format:")
-                    .font(AppTypography.caption2Medium)
-                Text(model.format.rawValue.uppercased())
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-
-            if let framework = model.framework {
-                HStack {
-                    Text("Framework:")
-                        .font(AppTypography.caption2Medium)
-                    Text(framework.displayName)
-                        .font(AppTypography.caption2)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-            }
-
-            if let contextLength = model.contextLength {
-                HStack {
-                    Text("Context Length:")
-                        .font(AppTypography.caption2Medium)
-                    Text("\(contextLength) tokens")
-                        .font(AppTypography.caption2)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                Text("Path:")
-                    .font(AppTypography.caption2Medium)
-                Text(model.path.path)
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            HStack {
-                Text("Created:")
+                Text("Downloaded:")
                     .font(AppTypography.caption2Medium)
                 Text(model.createdDate, style: .date)
                     .font(AppTypography.caption2)
@@ -754,6 +703,14 @@ private struct StoredModelRow: View {
                         .font(AppTypography.caption2)
                         .foregroundColor(AppColors.textSecondary)
                 }
+            }
+
+            HStack {
+                Text("Size:")
+                    .font(AppTypography.caption2Medium)
+                Text(ByteCountFormatter.string(fromByteCount: model.size, countStyle: .file))
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
             }
         }
         .padding(.top, AppSpacing.xSmall)
