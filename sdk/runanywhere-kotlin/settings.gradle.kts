@@ -62,6 +62,12 @@ include(":modules:runanywhere-core-llamacpp")
 // Provides: ONNXAdapter, ONNXService
 include(":modules:runanywhere-core-onnx")
 
+// RunAnywhere Core WhisperCPP module - STT backend adapter (pure Kotlin)
+// Uses whisper.cpp for GGML Whisper model inference
+// Depends on main SDK (which includes native libs transitively)
+// Provides: WhisperCPPServiceProvider, WhisperCPPCoreService
+include(":modules:runanywhere-core-whispercpp")
+
 // Other modules temporarily disabled due to build issues
 // TODO: Fix module build configurations
 // include(":modules:runanywhere-vad")
