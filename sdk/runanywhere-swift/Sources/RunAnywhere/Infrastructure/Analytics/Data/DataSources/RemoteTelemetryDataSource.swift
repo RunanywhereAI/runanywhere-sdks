@@ -69,7 +69,7 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
         }
     }
 
-    public func delete(id: String) async throws {
+    public func delete(id _: String) async throws {
         // Telemetry deletion is typically not supported
         throw DataSourceError.operationFailed(
             NSError(domain: "RemoteTelemetryDataSource", code: -1, userInfo: [
