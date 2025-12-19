@@ -64,14 +64,14 @@ object AppColors {
     val messageBubbleAssistantGradientStart = backgroundGray5
     val messageBubbleAssistantGradientEnd = backgroundGray6
 
-    // Dark mode
-    val messageBubbleUserDark = primaryAccent      // Vibrant orange-red - brand color
+    // Dark mode - toned down variant for reduced eye strain in low-light
+    val messageBubbleUserDark = Color(0xFFCC4400)  // Darker orange-red (80% brightness of primaryAccent)
     val messageBubbleAssistantDark = backgroundGray5Dark  // Dark gray
 
     // ====================
     // BADGE/TAG COLORS
     // ====================
-    val badgeBlue = primaryAccent.copy(alpha = 0.2f)  // Brand primary
+    val badgePrimary = primaryAccent.copy(alpha = 0.2f)  // Brand primary (orange-red)
     val badgeGreen = primaryGreen.copy(alpha = 0.2f)
     val badgePurple = primaryPurple.copy(alpha = 0.2f)
     val badgeOrange = primaryOrange.copy(alpha = 0.2f)
@@ -108,7 +108,7 @@ object AppColors {
     val statusOrange = primaryOrange
     val statusRed = primaryRed
     val statusGray = Color(0xFF64748B)  // Slate-500 - modern gray
-    val statusBlue = primaryAccent      // Brand primary
+    val statusPrimary = primaryAccent    // Brand primary (orange-red)
 
     // Warning color - matches iOS orange for error states
     val warningOrange = primaryOrange
