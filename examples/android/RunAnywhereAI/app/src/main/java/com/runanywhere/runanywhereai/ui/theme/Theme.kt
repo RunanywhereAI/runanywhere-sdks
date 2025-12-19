@@ -12,15 +12,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 /**
- * Light Color Scheme - Matching iOS Design System
- * Reference: examples/ios/RunAnywhereAI/IOS_IMPLEMENTATION_DETAILS.md
+ * Light Color Scheme - RunAnywhere Brand Theme
+ * Modern color scheme matching RunAnywhere.ai website
  */
 private val LightColorScheme = lightColorScheme(
     // Primary colors
     primary = AppColors.primaryAccent,
     onPrimary = Color.White,
-    primaryContainer = AppColors.primaryBlue.copy(alpha = 0.1f),
-    onPrimaryContainer = AppColors.primaryBlue,
+    primaryContainer = AppColors.primaryAccent.copy(alpha = 0.1f),
+    onPrimaryContainer = AppColors.primaryAccent,
 
     // Secondary colors
     secondary = AppColors.primaryPurple,
@@ -56,15 +56,15 @@ private val LightColorScheme = lightColorScheme(
 )
 
 /**
- * Dark Color Scheme - Matching iOS Design System
- * Reference: examples/ios/RunAnywhereAI/IOS_IMPLEMENTATION_DETAILS.md
+ * Dark Color Scheme - RunAnywhere Brand Theme
+ * Modern dark theme matching RunAnywhere.ai website
  */
 private val DarkColorScheme = darkColorScheme(
     // Primary colors
     primary = AppColors.primaryAccent,
     onPrimary = Color.White,
-    primaryContainer = AppColors.primaryBlue.copy(alpha = 0.2f),
-    onPrimaryContainer = AppColors.primaryBlue,
+    primaryContainer = AppColors.primaryAccent.copy(alpha = 0.2f),
+    onPrimaryContainer = AppColors.primaryAccent,
 
     // Secondary colors
     secondary = AppColors.primaryPurple,
@@ -102,7 +102,7 @@ private val DarkColorScheme = darkColorScheme(
 @Composable
 fun RunAnywhereAITheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color disabled to match iOS design exactly
+    // Dynamic color disabled to maintain RunAnywhere brand consistency
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {

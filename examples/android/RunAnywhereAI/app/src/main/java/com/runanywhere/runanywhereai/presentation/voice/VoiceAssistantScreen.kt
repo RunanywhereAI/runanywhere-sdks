@@ -180,7 +180,7 @@ private fun VoicePipelineSetupView(
             imageVector = Icons.Default.Mic,
             contentDescription = "Voice Assistant",
             modifier = Modifier.size(48.dp),
-            tint = AppColors.primaryBlue
+            tint = AppColors.primaryAccent
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -225,7 +225,7 @@ private fun VoicePipelineSetupView(
             title = "Language Model",
             subtitle = "Processes and responds to your input",
             icon = Icons.Default.Psychology,
-            color = AppColors.primaryBlue,
+            color = AppColors.primaryAccent,
             selectedFramework = llmModel?.framework,
             selectedModel = llmModel?.name,
             loadState = llmLoadState,
@@ -257,7 +257,7 @@ private fun VoicePipelineSetupView(
                 .fillMaxWidth()
                 .height(56.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = AppColors.primaryBlue
+                containerColor = AppColors.primaryAccent
             )
         ) {
             Icon(
@@ -474,7 +474,7 @@ private fun ModelSetupCard(
                     Text(
                         text = "Change",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppColors.primaryBlue
+                        color = AppColors.primaryAccent
                     )
                 }
                 else -> {
@@ -483,14 +483,14 @@ private fun ModelSetupCard(
                             text = "Select",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Medium,
-                            color = AppColors.primaryBlue
+                            color = AppColors.primaryAccent
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = AppColors.primaryBlue
+                            tint = AppColors.primaryAccent
                         )
                     }
                 }
@@ -572,7 +572,7 @@ private fun MainVoiceAssistantUI(
                 Icon(
                     imageVector = if (showModelInfo) Icons.Filled.Info else Icons.Outlined.Info,
                     contentDescription = if (showModelInfo) "Hide Models" else "Show Models",
-                    tint = if (showModelInfo) AppColors.primaryBlue else MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = if (showModelInfo) AppColors.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -597,7 +597,7 @@ private fun MainVoiceAssistantUI(
                         icon = Icons.Default.Psychology,
                         label = "LLM",
                         value = uiState.llmModel?.name ?: "Not set",
-                        color = AppColors.primaryBlue
+                        color = AppColors.primaryAccent
                     )
                     ModelBadge(
                         icon = Icons.Default.GraphicEq,
@@ -871,7 +871,7 @@ private fun ConversationBubble(
             modifier = Modifier
                 .background(
                     if (isUser) MaterialTheme.colorScheme.surfaceVariant
-                    else AppColors.primaryBlue.copy(alpha = 0.08f),
+                    else AppColors.primaryAccent.copy(alpha = 0.08f),
                     RoundedCornerShape(16.dp)
                 )
                 .padding(12.dp)
@@ -972,9 +972,9 @@ private fun MicrophoneButton(
         !hasPermission -> MaterialTheme.colorScheme.error
         sessionState == SessionState.CONNECTING -> Color(0xFFFFA000) // Orange
         sessionState == SessionState.LISTENING -> Color.Red
-        sessionState == SessionState.PROCESSING -> AppColors.primaryBlue
+        sessionState == SessionState.PROCESSING -> AppColors.primaryAccent
         sessionState == SessionState.SPEAKING -> Color.Green
-        else -> AppColors.primaryBlue
+        else -> AppColors.primaryAccent
     }
 
     val animatedScale by animateFloatAsState(

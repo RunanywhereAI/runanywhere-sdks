@@ -73,7 +73,7 @@ fun InitializationLoadingView() {
                 imageVector = Icons.Outlined.Psychology,
                 contentDescription = "AI Brain",
                 modifier = Modifier.scale(scale),
-                tint = AppColors.primaryBlue
+                tint = AppColors.primaryAccent
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -98,7 +98,7 @@ fun InitializationLoadingView() {
 
             // Progress indicator - matches iOS ProgressView()
             CircularProgressIndicator(
-                color = AppColors.primaryBlue
+                color = AppColors.primaryAccent
             )
         }
     }
