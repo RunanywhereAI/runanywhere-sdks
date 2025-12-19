@@ -413,7 +413,7 @@ private fun TranscriptionMetricsBar(
                 icon = Icons.Outlined.TextFields,
                 value = "${metrics.wordCount}",
                 label = "words",
-                color = AppColors.primaryBlue
+                color = AppColors.primaryAccent
             )
 
             MetricDivider()
@@ -743,7 +743,7 @@ private fun ModelStatusBannerSTT(
                 Button(
                     onClick = onSelectModel,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AppColors.primaryBlue
+                        containerColor = AppColors.primaryAccent
                     )
                 ) {
                     Icon(
@@ -796,7 +796,7 @@ private fun STTModeSelector(
                         modifier = Modifier.padding(vertical = 8.dp),
                         textAlign = TextAlign.Center,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isSelected) AppColors.primaryBlue else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isSelected) AppColors.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -831,7 +831,7 @@ private fun RecordingButton(
     // iOS code: viewModel.isRecording ? Color.red : (viewModel.isTranscribing ? Color.orange : Color.blue)
     val buttonColor by animateColorAsState(
         targetValue = when (recordingState) {
-            RecordingState.IDLE -> AppColors.primaryBlue
+            RecordingState.IDLE -> AppColors.primaryAccent
             RecordingState.RECORDING -> AppColors.primaryRed // RED when recording - matching iOS exactly
             RecordingState.PROCESSING -> AppColors.primaryOrange
         },
@@ -1006,7 +1006,7 @@ private fun ModelRequiredOverlaySTT(
                     .height(50.dp),
                 shape = RoundedCornerShape(25.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AppColors.primaryBlue
+                    containerColor = AppColors.primaryAccent
                 )
             ) {
                 Icon(
