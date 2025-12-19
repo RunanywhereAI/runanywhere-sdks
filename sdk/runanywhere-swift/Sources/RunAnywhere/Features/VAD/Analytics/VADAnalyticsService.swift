@@ -72,23 +72,26 @@ public actor VADAnalyticsService {
         EventPublisher.shared.track(VADEvent.stopped)
     }
 
-    /// Track speech detected (start of speech)
+    /// Track speech detected (start of speech/voice activity)
     public func trackSpeechStart() {
         speechStartTime = Date()
         lastEventTime = Date()
+
+        EventPublisher.shared.track(VADEvent.speechStarted)
     }
 
-    /// Track speech ended
+    /// Track speech ended (silence detected after speech)
     public func trackSpeechEnd() {
         guard let startTime = speechStartTime else { return }
 
-        let durationMs = Date().timeIntervalSince(startTime) * 1000
+        let endTime = Date()
+        let durationMs = endTime.timeIntervalSince(startTime) * 1000
         speechStartTime = nil
 
         // Update metrics
         totalSpeechSegments += 1
         totalSpeechDurationMs += durationMs
-        lastEventTime = Date()
+        lastEventTime = endTime
 
         EventPublisher.shared.track(VADEvent.speechEnded(durationMs: durationMs))
     }
@@ -103,6 +106,50 @@ public actor VADAnalyticsService {
     public func trackResumed() {
         lastEventTime = Date()
         EventPublisher.shared.track(VADEvent.resumed)
+    }
+
+    // MARK: - Model Lifecycle (for model-based VAD)
+
+    /// Track model load started (for model-based VAD like Silero)
+    public func trackModelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType) {
+        currentFramework = framework
+        lastEventTime = Date()
+
+        EventPublisher.shared.track(VADEvent.modelLoadStarted(
+            modelId: modelId,
+            modelSizeBytes: modelSizeBytes,
+            framework: framework
+        ))
+    }
+
+    /// Track model load completed
+    public func trackModelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0) {
+        lastEventTime = Date()
+
+        EventPublisher.shared.track(VADEvent.modelLoadCompleted(
+            modelId: modelId,
+            durationMs: durationMs,
+            modelSizeBytes: modelSizeBytes,
+            framework: currentFramework
+        ))
+    }
+
+    /// Track model load failed
+    public func trackModelLoadFailed(modelId: String, error: String) {
+        lastEventTime = Date()
+
+        EventPublisher.shared.track(VADEvent.modelLoadFailed(
+            modelId: modelId,
+            error: error,
+            framework: currentFramework
+        ))
+    }
+
+    /// Track model unloaded
+    public func trackModelUnloaded(modelId: String) {
+        lastEventTime = Date()
+
+        EventPublisher.shared.track(VADEvent.modelUnloaded(modelId: modelId))
     }
 
     // MARK: - Metrics

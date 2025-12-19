@@ -122,10 +122,8 @@ public actor TTSCapability: ModelLoadableCapability {
         let synthesisId = await analyticsService.startSynthesis(
             text: text,
             voice: effectiveOptions.voice ?? voiceId,
-            language: effectiveOptions.language
+            framework: service.inferenceFramework
         )
-
-        let startTime = Date()
 
         // Perform synthesis
         let audioData: Data
@@ -133,23 +131,22 @@ public actor TTSCapability: ModelLoadableCapability {
             audioData = try await service.synthesize(text: text, options: effectiveOptions)
         } catch {
             logger.error("Synthesis failed: \(error)")
-            let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
             await analyticsService.trackSynthesisFailed(
                 synthesisId: synthesisId,
-                characterCount: text.count,
-                processingTimeMs: processingTimeMs,
                 errorMessage: error.localizedDescription
             )
             await managedLifecycle.trackOperationError(error, operation: "synthesize")
             throw CapabilityError.operationFailed("Synthesis", error)
         }
 
-        let audioDuration = estimateAudioDuration(dataSize: audioData.count, sampleRate: effectiveOptions.sampleRate)
+        // Calculate audio duration from the generated audio data
+        let audioDurationSeconds = estimateAudioDuration(dataSize: audioData.count, sampleRate: effectiveOptions.sampleRate)
+        let audioDurationMs = audioDurationSeconds * 1000
 
         // Complete synthesis tracking
         await analyticsService.completeSynthesis(
             synthesisId: synthesisId,
-            audioDurationMs: audioDuration * 1000,
+            audioDurationMs: audioDurationMs,
             audioSizeBytes: audioData.count
         )
 
@@ -168,7 +165,7 @@ public actor TTSCapability: ModelLoadableCapability {
         return TTSOutput(
             audioData: audioData,
             format: effectiveOptions.audioFormat,
-            duration: audioDuration,
+            duration: audioDurationSeconds,
             phonemeTimestamps: nil,
             metadata: metadata
         )
@@ -199,11 +196,10 @@ public actor TTSCapability: ModelLoadableCapability {
                 let synthesisId = await self.analyticsService.startSynthesis(
                     text: text,
                     voice: effectiveOptions.voice ?? voiceId,
-                    language: effectiveOptions.language
+                    framework: service.inferenceFramework
                 )
 
                 var totalBytes = 0
-                let startTime = Date()
 
                 do {
                     try await service.synthesizeStream(
@@ -211,25 +207,29 @@ public actor TTSCapability: ModelLoadableCapability {
                         options: effectiveOptions,
                         onChunk: { chunk in
                             totalBytes += chunk.count
+                            Task {
+                                await self.analyticsService.trackSynthesisChunk(
+                                    synthesisId: synthesisId,
+                                    chunkSize: chunk.count
+                                )
+                            }
                             continuation.yield(chunk)
                         }
                     )
 
                     // Complete synthesis tracking
-                    let audioDuration = self.estimateAudioDuration(dataSize: totalBytes, sampleRate: effectiveOptions.sampleRate)
+                    let audioDurationSeconds = self.estimateAudioDuration(dataSize: totalBytes, sampleRate: effectiveOptions.sampleRate)
+                    let audioDurationMs = audioDurationSeconds * 1000
                     await self.analyticsService.completeSynthesis(
                         synthesisId: synthesisId,
-                        audioDurationMs: audioDuration * 1000,
+                        audioDurationMs: audioDurationMs,
                         audioSizeBytes: totalBytes
                     )
 
                     continuation.finish()
                 } catch {
-                    let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
                     await self.analyticsService.trackSynthesisFailed(
                         synthesisId: synthesisId,
-                        characterCount: text.count,
-                        processingTimeMs: processingTimeMs,
                         errorMessage: error.localizedDescription
                     )
                     continuation.finish(throwing: error)

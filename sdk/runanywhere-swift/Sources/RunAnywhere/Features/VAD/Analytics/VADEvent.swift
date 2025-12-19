@@ -25,11 +25,24 @@ public enum VADEvent: SDKEvent {
     case initializationFailed(error: String, framework: InferenceFrameworkType = .builtIn)
     case cleanedUp
 
+    // MARK: - Model Lifecycle (for model-based VAD)
+
+    /// Model loading started (for model-based VAD like Silero VAD)
+    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
+    /// Model loading completed
+    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
+    /// Model loading failed
+    case modelLoadFailed(modelId: String, error: String, framework: InferenceFrameworkType = .unknown)
+    /// Model unloaded
+    case modelUnloaded(modelId: String)
+
     // MARK: - Detection
 
     case started
     case stopped
-    case speechDetected(durationMs: Double)
+    /// Speech started (voice activity detected)
+    case speechStarted
+    /// Speech ended with duration
     case speechEnded(durationMs: Double)
     case paused
     case resumed
@@ -41,9 +54,13 @@ public enum VADEvent: SDKEvent {
         case .initialized: return "vad_initialized"
         case .initializationFailed: return "vad_initialization_failed"
         case .cleanedUp: return "vad_cleaned_up"
+        case .modelLoadStarted: return "vad_model_load_started"
+        case .modelLoadCompleted: return "vad_model_load_completed"
+        case .modelLoadFailed: return "vad_model_load_failed"
+        case .modelUnloaded: return "vad_model_unloaded"
         case .started: return "vad_started"
         case .stopped: return "vad_stopped"
-        case .speechDetected: return "vad_speech_detected"
+        case .speechStarted: return "vad_speech_started"
         case .speechEnded: return "vad_speech_ended"
         case .paused: return "vad_paused"
         case .resumed: return "vad_resumed"
@@ -55,7 +72,7 @@ public enum VADEvent: SDKEvent {
     public var destination: EventDestination {
         switch self {
         // Speech detection events are analytics only (too chatty)
-        case .speechDetected, .speechEnded:
+        case .speechStarted, .speechEnded:
             return .analyticsOnly
         default:
             return .all
@@ -76,14 +93,45 @@ public enum VADEvent: SDKEvent {
         case .cleanedUp:
             return [:]
 
+        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
+            var props = [
+                "model_id": modelId,
+                "framework": framework.rawValue
+            ]
+            if modelSizeBytes > 0 {
+                props["model_size_bytes"] = String(modelSizeBytes)
+            }
+            return props
+
+        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
+            var props = [
+                "model_id": modelId,
+                "duration_ms": String(format: "%.1f", durationMs),
+                "framework": framework.rawValue
+            ]
+            if modelSizeBytes > 0 {
+                props["model_size_bytes"] = String(modelSizeBytes)
+            }
+            return props
+
+        case .modelLoadFailed(let modelId, let error, let framework):
+            return [
+                "model_id": modelId,
+                "error": error,
+                "framework": framework.rawValue
+            ]
+
+        case .modelUnloaded(let modelId):
+            return ["model_id": modelId]
+
         case .started:
             return [:]
 
         case .stopped:
             return [:]
 
-        case .speechDetected(let durationMs):
-            return ["duration_ms": String(format: "%.1f", durationMs)]
+        case .speechStarted:
+            return [:]
 
         case .speechEnded(let durationMs):
             return ["duration_ms": String(format: "%.1f", durationMs)]

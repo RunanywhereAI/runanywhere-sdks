@@ -6,6 +6,12 @@
 //  Tracks transcription operations and metrics.
 //  Lifecycle events are handled by ManagedLifecycle.
 //
+//  NOTE: ⚠️ Audio length estimation assumes 16-bit PCM @ 16kHz (standard for STT).
+//  Formula: audioLengthMs = (bytes / 2) / 16000 * 1000
+//
+//  NOTE: ⚠️ Real-Time Factor (RTF) will be 0 or undefined for streaming transcription
+//  since audioLengthMs = 0 when audio is processed in chunks of unknown total length.
+//
 
 import Foundation
 
@@ -26,6 +32,8 @@ public actor STTAnalyticsService {
     private var transcriptionCount = 0
     private var totalConfidence: Float = 0
     private var totalLatency: TimeInterval = 0
+    private var totalAudioProcessed: Double = 0  // Total audio length in ms
+    private var totalRealTimeFactor: Double = 0
     private let startTime = Date()
     private var lastEventTime: Date?
 
@@ -34,6 +42,8 @@ public actor STTAnalyticsService {
     private struct TranscriptionTracker {
         let startTime: Date
         let audioLengthMs: Double
+        let audioSizeBytes: Int
+        let framework: InferenceFrameworkType
     }
 
     // MARK: - Initialization
@@ -43,35 +53,54 @@ public actor STTAnalyticsService {
     // MARK: - Transcription Tracking
 
     /// Start tracking a transcription
-    public func startTranscription(audioLengthMs: Double, language: String) -> String {
+    /// - Parameters:
+    ///   - audioLengthMs: Duration of audio in milliseconds
+    ///   - audioSizeBytes: Size of audio data in bytes
+    ///   - language: Language code for transcription
+    ///   - framework: The inference framework being used
+    /// - Returns: A unique transcription ID for tracking
+    public func startTranscription(
+        audioLengthMs: Double,
+        audioSizeBytes: Int,
+        language: String,
+        framework: InferenceFrameworkType = .unknown
+    ) -> String {
         let id = UUID().uuidString
         activeTranscriptions[id] = TranscriptionTracker(
             startTime: Date(),
-            audioLengthMs: audioLengthMs
+            audioLengthMs: audioLengthMs,
+            audioSizeBytes: audioSizeBytes,
+            framework: framework
         )
 
         EventPublisher.shared.track(STTEvent.transcriptionStarted(
             transcriptionId: id,
             audioLengthMs: audioLengthMs,
-            language: language
+            audioSizeBytes: audioSizeBytes,
+            language: language,
+            framework: framework
         ))
 
-        logger.debug("Transcription started: \(id)")
+        logger.debug("Transcription started: \(id), audio: \(String(format: "%.1f", audioLengthMs))ms, \(audioSizeBytes) bytes")
         return id
     }
 
-    /// Track partial transcript
+    /// Track partial transcript (for streaming transcription)
     public func trackPartialTranscript(text: String) {
         let wordCount = text.split(separator: " ").count
         EventPublisher.shared.track(STTEvent.partialTranscript(text: text, wordCount: wordCount))
     }
 
-    /// Track final transcript
+    /// Track final transcript (for streaming transcription)
     public func trackFinalTranscript(text: String, confidence: Float) {
         EventPublisher.shared.track(STTEvent.finalTranscript(text: text, confidence: confidence))
     }
 
     /// Complete a transcription
+    /// - Parameters:
+    ///   - transcriptionId: The transcription ID from startTranscription
+    ///   - text: The transcribed text
+    ///   - confidence: Confidence score (0.0 to 1.0)
     public func completeTranscription(
         transcriptionId: String,
         text: String,
@@ -79,14 +108,21 @@ public actor STTAnalyticsService {
     ) {
         guard let tracker = activeTranscriptions.removeValue(forKey: transcriptionId) else { return }
 
-        let processingTimeMs = Date().timeIntervalSince(tracker.startTime) * 1000
+        let endTime = Date()
+        let processingTimeMs = endTime.timeIntervalSince(tracker.startTime) * 1000
         let wordCount = text.split(separator: " ").count
+
+        // Calculate real-time factor (RTF): processing time / audio length
+        // RTF < 1.0 means faster than real-time
+        let realTimeFactor = tracker.audioLengthMs > 0 ? processingTimeMs / tracker.audioLengthMs : 0
 
         // Update metrics
         transcriptionCount += 1
         totalConfidence += confidence
         totalLatency += processingTimeMs / 1000.0
-        lastEventTime = Date()
+        totalAudioProcessed += tracker.audioLengthMs
+        totalRealTimeFactor += realTimeFactor
+        lastEventTime = endTime
 
         EventPublisher.shared.track(STTEvent.transcriptionCompleted(
             transcriptionId: transcriptionId,
@@ -94,17 +130,18 @@ public actor STTAnalyticsService {
             confidence: confidence,
             durationMs: processingTimeMs,
             audioLengthMs: tracker.audioLengthMs,
-            wordCount: wordCount
+            audioSizeBytes: tracker.audioSizeBytes,
+            wordCount: wordCount,
+            realTimeFactor: realTimeFactor,
+            framework: tracker.framework
         ))
 
-        logger.debug("Transcription completed: \(transcriptionId)")
+        logger.debug("Transcription completed: \(transcriptionId), RTF: \(String(format: "%.3f", realTimeFactor))")
     }
 
     /// Track transcription failure
     public func trackTranscriptionFailed(
         transcriptionId: String,
-        audioLengthMs _: Double,
-        processingTimeMs _: Double,
         errorMessage: String
     ) {
         activeTranscriptions.removeValue(forKey: transcriptionId)
@@ -124,11 +161,6 @@ public actor STTAnalyticsService {
         ))
     }
 
-    /// Track speaker change (analytics only)
-    public func trackSpeakerChange(from: String?, to: String) {
-        EventPublisher.shared.track(STTEvent.speakerChanged(fromSpeaker: from, toSpeaker: to))
-    }
-
     /// Track an error during operations
     public func trackError(_ error: Error, operation: String) {
         lastEventTime = Date()
@@ -142,13 +174,18 @@ public actor STTAnalyticsService {
     // MARK: - Metrics
 
     public func getMetrics() -> STTMetrics {
-        STTMetrics(
+        // Average RTF only if we have transcriptions
+        let avgRTF = transcriptionCount > 0 ? totalRealTimeFactor / Double(transcriptionCount) : 0
+
+        return STTMetrics(
             totalEvents: transcriptionCount,
             startTime: startTime,
             lastEventTime: lastEventTime,
             totalTranscriptions: transcriptionCount,
             averageConfidence: transcriptionCount > 0 ? totalConfidence / Float(transcriptionCount) : 0,
-            averageLatency: transcriptionCount > 0 ? totalLatency / Double(transcriptionCount) : 0
+            averageLatency: transcriptionCount > 0 ? totalLatency / Double(transcriptionCount) : 0,
+            averageRealTimeFactor: avgRTF,
+            totalAudioProcessedMs: totalAudioProcessed
         )
     }
 }
@@ -160,8 +197,19 @@ public struct STTMetrics: AnalyticsMetrics {
     public let startTime: Date
     public let lastEventTime: Date?
     public let totalTranscriptions: Int
+
+    /// Average confidence score across all transcriptions (0.0 to 1.0)
     public let averageConfidence: Float
+
+    /// Average processing latency in seconds
     public let averageLatency: TimeInterval
+
+    /// Average real-time factor (processing time / audio length)
+    /// - Note: Values < 1.0 indicate faster-than-real-time processing
+    public let averageRealTimeFactor: Double
+
+    /// Total audio processed in milliseconds
+    public let totalAudioProcessedMs: Double
 
     public init(
         totalEvents: Int = 0,
@@ -169,7 +217,9 @@ public struct STTMetrics: AnalyticsMetrics {
         lastEventTime: Date? = nil,
         totalTranscriptions: Int = 0,
         averageConfidence: Float = 0,
-        averageLatency: TimeInterval = 0
+        averageLatency: TimeInterval = 0,
+        averageRealTimeFactor: Double = 0,
+        totalAudioProcessedMs: Double = 0
     ) {
         self.totalEvents = totalEvents
         self.startTime = startTime
@@ -177,5 +227,7 @@ public struct STTMetrics: AnalyticsMetrics {
         self.totalTranscriptions = totalTranscriptions
         self.averageConfidence = averageConfidence
         self.averageLatency = averageLatency
+        self.averageRealTimeFactor = averageRealTimeFactor
+        self.totalAudioProcessedMs = totalAudioProcessedMs
     }
 }

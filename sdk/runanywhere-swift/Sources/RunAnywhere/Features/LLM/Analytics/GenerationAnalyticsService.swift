@@ -6,6 +6,9 @@
 //  Tracks generation operations and metrics.
 //  Lifecycle events are handled by ManagedLifecycle.
 //
+//  NOTE: ⚠️ Token estimation uses ~4 chars/token (approximation, not exact tokenizer count).
+//  Actual token counts may vary depending on the model's tokenizer and input content.
+//
 
 import Foundation
 
@@ -13,6 +16,10 @@ import Foundation
 
 /// LLM analytics service for tracking generation operations.
 /// Model lifecycle events (load/unload) are handled by ManagedLifecycle.
+///
+/// Supports two generation modes:
+/// - **Non-streaming** (`generate()`): Synchronous generation, no TTFT tracking
+/// - **Streaming** (`generateStream()`): Asynchronous token-by-token generation with TTFT tracking
 public actor GenerationAnalyticsService {
 
     // MARK: - Properties
@@ -22,9 +29,12 @@ public actor GenerationAnalyticsService {
     /// Active generation operations
     private var activeGenerations: [String: GenerationTracker] = [:]
 
-    /// Metrics
+    /// Metrics - separated by mode
     private var totalGenerations = 0
+    private var streamingGenerations = 0
+    private var nonStreamingGenerations = 0
     private var totalTimeToFirstToken: TimeInterval = 0
+    private var streamingTTFTCount = 0  // Only count TTFT for streaming generations
     private var totalTokensPerSecond: Double = 0
     private var totalInputTokens = 0
     private var totalOutputTokens = 0
@@ -35,6 +45,8 @@ public actor GenerationAnalyticsService {
 
     private struct GenerationTracker {
         let startTime: Date
+        let isStreaming: Bool
+        let framework: InferenceFrameworkType
         var firstTokenTime: Date?
     }
 
@@ -44,24 +56,73 @@ public actor GenerationAnalyticsService {
 
     // MARK: - Generation Tracking
 
-    /// Start tracking a generation
-    public func startGeneration(modelId: String, executionTarget _: String) -> String {
+    /// Start tracking a non-streaming generation (generate())
+    /// - Parameters:
+    ///   - modelId: The model ID being used
+    ///   - framework: The inference framework type
+    /// - Returns: A unique generation ID for tracking
+    public func startGeneration(
+        modelId: String,
+        framework: InferenceFrameworkType = .unknown
+    ) -> String {
         let id = UUID().uuidString
-        activeGenerations[id] = GenerationTracker(startTime: Date())
+        activeGenerations[id] = GenerationTracker(
+            startTime: Date(),
+            isStreaming: false,
+            framework: framework
+        )
 
         EventPublisher.shared.track(LLMEvent.generationStarted(
             generationId: id,
             modelId: modelId,
-            prompt: nil
+            prompt: nil,
+            isStreaming: false,
+            framework: framework
         ))
 
-        logger.debug("Generation started: \(id)")
+        logger.debug("Non-streaming generation started: \(id)")
         return id
     }
 
-    /// Track first token (time-to-first-token metric)
+    /// Start tracking a streaming generation (generateStream())
+    /// - Parameters:
+    ///   - modelId: The model ID being used
+    ///   - framework: The inference framework type
+    /// - Returns: A unique generation ID for tracking
+    public func startStreamingGeneration(
+        modelId: String,
+        framework: InferenceFrameworkType = .unknown
+    ) -> String {
+        let id = UUID().uuidString
+        activeGenerations[id] = GenerationTracker(
+            startTime: Date(),
+            isStreaming: true,
+            framework: framework
+        )
+
+        EventPublisher.shared.track(LLMEvent.generationStarted(
+            generationId: id,
+            modelId: modelId,
+            prompt: nil,
+            isStreaming: true,
+            framework: framework
+        ))
+
+        logger.debug("Streaming generation started: \(id)")
+        return id
+    }
+
+    /// Track first token for streaming generation (time-to-first-token metric)
+    /// - Note: Only applicable for streaming generations. Call is ignored for non-streaming.
     public func trackFirstToken(generationId: String) {
-        guard var tracker = activeGenerations[generationId] else { return }
+        guard var tracker = activeGenerations[generationId], tracker.isStreaming else {
+            // TTFT is only tracked for streaming generations
+            return
+        }
+
+        // Only record if not already recorded
+        guard tracker.firstTokenTime == nil else { return }
+
         let firstTokenTime = Date()
         tracker.firstTokenTime = firstTokenTime
         activeGenerations[generationId] = tracker
@@ -72,36 +133,61 @@ public actor GenerationAnalyticsService {
             generationId: generationId,
             latencyMs: latencyMs
         ))
+
+        logger.debug("First token received for \(generationId): \(String(format: "%.1f", latencyMs))ms")
     }
 
     /// Track streaming update (analytics only)
+    /// - Note: Only applicable for streaming generations
     public func trackStreamingUpdate(generationId: String, tokensGenerated: Int) {
+        guard let tracker = activeGenerations[generationId], tracker.isStreaming else {
+            return
+        }
+
         EventPublisher.shared.track(LLMEvent.streamingUpdate(
             generationId: generationId,
             tokensGenerated: tokensGenerated
         ))
     }
 
-    /// Complete a generation
+    /// Complete a generation (works for both streaming and non-streaming)
+    /// - Parameters:
+    ///   - generationId: The generation ID from startGeneration or startStreamingGeneration
+    ///   - inputTokens: Number of input tokens processed
+    ///   - outputTokens: Number of output tokens generated
+    ///   - modelId: The model ID used
     public func completeGeneration(
         generationId: String,
         inputTokens: Int,
         outputTokens: Int,
-        modelId: String,
-        executionTarget _: String
+        modelId: String
     ) {
         guard let tracker = activeGenerations.removeValue(forKey: generationId) else { return }
 
-        let totalTime = Date().timeIntervalSince(tracker.startTime)
+        let endTime = Date()
+        let totalTime = endTime.timeIntervalSince(tracker.startTime)
         let tokensPerSecond = totalTime > 0 ? Double(outputTokens) / totalTime : 0
+
+        // Calculate TTFT for streaming generations
+        var timeToFirstTokenMs: Double?
+        if tracker.isStreaming, let firstTokenTime = tracker.firstTokenTime {
+            let ttft = firstTokenTime.timeIntervalSince(tracker.startTime)
+            timeToFirstTokenMs = ttft * 1000
+            totalTimeToFirstToken += ttft
+            streamingTTFTCount += 1
+        }
 
         // Update metrics
         totalGenerations += 1
-        totalTimeToFirstToken += tracker.firstTokenTime?.timeIntervalSince(tracker.startTime) ?? 0
+        if tracker.isStreaming {
+            streamingGenerations += 1
+        } else {
+            nonStreamingGenerations += 1
+        }
         totalTokensPerSecond += tokensPerSecond
         totalInputTokens += inputTokens
         totalOutputTokens += outputTokens
-        lastEventTime = Date()
+        lastEventTime = endTime
 
         EventPublisher.shared.track(LLMEvent.generationCompleted(
             generationId: generationId,
@@ -109,10 +195,14 @@ public actor GenerationAnalyticsService {
             inputTokens: inputTokens,
             outputTokens: outputTokens,
             durationMs: totalTime * 1000,
-            tokensPerSecond: tokensPerSecond
+            tokensPerSecond: tokensPerSecond,
+            isStreaming: tracker.isStreaming,
+            timeToFirstTokenMs: timeToFirstTokenMs,
+            framework: tracker.framework
         ))
 
-        logger.debug("Generation completed: \(generationId)")
+        let modeStr = tracker.isStreaming ? "streaming" : "non-streaming"
+        logger.debug("Generation completed (\(modeStr)): \(generationId)")
     }
 
     /// Track generation failure
@@ -139,12 +229,17 @@ public actor GenerationAnalyticsService {
     // MARK: - Metrics
 
     public func getMetrics() -> GenerationMetrics {
-        GenerationMetrics(
+        // Average TTFT only counts streaming generations that had TTFT recorded
+        let avgTTFT = streamingTTFTCount > 0 ? totalTimeToFirstToken / Double(streamingTTFTCount) : 0
+
+        return GenerationMetrics(
             totalEvents: totalGenerations,
             startTime: startTime,
             lastEventTime: lastEventTime,
             totalGenerations: totalGenerations,
-            averageTimeToFirstToken: totalGenerations > 0 ? totalTimeToFirstToken / Double(totalGenerations) : 0,
+            streamingGenerations: streamingGenerations,
+            nonStreamingGenerations: nonStreamingGenerations,
+            averageTimeToFirstToken: avgTTFT,
             averageTokensPerSecond: totalGenerations > 0 ? totalTokensPerSecond / Double(totalGenerations) : 0,
             totalInputTokens: totalInputTokens,
             totalOutputTokens: totalOutputTokens
@@ -158,10 +253,27 @@ public struct GenerationMetrics: AnalyticsMetrics {
     public let totalEvents: Int
     public let startTime: Date
     public let lastEventTime: Date?
+
+    /// Total number of all generations (streaming + non-streaming)
     public let totalGenerations: Int
+
+    /// Number of streaming generations (generateStream())
+    public let streamingGenerations: Int
+
+    /// Number of non-streaming generations (generate())
+    public let nonStreamingGenerations: Int
+
+    /// Average time to first token in seconds (only for streaming generations)
+    /// Returns 0 if no streaming generations have completed
     public let averageTimeToFirstToken: TimeInterval
+
+    /// Average tokens per second across all generations
     public let averageTokensPerSecond: Double
+
+    /// Total input tokens processed
     public let totalInputTokens: Int
+
+    /// Total output tokens generated
     public let totalOutputTokens: Int
 
     public init(
@@ -169,6 +281,8 @@ public struct GenerationMetrics: AnalyticsMetrics {
         startTime: Date = Date(),
         lastEventTime: Date? = nil,
         totalGenerations: Int = 0,
+        streamingGenerations: Int = 0,
+        nonStreamingGenerations: Int = 0,
         averageTimeToFirstToken: TimeInterval = 0,
         averageTokensPerSecond: Double = 0,
         totalInputTokens: Int = 0,
@@ -178,6 +292,8 @@ public struct GenerationMetrics: AnalyticsMetrics {
         self.startTime = startTime
         self.lastEventTime = lastEventTime
         self.totalGenerations = totalGenerations
+        self.streamingGenerations = streamingGenerations
+        self.nonStreamingGenerations = nonStreamingGenerations
         self.averageTimeToFirstToken = averageTimeToFirstToken
         self.averageTokensPerSecond = averageTokensPerSecond
         self.totalInputTokens = totalInputTokens
