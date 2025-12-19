@@ -70,7 +70,7 @@ struct SpeechToTextView: View {
                                 VStack(spacing: 16) {
                                     Image(systemName: "mic.circle")
                                         .font(.system(size: 64))
-                                        .foregroundColor(.green.opacity(0.5))
+                                        .foregroundColor(AppColors.statusGreen.opacity(0.5))
 
                                     Text("Ready to transcribe")
                                         .font(.headline)
@@ -112,16 +112,16 @@ struct SpeechToTextView: View {
                                         if viewModel.isRecording {
                                             HStack(spacing: 6) {
                                                 Circle()
-                                                    .fill(Color.red)
+                                                    .fill(AppColors.statusRed)
                                                     .frame(width: 8, height: 8)
                                                 Text("RECORDING")
                                                     .font(.caption2)
                                                     .fontWeight(.bold)
-                                                    .foregroundColor(.red)
+                                                    .foregroundColor(AppColors.statusRed)
                                             }
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 4)
-                                            .background(Color.red.opacity(0.1))
+                                            .background(AppColors.statusRed.opacity(0.1))
                                             .cornerRadius(4)
                                         } else if viewModel.isTranscribing {
                                             HStack(spacing: 6) {
@@ -130,11 +130,11 @@ struct SpeechToTextView: View {
                                                 Text("TRANSCRIBING")
                                                     .font(.caption2)
                                                     .fontWeight(.bold)
-                                                    .foregroundColor(.orange)
+                                                    .foregroundColor(AppColors.statusOrange)
                                             }
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 4)
-                                            .background(Color.orange.opacity(0.1))
+                                            .background(AppColors.statusOrange.opacity(0.1))
                                             .cornerRadius(4)
                                         }
                                     }
@@ -164,7 +164,7 @@ struct SpeechToTextView: View {
                         if let error = viewModel.errorMessage {
                             Text(error)
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundColor(AppColors.statusRed)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal)
                         }
@@ -179,8 +179,8 @@ struct SpeechToTextView: View {
                             isActive: viewModel.isRecording,
                             isPulsing: false,
                             isLoading: viewModel.isProcessing || viewModel.isTranscribing,
-                            activeColor: .red,
-                            inactiveColor: viewModel.isTranscribing ? .orange : .blue,
+                            activeColor: AppColors.statusRed,
+                            inactiveColor: viewModel.isTranscribing ? AppColors.statusOrange : AppColors.primaryAccent,
                             icon: viewModel.isRecording ? "stop.fill" : "mic.fill"
                         ) {
                             Task {
