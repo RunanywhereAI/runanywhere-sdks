@@ -11,7 +11,7 @@ import com.runanywhere.sdk.components.vad.VADInput
 import com.runanywhere.sdk.components.TTSComponent
 import com.runanywhere.sdk.components.TTSOptions
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.events.SDKVoiceEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
@@ -78,7 +78,7 @@ class VoiceAgentComponent(
         initializeComponents()
 
         // Publish pipeline started event
-        EventBus.publish(SDKVoiceEvent.PipelineStarted)
+        EventPublisher.track(SDKVoiceEvent.PipelineStarted)
     }
 
     /**
@@ -217,7 +217,7 @@ class VoiceAgentComponent(
             }
 
             // Publish speech detected event
-            EventBus.publish(SDKVoiceEvent.SpeechDetected)
+            EventPublisher.track(SDKVoiceEvent.SpeechDetected)
 
             // Step 2: STT - Speech to Text
             pipelineState = VoiceAgentPipelineState.STT_PROCESSING
@@ -231,7 +231,7 @@ class VoiceAgentComponent(
             }
 
             // Publish transcription event
-            EventBus.publish(SDKVoiceEvent.TranscriptionFinal(transcription))
+            EventPublisher.track(SDKVoiceEvent.TranscriptionFinal(transcription))
 
             // Step 3: LLM - Generate Response
             pipelineState = VoiceAgentPipelineState.LLM_PROCESSING
@@ -245,7 +245,7 @@ class VoiceAgentComponent(
             }
 
             // Publish response generated event
-            EventBus.publish(SDKVoiceEvent.ResponseGenerated(response))
+            EventPublisher.track(SDKVoiceEvent.ResponseGenerated(response))
 
             // Step 4: TTS - Text to Speech
             pipelineState = VoiceAgentPipelineState.TTS_PROCESSING
@@ -254,7 +254,7 @@ class VoiceAgentComponent(
 
             if (synthesizedAudio != null) {
                 // Publish audio generated event
-                EventBus.publish(SDKVoiceEvent.AudioGenerated(synthesizedAudio))
+                EventPublisher.track(SDKVoiceEvent.AudioGenerated(synthesizedAudio))
             }
 
             pipelineState = VoiceAgentPipelineState.COMPLETED
@@ -263,7 +263,7 @@ class VoiceAgentComponent(
         } catch (e: Exception) {
             pipelineState = VoiceAgentPipelineState.ERROR
             logger.error("Pipeline processing failed", e)
-            EventBus.publish(SDKVoiceEvent.PipelineError(e))
+            EventPublisher.track(SDKVoiceEvent.PipelineError(e))
             throw e
         } finally {
             processingMutex.unlock()

@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.generation
 
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.events.SDKGenerationEvent
 import com.runanywhere.sdk.models.LoadedModelWithService
 import com.runanywhere.sdk.components.llm.LLMComponent
@@ -279,22 +279,22 @@ class GenerationService(
     }
 
     private fun publishGenerationStarted(sessionId: String, prompt: String) {
-        EventBus.publish(SDKGenerationEvent.Started(prompt, sessionId))
+        EventPublisher.track(SDKGenerationEvent.Started(prompt, sessionId))
         logger.debug("Generation started: $sessionId")
     }
 
     private fun publishGenerationCompleted(sessionId: String, result: GenerationResult) {
-        EventBus.publish(SDKGenerationEvent.Completed(result.text, result.tokensUsed, result.latencyMs.toDouble()))
+        EventPublisher.track(SDKGenerationEvent.Completed(result.text, result.tokensUsed, result.latencyMs.toDouble()))
         logger.debug("Generation completed: $sessionId")
     }
 
     private fun publishGenerationFailed(sessionId: String, error: Exception) {
-        EventBus.publish(SDKGenerationEvent.Failed(error))
+        EventPublisher.track(SDKGenerationEvent.Failed(error))
         logger.debug("Generation failed: $sessionId - ${error.message}")
     }
 
     private fun publishGenerationCancelled(sessionId: String) {
-        EventBus.publish(SDKGenerationEvent.Cancelled(sessionId))
+        EventPublisher.track(SDKGenerationEvent.Cancelled(sessionId))
         logger.debug("Generation cancelled: $sessionId")
     }
 

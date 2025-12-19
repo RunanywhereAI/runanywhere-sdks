@@ -275,8 +275,8 @@ class AnalyticsService internal constructor(
         // Non-blocking background submission
         analyticsScope.launch(Dispatchers.IO) {
             try {
-                // Get device ID dynamically from BaseRunAnywhereSDK (set during registration)
-                val currentDeviceId = com.runanywhere.sdk.public.BaseRunAnywhereSDK.sharedDeviceId ?: "unknown"
+                // Get device ID dynamically from ServiceContainer
+                val currentDeviceId = com.runanywhere.sdk.foundation.ServiceContainer.shared.deviceId
                 logger.info("📊 [ANALYTICS] Device ID: $currentDeviceId")
 
                 // Capture host app information

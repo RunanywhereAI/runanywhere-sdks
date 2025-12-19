@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
@@ -29,7 +29,7 @@ object RunAnywhereModelManagement {
      * @return Information about the loaded model
      */
     suspend fun loadModelWithInfo(modelIdentifier: String): ModelInfo = withContext(Dispatchers.Default) {
-        EventBus.publish(SDKModelEvent.LoadStarted(modelIdentifier))
+        EventPublisher.track(SDKModelEvent.LoadStarted(modelIdentifier))
 
         try {
             // Use existing service logic directly
@@ -39,10 +39,10 @@ object RunAnywhereModelManagement {
             ServiceContainer.shared.generationService.setCurrentModel(loadedModel)
             logger.info("✅ Model loaded and set in GenerationService: ${loadedModel.model.id}")
 
-            EventBus.publish(SDKModelEvent.LoadCompleted(modelIdentifier))
+            EventPublisher.track(SDKModelEvent.LoadCompleted(modelIdentifier))
             return@withContext loadedModel.model
         } catch (error: Exception) {
-            EventBus.publish(SDKModelEvent.LoadFailed(modelIdentifier, error))
+            EventPublisher.track(SDKModelEvent.LoadFailed(modelIdentifier, error))
             throw error
         }
     }
@@ -51,7 +51,7 @@ object RunAnywhereModelManagement {
      * Unload the currently loaded model - EXACT copy of iOS implementation
      */
     suspend fun unloadModel() = withContext(Dispatchers.Default) {
-        EventBus.publish(SDKModelEvent.UnloadStarted)
+        EventPublisher.track(SDKModelEvent.UnloadStarted)
 
         try {
             // Get the current model ID from generation service
@@ -61,9 +61,9 @@ object RunAnywhereModelManagement {
             // For now, unload all models as a placeholder
             ServiceContainer.shared.modelLoadingService.clearAllModels()
 
-            EventBus.publish(SDKModelEvent.UnloadCompleted)
+            EventPublisher.track(SDKModelEvent.UnloadCompleted)
         } catch (error: Exception) {
-            EventBus.publish(SDKModelEvent.UnloadFailed(error))
+            EventPublisher.track(SDKModelEvent.UnloadFailed(error))
             throw error
         }
     }
@@ -73,11 +73,11 @@ object RunAnywhereModelManagement {
      * @return Array of available models
      */
     suspend fun listAvailableModels(): List<ModelInfo> = withContext(Dispatchers.Default) {
-        EventBus.publish(SDKModelEvent.ListRequested)
+        EventPublisher.track(SDKModelEvent.ListRequested)
 
         // Use model registry to discover models
         val models = ServiceContainer.shared.modelRegistry.discoverModels()
-        EventBus.publish(SDKModelEvent.ListCompleted(models))
+        EventPublisher.track(SDKModelEvent.ListCompleted(models))
         return@withContext models
     }
 
@@ -86,7 +86,7 @@ object RunAnywhereModelManagement {
      * @param modelIdentifier The model to download
      */
     suspend fun downloadModel(modelIdentifier: String) = withContext(Dispatchers.IO) {
-        EventBus.publish(SDKModelEvent.DownloadStarted(modelIdentifier))
+        EventPublisher.track(SDKModelEvent.DownloadStarted(modelIdentifier))
 
         try {
             // Get the model info first
@@ -130,10 +130,10 @@ object RunAnywhereModelManagement {
             // Also update the model in the registry with the new local path
             ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
-            EventBus.publish(SDKModelEvent.DownloadCompleted(modelIdentifier))
+            EventPublisher.track(SDKModelEvent.DownloadCompleted(modelIdentifier))
 
         } catch (error: Exception) {
-            EventBus.publish(SDKModelEvent.DownloadFailed(modelIdentifier, error))
+            EventPublisher.track(SDKModelEvent.DownloadFailed(modelIdentifier, error))
             throw error
         }
     }
@@ -143,7 +143,7 @@ object RunAnywhereModelManagement {
      * @param modelIdentifier The model to delete
      */
     suspend fun deleteModel(modelIdentifier: String) = withContext(Dispatchers.IO) {
-        EventBus.publish(SDKModelEvent.DeleteStarted(modelIdentifier))
+        EventPublisher.track(SDKModelEvent.DeleteStarted(modelIdentifier))
 
         try {
             // Use model manager to delete model
@@ -153,9 +153,9 @@ object RunAnywhereModelManagement {
             ServiceContainer.shared.modelRegistry.removeModel(modelIdentifier)
             // TODO: Add deletion from modelInfoService when it supports deletion
 
-            EventBus.publish(SDKModelEvent.DeleteCompleted(modelIdentifier))
+            EventPublisher.track(SDKModelEvent.DeleteCompleted(modelIdentifier))
         } catch (error: Exception) {
-            EventBus.publish(SDKModelEvent.DeleteFailed(modelIdentifier, error))
+            EventPublisher.track(SDKModelEvent.DeleteFailed(modelIdentifier, error))
             throw error
         }
     }
@@ -173,7 +173,7 @@ object RunAnywhereModelManagement {
         name: String,
         type: String
     ): ModelInfo = withContext(Dispatchers.Default) {
-        EventBus.publish(SDKModelEvent.CustomModelAdded(name, url))
+        EventPublisher.track(SDKModelEvent.CustomModelAdded(name, url))
 
         // Create basic model info (this would need proper implementation)
         val modelInfo = ModelInfo(
@@ -206,7 +206,7 @@ object RunAnywhereModelManagement {
         // Register the model in the model registry
         ServiceContainer.shared.modelRegistry.registerModel(model)
 
-        EventBus.publish(SDKModelEvent.BuiltInModelRegistered(model.id))
+        EventPublisher.track(SDKModelEvent.BuiltInModelRegistered(model.id))
     }
 
     /**
@@ -229,7 +229,7 @@ object RunAnywhereModelManagement {
      */
     fun cancelDownload(modelIdentifier: String) {
         ServiceContainer.shared.downloadService.cancelDownload(modelIdentifier)
-        EventBus.publish(SDKModelEvent.DownloadCancelled(modelIdentifier))
+        EventPublisher.track(SDKModelEvent.DownloadCancelled(modelIdentifier))
     }
 
     /**

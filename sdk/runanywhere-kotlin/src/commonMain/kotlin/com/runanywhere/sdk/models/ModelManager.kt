@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.models
 
-import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.utils.ModelPathUtils
@@ -52,13 +52,13 @@ class ModelManager(
         logger.info("⬇️ Model not found locally, downloading: ${modelInfo.id}")
 
         // Emit download started event
-        EventBus.publish(SDKModelEvent.DownloadStarted(modelInfo.id))
+        EventPublisher.track(SDKModelEvent.DownloadStarted(modelInfo.id))
 
         try {
             // Use the real download service to download the model
             val downloadedPath = downloadService.downloadModel(modelInfo) { progress ->
                 // Emit progress events
-                EventBus.publish(SDKModelEvent.DownloadProgress(
+                EventPublisher.track(SDKModelEvent.DownloadProgress(
                     modelInfo.id,
                     progress.percentage
                 ))
@@ -85,13 +85,13 @@ class ModelManager(
             }
 
             // Emit download completed event
-            EventBus.publish(SDKModelEvent.DownloadCompleted(modelInfo.id))
+            EventPublisher.track(SDKModelEvent.DownloadCompleted(modelInfo.id))
 
             return@withContext downloadedPath
 
         } catch (e: Exception) {
             logger.error("❌ Failed to download model: ${modelInfo.id}", e)
-            EventBus.publish(SDKModelEvent.DownloadFailed(modelInfo.id, e))
+            EventPublisher.track(SDKModelEvent.DownloadFailed(modelInfo.id, e))
             throw e
         }
     }
@@ -143,14 +143,14 @@ class ModelManager(
             }
 
             if (deletedAny) {
-                EventBus.publish(SDKModelEvent.DeleteCompleted(modelId))
+                EventPublisher.track(SDKModelEvent.DeleteCompleted(modelId))
             } else {
                 logger.warn("⚠️ No model files found to delete for: $modelId")
             }
 
         } catch (e: Exception) {
             logger.error("❌ Failed to delete model: $modelId", e)
-            EventBus.publish(SDKModelEvent.DeleteFailed(modelId, e))
+            EventPublisher.track(SDKModelEvent.DeleteFailed(modelId, e))
             throw e
         }
     }

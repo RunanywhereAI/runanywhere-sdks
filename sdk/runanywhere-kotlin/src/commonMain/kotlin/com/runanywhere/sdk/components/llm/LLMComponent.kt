@@ -6,7 +6,7 @@ import com.runanywhere.sdk.components.base.ServiceWrapper
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.events.ComponentInitializationEvent
-import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.models.*
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.foundation.ServiceContainer
@@ -113,7 +113,7 @@ class LLMComponent(
 
             if (needsDownload) {
                 // Emit download required event
-                EventBus.publish(ComponentInitializationEvent.ComponentDownloadRequired(
+                EventPublisher.track(ComponentInitializationEvent.ComponentDownloadRequired(
                     component = componentType.name,
                     modelId = modelId,
                     sizeBytes = modelInfo.downloadSize ?: 1_000_000_000L
@@ -150,7 +150,7 @@ class LLMComponent(
 
     private suspend fun downloadModel(modelId: String) {
         // Emit download started event
-        EventBus.publish(ComponentInitializationEvent.ComponentDownloadStarted(
+        EventPublisher.track(ComponentInitializationEvent.ComponentDownloadStarted(
             component = componentType.name,
             modelId = modelId
         ))
@@ -176,7 +176,7 @@ class LLMComponent(
                     // Use provider to download the model
                     val downloadedModel = provider.downloadModel(modelId) { progress ->
                         modelLoadProgress = progress.toDouble()
-                        EventBus.publish(ComponentInitializationEvent.ComponentDownloadProgress(
+                        EventPublisher.track(ComponentInitializationEvent.ComponentDownloadProgress(
                             component = componentType.name,
                             modelId = modelId,
                             progress = progress.toDouble()
@@ -193,7 +193,7 @@ class LLMComponent(
                     for (i in 0..10) {
                         val progress = i / 10.0
                         modelLoadProgress = progress
-                        EventBus.publish(ComponentInitializationEvent.ComponentDownloadProgress(
+                        EventPublisher.track(ComponentInitializationEvent.ComponentDownloadProgress(
                             component = componentType.name,
                             modelId = modelId,
                             progress = progress
@@ -204,14 +204,14 @@ class LLMComponent(
             }
 
             // Emit download completed event
-            EventBus.publish(ComponentInitializationEvent.ComponentDownloadCompleted(
+            EventPublisher.track(ComponentInitializationEvent.ComponentDownloadCompleted(
                 component = componentType.name,
                 modelId = modelId
             ))
 
         } catch (e: Exception) {
             logger.error("Failed to download model $modelId: ${e.message}")
-            EventBus.publish(ComponentInitializationEvent.ComponentDownloadFailed(
+            EventPublisher.track(ComponentInitializationEvent.ComponentDownloadFailed(
                 component = componentType.name,
                 modelId = modelId,
                 error = e.message ?: "Unknown error"
@@ -245,7 +245,7 @@ class LLMComponent(
             modelPath = null
 
             // Publish event
-            EventBus.publish(ComponentInitializationEvent.ComponentUnloaded(
+            EventPublisher.track(ComponentInitializationEvent.ComponentUnloaded(
                 component = componentType.name,
                 modelId = modelId,
                 timestamp = currentTimeMillis()
