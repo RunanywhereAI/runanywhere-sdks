@@ -20,23 +20,39 @@ public enum STTEvent: SDKEvent {
 
     // MARK: - Model Lifecycle
 
-    case modelLoadStarted(modelId: String, framework: InferenceFrameworkType = .unknown)
-    case modelLoadCompleted(modelId: String, durationMs: Double, framework: InferenceFrameworkType = .unknown)
+    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
+    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
     case modelLoadFailed(modelId: String, error: String, framework: InferenceFrameworkType = .unknown)
     case modelUnloaded(modelId: String)
 
     // MARK: - Transcription
 
-    case transcriptionStarted(transcriptionId: String, audioLengthMs: Double, language: String, framework: InferenceFrameworkType = .unknown)
+    /// Transcription started event
+    /// - Parameters:
+    ///   - audioLengthMs: Duration of audio in milliseconds
+    ///   - audioSizeBytes: Size of audio data in bytes
+    case transcriptionStarted(
+        transcriptionId: String,
+        audioLengthMs: Double,
+        audioSizeBytes: Int,
+        language: String,
+        framework: InferenceFrameworkType = .unknown
+    )
     case partialTranscript(text: String, wordCount: Int)
     case finalTranscript(text: String, confidence: Float)
+
+    /// Transcription completed event
+    /// - Parameters:
+    ///   - realTimeFactor: Processing time / audio length (< 1.0 means faster than real-time)
     case transcriptionCompleted(
         transcriptionId: String,
         text: String,
         confidence: Float,
         durationMs: Double,
         audioLengthMs: Double,
+        audioSizeBytes: Int,
         wordCount: Int,
+        realTimeFactor: Double,
         framework: InferenceFrameworkType = .unknown
     )
     case transcriptionFailed(transcriptionId: String, error: String)
@@ -44,8 +60,6 @@ public enum STTEvent: SDKEvent {
     // MARK: - Detection (Analytics Only)
 
     case languageDetected(language: String, confidence: Float)
-    case speakerDetected(speakerId: String)
-    case speakerChanged(fromSpeaker: String?, toSpeaker: String)
 
     // MARK: - SDKEvent Conformance
 
@@ -61,8 +75,6 @@ public enum STTEvent: SDKEvent {
         case .transcriptionCompleted: return "stt_transcription_completed"
         case .transcriptionFailed: return "stt_transcription_failed"
         case .languageDetected: return "stt_language_detected"
-        case .speakerDetected: return "stt_speaker_detected"
-        case .speakerChanged: return "stt_speaker_changed"
         }
     }
 
@@ -71,7 +83,7 @@ public enum STTEvent: SDKEvent {
     public var destination: EventDestination {
         switch self {
         // Analytics only - internal metrics
-        case .languageDetected, .speakerDetected, .speakerChanged:
+        case .languageDetected:
             return .analyticsOnly
         // Both - app developers need these
         default:
@@ -81,18 +93,26 @@ public enum STTEvent: SDKEvent {
 
     public var properties: [String: String] {
         switch self {
-        case .modelLoadStarted(let modelId, let framework):
-            return [
+        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
+            var props = [
                 "model_id": modelId,
                 "framework": framework.rawValue
             ]
+            if modelSizeBytes > 0 {
+                props["model_size_bytes"] = String(modelSizeBytes)
+            }
+            return props
 
-        case .modelLoadCompleted(let modelId, let durationMs, let framework):
-            return [
+        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
+            var props = [
                 "model_id": modelId,
                 "duration_ms": String(format: "%.1f", durationMs),
                 "framework": framework.rawValue
             ]
+            if modelSizeBytes > 0 {
+                props["model_size_bytes"] = String(modelSizeBytes)
+            }
+            return props
 
         case .modelLoadFailed(let modelId, let error, let framework):
             return [
@@ -104,10 +124,11 @@ public enum STTEvent: SDKEvent {
         case .modelUnloaded(let modelId):
             return ["model_id": modelId]
 
-        case .transcriptionStarted(let id, let audioLengthMs, let language, let framework):
+        case .transcriptionStarted(let id, let audioLengthMs, let audioSizeBytes, let language, let framework):
             return [
                 "transcription_id": id,
                 "audio_length_ms": String(format: "%.1f", audioLengthMs),
+                "audio_size_bytes": String(audioSizeBytes),
                 "language": language,
                 "framework": framework.rawValue
             ]
@@ -124,16 +145,26 @@ public enum STTEvent: SDKEvent {
                 "confidence": String(format: "%.3f", confidence)
             ]
 
-        case .transcriptionCompleted(let id, let text, let confidence, let durationMs, let audioLengthMs, let wordCount, let framework):
-            let rtf = audioLengthMs > 0 ? durationMs / audioLengthMs : 0
+        case .transcriptionCompleted(
+            let id,
+            let text,
+            let confidence,
+            let durationMs,
+            let audioLengthMs,
+            let audioSizeBytes,
+            let wordCount,
+            let realTimeFactor,
+            let framework
+        ):
             return [
                 "transcription_id": id,
                 "text_length": String(text.count),
                 "confidence": String(format: "%.3f", confidence),
                 "duration_ms": String(format: "%.1f", durationMs),
                 "audio_length_ms": String(format: "%.1f", audioLengthMs),
+                "audio_size_bytes": String(audioSizeBytes),
                 "word_count": String(wordCount),
-                "real_time_factor": String(format: "%.3f", rtf),
+                "real_time_factor": String(format: "%.3f", realTimeFactor),
                 "framework": framework.rawValue
             ]
 
@@ -145,16 +176,6 @@ public enum STTEvent: SDKEvent {
                 "language": language,
                 "confidence": String(format: "%.3f", confidence)
             ]
-
-        case .speakerDetected(let speakerId):
-            return ["speaker_id": speakerId]
-
-        case .speakerChanged(let fromSpeaker, let toSpeaker):
-            var props = ["to_speaker": toSpeaker]
-            if let from = fromSpeaker {
-                props["from_speaker"] = from
-            }
-            return props
         }
     }
 }

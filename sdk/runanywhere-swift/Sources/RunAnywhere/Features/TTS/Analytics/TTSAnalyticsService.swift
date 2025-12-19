@@ -6,6 +6,10 @@
 //  Tracks synthesis operations and metrics.
 //  Lifecycle events are handled by ManagedLifecycle.
 //
+//  NOTE: ⚠️ Audio duration estimation assumes 16-bit PCM @ 22050Hz (standard for TTS).
+//  Formula: audioDurationMs = (bytes / 2) / 22050 * 1000
+//  Actual sample rates may vary depending on the TTS model/voice configuration.
+//
 
 import Foundation
 
@@ -25,7 +29,9 @@ public actor TTSAnalyticsService {
     /// Metrics
     private var synthesisCount = 0
     private var totalCharacters = 0
-    private var totalProcessingTime: Double = 0
+    private var totalProcessingTimeMs: Double = 0
+    private var totalAudioDurationMs: Double = 0
+    private var totalAudioSizeBytes: Int64 = 0
     private var totalCharactersPerSecond: Double = 0
     private let startTime = Date()
     private var lastEventTime: Date?
@@ -35,7 +41,8 @@ public actor TTSAnalyticsService {
     private struct SynthesisTracker {
         let startTime: Date
         let voiceId: String
-        let text: String
+        let characterCount: Int
+        let framework: InferenceFrameworkType
     }
 
     // MARK: - Initialization
@@ -45,25 +52,38 @@ public actor TTSAnalyticsService {
     // MARK: - Synthesis Tracking
 
     /// Start tracking a synthesis
-    public func startSynthesis(text: String, voice: String, language _: String) -> String {
+    /// - Parameters:
+    ///   - text: The text to synthesize
+    ///   - voice: The voice ID being used
+    ///   - framework: The inference framework being used
+    /// - Returns: A unique synthesis ID for tracking
+    public func startSynthesis(
+        text: String,
+        voice: String,
+        framework: InferenceFrameworkType = .unknown
+    ) -> String {
         let id = UUID().uuidString
+        let characterCount = text.count
+
         activeSyntheses[id] = SynthesisTracker(
             startTime: Date(),
             voiceId: voice,
-            text: text
+            characterCount: characterCount,
+            framework: framework
         )
 
         EventPublisher.shared.track(TTSEvent.synthesisStarted(
             synthesisId: id,
             voiceId: voice,
-            text: text
+            characterCount: characterCount,
+            framework: framework
         ))
 
-        logger.debug("Synthesis started: \(id)")
+        logger.debug("Synthesis started: \(id), \(characterCount) characters")
         return id
     }
 
-    /// Track synthesis chunk (analytics only)
+    /// Track synthesis chunk (analytics only, for streaming synthesis)
     public func trackSynthesisChunk(synthesisId: String, chunkSize: Int) {
         EventPublisher.shared.track(TTSEvent.synthesisChunk(
             synthesisId: synthesisId,
@@ -72,36 +92,50 @@ public actor TTSAnalyticsService {
     }
 
     /// Complete a synthesis
-    public func completeSynthesis(synthesisId: String, audioDurationMs _: Double, audioSizeBytes: Int) {
+    /// - Parameters:
+    ///   - synthesisId: The synthesis ID from startSynthesis
+    ///   - audioDurationMs: Duration of the generated audio in milliseconds
+    ///   - audioSizeBytes: Size of the generated audio in bytes
+    public func completeSynthesis(
+        synthesisId: String,
+        audioDurationMs: Double,
+        audioSizeBytes: Int
+    ) {
         guard let tracker = activeSyntheses.removeValue(forKey: synthesisId) else { return }
 
-        let processingTimeMs = Date().timeIntervalSince(tracker.startTime) * 1000
-        let characterCount = tracker.text.count
+        let endTime = Date()
+        let processingTimeMs = endTime.timeIntervalSince(tracker.startTime) * 1000
+        let characterCount = tracker.characterCount
+
+        // Calculate characters per second (synthesis speed)
         let charsPerSecond = processingTimeMs > 0 ? Double(characterCount) / (processingTimeMs / 1000.0) : 0
 
         // Update metrics
         synthesisCount += 1
         totalCharacters += characterCount
-        totalProcessingTime += processingTimeMs
+        totalProcessingTimeMs += processingTimeMs
+        totalAudioDurationMs += audioDurationMs
+        totalAudioSizeBytes += Int64(audioSizeBytes)
         totalCharactersPerSecond += charsPerSecond
-        lastEventTime = Date()
+        lastEventTime = endTime
 
         EventPublisher.shared.track(TTSEvent.synthesisCompleted(
             synthesisId: synthesisId,
             voiceId: tracker.voiceId,
             characterCount: characterCount,
+            audioDurationMs: audioDurationMs,
             audioSizeBytes: audioSizeBytes,
-            durationMs: processingTimeMs
+            processingDurationMs: processingTimeMs,
+            charactersPerSecond: charsPerSecond,
+            framework: tracker.framework
         ))
 
-        logger.debug("Synthesis completed: \(synthesisId)")
+        logger.debug("Synthesis completed: \(synthesisId), audio: \(String(format: "%.1f", audioDurationMs))ms, \(audioSizeBytes) bytes")
     }
 
     /// Track synthesis failure
     public func trackSynthesisFailed(
         synthesisId: String,
-        characterCount _: Int,
-        processingTimeMs _: Double,
         errorMessage: String
     ) {
         activeSyntheses.removeValue(forKey: synthesisId)
@@ -132,8 +166,10 @@ public actor TTSAnalyticsService {
             lastEventTime: lastEventTime,
             totalSyntheses: synthesisCount,
             averageCharactersPerSecond: synthesisCount > 0 ? totalCharactersPerSecond / Double(synthesisCount) : 0,
-            averageProcessingTimeMs: synthesisCount > 0 ? totalProcessingTime / Double(synthesisCount) : 0,
-            totalCharactersProcessed: totalCharacters
+            averageProcessingTimeMs: synthesisCount > 0 ? totalProcessingTimeMs / Double(synthesisCount) : 0,
+            averageAudioDurationMs: synthesisCount > 0 ? totalAudioDurationMs / Double(synthesisCount) : 0,
+            totalCharactersProcessed: totalCharacters,
+            totalAudioSizeBytes: totalAudioSizeBytes
         )
     }
 }
@@ -145,9 +181,21 @@ public struct TTSMetrics: AnalyticsMetrics {
     public let startTime: Date
     public let lastEventTime: Date?
     public let totalSyntheses: Int
+
+    /// Average synthesis speed (characters processed per second)
     public let averageCharactersPerSecond: Double
+
+    /// Average processing time in milliseconds
     public let averageProcessingTimeMs: Double
+
+    /// Average audio duration in milliseconds
+    public let averageAudioDurationMs: Double
+
+    /// Total characters processed across all syntheses
     public let totalCharactersProcessed: Int
+
+    /// Total audio size generated in bytes
+    public let totalAudioSizeBytes: Int64
 
     public init(
         totalEvents: Int = 0,
@@ -156,7 +204,9 @@ public struct TTSMetrics: AnalyticsMetrics {
         totalSyntheses: Int = 0,
         averageCharactersPerSecond: Double = 0,
         averageProcessingTimeMs: Double = 0,
-        totalCharactersProcessed: Int = 0
+        averageAudioDurationMs: Double = 0,
+        totalCharactersProcessed: Int = 0,
+        totalAudioSizeBytes: Int64 = 0
     ) {
         self.totalEvents = totalEvents
         self.startTime = startTime
@@ -164,6 +214,8 @@ public struct TTSMetrics: AnalyticsMetrics {
         self.totalSyntheses = totalSyntheses
         self.averageCharactersPerSecond = averageCharactersPerSecond
         self.averageProcessingTimeMs = averageProcessingTimeMs
+        self.averageAudioDurationMs = averageAudioDurationMs
         self.totalCharactersProcessed = totalCharactersProcessed
+        self.totalAudioSizeBytes = totalAudioSizeBytes
     }
 }

@@ -80,11 +80,13 @@ public actor LLMCapability: ModelLoadableCapability {
 
     // MARK: - Generation
 
-    /// Generate text from a prompt
+    /// Generate text from a prompt (non-streaming)
     /// - Parameters:
     ///   - prompt: The input prompt
     ///   - options: Generation options
     /// - Returns: Generation result with text and metrics
+    /// - Note: This is a non-streaming generation. Time-to-first-token (TTFT) is not tracked
+    ///         since the entire response is returned at once. Use `generateStream()` for TTFT metrics.
     public func generate(
         _ prompt: String,
         options: LLMGenerationOptions = LLMGenerationOptions()
@@ -92,15 +94,17 @@ public actor LLMCapability: ModelLoadableCapability {
         let service = try await managedLifecycle.requireService()
         let modelId = await managedLifecycle.resourceIdOrUnknown()
 
-        logger.info("Generating with model: \(modelId)")
+        logger.info("Generating with model: \(modelId) (non-streaming)")
 
         // Apply configuration defaults if not specified in options
         let effectiveOptions = mergeOptions(options)
 
-        // Start generation tracking
+        let startTime = Date()
+
+        // Start generation tracking (non-streaming mode)
         let generationId = await analyticsService.startGeneration(
             modelId: modelId,
-            executionTarget: "local"
+            framework: service.inferenceFramework
         )
 
         // Generate text
@@ -109,37 +113,39 @@ public actor LLMCapability: ModelLoadableCapability {
             generatedText = try await service.generate(prompt: prompt, options: effectiveOptions)
         } catch {
             logger.error("Generation failed: \(error)")
+            await analyticsService.trackGenerationFailed(generationId: generationId, error: error)
             await managedLifecycle.trackOperationError(error, operation: "generate")
             throw CapabilityError.operationFailed("Generation", error)
         }
 
+        let endTime = Date()
+        let totalTimeMs = endTime.timeIntervalSince(startTime) * 1000
+
         // Simple token estimation (~4 chars per token)
         let inputTokens = max(1, prompt.count / 4)
         let outputTokens = max(1, generatedText.count / 4)
+        let tokensPerSecond = totalTimeMs > 0 ? Double(outputTokens) / (totalTimeMs / 1000.0) : 0
 
         // Complete generation tracking
         await analyticsService.completeGeneration(
             generationId: generationId,
             inputTokens: inputTokens,
             outputTokens: outputTokens,
-            modelId: modelId,
-            executionTarget: "local"
+            modelId: modelId
         )
 
-        let metrics = await analyticsService.getMetrics()
-        let latencyMs = metrics.lastEventTime.map { $0.timeIntervalSince(metrics.startTime) * 1000 } ?? 0
-        let tokensPerSecond = latencyMs > 0 ? Double(outputTokens) / (latencyMs / 1000.0) : 0
-
-        logger.info("Generation completed: \(outputTokens) tokens in \(Int(latencyMs))ms")
+        logger.info("Generation completed: \(outputTokens) tokens in \(Int(totalTimeMs))ms")
 
         return LLMGenerationResult(
             text: generatedText,
             thinkingContent: nil,
+            inputTokens: inputTokens,
             tokensUsed: outputTokens,
             modelUsed: modelId,
-            latencyMs: latencyMs,
-            framework: nil,
+            latencyMs: totalTimeMs,
+            framework: service.inferenceFramework.rawValue,
             tokensPerSecond: tokensPerSecond,
+            timeToFirstTokenMs: nil,  // Non-streaming: no TTFT
             thinkingTokens: 0,
             responseTokens: outputTokens
         )
@@ -157,12 +163,13 @@ public actor LLMCapability: ModelLoadableCapability {
         }
     }
 
-    /// Generate text with streaming
+    /// Generate text with streaming (token-by-token)
     /// - Parameters:
     ///   - prompt: The input prompt
     ///   - options: Generation options
     /// - Returns: Streaming result with token stream and final metrics
     /// - Throws: `LLMError.streamingNotSupported` if the service doesn't support streaming
+    /// - Note: Time-to-first-token (TTFT) is tracked for streaming generations
     public func generateStream(
         _ prompt: String,
         options: LLMGenerationOptions = LLMGenerationOptions()
@@ -177,20 +184,23 @@ public actor LLMCapability: ModelLoadableCapability {
 
         let modelId = await managedLifecycle.resourceIdOrUnknown()
         let effectiveOptions = mergeOptions(options)
+        let framework = service.inferenceFramework
 
         logger.info("Starting streaming generation with model: \(modelId)")
 
-        // Start generation tracking
-        let generationId = await analyticsService.startGeneration(
+        // Start streaming generation tracking
+        let generationId = await analyticsService.startStreamingGeneration(
             modelId: modelId,
-            executionTarget: "local"
+            framework: framework
         )
 
         // Create metrics collector
         let collector = StreamingMetricsCollector(
             modelId: modelId,
             generationId: generationId,
-            analyticsService: analyticsService
+            analyticsService: analyticsService,
+            framework: framework,
+            promptLength: prompt.count
         )
 
         // Create the token stream
@@ -254,12 +264,16 @@ public actor LLMCapability: ModelLoadableCapability {
 
 // MARK: - Streaming Metrics Collector
 
-/// Internal actor for collecting streaming metrics
+/// Internal actor for collecting streaming metrics with TTFT tracking
 private actor StreamingMetricsCollector {
     private let modelId: String
     private let generationId: String
     private let analyticsService: GenerationAnalyticsService
+    private let framework: InferenceFrameworkType
+    private let promptLength: Int
+
     private var startTime: Date?
+    private var firstTokenTime: Date?
     private var fullText = ""
     private var tokenCount = 0
     private var firstTokenRecorded = false
@@ -267,10 +281,18 @@ private actor StreamingMetricsCollector {
     private var error: Error?
     private var resultContinuation: CheckedContinuation<LLMGenerationResult, Error>?
 
-    init(modelId: String, generationId: String, analyticsService: GenerationAnalyticsService) {
+    init(
+        modelId: String,
+        generationId: String,
+        analyticsService: GenerationAnalyticsService,
+        framework: InferenceFrameworkType,
+        promptLength: Int
+    ) {
         self.modelId = modelId
         self.generationId = generationId
         self.analyticsService = analyticsService
+        self.framework = framework
+        self.promptLength = promptLength
     }
 
     func markStart() {
@@ -281,9 +303,10 @@ private actor StreamingMetricsCollector {
         fullText += token
         tokenCount += 1
 
-        // Track first token
+        // Track first token for TTFT metric
         if !firstTokenRecorded {
             firstTokenRecorded = true
+            firstTokenTime = Date()
             await analyticsService.trackFirstToken(generationId: generationId)
         }
     }
@@ -292,15 +315,14 @@ private actor StreamingMetricsCollector {
         isComplete = true
 
         // Simple token estimation (~4 chars per token)
-        let inputTokens = 0 // We don't have access to prompt here
+        let inputTokens = max(1, promptLength / 4)
         let outputTokens = max(1, fullText.count / 4)
 
         await analyticsService.completeGeneration(
             generationId: generationId,
             inputTokens: inputTokens,
             outputTokens: outputTokens,
-            modelId: modelId,
-            executionTarget: "local"
+            modelId: modelId
         )
 
         if let continuation = resultContinuation {
@@ -311,7 +333,7 @@ private actor StreamingMetricsCollector {
 
     func markFailed(_ error: Error) async {
         self.error = error
-        await analyticsService.trackError(error, operation: "streaming_generation")
+        await analyticsService.trackGenerationFailed(generationId: generationId, error: error)
 
         if let continuation = resultContinuation {
             continuation.resume(throwing: error)
@@ -337,18 +359,27 @@ private actor StreamingMetricsCollector {
         let endTime = Date()
         let latencyMs = (startTime.map { endTime.timeIntervalSince($0) } ?? 0) * 1000
 
+        // Calculate TTFT for streaming
+        var timeToFirstTokenMs: Double?
+        if let start = startTime, let firstToken = firstTokenTime {
+            timeToFirstTokenMs = firstToken.timeIntervalSince(start) * 1000
+        }
+
         // Simple token estimation (~4 chars per token)
+        let inputTokens = max(1, promptLength / 4)
         let outputTokens = max(1, fullText.count / 4)
         let tokensPerSecond = latencyMs > 0 ? Double(outputTokens) / (latencyMs / 1000.0) : 0
 
         return LLMGenerationResult(
             text: fullText,
             thinkingContent: nil,
+            inputTokens: inputTokens,
             tokensUsed: outputTokens,
             modelUsed: modelId,
             latencyMs: latencyMs,
-            framework: nil,
+            framework: framework.rawValue,
             tokensPerSecond: tokensPerSecond,
+            timeToFirstTokenMs: timeToFirstTokenMs,
             thinkingTokens: 0,
             responseTokens: outputTokens
         )

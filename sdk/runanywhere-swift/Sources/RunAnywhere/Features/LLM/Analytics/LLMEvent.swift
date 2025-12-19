@@ -20,17 +20,35 @@ public enum LLMEvent: SDKEvent {
 
     // MARK: - Model Lifecycle
 
-    case modelLoadStarted(modelId: String, framework: InferenceFrameworkType = .unknown)
-    case modelLoadCompleted(modelId: String, durationMs: Double, framework: InferenceFrameworkType = .unknown)
+    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
+    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
     case modelLoadFailed(modelId: String, error: String, framework: InferenceFrameworkType = .unknown)
     case modelUnloaded(modelId: String)
     case modelUnloadStarted(modelId: String)
 
     // MARK: - Generation
 
-    case generationStarted(generationId: String, modelId: String, prompt: String?, framework: InferenceFrameworkType = .unknown)
+    /// Generation started event
+    /// - Parameters:
+    ///   - isStreaming: true for generateStream(), false for generate()
+    case generationStarted(
+        generationId: String,
+        modelId: String,
+        prompt: String?,
+        isStreaming: Bool = false,
+        framework: InferenceFrameworkType = .unknown
+    )
+
+    /// First token received (only applicable for streaming generation)
     case firstToken(generationId: String, latencyMs: Double)
+
+    /// Streaming update (only applicable for streaming generation)
     case streamingUpdate(generationId: String, tokensGenerated: Int)
+
+    /// Generation completed
+    /// - Parameters:
+    ///   - isStreaming: true for generateStream(), false for generate()
+    ///   - timeToFirstTokenMs: Time to first token in ms (only for streaming, nil for non-streaming)
     case generationCompleted(
         generationId: String,
         modelId: String,
@@ -38,6 +56,8 @@ public enum LLMEvent: SDKEvent {
         outputTokens: Int,
         durationMs: Double,
         tokensPerSecond: Double,
+        isStreaming: Bool = false,
+        timeToFirstTokenMs: Double? = nil,
         framework: InferenceFrameworkType = .unknown
     )
     case generationFailed(generationId: String, error: String)
@@ -73,18 +93,26 @@ public enum LLMEvent: SDKEvent {
 
     public var properties: [String: String] {
         switch self {
-        case .modelLoadStarted(let modelId, let framework):
-            return [
+        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
+            var props = [
                 "model_id": modelId,
                 "framework": framework.rawValue
             ]
+            if modelSizeBytes > 0 {
+                props["model_size_bytes"] = String(modelSizeBytes)
+            }
+            return props
 
-        case .modelLoadCompleted(let modelId, let durationMs, let framework):
-            return [
+        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
+            var props = [
                 "model_id": modelId,
                 "duration_ms": String(format: "%.1f", durationMs),
                 "framework": framework.rawValue
             ]
+            if modelSizeBytes > 0 {
+                props["model_size_bytes"] = String(modelSizeBytes)
+            }
+            return props
 
         case .modelLoadFailed(let modelId, let error, let framework):
             return [
@@ -99,10 +127,11 @@ public enum LLMEvent: SDKEvent {
         case .modelUnloadStarted(let modelId):
             return ["model_id": modelId]
 
-        case .generationStarted(let generationId, let modelId, let prompt, let framework):
+        case .generationStarted(let generationId, let modelId, let prompt, let isStreaming, let framework):
             var props = [
                 "generation_id": generationId,
                 "model_id": modelId,
+                "is_streaming": String(isStreaming),
                 "framework": framework.rawValue
             ]
             if let prompt = prompt {
@@ -129,17 +158,24 @@ public enum LLMEvent: SDKEvent {
             let outputTokens,
             let durationMs,
             let tokensPerSecond,
+            let isStreaming,
+            let timeToFirstTokenMs,
             let framework
         ):
-            return [
+            var props = [
                 "generation_id": generationId,
                 "model_id": modelId,
                 "input_tokens": String(inputTokens),
                 "output_tokens": String(outputTokens),
                 "duration_ms": String(format: "%.1f", durationMs),
                 "tokens_per_second": String(format: "%.2f", tokensPerSecond),
+                "is_streaming": String(isStreaming),
                 "framework": framework.rawValue
             ]
+            if let ttft = timeToFirstTokenMs {
+                props["time_to_first_token_ms"] = String(format: "%.1f", ttft)
+            }
+            return props
 
         case .generationFailed(let generationId, let error):
             return [

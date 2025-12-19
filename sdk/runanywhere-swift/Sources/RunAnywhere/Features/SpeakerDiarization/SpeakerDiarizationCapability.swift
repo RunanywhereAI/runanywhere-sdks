@@ -17,27 +17,21 @@ public actor SpeakerDiarizationCapability: ServiceBasedCapability {
     /// Currently active service
     private var service: SpeakerDiarizationService?
 
-    /// Current configuration
-    private var config: SpeakerDiarizationConfiguration?
-
     /// Whether diarization is initialized
     private var isConfigured = false
 
     // MARK: - Dependencies
 
     private let logger = SDKLogger(category: "SpeakerDiarizationCapability")
-    private let analyticsService: SpeakerDiarizationAnalyticsService
 
     // MARK: - Initialization
 
-    public init(analyticsService: SpeakerDiarizationAnalyticsService = SpeakerDiarizationAnalyticsService()) {
-        self.analyticsService = analyticsService
-    }
+    public init() {}
 
     // MARK: - Configuration (Capability Protocol)
 
     public func configure(_ config: SpeakerDiarizationConfiguration) {
-        self.config = config
+        // Configuration is applied during initialize()
     }
 
     // MARK: - Service Lifecycle (ServiceBasedCapability Protocol)
@@ -53,8 +47,6 @@ public actor SpeakerDiarizationCapability: ServiceBasedCapability {
     public func initialize(_ config: SpeakerDiarizationConfiguration) async throws {
         logger.info("Initializing Speaker Diarization")
 
-        self.config = config
-
         // Create service through ServiceRegistry
         let diarizationService = try await MainActor.run {
             Task {
@@ -65,22 +57,11 @@ public actor SpeakerDiarizationCapability: ServiceBasedCapability {
         self.service = diarizationService
         self.isConfigured = true
 
-        // Track session start via analytics service
-        _ = await analyticsService.startDiarizationSession(maxSpeakers: config.maxSpeakers)
-
         logger.info("Speaker Diarization initialized successfully")
     }
 
     public func cleanup() async {
         logger.info("Cleaning up Speaker Diarization")
-
-        // Track session completed before cleanup
-        let speakers = (try? getAllSpeakers()) ?? []
-        await analyticsService.completeDiarizationSession(
-            speakerCount: speakers.count,
-            segmentCount: 0,
-            averageConfidence: 0.0
-        )
 
         await service?.cleanup()
         service = nil
@@ -133,15 +114,5 @@ public actor SpeakerDiarizationCapability: ServiceBasedCapability {
 
         logger.info("Resetting speaker diarization state")
         service.reset()
-
-        // Start new analytics session
-        _ = await analyticsService.startDiarizationSession(maxSpeakers: config?.maxSpeakers ?? 10)
-    }
-
-    // MARK: - Analytics
-
-    /// Get current analytics metrics
-    public func getAnalyticsMetrics() async -> SpeakerDiarizationMetrics {
-        await analyticsService.getMetrics()
     }
 }

@@ -94,16 +94,17 @@ public actor STTCapability: ModelLoadableCapability {
         // Merge options with config defaults
         let effectiveOptions = mergeOptions(options)
 
-        // Estimate audio length
-        let audioLengthMs = estimateAudioLength(dataSize: audioData.count) * 1000
+        // Calculate audio metrics
+        let audioSizeBytes = audioData.count
+        let audioLengthMs = estimateAudioLength(dataSize: audioSizeBytes) * 1000
 
         // Start transcription tracking
         let transcriptionId = await analyticsService.startTranscription(
             audioLengthMs: audioLengthMs,
-            language: effectiveOptions.language
+            audioSizeBytes: audioSizeBytes,
+            language: effectiveOptions.language,
+            framework: service.inferenceFramework
         )
-
-        let startTime = Date()
 
         // Perform transcription
         let result: STTTranscriptionResult
@@ -111,11 +112,8 @@ public actor STTCapability: ModelLoadableCapability {
             result = try await service.transcribe(audioData: audioData, options: effectiveOptions)
         } catch {
             logger.error("Transcription failed: \(error)")
-            let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
             await analyticsService.trackTranscriptionFailed(
                 transcriptionId: transcriptionId,
-                audioLengthMs: audioLengthMs,
-                processingTimeMs: processingTimeMs,
                 errorMessage: error.localizedDescription
             )
             await managedLifecycle.trackOperationError(error, operation: "transcribe")
@@ -196,13 +194,14 @@ public actor STTCapability: ModelLoadableCapability {
 
                 let effectiveOptions = self.mergeOptions(options)
 
-                // Start transcription tracking
+                // Start transcription tracking (streaming mode - audio length unknown upfront)
                 let transcriptionId = await self.analyticsService.startTranscription(
-                    audioLengthMs: 0, // Unknown for streaming
-                    language: effectiveOptions.language
+                    audioLengthMs: 0,  // Unknown for streaming
+                    audioSizeBytes: 0, // Unknown for streaming
+                    language: effectiveOptions.language,
+                    framework: service.inferenceFramework
                 )
 
-                let startTime = Date()
                 var lastPartialWordCount = 0
 
                 do {
@@ -233,11 +232,8 @@ public actor STTCapability: ModelLoadableCapability {
                     continuation.yield(result.transcript)
                     continuation.finish()
                 } catch {
-                    let processingTimeMs = Date().timeIntervalSince(startTime) * 1000
                     await self.analyticsService.trackTranscriptionFailed(
                         transcriptionId: transcriptionId,
-                        audioLengthMs: 0,
-                        processingTimeMs: processingTimeMs,
                         errorMessage: error.localizedDescription
                     )
                     continuation.finish(throwing: error)

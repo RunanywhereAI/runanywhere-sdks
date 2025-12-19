@@ -25,14 +25,19 @@ public struct LLMGenerationResult: Sendable {
     /// Model used for generation
     public let modelUsed: String
 
-    /// Latency in milliseconds
+    /// Total latency in milliseconds (from start to completion)
     public let latencyMs: TimeInterval
 
-    /// Framework used for generation
-    public let framework: InferenceFramework?
+    /// Framework used for generation (as string for flexibility)
+    public let framework: String?
 
     /// Tokens generated per second
     public let tokensPerSecond: Double
+
+    /// Time to first token in milliseconds (only available for streaming generations)
+    /// - Note: This is nil for non-streaming `generate()` calls since the entire response
+    ///         is returned at once. Use `generateStream()` to get TTFT metrics.
+    public let timeToFirstTokenMs: Double?
 
     /// Structured output validation result (if structured output was requested)
     public var structuredOutputValidation: StructuredOutputValidation?
@@ -53,8 +58,9 @@ public struct LLMGenerationResult: Sendable {
         tokensUsed: Int,
         modelUsed: String,
         latencyMs: TimeInterval,
-        framework: InferenceFramework? = nil,
+        framework: String? = nil,
         tokensPerSecond: Double = 0,
+        timeToFirstTokenMs: Double? = nil,
         structuredOutputValidation: StructuredOutputValidation? = nil,
         thinkingTokens: Int? = nil,
         responseTokens: Int? = nil
@@ -67,6 +73,7 @@ public struct LLMGenerationResult: Sendable {
         self.latencyMs = latencyMs
         self.framework = framework
         self.tokensPerSecond = tokensPerSecond
+        self.timeToFirstTokenMs = timeToFirstTokenMs
         self.structuredOutputValidation = structuredOutputValidation
         self.thinkingTokens = thinkingTokens
         self.responseTokens = responseTokens ?? tokensUsed

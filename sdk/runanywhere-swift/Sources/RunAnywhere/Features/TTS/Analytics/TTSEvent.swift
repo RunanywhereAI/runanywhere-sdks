@@ -20,21 +20,40 @@ public enum TTSEvent: SDKEvent {
 
     // MARK: - Model Lifecycle
 
-    case modelLoadStarted(voiceId: String, framework: InferenceFrameworkType = .unknown)
-    case modelLoadCompleted(voiceId: String, durationMs: Double, framework: InferenceFrameworkType = .unknown)
+    case modelLoadStarted(voiceId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
+    case modelLoadCompleted(voiceId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
     case modelLoadFailed(voiceId: String, error: String, framework: InferenceFrameworkType = .unknown)
     case modelUnloaded(voiceId: String)
 
     // MARK: - Synthesis
 
-    case synthesisStarted(synthesisId: String, voiceId: String, text: String, framework: InferenceFrameworkType = .unknown)
+    /// Synthesis started event
+    /// - Parameters:
+    ///   - characterCount: Number of characters in the text to synthesize
+    case synthesisStarted(
+        synthesisId: String,
+        voiceId: String,
+        characterCount: Int,
+        framework: InferenceFrameworkType = .unknown
+    )
+
+    /// Streaming synthesis chunk generated
     case synthesisChunk(synthesisId: String, chunkSize: Int)
+
+    /// Synthesis completed event
+    /// - Parameters:
+    ///   - audioDurationMs: Duration of generated audio in milliseconds
+    ///   - audioSizeBytes: Size of generated audio in bytes
+    ///   - processingDurationMs: Time taken to synthesize (processing time)
+    ///   - charactersPerSecond: Synthesis speed (characters processed per second)
     case synthesisCompleted(
         synthesisId: String,
         voiceId: String,
         characterCount: Int,
+        audioDurationMs: Double,
         audioSizeBytes: Int,
-        durationMs: Double,
+        processingDurationMs: Double,
+        charactersPerSecond: Double,
         framework: InferenceFrameworkType = .unknown
     )
     case synthesisFailed(synthesisId: String, error: String)
@@ -68,18 +87,26 @@ public enum TTSEvent: SDKEvent {
 
     public var properties: [String: String] {
         switch self {
-        case .modelLoadStarted(let voiceId, let framework):
-            return [
+        case .modelLoadStarted(let voiceId, let modelSizeBytes, let framework):
+            var props = [
                 "voice_id": voiceId,
                 "framework": framework.rawValue
             ]
+            if modelSizeBytes > 0 {
+                props["model_size_bytes"] = String(modelSizeBytes)
+            }
+            return props
 
-        case .modelLoadCompleted(let voiceId, let durationMs, let framework):
-            return [
+        case .modelLoadCompleted(let voiceId, let durationMs, let modelSizeBytes, let framework):
+            var props = [
                 "voice_id": voiceId,
                 "duration_ms": String(format: "%.1f", durationMs),
                 "framework": framework.rawValue
             ]
+            if modelSizeBytes > 0 {
+                props["model_size_bytes"] = String(modelSizeBytes)
+            }
+            return props
 
         case .modelLoadFailed(let voiceId, let error, let framework):
             return [
@@ -91,11 +118,11 @@ public enum TTSEvent: SDKEvent {
         case .modelUnloaded(let voiceId):
             return ["voice_id": voiceId]
 
-        case .synthesisStarted(let id, let voiceId, let text, let framework):
+        case .synthesisStarted(let id, let voiceId, let characterCount, let framework):
             return [
                 "synthesis_id": id,
                 "voice_id": voiceId,
-                "character_count": String(text.count),
+                "character_count": String(characterCount),
                 "framework": framework.rawValue
             ]
 
@@ -105,14 +132,23 @@ public enum TTSEvent: SDKEvent {
                 "chunk_size": String(chunkSize)
             ]
 
-        case .synthesisCompleted(let id, let voiceId, let charCount, let audioSize, let durationMs, let framework):
-            let charsPerSecond = durationMs > 0 ? Double(charCount) / (durationMs / 1000.0) : 0
+        case .synthesisCompleted(
+            let id,
+            let voiceId,
+            let charCount,
+            let audioDurationMs,
+            let audioSize,
+            let processingDurationMs,
+            let charsPerSecond,
+            let framework
+        ):
             return [
                 "synthesis_id": id,
                 "voice_id": voiceId,
                 "character_count": String(charCount),
+                "audio_duration_ms": String(format: "%.1f", audioDurationMs),
                 "audio_size_bytes": String(audioSize),
-                "duration_ms": String(format: "%.1f", durationMs),
+                "processing_duration_ms": String(format: "%.1f", processingDurationMs),
                 "chars_per_second": String(format: "%.2f", charsPerSecond),
                 "framework": framework.rawValue
             ]
