@@ -112,6 +112,27 @@ public final class Logging {
         configure(config)
     }
 
+    /// Enable or disable Sentry logging for crash reporting and error tracking
+    /// - Parameter enabled: Whether to enable Sentry logging
+    /// - Note: When enabled, logs at warning level and above are sent to Sentry
+    public func setSentryLoggingEnabled(_ enabled: Bool) {
+        var config = configuration
+        config.enableSentryLogging = enabled
+        configure(config)
+
+        // If enabling, ensure Sentry is initialized and destination is added
+        if enabled {
+            let environment = RunAnywhere.currentEnvironment ?? .development
+            SentryManager.shared.initialize(environment: environment)
+            addDestination(SentryDestination())
+        } else {
+            // Remove Sentry destination when disabling
+            if let sentryDest = destinations.first(where: { $0.identifier == "com.runanywhere.logging.sentry" }) {
+                removeDestination(sentryDest)
+            }
+        }
+    }
+
     // MARK: - Destination Management
 
     /// Add a custom log destination

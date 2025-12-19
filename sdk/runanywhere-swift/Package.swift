@@ -102,6 +102,9 @@ let package = Package(
 
         // FluidAudio dependency
         .package(url: "https://github.com/FluidInference/FluidAudio.git", branch: "main"),
+
+        // Sentry for crash reporting and error tracking
+        .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
     ],
     targets: [
         // =================================================================
@@ -119,6 +122,8 @@ let package = Package(
                 .product(name: "Pulse", package: "Pulse"),
                 // SWCompression for pure Swift tar.bz2/tar.gz extraction
                 .product(name: "SWCompression", package: "SWCompression"),
+                // Sentry for crash reporting and error tracking
+                .product(name: "Sentry", package: "sentry-cocoa"),
             ],
             path: "Sources/RunAnywhere",
             exclude: [

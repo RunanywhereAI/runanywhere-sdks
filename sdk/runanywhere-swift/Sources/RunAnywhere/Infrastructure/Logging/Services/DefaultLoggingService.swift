@@ -55,6 +55,19 @@ public final class DefaultLoggingService: LoggingService {
         if configuration.enableLocalLogging {
             addDestination(PulseDestination())
         }
+
+        // Add Sentry destination if Sentry logging is enabled
+        if configuration.enableSentryLogging {
+            setupSentryLogging()
+        }
+    }
+
+    /// Setup Sentry logging destination
+    /// Initializes SentryManager and adds SentryDestination
+    private func setupSentryLogging() {
+        let environment = RunAnywhere.currentEnvironment ?? .development
+        SentryManager.shared.initialize(environment: environment)
+        addDestination(SentryDestination())
     }
 
     // MARK: - LoggingService
@@ -73,8 +86,8 @@ public final class DefaultLoggingService: LoggingService {
         let currentConfig = configuration
         guard level >= currentConfig.minLogLevel else { return }
 
-        // Check if local logging is enabled
-        guard currentConfig.enableLocalLogging else { return }
+        // Check if any logging is enabled (local or Sentry)
+        guard currentConfig.enableLocalLogging || currentConfig.enableSentryLogging else { return }
 
         // Sanitize metadata to prevent logging sensitive information
         let sanitizedMetadata = sanitizeMetadata(metadata)
@@ -175,5 +188,10 @@ extension DefaultLoggingService {
             config = .production
         }
         configure(config)
+
+        // Setup Sentry if enabled in the new configuration
+        if config.enableSentryLogging {
+            setupSentryLogging()
+        }
     }
 }
