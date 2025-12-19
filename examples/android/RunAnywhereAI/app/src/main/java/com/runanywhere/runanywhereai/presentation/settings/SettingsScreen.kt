@@ -554,7 +554,7 @@ private fun StoredModelRow(
                     // Format badge
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = AppColors.badgeBlue
+                        color = AppColors.badgePrimary
                     ) {
                         Text(
                             text = model.format.uppercase(),
