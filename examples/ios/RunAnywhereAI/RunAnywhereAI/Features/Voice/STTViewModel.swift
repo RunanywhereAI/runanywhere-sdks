@@ -36,6 +36,12 @@ class STTViewModel: ObservableObject {
 
     private var audioBuffer = Data()
 
+    // MARK: - Initialization State (for idempotency)
+
+    private var isInitialized = false
+    private var hasSubscribedToAudioLevel = false
+    private var hasSubscribedToSDKEvents = false
+
     // MARK: - Initialization
 
     init() {
@@ -45,7 +51,14 @@ class STTViewModel: ObservableObject {
     // MARK: - Public Methods
 
     /// Initialize the ViewModel - request permissions and setup subscriptions
+    /// This method is idempotent - calling it multiple times is safe
     func initialize() async {
+        guard !isInitialized else {
+            logger.debug("STT view model already initialized, skipping")
+            return
+        }
+        isInitialized = true
+
         logger.info("Initializing STT view model")
 
         // Request microphone permission
@@ -104,6 +117,12 @@ class STTViewModel: ObservableObject {
     // MARK: - Private Methods - Subscriptions
 
     private func subscribeToAudioLevelUpdates() {
+        guard !hasSubscribedToAudioLevel else {
+            logger.debug("Already subscribed to audio level updates, skipping")
+            return
+        }
+        hasSubscribedToAudioLevel = true
+
         audioCapture.$audioLevel
             .receive(on: DispatchQueue.main)
             .sink { [weak self] level in
@@ -116,6 +135,12 @@ class STTViewModel: ObservableObject {
     }
 
     private func subscribeToSDKEvents() {
+        guard !hasSubscribedToSDKEvents else {
+            logger.debug("Already subscribed to SDK events, skipping")
+            return
+        }
+        hasSubscribedToSDKEvents = true
+
         RunAnywhere.events.events
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
@@ -130,9 +155,15 @@ class STTViewModel: ObservableObject {
     private func handleSDKEvent(_ event: any SDKEvent) {
         if let sttEvent = event as? STTEvent {
             switch sttEvent {
-            case .modelLoadCompleted(let modelId, _, _):
+            case .modelLoadCompleted(let modelId, _, _, _):
                 selectedModelId = modelId
-                selectedModelName = modelId
+                // Look up the model name from available models
+                if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
+                    selectedModelName = matchingModel.name
+                    selectedFramework = matchingModel.preferredFramework
+                } else {
+                    selectedModelName = modelId // Fallback to ID if model not found
+                }
                 logger.info("STT model loaded: \(modelId)")
             case .modelUnloaded:
                 selectedModelId = nil
@@ -220,9 +251,16 @@ class STTViewModel: ObservableObject {
 
     // MARK: - Cleanup
 
-    deinit {
+    /// Clean up resources - call from view's onDisappear
+    /// This replaces deinit cleanup to comply with Swift 6 concurrency
+    func cleanup() {
         audioCapture.stopRecording()
         cancellables.removeAll()
+
+        // Reset initialization flags to allow re-initialization if needed
+        isInitialized = false
+        hasSubscribedToAudioLevel = false
+        hasSubscribedToSDKEvents = false
     }
 }
 

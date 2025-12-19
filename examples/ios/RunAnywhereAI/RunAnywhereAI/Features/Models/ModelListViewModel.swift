@@ -49,7 +49,7 @@ class ModelListViewModel: ObservableObject {
         // Check for LLM model load/unload events
         if let llmEvent = event as? LLMEvent {
             switch llmEvent {
-            case .modelLoadCompleted(let modelId, _, _):
+            case .modelLoadCompleted(let modelId, _, _, _):
                 // Find the matching model and set as current
                 if let matchingModel = availableModels.first(where: { $0.id == modelId }) {
                     currentModel = matchingModel

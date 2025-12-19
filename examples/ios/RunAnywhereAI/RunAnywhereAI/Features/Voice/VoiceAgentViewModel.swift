@@ -193,10 +193,22 @@ final class VoiceAgentViewModel: ObservableObject {
     private var session: VoiceSessionHandle?
     private var eventTask: Task<Void, Never>?
 
+    // MARK: - Initialization State (for idempotency)
+
+    private var isViewModelInitialized = false
+    private var hasSubscribedToSDKEvents = false
+
     // MARK: - Initialization
 
     /// Initialize the ViewModel and subscribe to SDK events
+    /// This method is idempotent - calling it multiple times is safe
     func initialize() async {
+        guard !isViewModelInitialized else {
+            logger.debug("Voice agent already initialized, skipping")
+            return
+        }
+        isViewModelInitialized = true
+
         logger.info("Initializing voice agent...")
 
         // Subscribe to SDK component events for model state tracking
@@ -264,6 +276,12 @@ final class VoiceAgentViewModel: ObservableObject {
     // MARK: - SDK Event Subscription
 
     private func subscribeToSDKEvents() {
+        guard !hasSubscribedToSDKEvents else {
+            logger.debug("Already subscribed to SDK events, skipping")
+            return
+        }
+        hasSubscribedToSDKEvents = true
+
         RunAnywhere.events.events
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
@@ -281,7 +299,7 @@ final class VoiceAgentViewModel: ObservableObject {
             switch llmEvent {
             case .modelLoadStarted:
                 llmModelState = .loading
-            case .modelLoadCompleted(let id, _, _):
+            case .modelLoadCompleted(let id, _, _, _):
                 llmModelState = .loaded
                 updateModel(.llm, id: id)
             case .modelLoadFailed(_, let error, _):
@@ -299,7 +317,7 @@ final class VoiceAgentViewModel: ObservableObject {
             switch sttEvent {
             case .modelLoadStarted:
                 sttModelState = .loading
-            case .modelLoadCompleted(let id, _, _):
+            case .modelLoadCompleted(let id, _, _, _):
                 sttModelState = .loaded
                 updateModel(.stt, id: id)
             case .modelLoadFailed(_, let error, _):
@@ -317,7 +335,7 @@ final class VoiceAgentViewModel: ObservableObject {
             switch ttsEvent {
             case .modelLoadStarted:
                 ttsModelState = .loading
-            case .modelLoadCompleted(let id, _, _):
+            case .modelLoadCompleted(let id, _, _, _):
                 ttsModelState = .loaded
                 updateModel(.tts, id: id)
             case .modelLoadFailed(_, let error, _):
@@ -485,10 +503,18 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Cleanup
 
-    deinit {
+    /// Clean up resources - call from view's onDisappear
+    /// This replaces deinit cleanup to comply with Swift 6 concurrency
+    func cleanup() {
         eventTask?.cancel()
+        eventTask = nil
         cancellables.removeAll()
-        logger.info("VoiceAgentViewModel deinitialized")
+
+        // Reset initialization flags to allow re-initialization if needed
+        isViewModelInitialized = false
+        hasSubscribedToSDKEvents = false
+
+        logger.info("VoiceAgentViewModel cleanup completed")
     }
 }
 

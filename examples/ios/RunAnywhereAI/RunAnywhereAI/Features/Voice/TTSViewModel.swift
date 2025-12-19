@@ -54,17 +54,22 @@ class TTSViewModel: ObservableObject {
     private var playbackTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - Lifecycle
+    // MARK: - Initialization State (for idempotency)
 
-    deinit {
-        playbackTimer?.invalidate()
-        audioPlayer?.stop()
-    }
+    private var isInitialized = false
+    private var hasSubscribedToEvents = false
 
     // MARK: - Initialization
 
     /// Initialize the TTS view model and configure audio session
+    /// This method is idempotent - calling it multiple times is safe
     func initialize() async {
+        guard !isInitialized else {
+            logger.debug("TTS view model already initialized, skipping")
+            return
+        }
+        isInitialized = true
+
         logger.info("Initializing TTS view model")
 
         // Configure audio session for playback (iOS only)
@@ -176,7 +181,7 @@ class TTSViewModel: ObservableObject {
             Task { @MainActor in
                 guard let self = self, let player = self.audioPlayer else { return }
                 self.currentTime = player.currentTime
-                self.playbackProgress = player.currentTime / player.duration
+                self.playbackProgress = player.duration > 0 ? player.currentTime / player.duration : 0
                 if !player.isPlaying {
                     self.stopPlayback()
                 }
@@ -207,10 +212,32 @@ class TTSViewModel: ObservableObject {
         audioPlayer?.prepareToPlay()
     }
 
+    // MARK: - Cleanup
+
+    /// Clean up resources - call from view's onDisappear
+    /// This replaces deinit cleanup to comply with Swift 6 concurrency
+    func cleanup() {
+        playbackTimer?.invalidate()
+        playbackTimer = nil
+        audioPlayer?.stop()
+        audioPlayer = nil
+        cancellables.removeAll()
+
+        // Reset initialization flags to allow re-initialization if needed
+        isInitialized = false
+        hasSubscribedToEvents = false
+    }
+
     // MARK: - SDK Event Handling
 
     /// Subscribe to SDK events for TTS model state updates
     private func subscribeToSDKEvents() {
+        guard !hasSubscribedToEvents else {
+            logger.debug("Already subscribed to SDK events, skipping")
+            return
+        }
+        hasSubscribedToEvents = true
+
         RunAnywhere.events.events
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
@@ -226,7 +253,7 @@ class TTSViewModel: ObservableObject {
     private func handleSDKEvent(_ event: any SDKEvent) {
         if let ttsEvent = event as? TTSEvent {
             switch ttsEvent {
-            case .modelLoadCompleted(let voiceId, _, _):
+            case .modelLoadCompleted(let voiceId, _, _, _):
                 selectedModelId = voiceId
                 selectedModelName = voiceId
                 logger.info("TTS voice loaded: \(voiceId)")

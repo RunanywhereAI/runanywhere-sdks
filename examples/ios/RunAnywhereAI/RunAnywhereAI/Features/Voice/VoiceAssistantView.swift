@@ -475,6 +475,9 @@ struct VoiceAssistantView: View {
                 }
             }
         }
+        .onDisappear {
+            viewModel.cleanup()
+        }
     }
 
 }
