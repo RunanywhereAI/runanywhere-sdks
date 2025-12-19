@@ -29,6 +29,7 @@ struct VoiceAssistantView: View {
                     Label("Models", systemImage: "cube")
                 }
                 .buttonStyle(.bordered)
+                .tint(AppColors.primaryAccent)
 
                 Spacer()
 
@@ -53,6 +54,7 @@ struct VoiceAssistantView: View {
                     Label(showModelInfo ? "Hide Info" : "Show Info", systemImage: "info.circle")
                 }
                 .buttonStyle(.bordered)
+                .tint(AppColors.primaryAccent)
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
@@ -64,7 +66,7 @@ struct VoiceAssistantView: View {
             if showModelInfo {
                 VStack(spacing: 8) {
                     HStack(spacing: 15) {
-                        ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel, color: AppColors.primaryBlue)
+                        ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel, color: AppColors.primaryAccent)
                         ModelBadge(icon: "waveform", label: "STT", value: viewModel.currentSTTModel, color: AppColors.statusGreen)
                         ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.currentTTSModel, color: AppColors.primaryPurple)
                     }
@@ -253,7 +255,7 @@ struct VoiceAssistantView: View {
                         VStack(spacing: 8) {
                             HStack(spacing: 15) {
                                 // Compact model badges
-                                ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel, color: AppColors.primaryBlue)
+                                ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel, color: AppColors.primaryAccent)
                                 ModelBadge(icon: "waveform", label: "STT", value: viewModel.currentSTTModel, color: AppColors.statusGreen)
                                 ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.currentTTSModel, color: AppColors.primaryPurple)
                             }

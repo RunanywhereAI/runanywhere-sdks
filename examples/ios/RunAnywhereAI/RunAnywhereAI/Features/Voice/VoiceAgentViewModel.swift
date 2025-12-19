@@ -145,7 +145,7 @@ final class VoiceAgentViewModel: ObservableObject {
         case .connecting: return .orange
         case .connected: return .green
         case .listening: return .red
-        case .processing: return .blue
+        case .processing: return .orange
         case .speaking: return .green
         case .error: return .red
         }
@@ -156,9 +156,9 @@ final class VoiceAgentViewModel: ObservableObject {
         switch sessionState {
         case .connecting: return .orange
         case .listening: return .red
-        case .processing: return .blue
+        case .processing: return .orange
         case .speaking: return .green
-        default: return .blue
+        default: return .orange
         }
     }
 
@@ -536,10 +536,10 @@ extension StatusColor {
     var swiftUIColor: Color {
         switch self {
         case .gray: return .gray
-        case .orange: return .orange
+        case .orange: return AppColors.primaryAccent
         case .green: return .green
         case .red: return .red
-        case .blue: return .blue
+        case .blue: return AppColors.primaryAccent
         }
     }
 }
@@ -547,9 +547,9 @@ extension StatusColor {
 extension MicButtonColor {
     var swiftUIColor: Color {
         switch self {
-        case .orange: return .orange
+        case .orange: return AppColors.primaryAccent
         case .red: return .red
-        case .blue: return .blue
+        case .blue: return AppColors.primaryAccent
         case .green: return .green
         }
     }

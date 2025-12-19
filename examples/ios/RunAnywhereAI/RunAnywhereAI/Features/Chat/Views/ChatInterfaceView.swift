@@ -80,6 +80,7 @@ struct ChatInterfaceView: View {
                         Label("Conversations", systemImage: "list.bullet")
                     }
                     .buttonStyle(.bordered)
+                    .tint(AppColors.primaryAccent)
 
                     Spacer()
 
@@ -285,11 +286,12 @@ struct ChatInterfaceView: View {
         HStack(spacing: 8) {
             Button(action: { showingChatDetails = true }) {
                 Image(systemName: "info.circle")
-                    .foregroundColor(viewModel.messages.isEmpty ? .gray : .blue)
+                    .foregroundColor(viewModel.messages.isEmpty ? .gray : AppColors.primaryAccent)
             }
             .disabled(viewModel.messages.isEmpty)
             #if os(macOS)
             .buttonStyle(.bordered)
+            .tint(AppColors.primaryAccent)
             #endif
 
             Button(action: { showingModelSelection = true }) {
@@ -306,6 +308,7 @@ struct ChatInterfaceView: View {
             }
             #if os(macOS)
             .buttonStyle(.bordered)
+            .tint(AppColors.primaryAccent)
             #endif
 
             Button(action: { viewModel.clearChat() }) {
@@ -314,6 +317,7 @@ struct ChatInterfaceView: View {
             .disabled(viewModel.messages.isEmpty)
             #if os(macOS)
             .buttonStyle(.bordered)
+            .tint(AppColors.primaryAccent)
             #endif
         }
     }
@@ -414,7 +418,7 @@ struct TypingIndicatorView: View {
                 HStack(spacing: AppSpacing.xSmall) {
                     ForEach(0..<3) { index in
                         Circle()
-                            .fill(AppColors.primaryBlue.opacity(0.7))
+                            .fill(AppColors.primaryAccent.opacity(0.7))
                             .frame(width: AppSpacing.iconSmall, height: AppSpacing.iconSmall)
                             .scaleEffect(animationPhase == index ? 1.3 : 0.8)
                             .animation(
@@ -642,9 +646,9 @@ struct MessageBubbleView: View {
             .padding(.vertical, 5)
             .background(
                 RoundedRectangle(cornerRadius: AppSpacing.regular)
-                    .fill(LinearGradient(colors: [AppColors.primaryBlue, AppColors.primaryBlue.opacity(0.8)],
+                    .fill(LinearGradient(colors: [AppColors.primaryAccent, AppColors.primaryAccent.opacity(0.8)],
                                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .shadow(color: AppColors.primaryBlue.opacity(0.3), radius: 2, x: 0, y: 1)
+                    .shadow(color: AppColors.primaryAccent.opacity(0.3), radius: 2, x: 0, y: 1)
                     .overlay(
                         RoundedRectangle(cornerRadius: AppSpacing.regular)
                             .strokeBorder(AppColors.textWhite.opacity(0.2), lineWidth: AppSpacing.strokeThin)

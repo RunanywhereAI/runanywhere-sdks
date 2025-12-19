@@ -178,7 +178,7 @@ private struct SimplifiedModelRow: View {
     private var frameworkColor: Color {
         guard let framework = model.preferredFramework else { return .gray }
         switch framework {
-        case .llamaCpp: return .blue
+        case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
         case .whisperKit: return .green
@@ -244,11 +244,11 @@ private struct SimplifiedModelRow: View {
                     } else {
                         HStack(spacing: AppSpacing.xxSmall) {
                             Image(systemName: isReady ? "checkmark.circle.fill" : "arrow.down.circle")
-                                .foregroundColor(isReady ? AppColors.statusGreen : AppColors.statusBlue)
+                                .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                                 .font(AppTypography.caption2)
                             Text(model.preferredFramework == .foundationModels ? "Built-in" : (model.localPath != nil ? "Ready" : "Download"))
                                 .font(AppTypography.caption2)
-                                .foregroundColor(isReady ? AppColors.statusGreen : AppColors.statusBlue)
+                                .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                         }
                     }
 
@@ -277,6 +277,7 @@ private struct SimplifiedModelRow: View {
                 .font(AppTypography.caption)
                 .fontWeight(.semibold)
                 .buttonStyle(.borderedProminent)
+                .tint(AppColors.primaryAccent)
                 .controlSize(.small)
                 .disabled(isSelected)
             } else if model.localPath == nil {
@@ -297,6 +298,7 @@ private struct SimplifiedModelRow: View {
                     .font(AppTypography.caption)
                     .fontWeight(.semibold)
                     .buttonStyle(.bordered)
+                    .tint(AppColors.primaryAccent)
                     .controlSize(.small)
                 }
             } else {
@@ -315,6 +317,7 @@ private struct SimplifiedModelRow: View {
                     .font(AppTypography.caption)
                     .fontWeight(.semibold)
                     .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primaryAccent)
                     .controlSize(.small)
                 }
             }

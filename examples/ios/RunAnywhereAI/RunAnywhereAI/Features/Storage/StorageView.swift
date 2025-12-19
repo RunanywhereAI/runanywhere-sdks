@@ -37,6 +37,7 @@ struct StorageView: View {
                             Label("Refresh", systemImage: "arrow.clockwise")
                         }
                         .buttonStyle(.bordered)
+                        .tint(AppColors.primaryAccent)
                     }
 
                     VStack(spacing: 0) {
@@ -134,7 +135,7 @@ struct StorageView: View {
                     Label("Models Storage", systemImage: "cpu")
                     Spacer()
                     Text(ByteCountFormatter.string(fromByteCount: viewModel.modelStorageSize, countStyle: .file))
-                        .foregroundColor(AppColors.primaryBlue)
+                        .foregroundColor(AppColors.primaryAccent)
                 }
 
                 // Models count
@@ -172,7 +173,7 @@ struct StorageView: View {
                     Label("Models Storage", systemImage: "cpu")
                     Spacer()
                     Text(ByteCountFormatter.string(fromByteCount: viewModel.modelStorageSize, countStyle: .file))
-                        .foregroundColor(AppColors.primaryBlue)
+                        .foregroundColor(AppColors.primaryAccent)
                 }
 
                 // Models count
@@ -345,7 +346,7 @@ private struct StoredModelRow: View {
                             .font(AppTypography.caption2)
                             .padding(.horizontal, AppSpacing.small)
                             .padding(.vertical, AppSpacing.xxSmall)
-                            .background(AppColors.badgeBlue)
+                            .background(AppColors.badgePrimary)
                             .cornerRadius(AppSpacing.cornerRadiusSmall)
 
                         if let framework = model.framework {
@@ -373,6 +374,7 @@ private struct StoredModelRow: View {
                         }
                         .font(AppTypography.caption2)
                         .buttonStyle(.bordered)
+                        .tint(AppColors.primaryAccent)
                         .controlSize(.mini)
 
                         Button(action: {
@@ -383,6 +385,7 @@ private struct StoredModelRow: View {
                         }
                         .font(AppTypography.caption2)
                         .buttonStyle(.bordered)
+                        .tint(AppColors.primaryRed)
                         .controlSize(.mini)
                         .disabled(isDeleting)
                     }
@@ -433,7 +436,7 @@ private struct StoredModelRow: View {
                                         .font(AppTypography.caption2)
                                         .padding(.horizontal, AppSpacing.small)
                                         .padding(.vertical, AppSpacing.xxSmall)
-                                        .background(AppColors.badgeBlue)
+                                        .background(AppColors.badgePrimary)
                                         .cornerRadius(AppSpacing.cornerRadiusSmall)
                                 }
                             }

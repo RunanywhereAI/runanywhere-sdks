@@ -213,7 +213,7 @@ struct InitializationLoadingView: View {
         VStack(spacing: 24) {
             Image(systemName: "brain")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundColor(AppColors.primaryAccent)
                 .scaleEffect(isAnimating ? 1.2 : 1.0)
                 .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isAnimating)
 
@@ -266,6 +266,7 @@ struct InitializationErrorView: View {
                 retryAction()
             }
             .buttonStyle(.borderedProminent)
+            .tint(AppColors.primaryAccent)
             .font(.headline)
         }
         .padding(40)

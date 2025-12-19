@@ -131,7 +131,7 @@ struct ChatOverviewTab: View {
                     VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                         HStack {
                             Image(systemName: "message.circle")
-                                .foregroundColor(AppColors.primaryBlue)
+                                .foregroundColor(AppColors.primaryAccent)
                             Text(conversationSummary)
                                 .font(AppTypography.subheadline)
                         }
@@ -139,7 +139,7 @@ struct ChatOverviewTab: View {
                         if let conversation = conversation {
                             HStack {
                                 Image(systemName: "clock")
-                                    .foregroundColor(AppColors.primaryBlue)
+                                    .foregroundColor(AppColors.primaryAccent)
                                 Text("Created \(conversation.createdAt, style: .relative)")
                                     .font(AppTypography.subheadline)
                             }
@@ -148,7 +148,7 @@ struct ChatOverviewTab: View {
                         if !analyticsMessages.isEmpty {
                             HStack {
                                 Image(systemName: "cube")
-                                    .foregroundColor(AppColors.primaryBlue)
+                                    .foregroundColor(AppColors.primaryAccent)
                                 let models = Set(analyticsMessages.map { $0.modelName })
                                 Text("\(models.count) model\(models.count == 1 ? "" : "s") used")
                                     .font(AppTypography.subheadline)
@@ -183,7 +183,7 @@ struct ChatOverviewTab: View {
                                 title: "Avg Speed",
                                 value: "\(Int(averageTokensPerSecond)) tok/s",
                                 icon: "speedometer",
-                                color: AppColors.statusBlue
+                                color: AppColors.primaryAccent
                             )
 
                             PerformanceCard(
@@ -321,7 +321,7 @@ struct MessageAnalyticsRow: View {
                     .font(AppTypography.caption)
                     .padding(.horizontal, AppSpacing.small)
                     .padding(.vertical, AppSpacing.xxSmall)
-                    .background(AppColors.badgeBlue)
+                    .background(AppColors.badgePrimary)
                     .cornerRadius(AppSpacing.cornerRadiusSmall)
 
                 Text(analytics.framework)
@@ -343,7 +343,7 @@ struct MessageAnalyticsRow: View {
                     MetricView(
                         label: "TTFT",
                         value: String(format: "%.1fs", ttft),
-                        color: AppColors.statusBlue
+                        color: AppColors.primaryAccent
                     )
                 }
 
@@ -434,7 +434,7 @@ struct PerformanceTab: View {
 
                                     Text("\(Int(avgSpeed)) tok/s")
                                         .font(.caption)
-                                        .foregroundColor(AppColors.primaryBlue)
+                                        .foregroundColor(AppColors.primaryAccent)
                                 }
                             }
                             .padding(AppSpacing.large)
