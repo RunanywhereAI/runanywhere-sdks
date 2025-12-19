@@ -6,6 +6,18 @@ import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.llm.LLMComponent
 import com.runanywhere.sdk.components.llm.LLMConfiguration
+import com.runanywhere.sdk.components.TTSComponent
+import com.runanywhere.sdk.components.TTSConfiguration
+import com.runanywhere.sdk.capabilities.stt.STTCapability
+import com.runanywhere.sdk.capabilities.tts.TTSCapability
+import com.runanywhere.sdk.capabilities.llm.LLMCapability
+import com.runanywhere.sdk.capabilities.vad.VADCapability
+import com.runanywhere.sdk.capabilities.speakerdiarization.SpeakerDiarizationCapability
+import com.runanywhere.sdk.capabilities.voiceagent.VoiceAgentCapability
+import com.runanywhere.sdk.components.voiceagent.VoiceAgentComponent
+import com.runanywhere.sdk.components.voiceagent.VoiceAgentConfiguration
+import com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationComponent
+import com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationConfiguration
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.ConfigurationData
 import com.runanywhere.sdk.data.models.SDKInitParams
@@ -51,11 +63,25 @@ import com.runanywhere.sdk.events.SDKInitializationEvent
 import com.runanywhere.sdk.events.SDKBootstrapEvent
 import com.runanywhere.sdk.events.SDKDeviceEvent
 import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.EventPublisher
+import com.runanywhere.sdk.events.SDKEvent
+import com.runanywhere.sdk.foundation.analytics.AnalyticsQueueManager
+import com.runanywhere.sdk.foundation.analytics.AnalyticsEvent
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
+
+/**
+ * Adapter to wrap SDKEvent as AnalyticsEvent for the analytics queue.
+ * Enables dual-path routing: EventPublisher -> AnalyticsQueueManager
+ */
+private class SDKEventAnalyticsAdapter(private val sdkEvent: SDKEvent) : AnalyticsEvent {
+    override val type: String = sdkEvent.type
+    override val eventData: Any = sdkEvent.properties
+    override val timestamp: Long = sdkEvent.timestamp
+}
 
 /**
  * Central service container - Common implementation
@@ -99,6 +125,73 @@ class ServiceContainer {
 
     val llmComponent: LLMComponent by lazy {
         LLMComponent(LLMConfiguration(modelId = "llama-2-7b-chat"))
+    }
+
+    val ttsComponent: TTSComponent by lazy {
+        TTSComponent(TTSConfiguration())
+    }
+
+    val speakerDiarizationComponent: SpeakerDiarizationComponent by lazy {
+        SpeakerDiarizationComponent(SpeakerDiarizationConfiguration())
+    }
+
+    // ============================================================================
+    // MARK: - Capabilities (iOS-aligned public API wrappers)
+    // ============================================================================
+
+    /**
+     * STT Capability - Public API for Speech-to-Text operations
+     * Wraps STTComponent with iOS-aligned capability interface
+     */
+    val sttCapability: STTCapability? by lazy {
+        STTCapability { sttComponent }
+    }
+
+    /**
+     * TTS Capability - Public API for Text-to-Speech operations
+     * Wraps TTSComponent with iOS-aligned capability interface
+     */
+    val ttsCapability: TTSCapability? by lazy {
+        TTSCapability { ttsComponent }
+    }
+
+    /**
+     * LLM Capability - Public API for Language Model operations
+     * Wraps LLMComponent with iOS-aligned capability interface
+     */
+    val llmCapability: LLMCapability? by lazy {
+        LLMCapability { llmComponent }
+    }
+
+    /**
+     * VAD Capability - Public API for Voice Activity Detection operations
+     * Wraps VADComponent with iOS-aligned capability interface
+     */
+    val vadCapability: VADCapability? by lazy {
+        VADCapability { vadComponent }
+    }
+
+    /**
+     * Speaker Diarization Capability - Public API for Speaker Diarization operations
+     * Wraps SpeakerDiarizationComponent with iOS-aligned capability interface
+     */
+    val speakerDiarizationCapability: SpeakerDiarizationCapability? by lazy {
+        SpeakerDiarizationCapability { speakerDiarizationComponent }
+    }
+
+    /**
+     * VoiceAgent Capability - Public API for end-to-end voice AI pipeline
+     * Wraps VoiceAgentComponent with iOS-aligned capability interface
+     * Orchestrates: VAD -> STT -> LLM -> TTS
+     */
+    val voiceAgentCapability: VoiceAgentCapability? by lazy {
+        VoiceAgentCapability(
+            getSTTCapability = { sttCapability },
+            getLLMCapability = { llmCapability },
+            getTTSCapability = { ttsCapability },
+            getVADCapability = { vadCapability },
+            getOrCreateComponent = { config -> VoiceAgentComponent(config, this) }
+        )
     }
 
     // Services
@@ -184,6 +277,15 @@ class ServiceContainer {
     val deviceInfo: DeviceInfo? get() = _deviceInfo
 
     /**
+     * Device ID for analytics and telemetry
+     * Returns a consistent identifier based on device info
+     */
+    val deviceId: String
+        get() = _deviceInfoData?.deviceId
+            ?: _deviceInfo?.let { "${it.platformName}-${it.deviceModel}" }
+            ?: "unknown"
+
+    /**
      * Initialize the service container with platform-specific context
      * This is implemented differently for each platform
      */
@@ -236,7 +338,7 @@ class ServiceContainer {
         try {
             // Step 1: Platform initialization & device info collection
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(1, "Platform initialization & device info collection"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(1, "Platform initialization & device info collection"))
             EventBus.publish(SDKBootstrapEvent.NetworkServicesConfigured)
 
             _deviceInfo = collectDeviceInfo()
@@ -253,21 +355,21 @@ class ServiceContainer {
                 EventBus.publish(SDKBootstrapEvent.DeviceInfoSyncFailed(e.message ?: "Unknown error"))
             }
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(1, "Platform initialization & device info collection", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(1, "Platform initialization & device info collection", currentTimeMillis() - stepStartTime))
 
             // Step 2: Configuration loading (from multiple sources)
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(2, "Configuration loading"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(2, "Configuration loading"))
 
             // TODO: Implement multi-source configuration loading
             val configData = ConfigurationData.default(params.apiKey)
             EventBus.publish(SDKBootstrapEvent.ConfigurationLoaded(configData))
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(2, "Configuration loading", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(2, "Configuration loading", currentTimeMillis() - stepStartTime))
 
             // Step 3: Authentication service initialization
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(3, "Authentication service initialization"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(3, "Authentication service initialization"))
 
             // Initialize SDKConfig with baseURL before authentication
             if (params.baseURL != null) {
@@ -277,11 +379,11 @@ class ServiceContainer {
 
             authenticationService.authenticate(params.apiKey)
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", currentTimeMillis() - stepStartTime))
 
             // Step 4: Model repository sync
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(4, "Model repository sync"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(4, "Model repository sync"))
 
             modelInfoService.initialize()
 
@@ -294,11 +396,11 @@ class ServiceContainer {
             val models = modelInfoService.getAllModels()
             EventBus.publish(SDKBootstrapEvent.ModelCatalogSynced(models))
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(4, "Model repository sync", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(4, "Model repository sync", currentTimeMillis() - stepStartTime))
 
             // Step 5: Analytics service setup
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(5, "Analytics service setup"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(5, "Analytics service setup"))
 
             try {
                 // Create analytics network services for production mode
@@ -367,6 +469,11 @@ class ServiceContainer {
                     sdkVersion = com.runanywhere.sdk.core.SDKConstants.SDK_VERSION
                 )
                 logger.info("✅ Telemetry service initialized successfully with device ID: $deviceId")
+
+                // Wire EventPublisher to AnalyticsQueueManager for dual-path event routing
+                // This enables: EventPublisher.track(event) -> EventBus + AnalyticsQueueManager
+                initializeEventPublisher()
+                logger.info("✅ EventPublisher wired to AnalyticsQueueManager")
             } catch (e: Exception) {
                 logger.error("Analytics initialization failed: ${e.message}")
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitializationFailed(e.message ?: "Unknown error"))
@@ -374,34 +481,34 @@ class ServiceContainer {
                 throw com.runanywhere.sdk.data.models.SDKError.InitializationFailed("Analytics service initialization failed: ${e.message}")
             }
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(5, "Analytics service setup", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(5, "Analytics service setup", currentTimeMillis() - stepStartTime))
 
             // Step 6: Component initialization
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(6, "Component initialization"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(6, "Component initialization"))
 
             registerDefaultModules()
             initializeComponents()
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(6, "Component initialization", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(6, "Component initialization", currentTimeMillis() - stepStartTime))
 
             // Step 7: Cache warmup
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(7, "Cache warmup"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(7, "Cache warmup"))
 
             // TODO: Implement cache warmup
             logger.info("Cache warmup completed (placeholder)")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(7, "Cache warmup", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(7, "Cache warmup", currentTimeMillis() - stepStartTime))
 
             // Step 8: Health check
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(8, "Health check"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(8, "Health check"))
 
             // TODO: Implement comprehensive health check
             logger.info("Health check completed (placeholder)")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(8, "Health check", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(8, "Health check", currentTimeMillis() - stepStartTime))
 
             EventBus.publish(SDKBootstrapEvent.BootstrapCompleted)
             logger.info("✅ 8-step bootstrap process completed successfully (Production Mode)")
@@ -427,7 +534,7 @@ class ServiceContainer {
         try {
             // Step 1: Platform initialization & device info collection
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(1, "Platform initialization & device info collection"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(1, "Platform initialization & device info collection"))
             logger.info("🔧 Step 1: Platform initialization & device info collection...")
 
             EventBus.publish(SDKBootstrapEvent.NetworkServicesConfigured)
@@ -437,34 +544,34 @@ class ServiceContainer {
             EventBus.publish(SDKBootstrapEvent.DeviceInfoCollected(_deviceInfoData!!))
             logger.info("   Device: ${_deviceInfo!!.description}")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(1, "Platform initialization & device info collection", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(1, "Platform initialization & device info collection", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 1 completed")
 
             // Step 2: Configuration loading (mock in dev mode)
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(2, "Configuration loading"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(2, "Configuration loading"))
             logger.info("🔧 Step 2: Configuration loading (dev mode)...")
 
             val configData = ConfigurationData.default(params.apiKey)
             EventBus.publish(SDKBootstrapEvent.ConfigurationLoaded(configData))
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(2, "Configuration loading", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(2, "Configuration loading", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 2 completed")
 
             // Step 3: Authentication service initialization (SKIPPED in dev mode)
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(3, "Authentication service initialization"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(3, "Authentication service initialization"))
             logger.info("🔧 Step 3: Skipping authentication service in development mode...")
 
             // NO AUTHENTICATION IN DEVELOPMENT MODE - Following iOS pattern exactly
             logger.info("   Authentication skipped - using mock/local services only")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 3 completed (authentication skipped)")
 
             // Step 4: Model repository sync (fetch mock models)
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(4, "Model repository sync"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(4, "Model repository sync"))
             logger.info("🔧 Step 4: Model repository sync (fetching mock models)...")
 
             modelInfoService.initialize()
@@ -479,12 +586,12 @@ class ServiceContainer {
             val models = modelInfoService.getAllModels()
             EventBus.publish(SDKBootstrapEvent.ModelCatalogSynced(models))
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(4, "Model repository sync", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(4, "Model repository sync", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 4 completed (${models.size} models)")
 
             // Step 5: Analytics service setup (with Supabase in dev mode)
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(5, "Analytics service setup"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(5, "Analytics service setup"))
             logger.info("🔧 Step 5: Analytics service setup (dev mode with Supabase)...")
 
             try {
@@ -515,45 +622,50 @@ class ServiceContainer {
                     sdkVersion = com.runanywhere.sdk.core.SDKConstants.SDK_VERSION
                 )
                 logger.info("✅ Telemetry service initialized successfully with device ID: $deviceId")
+
+                // Wire EventPublisher to AnalyticsQueueManager for dual-path event routing
+                // This enables: EventPublisher.track(event) -> EventBus + AnalyticsQueueManager
+                initializeEventPublisher()
+                logger.info("✅ EventPublisher wired to AnalyticsQueueManager")
             } catch (e: Exception) {
                 logger.warn("Analytics initialization failed (non-critical in dev mode): ${e.message}")
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitializationFailed(e.message ?: "Unknown error"))
             }
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(5, "Analytics service setup", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(5, "Analytics service setup", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 5 completed")
 
             // Step 6: Component initialization
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(6, "Component initialization"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(6, "Component initialization"))
             logger.info("🔧 Step 6: Component initialization...")
 
             registerDefaultModules()
             initializeComponents()
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(6, "Component initialization", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(6, "Component initialization", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 6 completed")
 
             // Step 7: Cache warmup (minimal in dev mode)
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(7, "Cache warmup"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(7, "Cache warmup"))
             logger.info("🔧 Step 7: Cache warmup (dev mode)...")
 
             // Minimal cache warmup for development
             logger.info("   Cache warmup minimal for dev mode")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(7, "Cache warmup", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(7, "Cache warmup", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 7 completed")
 
             // Step 8: Health check (basic in dev mode)
             stepStartTime = currentTimeMillis()
-            EventBus.publish(SDKInitializationEvent.StepStarted(8, "Health check"))
+            EventPublisher.track(SDKInitializationEvent.StepStarted(8, "Health check"))
             logger.info("🔧 Step 8: Health check (dev mode)...")
 
             // Basic health check for development mode
             logger.info("   Basic health check passed")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(8, "Health check", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(SDKInitializationEvent.StepCompleted(8, "Health check", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 8 completed")
 
             EventBus.publish(SDKBootstrapEvent.BootstrapCompleted)
@@ -592,8 +704,33 @@ class ServiceContainer {
     }
 
     /**
-     * Register default modules for SDK operation
+     * Initialize EventPublisher with AnalyticsQueueManager for dual-path event routing.
+     *
+     * This wires up the dual-path routing:
+     * - EventPublisher.track(event) routes to:
+     *   1. EventBus (for public app developer subscriptions)
+     *   2. AnalyticsQueueManager (for telemetry to backend)
+     *
+     * Mirrors iOS EventPublisher.swift initialization pattern.
      */
+    private fun initializeEventPublisher() {
+        // First initialize AnalyticsQueueManager with telemetry repository and device info
+        val deviceInfoService = com.runanywhere.sdk.foundation.device.DeviceInfoService()
+        AnalyticsQueueManager.initialize(
+            telemetryRepository = telemetryRepository,
+            deviceInfoService = deviceInfoService
+        )
+
+        // Wire EventPublisher to AnalyticsQueueManager
+        EventPublisher.initialize { sdkEvent: SDKEvent ->
+            // Wrap SDKEvent as AnalyticsEvent and enqueue
+            val analyticsEvent = SDKEventAnalyticsAdapter(sdkEvent)
+            AnalyticsQueueManager.enqueue(analyticsEvent)
+        }
+
+        logger.debug("EventPublisher initialized with dual-path routing to EventBus + AnalyticsQueueManager")
+    }
+
     /**
      * Convert simple DeviceInfo to comprehensive DeviceInfoData
      */
@@ -948,6 +1085,8 @@ class ServiceContainer {
         sttComponent.cleanup()
         vadComponent.cleanup()
         llmComponent.cleanup()
+        ttsComponent.cleanup()
+        speakerDiarizationComponent.cleanup()
     }
 }
 

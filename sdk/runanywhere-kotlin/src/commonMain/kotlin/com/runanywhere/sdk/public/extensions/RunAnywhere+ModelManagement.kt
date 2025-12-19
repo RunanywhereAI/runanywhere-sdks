@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
@@ -26,7 +26,7 @@ private val logger = SDKLogger("ModelManagement")
  * @return Information about the loaded model
  */
 suspend fun loadModelWithInfo(modelIdentifier: String): ModelInfo = withContext(Dispatchers.IO) {
-    EventBus.publish(SDKModelEvent.LoadStarted(modelIdentifier))
+    EventPublisher.track(SDKModelEvent.LoadStarted(modelIdentifier))
 
     try {
         // Use existing service logic directly
@@ -35,10 +35,10 @@ suspend fun loadModelWithInfo(modelIdentifier: String): ModelInfo = withContext(
         // IMPORTANT: Set the loaded model in the generation service
         ServiceContainer.shared.generationService.setCurrentModel(loadedModel)
 
-        EventBus.publish(SDKModelEvent.LoadCompleted(modelIdentifier))
+        EventPublisher.track(SDKModelEvent.LoadCompleted(modelIdentifier))
         return@withContext loadedModel.model
     } catch (error: Throwable) {
-        EventBus.publish(SDKModelEvent.LoadFailed(modelIdentifier, error))
+        EventPublisher.track(SDKModelEvent.LoadFailed(modelIdentifier, error))
         throw error
     }
 }
@@ -47,7 +47,7 @@ suspend fun loadModelWithInfo(modelIdentifier: String): ModelInfo = withContext(
  * Unload the currently loaded model
  */
 suspend fun unloadModel() = withContext(Dispatchers.IO) {
-    EventBus.publish(SDKModelEvent.UnloadStarted)
+    EventPublisher.track(SDKModelEvent.UnloadStarted)
 
     try {
         // Get the current model ID from generation service
@@ -62,9 +62,9 @@ suspend fun unloadModel() = withContext(Dispatchers.IO) {
             ServiceContainer.shared.generationService.setCurrentModel(null)
         }
 
-        EventBus.publish(SDKModelEvent.UnloadCompleted)
+        EventPublisher.track(SDKModelEvent.UnloadCompleted)
     } catch (error: Throwable) {
-        EventBus.publish(SDKModelEvent.UnloadFailed(error))
+        EventPublisher.track(SDKModelEvent.UnloadFailed(error))
         throw error
     }
 }
@@ -74,11 +74,11 @@ suspend fun unloadModel() = withContext(Dispatchers.IO) {
  * @return Array of available models
  */
 suspend fun listAvailableModels(): List<ModelInfo> = withContext(Dispatchers.IO) {
-    EventBus.publish(SDKModelEvent.ListRequested)
+    EventPublisher.track(SDKModelEvent.ListRequested)
 
     // Use model registry to discover models
     val models = ServiceContainer.shared.modelRegistry.discoverModels()
-    EventBus.publish(SDKModelEvent.ListCompleted(models))
+    EventPublisher.track(SDKModelEvent.ListCompleted(models))
     return@withContext models
 }
 
@@ -87,7 +87,7 @@ suspend fun listAvailableModels(): List<ModelInfo> = withContext(Dispatchers.IO)
  * @param modelIdentifier The model to download
  */
 suspend fun downloadModel(modelIdentifier: String) = withContext(Dispatchers.IO) {
-    EventBus.publish(SDKModelEvent.DownloadStarted(modelIdentifier))
+    EventPublisher.track(SDKModelEvent.DownloadStarted(modelIdentifier))
 
     try {
         // Get the model info first
@@ -126,9 +126,9 @@ suspend fun downloadModel(modelIdentifier: String) = withContext(Dispatchers.IO)
             ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
         }
 
-        EventBus.publish(SDKModelEvent.DownloadCompleted(modelIdentifier))
+        EventPublisher.track(SDKModelEvent.DownloadCompleted(modelIdentifier))
     } catch (error: Throwable) {
-        EventBus.publish(SDKModelEvent.DownloadFailed(modelIdentifier, error))
+        EventPublisher.track(SDKModelEvent.DownloadFailed(modelIdentifier, error))
         throw error
     }
 }
@@ -138,14 +138,14 @@ suspend fun downloadModel(modelIdentifier: String) = withContext(Dispatchers.IO)
  * @param modelIdentifier The model to delete
  */
 suspend fun deleteModel(modelIdentifier: String) = withContext(Dispatchers.IO) {
-    EventBus.publish(SDKModelEvent.DeleteStarted(modelIdentifier))
+    EventPublisher.track(SDKModelEvent.DeleteStarted(modelIdentifier))
 
     try {
         // Use model manager to delete model
         ServiceContainer.shared.modelManager.deleteModel(modelIdentifier)
-        EventBus.publish(SDKModelEvent.DeleteCompleted(modelIdentifier))
+        EventPublisher.track(SDKModelEvent.DeleteCompleted(modelIdentifier))
     } catch (error: Throwable) {
-        EventBus.publish(SDKModelEvent.DeleteFailed(modelIdentifier, error))
+        EventPublisher.track(SDKModelEvent.DeleteFailed(modelIdentifier, error))
         throw error
     }
 }
@@ -164,7 +164,7 @@ suspend fun addModelFromURL(
     type: String
 ): ModelInfo = withContext(Dispatchers.IO) {
     logger.info("Adding custom model from URL: $url")
-    EventBus.publish(SDKModelEvent.CustomModelAdded(name, url))
+    EventPublisher.track(SDKModelEvent.CustomModelAdded(name, url))
 
     try {
         // Parse model category from type string
@@ -212,14 +212,14 @@ suspend fun addModelFromURL(
         }
 
         // Publish success event
-        EventBus.publish(SDKModelEvent.CustomModelRegistered(modelInfo.id, url))
+        EventPublisher.track(SDKModelEvent.CustomModelRegistered(modelInfo.id, url))
 
         logger.info("Successfully added custom model: ${modelInfo.name} (${modelInfo.id})")
         return@withContext modelInfo
 
     } catch (error: Exception) {
         logger.error("Failed to add model from URL: ${error.message}")
-        EventBus.publish(SDKModelEvent.CustomModelFailed(name, url, error.message ?: "Unknown error"))
+        EventPublisher.track(SDKModelEvent.CustomModelFailed(name, url, error.message ?: "Unknown error"))
         throw SDKError.ModelRegistrationFailed("Failed to add model from URL: ${error.message}")
     }
 }
@@ -232,7 +232,7 @@ suspend fun registerBuiltInModel(model: ModelInfo) = withContext(Dispatchers.IO)
     // Register the model in the model registry
     ServiceContainer.shared.modelRegistry.registerModel(model)
 
-    EventBus.publish(SDKModelEvent.BuiltInModelRegistered(model.id))
+    EventPublisher.track(SDKModelEvent.BuiltInModelRegistered(model.id))
 }
 
 /**

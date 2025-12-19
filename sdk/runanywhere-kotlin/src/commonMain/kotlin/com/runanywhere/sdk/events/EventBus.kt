@@ -7,12 +7,43 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 /**
- * Central event bus for SDK-wide event distribution
- * Thread-safe event bus mirroring iOS EventBus functionality
+ * Central event bus for SDK-wide event distribution.
+ * Mirrors iOS EventBus functionality.
+ *
+ * Consumer-facing pub/sub system. App developers subscribe here to receive SDK events.
+ * Events are filtered by their `destination` property before being published here.
+ *
+ * Usage:
+ * ```kotlin
+ * // Subscribe to all events
+ * EventBus.events.collect { event -> ... }
+ *
+ * // Subscribe to a specific category
+ * EventBus.events(EventCategory.LLM).collect { event -> ... }
+ *
+ * // Closure-based subscription
+ * EventBus.on<SDKGenerationEvent>(scope) { event -> ... }
+ * ```
  */
 object EventBus {
 
-    // Event publishers for each event type
+    // Main events publisher - only events with PUBLIC_ONLY or ALL destination
+    private val _events = MutableSharedFlow<SDKEvent>()
+
+    /**
+     * All public events stream.
+     * Only events with destination != ANALYTICS_ONLY are published here.
+     */
+    val events: SharedFlow<SDKEvent> = _events.asSharedFlow()
+
+    /**
+     * Get events filtered by category.
+     */
+    fun events(category: EventCategory): Flow<SDKEvent> =
+        events.filter { it.category == category }
+
+    // MARK: - Legacy typed event publishers (for backwards compatibility)
+
     private val _initializationEvents = MutableSharedFlow<SDKInitializationEvent>()
     val initializationEvents: SharedFlow<SDKInitializationEvent> = _initializationEvents.asSharedFlow()
 
@@ -49,9 +80,9 @@ object EventBus {
     private val _componentEvents = MutableSharedFlow<ComponentInitializationEvent>()
     val componentEvents: SharedFlow<ComponentInitializationEvent> = _componentEvents.asSharedFlow()
 
-    // All events publisher
-    private val _allEvents = MutableSharedFlow<SDKEvent>()
-    val allEvents: SharedFlow<SDKEvent> = _allEvents.asSharedFlow()
+    // Legacy: All events publisher (now just an alias)
+    @Deprecated("Use 'events' instead", ReplaceWith("events"))
+    val allEvents: SharedFlow<SDKEvent> get() = events
 
     // Legacy support - Speaker Diarization Events
     private val _speakerDiarizationEvents = MutableSharedFlow<com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationEvent>()
@@ -61,14 +92,23 @@ object EventBus {
     private val _bootstrapEvents = MutableSharedFlow<SDKBootstrapEvent>()
     val bootstrapEvents: SharedFlow<SDKBootstrapEvent> = _bootstrapEvents.asSharedFlow()
 
-    // MARK: - Event Publishing
+    // MARK: - Internal Event Publishing
+    // Note: Components should use EventPublisher.track() instead of calling these directly
+
+    /**
+     * Internal: Publish an event to the main events stream.
+     * This is called by EventPublisher after routing checks.
+     */
+    internal fun publish(event: SDKEvent) {
+        _events.tryEmit(event)
+    }
 
     /**
      * Publish an initialization event
      */
     fun publish(event: SDKInitializationEvent) {
         _initializationEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -76,7 +116,7 @@ object EventBus {
      */
     fun publish(event: SDKConfigurationEvent) {
         _configurationEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -84,7 +124,7 @@ object EventBus {
      */
     fun publish(event: SDKGenerationEvent) {
         _generationEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -92,7 +132,7 @@ object EventBus {
      */
     fun publish(event: SDKModelEvent) {
         _modelEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -100,7 +140,7 @@ object EventBus {
      */
     fun publish(event: SDKVoiceEvent) {
         _voiceEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -108,7 +148,7 @@ object EventBus {
      */
     fun publish(event: SDKPerformanceEvent) {
         _performanceEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -116,7 +156,7 @@ object EventBus {
      */
     fun publish(event: SDKNetworkEvent) {
         _networkEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -124,7 +164,7 @@ object EventBus {
      */
     fun publish(event: SDKStorageEvent) {
         _storageEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -132,7 +172,7 @@ object EventBus {
      */
     fun publish(event: SDKFrameworkEvent) {
         _frameworkEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -140,7 +180,7 @@ object EventBus {
      */
     fun publish(event: SDKDeviceEvent) {
         _deviceEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -148,7 +188,7 @@ object EventBus {
      */
     fun publish(event: SDKLoggingEvent) {
         _loggingEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
@@ -156,11 +196,11 @@ object EventBus {
      */
     fun publish(event: ComponentInitializationEvent) {
         _componentEvents.tryEmit(event)
-        _allEvents.tryEmit(event as SDKEvent)
+        _events.tryEmit(event as SDKEvent)
     }
 
     /**
-     * Generic event publisher - avoid overload conflicts by using explicit types
+     * Generic event publisher - routes to typed publisher + main events
      */
     fun publishSDKEvent(event: SDKEvent) {
         when (event) {
@@ -174,15 +214,17 @@ object EventBus {
             is SDKStorageEvent -> publish(event)
             is SDKFrameworkEvent -> publish(event)
             is SDKDeviceEvent -> publish(event)
+            is SDKLoggingEvent -> publish(event)
             is ComponentInitializationEvent -> publish(event)
-            else -> _allEvents.tryEmit(event)
+            else -> _events.tryEmit(event)
         }
     }
 
     // Legacy support method for ComponentEvent (excluding ComponentInitializationEvent)
+    @Suppress("DEPRECATION")
     fun publishComponentEvent(event: ComponentEvent) {
-        // For ComponentEvent types, just emit to all events
-        _allEvents.tryEmit(object : BaseSDKEvent(SDKEventType.INITIALIZATION) {})
+        // For ComponentEvent types, emit a generic SDK event
+        _events.tryEmit(object : BaseSDKEvent(EventCategory.SDK) {})
     }
 
     fun publish(event: com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationEvent) {
@@ -199,18 +241,34 @@ object EventBus {
 // MARK: - Convenience Extensions
 
 /**
- * Subscribe to events with a closure
+ * Subscribe to events with a closure.
+ * Only receives events with destination != ANALYTICS_ONLY.
  */
 inline fun <reified T : SDKEvent> EventBus.on(
     scope: CoroutineScope,
     crossinline handler: (T) -> Unit
 ): Job {
     return scope.launch {
-        allEvents
+        events
             .filterIsInstance<T>()
             .collect { event ->
                 handler(event)
             }
+    }
+}
+
+/**
+ * Subscribe to events by category with a closure.
+ */
+fun EventBus.on(
+    category: EventCategory,
+    scope: CoroutineScope,
+    handler: (SDKEvent) -> Unit
+): Job {
+    return scope.launch {
+        events(category).collect { event ->
+            handler(event)
+        }
     }
 }
 

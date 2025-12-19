@@ -7,6 +7,7 @@ import com.runanywhere.sdk.data.repositories.DeviceInfoRepository
 import com.runanywhere.sdk.services.sync.SyncCoordinator
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.events.SDKDeviceEvent
 import com.runanywhere.sdk.network.APIClient
 import kotlinx.coroutines.withTimeoutOrNull
@@ -282,7 +283,7 @@ expect suspend fun collectPlatformDeviceInfo(): DeviceInfoData
 
 // Device events are now defined in com.runanywhere.sdk.events.SDKEvent.kt
 
-// Extension to publish device events - updated to use proper event types
+// Extension to publish device events - updated to use EventPublisher for dual-path routing
 fun EventBus.publishDeviceInfo(deviceInfo: DeviceInfoData) {
     val deviceInfoMap = mapOf(
         "deviceId" to deviceInfo.deviceId,
@@ -291,13 +292,13 @@ fun EventBus.publishDeviceInfo(deviceInfo: DeviceInfoData) {
         "systemVersion" to deviceInfo.systemVersion,
         "modelName" to deviceInfo.modelName
     )
-    publish(SDKDeviceEvent.DeviceInfoCollected(deviceInfoMap))
+    EventPublisher.track(SDKDeviceEvent.DeviceInfoCollected(deviceInfoMap))
 }
 
 fun EventBus.publishDeviceInfoSyncFailed(error: Throwable) {
-    publish(SDKDeviceEvent.DeviceInfoSyncFailed(error))
+    EventPublisher.track(SDKDeviceEvent.DeviceInfoSyncFailed(error))
 }
 
 fun EventBus.publishDeviceInfoSyncCompleted() {
-    publish(SDKDeviceEvent.DeviceInfoSyncCompleted)
+    EventPublisher.track(SDKDeviceEvent.DeviceInfoSyncCompleted)
 }
