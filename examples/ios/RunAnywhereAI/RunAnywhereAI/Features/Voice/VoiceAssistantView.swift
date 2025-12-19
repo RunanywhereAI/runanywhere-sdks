@@ -64,9 +64,9 @@ struct VoiceAssistantView: View {
             if showModelInfo {
                 VStack(spacing: 8) {
                     HStack(spacing: 15) {
-                        ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel.isEmpty ? "Loading..." : viewModel.currentLLMModel, color: .blue)
-                        ModelBadge(icon: "waveform", label: "STT", value: viewModel.whisperModel, color: .green)
-                        ModelBadge(icon: "speaker.wave.2", label: "TTS", value: "System", color: .purple)
+                        ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel.isEmpty ? "Loading..." : viewModel.currentLLMModel, color: AppColors.primaryAccent)
+                        ModelBadge(icon: "waveform", label: "STT", value: viewModel.whisperModel, color: AppColors.statusGreen)
+                        ModelBadge(icon: "speaker.wave.2", label: "TTS", value: "System", color: AppColors.primaryPurple)
                     }
                     .padding(.horizontal, 20)
                 }
@@ -256,9 +256,9 @@ struct VoiceAssistantView: View {
                         VStack(spacing: 8) {
                             HStack(spacing: 15) {
                                 // Compact model badges
-                                ModelBadge(icon: "brain", label: "LLM", value: viewModel.llmModel?.name ?? "Not set", color: .blue)
-                                ModelBadge(icon: "waveform", label: "STT", value: viewModel.sttModel?.name ?? "Not set", color: .green)
-                                ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.ttsModel?.name ?? "Not set", color: .purple)
+                                ModelBadge(icon: "brain", label: "LLM", value: viewModel.llmModel?.name ?? "Not set", color: AppColors.primaryAccent)
+                                ModelBadge(icon: "waveform", label: "STT", value: viewModel.sttModel?.name ?? "Not set", color: AppColors.statusGreen)
+                                ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.ttsModel?.name ?? "Not set", color: AppColors.primaryPurple)
                             }
                             .padding(.horizontal, 20)
                         }
@@ -480,11 +480,11 @@ struct VoiceAssistantView: View {
     // Helper computed properties
     private var micButtonColor: Color {
         switch viewModel.sessionState {
-        case .connecting: return .orange
-        case .listening: return .red
-        case .processing: return .blue
-        case .speaking: return .green
-        default: return .blue
+        case .connecting: return AppColors.statusOrange
+        case .listening: return AppColors.statusRed
+        case .processing: return AppColors.primaryAccent
+        case .speaking: return AppColors.statusGreen
+        default: return AppColors.primaryAccent
         }
     }
 
@@ -499,13 +499,13 @@ struct VoiceAssistantView: View {
 
     private var statusColor: Color {
         switch viewModel.sessionState {
-        case .disconnected: return .gray
-        case .connecting: return .orange
-        case .connected: return .green
-        case .listening: return .red
-        case .processing: return .blue
-        case .speaking: return .green
-        case .error: return .red
+        case .disconnected: return AppColors.statusGray
+        case .connecting: return AppColors.statusOrange
+        case .connected: return AppColors.statusGreen
+        case .listening: return AppColors.statusRed
+        case .processing: return AppColors.primaryAccent
+        case .speaking: return AppColors.statusGreen
+        case .error: return AppColors.statusRed
         }
     }
 
@@ -551,7 +551,7 @@ struct ConversationBubble: View {
             return Color(.secondarySystemBackground)
             #endif
         } else {
-            return Color.blue.opacity(0.08)
+            return AppColors.primaryAccent.opacity(0.08)
         }
     }
 
