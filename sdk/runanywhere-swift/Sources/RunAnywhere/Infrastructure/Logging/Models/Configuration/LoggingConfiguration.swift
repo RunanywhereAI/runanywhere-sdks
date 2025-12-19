@@ -21,6 +21,11 @@ public struct LoggingConfiguration: Sendable {
     /// Include device metadata in logs
     public var includeDeviceMetadata: Bool
 
+    /// Enable Sentry logging for crash reporting and error tracking
+    /// When enabled, logs at warning level and above are sent to Sentry
+    /// Default: true in development, false otherwise
+    public var enableSentryLogging: Bool
+
     // MARK: - Initialization
 
     /// Initialize with default values
@@ -28,6 +33,7 @@ public struct LoggingConfiguration: Sendable {
         self.enableLocalLogging = true
         self.minLogLevel = .info
         self.includeDeviceMetadata = true
+        self.enableSentryLogging = false
     }
 
     /// Initialize with custom values
@@ -35,14 +41,17 @@ public struct LoggingConfiguration: Sendable {
     ///   - enableLocalLogging: Whether to enable local logging
     ///   - minLogLevel: Minimum log level to capture
     ///   - includeDeviceMetadata: Whether to include device metadata
+    ///   - enableSentryLogging: Whether to enable Sentry logging (default: false)
     public init(
         enableLocalLogging: Bool = true,
         minLogLevel: LogLevel = .info,
-        includeDeviceMetadata: Bool = true
+        includeDeviceMetadata: Bool = true,
+        enableSentryLogging: Bool = false
     ) {
         self.enableLocalLogging = enableLocalLogging
         self.minLogLevel = minLogLevel
         self.includeDeviceMetadata = includeDeviceMetadata
+        self.enableSentryLogging = enableSentryLogging
     }
 
     // MARK: - Validation
@@ -87,6 +96,12 @@ extension LoggingConfiguration {
             return self
         }
 
+        /// Set whether Sentry logging is enabled
+        public func enableSentryLogging(_ enabled: Bool) -> Builder {
+            config.enableSentryLogging = enabled
+            return self
+        }
+
         /// Build the configuration
         public func build() -> LoggingConfiguration {
             config
@@ -99,11 +114,13 @@ extension LoggingConfiguration {
 extension LoggingConfiguration {
 
     /// Configuration preset for development environment
+    /// Sentry logging is enabled by default for development
     public static var development: LoggingConfiguration {
         LoggingConfiguration(
             enableLocalLogging: true,
             minLogLevel: .debug,
-            includeDeviceMetadata: false
+            includeDeviceMetadata: false,
+            enableSentryLogging: true
         )
     }
 
@@ -112,7 +129,8 @@ extension LoggingConfiguration {
         LoggingConfiguration(
             enableLocalLogging: true,
             minLogLevel: .info,
-            includeDeviceMetadata: true
+            includeDeviceMetadata: true,
+            enableSentryLogging: false
         )
     }
 
@@ -121,7 +139,8 @@ extension LoggingConfiguration {
         LoggingConfiguration(
             enableLocalLogging: false,
             minLogLevel: .warning,
-            includeDeviceMetadata: true
+            includeDeviceMetadata: true,
+            enableSentryLogging: false
         )
     }
 }
