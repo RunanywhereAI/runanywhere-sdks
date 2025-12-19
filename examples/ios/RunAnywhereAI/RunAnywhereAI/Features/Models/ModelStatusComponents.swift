@@ -90,6 +90,7 @@ struct ModelStatusBanner: View {
                             .fontWeight(.medium)
                     }
                     .buttonStyle(.bordered)
+                    .tint(AppColors.primaryAccent)
                     .controlSize(.small)
                 }
             } else {
@@ -113,6 +114,7 @@ struct ModelStatusBanner: View {
                         .fontWeight(.semibold)
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primaryAccent)
                     .controlSize(.small)
                 }
             }
@@ -157,7 +159,7 @@ struct ModelStatusBanner: View {
 
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
-        case .llamaCpp: return .blue
+        case .llamaCpp: return AppColors.primaryAccent
         case .whisperKit: return .green
         case .onnx: return .purple
         case .foundationModels: return .primary
@@ -254,10 +256,10 @@ struct ModelRequiredOverlay: View {
 
     private var modalityColor: Color {
         switch modality {
-        case .llm: return AppColors.primaryBlue
+        case .llm: return AppColors.primaryAccent
         case .stt: return .green
         case .tts: return AppColors.primaryPurple
-        case .voice: return .orange
+        case .voice: return AppColors.primaryAccent
         }
     }
 
@@ -312,7 +314,7 @@ struct VoicePipelineSetupView: View {
             VStack(spacing: 8) {
                 Image(systemName: "mic.circle.fill")
                     .font(.system(size: 48))
-                    .foregroundColor(.blue)
+                    .foregroundColor(AppColors.primaryAccent)
 
                 Text("Voice Assistant Setup")
                     .font(.title2)
@@ -345,7 +347,7 @@ struct VoicePipelineSetupView: View {
                     title: "Language Model",
                     subtitle: "Processes and responds to your input",
                     icon: "brain",
-                    color: .blue,
+                    color: AppColors.primaryAccent,
                     selectedFramework: llmModel?.framework,
                     selectedModel: llmModel?.name,
                     loadState: llmLoadState,
@@ -380,6 +382,7 @@ struct VoicePipelineSetupView: View {
                 .padding(.vertical, 16)
             }
             .buttonStyle(.borderedProminent)
+            .tint(AppColors.primaryAccent)
             .disabled(!allModelsLoaded)
             .padding(.horizontal)
             .padding(.bottom, 20)
@@ -510,7 +513,7 @@ struct ModelSetupCard: View {
                 } else if isConfigured {
                     Text("Change")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primaryAccent)
                 } else {
                     HStack(spacing: 4) {
                         Text("Select")
@@ -518,7 +521,7 @@ struct ModelSetupCard: View {
                     }
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundColor(.blue)
+                    .foregroundColor(AppColors.primaryAccent)
                 }
             }
             .padding(16)
@@ -593,15 +596,15 @@ struct CompactModelIndicator: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(framework != nil ? Color.blue.opacity(0.1) : Color.orange.opacity(0.1))
-            .foregroundColor(framework != nil ? .blue : .orange)
+            .background(framework != nil ? AppColors.primaryAccent.opacity(0.1) : AppColors.primaryAccent.opacity(0.2))
+            .foregroundColor(AppColors.primaryAccent)
             .cornerRadius(8)
         }
     }
 
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
-        case .llamaCpp: return .blue
+        case .llamaCpp: return AppColors.primaryAccent
         case .whisperKit: return .green
         case .onnx: return .purple
         case .foundationModels: return .primary

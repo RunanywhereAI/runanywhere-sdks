@@ -228,6 +228,7 @@ struct CombinedSettingsView: View {
                                 viewModel.showApiKeySheet()
                             }
                             .buttonStyle(.bordered)
+                            .tint(AppColors.primaryAccent)
                         }
                     }
                 }
@@ -242,6 +243,7 @@ struct CombinedSettingsView: View {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(.bordered)
+                    .tint(AppColors.primaryAccent)
                 }) {
                     VStack(alignment: .leading, spacing: AppSpacing.large) {
                         storageOverviewRows
@@ -379,7 +381,7 @@ struct CombinedSettingsView: View {
                 Label("Models Storage", systemImage: "cpu")
                 Spacer()
                 Text(viewModel.formatBytes(viewModel.modelStorageSize))
-                    .foregroundColor(AppColors.primaryBlue)
+                    .foregroundColor(AppColors.primaryAccent)
             }
 
             HStack {
@@ -556,6 +558,7 @@ private struct StoredModelRow: View {
                         }
                         .font(AppTypography.caption2)
                         .buttonStyle(.bordered)
+                        .tint(AppColors.primaryAccent)
                         .controlSize(.mini)
 
                         Button(action: {
@@ -566,6 +569,7 @@ private struct StoredModelRow: View {
                         }
                         .font(AppTypography.caption2)
                         .buttonStyle(.bordered)
+                        .tint(AppColors.primaryRed)
                         .controlSize(.mini)
                         .disabled(isDeleting)
                     }

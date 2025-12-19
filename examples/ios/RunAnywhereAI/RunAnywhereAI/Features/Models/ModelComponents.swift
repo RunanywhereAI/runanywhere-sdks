@@ -55,7 +55,7 @@ struct FrameworkRow: View {
         case .foundationModels:
             return AppColors.textPrimary
         case .mediaPipe:
-            return AppColors.statusBlue
+            return AppColors.primaryAccent
         default:
             return AppColors.statusGray
         }

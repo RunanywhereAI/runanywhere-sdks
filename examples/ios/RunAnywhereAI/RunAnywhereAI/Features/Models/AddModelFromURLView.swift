@@ -39,6 +39,7 @@ struct AddModelFromURLView: View {
                     .disabled(modelName.isEmpty || modelURL.isEmpty || isAdding)
                     #if os(macOS)
                     .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primaryAccent)
                     #endif
 
                     if isAdding {

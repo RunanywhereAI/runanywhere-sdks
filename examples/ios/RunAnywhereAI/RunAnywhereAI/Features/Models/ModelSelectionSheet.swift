@@ -339,6 +339,7 @@ struct ModelSelectionSheet: View {
             .font(AppTypography.caption)
             .fontWeight(.semibold)
             .buttonStyle(.borderedProminent)
+            .tint(AppColors.primaryAccent)
             .controlSize(.small)
             .disabled(isLoadingModel)
         }
@@ -579,7 +580,7 @@ private struct SelectableModelRow: View {
                             } else {
                                 Text("Available for download")
                                     .font(AppTypography.caption2)
-                                    .foregroundColor(AppColors.statusBlue)
+                                    .foregroundColor(AppColors.primaryAccent)
                             }
                         }
                     } else {
@@ -606,6 +607,7 @@ private struct SelectableModelRow: View {
                     }
                     .font(AppTypography.caption)
                     .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primaryAccent)
                     .controlSize(.small)
                     .disabled(isLoading || isSelected)
                 } else if let _ = model.downloadURL, model.localPath == nil {
@@ -628,6 +630,7 @@ private struct SelectableModelRow: View {
                         }
                         .font(AppTypography.caption)
                         .buttonStyle(.borderedProminent)
+                        .tint(AppColors.primaryAccent)
                         .controlSize(.small)
                         .disabled(isLoading)
                     }
@@ -638,6 +641,7 @@ private struct SelectableModelRow: View {
                     }
                     .font(AppTypography.caption)
                     .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primaryAccent)
                     .controlSize(.small)
                     .disabled(isLoading || isSelected)
                 }
@@ -710,7 +714,7 @@ private struct FlatModelRow: View {
     private var frameworkColor: Color {
         guard let framework = model.preferredFramework else { return .gray }
         switch framework {
-        case .llamaCpp: return .blue
+        case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
         case .whisperKit: return .green
@@ -743,7 +747,7 @@ private struct FlatModelRow: View {
         if model.preferredFramework == .foundationModels || model.localPath != nil {
             return AppColors.statusGreen
         } else {
-            return AppColors.statusBlue
+            return AppColors.primaryAccent
         }
     }
 
@@ -836,6 +840,7 @@ private struct FlatModelRow: View {
             .font(AppTypography.caption)
             .fontWeight(.semibold)
             .buttonStyle(.borderedProminent)
+            .tint(AppColors.primaryAccent)
             .controlSize(.small)
             .disabled(isLoading || isSelected)
         } else if model.localPath == nil {
@@ -857,6 +862,7 @@ private struct FlatModelRow: View {
                 .font(AppTypography.caption)
                 .fontWeight(.semibold)
                 .buttonStyle(.bordered)
+                .tint(AppColors.primaryAccent)
                 .controlSize(.small)
                 .disabled(isLoading)
             }
@@ -868,6 +874,7 @@ private struct FlatModelRow: View {
             .font(AppTypography.caption)
             .fontWeight(.semibold)
             .buttonStyle(.borderedProminent)
+            .tint(AppColors.primaryAccent)
             .controlSize(.small)
             .disabled(isLoading || isSelected)
         }
