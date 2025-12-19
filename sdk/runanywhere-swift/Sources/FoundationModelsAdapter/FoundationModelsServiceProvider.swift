@@ -1,5 +1,5 @@
 //
-//  FoundationModelsModule.swift
+//  FoundationModelsServiceProvider.swift
 //  FoundationModelsAdapter Module
 //
 //  Apple Foundation Models module providing LLM capabilities via Apple Intelligence.
@@ -111,8 +111,8 @@ public enum AppleAI: RunAnywhereModule {
         let lowercasedId = modelId.lowercased()
         return lowercasedId.contains("foundation")
             || lowercasedId.contains("apple")
-            || modelId == "foundation-models-default"
-            || modelId == "foundation-models-native"
+            || lowercasedId == "foundation-models-default"
+            || lowercasedId == "foundation-models-native"
     }
 
     private static func createService(config _: LLMConfiguration) async throws -> LLMService {

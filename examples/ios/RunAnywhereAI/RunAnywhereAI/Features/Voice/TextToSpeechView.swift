@@ -96,6 +96,9 @@ struct TextToSpeechView: View {
                 await viewModel.initialize()
             }
         }
+        .onDisappear {
+            viewModel.cleanup()
+        }
         .onChange(of: viewModel.selectedModelName) { oldValue, newValue in
             // Set a new random funny text when a model is loaded
             if oldValue == nil && newValue != nil {

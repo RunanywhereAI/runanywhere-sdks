@@ -244,7 +244,9 @@ public class FoundationModelsService: LLMService {
         switch error {
         case .exceededContextWindowSize:
             logger.error("Exceeded context window size - please reduce prompt length")
-            throw LLMError.contextLengthExceeded(maxLength: 0, requestedLength: 0)
+            // Foundation Models has a 4096 token context window
+            // Apple's API doesn't provide the actual requested length, so use -1 to indicate unknown
+            throw LLMError.contextLengthExceeded(maxLength: 4096, requestedLength: -1)
         default:
             logger.error("Other generation error: \(error)")
             throw LLMError.generationFailed(error)

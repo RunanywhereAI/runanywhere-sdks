@@ -880,7 +880,7 @@ private struct FlatModelRow: View {
         }
 
         do {
-            let progressStream = try await RunAnywhere.downloadModelWithProgress(model.id)
+            let progressStream = try await RunAnywhere.downloadModel(model.id)
 
             for await progress in progressStream {
                 await MainActor.run {

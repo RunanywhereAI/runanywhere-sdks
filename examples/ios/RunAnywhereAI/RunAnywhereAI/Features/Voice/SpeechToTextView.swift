@@ -14,6 +14,16 @@ struct SpeechToTextView: View {
         viewModel.selectedModelName != nil
     }
 
+    private var statusMessage: String {
+        if viewModel.isTranscribing {
+            return "Processing transcription..."
+        } else if viewModel.isRecording {
+            return "Tap to stop recording"
+        } else {
+            return "Tap to start recording"
+        }
+    }
+
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
@@ -190,11 +200,7 @@ struct SpeechToTextView: View {
                         .disabled(viewModel.selectedModelName == nil || viewModel.isProcessing || viewModel.isTranscribing)
                         .opacity(viewModel.selectedModelName == nil || viewModel.isProcessing || viewModel.isTranscribing ? 0.6 : 1.0)
 
-                        Text(
-                            viewModel.isTranscribing
-                                ? "Processing transcription..."
-                                : (viewModel.isRecording ? "Tap to stop recording" : "Tap to start recording")
-                        )
+                        Text(statusMessage)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -229,6 +235,9 @@ struct SpeechToTextView: View {
             Task {
                 await viewModel.initialize()
             }
+        }
+        .onDisappear {
+            viewModel.cleanup()
         }
     }
 }

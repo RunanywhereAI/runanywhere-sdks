@@ -479,8 +479,11 @@ struct MessageBubbleView: View {
                     thinkingSection
                 }
 
-                if message.role == .assistant && message.content.isEmpty &&
-                    message.thinkingContent != nil && !message.thinkingContent!.isEmpty && isGenerating {
+                if message.role == .assistant &&
+                    message.content.isEmpty &&
+                    message.thinkingContent != nil &&
+                    !message.thinkingContent!.isEmpty &&
+                    isGenerating {
                     thinkingProgressIndicator
                 }
 

@@ -19,6 +19,11 @@ import os.log
 @MainActor
 @Observable
 final class LLMViewModel {
+    // MARK: - Constants
+
+    private static let defaultMaxTokens = 1000
+    private static let defaultTemperature = 0.7
+
     // MARK: - Published State
 
     private(set) var messages: [Message] = []
@@ -320,7 +325,7 @@ final class LLMViewModel {
         guard let llmEvent = event as? LLMEvent else { return }
 
         switch llmEvent {
-        case .modelLoadCompleted(let modelId, _, _):
+        case .modelLoadCompleted(let modelId, _, _, _):
             let wasLoaded = self.isModelLoaded
             self.isModelLoaded = true
 
@@ -342,14 +347,14 @@ final class LLMViewModel {
             self.loadedModelName = nil
             self.selectedFramework = nil
 
-        case .modelLoadStarted(let modelId, _):
+        case .modelLoadStarted(let modelId, _, _):
             logger.info("LLM model loading: \(modelId)")
 
         case .firstToken(let generationId, let latencyMs):
             self.firstTokenLatencies[generationId] = latencyMs
             logger.info("First token: \(latencyMs)ms")
 
-        case .generationCompleted(let generationId, let modelId, let inputTokens, let outputTokens, let durationMs, let tokensPerSecond, _):
+        case .generationCompleted(let generationId, let modelId, let inputTokens, let outputTokens, let durationMs, let tokensPerSecond, _, _, _):
             let ttft = self.firstTokenLatencies[generationId]
             let metrics = GenerationMetricsFromSDK(
                 generationId: generationId,
@@ -393,8 +398,8 @@ final class LLMViewModel {
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
 
         let effectiveSettings = (
-            temperature: savedTemperature != 0 ? savedTemperature : 0.7,
-            maxTokens: savedMaxTokens != 0 ? savedMaxTokens : 1000
+            temperature: savedTemperature != 0 ? savedTemperature : Self.defaultTemperature,
+            maxTokens: savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokens
         )
 
         return LLMGenerationOptions(
@@ -589,8 +594,8 @@ final class LLMViewModel {
         let completionStatus: MessageAnalytics.CompletionStatus = wasInterrupted ? .interrupted : .complete
 
         let generationParameters = MessageAnalytics.GenerationParameters(
-            temperature: Double(options.temperature ?? 0.7),
-            maxTokens: options.maxTokens ?? 1000,
+            temperature: Double(options.temperature ?? Float(Self.defaultTemperature)),
+            maxTokens: options.maxTokens ?? Self.defaultMaxTokens,
             topP: nil,
             topK: nil
         )
@@ -600,7 +605,7 @@ final class LLMViewModel {
             conversationId: conversationId,
             modelId: currentModel.id,
             modelName: modelName,
-            framework: result.framework?.rawValue ?? currentModel.compatibleFrameworks.first?.rawValue ?? "unknown",
+            framework: result.framework ?? currentModel.compatibleFrameworks.first?.rawValue ?? "unknown",
             timestamp: Date(),
             timeToFirstToken: nil,
             totalGenerationTime: totalGenerationTime,
@@ -682,10 +687,10 @@ final class LLMViewModel {
 
     private func ensureSettingsAreApplied() async {
         let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
-        let temperature = savedTemperature != 0 ? savedTemperature : 0.7
+        let temperature = savedTemperature != 0 ? savedTemperature : Self.defaultTemperature
 
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
-        let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : 10000
+        let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokens
 
         UserDefaults.standard.set(temperature, forKey: "defaultTemperature")
         UserDefaults.standard.set(maxTokens, forKey: "defaultMaxTokens")
