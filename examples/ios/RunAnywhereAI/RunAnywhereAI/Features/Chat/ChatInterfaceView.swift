@@ -383,7 +383,7 @@ struct ChatInterfaceView: View {
             // Info icon for chat details
             Button(action: { showingChatDetails = true }) {
                 Image(systemName: "info.circle")
-                    .foregroundColor(viewModel.messages.isEmpty ? .gray : .blue)
+                    .foregroundColor(viewModel.messages.isEmpty ? AppColors.statusGray : AppColors.primaryAccent)
             }
             .disabled(viewModel.messages.isEmpty)
             #if os(macOS)
@@ -524,7 +524,7 @@ struct TypingIndicatorView: View {
                 HStack(spacing: AppSpacing.xSmall) {
                     ForEach(0..<3) { index in
                         Circle()
-                            .fill(AppColors.primaryBlue.opacity(0.7))
+                            .fill(AppColors.typingIndicatorDots)
                             .frame(width: AppSpacing.iconSmall, height: AppSpacing.iconSmall)
                             .scaleEffect(animationPhase == index ? 1.3 : 0.8)
                             .animation(
@@ -798,9 +798,9 @@ struct MessageBubbleView: View {
             .padding(.vertical, 5)
             .background(
                 RoundedRectangle(cornerRadius: AppSpacing.regular)
-                    .fill(LinearGradient(colors: [AppColors.primaryBlue, AppColors.primaryBlue.opacity(0.8)],
+                    .fill(LinearGradient(colors: [AppColors.primaryAccent, AppColors.primaryAccent.opacity(0.8)],
                                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .shadow(color: AppColors.primaryBlue.opacity(0.3), radius: 2, x: 0, y: 1)
+                    .shadow(color: AppColors.shadowModelBadge, radius: 2, x: 0, y: 1)
                     .overlay(
                         RoundedRectangle(cornerRadius: AppSpacing.regular)
                             .strokeBorder(AppColors.textWhite.opacity(0.2), lineWidth: AppSpacing.strokeThin)
@@ -1017,7 +1017,7 @@ struct ChatOverviewTab: View {
                     VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                         HStack {
                             Image(systemName: "message.circle")
-                                .foregroundColor(AppColors.primaryBlue)
+                                .foregroundColor(AppColors.primaryAccent)
                             Text(conversationSummary)
                                 .font(AppTypography.subheadline)
                         }
@@ -1025,7 +1025,7 @@ struct ChatOverviewTab: View {
                         if let conversation = conversation {
                             HStack {
                                 Image(systemName: "clock")
-                                    .foregroundColor(AppColors.primaryBlue)
+                                    .foregroundColor(AppColors.primaryAccent)
                                 Text("Created \(conversation.createdAt, style: .relative)")
                                     .font(AppTypography.subheadline)
                             }
@@ -1034,7 +1034,7 @@ struct ChatOverviewTab: View {
                         if !analyticsMessages.isEmpty {
                             HStack {
                                 Image(systemName: "cube")
-                                    .foregroundColor(AppColors.primaryBlue)
+                                    .foregroundColor(AppColors.primaryAccent)
                                 let models = Set(analyticsMessages.map { $0.modelName })
                                 Text("\(models.count) model\(models.count == 1 ? "" : "s") used")
                                     .font(AppTypography.subheadline)
@@ -1321,11 +1321,11 @@ struct PerformanceTab: View {
                                 VStack(alignment: .trailing, spacing: 4) {
                                     Text(String(format: "%.1fs avg", avgTime))
                                         .font(.caption)
-                                        .foregroundColor(.green)
+                                        .foregroundColor(AppColors.statusGreen)
 
                                     Text("\(Int(avgSpeed)) tok/s")
                                         .font(.caption)
-                                        .foregroundColor(AppColors.primaryBlue)
+                                        .foregroundColor(AppColors.primaryAccent)
                                 }
                             }
                             .padding(AppSpacing.large)
@@ -1348,7 +1348,7 @@ struct PerformanceTab: View {
 
                             HStack {
                                 Image(systemName: "lightbulb.min")
-                                    .foregroundColor(.purple)
+                                    .foregroundColor(AppColors.primaryPurple)
 
                                 Text("Used in \(thinkingMessages.count) messages (\(String(format: "%.0f", thinkingPercentage))%)")
                                     .font(AppTypography.subheadline)
@@ -1356,7 +1356,7 @@ struct PerformanceTab: View {
                             .padding(AppSpacing.large)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.purple.opacity(0.1))
+                                    .fill(AppColors.primaryPurple.opacity(0.1))
                             )
                         }
                     }

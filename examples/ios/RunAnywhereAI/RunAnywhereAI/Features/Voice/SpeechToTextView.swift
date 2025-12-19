@@ -74,7 +74,7 @@ struct SpeechToTextView: View {
                                 VStack(spacing: 16) {
                                     Image(systemName: "mic.circle")
                                         .font(.system(size: 64))
-                                        .foregroundColor(.green.opacity(0.5))
+                                        .foregroundColor(AppColors.statusGreen.opacity(0.5))
 
                                     Text("Ready to transcribe")
                                         .font(.headline)
@@ -134,11 +134,11 @@ struct SpeechToTextView: View {
                                         Text("TRANSCRIBING")
                                             .font(.caption2)
                                             .fontWeight(.bold)
-                                            .foregroundColor(.orange)
+                                            .foregroundColor(AppColors.statusOrange)
                                     }
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(Color.orange.opacity(0.1))
+                                    .background(AppColors.statusOrange.opacity(0.1))
                                     .cornerRadius(4)
                                 }
                             }
@@ -183,8 +183,8 @@ struct SpeechToTextView: View {
                     isActive: viewModel.isRecording,
                     isPulsing: false,
                     isLoading: viewModel.isProcessing || viewModel.isTranscribing,
-                    activeColor: .red,
-                    inactiveColor: viewModel.isTranscribing ? .orange : .blue,
+                    activeColor: AppColors.statusRed,
+                    inactiveColor: viewModel.isTranscribing ? AppColors.statusOrange : AppColors.primaryAccent,
                     icon: viewModel.isRecording ? "stop.fill" : "mic.fill"
                 ) {
                     Task {
@@ -234,13 +234,13 @@ struct SpeechToTextView: View {
 
     private var statusColor: Color {
         if viewModel.isRecording {
-            return .red
+            return AppColors.statusRed
         } else if viewModel.isProcessing {
-            return .orange
+            return AppColors.statusOrange
         } else if viewModel.selectedModelName != nil {
-            return .green
+            return AppColors.statusGreen
         } else {
-            return .gray
+            return AppColors.statusGray
         }
     }
 

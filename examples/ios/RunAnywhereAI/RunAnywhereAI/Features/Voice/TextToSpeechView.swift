@@ -128,7 +128,7 @@ struct TextToSpeechView: View {
                                     Text("Surprise me!")
                                 }
                                 .font(.caption)
-                                .foregroundColor(.purple)
+                                .foregroundColor(AppColors.primaryAccent)
                             }
                         }
                     }
@@ -150,7 +150,7 @@ struct TextToSpeechView: View {
                                     .foregroundColor(.secondary)
                             }
                             Slider(value: $viewModel.speechRate, in: 0.5...2.0, step: 0.1)
-                                .tint(.blue)
+                                .tint(AppColors.primaryAccent)
                         }
 
                         // Pitch
@@ -164,7 +164,7 @@ struct TextToSpeechView: View {
                                     .foregroundColor(.secondary)
                             }
                             Slider(value: $viewModel.pitch, in: 0.5...2.0, step: 0.1)
-                                .tint(.purple)
+                                .tint(AppColors.primaryPurple)
                         }
                     }
                     .padding()
@@ -215,7 +215,7 @@ struct TextToSpeechView: View {
                             .foregroundColor(.secondary)
 
                         ProgressView(value: viewModel.playbackProgress)
-                            .tint(.purple)
+                            .tint(AppColors.primaryAccent)
 
                         Text(formatTime(viewModel.duration))
                             .font(.caption)
@@ -247,7 +247,7 @@ struct TextToSpeechView: View {
                         }
                         .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
                         .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
-                        .background(inputText.isEmpty || viewModel.selectedModelName == nil ? Color.gray : Color.purple)
+                        .background(inputText.isEmpty || viewModel.selectedModelName == nil ? AppColors.statusGray : AppColors.primaryAccent)
                         .foregroundColor(.white)
                         .cornerRadius(25)
                     }
@@ -267,7 +267,7 @@ struct TextToSpeechView: View {
                         }
                         .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
                         .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
-                        .background(viewModel.hasGeneratedAudio ? Color.green : Color.gray)
+                        .background(viewModel.hasGeneratedAudio ? AppColors.statusGreen : AppColors.statusGray)
                         .foregroundColor(.white)
                         .cornerRadius(25)
                     }
@@ -324,13 +324,13 @@ struct TextToSpeechView: View {
 
     private var statusColor: Color {
         if viewModel.isGenerating {
-            return .orange
+            return AppColors.statusOrange
         } else if viewModel.isPlaying {
-            return .green
+            return AppColors.statusGreen
         } else if viewModel.selectedModelName != nil {
-            return .green
+            return AppColors.statusGreen
         } else {
-            return .gray
+            return AppColors.statusGray
         }
     }
 

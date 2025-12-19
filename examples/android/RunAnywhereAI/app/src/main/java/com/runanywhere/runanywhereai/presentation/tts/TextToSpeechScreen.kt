@@ -208,7 +208,7 @@ private fun ModelStatusBannerTTS(
                 Icon(
                     imageVector = Icons.Filled.VolumeUp,
                     contentDescription = null,
-                    tint = AppColors.primaryPurple,
+                    tint = AppColors.primaryAccent,
                     modifier = Modifier.size(18.dp)
                 )
                 Column(modifier = Modifier.weight(1f)) {
@@ -244,16 +244,21 @@ private fun ModelStatusBannerTTS(
                 Button(
                     onClick = onSelectModel,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AppColors.primaryPurple
+                        containerColor = AppColors.primaryAccent,
+                        contentColor = Color.White
                     )
                 ) {
                     Icon(
                         Icons.Filled.Apps,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.White
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Select Voice")
+                    Text(
+                        "Select Voice",
+                        color = Color.White
+                    )
                 }
             }
         }
@@ -312,13 +317,13 @@ private fun TextInputSection(
                     imageVector = Icons.Filled.Casino,
                     contentDescription = "Shuffle",
                     modifier = Modifier.size(16.dp),
-                    tint = AppColors.primaryPurple
+                    tint = AppColors.primaryAccent
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "Surprise me!",
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColors.primaryPurple
+                    color = AppColors.primaryAccent
                 )
             }
         }
@@ -372,8 +377,8 @@ private fun VoiceSettingsSection(
                     valueRange = 0.5f..2.0f,
                     steps = 14, // 0.1 increments
                     colors = SliderDefaults.colors(
-                        thumbColor = AppColors.primaryBlue,
-                        activeTrackColor = AppColors.primaryBlue
+                        thumbColor = AppColors.primaryAccent,
+                        activeTrackColor = AppColors.primaryAccent
                     )
                 )
             }
@@ -400,8 +405,8 @@ private fun VoiceSettingsSection(
                     valueRange = 0.5f..2.0f,
                     steps = 14,
                     colors = SliderDefaults.colors(
-                        thumbColor = AppColors.primaryPurple,
-                        activeTrackColor = AppColors.primaryPurple
+                        thumbColor = AppColors.primaryAccent,
+                        activeTrackColor = AppColors.primaryAccent
                     )
                 )
             }
@@ -541,7 +546,7 @@ private fun ControlsSection(
                 LinearProgressIndicator(
                     progress = { playbackProgress.toFloat() },
                     modifier = Modifier.weight(1f),
-                    color = AppColors.primaryPurple
+                    color = AppColors.primaryAccent
                 )
                 Text(
                     text = formatTime(duration),
@@ -564,7 +569,8 @@ private fun ControlsSection(
                     .height(50.dp),
                 shape = RoundedCornerShape(25.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AppColors.primaryPurple,
+                    containerColor = AppColors.primaryAccent,
+                    contentColor = Color.White,
                     disabledContainerColor = Color.Gray
                 )
             ) {
@@ -578,13 +584,15 @@ private fun ControlsSection(
                     Icon(
                         imageVector = if (isSystemTTS) Icons.Filled.VolumeUp else Icons.Filled.GraphicEq,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.White
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (isSystemTTS) "Speak" else "Generate",
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
                 )
             }
 
@@ -675,18 +683,21 @@ private fun ModelRequiredOverlayTTS(
                     .height(50.dp),
                 shape = RoundedCornerShape(25.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AppColors.primaryPurple
+                    containerColor = AppColors.primaryAccent,
+                    contentColor = Color.White
                 )
             ) {
                 Icon(
                     Icons.Filled.Apps,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
+                    tint = Color.White
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     "Select a Voice",
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
                 )
             }
         }
