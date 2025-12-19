@@ -64,9 +64,9 @@ struct VoiceAssistantView: View {
             if showModelInfo {
                 VStack(spacing: 8) {
                     HStack(spacing: 15) {
-                        ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel, color: .blue)
-                        ModelBadge(icon: "waveform", label: "STT", value: viewModel.currentSTTModel, color: .green)
-                        ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.currentTTSModel, color: .purple)
+                        ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel, color: AppColors.primaryBlue)
+                        ModelBadge(icon: "waveform", label: "STT", value: viewModel.currentSTTModel, color: AppColors.statusGreen)
+                        ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.currentTTSModel, color: AppColors.primaryPurple)
                     }
                     .padding(.horizontal, 20)
                 }
@@ -131,7 +131,7 @@ struct VoiceAssistantView: View {
                 if let error = viewModel.errorMessage {
                     Text(error)
                         .font(.caption)
-                        .foregroundColor(.red)
+                        .foregroundColor(AppColors.statusRed)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
                 }
@@ -253,9 +253,9 @@ struct VoiceAssistantView: View {
                         VStack(spacing: 8) {
                             HStack(spacing: 15) {
                                 // Compact model badges
-                                ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel, color: .blue)
-                                ModelBadge(icon: "waveform", label: "STT", value: viewModel.currentSTTModel, color: .green)
-                                ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.currentTTSModel, color: .purple)
+                                ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel, color: AppColors.primaryBlue)
+                                ModelBadge(icon: "waveform", label: "STT", value: viewModel.currentSTTModel, color: AppColors.statusGreen)
+                                ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.currentTTSModel, color: AppColors.primaryPurple)
                             }
                             .padding(.horizontal, 20)
                         }
@@ -319,7 +319,7 @@ struct VoiceAssistantView: View {
                         if let error = viewModel.errorMessage {
                             Text(error)
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundColor(AppColors.statusRed)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 20)
                         }
@@ -330,16 +330,16 @@ struct VoiceAssistantView: View {
                                 // Recording status badge
                                 HStack(spacing: 6) {
                                     Circle()
-                                        .fill(Color.red)
+                                        .fill(AppColors.statusRed)
                                         .frame(width: 8, height: 8)
                                     Text("RECORDING")
                                         .font(.caption2)
                                         .fontWeight(.bold)
-                                        .foregroundColor(.red)
+                                        .foregroundColor(AppColors.statusRed)
                                 }
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.red.opacity(0.1))
+                                .background(AppColors.statusRed.opacity(0.1))
                                 .cornerRadius(4)
 
                                 // Audio level bars - using adaptive sizing
@@ -493,7 +493,7 @@ struct ConversationBubble: View {
             return Color(.secondarySystemBackground)
             #endif
         } else {
-            return Color.blue.opacity(0.08)
+            return AppColors.primaryAccent.opacity(0.08)
         }
     }
 

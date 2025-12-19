@@ -177,7 +177,7 @@ struct TextToSpeechView: View {
                         Text("Surprise me!")
                     }
                     .font(.caption)
-                    .foregroundColor(.purple)
+                    .foregroundColor(AppColors.primaryPurple)
                 }
             }
         }
@@ -201,7 +201,7 @@ struct TextToSpeechView: View {
                         .foregroundColor(.secondary)
                 }
                 Slider(value: $viewModel.speechRate, in: 0.5...2.0, step: 0.1)
-                    .tint(.blue)
+                    .tint(AppColors.primaryAccent)
             }
 
             // Pitch
@@ -215,7 +215,7 @@ struct TextToSpeechView: View {
                         .foregroundColor(.secondary)
                 }
                 Slider(value: $viewModel.pitch, in: 0.5...2.0, step: 0.1)
-                    .tint(.purple)
+                    .tint(AppColors.primaryPurple)
             }
         }
         .padding()
@@ -262,7 +262,7 @@ struct TextToSpeechView: View {
             if let error = viewModel.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundColor(.red)
+                    .foregroundColor(AppColors.statusRed)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -275,7 +275,7 @@ struct TextToSpeechView: View {
                         .foregroundColor(.secondary)
 
                     ProgressView(value: viewModel.playbackProgress)
-                        .tint(.purple)
+                        .tint(AppColors.primaryPurple)
 
                     Text(viewModel.formatTime(viewModel.duration))
                         .font(.caption)
@@ -378,15 +378,15 @@ struct TextToSpeechView: View {
     /// Generate button color based on state
     private var generateButtonColor: Color {
         if inputText.isEmpty || viewModel.selectedModelName == nil {
-            return Color.gray
+            return AppColors.statusGray
         } else {
-            return Color.purple
+            return AppColors.primaryPurple
         }
     }
 
     /// Play button color based on state
     private var playButtonColor: Color {
-        viewModel.hasGeneratedAudio ? Color.green : Color.gray
+        viewModel.hasGeneratedAudio ? AppColors.statusGreen : AppColors.statusGray
     }
 }
 
