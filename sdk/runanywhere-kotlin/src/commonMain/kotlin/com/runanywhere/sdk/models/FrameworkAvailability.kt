@@ -39,7 +39,7 @@ data class FrameworkAvailability(
 
         private fun getRecommendedFor(framework: InferenceFramework): List<String> =
             when (framework) {
-                InferenceFramework.LLAMA_CPP, InferenceFramework.LLAMACPP -> listOf("GGUF models", "Text generation", "Chat")
+                InferenceFramework.LLAMA_CPP -> listOf("GGUF models", "Text generation", "Chat")
                 InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP, InferenceFramework.OPEN_AI_WHISPER ->
                     listOf(
                         "Speech recognition",
@@ -63,7 +63,7 @@ data class FrameworkAvailability(
 
         private fun getSupportedFormats(framework: InferenceFramework): List<ModelFormat> =
             when (framework) {
-                InferenceFramework.LLAMA_CPP, InferenceFramework.LLAMACPP -> listOf(ModelFormat.GGUF, ModelFormat.GGML)
+                InferenceFramework.LLAMA_CPP -> listOf(ModelFormat.GGUF, ModelFormat.GGML)
                 InferenceFramework.WHISPER_KIT -> listOf(ModelFormat.MLMODEL, ModelFormat.MLPACKAGE)
                 InferenceFramework.WHISPER_CPP -> listOf(ModelFormat.GGML, ModelFormat.BIN)
                 InferenceFramework.OPEN_AI_WHISPER -> listOf(ModelFormat.BIN, ModelFormat.SAFETENSORS)

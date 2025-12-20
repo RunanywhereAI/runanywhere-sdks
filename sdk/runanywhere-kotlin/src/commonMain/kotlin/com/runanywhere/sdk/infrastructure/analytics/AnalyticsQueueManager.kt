@@ -212,7 +212,7 @@ object AnalyticsQueueManager {
     // MARK: - Helper Methods
 
     /**
-     * Get device ID from PersistentDeviceIdentity
+     * Get device ID from DeviceIdentity
      * Falls back to a stable placeholder if unavailable
      */
     private fun getDeviceId(): String =

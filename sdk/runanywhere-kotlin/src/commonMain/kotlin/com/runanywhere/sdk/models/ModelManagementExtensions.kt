@@ -14,7 +14,8 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * Model Management Extensions for RunAnywhere SDK - EXACT copy of iOS RunAnywhere+ModelManagement.swift
+ * Model Management Extensions for RunAnywhere SDK
+ * Matches iOS RunAnywhere+ModelManagement.swift patterns.
  *
  * This object provides static methods for model management operations.
  * All methods are suspend functions following Kotlin coroutine patterns.
@@ -23,7 +24,8 @@ object RunAnywhereModelManagement {
     private val logger = SDKLogger("ModelManagement")
 
     /**
-     * Load a model by identifier and return model info - EXACT copy of iOS implementation
+     * Load a model by identifier and return model info
+     * Matches iOS RunAnywhere.loadModel() pattern via LLMCapability
      * @param modelIdentifier The model to load
      * @return Information about the loaded model
      */
@@ -32,15 +34,21 @@ object RunAnywhereModelManagement {
             EventPublisher.track(SDKModelEvent.LoadStarted(modelIdentifier))
 
             try {
-                // Use existing service logic directly
-                val loadedModel = ServiceContainer.shared.modelLoadingService.loadModel(modelIdentifier)
+                // iOS pattern: loadModel() goes through llmCapability which handles lifecycle
+                val llmCapability =
+                    ServiceContainer.shared.llmCapability
+                        ?: throw SDKError.ComponentNotInitialized("LLM capability not available")
 
-                // CRITICAL: Set the loaded model in the generation service so it can use it for inference
-                ServiceContainer.shared.generationService.setCurrentModel(loadedModel)
-                logger.info("✅ Model loaded and set in GenerationService: ${loadedModel.model.id}")
+                llmCapability.loadModel(modelIdentifier)
 
+                // Get model info from model info service after loading
+                val modelInfo =
+                    ServiceContainer.shared.modelInfoService.getModel(modelIdentifier)
+                        ?: throw SDKError.ModelNotFound(modelIdentifier)
+
+                logger.info("✅ Model loaded successfully: ${modelInfo.id}")
                 EventPublisher.track(SDKModelEvent.LoadCompleted(modelIdentifier))
-                return@withContext loadedModel.model
+                return@withContext modelInfo
             } catch (error: Exception) {
                 EventPublisher.track(SDKModelEvent.LoadFailed(modelIdentifier, error))
                 throw error
@@ -48,19 +56,16 @@ object RunAnywhereModelManagement {
         }
 
     /**
-     * Unload the currently loaded model - EXACT copy of iOS implementation
+     * Unload the currently loaded model
+     * Matches iOS RunAnywhere.unloadModel() pattern via LLMCapability
      */
     suspend fun unloadModel() =
         withContext(Dispatchers.Default) {
             EventPublisher.track(SDKModelEvent.UnloadStarted)
 
             try {
-                // Get the current model ID from generation service
-                // TODO: Implement when generation service supports getCurrentModel()
-                // val currentModel = ServiceContainer.shared.generationService.getCurrentModel()
-
-                // For now, unload all models as a placeholder
-                ServiceContainer.shared.modelLoadingService.clearAllModels()
+                // iOS pattern: unloadModel() goes through llmCapability which handles lifecycle
+                ServiceContainer.shared.llmCapability?.unload()
 
                 EventPublisher.track(SDKModelEvent.UnloadCompleted)
             } catch (error: Exception) {
@@ -70,7 +75,7 @@ object RunAnywhereModelManagement {
         }
 
     /**
-     * List all available models - EXACT copy of iOS implementation
+     * List all available models
      * @return Array of available models
      */
     suspend fun listAvailableModels(): List<ModelInfo> =
@@ -84,7 +89,7 @@ object RunAnywhereModelManagement {
         }
 
     /**
-     * Download a model - EXACT copy of iOS implementation
+     * Download a model
      * @param modelIdentifier The model to download
      */
     suspend fun downloadModel(modelIdentifier: String) =
@@ -142,7 +147,7 @@ object RunAnywhereModelManagement {
         }
 
     /**
-     * Delete a model - EXACT copy of iOS implementation
+     * Delete a model
      * @param modelIdentifier The model to delete
      */
     suspend fun deleteModel(modelIdentifier: String) =
@@ -165,7 +170,7 @@ object RunAnywhereModelManagement {
         }
 
     /**
-     * Add a custom model from URL - EXACT copy of iOS implementation
+     * Add a custom model from URL
      * @param url URL to the model
      * @param name Display name for the model
      * @param type Model type
@@ -206,7 +211,7 @@ object RunAnywhereModelManagement {
         }
 
     /**
-     * Register a built-in model - EXACT copy of iOS implementation
+     * Register a built-in model
      * @param model The model to register
      */
     suspend fun registerBuiltInModel(model: ModelInfo) =

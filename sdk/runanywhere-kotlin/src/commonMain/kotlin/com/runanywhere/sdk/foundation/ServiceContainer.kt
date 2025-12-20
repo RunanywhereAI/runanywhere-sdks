@@ -13,6 +13,7 @@ import com.runanywhere.sdk.data.network.services.AnalyticsNetworkService
 import com.runanywhere.sdk.data.repositories.ModelInfoRepository
 import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
 import com.runanywhere.sdk.data.repositories.TelemetryRepository
+import com.runanywhere.sdk.data.sync.SyncCoordinator
 import com.runanywhere.sdk.features.llm.LLMCapability
 import com.runanywhere.sdk.features.llm.LLMComponent
 import com.runanywhere.sdk.features.llm.LLMConfiguration
@@ -30,8 +31,6 @@ import com.runanywhere.sdk.features.vad.VADComponent
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentCapability
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentComponent
-import com.runanywhere.sdk.generation.GenerationService
-import com.runanywhere.sdk.generation.StreamingService
 import com.runanywhere.sdk.infrastructure.analytics.AnalyticsEvent
 import com.runanywhere.sdk.infrastructure.analytics.AnalyticsQueueManager
 import com.runanywhere.sdk.infrastructure.analytics.AnalyticsService
@@ -44,13 +43,11 @@ import com.runanywhere.sdk.infrastructure.events.EventPublisher
 import com.runanywhere.sdk.infrastructure.events.SDKBootstrapEvent
 import com.runanywhere.sdk.infrastructure.events.SDKEvent
 import com.runanywhere.sdk.infrastructure.events.SDKInitializationEvent
-import com.runanywhere.sdk.memory.MemoryManager
-import com.runanywhere.sdk.memory.MemoryService
+import com.runanywhere.sdk.infrastructure.modelmanagement.services.ModelInfoService
 import com.runanywhere.sdk.models.DefaultModelRegistry
 import com.runanywhere.sdk.models.DeviceInfo
 import com.runanywhere.sdk.models.ModelHandle
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.ModelLoadingService
 import com.runanywhere.sdk.models.ModelManager
 import com.runanywhere.sdk.models.ModelRegistry
 import com.runanywhere.sdk.models.collectDeviceInfo
@@ -58,9 +55,6 @@ import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.security.SecureStorageFactory
-import com.runanywhere.sdk.services.ValidationService
-import com.runanywhere.sdk.services.modelinfo.ModelInfoService
-import com.runanywhere.sdk.services.sync.SyncCoordinator
 import com.runanywhere.sdk.storage.createFileSystem
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
@@ -191,10 +185,6 @@ class ServiceContainer {
         AuthenticationService(secureStorage, httpClient)
     }
 
-    val validationService: ValidationService by lazy {
-        ValidationService(fileSystem)
-    }
-
     val downloadService: DownloadService by lazy {
         // Use real KtorDownloadService with default configuration
         val ktorService =
@@ -209,33 +199,8 @@ class ServiceContainer {
         DefaultModelRegistry()
     }
 
-    val memoryManager: MemoryManager by lazy {
-        // Use the real MemoryService implementation
-        MemoryService()
-    }
-
-    val modelLoadingService: ModelLoadingService by lazy {
-        ModelLoadingService(
-            registry = modelRegistry,
-            fileSystem = fileSystem,
-        )
-    }
-
     val modelManager: ModelManager by lazy {
         ModelManager(fileSystem, downloadService)
-    }
-
-    val streamingService: StreamingService by lazy {
-        StreamingService()
-    }
-
-    val generationService: GenerationService by lazy {
-        GenerationService(streamingService)
-    }
-
-    // New services for 8-step bootstrap matching iOS
-    val memoryService: MemoryService by lazy {
-        MemoryService()
     }
 
     val syncCoordinator: SyncCoordinator by lazy {
@@ -253,8 +218,8 @@ class ServiceContainer {
 
     // Telemetry service for production event tracking (STT/TTS/LLM)
     // Matches iOS ServiceContainer.shared.telemetryService
-    private var _telemetryService: com.runanywhere.sdk.services.telemetry.TelemetryService? = null
-    val telemetryService: com.runanywhere.sdk.services.telemetry.TelemetryService? get() = _telemetryService
+    private var _telemetryService: com.runanywhere.sdk.infrastructure.analytics.TelemetryService? = null
+    val telemetryService: com.runanywhere.sdk.infrastructure.analytics.TelemetryService? get() = _telemetryService
 
     // Analytics network services (for production analytics)
     private var _analyticsNetworkService: AnalyticsNetworkService? = null
@@ -480,7 +445,7 @@ class ServiceContainer {
                 // Initialize TelemetryService for production event tracking (STT/TTS/LLM)
                 // Matches iOS ServiceContainer.shared.telemetryService
                 _telemetryService =
-                    com.runanywhere.sdk.services.telemetry.TelemetryService(
+                    com.runanywhere.sdk.infrastructure.analytics.TelemetryService(
                         telemetryRepository = telemetryRepository,
                         syncCoordinator = syncCoordinator,
                     )
@@ -649,7 +614,7 @@ class ServiceContainer {
                 // Initialize TelemetryService for event tracking (STT/TTS/LLM)
                 // Matches iOS ServiceContainer.shared.telemetryService
                 _telemetryService =
-                    com.runanywhere.sdk.services.telemetry.TelemetryService(
+                    com.runanywhere.sdk.infrastructure.analytics.TelemetryService(
                         telemetryRepository = telemetryRepository,
                         syncCoordinator = syncCoordinator,
                     )
@@ -861,10 +826,6 @@ class ServiceContainer {
             // Initialize LLM component only if a provider is registered
             if (ModuleRegistry.hasLLM) {
                 llmComponent.initialize()
-
-                // Initialize GenerationService with LLM component
-                generationService.initializeWithLLMComponent(llmComponent)
-
                 logger.info("✅ LLM component initialized")
             } else {
                 logger.info("ℹ️ LLM component skipped - no provider registered yet")
@@ -1026,7 +987,7 @@ class ServiceContainer {
         format: ModelFormat = ModelFormat.GGUF,
         downloadSize: Long? = null,
         sha256Checksum: String? = null,
-        compatibleFrameworks: List<InferenceFramework> = listOf(InferenceFramework.LLAMACPP),
+        compatibleFrameworks: List<InferenceFramework> = listOf(InferenceFramework.LLAMA_CPP),
     ): ModelHandle {
         logger.info("🚀 Adding model from URL: $modelId")
 
@@ -1095,7 +1056,7 @@ class ServiceContainer {
             format = ModelFormat.GGUF,
             downloadSize = 3825866240L, // ~3.8GB
             sha256Checksum = null, // Optional - add real checksum for verification
-            compatibleFrameworks = listOf(InferenceFramework.LLAMACPP),
+            compatibleFrameworks = listOf(InferenceFramework.LLAMA_CPP),
         )
 
     /**

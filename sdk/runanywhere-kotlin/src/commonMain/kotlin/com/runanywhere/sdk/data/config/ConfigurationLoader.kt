@@ -7,9 +7,8 @@ import kotlinx.serialization.json.Json
 
 /**
  * Loads configuration from JSON files based on environment
- * Optional enhancement - existing ConfigurationService already handles config loading
  *
- * This provides an alternative way to load environment-specific configs from files:
+ * This provides environment-specific config loading from files:
  * - dev.json for development
  * - staging.json for staging
  * - prod.json for production

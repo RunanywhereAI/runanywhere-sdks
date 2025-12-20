@@ -1,12 +1,12 @@
-package com.runanywhere.sdk.services.modelinfo
+package com.runanywhere.sdk.infrastructure.modelmanagement.services
 
 import com.runanywhere.sdk.data.models.ModelSearchCriteria
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.repositories.ModelInfoRepository
+import com.runanywhere.sdk.data.sync.SyncCoordinator
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.InferenceFramework
-import com.runanywhere.sdk.services.sync.SyncCoordinator
 import com.runanywhere.sdk.utils.SimpleInstant
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.sync.Mutex

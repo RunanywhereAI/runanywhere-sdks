@@ -36,7 +36,7 @@ val InferenceFramework.primaryModality: FrameworkModality
             InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP, InferenceFramework.OPEN_AI_WHISPER -> FrameworkModality.VOICE_TO_TEXT
 
             // Text generation frameworks
-            InferenceFramework.LLAMA_CPP, InferenceFramework.LLAMACPP, InferenceFramework.MLX, InferenceFramework.MLC,
+            InferenceFramework.LLAMA_CPP, InferenceFramework.MLX, InferenceFramework.MLC,
             InferenceFramework.EXECU_TORCH, InferenceFramework.PICO_LLM,
             -> FrameworkModality.TEXT_TO_TEXT
 
@@ -73,7 +73,7 @@ val InferenceFramework.supportedModalities: Set<FrameworkModality>
                 )
 
             // Text-only frameworks
-            InferenceFramework.LLAMA_CPP, InferenceFramework.LLAMACPP, InferenceFramework.MLX, InferenceFramework.MLC,
+            InferenceFramework.LLAMA_CPP, InferenceFramework.MLX, InferenceFramework.MLC,
             InferenceFramework.EXECU_TORCH, InferenceFramework.PICO_LLM,
             -> setOf(FrameworkModality.TEXT_TO_TEXT)
 

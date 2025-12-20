@@ -18,9 +18,6 @@ enum class InferenceFramework(
     ONNX("ONNX", "ONNX Runtime"),
     EXECU_TORCH("ExecuTorch", "ExecuTorch"),
     LLAMA_CPP("LlamaCpp", "llama.cpp"),
-
-    @Deprecated("Use LLAMA_CPP instead", ReplaceWith("LLAMA_CPP"))
-    LLAMACPP("LlamaCpp", "llama.cpp"), // Alias for compatibility
     FOUNDATION_MODELS("FoundationModels", "Foundation Models"),
     PICO_LLM("PicoLLM", "Pico LLM"),
     MLC("MLC", "MLC"),
@@ -71,9 +68,3 @@ enum class InferenceFramework(
                 else -> false
             }
 }
-
-/**
- * Type alias for backward compatibility during migration
- */
-@Deprecated("Use InferenceFramework instead", ReplaceWith("InferenceFramework"))
-typealias LLMFramework = InferenceFramework
