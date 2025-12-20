@@ -1,9 +1,9 @@
 package com.runanywhere.sdk.core.frameworks
 
-import com.runanywhere.sdk.components.llm.HardwareConfiguration
+import com.runanywhere.sdk.features.llm.HardwareConfiguration
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.FrameworkModality
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
 
 /**
@@ -22,7 +22,7 @@ interface UnifiedFrameworkAdapter {
     /**
      * The framework this adapter handles
      */
-    val framework: LLMFramework
+    val framework: InferenceFramework
 
     /**
      * The modalities this adapter supports

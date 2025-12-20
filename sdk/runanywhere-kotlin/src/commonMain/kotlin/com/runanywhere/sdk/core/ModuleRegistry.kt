@@ -1,17 +1,17 @@
 package com.runanywhere.sdk.core
 
-import com.runanywhere.sdk.components.base.SDKComponent
-import com.runanywhere.sdk.components.llm.LLMServiceProvider
-import com.runanywhere.sdk.components.stt.STTConfiguration
-import com.runanywhere.sdk.components.stt.STTService
-import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.components.vad.VADService
+import com.runanywhere.sdk.core.capabilities.SDKComponent
+import com.runanywhere.sdk.features.llm.LLMServiceProvider
+import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.stt.STTService
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.features.vad.VADService
 import com.runanywhere.sdk.core.frameworks.UnifiedFrameworkAdapter
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.FrameworkModality
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 
 /**
  * Central registry for external AI module implementations
@@ -52,7 +52,7 @@ object ModuleRegistry {
 
     // Framework adapter storage - protected by synchronized blocks
     private val _frameworkAdapters = mutableListOf<RegisteredAdapter>()
-    private val _adaptersByFramework = mutableMapOf<LLMFramework, UnifiedFrameworkAdapter>()
+    private val _adaptersByFramework = mutableMapOf<InferenceFramework, UnifiedFrameworkAdapter>()
     private val _adaptersByModality = mutableMapOf<FrameworkModality, MutableList<RegisteredAdapter>>()
 
     // Provider lists - protected by synchronized blocks for thread safety
@@ -184,7 +184,7 @@ object ModuleRegistry {
      * @param framework The framework to get adapter for
      * @return The adapter or null if not registered
      */
-    fun adapterForFramework(framework: LLMFramework): UnifiedFrameworkAdapter? {
+    fun adapterForFramework(framework: InferenceFramework): UnifiedFrameworkAdapter? {
         return synchronized(_adaptersByFramework) {
             _adaptersByFramework[framework]
         }
@@ -265,7 +265,7 @@ object ModuleRegistry {
      * Get all registered frameworks
      * @return Set of frameworks that have adapters registered
      */
-    val registeredFrameworks: Set<LLMFramework>
+    val registeredFrameworks: Set<InferenceFramework>
         get() = synchronized(_adaptersByFramework) { _adaptersByFramework.keys.toSet() }
 
     /**
@@ -273,7 +273,7 @@ object ModuleRegistry {
      * @param framework The framework to check
      * @return True if an adapter is registered
      */
-    fun hasFramework(framework: LLMFramework): Boolean {
+    fun hasFramework(framework: InferenceFramework): Boolean {
         return synchronized(_adaptersByFramework) { _adaptersByFramework.containsKey(framework) }
     }
 
@@ -282,7 +282,7 @@ object ModuleRegistry {
      * @param framework The framework to get storage strategy for
      * @return Storage strategy if available, null otherwise
      */
-    fun getStorageStrategy(framework: LLMFramework): com.runanywhere.sdk.core.frameworks.ModelStorageStrategy? {
+    fun getStorageStrategy(framework: InferenceFramework): com.runanywhere.sdk.core.frameworks.ModelStorageStrategy? {
         return synchronized(_adaptersByFramework) {
             _adaptersByFramework[framework]?.getModelStorageStrategy()
         }
@@ -292,7 +292,7 @@ object ModuleRegistry {
      * Get all registered model storage strategies
      * @return Map of framework to storage strategy
      */
-    val allStorageStrategies: Map<LLMFramework, com.runanywhere.sdk.core.frameworks.ModelStorageStrategy>
+    val allStorageStrategies: Map<InferenceFramework, com.runanywhere.sdk.core.frameworks.ModelStorageStrategy>
         get() = synchronized(_adaptersByFramework) {
             _adaptersByFramework.mapNotNull { (framework, adapter) ->
                 adapter.getModelStorageStrategy()?.let { framework to it }
@@ -510,7 +510,7 @@ interface STTServiceProvider {
     suspend fun createSTTService(configuration: STTConfiguration): STTService
     fun canHandle(modelId: String?): Boolean
     val name: String
-    val framework: LLMFramework
+    val framework: InferenceFramework
 }
 
 /**
@@ -522,25 +522,25 @@ interface VADServiceProvider {
     val name: String
 }
 
-// LLMServiceProvider is now imported from com.runanywhere.sdk.components.llm.LLMServiceProvider
+// LLMServiceProvider is now imported from com.runanywhere.sdk.features.llm.LLMServiceProvider
 
 /**
  * Provider for Text-to-Speech services
  */
 interface TTSServiceProvider {
-    suspend fun synthesize(text: String, options: com.runanywhere.sdk.components.TTSOptions): ByteArray
-    fun synthesizeStream(text: String, options: com.runanywhere.sdk.components.TTSOptions): kotlinx.coroutines.flow.Flow<ByteArray>
+    suspend fun synthesize(text: String, options: com.runanywhere.sdk.features.tts.TTSOptions): ByteArray
+    fun synthesizeStream(text: String, options: com.runanywhere.sdk.features.tts.TTSOptions): kotlinx.coroutines.flow.Flow<ByteArray>
     fun canHandle(modelId: String): Boolean = true
     val name: String
     /** Framework this provider supports */
-    val framework: LLMFramework
+    val framework: InferenceFramework
 }
 
 /**
  * Provider for Vision Language Model services
  */
 interface VLMServiceProvider {
-    suspend fun analyze(image: ByteArray, prompt: String?): com.runanywhere.sdk.components.VLMOutput
+    suspend fun analyze(image: ByteArray, prompt: String?): com.runanywhere.sdk.features.vlm.VLMOutput
     suspend fun generateFromImage(image: ByteArray, prompt: String, options: com.runanywhere.sdk.generation.GenerationOptions): String
     fun canHandle(modelId: String): Boolean = true
     val name: String
@@ -550,7 +550,7 @@ interface VLMServiceProvider {
  * Provider for Wake Word Detection services
  */
 interface WakeWordServiceProvider {
-    suspend fun createWakeWordService(configuration: com.runanywhere.sdk.components.wakeword.WakeWordConfiguration): com.runanywhere.sdk.components.wakeword.WakeWordService
+    suspend fun createWakeWordService(configuration: com.runanywhere.sdk.features.wakeword.WakeWordConfiguration): com.runanywhere.sdk.features.wakeword.WakeWordService
     fun canHandle(modelId: String?): Boolean
     val name: String
 }
@@ -559,7 +559,7 @@ interface WakeWordServiceProvider {
  * Provider for Speaker Diarization services
  */
 interface SpeakerDiarizationServiceProvider {
-    suspend fun createSpeakerDiarizationService(configuration: com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationConfiguration): com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationService
+    suspend fun createSpeakerDiarizationService(configuration: com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration): com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationService
     fun canHandle(modelId: String?): Boolean
     val name: String
 }

@@ -146,7 +146,7 @@ class DefaultStorageAnalyzer(
      * public func getModelStorageUsage() async -> ModelStorageInfo {
      *     let modelStorageSize = fileManager.getModelStorageSize()
      *     let storedModelsData = fileManager.getAllStoredModels()
-     *     var modelsByFramework: [LLMFramework: [StoredModel]] = [:]
+     *     var modelsByFramework: [InferenceFramework: [StoredModel]] = [:]
      *     let storedModels = await getStoredModelsList()
      *     for model in storedModels {
      *         if let framework = model.framework {

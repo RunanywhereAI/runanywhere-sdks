@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.data.models
 
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
@@ -28,7 +28,7 @@ data class ModelInfo(
     val name: String,
     val category: ModelCategory,
     val format: ModelFormat,
-    val framework: LLMFramework,
+    val framework: InferenceFramework,
     @SerialName("download_url")
     val downloadURL: String,
     @SerialName("local_path")
@@ -207,7 +207,7 @@ data class ModelRegistryEntry(
  */
 data class ModelSearchCriteria(
     val category: ModelCategory? = null,
-    val framework: LLMFramework? = null,
+    val framework: InferenceFramework? = null,
     val format: ModelFormat? = null,
     val maxSize: Long? = null,
     val minAccuracy: Float? = null,

@@ -1,23 +1,23 @@
 package com.runanywhere.sdk.foundation
 
-import com.runanywhere.sdk.components.stt.STTComponent
-import com.runanywhere.sdk.components.stt.STTConfiguration
-import com.runanywhere.sdk.components.vad.VADComponent
-import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.components.llm.LLMComponent
-import com.runanywhere.sdk.components.llm.LLMConfiguration
-import com.runanywhere.sdk.components.TTSComponent
-import com.runanywhere.sdk.components.TTSConfiguration
-import com.runanywhere.sdk.capabilities.stt.STTCapability
-import com.runanywhere.sdk.capabilities.tts.TTSCapability
-import com.runanywhere.sdk.capabilities.llm.LLMCapability
-import com.runanywhere.sdk.capabilities.vad.VADCapability
-import com.runanywhere.sdk.capabilities.speakerdiarization.SpeakerDiarizationCapability
-import com.runanywhere.sdk.capabilities.voiceagent.VoiceAgentCapability
-import com.runanywhere.sdk.components.voiceagent.VoiceAgentComponent
-import com.runanywhere.sdk.components.voiceagent.VoiceAgentConfiguration
-import com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationComponent
-import com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationConfiguration
+import com.runanywhere.sdk.features.stt.STTComponent
+import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.vad.VADComponent
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.features.llm.LLMComponent
+import com.runanywhere.sdk.features.llm.LLMConfiguration
+import com.runanywhere.sdk.features.tts.TTSComponent
+import com.runanywhere.sdk.features.tts.TTSConfiguration
+import com.runanywhere.sdk.features.stt.STTCapability
+import com.runanywhere.sdk.features.tts.TTSCapability
+import com.runanywhere.sdk.features.llm.LLMCapability
+import com.runanywhere.sdk.features.vad.VADCapability
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationCapability
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentCapability
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentComponent
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentConfiguration
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationComponent
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.ConfigurationData
 import com.runanywhere.sdk.data.models.SDKInitParams
@@ -34,7 +34,7 @@ import com.runanywhere.sdk.models.ModelHandle
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.network.createHttpClient
 import com.runanywhere.sdk.services.AuthenticationService
 import com.runanywhere.sdk.services.download.DownloadService
@@ -44,7 +44,7 @@ import com.runanywhere.sdk.services.download.DownloadConfiguration
 import com.runanywhere.sdk.services.ValidationService
 import com.runanywhere.sdk.services.modelinfo.ModelInfoService
 import com.runanywhere.sdk.storage.createFileSystem
-import com.runanywhere.sdk.storage.createSecureStorage
+import com.runanywhere.sdk.security.SecureStorageFactory
 import com.runanywhere.sdk.storage.FileSystem
 import com.runanywhere.sdk.data.network.NetworkService
 import com.runanywhere.sdk.data.network.NetworkServiceFactory
@@ -96,7 +96,7 @@ class ServiceContainer {
     // Platform abstractions
     internal val fileSystem by lazy { createFileSystem() }
     private val httpClient by lazy { createHttpClient() }
-    private val secureStorage by lazy { createSecureStorage() }
+    private val secureStorage by lazy { SecureStorageFactory.create() }
 
     // Network service (will be initialized based on environment)
     private lateinit var networkService: NetworkService
@@ -466,7 +466,7 @@ class ServiceContainer {
                 _telemetryService?.setContext(
                     deviceId = deviceId,
                     appVersion = null,  // App version not available at SDK init time
-                    sdkVersion = com.runanywhere.sdk.core.SDKConstants.SDK_VERSION
+                    sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
                 )
                 logger.info("✅ Telemetry service initialized successfully with device ID: $deviceId")
 
@@ -619,7 +619,7 @@ class ServiceContainer {
                 _telemetryService?.setContext(
                     deviceId = deviceId,
                     appVersion = null,  // App version not available at SDK init time
-                    sdkVersion = com.runanywhere.sdk.core.SDKConstants.SDK_VERSION
+                    sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
                 )
                 logger.info("✅ Telemetry service initialized successfully with device ID: $deviceId")
 
@@ -681,17 +681,17 @@ class ServiceContainer {
     }
 
     // Dynamic component storage for runtime replacement
-    private val _dynamicComponents = mutableMapOf<com.runanywhere.sdk.components.base.SDKComponent, com.runanywhere.sdk.components.base.Component>()
+    private val _dynamicComponents = mutableMapOf<com.runanywhere.sdk.core.capabilities.SDKComponent, com.runanywhere.sdk.core.capabilities.Component>()
 
     /**
      * Get component by type
      */
-    fun getComponent(component: com.runanywhere.sdk.components.base.SDKComponent): com.runanywhere.sdk.components.base.Component? {
+    fun getComponent(component: com.runanywhere.sdk.core.capabilities.SDKComponent): com.runanywhere.sdk.core.capabilities.Component? {
         // Check dynamic components first (for runtime-created components)
         return _dynamicComponents[component] ?: when (component) {
-            com.runanywhere.sdk.components.base.SDKComponent.STT -> sttComponent
-            com.runanywhere.sdk.components.base.SDKComponent.VAD -> vadComponent
-            com.runanywhere.sdk.components.base.SDKComponent.LLM -> llmComponent
+            com.runanywhere.sdk.core.capabilities.SDKComponent.STT -> sttComponent
+            com.runanywhere.sdk.core.capabilities.SDKComponent.VAD -> vadComponent
+            com.runanywhere.sdk.core.capabilities.SDKComponent.LLM -> llmComponent
             else -> null
         }
     }
@@ -699,7 +699,7 @@ class ServiceContainer {
     /**
      * Set component by type (for runtime component creation)
      */
-    fun setComponent(component: com.runanywhere.sdk.components.base.SDKComponent, instance: com.runanywhere.sdk.components.base.Component) {
+    fun setComponent(component: com.runanywhere.sdk.core.capabilities.SDKComponent, instance: com.runanywhere.sdk.core.capabilities.Component) {
         _dynamicComponents[component] = instance
     }
 
@@ -844,7 +844,7 @@ class ServiceContainer {
      */
     private fun registerSimpleEnergyVADProvider() {
         val simpleVADProvider = object : com.runanywhere.sdk.core.VADServiceProvider {
-            override suspend fun createVADService(configuration: VADConfiguration): com.runanywhere.sdk.components.vad.VADService {
+            override suspend fun createVADService(configuration: VADConfiguration): com.runanywhere.sdk.features.vad.VADService {
                 return com.runanywhere.sdk.voice.vad.SimpleEnergyVAD(
                     vadConfig = configuration
                 )
@@ -905,8 +905,8 @@ class ServiceContainer {
                     localPath = null,
                     downloadSize = 74_000_000L, // ~74MB
                     memoryRequired = 74_000_000L, // 74MB
-                    compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_KIT),
-                    preferredFramework = com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_KIT,
+                    compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT),
+                    preferredFramework = com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT,
                     contextLength = 0,
                     supportsThinking = false,
                     createdAt = com.runanywhere.sdk.utils.SimpleInstant.now(),
@@ -923,8 +923,8 @@ class ServiceContainer {
                     localPath = null,
                     downloadSize = 39_000_000L, // ~39MB
                     memoryRequired = 39_000_000L, // 39MB
-                    compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_KIT),
-                    preferredFramework = com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_KIT,
+                    compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT),
+                    preferredFramework = com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT,
                     contextLength = 0,
                     supportsThinking = false,
                     createdAt = com.runanywhere.sdk.utils.SimpleInstant.now(),
@@ -973,7 +973,7 @@ class ServiceContainer {
         format: ModelFormat = ModelFormat.GGUF,
         downloadSize: Long? = null,
         sha256Checksum: String? = null,
-        compatibleFrameworks: List<LLMFramework> = listOf(LLMFramework.LLAMACPP)
+        compatibleFrameworks: List<InferenceFramework> = listOf(InferenceFramework.LLAMACPP)
     ): ModelHandle {
         logger.info("🚀 Adding model from URL: $modelId")
 
@@ -1041,7 +1041,7 @@ class ServiceContainer {
             format = ModelFormat.GGUF,
             downloadSize = 3825866240L, // ~3.8GB
             sha256Checksum = null, // Optional - add real checksum for verification
-            compatibleFrameworks = listOf(LLMFramework.LLAMACPP)
+            compatibleFrameworks = listOf(InferenceFramework.LLAMACPP)
         )
     }
 

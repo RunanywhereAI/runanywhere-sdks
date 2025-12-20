@@ -1,14 +1,14 @@
 package com.runanywhere.sdk.llm.llamacpp
 
-import com.runanywhere.sdk.components.llm.LLMConfiguration
-import com.runanywhere.sdk.components.llm.LLMService
-import com.runanywhere.sdk.components.llm.LLMServiceProvider
-import com.runanywhere.sdk.components.llm.ModelCompatibilityResult
-import com.runanywhere.sdk.components.llm.HardwareConfiguration
+import com.runanywhere.sdk.features.llm.LLMConfiguration
+import com.runanywhere.sdk.features.llm.LLMService
+import com.runanywhere.sdk.features.llm.LLMServiceProvider
+import com.runanywhere.sdk.features.llm.ModelCompatibilityResult
+import com.runanywhere.sdk.features.llm.HardwareConfiguration
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 
@@ -41,7 +41,7 @@ object LlamaCppServiceProvider : LLMServiceProvider {
 
     override val name: String = "LlamaCpp (RunAnywhere Core)"
 
-    override val framework: LLMFramework = LLMFramework.LLAMA_CPP
+    override val framework: InferenceFramework = InferenceFramework.LLAMA_CPP
 
     override val supportedFeatures: Set<String> = setOf(
         "text-generation",
@@ -134,8 +134,8 @@ object LlamaCppServiceProvider : LLMServiceProvider {
             localPath = null,
             downloadSize = null,
             memoryRequired = null,
-            compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
-            preferredFramework = LLMFramework.LLAMA_CPP,
+            compatibleFrameworks = listOf(InferenceFramework.LLAMA_CPP),
+            preferredFramework = InferenceFramework.LLAMA_CPP,
             contextLength = 4096,
             supportsThinking = false,
             metadata = null

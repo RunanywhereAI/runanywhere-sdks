@@ -1,6 +1,7 @@
 package com.runanywhere.sdk.llm.llamacpp
 
-import com.runanywhere.sdk.components.llm.HardwareConfiguration
+import com.runanywhere.sdk.features.llm.HardwareConfiguration
+import com.runanywhere.sdk.features.llm.LLMConfiguration
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.core.frameworks.ComponentInitParameters
 import com.runanywhere.sdk.core.frameworks.DownloadStrategy
@@ -10,7 +11,7 @@ import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.QuantizationLevel
 import com.runanywhere.sdk.models.enums.FrameworkModality
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
 
 /**
@@ -34,7 +35,7 @@ class LlamaCppAdapter : UnifiedFrameworkAdapter {
 
     // MARK: - UnifiedFrameworkAdapter Properties
 
-    override val framework: LLMFramework = LLMFramework.LLAMA_CPP
+    override val framework: InferenceFramework = InferenceFramework.LLAMA_CPP
 
     override val supportedModalities: Set<FrameworkModality> = setOf(
         FrameworkModality.TEXT_TO_TEXT
@@ -114,7 +115,7 @@ class LlamaCppAdapter : UnifiedFrameworkAdapter {
         val localPath = model.localPath
             ?: throw LlamaCppError.ModelNotFound(model.id)
 
-        val config = com.runanywhere.sdk.components.llm.LLMConfiguration(
+        val config = LLMConfiguration(
             modelId = model.id,
             contextLength = model.contextLength ?: 4096,
             useGPUIfAvailable = false

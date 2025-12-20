@@ -1,9 +1,9 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.capabilities.tts.TTSCapability
-import com.runanywhere.sdk.capabilities.tts.TTSOptions
-import com.runanywhere.sdk.capabilities.tts.TTSResult
+import com.runanywhere.sdk.features.tts.TTSCapability
+import com.runanywhere.sdk.features.tts.TTSOptions
+import com.runanywhere.sdk.features.tts.TTSResult
 import com.runanywhere.sdk.data.models.SDKError
 import kotlinx.coroutines.flow.Flow
 

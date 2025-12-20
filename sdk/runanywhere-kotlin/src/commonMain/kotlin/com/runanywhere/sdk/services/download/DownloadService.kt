@@ -4,7 +4,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.utils.ModelPathUtils
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.storage.FileSystem
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -44,6 +44,58 @@ sealed class DownloadState {
     object Completed : DownloadState()
     data class Failed(val error: Throwable) : DownloadState()
     object Cancelled : DownloadState()
+}
+
+/**
+ * Download pipeline stages - EXACT copy of iOS DownloadStage
+ * Used for calculating overall progress across multiple stages.
+ *
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Download/Models/Output/DownloadProgress.swift
+ */
+enum class DownloadStage {
+    /** Downloading file - 0-80% of overall progress */
+    DOWNLOADING,
+    /** Extracting archive - 80-95% of overall progress */
+    EXTRACTING,
+    /** Validating downloaded content - 95-100% of overall progress */
+    VALIDATING,
+    /** Download complete - 100% */
+    COMPLETED;
+
+    /**
+     * Weight for this stage in overall progress calculation.
+     * Matches iOS stageWeight computed property.
+     */
+    val weight: Double
+        get() = when (this) {
+            DOWNLOADING -> 0.8  // 80% of overall progress
+            EXTRACTING -> 0.15  // 15% of overall progress
+            VALIDATING -> 0.05  // 5% of overall progress
+            COMPLETED -> 0.0    // No weight, already complete
+        }
+
+    /**
+     * Starting progress for this stage.
+     * Matches iOS stageStartProgress computed property.
+     */
+    val startProgress: Double
+        get() = when (this) {
+            DOWNLOADING -> 0.0
+            EXTRACTING -> 0.8
+            VALIDATING -> 0.95
+            COMPLETED -> 1.0
+        }
+
+    /**
+     * Calculate overall progress given stage-specific progress (0.0 to 1.0)
+     * Matches iOS calculateOverallProgress method.
+     */
+    fun calculateOverallProgress(stageProgress: Double): Double {
+        return when (this) {
+            COMPLETED -> 1.0
+            else -> startProgress + (stageProgress * weight)
+        }
+    }
 }
 
 /**
@@ -336,7 +388,7 @@ class KtorDownloadService(
     }
 
     // Track which frameworks have had their strategies registered to avoid duplicates
-    private val registeredFrameworks = mutableSetOf<com.runanywhere.sdk.models.enums.LLMFramework>()
+    private val registeredFrameworks = mutableSetOf<com.runanywhere.sdk.models.enums.InferenceFramework>()
 
     /// Auto-discover and register strategies from framework adapters
     private fun autoRegisterStrategies() {
@@ -495,7 +547,7 @@ class KtorDownloadService(
     }
 
     /// Helper to get destination folder for a model (EXACT copy of iOS)
-    private fun getDestinationFolder(modelId: String, framework: LLMFramework? = null): String {
+    private fun getDestinationFolder(modelId: String, framework: InferenceFramework? = null): String {
         return if (framework != null) {
             getModelFolder(modelId, framework)
         } else {
@@ -504,7 +556,7 @@ class KtorDownloadService(
     }
 
     // Model folder helpers - Use centralized ModelPathUtils
-    private fun getModelFolder(modelId: String, framework: LLMFramework): String {
+    private fun getModelFolder(modelId: String, framework: InferenceFramework): String {
         return ModelPathUtils.getModelFolder(modelId, framework)
     }
 
@@ -718,7 +770,7 @@ suspend fun KtorDownloadService.downloadModelWithResume(model: ModelInfo, resume
 }
 
 // Extension functions using centralized ModelPathUtils
-private fun KtorDownloadService.getModelFolder(modelId: String, framework: LLMFramework): String {
+private fun KtorDownloadService.getModelFolder(modelId: String, framework: InferenceFramework): String {
     return ModelPathUtils.getModelFolder(modelId, framework)
 }
 

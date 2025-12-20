@@ -85,8 +85,8 @@ object EventBus {
     val allEvents: SharedFlow<SDKEvent> get() = events
 
     // Legacy support - Speaker Diarization Events
-    private val _speakerDiarizationEvents = MutableSharedFlow<com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationEvent>()
-    val speakerDiarizationEvents: SharedFlow<com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationEvent> = _speakerDiarizationEvents.asSharedFlow()
+    private val _speakerDiarizationEvents = MutableSharedFlow<com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationEvent>()
+    val speakerDiarizationEvents: SharedFlow<com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationEvent> = _speakerDiarizationEvents.asSharedFlow()
 
     // Legacy support - Bootstrap Events
     private val _bootstrapEvents = MutableSharedFlow<SDKBootstrapEvent>()
@@ -227,7 +227,7 @@ object EventBus {
         _events.tryEmit(object : BaseSDKEvent(EventCategory.SDK) {})
     }
 
-    fun publish(event: com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationEvent) {
+    fun publish(event: com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationEvent) {
         _speakerDiarizationEvents.tryEmit(event)
     }
 

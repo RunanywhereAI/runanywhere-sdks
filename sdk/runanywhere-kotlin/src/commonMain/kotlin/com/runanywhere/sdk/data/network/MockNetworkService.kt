@@ -6,7 +6,7 @@ import com.runanywhere.sdk.models.ConfigurationSource
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.ModelInfoMetadata
 import com.runanywhere.sdk.models.QuantizationLevel
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.utils.SimpleInstant
@@ -244,8 +244,8 @@ class MockNetworkService : NetworkService {
                 downloadURL = "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-tiny",
                 downloadSize = 39_000_000L,
                 memoryRequired = 100_000_000L,
-                compatibleFrameworks = listOf(LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP),
-                preferredFramework = LLMFramework.WHISPER_KIT,
+                compatibleFrameworks = listOf(InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP),
+                preferredFramework = InferenceFramework.WHISPER_KIT,
                 metadata = ModelInfoMetadata(
                     description = "Smallest and fastest Whisper model",
                     version = "1.0.0",
@@ -261,8 +261,8 @@ class MockNetworkService : NetworkService {
                 downloadURL = "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-base",
                 downloadSize = 74_000_000L,
                 memoryRequired = 200_000_000L,
-                compatibleFrameworks = listOf(LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP),
-                preferredFramework = LLMFramework.WHISPER_KIT,
+                compatibleFrameworks = listOf(InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP),
+                preferredFramework = InferenceFramework.WHISPER_KIT,
                 metadata = ModelInfoMetadata(
                     description = "Good balance between speed and accuracy",
                     version = "1.0.0",
@@ -278,8 +278,8 @@ class MockNetworkService : NetworkService {
                 downloadURL = "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-small",
                 downloadSize = 244_000_000L,
                 memoryRequired = 500_000_000L,
-                compatibleFrameworks = listOf(LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP),
-                preferredFramework = LLMFramework.WHISPER_KIT,
+                compatibleFrameworks = listOf(InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP),
+                preferredFramework = InferenceFramework.WHISPER_KIT,
                 metadata = ModelInfoMetadata(
                     description = "Better accuracy with reasonable performance",
                     version = "1.0.0",
@@ -300,8 +300,8 @@ class MockNetworkService : NetworkService {
                 downloadURL = "https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/main/model.gguf",
                 downloadSize = 750_000_000L,
                 memoryRequired = 2_000_000_000L,
-                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP, LLMFramework.MLX),
-                preferredFramework = LLMFramework.LLAMA_CPP,
+                compatibleFrameworks = listOf(InferenceFramework.LLAMA_CPP, InferenceFramework.MLX),
+                preferredFramework = InferenceFramework.LLAMA_CPP,
                 metadata = ModelInfoMetadata(
                     description = "Small but capable language model",
                     version = "3.2",
@@ -317,8 +317,8 @@ class MockNetworkService : NetworkService {
                 downloadURL = "https://huggingface.co/mlx-community/Llama-3.2-3B-Instruct-4bit/resolve/main/model.gguf",
                 downloadSize = 2_000_000_000L,
                 memoryRequired = 4_000_000_000L,
-                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP, LLMFramework.MLX),
-                preferredFramework = LLMFramework.LLAMA_CPP,
+                compatibleFrameworks = listOf(InferenceFramework.LLAMA_CPP, InferenceFramework.MLX),
+                preferredFramework = InferenceFramework.LLAMA_CPP,
                 metadata = ModelInfoMetadata(
                     description = "Balanced performance and capability",
                     version = "3.2",
@@ -339,8 +339,8 @@ class MockNetworkService : NetworkService {
                 downloadURL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/model.onnx",
                 downloadSize = 63_000_000L,
                 memoryRequired = 150_000_000L,
-                compatibleFrameworks = listOf(LLMFramework.ONNX),
-                preferredFramework = LLMFramework.ONNX,
+                compatibleFrameworks = listOf(InferenceFramework.ONNX),
+                preferredFramework = InferenceFramework.ONNX,
                 metadata = ModelInfoMetadata(
                     description = "Natural English voice synthesis",
                     version = "1.0.0",

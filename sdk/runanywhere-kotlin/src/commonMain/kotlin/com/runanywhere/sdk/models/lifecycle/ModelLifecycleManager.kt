@@ -2,7 +2,7 @@ package com.runanywhere.sdk.models.lifecycle
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.currentTimeMillis
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -12,12 +12,32 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 
+// =============================================================================
+// DEPRECATION NOTICE
+// =============================================================================
+// This file contains legacy lifecycle management code that is NOT aligned with iOS.
+//
+// For iOS-aligned lifecycle management, use:
+//   - com.runanywhere.sdk.core.capabilities.ModelLifecycleManager<ServiceType>
+//   - com.runanywhere.sdk.core.capabilities.ManagedLifecycle<ServiceType>
+//   - com.runanywhere.sdk.core.capabilities.CapabilityLoadingState
+//
+// This file will be removed in a future version.
+// =============================================================================
+
 // MARK: - Model Load State
 
 /**
  * Represents the current state of a model
  * Matches iOS ModelLoadState enum
+ *
+ * @deprecated Use [com.runanywhere.sdk.core.capabilities.CapabilityLoadingState] instead
+ * for iOS-aligned lifecycle state tracking.
  */
+@Deprecated(
+    message = "Use CapabilityLoadingState from core.capabilities package instead",
+    replaceWith = ReplaceWith("CapabilityLoadingState", "com.runanywhere.sdk.core.capabilities.CapabilityLoadingState")
+)
 @Serializable
 sealed class ModelLoadState {
     @Serializable
@@ -77,7 +97,7 @@ enum class Modality(val value: String, val displayName: String) {
 data class LoadedModelState(
     val modelId: String,
     val modelName: String,
-    val framework: LLMFramework,
+    val framework: InferenceFramework,
     val modality: Modality,
     val state: ModelLoadState,
     val loadedAt: Long? = null, // Epoch milliseconds
@@ -107,11 +127,17 @@ data class LoadedModelState(
 /**
  * Events published when model lifecycle changes
  * Matches iOS ModelLifecycleEvent enum
+ *
+ * @deprecated Use LLMEvent, STTEvent, TTSEvent, VADEvent from features package instead.
+ * These provide iOS-aligned event tracking with EventPublisher integration.
  */
+@Deprecated(
+    message = "Use capability-specific events (LLMEvent, STTEvent, etc.) from features package instead"
+)
 sealed class ModelLifecycleEvent {
     data class WillLoad(val modelId: String, val modality: Modality) : ModelLifecycleEvent()
     data class LoadProgress(val modelId: String, val modality: Modality, val progress: Double) : ModelLifecycleEvent()
-    data class DidLoad(val modelId: String, val modality: Modality, val framework: LLMFramework) : ModelLifecycleEvent()
+    data class DidLoad(val modelId: String, val modality: Modality, val framework: InferenceFramework) : ModelLifecycleEvent()
     data class WillUnload(val modelId: String, val modality: Modality) : ModelLifecycleEvent()
     data class DidUnload(val modelId: String, val modality: Modality) : ModelLifecycleEvent()
     data class LoadFailed(val modelId: String, val modality: Modality, val error: String) : ModelLifecycleEvent()
@@ -124,7 +150,15 @@ sealed class ModelLifecycleEvent {
  * Thread-safe singleton with StateFlow-based reactive updates
  *
  * Matches iOS ModelLifecycleTracker
+ *
+ * @deprecated Use [com.runanywhere.sdk.core.capabilities.ManagedLifecycle] instead.
+ * ManagedLifecycle provides per-service lifecycle management with integrated
+ * event tracking via EventPublisher, matching iOS architecture.
  */
+@Deprecated(
+    message = "Use ManagedLifecycle from core.capabilities package instead",
+    replaceWith = ReplaceWith("ManagedLifecycle", "com.runanywhere.sdk.core.capabilities.ManagedLifecycle")
+)
 object ModelLifecycleTracker {
     private val logger = SDKLogger("ModelLifecycleTracker")
 
@@ -181,7 +215,7 @@ object ModelLifecycleTracker {
     fun modelWillLoad(
         modelId: String,
         modelName: String,
-        framework: LLMFramework,
+        framework: InferenceFramework,
         modality: Modality
     ) {
         logger.info("Model will load: $modelName [$modality]")
@@ -225,7 +259,7 @@ object ModelLifecycleTracker {
     fun modelDidLoad(
         modelId: String,
         modelName: String,
-        framework: LLMFramework,
+        framework: InferenceFramework,
         modality: Modality,
         memoryUsage: Long? = null
     ) {

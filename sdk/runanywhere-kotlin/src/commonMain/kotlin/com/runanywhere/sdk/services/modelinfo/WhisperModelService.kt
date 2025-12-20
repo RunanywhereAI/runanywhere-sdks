@@ -3,7 +3,7 @@ package com.runanywhere.sdk.services.modelinfo
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.network.APIClient
@@ -89,8 +89,8 @@ class WhisperModelService(
             // Filter for Whisper models only
             val whisperModels = mockModels.filter { model ->
                 model.category == ModelCategory.SPEECH_RECOGNITION &&
-                (model.preferredFramework == LLMFramework.WHISPER_CPP ||
-                 model.preferredFramework == LLMFramework.WHISPER_KIT)
+                (model.preferredFramework == InferenceFramework.WHISPER_CPP ||
+                 model.preferredFramework == InferenceFramework.WHISPER_KIT)
             }
 
             // Save to local cache
@@ -131,7 +131,7 @@ class WhisperModelService(
                 downloadURL = getWhisperModelUrl(spec.id),
                 downloadSize = spec.size,
                 memoryRequired = spec.memoryRequired,
-                preferredFramework = LLMFramework.WHISPER_CPP,
+                preferredFramework = InferenceFramework.WHISPER_CPP,
                 localPath = null,
                 createdAt = SimpleInstant.now(),
                 updatedAt = SimpleInstant.now()
@@ -170,7 +170,7 @@ class WhisperModelService(
                     downloadURL = remoteModel.downloadUrl,
                     downloadSize = remoteModel.size,
                     memoryRequired = remoteModel.memoryRequired,
-                    preferredFramework = LLMFramework.WHISPER_CPP,
+                    preferredFramework = InferenceFramework.WHISPER_CPP,
                     localPath = null,
                     createdAt = SimpleInstant.now(),
                     updatedAt = SimpleInstant.now()

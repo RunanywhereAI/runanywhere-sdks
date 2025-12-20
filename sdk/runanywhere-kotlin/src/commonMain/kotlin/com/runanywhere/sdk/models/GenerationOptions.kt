@@ -3,11 +3,11 @@ package com.runanywhere.sdk.models
 import kotlinx.serialization.Serializable
 
 /**
- * Options for text generation - exact match with iOS RunAnywhereGenerationOptions
+ * Options for text generation - exact match with iOS LLMGenerationOptions
  * Significantly enhanced from the simple GenerationOptions in generation package
  */
 @Serializable
-data class RunAnywhereGenerationOptions(
+data class LLMGenerationOptions(
     /** Maximum number of tokens to generate */
     val maxTokens: Int = 100,
 
@@ -51,7 +51,13 @@ data class RunAnywhereGenerationOptions(
     val seed: Int? = null,
 
     /** Context window size */
-    val contextLength: Int? = null
+    val contextLength: Int? = null,
+
+    /** Enable thinking mode for reasoning models */
+    val enableThinking: Boolean = false,
+
+    /** Maximum thinking tokens (for reasoning models) */
+    val maxThinkingTokens: Int? = null
 ) {
 
     /**
@@ -71,28 +77,28 @@ data class RunAnywhereGenerationOptions(
     /**
      * Create a copy with different streaming setting
      */
-    fun withStreaming(enabled: Boolean): RunAnywhereGenerationOptions {
+    fun withStreaming(enabled: Boolean): LLMGenerationOptions {
         return copy(streamingEnabled = enabled)
     }
 
     /**
      * Create a copy with different system prompt
      */
-    fun withSystemPrompt(prompt: String?): RunAnywhereGenerationOptions {
+    fun withSystemPrompt(prompt: String?): LLMGenerationOptions {
         return copy(systemPrompt = prompt)
     }
 
     /**
      * Create a copy with different execution target
      */
-    fun withExecutionTarget(target: ExecutionTarget?): RunAnywhereGenerationOptions {
+    fun withExecutionTarget(target: ExecutionTarget?): LLMGenerationOptions {
         return copy(preferredExecutionTarget = target)
     }
 
     /**
      * Create a copy with structured output configuration
      */
-    fun withStructuredOutput(config: StructuredOutputConfig?): RunAnywhereGenerationOptions {
+    fun withStructuredOutput(config: StructuredOutputConfig?): LLMGenerationOptions {
         return copy(structuredOutput = config)
     }
 
@@ -115,12 +121,12 @@ data class RunAnywhereGenerationOptions(
         /**
          * Default options for quick text generation
          */
-        val DEFAULT = RunAnywhereGenerationOptions()
+        val DEFAULT = LLMGenerationOptions()
 
         /**
          * Options optimized for streaming
          */
-        val STREAMING = RunAnywhereGenerationOptions(
+        val STREAMING = LLMGenerationOptions(
             streamingEnabled = true,
             maxTokens = 1000
         )
@@ -128,7 +134,7 @@ data class RunAnywhereGenerationOptions(
         /**
          * Options for creative writing (higher temperature)
          */
-        val CREATIVE = RunAnywhereGenerationOptions(
+        val CREATIVE = LLMGenerationOptions(
             temperature = 1.0f,
             maxTokens = 2000,
             topP = 0.9f
@@ -137,7 +143,7 @@ data class RunAnywhereGenerationOptions(
         /**
          * Options for factual/analytical responses (lower temperature)
          */
-        val FACTUAL = RunAnywhereGenerationOptions(
+        val FACTUAL = LLMGenerationOptions(
             temperature = 0.1f,
             maxTokens = 500,
             topP = 0.95f
@@ -146,10 +152,13 @@ data class RunAnywhereGenerationOptions(
         /**
          * Options for code generation
          */
-        val CODE = RunAnywhereGenerationOptions(
+        val CODE = LLMGenerationOptions(
             temperature = 0.2f,
             maxTokens = 1500,
             stopSequences = listOf("```", "\n\n\n")
         )
     }
 }
+
+// Note: RunAnywhereGenerationOptions typealias was removed in iteration 17.
+// All code should use LLMGenerationOptions directly.

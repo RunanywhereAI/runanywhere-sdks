@@ -1,11 +1,11 @@
 package com.runanywhere.whisperkit.service
 
 import android.content.Context
-import com.runanywhere.sdk.components.stt.STTOptions
-import com.runanywhere.sdk.components.stt.STTTranscriptionResult
-import com.runanywhere.sdk.components.stt.STTTranscriptionResult.TimestampInfo
-import com.runanywhere.sdk.components.stt.STTStreamingOptions
-import com.runanywhere.sdk.components.stt.STTStreamEvent
+import com.runanywhere.sdk.features.stt.STTOptions
+import com.runanywhere.sdk.features.stt.STTTranscriptionResult
+import com.runanywhere.sdk.features.stt.STTTranscriptionResult.TimestampInfo
+import com.runanywhere.sdk.features.stt.STTStreamingOptions
+import com.runanywhere.sdk.features.stt.STTStreamEvent
 import com.runanywhere.whisperkit.models.*
 import com.runanywhere.whisperkit.storage.DefaultWhisperStorage
 import com.runanywhere.whisperkit.storage.WhisperStorageStrategy
@@ -300,13 +300,8 @@ class AndroidWhisperKitService(
     }
 
     private fun createWhisperParams(options: STTOptions): WhisperFullParams {
-        // Create params with appropriate strategy based on sensitivity
-        val strategy = when (options.sensitivityMode) {
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.NORMAL -> WhisperSamplingStrategy.GREEDY
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.HIGH,
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.MAXIMUM -> WhisperSamplingStrategy.GREEDY // Use GREEDY for now until BEAM_SEARCH is available
-        }
-        val params = WhisperFullParams(strategy)
+        // Use GREEDY strategy for transcription
+        val params = WhisperFullParams(WhisperSamplingStrategy.GREEDY)
 
         // Set language
         params.language = when(options.language) {
@@ -316,23 +311,10 @@ class AndroidWhisperKitService(
 
         // Set other parameters based on STTOptions
         params.printTimestamps = options.enableTimestamps
-        params.suppressBlank = options.suppressBlank
-        params.suppressNonSpeechTokens = options.suppressNonSpeechTokens
-
-        // Set temperature and beam size based on sensitivity mode
-        when (options.sensitivityMode) {
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.NORMAL -> {
-                params.temperature = 0.0f
-            }
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.HIGH -> {
-                params.temperature = 0.3f
-                params.beamSearchBeamSize = 5
-            }
-            com.runanywhere.sdk.components.stt.STTSensitivityMode.MAXIMUM -> {
-                params.temperature = 0.5f
-                params.beamSearchBeamSize = 10
-            }
-        }
+        // Use sensible defaults for whisper params
+        params.suppressBlank = true
+        params.suppressNonSpeechTokens = true
+        params.temperature = 0.0f
 
         return params
     }
@@ -379,7 +361,7 @@ class AndroidWhisperKitService(
             emit(STTStreamEvent.SpeechEnded)
 
         } catch (e: Exception) {
-            emit(STTStreamEvent.Error(com.runanywhere.sdk.components.stt.STTError.transcriptionFailed(e)))
+            emit(STTStreamEvent.Error(com.runanywhere.sdk.features.stt.STTError.transcriptionFailed(e)))
         }
     }.flowOn(Dispatchers.Default)
 

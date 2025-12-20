@@ -2,7 +2,7 @@ package com.runanywhere.sdk.foundation.utils
 
 import com.runanywhere.sdk.foundation.filemanager.SimplifiedFileManager
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
 
 /**
@@ -51,7 +51,7 @@ object ModelPathUtils {
      * Pattern: {modelsDir}/{framework.value}/
      * Example: Models/ONNX/
      */
-    fun getFrameworkDirectory(framework: LLMFramework): String {
+    fun getFrameworkDirectory(framework: InferenceFramework): String {
         val modelsDir = getModelsDirectory()
         return "$modelsDir/${framework.value}"
     }
@@ -65,7 +65,7 @@ object ModelPathUtils {
      * @param framework The framework the model is associated with
      * @return The full path to the model folder
      */
-    fun getModelFolder(modelId: String, framework: LLMFramework): String {
+    fun getModelFolder(modelId: String, framework: InferenceFramework): String {
         val modelsDir = getModelsDirectory()
         return "$modelsDir/${framework.value}/$modelId"
     }
@@ -99,7 +99,7 @@ object ModelPathUtils {
      * @param format The model format (determines file extension)
      * @return The full path to the model file
      */
-    fun getModelFilePath(modelId: String, framework: LLMFramework, format: ModelFormat): String {
+    fun getModelFilePath(modelId: String, framework: InferenceFramework, format: ModelFormat): String {
         val folder = getModelFolder(modelId, framework)
         val extension = format.value
         return "$folder/$modelId.$extension"
@@ -146,7 +146,7 @@ object ModelPathUtils {
      * @param format The model format
      * @return The full path to the expected model file
      */
-    fun getExpectedModelPath(modelId: String, framework: LLMFramework?, format: ModelFormat): String {
+    fun getExpectedModelPath(modelId: String, framework: InferenceFramework?, format: ModelFormat): String {
         return if (framework != null) {
             getModelFilePath(modelId, framework, format)
         } else {
@@ -202,7 +202,7 @@ object ModelPathUtils {
         return when {
             components.size >= 2 -> {
                 // Could be framework/modelId or modelId/file
-                val possibleFramework = LLMFramework.entries.find { it.value == components[0] }
+                val possibleFramework = InferenceFramework.entries.find { it.value == components[0] }
                 if (possibleFramework != null && components.size >= 2) {
                     components[1] // It's a framework path, modelId is second
                 } else {
@@ -220,14 +220,14 @@ object ModelPathUtils {
      * @param path The path to analyze
      * @return The framework if found, null otherwise
      */
-    fun extractFramework(path: String): LLMFramework? {
+    fun extractFramework(path: String): InferenceFramework? {
         val modelsDir = getModelsDirectory()
         if (!path.startsWith(modelsDir)) return null
 
         val relativePath = path.removePrefix(modelsDir).trim('/')
         val firstComponent = relativePath.split("/").firstOrNull() ?: return null
 
-        return LLMFramework.entries.find { it.value == firstComponent }
+        return InferenceFramework.entries.find { it.value == firstComponent }
     }
 
     /**
@@ -257,11 +257,11 @@ object ModelPathUtils {
             // Legacy path
             "$modelsDir/$modelId",
             // Framework-specific paths
-            "$modelsDir/${LLMFramework.LLAMA_CPP.value}/$modelId",
-            "$modelsDir/${LLMFramework.ONNX.value}/$modelId",
-            "$modelsDir/${LLMFramework.WHISPER_KIT.value}/$modelId",
-            "$modelsDir/${LLMFramework.CORE_ML.value}/$modelId",
-            "$modelsDir/${LLMFramework.MLC.value}/$modelId"
+            "$modelsDir/${InferenceFramework.LLAMA_CPP.value}/$modelId",
+            "$modelsDir/${InferenceFramework.ONNX.value}/$modelId",
+            "$modelsDir/${InferenceFramework.WHISPER_KIT.value}/$modelId",
+            "$modelsDir/${InferenceFramework.CORE_ML.value}/$modelId",
+            "$modelsDir/${InferenceFramework.MLC.value}/$modelId"
         )
     }
 
@@ -275,7 +275,7 @@ object ModelPathUtils {
     fun getPossibleModelFilePaths(modelId: String): List<String> {
         val modelsDir = getModelsDirectory()
         val extensions = listOf("gguf", "bin", "onnx", "mlmodelc", "mlpackage")
-        val frameworks = LLMFramework.entries.map { it.value }
+        val frameworks = InferenceFramework.entries.map { it.value }
 
         val paths = mutableListOf<String>()
 

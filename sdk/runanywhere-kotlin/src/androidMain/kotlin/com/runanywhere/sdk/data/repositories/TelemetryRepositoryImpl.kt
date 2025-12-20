@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.data.repositories
 
-import com.runanywhere.sdk.core.SDKConstants
+import com.runanywhere.sdk.utils.SDKConstants
 import com.runanywhere.sdk.data.database.RunAnywhereDatabase
 import com.runanywhere.sdk.data.database.entities.TelemetryEventEntity
 import com.runanywhere.sdk.data.datasources.RemoteTelemetryDataSource

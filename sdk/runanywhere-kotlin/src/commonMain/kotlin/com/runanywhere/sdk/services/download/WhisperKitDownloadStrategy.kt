@@ -3,7 +3,7 @@ package com.runanywhere.sdk.services.download
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.storage.FileSystem
@@ -44,7 +44,7 @@ class WhisperKitDownloadStrategy(
      * Check if this strategy can handle the model
      */
     override fun canHandle(model: ModelInfo): Boolean {
-        return model.preferredFramework == LLMFramework.WHISPER_KIT ||
+        return model.preferredFramework == InferenceFramework.WHISPER_KIT ||
                (model.format == ModelFormat.MLMODEL &&
                 model.category == ModelCategory.SPEECH_RECOGNITION)
     }

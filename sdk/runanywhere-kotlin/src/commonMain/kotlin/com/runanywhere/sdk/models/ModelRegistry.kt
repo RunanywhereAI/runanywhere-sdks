@@ -1,14 +1,14 @@
 package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.models.enums.ModelCategory
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 
 /**
  * Model criteria for filtering models - EXACT copy of iOS ModelCriteria
  */
 data class ModelCriteria(
     val category: ModelCategory? = null,
-    val framework: LLMFramework? = null,
+    val framework: InferenceFramework? = null,
     val minMemoryRequired: Long? = null,
     val maxMemoryRequired: Long? = null,
     val format: String? = null,

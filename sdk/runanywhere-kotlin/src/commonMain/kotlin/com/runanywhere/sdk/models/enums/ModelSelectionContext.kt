@@ -70,7 +70,7 @@ enum class ModelSelectionContext(
     /**
      * Check if a framework is relevant for this context
      */
-    fun isFrameworkRelevant(framework: LLMFramework): Boolean {
+    fun isFrameworkRelevant(framework: InferenceFramework): Boolean {
         val frameworkModalities = framework.supportedModalities
         return frameworkModalities.any { relevantModalities.contains(it) }
     }

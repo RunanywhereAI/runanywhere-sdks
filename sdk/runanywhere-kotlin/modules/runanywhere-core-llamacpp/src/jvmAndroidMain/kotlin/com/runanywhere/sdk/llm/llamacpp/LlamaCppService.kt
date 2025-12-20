@@ -1,9 +1,9 @@
 package com.runanywhere.sdk.llm.llamacpp
 
-import com.runanywhere.sdk.components.llm.LLMConfiguration
-import com.runanywhere.sdk.components.llm.LLMInput
-import com.runanywhere.sdk.components.llm.LLMOutput
-import com.runanywhere.sdk.components.llm.LLMService
+import com.runanywhere.sdk.features.llm.LLMConfiguration
+import com.runanywhere.sdk.features.llm.LLMInput
+import com.runanywhere.sdk.features.llm.LLMOutput
+import com.runanywhere.sdk.features.llm.LLMService
 import com.runanywhere.sdk.core.llamacpp.LlamaCppCoreService
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
@@ -74,7 +74,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
 
     actual override suspend fun generate(
         prompt: String,
-        options: RunAnywhereGenerationOptions
+        options: LLMGenerationOptions
     ): String = withContext(Dispatchers.IO) {
         if (!isServiceInitialized) {
             throw IllegalStateException("LlamaCppService not initialized")
@@ -91,7 +91,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
 
     actual override suspend fun streamGenerate(
         prompt: String,
-        options: RunAnywhereGenerationOptions,
+        options: LLMGenerationOptions,
         onToken: (String) -> Unit
     ) = withContext(Dispatchers.IO) {
         if (!isServiceInitialized) {
@@ -243,7 +243,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         }
 
         // Use provided options or defaults
-        val options = input.options ?: RunAnywhereGenerationOptions(
+        val options = input.options ?: LLMGenerationOptions(
             maxTokens = configuration.maxTokens,
             temperature = configuration.temperature.toFloat(),
             streamingEnabled = false
@@ -297,7 +297,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
 
         logger.info("Stream prompt: ${prompt.take(100)}...")
 
-        val options = input.options ?: RunAnywhereGenerationOptions(
+        val options = input.options ?: LLMGenerationOptions(
             maxTokens = configuration.maxTokens,
             temperature = configuration.temperature.toFloat(),
             streamingEnabled = true

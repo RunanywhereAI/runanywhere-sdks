@@ -1,8 +1,8 @@
 package com.runanywhere.whisperkit.service
 
-import com.runanywhere.sdk.components.stt.STTOptions
-import com.runanywhere.sdk.components.stt.STTTranscriptionResult
-import com.runanywhere.sdk.components.stt.STTTranscriptionResult.TimestampInfo
+import com.runanywhere.sdk.features.stt.STTOptions
+import com.runanywhere.sdk.features.stt.STTTranscriptionResult
+import com.runanywhere.sdk.features.stt.STTTranscriptionResult.TimestampInfo
 import com.runanywhere.whisperkit.models.*
 import com.runanywhere.whisperkit.storage.DefaultWhisperStorage
 import com.runanywhere.whisperkit.storage.WhisperStorageStrategy
@@ -307,11 +307,11 @@ class JvmWhisperKitService : WhisperKitService() {
      */
     fun transcribeStream(
         audioStream: Flow<ByteArray>,
-        options: com.runanywhere.sdk.components.stt.STTStreamingOptions
-    ): Flow<com.runanywhere.sdk.components.stt.STTStreamEvent> = flow {
+        options: com.runanywhere.sdk.features.stt.STTStreamingOptions
+    ): Flow<com.runanywhere.sdk.features.stt.STTStreamEvent> = flow {
         val context = whisperContext ?: throw WhisperError.ServiceNotReady()
 
-        emit(com.runanywhere.sdk.components.stt.STTStreamEvent.SpeechStarted)
+        emit(com.runanywhere.sdk.features.stt.STTStreamEvent.SpeechStarted)
 
         val audioBuffer = mutableListOf<ByteArray>()
         var lastEmitTime = System.currentTimeMillis()
@@ -337,7 +337,7 @@ class JvmWhisperKitService : WhisperKitService() {
                     }
 
                     val floatAudio = convertPCM16ToFloat(combinedAudio)
-                    val sttOptions = com.runanywhere.sdk.components.stt.STTOptions(
+                    val sttOptions = com.runanywhere.sdk.features.stt.STTOptions(
                         language = options.language ?: "auto",
                         detectLanguage = options.detectLanguage,
                         enableTimestamps = false
@@ -354,7 +354,7 @@ class JvmWhisperKitService : WhisperKitService() {
                             }
 
                             if (transcript.isNotBlank()) {
-                                emit(com.runanywhere.sdk.components.stt.STTStreamEvent.PartialTranscription(
+                                emit(com.runanywhere.sdk.features.stt.STTStreamEvent.PartialTranscription(
                                     text = transcript.trim(),
                                     confidence = 0.9f,
                                     isFinal = false
@@ -362,7 +362,7 @@ class JvmWhisperKitService : WhisperKitService() {
 
                                 // Language detection
                                 if (options.detectLanguage) {
-                                    emit(com.runanywhere.sdk.components.stt.STTStreamEvent.LanguageDetected(
+                                    emit(com.runanywhere.sdk.features.stt.STTStreamEvent.LanguageDetected(
                                         language = sttOptions.language,
                                         confidence = 0.8f
                                     ))
@@ -391,14 +391,14 @@ class JvmWhisperKitService : WhisperKitService() {
                 }
             }
 
-            emit(com.runanywhere.sdk.components.stt.STTStreamEvent.SpeechEnded)
+            emit(com.runanywhere.sdk.features.stt.STTStreamEvent.SpeechEnded)
 
         } catch (e: Exception) {
-            emit(com.runanywhere.sdk.components.stt.STTStreamEvent.Error(
+            emit(com.runanywhere.sdk.features.stt.STTStreamEvent.Error(
                 when (e) {
-                    is com.runanywhere.sdk.components.stt.STTError -> e
-                    is WhisperError -> com.runanywhere.sdk.components.stt.STTError.transcriptionFailed(e)
-                    else -> com.runanywhere.sdk.components.stt.STTError.transcriptionFailed(e)
+                    is com.runanywhere.sdk.features.stt.STTError -> e
+                    is WhisperError -> com.runanywhere.sdk.features.stt.STTError.transcriptionFailed(e)
+                    else -> com.runanywhere.sdk.features.stt.STTError.transcriptionFailed(e)
                 }
             ))
         }
@@ -417,7 +417,7 @@ class JvmWhisperKitService : WhisperKitService() {
                 val sampleData = audioData.sliceArray(0 until sampleSize)
                 val floatAudio = convertPCM16ToFloat(sampleData)
 
-                val detectionOptions = com.runanywhere.sdk.components.stt.STTOptions(
+                val detectionOptions = com.runanywhere.sdk.features.stt.STTOptions(
                     language = "auto",
                     detectLanguage = true
                 )

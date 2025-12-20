@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.foundation.filemanager
 
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.platform.getPlatformBaseDirectory
 import com.runanywhere.sdk.platform.getPlatformTempDirectory
@@ -431,7 +431,7 @@ class SimplifiedFileManager {
                 val entryName = entryPath.substringAfterLast("/")
 
                 // Check if this is a framework folder
-                val framework = LLMFramework.values().firstOrNull {
+                val framework = InferenceFramework.values().firstOrNull {
                     it.value.equals(entryName, ignoreCase = true) ||
                     it.displayName.equals(entryName, ignoreCase = true)
                 }
@@ -466,7 +466,7 @@ class SimplifiedFileManager {
      * Scan framework-specific folder for models
      * Matches iOS getAllStoredModels() framework scanning logic
      */
-    private fun scanFrameworkFolder(frameworkPath: String, framework: LLMFramework): List<StoredModelData> {
+    private fun scanFrameworkFolder(frameworkPath: String, framework: InferenceFramework): List<StoredModelData> {
         val models = mutableListOf<StoredModelData>()
 
         try {
@@ -595,7 +595,7 @@ class SimplifiedFileManager {
             val modelsPath = modelsDirectory.toString()
 
             // Check framework-specific folders first
-            for (framework in LLMFramework.values()) {
+            for (framework in InferenceFramework.values()) {
                 val frameworkPath = "$modelsPath/${framework.value}"
                 if (fileSystem.exists(frameworkPath.toPath())) {
                     val modelPath = "$frameworkPath/$modelId"
@@ -639,7 +639,7 @@ class SimplifiedFileManager {
             val modelsPath = modelsDirectory.toString()
 
             // Search in framework-specific folders first
-            for (framework in LLMFramework.values()) {
+            for (framework in InferenceFramework.values()) {
                 val frameworkPath = "$modelsPath/${framework.value}"
                 if (!fileSystem.exists(frameworkPath.toPath())) continue
 
@@ -757,7 +757,7 @@ data class StoredModelData(
     val modelId: String,
     val format: ModelFormat,
     val size: Long,
-    val framework: LLMFramework?
+    val framework: InferenceFramework?
 )
 
 /**

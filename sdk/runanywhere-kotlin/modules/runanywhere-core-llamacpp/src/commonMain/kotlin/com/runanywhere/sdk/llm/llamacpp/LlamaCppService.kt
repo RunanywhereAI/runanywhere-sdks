@@ -1,12 +1,12 @@
 package com.runanywhere.sdk.llm.llamacpp
 
-import com.runanywhere.sdk.components.llm.LLMConfiguration
-import com.runanywhere.sdk.components.llm.LLMInput
-import com.runanywhere.sdk.components.llm.LLMOutput
-import com.runanywhere.sdk.components.llm.LLMService
+import com.runanywhere.sdk.features.llm.LLMConfiguration
+import com.runanywhere.sdk.features.llm.LLMInput
+import com.runanywhere.sdk.features.llm.LLMOutput
+import com.runanywhere.sdk.features.llm.LLMService
 import com.runanywhere.sdk.models.LLMGenerationChunk
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
+import com.runanywhere.sdk.models.LLMGenerationOptions
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -32,10 +32,10 @@ import kotlinx.coroutines.flow.Flow
 expect class LlamaCppService(configuration: LLMConfiguration) : LLMService {
     // Core LLMService interface methods (from iOS LLMService protocol)
     override suspend fun initialize(modelPath: String?)
-    override suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions): String
+    override suspend fun generate(prompt: String, options: LLMGenerationOptions): String
     override suspend fun streamGenerate(
         prompt: String,
-        options: RunAnywhereGenerationOptions,
+        options: LLMGenerationOptions,
         onToken: (String) -> Unit
     )
     override suspend fun cleanup()

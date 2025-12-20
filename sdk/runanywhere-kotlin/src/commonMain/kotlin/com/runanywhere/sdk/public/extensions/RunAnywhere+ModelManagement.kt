@@ -188,8 +188,8 @@ suspend fun addModelFromURL(
             localPath = null,
             downloadSize = null,
             memoryRequired = 1024 * 1024 * 1024L, // Default 1GB
-            compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP),
-            preferredFramework = com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP,
+            compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.InferenceFramework.LLAMA_CPP),
+            preferredFramework = com.runanywhere.sdk.models.enums.InferenceFramework.LLAMA_CPP,
             contextLength = 4096,
             supportsThinking = false,
             metadata = com.runanywhere.sdk.models.ModelInfoMetadata(

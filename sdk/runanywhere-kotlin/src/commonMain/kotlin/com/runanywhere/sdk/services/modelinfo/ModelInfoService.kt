@@ -5,7 +5,7 @@ import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.repositories.ModelInfoRepository
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.services.sync.SyncCoordinator
 import com.runanywhere.sdk.utils.SimpleInstant
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
@@ -91,9 +91,9 @@ class ModelInfoService(
 
     /**
      * Load models for specific frameworks
-     * Equivalent to iOS: func loadModels(for frameworks: [LLMFramework]) async throws -> [ModelInfo]
+     * Equivalent to iOS: func loadModels(for frameworks: [InferenceFramework]) async throws -> [ModelInfo]
      */
-    suspend fun loadModels(frameworks: List<LLMFramework>): List<ModelInfo> = mutex.withLock {
+    suspend fun loadModels(frameworks: List<InferenceFramework>): List<ModelInfo> = mutex.withLock {
         logger.debug("Loading models for frameworks: $frameworks")
 
         try {

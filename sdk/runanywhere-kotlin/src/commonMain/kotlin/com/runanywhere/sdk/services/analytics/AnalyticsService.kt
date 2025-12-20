@@ -295,7 +295,7 @@ class AnalyticsService internal constructor(
                     success = success,
                     executionTarget = executionTarget,
                     buildToken = BuildToken.token,
-                    sdkVersion = com.runanywhere.sdk.core.SDKConstants.SDK_VERSION,
+                    sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION,
                     timestamp = currentTimeISO8601(), // ISO8601 format
                     hostAppIdentifier = hostAppInfo.identifier,
                     hostAppName = hostAppInfo.name,

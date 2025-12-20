@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.events
 
-import com.runanywhere.sdk.components.base.ComponentState
-import com.runanywhere.sdk.components.base.SDKComponent
+import com.runanywhere.sdk.core.capabilities.ComponentState
+import com.runanywhere.sdk.core.capabilities.SDKComponent
 
 // MARK: - Component Events
 
@@ -255,7 +255,7 @@ data class SpeakerInfo(
  * Matches iOS VoicePipelineResult struct
  */
 data class VoicePipelineResult(
-    val transcription: com.runanywhere.sdk.components.stt.STTOutput,
+    val transcription: com.runanywhere.sdk.features.stt.STTOutput,
     val llmResponse: String,
     val audioOutput: ByteArray? = null,
     val processingTime: Double = 0.0,

@@ -3,9 +3,9 @@ package com.runanywhere.sdk.services
 import com.runanywhere.sdk.data.models.*
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.network.HttpClient
-import com.runanywhere.sdk.storage.SecureStorage
+import com.runanywhere.sdk.security.SecureStorage
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
-import com.runanywhere.sdk.foundation.PersistentDeviceIdentity
+import com.runanywhere.sdk.foundation.DeviceIdentity
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.utils.SDKConstants
 import com.runanywhere.sdk.config.SDKConfig
@@ -70,7 +70,7 @@ class AuthenticationService(
      * Matches iOS AuthenticationService.authenticate(apiKey:) method
      */
     suspend fun authenticate(apiKey: String): AuthenticationResponse = mutex.withLock {
-        val deviceId = PersistentDeviceIdentity.getPersistentDeviceUUID()
+        val deviceId = DeviceIdentity.persistentUUID
 
         val request = AuthenticationRequest(
             apiKey = apiKey,

@@ -1,8 +1,8 @@
 package com.runanywhere.whisperkit.service
 
-import com.runanywhere.sdk.components.stt.STTOptions
-import com.runanywhere.sdk.components.stt.STTTranscriptionResult
-import com.runanywhere.sdk.components.stt.STTTranscriptionResult.TimestampInfo
+import com.runanywhere.sdk.features.stt.STTOptions
+import com.runanywhere.sdk.features.stt.STTTranscriptionResult
+import com.runanywhere.sdk.features.stt.STTTranscriptionResult.TimestampInfo
 import com.runanywhere.whisperkit.models.*
 import com.runanywhere.whisperkit.storage.WhisperStorageStrategy
 import com.runanywhere.whisperkit.storage.JvmAndroidWhisperStorage
@@ -10,9 +10,9 @@ import io.github.givimad.whisperjni.WhisperContext
 import io.github.givimad.whisperjni.WhisperFullParams
 import io.github.givimad.whisperjni.WhisperJNI
 import io.github.givimad.whisperjni.WhisperSamplingStrategy
-import com.runanywhere.sdk.components.stt.STTStreamEvent
-import com.runanywhere.sdk.components.stt.STTStreamingOptions
-import com.runanywhere.sdk.components.stt.STTError
+import com.runanywhere.sdk.features.stt.STTStreamEvent
+import com.runanywhere.sdk.features.stt.STTStreamingOptions
+import com.runanywhere.sdk.features.stt.STTError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext

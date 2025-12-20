@@ -1,8 +1,8 @@
 package com.runanywhere.whisperkit.service
 
-import com.runanywhere.sdk.components.stt.STTService
-import com.runanywhere.sdk.components.stt.STTOptions
-import com.runanywhere.sdk.components.stt.STTTranscriptionResult
+import com.runanywhere.sdk.features.stt.STTService
+import com.runanywhere.sdk.features.stt.STTOptions
+import com.runanywhere.sdk.features.stt.STTTranscriptionResult
 import com.runanywhere.whisperkit.models.*
 import com.runanywhere.whisperkit.storage.WhisperStorageStrategy
 import kotlinx.coroutines.flow.Flow

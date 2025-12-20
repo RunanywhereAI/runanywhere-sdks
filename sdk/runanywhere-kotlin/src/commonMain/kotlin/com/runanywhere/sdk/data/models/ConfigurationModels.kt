@@ -3,6 +3,7 @@ package com.runanywhere.sdk.data.models
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
@@ -112,21 +113,6 @@ enum class CacheEvictionPolicy {
     LARGEST_FIRST
 }
 
-/**
- * LLM Framework enumeration
- * Exact match to iOS LLMFramework enum
- */
-@Serializable
-enum class LLMFramework {
-    @SerialName("llama_cpp")
-    LLAMA_CPP,
-    @SerialName("onnx")
-    ONNX,
-    @SerialName("core_ml")
-    CORE_ML,
-    @SerialName("tensorflow_lite")
-    TENSORFLOW_LITE
-}
 
 /**
  * SDK Environment enumeration
@@ -287,7 +273,7 @@ data class GenerationConfiguration(
 
     /// Preferred frameworks for generation in order of preference
     @SerialName("framework_preferences")
-    val frameworkPreferences: List<LLMFramework> = emptyList(),
+    val frameworkPreferences: List<InferenceFramework> = emptyList(),
 
     /// Maximum context length
     @SerialName("max_context_length")

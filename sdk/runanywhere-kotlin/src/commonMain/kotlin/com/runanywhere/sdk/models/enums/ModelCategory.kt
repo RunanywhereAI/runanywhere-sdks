@@ -72,15 +72,21 @@ enum class ModelCategory(
          * Determine category from a framework
          * Matches iOS ModelCategory.from(framework:)
          */
-        fun from(framework: LLMFramework): ModelCategory {
+        fun from(framework: InferenceFramework): ModelCategory {
             return when (framework) {
-                LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP, LLMFramework.OPEN_AI_WHISPER -> SPEECH_RECOGNITION
-                LLMFramework.SYSTEM_TTS -> SPEECH_SYNTHESIS
-                LLMFramework.LLAMA_CPP, LLMFramework.LLAMACPP, LLMFramework.MLX, LLMFramework.MLC,
-                LLMFramework.EXECU_TORCH, LLMFramework.PICO_LLM,
-                LLMFramework.FOUNDATION_MODELS, LLMFramework.SWIFT_TRANSFORMERS -> LANGUAGE
-                LLMFramework.CORE_ML, LLMFramework.TENSOR_FLOW_LITE,
-                LLMFramework.ONNX, LLMFramework.MEDIA_PIPE -> MULTIMODAL
+                InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP, InferenceFramework.OPEN_AI_WHISPER -> SPEECH_RECOGNITION
+                InferenceFramework.SYSTEM_TTS -> SPEECH_SYNTHESIS
+                InferenceFramework.LLAMA_CPP, InferenceFramework.LLAMACPP, InferenceFramework.MLX, InferenceFramework.MLC,
+                InferenceFramework.EXECU_TORCH, InferenceFramework.PICO_LLM,
+                InferenceFramework.FOUNDATION_MODELS, InferenceFramework.SWIFT_TRANSFORMERS -> LANGUAGE
+                InferenceFramework.CORE_ML, InferenceFramework.TENSOR_FLOW_LITE,
+                InferenceFramework.ONNX, InferenceFramework.MEDIA_PIPE -> MULTIMODAL
+                // FluidAudio is for speaker diarization - categorize as audio
+                InferenceFramework.FLUID_AUDIO -> AUDIO
+                // Built-in is for VAD and other built-in algorithms - categorize as audio
+                InferenceFramework.BUILT_IN -> AUDIO
+                // Unknown/None default to multimodal
+                InferenceFramework.NONE, InferenceFramework.UNKNOWN -> MULTIMODAL
             }
         }
 
@@ -102,7 +108,7 @@ enum class ModelCategory(
         /**
          * Determine category from format and frameworks
          */
-        fun from(format: ModelFormat, frameworks: List<LLMFramework>): ModelCategory {
+        fun from(format: ModelFormat, frameworks: List<InferenceFramework>): ModelCategory {
             // First check if we have framework hints
             frameworks.firstOrNull()?.let {
                 return from(it)

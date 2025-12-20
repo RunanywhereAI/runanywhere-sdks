@@ -1,16 +1,16 @@
 package com.runanywhere.sdk.core.onnx
 
-import com.runanywhere.sdk.components.stt.STTConfiguration
-import com.runanywhere.sdk.components.stt.STTService
-import com.runanywhere.sdk.components.TTSOptions
-import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.components.vad.VADService
+import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.stt.STTService
+import com.runanywhere.sdk.features.tts.TTSOptions
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.features.vad.VADService
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.core.STTServiceProvider
 import com.runanywhere.sdk.core.TTSServiceProvider
 import com.runanywhere.sdk.core.VADServiceProvider
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -24,7 +24,7 @@ class ONNXSTTServiceProvider : STTServiceProvider {
     private val logger = SDKLogger("ONNXSTTServiceProvider")
 
     override val name: String = "ONNX Runtime"
-    override val framework: LLMFramework = LLMFramework.ONNX
+    override val framework: InferenceFramework = InferenceFramework.ONNX
 
     /**
      * Version of ONNX Runtime used
@@ -88,7 +88,7 @@ class ONNXTTSServiceProvider : TTSServiceProvider {
     private val logger = SDKLogger("ONNXTTSServiceProvider")
 
     override val name: String = "ONNX TTS"
-    override val framework: LLMFramework = LLMFramework.ONNX
+    override val framework: InferenceFramework = InferenceFramework.ONNX
 
     /**
      * Version of ONNX TTS implementation

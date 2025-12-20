@@ -1,11 +1,11 @@
 package com.runanywhere.sdk.voice.handlers
 
-import com.runanywhere.sdk.components.vad.VADComponent
-import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.components.vad.VADInput
-import com.runanywhere.sdk.components.vad.VADOutput
-import com.runanywhere.sdk.components.vad.VADMetadata
-import com.runanywhere.sdk.components.vad.SpeechActivityEvent
+import com.runanywhere.sdk.features.vad.VADComponent
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.features.vad.VADInput
+import com.runanywhere.sdk.features.vad.VADOutput
+import com.runanywhere.sdk.features.vad.VADMetadata
+import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.voice.vad.SimpleEnergyVAD
 import kotlinx.coroutines.flow.Flow

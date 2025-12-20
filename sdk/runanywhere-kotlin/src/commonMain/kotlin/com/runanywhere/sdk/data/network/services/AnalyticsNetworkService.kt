@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.data.network.services
 
-import com.runanywhere.sdk.core.SDKConstants
+import com.runanywhere.sdk.utils.SDKConstants
 import com.runanywhere.sdk.data.models.TelemetryBatch
 import com.runanywhere.sdk.data.models.TelemetryBatchRequest
 import com.runanywhere.sdk.data.models.TelemetryData

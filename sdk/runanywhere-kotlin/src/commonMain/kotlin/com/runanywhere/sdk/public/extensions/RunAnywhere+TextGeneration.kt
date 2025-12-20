@@ -1,10 +1,10 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.capabilities.llm.LLMCapability
-import com.runanywhere.sdk.capabilities.llm.LLMGenerationOptions
-import com.runanywhere.sdk.capabilities.llm.LLMGenerationResult
-import com.runanywhere.sdk.capabilities.llm.LLMStreamingResult
+import com.runanywhere.sdk.features.llm.LLMCapability
+import com.runanywhere.sdk.models.LLMGenerationOptions
+import com.runanywhere.sdk.features.llm.LLMGenerationResult
+import com.runanywhere.sdk.features.llm.LLMStreamingResult
 import com.runanywhere.sdk.data.models.SDKError
 import kotlinx.coroutines.flow.Flow
 

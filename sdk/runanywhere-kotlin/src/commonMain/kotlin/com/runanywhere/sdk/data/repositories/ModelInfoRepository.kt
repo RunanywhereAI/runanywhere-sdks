@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.data.repositories
 
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 
 /**
@@ -31,7 +31,7 @@ interface ModelInfoRepository {
     /**
      * Model-specific queries
      */
-    suspend fun fetchByFramework(framework: LLMFramework): List<ModelInfo>
+    suspend fun fetchByFramework(framework: InferenceFramework): List<ModelInfo>
     suspend fun fetchByCategory(category: ModelCategory): List<ModelInfo>
     suspend fun fetchDownloaded(): List<ModelInfo>
 

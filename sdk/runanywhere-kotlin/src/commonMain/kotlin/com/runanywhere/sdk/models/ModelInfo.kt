@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.data.models.fileExists
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.utils.SimpleInstant
@@ -32,8 +32,8 @@ data class ModelInfo(
     val md5Checksum: String? = null,
 
     // Framework compatibility
-    val compatibleFrameworks: List<LLMFramework> = emptyList(),
-    val preferredFramework: LLMFramework? = null,
+    val compatibleFrameworks: List<InferenceFramework> = emptyList(),
+    val preferredFramework: InferenceFramework? = null,
 
     // Model-specific capabilities (optional based on category)
     val contextLength: Int? = null,

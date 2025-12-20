@@ -1,14 +1,14 @@
 package com.runanywhere.sdk.providers
 
-import com.runanywhere.sdk.components.stt.JvmWhisperSTTService
-import com.runanywhere.sdk.components.stt.STTConfiguration
-import com.runanywhere.sdk.components.stt.STTService
+import com.runanywhere.sdk.features.stt.JvmWhisperSTTService
+import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.stt.STTService
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.core.STTServiceProvider
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.JvmWhisperJNIModelMapper
 import com.runanywhere.sdk.models.JvmModelStorage
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 
 /**
  * JVM WhisperJNI STT Service Provider
@@ -35,7 +35,7 @@ class JvmWhisperSTTServiceProvider : STTServiceProvider {
 
     override val name: String = "WhisperJNI-JVM"
 
-    override val framework: LLMFramework = LLMFramework.WHISPER_CPP
+    override val framework: InferenceFramework = InferenceFramework.WHISPER_CPP
 
     override fun canHandle(modelId: String?): Boolean {
         // This provider can handle:

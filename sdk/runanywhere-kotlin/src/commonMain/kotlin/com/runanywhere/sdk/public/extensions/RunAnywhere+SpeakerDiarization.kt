@@ -1,11 +1,11 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.capabilities.speakerdiarization.SpeakerDiarizationCapability
-import com.runanywhere.sdk.capabilities.speakerdiarization.SpeakerDiarizationSpeakerInfo
-import com.runanywhere.sdk.capabilities.speakerdiarization.SpeakerDiarizationProfile
-import com.runanywhere.sdk.capabilities.speakerdiarization.SpeakerDiarizationOutput
-import com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationConfiguration
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationCapability
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerInfo
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerProfile
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationOutput
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration
 import com.runanywhere.sdk.data.models.SDKError
 import kotlinx.coroutines.flow.Flow
 
@@ -66,7 +66,7 @@ val RunAnywhere.isSpeakerDiarizationReady: Boolean
  * @return Information about the detected speaker
  * @throws SDKError if SDK is not initialized or speaker diarization not ready
  */
-suspend fun RunAnywhere.identifySpeaker(samples: FloatArray): SpeakerDiarizationSpeakerInfo {
+suspend fun RunAnywhere.identifySpeaker(samples: FloatArray): SpeakerInfo {
     requireInitialized()
 
     val capability = speakerDiarizationCapability
@@ -81,7 +81,7 @@ suspend fun RunAnywhere.identifySpeaker(samples: FloatArray): SpeakerDiarization
  * @param audioStream Flow of audio data
  * @return Flow of speaker information
  */
-fun RunAnywhere.identifySpeakerStream(audioStream: Flow<ByteArray>): Flow<SpeakerDiarizationSpeakerInfo> {
+fun RunAnywhere.identifySpeakerStream(audioStream: Flow<ByteArray>): Flow<SpeakerInfo> {
     requireInitialized()
 
     val capability = speakerDiarizationCapability
@@ -112,7 +112,7 @@ suspend fun RunAnywhere.diarize(samples: FloatArray, sampleRate: Int = 16000): S
  * @return Array of all speakers detected so far
  * @throws SDKError if SDK is not initialized
  */
-fun RunAnywhere.getAllSpeakers(): List<SpeakerDiarizationSpeakerInfo> {
+fun RunAnywhere.getAllSpeakers(): List<SpeakerInfo> {
     requireInitialized()
 
     val capability = speakerDiarizationCapability
@@ -127,7 +127,7 @@ fun RunAnywhere.getAllSpeakers(): List<SpeakerDiarizationSpeakerInfo> {
  * @param speakerId The speaker ID
  * @return Speaker profile or null if not found
  */
-suspend fun RunAnywhere.getSpeakerProfile(speakerId: String): SpeakerDiarizationProfile? {
+suspend fun RunAnywhere.getSpeakerProfile(speakerId: String): SpeakerProfile? {
     requireInitialized()
 
     val capability = speakerDiarizationCapability ?: return null
@@ -171,14 +171,14 @@ suspend fun RunAnywhere.resetSpeakerDiarization() {
 /**
  * Set callback for speaker detection events
  */
-fun RunAnywhere.onSpeakerDetected(callback: (SpeakerDiarizationSpeakerInfo) -> Unit) {
+fun RunAnywhere.onSpeakerDetected(callback: (SpeakerInfo) -> Unit) {
     speakerDiarizationCapability?.onSpeakerDetected(callback)
 }
 
 /**
  * Set callback for speaker change events
  */
-fun RunAnywhere.onSpeakerChanged(callback: (previous: SpeakerDiarizationSpeakerInfo?, current: SpeakerDiarizationSpeakerInfo) -> Unit) {
+fun RunAnywhere.onSpeakerChanged(callback: (previous: SpeakerInfo?, current: SpeakerInfo) -> Unit) {
     speakerDiarizationCapability?.onSpeakerChanged(callback)
 }
 
@@ -192,17 +192,3 @@ fun RunAnywhere.onSpeakerChanged(callback: (previous: SpeakerDiarizationSpeakerI
 suspend fun RunAnywhere.cleanupSpeakerDiarization() {
     speakerDiarizationCapability?.cleanup()
 }
-
-// ============================================================================
-// MARK: - Private Helpers
-// ============================================================================
-
-/**
- * Get Speaker Diarization capability from RunAnywhere
- */
-private val RunAnywhere.speakerDiarizationCapability: SpeakerDiarizationCapability?
-    get() = try {
-        com.runanywhere.sdk.foundation.ServiceContainer.shared.speakerDiarizationCapability
-    } catch (e: Exception) {
-        null
-    }
