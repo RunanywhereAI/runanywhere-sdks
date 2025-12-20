@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.features.vad
 
-import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.events.EventPublisher
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

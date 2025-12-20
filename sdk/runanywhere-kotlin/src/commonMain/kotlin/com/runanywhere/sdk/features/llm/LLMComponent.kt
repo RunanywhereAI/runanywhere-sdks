@@ -5,11 +5,11 @@ import com.runanywhere.sdk.core.capabilities.BaseComponent
 import com.runanywhere.sdk.core.capabilities.SDKComponent
 import com.runanywhere.sdk.core.capabilities.ServiceWrapper
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.events.ComponentInitializationEvent
-import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.currentTimeMillis
+import com.runanywhere.sdk.infrastructure.events.ComponentInitializationEvent
+import com.runanywhere.sdk.infrastructure.events.EventPublisher
 import com.runanywhere.sdk.models.*
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlinx.coroutines.flow.Flow

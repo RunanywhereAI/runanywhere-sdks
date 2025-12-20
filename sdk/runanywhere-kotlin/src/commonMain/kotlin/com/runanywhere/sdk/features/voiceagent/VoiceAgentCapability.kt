@@ -1,8 +1,6 @@
 package com.runanywhere.sdk.features.voiceagent
 
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.events.EventPublisher
-import com.runanywhere.sdk.events.SDKVoiceEvent
 import com.runanywhere.sdk.features.llm.LLMCapability
 import com.runanywhere.sdk.features.llm.LLMConfiguration
 import com.runanywhere.sdk.features.stt.STTCapability
@@ -11,6 +9,8 @@ import com.runanywhere.sdk.features.tts.TTSCapability
 import com.runanywhere.sdk.features.tts.TTSConfiguration
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.events.EventPublisher
+import com.runanywhere.sdk.infrastructure.events.SDKVoiceEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

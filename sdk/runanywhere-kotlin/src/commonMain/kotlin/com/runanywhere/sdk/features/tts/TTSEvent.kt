@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.features.tts
 
-import com.runanywhere.sdk.events.BaseSDKEvent
-import com.runanywhere.sdk.events.EventCategory
-import com.runanywhere.sdk.events.EventDestination
+import com.runanywhere.sdk.infrastructure.events.BaseSDKEvent
+import com.runanywhere.sdk.infrastructure.events.EventCategory
+import com.runanywhere.sdk.infrastructure.events.EventDestination
 import com.runanywhere.sdk.models.enums.InferenceFramework
 
 /**

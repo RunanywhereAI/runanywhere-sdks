@@ -3,9 +3,6 @@ package com.runanywhere.sdk.data.network
 import com.runanywhere.sdk.config.SDKConfig
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.network.NetworkConfiguration
-import com.runanywhere.sdk.network.createHttpClient
-import com.runanywhere.sdk.services.AuthenticationService
 
 /**
  * Factory for creating the appropriate NetworkService based on the environment
@@ -80,7 +77,7 @@ object NetworkServiceFactory {
 
         // Create circuit breaker for this service
         val circuitBreaker =
-            com.runanywhere.sdk.network.CircuitBreakerRegistry.getOrCreate(
+            CircuitBreakerRegistry.getOrCreate(
                 name = "NetworkService",
                 failureThreshold = 5,
                 recoveryTimeoutMs = 30_000,
@@ -117,4 +114,4 @@ object NetworkServiceFactory {
 /**
  * Platform-specific network checker creation
  */
-expect fun createPlatformNetworkChecker(): com.runanywhere.sdk.network.NetworkChecker?
+expect fun createPlatformNetworkChecker(): NetworkChecker?

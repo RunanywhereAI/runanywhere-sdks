@@ -2,7 +2,6 @@ package com.runanywhere.sdk.data.network
 
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.network.models.APIEndpoint
-import com.runanywhere.sdk.network.CircuitBreakerRegistry
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test

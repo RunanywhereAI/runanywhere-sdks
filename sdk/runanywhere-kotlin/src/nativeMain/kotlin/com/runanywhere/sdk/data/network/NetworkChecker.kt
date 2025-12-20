@@ -1,7 +1,5 @@
 package com.runanywhere.sdk.data.network
 
-import com.runanywhere.sdk.network.NetworkChecker
-
 /**
  * Create platform-specific network checker for Native platforms
  */

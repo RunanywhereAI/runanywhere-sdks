@@ -1,12 +1,12 @@
 package com.runanywhere.sdk.core.capabilities
 
-import com.runanywhere.sdk.events.EventPublisher
-import com.runanywhere.sdk.events.SDKEvent
 import com.runanywhere.sdk.features.llm.LLMEvent
 import com.runanywhere.sdk.features.tts.TTSEvent
 import com.runanywhere.sdk.features.vad.VADEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.currentTimeMillis
+import com.runanywhere.sdk.infrastructure.events.EventPublisher
+import com.runanywhere.sdk.infrastructure.events.SDKEvent
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 

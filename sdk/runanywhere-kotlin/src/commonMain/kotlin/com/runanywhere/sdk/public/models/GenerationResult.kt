@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.public.models
 
+import com.runanywhere.sdk.infrastructure.analytics.PerformanceMetrics
 import com.runanywhere.sdk.models.ExecutionTarget
 import com.runanywhere.sdk.models.enums.InferenceFramework
-import com.runanywhere.sdk.services.analytics.PerformanceMetrics
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.Flow
 

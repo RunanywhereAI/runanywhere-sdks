@@ -7,9 +7,9 @@ import com.runanywhere.sdk.core.capabilities.ComponentState
 import com.runanywhere.sdk.core.capabilities.SDKComponent
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.models.generateUUID
-import com.runanywhere.sdk.events.ModularPipelineEvent
 import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationService
 import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.infrastructure.events.ModularPipelineEvent
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.CoroutineScope

@@ -1,6 +1,6 @@
 package com.runanywhere.sdk
 
-import com.runanywhere.sdk.events.TranscriptionEvent
+import com.runanywhere.sdk.infrastructure.events.TranscriptionEvent
 import com.runanywhere.sdk.public.RunAnywhereSTT
 import com.runanywhere.sdk.public.STTSDKConfig
 import kotlinx.coroutines.flow.flowOf

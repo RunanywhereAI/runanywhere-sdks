@@ -1,10 +1,10 @@
 package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.events.EventPublisher
-import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.infrastructure.events.EventPublisher
+import com.runanywhere.sdk.infrastructure.events.SDKModelEvent
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat

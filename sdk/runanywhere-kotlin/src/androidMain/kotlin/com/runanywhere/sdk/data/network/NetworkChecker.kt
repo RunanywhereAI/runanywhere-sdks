@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
-import com.runanywhere.sdk.network.NetworkChecker
 
 /**
  * Create platform-specific network checker for Android

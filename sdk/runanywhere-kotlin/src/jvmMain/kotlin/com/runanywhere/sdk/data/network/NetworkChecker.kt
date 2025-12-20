@@ -1,6 +1,5 @@
 package com.runanywhere.sdk.data.network
 
-import com.runanywhere.sdk.network.NetworkChecker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.InetAddress

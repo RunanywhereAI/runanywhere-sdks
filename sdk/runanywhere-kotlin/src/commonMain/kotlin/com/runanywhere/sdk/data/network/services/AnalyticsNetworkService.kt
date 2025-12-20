@@ -4,9 +4,10 @@ import com.runanywhere.sdk.data.models.TelemetryBatch
 import com.runanywhere.sdk.data.models.TelemetryBatchRequest
 import com.runanywhere.sdk.data.models.TelemetryData
 import com.runanywhere.sdk.data.models.toPayload
+import com.runanywhere.sdk.data.network.AuthenticationService
 import com.runanywhere.sdk.data.network.models.APIEndpoint
+import com.runanywhere.sdk.data.network.models.DeviceRegistrationResponse
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.services.AuthenticationService
 import com.runanywhere.sdk.utils.SDKConstants
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -229,13 +230,4 @@ internal class AnalyticsNetworkService(
     }
 }
 
-/**
- * Device registration response
- * Matches Swift SDK's DeviceRegistrationResponse
- */
-@kotlinx.serialization.Serializable
-data class DeviceRegistrationResponse(
-    val deviceId: String,
-    val registered: Boolean,
-    val timestamp: Long? = null,
-)
+// DeviceRegistrationResponse moved to data/network/models/AuthModels.kt - use import

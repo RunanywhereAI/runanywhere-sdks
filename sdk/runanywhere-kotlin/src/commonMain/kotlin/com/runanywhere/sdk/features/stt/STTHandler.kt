@@ -1,10 +1,10 @@
 package com.runanywhere.sdk.features.stt
 
 import com.runanywhere.sdk.data.models.generateUUID
-import com.runanywhere.sdk.events.ModularPipelineEvent
 import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationService
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.infrastructure.events.ModularPipelineEvent
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.CoroutineScope

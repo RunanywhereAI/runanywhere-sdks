@@ -1,7 +1,5 @@
 package com.runanywhere.sdk.features.vad
 
-import com.runanywhere.sdk.voice.vad.SimpleEnergyVAD
-
 /**
  * Platform-specific VAD service creation for JVM
  * Now uses the simplified SimpleEnergyVAD matching iOS behavior exactly

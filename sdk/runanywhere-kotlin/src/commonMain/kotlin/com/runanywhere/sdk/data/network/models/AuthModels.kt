@@ -80,14 +80,16 @@ data class DeviceRegistrationRequest(
 
 /**
  * Device registration response model
- * Matches iOS DeviceRegistrationResponse structure
+ * Matches iOS DeviceRegistrationResponse structure exactly
+ * Location: Infrastructure/Device/Models/Network/DeviceRegistrationResponse.swift
  */
 @Serializable
 data class DeviceRegistrationResponse(
+    val success: Boolean,
+    @kotlinx.serialization.SerialName("device_id")
     val deviceId: String,
-    val status: String,
-    val capabilities: List<String>? = null,
-    val features: Map<String, Boolean>? = null,
+    @kotlinx.serialization.SerialName("registered_at")
+    val registeredAt: String,
 )
 
 /**

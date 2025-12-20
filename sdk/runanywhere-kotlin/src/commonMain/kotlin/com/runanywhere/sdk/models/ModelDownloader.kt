@@ -2,7 +2,7 @@ package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.utils.ModelPathUtils
-import com.runanywhere.sdk.services.download.DownloadService
+import com.runanywhere.sdk.infrastructure.download.DownloadService
 import com.runanywhere.sdk.storage.FileSystem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
