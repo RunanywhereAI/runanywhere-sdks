@@ -15,28 +15,24 @@ import kotlinx.serialization.Serializable
 data class LLMInput(
     /** Messages in the conversation */
     val messages: List<Message>,
-
     /** Optional system prompt override */
     val systemPrompt: String? = null,
-
     /** Optional context for conversation */
     val context: Context? = null,
-
     /** Optional generation options override */
-    val options: LLMGenerationOptions? = null
+    val options: LLMGenerationOptions? = null,
 ) : ComponentInput {
-
     /**
      * Convenience constructor for single prompt
      */
     constructor(
         prompt: String,
-        systemPrompt: String? = null
+        systemPrompt: String? = null,
     ) : this(
         messages = listOf(Message(role = MessageRole.USER, content = prompt)),
         systemPrompt = systemPrompt,
         context = null,
-        options = null
+        options = null,
     )
 
     /**
@@ -85,9 +81,7 @@ data class LLMInput(
     /**
      * Get effective system prompt (input override or context system prompt)
      */
-    fun getEffectiveSystemPrompt(): String? {
-        return systemPrompt ?: context?.systemPrompt
-    }
+    fun getEffectiveSystemPrompt(): String? = systemPrompt ?: context?.systemPrompt
 
     /**
      * Get estimated token count for the entire input
@@ -115,29 +109,21 @@ data class LLMInput(
 data class LLMOutput(
     /** Generated text */
     val text: String,
-
     /** Token usage statistics */
     val tokenUsage: TokenUsage,
-
     /** Generation metadata */
     val metadata: GenerationMetadata,
-
     /** Finish reason */
     val finishReason: FinishReason,
-
     /** Timestamp (required by ComponentOutput) */
     override val timestamp: Long = getCurrentTimeMillis(),
-
     /** Session ID for tracking */
     val sessionId: String? = null,
-
     /** Cost savings compared to cloud execution */
     val savedAmount: Double = 0.0,
-
     /** Execution target that was actually used */
-    val actualExecutionTarget: ExecutionTarget? = null
+    val actualExecutionTarget: ExecutionTarget? = null,
 ) : ComponentOutput {
-
     /**
      * Validate the output
      */
@@ -162,7 +148,8 @@ data class LLMOutput(
      * Check if generation was successful
      */
     val isSuccessful: Boolean
-        get() = finishReason == FinishReason.COMPLETED ||
+        get() =
+            finishReason == FinishReason.COMPLETED ||
                 finishReason == FinishReason.MAX_TOKENS ||
                 finishReason == FinishReason.STOP_SEQUENCE
 
@@ -170,24 +157,27 @@ data class LLMOutput(
      * Get effective tokens per second
      */
     val effectiveTokensPerSecond: Double?
-        get() = metadata.tokensPerSecond ?: if (metadata.generationTime > 0) {
-            tokenUsage.completionTokens.toDouble() / (metadata.generationTime / 1000.0)
-        } else null
+        get() =
+            metadata.tokensPerSecond ?: if (metadata.generationTime > 0) {
+                tokenUsage.completionTokens.toDouble() / (metadata.generationTime / 1000.0)
+            } else {
+                null
+            }
 
     /**
      * Create a Message from this output (for adding to conversation context)
      */
-    fun toMessage(): Message {
-        return Message(
+    fun toMessage(): Message =
+        Message(
             role = MessageRole.ASSISTANT,
             content = text,
-            metadata = mapOf(
-                "sessionId" to (sessionId ?: "unknown"),
-                "finishReason" to finishReason.value,
-                "modelId" to metadata.modelId,
-                "tokensUsed" to tokenUsage.totalTokens.toString()
-            ),
-            timestamp = timestamp
+            metadata =
+                mapOf(
+                    "sessionId" to (sessionId ?: "unknown"),
+                    "finishReason" to finishReason.value,
+                    "modelId" to metadata.modelId,
+                    "tokensUsed" to tokenUsage.totalTokens.toString(),
+                ),
+            timestamp = timestamp,
         )
-    }
 }

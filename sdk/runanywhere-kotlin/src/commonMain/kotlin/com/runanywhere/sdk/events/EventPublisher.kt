@@ -19,7 +19,6 @@ import kotlinx.coroutines.launch
  * ```
  */
 object EventPublisher {
-
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val logger = SDKLogger("EventPublisher")
 

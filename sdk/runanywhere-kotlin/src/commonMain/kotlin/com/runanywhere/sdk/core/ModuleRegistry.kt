@@ -1,12 +1,11 @@
 package com.runanywhere.sdk.core
 
-import com.runanywhere.sdk.core.capabilities.SDKComponent
+import com.runanywhere.sdk.core.frameworks.UnifiedFrameworkAdapter
 import com.runanywhere.sdk.features.llm.LLMServiceProvider
 import com.runanywhere.sdk.features.stt.STTConfiguration
 import com.runanywhere.sdk.features.stt.STTService
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.vad.VADService
-import com.runanywhere.sdk.core.frameworks.UnifiedFrameworkAdapter
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.ModelInfo
@@ -37,7 +36,6 @@ import com.runanywhere.sdk.models.enums.InferenceFramework
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/ModuleRegistry.swift
  */
 object ModuleRegistry {
-
     private val logger = SDKLogger("ModuleRegistry")
 
     /**
@@ -47,7 +45,7 @@ object ModuleRegistry {
     private data class RegisteredAdapter(
         val adapter: UnifiedFrameworkAdapter,
         val priority: Int,
-        val registrationTime: Long = currentTimeMillis()
+        val registrationTime: Long = currentTimeMillis(),
     )
 
     // Framework adapter storage - protected by synchronized blocks
@@ -61,8 +59,6 @@ object ModuleRegistry {
     private val _vadProviders = mutableListOf<VADServiceProvider>()
     private val _llmProviders = mutableListOf<LLMServiceProvider>()
     private val _ttsProviders = mutableListOf<TTSServiceProvider>()
-    private val _vlmProviders = mutableListOf<VLMServiceProvider>()
-    private val _wakeWordProviders = mutableListOf<WakeWordServiceProvider>()
     private val _speakerDiarizationProviders = mutableListOf<SpeakerDiarizationServiceProvider>()
 
     // MARK: - Registration Methods
@@ -112,28 +108,6 @@ object ModuleRegistry {
     }
 
     /**
-     * Register a Vision Language Model provider
-     * Thread-safe: Can be called from any thread
-     */
-    fun registerVLM(provider: VLMServiceProvider) {
-        synchronized(_vlmProviders) {
-            _vlmProviders.add(provider)
-        }
-        logger.info("Registered VLM provider: ${provider.name}")
-    }
-
-    /**
-     * Register a Wake Word Detection provider
-     * Thread-safe: Can be called from any thread
-     */
-    fun registerWakeWord(provider: WakeWordServiceProvider) {
-        synchronized(_wakeWordProviders) {
-            _wakeWordProviders.add(provider)
-        }
-        logger.info("Registered Wake Word provider: ${provider.name}")
-    }
-
-    /**
      * Register a Speaker Diarization provider
      * Thread-safe: Can be called from any thread
      */
@@ -153,7 +127,10 @@ object ModuleRegistry {
      * @param adapter The framework adapter to register
      * @param priority Priority for selection (higher = selected first). Default is 100.
      */
-    fun registerFrameworkAdapter(adapter: UnifiedFrameworkAdapter, priority: Int = 100) {
+    fun registerFrameworkAdapter(
+        adapter: UnifiedFrameworkAdapter,
+        priority: Int = 100,
+    ) {
         synchronized(_frameworkAdapters) {
             val registered = RegisteredAdapter(adapter, priority)
 
@@ -168,8 +145,10 @@ object ModuleRegistry {
                 val modalityList = _adaptersByModality.getOrPut(modality) { mutableListOf() }
                 modalityList.add(registered)
                 // Sort by priority (descending) then registration time (ascending)
-                modalityList.sortWith(compareByDescending<RegisteredAdapter> { it.priority }
-                    .thenBy { it.registrationTime })
+                modalityList.sortWith(
+                    compareByDescending<RegisteredAdapter> { it.priority }
+                        .thenBy { it.registrationTime },
+                )
             }
         }
 
@@ -184,22 +163,20 @@ object ModuleRegistry {
      * @param framework The framework to get adapter for
      * @return The adapter or null if not registered
      */
-    fun adapterForFramework(framework: InferenceFramework): UnifiedFrameworkAdapter? {
-        return synchronized(_adaptersByFramework) {
+    fun adapterForFramework(framework: InferenceFramework): UnifiedFrameworkAdapter? =
+        synchronized(_adaptersByFramework) {
             _adaptersByFramework[framework]
         }
-    }
 
     /**
      * Get all adapters that support a specific modality, sorted by priority
      * @param modality The modality to filter by
      * @return List of adapters supporting the modality
      */
-    fun adaptersForModality(modality: FrameworkModality): List<UnifiedFrameworkAdapter> {
-        return synchronized(_adaptersByModality) {
+    fun adaptersForModality(modality: FrameworkModality): List<UnifiedFrameworkAdapter> =
+        synchronized(_adaptersByModality) {
             _adaptersByModality[modality]?.map { it.adapter } ?: emptyList()
         }
-    }
 
     /**
      * Find adapters that can handle a specific model for a modality
@@ -207,14 +184,16 @@ object ModuleRegistry {
      * @param modality The modality to use
      * @return List of compatible adapters, sorted by priority
      */
-    fun findAdapters(model: ModelInfo, modality: FrameworkModality): List<UnifiedFrameworkAdapter> {
-        return synchronized(_adaptersByModality) {
+    fun findAdapters(
+        model: ModelInfo,
+        modality: FrameworkModality,
+    ): List<UnifiedFrameworkAdapter> =
+        synchronized(_adaptersByModality) {
             _adaptersByModality[modality]
                 ?.filter { it.adapter.canHandle(model) }
                 ?.map { it.adapter }
                 ?: emptyList()
         }
-    }
 
     /**
      * Find the best adapter for a model and modality
@@ -227,11 +206,15 @@ object ModuleRegistry {
      * @param modality The modality to use
      * @return Best matching adapter or null
      */
-    fun findBestAdapter(model: ModelInfo, modality: FrameworkModality): UnifiedFrameworkAdapter? {
+    fun findBestAdapter(
+        model: ModelInfo,
+        modality: FrameworkModality,
+    ): UnifiedFrameworkAdapter? {
         return synchronized(_adaptersByModality) {
-            val compatibleAdapters = _adaptersByModality[modality]
-                ?.filter { it.adapter.canHandle(model) }
-                ?: return null
+            val compatibleAdapters =
+                _adaptersByModality[modality]
+                    ?.filter { it.adapter.canHandle(model) }
+                    ?: return null
 
             if (compatibleAdapters.isEmpty()) return null
 
@@ -273,31 +256,31 @@ object ModuleRegistry {
      * @param framework The framework to check
      * @return True if an adapter is registered
      */
-    fun hasFramework(framework: InferenceFramework): Boolean {
-        return synchronized(_adaptersByFramework) { _adaptersByFramework.containsKey(framework) }
-    }
+    fun hasFramework(framework: InferenceFramework): Boolean =
+        synchronized(_adaptersByFramework) { _adaptersByFramework.containsKey(framework) }
 
     /**
      * Get model storage strategy for a specific framework
      * @param framework The framework to get storage strategy for
      * @return Storage strategy if available, null otherwise
      */
-    fun getStorageStrategy(framework: InferenceFramework): com.runanywhere.sdk.core.frameworks.ModelStorageStrategy? {
-        return synchronized(_adaptersByFramework) {
+    fun getStorageStrategy(framework: InferenceFramework): com.runanywhere.sdk.core.frameworks.ModelStorageStrategy? =
+        synchronized(_adaptersByFramework) {
             _adaptersByFramework[framework]?.getModelStorageStrategy()
         }
-    }
 
     /**
      * Get all registered model storage strategies
      * @return Map of framework to storage strategy
      */
     val allStorageStrategies: Map<InferenceFramework, com.runanywhere.sdk.core.frameworks.ModelStorageStrategy>
-        get() = synchronized(_adaptersByFramework) {
-            _adaptersByFramework.mapNotNull { (framework, adapter) ->
-                adapter.getModelStorageStrategy()?.let { framework to it }
-            }.toMap()
-        }
+        get() =
+            synchronized(_adaptersByFramework) {
+                _adaptersByFramework
+                    .mapNotNull { (framework, adapter) ->
+                        adapter.getModelStorageStrategy()?.let { framework to it }
+                    }.toMap()
+            }
 
     // MARK: - Provider Access
 
@@ -305,99 +288,66 @@ object ModuleRegistry {
      * Get an STT provider for the specified model
      * Thread-safe: Can be called from any thread
      */
-    fun sttProvider(modelId: String? = null): STTServiceProvider? {
-        return synchronized(_sttProviders) {
+    fun sttProvider(modelId: String? = null): STTServiceProvider? =
+        synchronized(_sttProviders) {
             if (modelId != null) {
                 _sttProviders.firstOrNull { it.canHandle(modelId) }
             } else {
                 _sttProviders.firstOrNull()
             }
         }
-    }
 
     /**
      * Get a VAD provider for the specified model
      * Thread-safe: Can be called from any thread
      */
-    fun vadProvider(modelId: String? = null): VADServiceProvider? {
-        return synchronized(_vadProviders) {
+    fun vadProvider(modelId: String? = null): VADServiceProvider? =
+        synchronized(_vadProviders) {
             if (modelId != null) {
                 _vadProviders.firstOrNull { it.canHandle(modelId) }
             } else {
                 _vadProviders.firstOrNull()
             }
         }
-    }
 
     /**
      * Get an LLM provider for the specified model
      * Thread-safe: Can be called from any thread
      */
-    fun llmProvider(modelId: String? = null): LLMServiceProvider? {
-        return synchronized(_llmProviders) {
+    fun llmProvider(modelId: String? = null): LLMServiceProvider? =
+        synchronized(_llmProviders) {
             if (modelId != null) {
                 _llmProviders.firstOrNull { it.canHandle(modelId) }
             } else {
                 _llmProviders.firstOrNull()
             }
         }
-    }
 
     /**
      * Get a TTS provider for the specified model
      * Thread-safe: Can be called from any thread
      */
-    fun ttsProvider(modelId: String? = null): TTSServiceProvider? {
-        return synchronized(_ttsProviders) {
+    fun ttsProvider(modelId: String? = null): TTSServiceProvider? =
+        synchronized(_ttsProviders) {
             if (modelId != null) {
                 _ttsProviders.firstOrNull { it.canHandle(modelId) }
             } else {
                 _ttsProviders.firstOrNull()
             }
         }
-    }
-
-    /**
-     * Get a VLM provider for the specified model
-     * Thread-safe: Can be called from any thread
-     */
-    fun vlmProvider(modelId: String? = null): VLMServiceProvider? {
-        return synchronized(_vlmProviders) {
-            if (modelId != null) {
-                _vlmProviders.firstOrNull { it.canHandle(modelId) }
-            } else {
-                _vlmProviders.firstOrNull()
-            }
-        }
-    }
-
-    /**
-     * Get a Wake Word provider
-     * Thread-safe: Can be called from any thread
-     */
-    fun wakeWordProvider(modelId: String? = null): WakeWordServiceProvider? {
-        return synchronized(_wakeWordProviders) {
-            if (modelId != null) {
-                _wakeWordProviders.firstOrNull { it.canHandle(modelId) }
-            } else {
-                _wakeWordProviders.firstOrNull()
-            }
-        }
-    }
 
     /**
      * Get a Speaker Diarization provider
      * Thread-safe: Can be called from any thread
      */
-    fun speakerDiarizationProvider(modelId: String? = null): SpeakerDiarizationServiceProvider? {
-        return synchronized(_speakerDiarizationProviders) {
+    fun speakerDiarizationProvider(modelId: String? = null): SpeakerDiarizationServiceProvider? =
+        synchronized(_speakerDiarizationProviders) {
             if (modelId != null) {
                 _speakerDiarizationProviders.firstOrNull { it.canHandle(modelId) }
             } else {
                 _speakerDiarizationProviders.firstOrNull()
             }
         }
-    }
 
     // MARK: - Provider List Access (for framework management)
 
@@ -421,13 +371,6 @@ object ModuleRegistry {
      */
     val allTTSProviders: List<TTSServiceProvider>
         get() = synchronized(_ttsProviders) { _ttsProviders.toList() }
-
-    /**
-     * Get all registered VLM providers
-     * Thread-safe: Returns a snapshot of the current provider list
-     */
-    val allVLMProviders: List<VLMServiceProvider>
-        get() = synchronized(_vlmProviders) { _vlmProviders.toList() }
 
     // MARK: - Availability Checking
 
@@ -460,20 +403,6 @@ object ModuleRegistry {
         get() = synchronized(_ttsProviders) { _ttsProviders.isNotEmpty() }
 
     /**
-     * Check if VLM is available
-     * Thread-safe: Can be called from any thread
-     */
-    val hasVLM: Boolean
-        get() = synchronized(_vlmProviders) { _vlmProviders.isNotEmpty() }
-
-    /**
-     * Check if Wake Word Detection is available
-     * Thread-safe: Can be called from any thread
-     */
-    val hasWakeWord: Boolean
-        get() = synchronized(_wakeWordProviders) { _wakeWordProviders.isNotEmpty() }
-
-    /**
      * Check if Speaker Diarization is available
      * Thread-safe: Can be called from any thread
      */
@@ -485,15 +414,14 @@ object ModuleRegistry {
      * Thread-safe: Can be called from any thread
      */
     val registeredModules: List<String>
-        get() = buildList {
-            if (hasSTT) add("STT")
-            if (hasVAD) add("VAD")
-            if (hasLLM) add("LLM")
-            if (hasTTS) add("TTS")
-            if (hasVLM) add("VLM")
-            if (hasWakeWord) add("WakeWord")
-            if (hasSpeakerDiarization) add("SpeakerDiarization")
-        }
+        get() =
+            buildList {
+                if (hasSTT) add("STT")
+                if (hasVAD) add("VAD")
+                if (hasLLM) add("LLM")
+                if (hasTTS) add("TTS")
+                if (hasSpeakerDiarization) add("SpeakerDiarization")
+            }
 
     /**
      * Singleton instance for convenience
@@ -508,7 +436,9 @@ object ModuleRegistry {
  */
 interface STTServiceProvider {
     suspend fun createSTTService(configuration: STTConfiguration): STTService
+
     fun canHandle(modelId: String?): Boolean
+
     val name: String
     val framework: InferenceFramework
 }
@@ -518,7 +448,9 @@ interface STTServiceProvider {
  */
 interface VADServiceProvider {
     suspend fun createVADService(configuration: VADConfiguration): VADService
+
     fun canHandle(modelId: String): Boolean
+
     val name: String
 }
 
@@ -528,39 +460,34 @@ interface VADServiceProvider {
  * Provider for Text-to-Speech services
  */
 interface TTSServiceProvider {
-    suspend fun synthesize(text: String, options: com.runanywhere.sdk.features.tts.TTSOptions): ByteArray
-    fun synthesizeStream(text: String, options: com.runanywhere.sdk.features.tts.TTSOptions): kotlinx.coroutines.flow.Flow<ByteArray>
+    suspend fun synthesize(
+        text: String,
+        options: com.runanywhere.sdk.features.tts.TTSOptions,
+    ): ByteArray
+
+    fun synthesizeStream(
+        text: String,
+        options: com.runanywhere.sdk.features.tts.TTSOptions,
+    ): kotlinx.coroutines.flow.Flow<ByteArray>
+
     fun canHandle(modelId: String): Boolean = true
+
     val name: String
+
     /** Framework this provider supports */
     val framework: InferenceFramework
-}
-
-/**
- * Provider for Vision Language Model services
- */
-interface VLMServiceProvider {
-    suspend fun analyze(image: ByteArray, prompt: String?): com.runanywhere.sdk.features.vlm.VLMOutput
-    suspend fun generateFromImage(image: ByteArray, prompt: String, options: com.runanywhere.sdk.generation.GenerationOptions): String
-    fun canHandle(modelId: String): Boolean = true
-    val name: String
-}
-
-/**
- * Provider for Wake Word Detection services
- */
-interface WakeWordServiceProvider {
-    suspend fun createWakeWordService(configuration: com.runanywhere.sdk.features.wakeword.WakeWordConfiguration): com.runanywhere.sdk.features.wakeword.WakeWordService
-    fun canHandle(modelId: String?): Boolean
-    val name: String
 }
 
 /**
  * Provider for Speaker Diarization services
  */
 interface SpeakerDiarizationServiceProvider {
-    suspend fun createSpeakerDiarizationService(configuration: com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration): com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationService
+    suspend fun createSpeakerDiarizationService(
+        configuration: com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration,
+    ): com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationService
+
     fun canHandle(modelId: String?): Boolean
+
     val name: String
 }
 

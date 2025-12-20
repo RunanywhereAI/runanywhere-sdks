@@ -1,10 +1,9 @@
 package com.runanywhere.sdk.features.llm
 
-import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.LLMGenerationOptions
 import com.runanywhere.sdk.models.*
+import com.runanywhere.sdk.models.LLMGenerationOptions
+import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.InferenceFramework
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Protocol for Language Model services - matches iOS LLMService protocol exactly
@@ -20,13 +19,16 @@ interface LLMService {
     suspend fun initialize(modelPath: String?)
 
     /** Generate text from prompt */
-    suspend fun generate(prompt: String, options: LLMGenerationOptions): String
+    suspend fun generate(
+        prompt: String,
+        options: LLMGenerationOptions,
+    ): String
 
     /** Stream generation token by token */
     suspend fun streamGenerate(
         prompt: String,
         options: LLMGenerationOptions,
-        onToken: (String) -> Unit
+        onToken: (String) -> Unit,
     )
 
     /** Check if service is ready */
@@ -58,14 +60,13 @@ interface LLMServiceProvider {
     /** Supported features */
     val supportedFeatures: Set<String>
 
-
     /** Check model compatibility with detailed validation */
     fun validateModelCompatibility(model: ModelInfo): ModelCompatibilityResult
 
     /** Download model with progress tracking */
     suspend fun downloadModel(
         modelId: String,
-        onProgress: (Float) -> Unit = {}
+        onProgress: (Float) -> Unit = {},
     ): ModelInfo
 
     /** Estimate memory requirements for model */
@@ -84,25 +85,20 @@ interface LLMServiceProvider {
 data class ModelCompatibilityResult(
     /** Whether the model is compatible */
     val isCompatible: Boolean,
-
     /** Detailed compatibility information */
     val details: String,
-
     /** Required memory in bytes */
     val memoryRequired: Long = 0L,
-
     /** Recommended hardware configuration */
     val recommendedConfiguration: HardwareConfiguration? = null,
-
     /** Any warnings about compatibility */
-    val warnings: List<String> = emptyList()
+    val warnings: List<String> = emptyList(),
 )
 
 /**
  * Base LLM Service Provider implementation
  */
 abstract class BaseLLMServiceProvider : LLMServiceProvider {
-
     override fun canHandle(modelId: String?): Boolean {
         if (modelId == null) return false
         // Simple check based on model ID patterns
@@ -125,7 +121,7 @@ abstract class BaseLLMServiceProvider : LLMServiceProvider {
             details = "Model is compatible with ${framework.displayName}",
             memoryRequired = memoryRequired,
             recommendedConfiguration = getOptimalConfiguration(model),
-            warnings = warnings
+            warnings = warnings,
         )
     }
 
@@ -134,21 +130,18 @@ abstract class BaseLLMServiceProvider : LLMServiceProvider {
         return model.memoryRequired ?: model.downloadSize ?: 8_000_000_000L
     }
 
-    override fun getOptimalConfiguration(model: ModelInfo): HardwareConfiguration {
-        return HardwareConfiguration(
+    override fun getOptimalConfiguration(model: ModelInfo): HardwareConfiguration =
+        HardwareConfiguration(
             preferGPU = true,
             minMemoryMB = (estimateMemoryRequirements(model) / 1024 / 1024).toInt(),
-            recommendedThreads = 4
+            recommendedThreads = 4,
         )
-    }
 
-    override fun createModelInfo(modelId: String): ModelInfo {
-        return createModelInfoImpl(modelId)
-    }
+    override fun createModelInfo(modelId: String): ModelInfo = createModelInfoImpl(modelId)
 
     override suspend fun downloadModel(
         modelId: String,
-        onProgress: (Float) -> Unit
+        onProgress: (Float) -> Unit,
     ): ModelInfo {
         // Default implementation - subclasses should override for actual download
         onProgress(0.0f)
@@ -163,8 +156,8 @@ abstract class BaseLLMServiceProvider : LLMServiceProvider {
     }
 
     /** Create a basic ModelInfo from model ID - override for more sophisticated creation */
-    protected open fun createModelInfoImpl(modelId: String): ModelInfo {
-        return ModelInfo(
+    protected open fun createModelInfoImpl(modelId: String): ModelInfo =
+        ModelInfo(
             id = modelId,
             name = modelId,
             category = com.runanywhere.sdk.models.enums.ModelCategory.LANGUAGE,
@@ -177,9 +170,8 @@ abstract class BaseLLMServiceProvider : LLMServiceProvider {
             preferredFramework = com.runanywhere.sdk.models.enums.InferenceFramework.LLAMA_CPP,
             contextLength = 4096,
             supportsThinking = false,
-            metadata = null
+            metadata = null,
         )
-    }
 
     /** Get available system memory - platform-specific */
     protected abstract fun getAvailableSystemMemory(): Long

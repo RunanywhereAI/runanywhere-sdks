@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.asStateFlow
  * One-to-one mapping from iOS ComponentAdapter
  */
 abstract class ComponentAdapter<Input, Output> {
-
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
 
@@ -143,7 +142,8 @@ enum class ComponentState {
     INITIALIZING,
     READY,
     PROCESSING,
-    ERROR;
+    ERROR,
+    ;
 
     val canProcess: Boolean
         get() = this == READY
@@ -155,17 +155,35 @@ enum class ComponentState {
 open class ComponentConfiguration(
     val name: String = "",
     val version: String = "1.0.0",
-    val metadata: Map<String, Any> = emptyMap()
+    val metadata: Map<String, Any> = emptyMap(),
 )
 
 /**
  * Component errors
  */
-sealed class ComponentError(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    data class InitializationError(override val message: String, override val cause: Throwable? = null) : ComponentError(message, cause)
-    data class ProcessingError(override val message: String, override val cause: Throwable? = null) : ComponentError(message, cause)
-    data class ConfigurationError(override val message: String, override val cause: Throwable? = null) : ComponentError(message, cause)
-    data class CleanupError(override val message: String, override val cause: Throwable? = null) : ComponentError(message, cause)
+sealed class ComponentError(
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause) {
+    data class InitializationError(
+        override val message: String,
+        override val cause: Throwable? = null,
+    ) : ComponentError(message, cause)
+
+    data class ProcessingError(
+        override val message: String,
+        override val cause: Throwable? = null,
+    ) : ComponentError(message, cause)
+
+    data class ConfigurationError(
+        override val message: String,
+        override val cause: Throwable? = null,
+    ) : ComponentError(message, cause)
+
+    data class CleanupError(
+        override val message: String,
+        override val cause: Throwable? = null,
+    ) : ComponentError(message, cause)
 }
 
 /**
@@ -177,7 +195,10 @@ object AdapterRegistry {
     /**
      * Register an adapter
      */
-    fun <I, O> register(key: String, adapter: ComponentAdapter<I, O>) {
+    fun <I, O> register(
+        key: String,
+        adapter: ComponentAdapter<I, O>,
+    ) {
         adapters[key] = adapter
     }
 
@@ -185,16 +206,12 @@ object AdapterRegistry {
      * Get an adapter by key
      */
     @Suppress("UNCHECKED_CAST")
-    fun <I, O> get(key: String): ComponentAdapter<I, O>? {
-        return adapters[key] as? ComponentAdapter<I, O>
-    }
+    fun <I, O> get(key: String): ComponentAdapter<I, O>? = adapters[key] as? ComponentAdapter<I, O>
 
     /**
      * Remove an adapter
      */
-    fun remove(key: String): ComponentAdapter<*, *>? {
-        return adapters.remove(key)
-    }
+    fun remove(key: String): ComponentAdapter<*, *>? = adapters.remove(key)
 
     /**
      * Clear all adapters
@@ -218,14 +235,15 @@ object AdapterRegistry {
  * Bi-directional adapter for two-way transformations
  */
 abstract class BidirectionalAdapter<A, B> {
+    private val forwardAdapter =
+        object : ComponentAdapter<A, B>() {
+            override suspend fun performAdaptation(input: A): B = forward(input)
+        }
 
-    private val forwardAdapter = object : ComponentAdapter<A, B>() {
-        override suspend fun performAdaptation(input: A): B = forward(input)
-    }
-
-    private val reverseAdapter = object : ComponentAdapter<B, A>() {
-        override suspend fun performAdaptation(input: B): A = reverse(input)
-    }
+    private val reverseAdapter =
+        object : ComponentAdapter<B, A>() {
+            override suspend fun performAdaptation(input: B): A = reverse(input)
+        }
 
     /**
      * Initialize both adapters
@@ -255,5 +273,6 @@ abstract class BidirectionalAdapter<A, B> {
 
     // Abstract transformation methods
     protected abstract suspend fun forward(input: A): B
+
     protected abstract suspend fun reverse(input: B): A
 }

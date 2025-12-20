@@ -32,18 +32,25 @@ interface ModelInfoRepository {
      * Model-specific queries
      */
     suspend fun fetchByFramework(framework: InferenceFramework): List<ModelInfo>
+
     suspend fun fetchByCategory(category: ModelCategory): List<ModelInfo>
+
     suspend fun fetchDownloaded(): List<ModelInfo>
 
     /**
      * Update operations
      */
-    suspend fun updateDownloadStatus(modelId: String, localPath: String?)
+    suspend fun updateDownloadStatus(
+        modelId: String,
+        localPath: String?,
+    )
+
     suspend fun updateLastUsed(modelId: String)
 
     /**
      * Sync support
      */
     suspend fun fetchPendingSync(): List<ModelInfo>
+
     suspend fun markSynced(ids: List<String>)
 }

@@ -7,7 +7,6 @@ import java.lang.management.ManagementFactory
  */
 actual fun collectDeviceInfo(): DeviceInfo {
     val runtime = Runtime.getRuntime()
-    val osBean = ManagementFactory.getOperatingSystemMXBean()
     val runtimeBean = ManagementFactory.getRuntimeMXBean()
 
     return DeviceInfo.create(
@@ -19,6 +18,6 @@ actual fun collectDeviceInfo(): DeviceInfo {
         cpuCores = runtime.availableProcessors(),
         totalMemoryMB = runtime.maxMemory() / (1024 * 1024),
         appBundleId = runtimeBean.specName ?: System.getProperty("java.class.path")?.substringBefore(":"),
-        appVersion = System.getProperty("java.specification.version")
+        appVersion = System.getProperty("java.specification.version"),
     )
 }

@@ -1,10 +1,10 @@
 package com.runanywhere.sdk.native.bridge.providers
 
+import com.runanywhere.sdk.core.VADServiceProvider
 import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.vad.VADResult
 import com.runanywhere.sdk.features.vad.VADService
-import com.runanywhere.sdk.core.VADServiceProvider
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeBridgeException
 import com.runanywhere.sdk.native.bridge.NativeResultCode
@@ -25,16 +25,19 @@ import kotlinx.coroutines.withContext
  * - Custom VAD models
  */
 class ONNXVADProvider : VADServiceProvider {
-
     private val logger = SDKLogger("ONNXVADProvider")
 
     override val name: String = "ONNX VAD"
 
     override fun canHandle(modelId: String): Boolean {
         // Handle models that are known to work with ONNX VAD
-        val onnxVADModels = listOf(
-            "silero", "vad", "webrtc", "onnx-vad"
-        )
+        val onnxVADModels =
+            listOf(
+                "silero",
+                "vad",
+                "webrtc",
+                "onnx-vad",
+            )
         return onnxVADModels.any { modelId.lowercase().contains(it) }
     }
 
@@ -48,9 +51,8 @@ class ONNXVADProvider : VADServiceProvider {
  * ONNX-based VAD Service implementation
  */
 class ONNXVADService(
-    private val vadConfiguration: VADConfiguration
+    private val vadConfiguration: VADConfiguration,
 ) : VADService {
-
     private val logger = SDKLogger("ONNXVADService")
 
     private val coreService = ONNXCoreService()
@@ -61,8 +63,8 @@ class ONNXVADService(
     // Track speech state for hysteresis
     private var consecutiveSpeechFrames = 0
     private var consecutiveSilenceFrames = 0
-    private val speechStartThreshold = 3  // Frames needed to confirm speech start
-    private val speechEndThreshold = 10   // Frames needed to confirm speech end
+    private val speechStartThreshold = 3 // Frames needed to confirm speech start
+    private val speechEndThreshold = 10 // Frames needed to confirm speech end
 
     override var energyThreshold: Float
         get() = _energyThreshold
@@ -88,30 +90,31 @@ class ONNXVADService(
     override val configuration: VADConfiguration
         get() = vadConfiguration
 
-    override suspend fun initialize(configuration: VADConfiguration) = withContext(Dispatchers.IO) {
-        logger.info("Initializing ONNX VAD service")
+    override suspend fun initialize(configuration: VADConfiguration) =
+        withContext(Dispatchers.IO) {
+            logger.info("Initializing ONNX VAD service")
 
-        try {
-            // Initialize the core service
-            if (!coreService.isInitialized) {
-                coreService.initialize()
+            try {
+                // Initialize the core service
+                if (!coreService.isInitialized) {
+                    coreService.initialize()
+                }
+
+                // Load VAD model if specified, otherwise use built-in
+                configuration.modelId?.let { modelPath ->
+                    coreService.loadVADModel(modelPath)
+                } ?: run {
+                    // Load default/built-in VAD model
+                    coreService.loadVADModel(null)
+                }
+
+                _isReady = true
+                logger.info("✅ ONNX VAD service initialized")
+            } catch (e: NativeBridgeException) {
+                logger.error("Failed to initialize ONNX VAD service", e)
+                throw e
             }
-
-            // Load VAD model if specified, otherwise use built-in
-            configuration.modelId?.let { modelPath ->
-                coreService.loadVADModel(modelPath)
-            } ?: run {
-                // Load default/built-in VAD model
-                coreService.loadVADModel(null)
-            }
-
-            _isReady = true
-            logger.info("✅ ONNX VAD service initialized")
-        } catch (e: NativeBridgeException) {
-            logger.error("Failed to initialize ONNX VAD service", e)
-            throw e
         }
-    }
 
     override fun start() {
         logger.debug("Starting VAD processing")
@@ -137,14 +140,15 @@ class ONNXVADService(
         if (!isReady) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_INVALID_HANDLE,
-                "VAD service not initialized"
+                "VAD service not initialized",
             )
         }
 
         // Process through native VAD
-        val result = runBlocking {
-            coreService.processVAD(audioSamples, sampleRate)
-        }
+        val result =
+            runBlocking {
+                coreService.processVAD(audioSamples, sampleRate)
+            }
 
         val speechDetected = result.isSpeech
         val confidence = result.probability
@@ -155,7 +159,7 @@ class ONNXVADService(
         return VADResult(
             isSpeechDetected = _isSpeechActive,
             confidence = confidence,
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
         )
     }
 
@@ -182,8 +186,6 @@ class ONNXVADService(
     // =============================================================================
 
     private fun updateSpeechState(speechDetected: Boolean) {
-        val wasSpeechActive = _isSpeechActive
-
         if (speechDetected) {
             consecutiveSpeechFrames++
             consecutiveSilenceFrames = 0

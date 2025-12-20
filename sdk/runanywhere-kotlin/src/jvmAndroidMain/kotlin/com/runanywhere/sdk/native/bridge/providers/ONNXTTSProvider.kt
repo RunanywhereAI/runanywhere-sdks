@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.native.bridge.providers
 
 import com.runanywhere.sdk.core.AudioFormat
-import com.runanywhere.sdk.features.tts.TTSOptions
 import com.runanywhere.sdk.core.TTSServiceProvider
+import com.runanywhere.sdk.features.tts.TTSOptions
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.native.bridge.NativeBridgeException
@@ -25,7 +25,6 @@ import kotlinx.coroutines.withContext
  * - Piper TTS
  */
 class ONNXTTSProvider : TTSServiceProvider {
-
     private val logger = SDKLogger("ONNXTTSProvider")
     private val coreService = ONNXCoreService()
     private var isInitialized = false
@@ -36,17 +35,26 @@ class ONNXTTSProvider : TTSServiceProvider {
 
     override fun canHandle(modelId: String): Boolean {
         // Handle models that are known to work with ONNX TTS
-        val onnxTTSModels = listOf(
-            "vits", "piper", "tacotron", "fastspeech",
-            "waveglow", "hifigan", "onnx-tts"
-        )
+        val onnxTTSModels =
+            listOf(
+                "vits",
+                "piper",
+                "tacotron",
+                "fastspeech",
+                "waveglow",
+                "hifigan",
+                "onnx-tts",
+            )
         return onnxTTSModels.any { modelId.lowercase().contains(it) }
     }
 
     /**
      * Initialize the TTS service with a model
      */
-    suspend fun initialize(modelPath: String, modelType: String = "vits") {
+    suspend fun initialize(
+        modelPath: String,
+        modelType: String = "vits",
+    ) {
         if (!coreService.isInitialized) {
             coreService.initialize()
         }
@@ -60,17 +68,21 @@ class ONNXTTSProvider : TTSServiceProvider {
         logger.info("✅ ONNX TTS provider initialized with model: $modelPath")
     }
 
-    override suspend fun synthesize(text: String, options: TTSOptions): ByteArray =
+    override suspend fun synthesize(
+        text: String,
+        options: TTSOptions,
+    ): ByteArray =
         withContext(Dispatchers.IO) {
             ensureInitialized()
 
             try {
-                val result = coreService.synthesize(
-                    text = text,
-                    voiceId = options.voice ?: "default",
-                    speedRate = options.rate,
-                    pitchShift = options.pitch
-                )
+                val result =
+                    coreService.synthesize(
+                        text = text,
+                        voiceId = options.voice ?: "default",
+                        speedRate = options.rate,
+                        pitchShift = options.pitch,
+                    )
 
                 // Convert to output format if needed
                 convertToFormat(result.samples, result.sampleRate, options.audioFormat)
@@ -80,32 +92,37 @@ class ONNXTTSProvider : TTSServiceProvider {
             }
         }
 
-    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> = flow {
-        // For ONNX, we synthesize the whole text and emit it
-        // True streaming would require model support
-        val audioData = synthesize(text, options)
+    override fun synthesizeStream(
+        text: String,
+        options: TTSOptions,
+    ): Flow<ByteArray> =
+        flow {
+            // For ONNX, we synthesize the whole text and emit it
+            // True streaming would require model support
+            val audioData = synthesize(text, options)
 
-        // Split into chunks for streaming delivery
-        val chunkSize = options.sampleRate * 2 // 1 second of audio at 16-bit (sampleRate is already in Hz)
-        var offset = 0
+            // Split into chunks for streaming delivery
+            val chunkSize = options.sampleRate * 2 // 1 second of audio at 16-bit (sampleRate is already in Hz)
+            var offset = 0
 
-        while (offset < audioData.size) {
-            val end = minOf(offset + chunkSize, audioData.size)
-            emit(audioData.copyOfRange(offset, end))
-            offset = end
+            while (offset < audioData.size) {
+                val end = minOf(offset + chunkSize, audioData.size)
+                emit(audioData.copyOfRange(offset, end))
+                offset = end
+            }
         }
-    }
 
     /**
      * Get available voices as JSON
      */
-    suspend fun getAvailableVoices(): String = withContext(Dispatchers.IO) {
-        if (coreService.isInitialized) {
-            coreService.getVoices()
-        } else {
-            "[]"
+    suspend fun getAvailableVoices(): String =
+        withContext(Dispatchers.IO) {
+            if (coreService.isInitialized) {
+                coreService.getVoices()
+            } else {
+                "[]"
+            }
         }
-    }
 
     /**
      * Cleanup resources
@@ -127,7 +144,7 @@ class ONNXTTSProvider : TTSServiceProvider {
         if (!isInitialized || !coreService.isTTSModelLoaded) {
             throw NativeBridgeException(
                 com.runanywhere.sdk.native.bridge.NativeResultCode.ERROR_MODEL_LOAD_FAILED,
-                "TTS model not loaded. Call initialize() with a model path first."
+                "TTS model not loaded. Call initialize() with a model path first.",
             )
         }
     }
@@ -135,7 +152,7 @@ class ONNXTTSProvider : TTSServiceProvider {
     private fun convertToFormat(
         audioData: FloatArray,
         sampleRate: Int,
-        targetFormat: AudioFormat
+        targetFormat: AudioFormat,
     ): ByteArray {
         // Convert float samples to 16-bit PCM
         val pcmData = ByteArray(audioData.size * 2)
@@ -156,7 +173,7 @@ class ONNXTTSProvider : TTSServiceProvider {
         pcmData: ByteArray,
         sampleRate: Int,
         channels: Int,
-        bitsPerSample: Int
+        bitsPerSample: Int,
     ): ByteArray {
         val byteRate = sampleRate * channels * bitsPerSample / 8
         val blockAlign = channels * bitsPerSample / 8

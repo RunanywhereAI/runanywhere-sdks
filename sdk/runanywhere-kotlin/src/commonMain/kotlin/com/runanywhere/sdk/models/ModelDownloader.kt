@@ -14,13 +14,13 @@ import kotlinx.coroutines.flow.flow
 class ModelDownloader(
     private val fileSystem: FileSystem,
     private val downloadService: DownloadService,
-    private val modelsDirectory: String = ModelPathUtils.getModelsDirectory()
+    private val modelsDirectory: String = ModelPathUtils.getModelsDirectory(),
 ) {
     private val logger = SDKLogger("ModelDownloader")
 
     suspend fun downloadModel(
         model: ModelInfo,
-        progressCallback: (Float) -> Unit = {}
+        progressCallback: (Float) -> Unit = {},
     ): String {
         // Ensure models directory exists
         if (!fileSystem.exists(modelsDirectory)) {
@@ -29,8 +29,9 @@ class ModelDownloader(
         }
 
         // Generate destination path
-        val fileName = model.downloadURL?.substringAfterLast("/")
-            ?: "${model.id}.gguf"
+        val fileName =
+            model.downloadURL?.substringAfterLast("/")
+                ?: "${model.id}.gguf"
         val destinationPath = "$modelsDirectory/$fileName"
 
         logger.info("Downloading model ${model.id} to $destinationPath")
@@ -46,59 +47,63 @@ class ModelDownloader(
      * Check if model is already downloaded
      */
     suspend fun isModelDownloaded(model: ModelInfo): Boolean {
-        val fileName = model.downloadURL?.substringAfterLast("/")
-            ?: "${model.id}.gguf"
+        val fileName =
+            model.downloadURL?.substringAfterLast("/")
+                ?: "${model.id}.gguf"
         val filePath = "$modelsDirectory/$fileName"
 
         return fileSystem.exists(filePath) &&
-                fileSystem.fileSize(filePath) == (model.downloadSize ?: 0L)
+            fileSystem.fileSize(filePath) == (model.downloadSize ?: 0L)
     }
 
     /**
      * Get local path for a model
      */
     fun getModelPath(model: ModelInfo): String {
-        val fileName = model.downloadURL?.substringAfterLast("/")
-            ?: "${model.id}.gguf"
+        val fileName =
+            model.downloadURL?.substringAfterLast("/")
+                ?: "${model.id}.gguf"
         return "$modelsDirectory/$fileName"
     }
 
     /**
      * Download model with progress tracking as Flow
      */
-    suspend fun downloadModelWithProgress(model: ModelInfo): Flow<Float> = flow {
-        // Check if already downloaded
-        if (isModelDownloaded(model)) {
+    suspend fun downloadModelWithProgress(model: ModelInfo): Flow<Float> =
+        flow {
+            // Check if already downloaded
+            if (isModelDownloaded(model)) {
+                emit(1.0f)
+                return@flow
+            }
+
+            // Ensure models directory exists
+            if (!fileSystem.exists(modelsDirectory)) {
+                fileSystem.createDirectory(modelsDirectory)
+                logger.info("Created models directory: $modelsDirectory")
+            }
+
+            val destinationPath = getModelPath(model)
+
+            // Download with progress
+            emit(0.0f)
+
+            var lastProgress = 0.0f
+            downloadService.downloadModel(model) { downloadProgress ->
+                lastProgress = downloadProgress.percentage.toFloat()
+            }
+
+            emit(lastProgress)
             emit(1.0f)
-            return@flow
         }
-
-        // Ensure models directory exists
-        if (!fileSystem.exists(modelsDirectory)) {
-            fileSystem.createDirectory(modelsDirectory)
-            logger.info("Created models directory: $modelsDirectory")
-        }
-
-        val destinationPath = getModelPath(model)
-
-        // Download with progress
-        emit(0.0f)
-
-        var lastProgress = 0.0f
-        downloadService.downloadModel(model) { downloadProgress ->
-            lastProgress = downloadProgress.percentage.toFloat()
-        }
-
-        emit(lastProgress)
-        emit(1.0f)
-    }
 
     /**
      * Delete downloaded model
      */
     suspend fun deleteModel(model: ModelInfo): Boolean {
-        val fileName = model.downloadURL?.substringAfterLast("/")
-            ?: "${model.id}.gguf"
+        val fileName =
+            model.downloadURL?.substringAfterLast("/")
+                ?: "${model.id}.gguf"
         val filePath = "$modelsDirectory/$fileName"
 
         return if (fileSystem.exists(filePath)) {

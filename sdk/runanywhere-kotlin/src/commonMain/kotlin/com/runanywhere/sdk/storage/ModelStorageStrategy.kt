@@ -9,14 +9,16 @@ import com.runanywhere.sdk.models.enums.ModelFormat
  * This matches the iOS hierarchy: DownloadStrategy -> ModelStorageStrategy
  */
 interface ModelStorageStrategy : DownloadStrategy {
-
     /**
      * Find the model file/folder path in storage
      * @param modelId The model identifier
      * @param modelFolder The folder to search in
      * @return Path to the model if found, null otherwise
      */
-    suspend fun findModelPath(modelId: String, modelFolder: String): String?
+    suspend fun findModelPath(
+        modelId: String,
+        modelFolder: String,
+    ): String?
 
     /**
      * Detect if a model exists in the given folder and return its details
@@ -43,19 +45,18 @@ interface ModelStorageStrategy : DownloadStrategy {
     override suspend fun download(
         model: ModelInfo,
         destinationFolder: String,
-        progressHandler: ((DownloadProgress) -> Unit)?
+        progressHandler: ((DownloadProgress) -> Unit)?,
     ): String
 
     // Legacy method for backward compatibility
     suspend fun downloadWithSimpleProgress(
         model: ModelInfo,
         destinationFolder: String,
-        progressHandler: ((Float) -> Unit)?
-    ): String {
-        return download(model, destinationFolder) { progress ->
+        progressHandler: ((Float) -> Unit)?,
+    ): String =
+        download(model, destinationFolder) { progress ->
             progressHandler?.invoke(progress.percentage.toFloat())
         }
-    }
 }
 
 /**
@@ -63,7 +64,7 @@ interface ModelStorageStrategy : DownloadStrategy {
  */
 data class ModelDetectionResult(
     val format: ModelFormat,
-    val sizeBytes: Long
+    val sizeBytes: Long,
 )
 
 /**
@@ -78,7 +79,7 @@ data class ModelStorageDetails(
     val isDirectoryBased: Boolean = false,
     val lastModified: Long? = null,
     val checksum: String? = null,
-    val files: List<String> = emptyList()
+    val files: List<String> = emptyList(),
 ) {
     /**
      * Human-readable size string

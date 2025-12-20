@@ -4,14 +4,20 @@ import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.network.CircuitBreakerRegistry
 import kotlinx.coroutines.test.runTest
-import kotlin.test.*
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /**
  * Integration test for networking components
  * Tests the complete networking stack including factory, circuit breakers, and real services
  */
 class NetworkIntegrationTest {
-
     @BeforeTest
     fun setup() {
         // Reset circuit breakers before each test
@@ -23,9 +29,10 @@ class NetworkIntegrationTest {
     @Test
     fun `should create mock network service for development environment`() {
         // Act
-        val networkService = NetworkServiceFactory.create(
-            environment = SDKEnvironment.DEVELOPMENT
-        )
+        val networkService =
+            NetworkServiceFactory.create(
+                environment = SDKEnvironment.DEVELOPMENT,
+            )
 
         // Assert
         assertTrue(networkService is MockNetworkService)
@@ -36,7 +43,7 @@ class NetworkIntegrationTest {
         // Act
         assertFailsWith<IllegalArgumentException> {
             NetworkServiceFactory.create(
-                environment = SDKEnvironment.PRODUCTION
+                environment = SDKEnvironment.PRODUCTION,
             )
         }
     }
@@ -44,83 +51,91 @@ class NetworkIntegrationTest {
     @Test
     fun `should create real network service with proper configuration`() {
         // Act
-        val networkService = NetworkServiceFactory.create(
-            environment = SDKEnvironment.PRODUCTION,
-            baseURL = "https://api.test.com",
-            apiKey = "test-api-key"
-        )
+        val networkService =
+            NetworkServiceFactory.create(
+                environment = SDKEnvironment.PRODUCTION,
+                baseURL = "https://api.test.com",
+                apiKey = "test-api-key",
+            )
 
         // Assert
         assertTrue(networkService is CircuitBreakerNetworkService)
     }
 
     @Test
-    fun `should make mock requests successfully in development mode`() = runTest {
-        // Arrange
-        val networkService = NetworkServiceFactory.create(
-            environment = SDKEnvironment.DEVELOPMENT
-        )
+    fun `should make mock requests successfully in development mode`() =
+        runTest {
+            // Arrange
+            val networkService =
+                NetworkServiceFactory.create(
+                    environment = SDKEnvironment.DEVELOPMENT,
+                )
 
-        // Act
-        val result = networkService.getRaw(APIEndpoint.models, requiresAuth = false)
+            // Act
+            val result = networkService.getRaw(APIEndpoint.models, requiresAuth = false)
 
-        // Assert
-        assertTrue(result.isNotEmpty())
-        val responseString = result.decodeToString()
-        assertTrue(responseString.contains("models"))
-    }
-
-    @Test
-    fun `circuit breaker should be created and accessible`() = runTest {
-        // Arrange
-        val networkService = NetworkServiceFactory.create(
-            environment = SDKEnvironment.STAGING,
-            baseURL = "https://staging.api.test.com",
-            apiKey = "test-api-key"
-        ) as CircuitBreakerNetworkService
-
-        // Act
-        val status = networkService.getCircuitBreakerStatus()
-
-        // Assert
-        assertEquals(com.runanywhere.sdk.network.CircuitBreakerState.CLOSED, status.state)
-        assertEquals(0, status.failureCount)
-        assertTrue(status.isHealthy)
-    }
+            // Assert
+            assertTrue(result.isNotEmpty())
+            val responseString = result.decodeToString()
+            assertTrue(responseString.contains("models"))
+        }
 
     @Test
-    fun `should handle different API endpoints correctly`() = runTest {
-        // Arrange
-        val networkService = NetworkServiceFactory.create(
-            environment = SDKEnvironment.DEVELOPMENT
-        )
+    fun `circuit breaker should be created and accessible`() =
+        runTest {
+            // Arrange
+            val networkService =
+                NetworkServiceFactory.create(
+                    environment = SDKEnvironment.STAGING,
+                    baseURL = "https://staging.api.test.com",
+                    apiKey = "test-api-key",
+                ) as CircuitBreakerNetworkService
 
-        // Act & Assert - Test various endpoints
-        assertNotNull(networkService.getRaw(APIEndpoint.models, requiresAuth = false))
-        assertNotNull(networkService.getRaw(APIEndpoint.configuration, requiresAuth = false))
-        assertNotNull(networkService.getRaw(APIEndpoint.healthCheck, requiresAuth = false))
+            // Act
+            val status = networkService.getCircuitBreakerStatus()
 
-        // Telemetry should accept POST requests
-        val telemetryPayload = """{"event": "test"}""".encodeToByteArray()
-        val telemetryResult = networkService.postRaw(APIEndpoint.telemetry, telemetryPayload, requiresAuth = false)
-        assertNotNull(telemetryResult)
-    }
+            // Assert
+            assertEquals(com.runanywhere.sdk.network.CircuitBreakerState.CLOSED, status.state)
+            assertEquals(0, status.failureCount)
+            assertTrue(status.isHealthy)
+        }
 
     @Test
-    fun `circuit breaker registry should track multiple services`() = runTest {
-        // Arrange & Act
-        val circuitBreaker1 = CircuitBreakerRegistry.getOrCreate("service1")
-        val circuitBreaker2 = CircuitBreakerRegistry.getOrCreate("service2")
-        val circuitBreaker1Again = CircuitBreakerRegistry.getOrCreate("service1")
+    fun `should handle different API endpoints correctly`() =
+        runTest {
+            // Arrange
+            val networkService =
+                NetworkServiceFactory.create(
+                    environment = SDKEnvironment.DEVELOPMENT,
+                )
 
-        // Assert
-        assertSame(circuitBreaker1, circuitBreaker1Again) // Should reuse existing instance
-        assertNotSame(circuitBreaker1, circuitBreaker2) // Should be different instances
+            // Act & Assert - Test various endpoints
+            assertNotNull(networkService.getRaw(APIEndpoint.models, requiresAuth = false))
+            assertNotNull(networkService.getRaw(APIEndpoint.configuration, requiresAuth = false))
+            assertNotNull(networkService.getRaw(APIEndpoint.healthCheck, requiresAuth = false))
 
-        val allStatuses = CircuitBreakerRegistry.getAllStatuses()
-        assertTrue(allStatuses.containsKey("service1"))
-        assertTrue(allStatuses.containsKey("service2"))
-    }
+            // Telemetry should accept POST requests
+            val telemetryPayload = """{"event": "test"}""".encodeToByteArray()
+            val telemetryResult = networkService.postRaw(APIEndpoint.telemetry, telemetryPayload, requiresAuth = false)
+            assertNotNull(telemetryResult)
+        }
+
+    @Test
+    fun `circuit breaker registry should track multiple services`() =
+        runTest {
+            // Arrange & Act
+            val circuitBreaker1 = CircuitBreakerRegistry.getOrCreate("service1")
+            val circuitBreaker2 = CircuitBreakerRegistry.getOrCreate("service2")
+            val circuitBreaker1Again = CircuitBreakerRegistry.getOrCreate("service1")
+
+            // Assert
+            assertSame(circuitBreaker1, circuitBreaker1Again) // Should reuse existing instance
+            assertNotSame(circuitBreaker1, circuitBreaker2) // Should be different instances
+
+            val allStatuses = CircuitBreakerRegistry.getAllStatuses()
+            assertTrue(allStatuses.containsKey("service1"))
+            assertTrue(allStatuses.containsKey("service2"))
+        }
 
     @Test
     fun `network service factory should validate required parameters`() {
@@ -128,7 +143,7 @@ class NetworkIntegrationTest {
         assertFailsWith<IllegalArgumentException> {
             NetworkServiceFactory.create(
                 environment = SDKEnvironment.PRODUCTION,
-                baseURL = "https://api.test.com"
+                baseURL = "https://api.test.com",
                 // Missing apiKey
             )
         }
@@ -137,7 +152,7 @@ class NetworkIntegrationTest {
         assertFailsWith<IllegalArgumentException> {
             NetworkServiceFactory.create(
                 environment = SDKEnvironment.PRODUCTION,
-                apiKey = "test-key"
+                apiKey = "test-key",
                 // Missing baseURL - should fail when SDK config is not initialized
             )
         }
@@ -147,16 +162,18 @@ class NetworkIntegrationTest {
     fun `should create different network configurations for different environments`() {
         // Arrange & Act
         val devService = NetworkServiceFactory.create(SDKEnvironment.DEVELOPMENT)
-        val stagingService = NetworkServiceFactory.create(
-            SDKEnvironment.STAGING,
-            baseURL = "https://staging.api.test.com",
-            apiKey = "test-key"
-        )
-        val prodService = NetworkServiceFactory.create(
-            SDKEnvironment.PRODUCTION,
-            baseURL = "https://api.test.com",
-            apiKey = "test-key"
-        )
+        val stagingService =
+            NetworkServiceFactory.create(
+                SDKEnvironment.STAGING,
+                baseURL = "https://staging.api.test.com",
+                apiKey = "test-key",
+            )
+        val prodService =
+            NetworkServiceFactory.create(
+                SDKEnvironment.PRODUCTION,
+                baseURL = "https://api.test.com",
+                apiKey = "test-key",
+            )
 
         // Assert
         assertTrue(devService is MockNetworkService)
@@ -169,7 +186,6 @@ class NetworkIntegrationTest {
  * Test for verifying APIEndpoint URL construction
  */
 class APIEndpointTest {
-
     @Test
     fun `should have correct endpoint URLs`() {
         assertEquals("/v1/models", APIEndpoint.models.url)

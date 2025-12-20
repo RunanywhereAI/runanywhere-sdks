@@ -30,7 +30,6 @@ private val logger = SDKLogger("RunAnywhereBridge")
  * 4. Destroy the handle when done with nativeDestroy()
  */
 object RunAnywhereBridge {
-
     private var isLibraryLoaded = false
 
     /**
@@ -71,7 +70,10 @@ object RunAnywhereBridge {
     external fun nativeCreateBackend(backendName: String): Long
 
     @JvmStatic
-    external fun nativeInitialize(handle: Long, configJson: String?): Int
+    external fun nativeInitialize(
+        handle: Long,
+        configJson: String?,
+    ): Int
 
     @JvmStatic
     external fun nativeIsInitialized(handle: Long): Boolean
@@ -83,7 +85,10 @@ object RunAnywhereBridge {
     external fun nativeGetBackendInfo(handle: Long): String
 
     @JvmStatic
-    external fun nativeSupportsCapability(handle: Long, capability: Int): Boolean
+    external fun nativeSupportsCapability(
+        handle: Long,
+        capability: Int,
+    ): Boolean
 
     @JvmStatic
     external fun nativeGetCapabilities(handle: Long): IntArray
@@ -99,7 +104,11 @@ object RunAnywhereBridge {
     // =============================================================================
 
     @JvmStatic
-    external fun nativeTextLoadModel(handle: Long, modelPath: String, configJson: String?): Int
+    external fun nativeTextLoadModel(
+        handle: Long,
+        modelPath: String,
+        configJson: String?,
+    ): Int
 
     @JvmStatic
     external fun nativeTextIsModelLoaded(handle: Long): Boolean
@@ -113,7 +122,7 @@ object RunAnywhereBridge {
         prompt: String,
         systemPrompt: String?,
         maxTokens: Int,
-        temperature: Float
+        temperature: Float,
     ): String?
 
     @JvmStatic
@@ -128,7 +137,7 @@ object RunAnywhereBridge {
         handle: Long,
         modelPath: String,
         modelType: String,
-        configJson: String?
+        configJson: String?,
     ): Int
 
     @JvmStatic
@@ -142,40 +151,61 @@ object RunAnywhereBridge {
         handle: Long,
         audioSamples: FloatArray,
         sampleRate: Int,
-        language: String?
+        language: String?,
     ): String?
 
     @JvmStatic
     external fun nativeSTTSupportsStreaming(handle: Long): Boolean
 
     @JvmStatic
-    external fun nativeSTTCreateStream(handle: Long, configJson: String?): Long
+    external fun nativeSTTCreateStream(
+        handle: Long,
+        configJson: String?,
+    ): Long
 
     @JvmStatic
     external fun nativeSTTFeedAudio(
         handle: Long,
         streamHandle: Long,
         audioSamples: FloatArray,
-        sampleRate: Int
+        sampleRate: Int,
     ): Int
 
     @JvmStatic
-    external fun nativeSTTIsReady(handle: Long, streamHandle: Long): Boolean
+    external fun nativeSTTIsReady(
+        handle: Long,
+        streamHandle: Long,
+    ): Boolean
 
     @JvmStatic
-    external fun nativeSTTDecode(handle: Long, streamHandle: Long): String
+    external fun nativeSTTDecode(
+        handle: Long,
+        streamHandle: Long,
+    ): String
 
     @JvmStatic
-    external fun nativeSTTIsEndpoint(handle: Long, streamHandle: Long): Boolean
+    external fun nativeSTTIsEndpoint(
+        handle: Long,
+        streamHandle: Long,
+    ): Boolean
 
     @JvmStatic
-    external fun nativeSTTInputFinished(handle: Long, streamHandle: Long)
+    external fun nativeSTTInputFinished(
+        handle: Long,
+        streamHandle: Long,
+    )
 
     @JvmStatic
-    external fun nativeSTTResetStream(handle: Long, streamHandle: Long)
+    external fun nativeSTTResetStream(
+        handle: Long,
+        streamHandle: Long,
+    )
 
     @JvmStatic
-    external fun nativeSTTDestroyStream(handle: Long, streamHandle: Long)
+    external fun nativeSTTDestroyStream(
+        handle: Long,
+        streamHandle: Long,
+    )
 
     @JvmStatic
     external fun nativeSTTCancel(handle: Long)
@@ -189,7 +219,7 @@ object RunAnywhereBridge {
         handle: Long,
         modelPath: String,
         modelType: String,
-        configJson: String?
+        configJson: String?,
     ): Int
 
     @JvmStatic
@@ -204,7 +234,7 @@ object RunAnywhereBridge {
         text: String,
         voiceId: String?,
         speedRate: Float,
-        pitchShift: Float
+        pitchShift: Float,
     ): NativeTTSSynthesisResult?
 
     @JvmStatic
@@ -221,7 +251,11 @@ object RunAnywhereBridge {
     // =============================================================================
 
     @JvmStatic
-    external fun nativeVADLoadModel(handle: Long, modelPath: String?, configJson: String?): Int
+    external fun nativeVADLoadModel(
+        handle: Long,
+        modelPath: String?,
+        configJson: String?,
+    ): Int
 
     @JvmStatic
     external fun nativeVADIsModelLoaded(handle: Long): Boolean
@@ -233,14 +267,14 @@ object RunAnywhereBridge {
     external fun nativeVADProcess(
         handle: Long,
         audioSamples: FloatArray,
-        sampleRate: Int
+        sampleRate: Int,
     ): NativeVADResult?
 
     @JvmStatic
     external fun nativeVADDetectSegments(
         handle: Long,
         audioSamples: FloatArray,
-        sampleRate: Int
+        sampleRate: Int,
     ): String?
 
     @JvmStatic
@@ -251,7 +285,11 @@ object RunAnywhereBridge {
     // =============================================================================
 
     @JvmStatic
-    external fun nativeEmbedLoadModel(handle: Long, modelPath: String, configJson: String?): Int
+    external fun nativeEmbedLoadModel(
+        handle: Long,
+        modelPath: String,
+        configJson: String?,
+    ): Int
 
     @JvmStatic
     external fun nativeEmbedIsModelLoaded(handle: Long): Boolean
@@ -260,7 +298,10 @@ object RunAnywhereBridge {
     external fun nativeEmbedUnloadModel(handle: Long): Int
 
     @JvmStatic
-    external fun nativeEmbedText(handle: Long, text: String): FloatArray?
+    external fun nativeEmbedText(
+        handle: Long,
+        text: String,
+    ): FloatArray?
 
     @JvmStatic
     external fun nativeEmbedGetDimensions(handle: Long): Int
@@ -270,7 +311,11 @@ object RunAnywhereBridge {
     // =============================================================================
 
     @JvmStatic
-    external fun nativeDiarizeLoadModel(handle: Long, modelPath: String, configJson: String?): Int
+    external fun nativeDiarizeLoadModel(
+        handle: Long,
+        modelPath: String,
+        configJson: String?,
+    ): Int
 
     @JvmStatic
     external fun nativeDiarizeIsModelLoaded(handle: Long): Boolean
@@ -284,7 +329,7 @@ object RunAnywhereBridge {
         audioSamples: FloatArray,
         sampleRate: Int,
         minSpeakers: Int,
-        maxSpeakers: Int
+        maxSpeakers: Int,
     ): String?
 
     @JvmStatic
@@ -301,6 +346,8 @@ object RunAnywhereBridge {
     external fun nativeGetVersion(): String
 
     @JvmStatic
-    external fun nativeExtractArchive(archivePath: String, destDir: String): Int
-
+    external fun nativeExtractArchive(
+        archivePath: String,
+        destDir: String,
+    ): Int
 }

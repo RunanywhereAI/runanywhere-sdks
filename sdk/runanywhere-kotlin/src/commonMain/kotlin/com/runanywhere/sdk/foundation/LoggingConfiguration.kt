@@ -9,17 +9,14 @@ package com.runanywhere.sdk.foundation
 data class LoggingConfiguration(
     /** Enable local logging (console/file) */
     val enableLocalLogging: Boolean = true,
-
     /** Minimum log level filter */
     val minLogLevel: LogLevel = LogLevel.INFO,
-
     /** Include device metadata in logs */
     val includeDeviceMetadata: Boolean = true,
-
     /** Enable Sentry logging for crash reporting and error tracking.
      * When enabled, logs at warning level and above are sent to Sentry.
      * Default: true in development, false otherwise */
-    val enableSentryLogging: Boolean = false
+    val enableSentryLogging: Boolean = false,
 ) {
     /**
      * Validate the configuration.
@@ -35,32 +32,35 @@ data class LoggingConfiguration(
          * Configuration preset for development environment.
          * Sentry logging is enabled by default for development.
          */
-        val development = LoggingConfiguration(
-            enableLocalLogging = true,
-            minLogLevel = LogLevel.DEBUG,
-            includeDeviceMetadata = false,
-            enableSentryLogging = true
-        )
+        val development =
+            LoggingConfiguration(
+                enableLocalLogging = true,
+                minLogLevel = LogLevel.DEBUG,
+                includeDeviceMetadata = false,
+                enableSentryLogging = true,
+            )
 
         /**
          * Configuration preset for staging environment.
          */
-        val staging = LoggingConfiguration(
-            enableLocalLogging = true,
-            minLogLevel = LogLevel.INFO,
-            includeDeviceMetadata = true,
-            enableSentryLogging = false
-        )
+        val staging =
+            LoggingConfiguration(
+                enableLocalLogging = true,
+                minLogLevel = LogLevel.INFO,
+                includeDeviceMetadata = true,
+                enableSentryLogging = false,
+            )
 
         /**
          * Configuration preset for production environment.
          */
-        val production = LoggingConfiguration(
-            enableLocalLogging = false,
-            minLogLevel = LogLevel.WARNING,
-            includeDeviceMetadata = true,
-            enableSentryLogging = false
-        )
+        val production =
+            LoggingConfiguration(
+                enableLocalLogging = false,
+                minLogLevel = LogLevel.WARNING,
+                includeDeviceMetadata = true,
+                enableSentryLogging = false,
+            )
     }
 
     /**
@@ -73,22 +73,25 @@ data class LoggingConfiguration(
         private var enableSentryLogging: Boolean = false
 
         fun enableLocalLogging(enabled: Boolean) = apply { this.enableLocalLogging = enabled }
+
         fun minLogLevel(level: LogLevel) = apply { this.minLogLevel = level }
+
         fun includeDeviceMetadata(include: Boolean) = apply { this.includeDeviceMetadata = include }
+
         fun enableSentryLogging(enabled: Boolean) = apply { this.enableSentryLogging = enabled }
 
-        fun build() = LoggingConfiguration(
-            enableLocalLogging = enableLocalLogging,
-            minLogLevel = minLogLevel,
-            includeDeviceMetadata = includeDeviceMetadata,
-            enableSentryLogging = enableSentryLogging
-        )
+        fun build() =
+            LoggingConfiguration(
+                enableLocalLogging = enableLocalLogging,
+                minLogLevel = minLogLevel,
+                includeDeviceMetadata = includeDeviceMetadata,
+                enableSentryLogging = enableSentryLogging,
+            )
     }
 }
 
 /**
  * Extension to create a builder for LoggingConfiguration.
  */
-fun loggingConfiguration(block: LoggingConfiguration.Builder.() -> Unit): LoggingConfiguration {
-    return LoggingConfiguration.Builder().apply(block).build()
-}
+fun loggingConfiguration(block: LoggingConfiguration.Builder.() -> Unit): LoggingConfiguration =
+    LoggingConfiguration.Builder().apply(block).build()

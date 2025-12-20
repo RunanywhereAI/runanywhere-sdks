@@ -3,37 +3,50 @@ package com.runanywhere.sdk.foundation
 /**
  * Log levels for SDK logging
  */
-enum class LogLevel(val value: Int) {
+enum class LogLevel(
+    val value: Int,
+) {
     DEBUG(0),
     INFO(1),
     WARNING(2),
-    ERROR(3)
+    ERROR(3),
 }
 
 /**
  * Platform-specific logger interface
  */
-expect class PlatformLogger(tag: String) {
+expect class PlatformLogger(
+    tag: String,
+) {
     fun debug(message: String)
+
     fun info(message: String)
+
     fun warning(message: String)
-    fun error(message: String, throwable: Throwable? = null)
+
+    fun error(
+        message: String,
+        throwable: Throwable? = null,
+    )
 }
 
 /**
  * SDK Logger for consistent logging across the SDK
  */
-class SDKLogger(private val tag: String) {
-
+class SDKLogger(
+    private val tag: String,
+) {
     private val platformLogger = PlatformLogger(tag)
 
     companion object {
         // Nested LogLevel enum for easier access
-        enum class LogLevel(val value: Int) {
+        enum class LogLevel(
+            val value: Int,
+        ) {
             DEBUG(0),
             INFO(1),
             WARNING(2),
-            ERROR(3)
+            ERROR(3),
         }
 
         private var currentLevel: LogLevel = LogLevel.INFO
@@ -50,13 +63,14 @@ class SDKLogger(private val tag: String) {
         }
 
         fun setLogLevel(level: com.runanywhere.sdk.data.models.LogLevel) {
-            currentLevel = when(level) {
-                com.runanywhere.sdk.data.models.LogLevel.DEBUG -> LogLevel.DEBUG
-                com.runanywhere.sdk.data.models.LogLevel.INFO -> LogLevel.INFO
-                com.runanywhere.sdk.data.models.LogLevel.WARNING -> LogLevel.WARNING
-                com.runanywhere.sdk.data.models.LogLevel.ERROR -> LogLevel.ERROR
-                com.runanywhere.sdk.data.models.LogLevel.NONE -> LogLevel.ERROR
-            }
+            currentLevel =
+                when (level) {
+                    com.runanywhere.sdk.data.models.LogLevel.DEBUG -> LogLevel.DEBUG
+                    com.runanywhere.sdk.data.models.LogLevel.INFO -> LogLevel.INFO
+                    com.runanywhere.sdk.data.models.LogLevel.WARNING -> LogLevel.WARNING
+                    com.runanywhere.sdk.data.models.LogLevel.ERROR -> LogLevel.ERROR
+                    com.runanywhere.sdk.data.models.LogLevel.NONE -> LogLevel.ERROR
+                }
         }
     }
 
@@ -82,7 +96,10 @@ class SDKLogger(private val tag: String) {
         warn(message)
     }
 
-    fun error(message: String, throwable: Throwable? = null) {
+    fun error(
+        message: String,
+        throwable: Throwable? = null,
+    ) {
         if (currentLevel <= LogLevel.ERROR) {
             platformLogger.error(message, throwable)
         }

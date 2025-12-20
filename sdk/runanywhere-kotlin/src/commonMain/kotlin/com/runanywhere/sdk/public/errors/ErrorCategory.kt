@@ -17,7 +17,8 @@ enum class ErrorCategory {
     AUTHENTICATION,
     COMPONENT,
     FRAMEWORK,
-    UNKNOWN;
+    UNKNOWN,
+    ;
 
     companion object {
         /**

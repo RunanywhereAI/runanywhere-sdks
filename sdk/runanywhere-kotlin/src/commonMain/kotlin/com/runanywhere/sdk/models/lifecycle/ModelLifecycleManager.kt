@@ -36,7 +36,7 @@ import kotlinx.serialization.Serializable
  */
 @Deprecated(
     message = "Use CapabilityLoadingState from core.capabilities package instead",
-    replaceWith = ReplaceWith("CapabilityLoadingState", "com.runanywhere.sdk.core.capabilities.CapabilityLoadingState")
+    replaceWith = ReplaceWith("CapabilityLoadingState", "com.runanywhere.sdk.core.capabilities.CapabilityLoadingState"),
 )
 @Serializable
 sealed class ModelLoadState {
@@ -44,7 +44,9 @@ sealed class ModelLoadState {
     data object NotLoaded : ModelLoadState()
 
     @Serializable
-    data class Loading(val progress: Double = 0.0) : ModelLoadState()
+    data class Loading(
+        val progress: Double = 0.0,
+    ) : ModelLoadState()
 
     @Serializable
     data object Loaded : ModelLoadState()
@@ -53,7 +55,9 @@ sealed class ModelLoadState {
     data object Unloading : ModelLoadState()
 
     @Serializable
-    data class Error(val message: String) : ModelLoadState()
+    data class Error(
+        val message: String,
+    ) : ModelLoadState()
 
     val isLoaded: Boolean
         get() = this is Loaded
@@ -72,18 +76,20 @@ sealed class ModelLoadState {
  * Matches iOS Modality enum
  */
 @Serializable
-enum class Modality(val value: String, val displayName: String) {
+enum class Modality(
+    val value: String,
+    val displayName: String,
+) {
     LLM("llm", "Language Model"),
     STT("stt", "Speech Recognition"),
     TTS("tts", "Text to Speech"),
     VLM("vlm", "Vision Model"),
     SPEAKER_DIARIZATION("speaker_diarization", "Speaker Diarization"),
-    WAKE_WORD("wake_word", "Wake Word");
+    WAKE_WORD("wake_word", "Wake Word"),
+    ;
 
     companion object {
-        fun fromValue(value: String): Modality? {
-            return entries.find { it.value == value }
-        }
+        fun fromValue(value: String): Modality? = entries.find { it.value == value }
     }
 }
 
@@ -101,25 +107,22 @@ data class LoadedModelState(
     val modality: Modality,
     val state: ModelLoadState,
     val loadedAt: Long? = null, // Epoch milliseconds
-    val memoryUsage: Long? = null // Bytes
+    val memoryUsage: Long? = null, // Bytes
 ) {
     /**
      * Create a copy with updated state
      */
-    fun withState(newState: ModelLoadState): LoadedModelState {
-        return copy(state = newState)
-    }
+    fun withState(newState: ModelLoadState): LoadedModelState = copy(state = newState)
 
     /**
      * Create a copy marked as loaded with timestamp
      */
-    fun asLoaded(memoryUsage: Long? = null): LoadedModelState {
-        return copy(
+    fun asLoaded(memoryUsage: Long? = null): LoadedModelState =
+        copy(
             state = ModelLoadState.Loaded,
             loadedAt = currentTimeMillis(),
-            memoryUsage = memoryUsage
+            memoryUsage = memoryUsage,
         )
-    }
 }
 
 // MARK: - Model Lifecycle Events
@@ -132,15 +135,41 @@ data class LoadedModelState(
  * These provide iOS-aligned event tracking with EventPublisher integration.
  */
 @Deprecated(
-    message = "Use capability-specific events (LLMEvent, STTEvent, etc.) from features package instead"
+    message = "Use capability-specific events (LLMEvent, STTEvent, etc.) from features package instead",
 )
 sealed class ModelLifecycleEvent {
-    data class WillLoad(val modelId: String, val modality: Modality) : ModelLifecycleEvent()
-    data class LoadProgress(val modelId: String, val modality: Modality, val progress: Double) : ModelLifecycleEvent()
-    data class DidLoad(val modelId: String, val modality: Modality, val framework: InferenceFramework) : ModelLifecycleEvent()
-    data class WillUnload(val modelId: String, val modality: Modality) : ModelLifecycleEvent()
-    data class DidUnload(val modelId: String, val modality: Modality) : ModelLifecycleEvent()
-    data class LoadFailed(val modelId: String, val modality: Modality, val error: String) : ModelLifecycleEvent()
+    data class WillLoad(
+        val modelId: String,
+        val modality: Modality,
+    ) : ModelLifecycleEvent()
+
+    data class LoadProgress(
+        val modelId: String,
+        val modality: Modality,
+        val progress: Double,
+    ) : ModelLifecycleEvent()
+
+    data class DidLoad(
+        val modelId: String,
+        val modality: Modality,
+        val framework: InferenceFramework,
+    ) : ModelLifecycleEvent()
+
+    data class WillUnload(
+        val modelId: String,
+        val modality: Modality,
+    ) : ModelLifecycleEvent()
+
+    data class DidUnload(
+        val modelId: String,
+        val modality: Modality,
+    ) : ModelLifecycleEvent()
+
+    data class LoadFailed(
+        val modelId: String,
+        val modality: Modality,
+        val error: String,
+    ) : ModelLifecycleEvent()
 }
 
 // MARK: - Model Lifecycle Tracker
@@ -157,7 +186,7 @@ sealed class ModelLifecycleEvent {
  */
 @Deprecated(
     message = "Use ManagedLifecycle from core.capabilities package instead",
-    replaceWith = ReplaceWith("ManagedLifecycle", "com.runanywhere.sdk.core.capabilities.ManagedLifecycle")
+    replaceWith = ReplaceWith("ManagedLifecycle", "com.runanywhere.sdk.core.capabilities.ManagedLifecycle"),
 )
 object ModelLifecycleTracker {
     private val logger = SDKLogger("ModelLifecycleTracker")
@@ -175,37 +204,27 @@ object ModelLifecycleTracker {
     /**
      * Get currently loaded model for a specific modality
      */
-    fun loadedModel(modality: Modality): LoadedModelState? {
-        return _modelsByModality.value[modality]
-    }
+    fun loadedModel(modality: Modality): LoadedModelState? = _modelsByModality.value[modality]
 
     /**
      * Check if a model is loaded for a specific modality
      */
-    fun isModelLoaded(modality: Modality): Boolean {
-        return _modelsByModality.value[modality]?.state?.isLoaded == true
-    }
+    fun isModelLoaded(modality: Modality): Boolean = _modelsByModality.value[modality]?.state?.isLoaded == true
 
     /**
      * Get all currently loaded models
      */
-    fun allLoadedModels(): List<LoadedModelState> {
-        return _modelsByModality.value.values.filter { it.state.isLoaded }
-    }
+    fun allLoadedModels(): List<LoadedModelState> = _modelsByModality.value.values.filter { it.state.isLoaded }
 
     /**
      * Check if a specific model is loaded (by ID)
      */
-    fun isModelLoaded(modelId: String): Boolean {
-        return _modelsByModality.value.values.any { it.modelId == modelId && it.state.isLoaded }
-    }
+    fun isModelLoaded(modelId: String): Boolean = _modelsByModality.value.values.any { it.modelId == modelId && it.state.isLoaded }
 
     /**
      * Get the current state for a modality
      */
-    fun getState(modality: Modality): ModelLoadState {
-        return _modelsByModality.value[modality]?.state ?: ModelLoadState.NotLoaded
-    }
+    fun getState(modality: Modality): ModelLoadState = _modelsByModality.value[modality]?.state ?: ModelLoadState.NotLoaded
 
     // MARK: - State Management
 
@@ -216,17 +235,18 @@ object ModelLifecycleTracker {
         modelId: String,
         modelName: String,
         framework: InferenceFramework,
-        modality: Modality
+        modality: Modality,
     ) {
         logger.info("Model will load: $modelName [$modality]")
 
-        val state = LoadedModelState(
-            modelId = modelId,
-            modelName = modelName,
-            framework = framework,
-            modality = modality,
-            state = ModelLoadState.Loading(0.0)
-        )
+        val state =
+            LoadedModelState(
+                modelId = modelId,
+                modelName = modelName,
+                framework = framework,
+                modality = modality,
+                state = ModelLoadState.Loading(0.0),
+            )
 
         _modelsByModality.update { current ->
             current + (modality to state)
@@ -241,7 +261,7 @@ object ModelLifecycleTracker {
     fun updateLoadProgress(
         modelId: String,
         modality: Modality,
-        progress: Double
+        progress: Double,
     ) {
         val current = _modelsByModality.value[modality] ?: return
         if (current.modelId != modelId) return
@@ -261,19 +281,20 @@ object ModelLifecycleTracker {
         modelName: String,
         framework: InferenceFramework,
         modality: Modality,
-        memoryUsage: Long? = null
+        memoryUsage: Long? = null,
     ) {
         logger.info("Model loaded: $modelName [$modality] with ${framework.displayName}")
 
-        val state = LoadedModelState(
-            modelId = modelId,
-            modelName = modelName,
-            framework = framework,
-            modality = modality,
-            state = ModelLoadState.Loaded,
-            loadedAt = currentTimeMillis(),
-            memoryUsage = memoryUsage
-        )
+        val state =
+            LoadedModelState(
+                modelId = modelId,
+                modelName = modelName,
+                framework = framework,
+                modality = modality,
+                state = ModelLoadState.Loaded,
+                loadedAt = currentTimeMillis(),
+                memoryUsage = memoryUsage,
+            )
 
         _modelsByModality.update { current ->
             current + (modality to state)
@@ -288,7 +309,7 @@ object ModelLifecycleTracker {
     fun modelLoadFailed(
         modelId: String,
         modality: Modality,
-        error: String
+        error: String,
     ) {
         logger.error("Model load failed: $modelId [$modality] - $error")
 
@@ -305,7 +326,10 @@ object ModelLifecycleTracker {
     /**
      * Called when a model starts unloading
      */
-    fun modelWillUnload(modelId: String, modality: Modality) {
+    fun modelWillUnload(
+        modelId: String,
+        modality: Modality,
+    ) {
         logger.info("Model will unload: $modelId [$modality]")
 
         val current = _modelsByModality.value[modality]
@@ -321,7 +345,10 @@ object ModelLifecycleTracker {
     /**
      * Called when a model finishes unloading
      */
-    fun modelDidUnload(modelId: String, modality: Modality) {
+    fun modelDidUnload(
+        modelId: String,
+        modality: Modality,
+    ) {
         logger.info("Model unloaded: $modelId [$modality]")
 
         _modelsByModality.update { current ->

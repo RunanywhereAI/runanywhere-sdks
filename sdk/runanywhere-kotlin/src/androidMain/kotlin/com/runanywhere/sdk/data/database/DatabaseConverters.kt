@@ -24,12 +24,12 @@ import kotlinx.serialization.json.Json
  * Uses existing models with kotlinx.serialization for JSON conversion
  */
 class DatabaseConverters {
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = true
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            encodeDefaults = true
+        }
 
     // Enum Converters
     @TypeConverter

@@ -1,6 +1,11 @@
 package com.runanywhere.sdk.data.database.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import com.runanywhere.sdk.data.database.entities.AuthTokenEntity
 
 /**
@@ -9,7 +14,6 @@ import com.runanywhere.sdk.data.database.entities.AuthTokenEntity
  */
 @Dao
 interface AuthTokenDao {
-
     @Query("SELECT * FROM auth_tokens WHERE id = :tokenId")
     suspend fun getTokenById(tokenId: String): AuthTokenEntity?
 

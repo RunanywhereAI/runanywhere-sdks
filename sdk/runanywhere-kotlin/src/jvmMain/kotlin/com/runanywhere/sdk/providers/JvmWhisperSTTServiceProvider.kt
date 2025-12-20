@@ -1,13 +1,13 @@
 package com.runanywhere.sdk.providers
 
+import com.runanywhere.sdk.core.ModuleRegistry
+import com.runanywhere.sdk.core.STTServiceProvider
 import com.runanywhere.sdk.features.stt.JvmWhisperSTTService
 import com.runanywhere.sdk.features.stt.STTConfiguration
 import com.runanywhere.sdk.features.stt.STTService
-import com.runanywhere.sdk.core.ModuleRegistry
-import com.runanywhere.sdk.core.STTServiceProvider
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.models.JvmWhisperJNIModelMapper
 import com.runanywhere.sdk.models.JvmModelStorage
+import com.runanywhere.sdk.models.JvmWhisperJNIModelMapper
 import com.runanywhere.sdk.models.enums.InferenceFramework
 
 /**
@@ -43,8 +43,8 @@ class JvmWhisperSTTServiceProvider : STTServiceProvider {
         // 2. Any Whisper model ID
         // 3. Common size identifiers
         return modelId == null ||
-               JvmWhisperJNIModelMapper.isModelSupported(modelId) ||
-               isWhisperCompatibleModelId(modelId)
+            JvmWhisperJNIModelMapper.isModelSupported(modelId) ||
+            isWhisperCompatibleModelId(modelId)
     }
 
     override suspend fun createSTTService(configuration: STTConfiguration): STTService {
@@ -69,7 +69,6 @@ class JvmWhisperSTTServiceProvider : STTServiceProvider {
 
             logger.info("JvmWhisperSTTService created and initialized successfully")
             service
-
         } catch (e: Exception) {
             logger.error("Failed to create JvmWhisperSTTService", e)
             throw e
@@ -83,11 +82,19 @@ class JvmWhisperSTTServiceProvider : STTServiceProvider {
         val lowerModelId = modelId.lowercase()
 
         return lowerModelId.contains("whisper") ||
-               lowerModelId in setOf(
-                   "tiny", "base", "small", "medium", "large",
-                   "smallest", "default", "largest",
-                   "large-v2", "large-v3"
-               )
+            lowerModelId in
+            setOf(
+                "tiny",
+                "base",
+                "small",
+                "medium",
+                "large",
+                "smallest",
+                "default",
+                "largest",
+                "large-v2",
+                "large-v3",
+            )
     }
 
     /**

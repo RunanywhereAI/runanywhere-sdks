@@ -6,7 +6,7 @@ package com.runanywhere.sdk.network
 data class HttpResponse(
     val statusCode: Int,
     val body: ByteArray,
-    val headers: Map<String, List<String>> = emptyMap()
+    val headers: Map<String, List<String>> = emptyMap(),
 ) {
     val isSuccessful: Boolean
         get() = statusCode in 200..299
@@ -43,7 +43,7 @@ interface HttpClient {
      */
     suspend fun get(
         url: String,
-        headers: Map<String, String> = emptyMap()
+        headers: Map<String, String> = emptyMap(),
     ): HttpResponse
 
     /**
@@ -52,7 +52,7 @@ interface HttpClient {
     suspend fun post(
         url: String,
         body: ByteArray,
-        headers: Map<String, String> = emptyMap()
+        headers: Map<String, String> = emptyMap(),
     ): HttpResponse
 
     /**
@@ -61,7 +61,7 @@ interface HttpClient {
     suspend fun put(
         url: String,
         body: ByteArray,
-        headers: Map<String, String> = emptyMap()
+        headers: Map<String, String> = emptyMap(),
     ): HttpResponse
 
     /**
@@ -69,7 +69,7 @@ interface HttpClient {
      */
     suspend fun delete(
         url: String,
-        headers: Map<String, String> = emptyMap()
+        headers: Map<String, String> = emptyMap(),
     ): HttpResponse
 
     /**
@@ -78,7 +78,7 @@ interface HttpClient {
     suspend fun download(
         url: String,
         headers: Map<String, String> = emptyMap(),
-        onProgress: ((bytesDownloaded: Long, totalBytes: Long) -> Unit)? = null
+        onProgress: ((bytesDownloaded: Long, totalBytes: Long) -> Unit)? = null,
     ): ByteArray
 
     /**
@@ -88,7 +88,7 @@ interface HttpClient {
         url: String,
         data: ByteArray,
         headers: Map<String, String> = emptyMap(),
-        onProgress: ((bytesUploaded: Long, totalBytes: Long) -> Unit)? = null
+        onProgress: ((bytesUploaded: Long, totalBytes: Long) -> Unit)? = null,
     ): HttpResponse
 
     /**
@@ -116,7 +116,7 @@ data class HttpClientConfig(
     val writeTimeoutMs: Long = 30_000,
     val enableLogging: Boolean = false,
     val maxRetries: Int = 3,
-    val retryDelayMs: Long = 1000
+    val retryDelayMs: Long = 1000,
 )
 
 /**

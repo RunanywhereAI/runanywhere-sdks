@@ -1,15 +1,11 @@
 package com.runanywhere.sdk.features.llm
 
-import com.runanywhere.sdk.features.llm.LLMComponent
-import com.runanywhere.sdk.features.llm.LLMConfiguration
-import com.runanywhere.sdk.features.llm.LLMOutput
-import com.runanywhere.sdk.features.llm.LLMInput
-import com.runanywhere.sdk.models.Message
-import com.runanywhere.sdk.models.MessageRole
-import com.runanywhere.sdk.models.LLMGenerationOptions
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.models.LLMGenerationOptions
+import com.runanywhere.sdk.models.Message
+import com.runanywhere.sdk.models.MessageRole
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -26,7 +22,7 @@ import kotlinx.coroutines.flow.map
  * the public RunAnywhere+TextGeneration.kt extension functions.
  */
 class LLMCapability internal constructor(
-    private val getComponent: () -> LLMComponent
+    private val getComponent: () -> LLMComponent,
 ) {
     private val logger = SDKLogger("LLMCapability")
 
@@ -64,7 +60,7 @@ class LLMCapability internal constructor(
         // Check if provider is available
         if (!ModuleRegistry.hasLLM) {
             throw SDKError.ComponentNotInitialized(
-                "No LLM service provider registered. Add llama.cpp or another LLM module as a dependency."
+                "No LLM service provider registered. Add llama.cpp or another LLM module as a dependency.",
             )
         }
 
@@ -106,24 +102,29 @@ class LLMCapability internal constructor(
      * @param options Generation options
      * @return LLMGenerationResult with generated text and metrics
      */
-    suspend fun generate(prompt: String, options: LLMGenerationOptions): LLMGenerationResult {
+    suspend fun generate(
+        prompt: String,
+        options: LLMGenerationOptions,
+    ): LLMGenerationResult {
         ensureModelLoaded()
 
         val component = getComponent()
 
         // Build input with options
-        val input = LLMInput(
-            messages = listOf(Message(role = MessageRole.USER, content = prompt)),
-            systemPrompt = options.systemPrompt,
-            options = LLMGenerationOptions(
-                maxTokens = options.maxTokens,
-                temperature = options.temperature,
-                topP = options.topP,
-                topK = options.topK,
-                stopSequences = options.stopSequences,
-                streamingEnabled = false
+        val input =
+            LLMInput(
+                messages = listOf(Message(role = MessageRole.USER, content = prompt)),
+                systemPrompt = options.systemPrompt,
+                options =
+                    LLMGenerationOptions(
+                        maxTokens = options.maxTokens,
+                        temperature = options.temperature,
+                        topP = options.topP,
+                        topK = options.topK,
+                        stopSequences = options.stopSequences,
+                        streamingEnabled = false,
+                    ),
             )
-        )
 
         val output = component.process(input)
 
@@ -137,29 +138,35 @@ class LLMCapability internal constructor(
      * @param options Generation options
      * @return LLMStreamingResult with token stream and metrics accessor
      */
-    suspend fun generateStream(prompt: String, options: LLMGenerationOptions): LLMStreamingResult {
+    suspend fun generateStream(
+        prompt: String,
+        options: LLMGenerationOptions,
+    ): LLMStreamingResult {
         ensureModelLoaded()
 
         val component = getComponent()
 
         // Build input with options
-        val input = LLMInput(
-            messages = listOf(Message(role = MessageRole.USER, content = prompt)),
-            systemPrompt = options.systemPrompt,
-            options = LLMGenerationOptions(
-                maxTokens = options.maxTokens,
-                temperature = options.temperature,
-                topP = options.topP,
-                topK = options.topK,
-                stopSequences = options.stopSequences,
-                streamingEnabled = true
+        val input =
+            LLMInput(
+                messages = listOf(Message(role = MessageRole.USER, content = prompt)),
+                systemPrompt = options.systemPrompt,
+                options =
+                    LLMGenerationOptions(
+                        maxTokens = options.maxTokens,
+                        temperature = options.temperature,
+                        topP = options.topP,
+                        topK = options.topK,
+                        stopSequences = options.stopSequences,
+                        streamingEnabled = true,
+                    ),
             )
-        )
 
         // Get streaming flow from component
-        val tokenFlow = component.streamProcess(input).map { chunk ->
-            chunk.text
-        }
+        val tokenFlow =
+            component.streamProcess(input).map { chunk ->
+                chunk.text
+            }
 
         // Create result with metrics placeholder
         // In a full implementation, we'd track metrics during streaming
@@ -170,7 +177,7 @@ class LLMCapability internal constructor(
                 // In production, we'd accumulate metrics during streaming
                 val result = component.process(input)
                 result.toLLMGenerationResult()
-            }
+            },
         )
     }
 
@@ -196,20 +203,20 @@ class LLMCapability internal constructor(
         }
     }
 
-    private fun LLMOutput.toLLMGenerationResult(): LLMGenerationResult {
-        return LLMGenerationResult(
+    private fun LLMOutput.toLLMGenerationResult(): LLMGenerationResult =
+        LLMGenerationResult(
             text = this.text,
             tokensUsed = this.tokenUsage.totalTokens,
             latencyMs = (this.metadata.generationTime ?: 0L).toDouble(),
-            performanceMetrics = LLMPerformanceMetrics(
-                tokensPerSecond = this.metadata.tokensPerSecond ?: 0.0,
-                timeToFirstTokenMs = null, // Not tracked in component
-                inferenceTimeMs = (this.metadata.generationTime ?: 0L).toDouble()
-            ),
+            performanceMetrics =
+                LLMPerformanceMetrics(
+                    tokensPerSecond = this.metadata.tokensPerSecond ?: 0.0,
+                    timeToFirstTokenMs = null, // Not tracked in component
+                    inferenceTimeMs = (this.metadata.generationTime ?: 0L).toDouble(),
+                ),
             thinkingTokensUsed = null,
-            thinkingContent = null
+            thinkingContent = null,
         )
-    }
 }
 
 // ============================================================================
@@ -228,7 +235,7 @@ data class LLMPerformanceMetrics(
     /** Time to first token in milliseconds */
     val timeToFirstTokenMs: Double?,
     /** Total inference time in milliseconds */
-    val inferenceTimeMs: Double
+    val inferenceTimeMs: Double,
 )
 
 /**
@@ -246,7 +253,7 @@ data class LLMGenerationResult(
     /** Thinking tokens used (for reasoning models) */
     val thinkingTokensUsed: Int? = null,
     /** Thinking content (for reasoning models) */
-    val thinkingContent: String? = null
+    val thinkingContent: String? = null,
 )
 
 /**
@@ -257,5 +264,5 @@ data class LLMStreamingResult(
     /** Flow of generated tokens */
     val stream: Flow<String>,
     /** Suspend function to get final metrics after streaming completes */
-    val getMetrics: suspend () -> LLMGenerationResult
+    val getMetrics: suspend () -> LLMGenerationResult,
 )

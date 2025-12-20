@@ -7,14 +7,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 /**
  * Service wrapper for managing service lifecycle
  * One-to-one mapping from iOS ServiceWrapper
  */
 abstract class ServiceWrapper<T : Any> {
-
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val _state = MutableStateFlow(ServiceState.IDLE)
     val state: StateFlow<ServiceState> = _state.asStateFlow()
@@ -114,22 +112,19 @@ abstract class ServiceWrapper<T : Any> {
     /**
      * Get the wrapped service instance (throws if not initialized)
      */
-    fun requireService(): T = service
-        ?: throw IllegalStateException("Service not initialized")
+    fun requireService(): T =
+        service
+            ?: throw IllegalStateException("Service not initialized")
 
     /**
      * Execute an action with the service
      */
-    suspend fun <R> withService(action: suspend (T) -> R): R? {
-        return service?.let { action(it) }
-    }
+    suspend fun <R> withService(action: suspend (T) -> R): R? = service?.let { action(it) }
 
     /**
      * Execute an action with the service (throws if not initialized)
      */
-    suspend fun <R> requireWithService(action: suspend (T) -> R): R {
-        return action(requireService())
-    }
+    suspend fun <R> requireWithService(action: suspend (T) -> R): R = action(requireService())
 
     // Abstract methods to be implemented by subclasses
 
@@ -189,7 +184,8 @@ enum class ServiceState {
     STARTING,
     RUNNING,
     STOPPING,
-    ERROR;
+    ERROR,
+    ;
 
     val isActive: Boolean
         get() = this in listOf(STARTING, RUNNING, STOPPING)
@@ -206,16 +202,35 @@ enum class ServiceState {
  */
 interface ServiceLifecycle {
     suspend fun initialize()
+
     suspend fun start()
+
     suspend fun stop()
+
     suspend fun cleanup()
+
     fun getState(): ServiceState
 }
 
 /**
  * Service exceptions
  */
-open class ServiceException(message: String, cause: Throwable? = null) : Exception(message, cause)
-class ServiceInitializationException(message: String, cause: Throwable? = null) : ServiceException(message, cause)
-class ServiceStartException(message: String, cause: Throwable? = null) : ServiceException(message, cause)
-class ServiceStopException(message: String, cause: Throwable? = null) : ServiceException(message, cause)
+open class ServiceException(
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)
+
+class ServiceInitializationException(
+    message: String,
+    cause: Throwable? = null,
+) : ServiceException(message, cause)
+
+class ServiceStartException(
+    message: String,
+    cause: Throwable? = null,
+) : ServiceException(message, cause)
+
+class ServiceStopException(
+    message: String,
+    cause: Throwable? = null,
+) : ServiceException(message, cause)

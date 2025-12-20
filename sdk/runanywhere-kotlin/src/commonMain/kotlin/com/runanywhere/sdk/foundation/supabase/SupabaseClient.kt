@@ -2,9 +2,7 @@ package com.runanywhere.sdk.foundation.supabase
 
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.network.models.DevAnalyticsSubmissionRequest
-import com.runanywhere.sdk.data.network.models.DevAnalyticsSubmissionResponse
 import com.runanywhere.sdk.data.network.models.DevDeviceRegistrationRequest
-import com.runanywhere.sdk.data.network.models.DevDeviceRegistrationResponse
 import com.runanywhere.sdk.foundation.SDKLogger
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -26,7 +24,7 @@ import kotlinx.serialization.json.Json
  */
 internal data class SupabaseConfig(
     val projectUrl: String,
-    val anonKey: String
+    val anonKey: String,
 ) {
     companion object {
         /**
@@ -35,14 +33,14 @@ internal data class SupabaseConfig(
          *
          * Matches iOS: SupabaseConfig.configuration(for:)
          */
-        fun configuration(environment: SDKEnvironment): SupabaseConfig? {
-            return when (environment) {
+        fun configuration(environment: SDKEnvironment): SupabaseConfig? =
+            when (environment) {
                 SDKEnvironment.DEVELOPMENT -> {
                     // Development mode: Use RunAnywhere's public Supabase for dev analytics
                     // Note: Anon key is safe to include in client code - data access is controlled by RLS policies
                     SupabaseConfig(
                         projectUrl = "https://fhtgjtxuoikwwouxqzrn.supabase.co",
-                        anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodGdqdHh1b2lrd3dvdXhxenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExOTkwNzIsImV4cCI6MjA3Njc3NTA3Mn0.aIssX-t8CIqt8zoctNhMS8fm3wtH-DzsQiy9FunqD9E"
+                        anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodGdqdHh1b2lrd3dvdXhxenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExOTkwNzIsImV4cCI6MjA3Njc3NTA3Mn0.aIssX-t8CIqt8zoctNhMS8fm3wtH-DzsQiy9FunqD9E",
                     )
                 }
                 SDKEnvironment.STAGING, SDKEnvironment.PRODUCTION -> {
@@ -50,7 +48,6 @@ internal data class SupabaseConfig(
                     null
                 }
             }
-        }
     }
 }
 
@@ -60,27 +57,31 @@ internal data class SupabaseConfig(
  * Handles development mode analytics and device registration
  * Reference: iOS SDK uses URLSession for Supabase REST API calls
  */
-internal class SupabaseClient(private val config: SupabaseConfig) {
-
+internal class SupabaseClient(
+    private val config: SupabaseConfig,
+) {
     private val logger = SDKLogger("SupabaseClient")
 
-    private val httpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                prettyPrint = true
-                isLenient = true
-            })
-        }
+    private val httpClient =
+        HttpClient {
+            install(ContentNegotiation) {
+                json(
+                    Json {
+                        ignoreUnknownKeys = true
+                        prettyPrint = true
+                        isLenient = true
+                    },
+                )
+            }
 
-        // Add timeout to prevent blocking generation when offline
-        // Development analytics should never block user functionality
-        install(HttpTimeout) {
-            requestTimeoutMillis = 5000  // 5 second timeout
-            connectTimeoutMillis = 3000  // 3 second connect timeout
-            socketTimeoutMillis = 5000   // 5 second socket timeout
+            // Add timeout to prevent blocking generation when offline
+            // Development analytics should never block user functionality
+            install(HttpTimeout) {
+                requestTimeoutMillis = 5000 // 5 second timeout
+                connectTimeoutMillis = 3000 // 3 second connect timeout
+                socketTimeoutMillis = 5000 // 5 second socket timeout
+            }
         }
-    }
 
     /**
      * Register device with Supabase (development mode)
@@ -88,42 +89,43 @@ internal class SupabaseClient(private val config: SupabaseConfig) {
      * Endpoint: POST {projectUrl}/rest/v1/sdk_devices
      * Uses UPSERT resolution strategy (merge-duplicates)
      */
-    suspend fun registerDevice(request: DevDeviceRegistrationRequest): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            logger.info("📱 [SUPABASE] Registering device with Supabase")
-            // Log device ID at debug level to avoid exposing user identifiers in production logs
-            logger.debug("📱 [SUPABASE] Device ID: ${request.deviceId.take(8)}...")
-            logger.debug("📱 [SUPABASE] Platform: ${request.platform}")
-            logger.debug("📱 [SUPABASE] SDK Version: ${request.sdkVersion}")
-            logger.debug("📱 [SUPABASE] URL: ${config.projectUrl}/rest/v1/sdk_devices")
+    suspend fun registerDevice(request: DevDeviceRegistrationRequest): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                logger.info("📱 [SUPABASE] Registering device with Supabase")
+                // Log device ID at debug level to avoid exposing user identifiers in production logs
+                logger.debug("📱 [SUPABASE] Device ID: ${request.deviceId.take(8)}...")
+                logger.debug("📱 [SUPABASE] Platform: ${request.platform}")
+                logger.debug("📱 [SUPABASE] SDK Version: ${request.sdkVersion}")
+                logger.debug("📱 [SUPABASE] URL: ${config.projectUrl}/rest/v1/sdk_devices")
 
-            val response: HttpResponse = httpClient.post("${config.projectUrl}/rest/v1/sdk_devices") {
-                headers {
-                    append("apikey", config.anonKey)
-                    append("Authorization", "Bearer ${config.anonKey}")
-                    append("Content-Type", "application/json")
-                    append("Prefer", "resolution=merge-duplicates") // UPSERT
+                val response: HttpResponse =
+                    httpClient.post("${config.projectUrl}/rest/v1/sdk_devices") {
+                        headers {
+                            append("apikey", config.anonKey)
+                            append("Authorization", "Bearer ${config.anonKey}")
+                            append("Content-Type", "application/json")
+                            append("Prefer", "resolution=merge-duplicates") // UPSERT
+                        }
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                logger.info("📱 [SUPABASE] Response status: ${response.status.value}")
+
+                if (response.status.isSuccess()) {
+                    logger.info("✅ Device registered successfully with Supabase")
+                    return@withContext Result.success(Unit)
+                } else {
+                    val errorBody = response.bodyAsText()
+                    logger.warning("⚠️ Device registration failed: ${response.status} - $errorBody")
+                    return@withContext Result.failure(Exception("Device registration failed: ${response.status}"))
                 }
-                contentType(ContentType.Application.Json)
-                setBody(request)
+            } catch (e: Exception) {
+                logger.warning("⚠️ Device registration failed (non-critical): ${e.message}")
+                return@withContext Result.failure(e)
             }
-
-            logger.info("📱 [SUPABASE] Response status: ${response.status.value}")
-
-            if (response.status.isSuccess()) {
-                logger.info("✅ Device registered successfully with Supabase")
-                return@withContext Result.success(Unit)
-            } else {
-                val errorBody = response.bodyAsText()
-                logger.warning("⚠️ Device registration failed: ${response.status} - $errorBody")
-                return@withContext Result.failure(Exception("Device registration failed: ${response.status}"))
-            }
-
-        } catch (e: Exception) {
-            logger.warning("⚠️ Device registration failed (non-critical): ${e.message}")
-            return@withContext Result.failure(e)
         }
-    }
 
     /**
      * Submit generation analytics to Supabase (development mode)
@@ -133,59 +135,62 @@ internal class SupabaseClient(private val config: SupabaseConfig) {
      */
     suspend fun submitAnalytics(request: DevAnalyticsSubmissionRequest): Result<Unit> =
         withContext(Dispatchers.IO) {
-        try {
-            logger.info("📊 [SUPABASE] Submitting analytics to Supabase")
-            // Log sensitive identifiers at debug level with partial masking to protect user privacy
-            logger.debug("📊 [SUPABASE] Generation ID: ${request.generationId.take(8)}...")
-            logger.debug("📊 [SUPABASE] Device ID: ${request.deviceId.take(8)}...")
-            logger.debug("📊 [SUPABASE] Model ID: ${request.modelId}")
-            logger.debug("📊 [SUPABASE] Build Token: ${request.buildToken?.take(8) ?: "null"}...")
-            logger.debug("📊 [SUPABASE] SDK Version: ${request.sdkVersion}")
-            logger.debug("📊 [SUPABASE] Timestamp: ${request.timestamp}")
-            logger.debug("📊 [SUPABASE] URL: ${config.projectUrl}/rest/v1/sdk_generation_analytics")
-            // Performance metrics are non-sensitive and can be logged at debug level
-            logger.debug("📊 [SUPABASE] Performance: TTFT=${request.timeToFirstTokenMs}ms, TPS=${request.tokensPerSecond}, Total=${request.totalGenerationTimeMs}ms")
-            logger.debug("📊 [SUPABASE] Tokens: input=${request.inputTokens}, output=${request.outputTokens}")
-            logger.debug("📊 [SUPABASE] Execution Target: ${request.executionTarget}")
+            try {
+                logger.info("📊 [SUPABASE] Submitting analytics to Supabase")
+                // Log sensitive identifiers at debug level with partial masking to protect user privacy
+                logger.debug("📊 [SUPABASE] Generation ID: ${request.generationId.take(8)}...")
+                logger.debug("📊 [SUPABASE] Device ID: ${request.deviceId.take(8)}...")
+                logger.debug("📊 [SUPABASE] Model ID: ${request.modelId}")
+                logger.debug("📊 [SUPABASE] Build Token: ${request.buildToken?.take(8) ?: "null"}...")
+                logger.debug("📊 [SUPABASE] SDK Version: ${request.sdkVersion}")
+                logger.debug("📊 [SUPABASE] Timestamp: ${request.timestamp}")
+                logger.debug("📊 [SUPABASE] URL: ${config.projectUrl}/rest/v1/sdk_generation_analytics")
+                // Performance metrics are non-sensitive and can be logged at debug level
+                logger.debug(
+                    "📊 [SUPABASE] Performance: TTFT=${request.timeToFirstTokenMs}ms, TPS=${request.tokensPerSecond}, Total=${request.totalGenerationTimeMs}ms",
+                )
+                logger.debug("📊 [SUPABASE] Tokens: input=${request.inputTokens}, output=${request.outputTokens}")
+                logger.debug("📊 [SUPABASE] Execution Target: ${request.executionTarget}")
 
-            // Make POST request and get raw HTTP response (like iOS)
-            val httpResponse = httpClient.post(
-                "${config.projectUrl}/rest/v1/sdk_generation_analytics"
-            ) {
-                headers {
-                    append("apikey", config.anonKey)
-                    append("Authorization", "Bearer ${config.anonKey}")
-                    append("Content-Type", "application/json")
+                // Make POST request and get raw HTTP response (like iOS)
+                val httpResponse =
+                    httpClient.post(
+                        "${config.projectUrl}/rest/v1/sdk_generation_analytics",
+                    ) {
+                        headers {
+                            append("apikey", config.anonKey)
+                            append("Authorization", "Bearer ${config.anonKey}")
+                            append("Content-Type", "application/json")
+                        }
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                logger.info("📊 [SUPABASE] Response HTTP Status: ${httpResponse.status.value}")
+
+                // Check HTTP status code (matches iOS behavior exactly)
+                if (httpResponse.status == HttpStatusCode.OK || httpResponse.status == HttpStatusCode.Created) {
+                    logger.debug("📊 Analytics submitted successfully to Supabase (HTTP ${httpResponse.status.value})")
+                    return@withContext Result.success(Unit)
+                } else {
+                    // Log detailed error information
+                    val responseBody =
+                        try {
+                            httpResponse.bodyAsText()
+                        } catch (e: Exception) {
+                            "Unable to read response body: ${e.message}"
+                        }
+                    val errorMsg = "Analytics submission failed with HTTP ${httpResponse.status.value}"
+                    logger.warning("⚠️ $errorMsg")
+                    logger.warning("⚠️ Response body: $responseBody")
+                    return@withContext Result.failure(Exception("$errorMsg - Response: $responseBody"))
                 }
-                contentType(ContentType.Application.Json)
-                setBody(request)
+            } catch (e: Exception) {
+                logger.warning("⚠️ Failed to submit analytics to Supabase: ${e.message}")
+                // Fail silently - don't disrupt SDK operations
+                return@withContext Result.failure(e)
             }
-
-            logger.info("📊 [SUPABASE] Response HTTP Status: ${httpResponse.status.value}")
-
-            // Check HTTP status code (matches iOS behavior exactly)
-            if (httpResponse.status == HttpStatusCode.OK || httpResponse.status == HttpStatusCode.Created) {
-                logger.debug("📊 Analytics submitted successfully to Supabase (HTTP ${httpResponse.status.value})")
-                return@withContext Result.success(Unit)
-            } else {
-                // Log detailed error information
-                val responseBody = try {
-                    httpResponse.bodyAsText()
-                } catch (e: Exception) {
-                    "Unable to read response body: ${e.message}"
-                }
-                val errorMsg = "Analytics submission failed with HTTP ${httpResponse.status.value}"
-                logger.warning("⚠️ $errorMsg")
-                logger.warning("⚠️ Response body: $responseBody")
-                return@withContext Result.failure(Exception("$errorMsg - Response: $responseBody"))
-            }
-
-        } catch (e: Exception) {
-            logger.warning("⚠️ Failed to submit analytics to Supabase: ${e.message}")
-            // Fail silently - don't disrupt SDK operations
-            return@withContext Result.failure(e)
         }
-    }
 
     /**
      * Close HTTP client resources

@@ -1,13 +1,11 @@
 package com.runanywhere.sdk.generation
 
-import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.events.SDKGenerationEvent
-import com.runanywhere.sdk.models.LoadedModelWithService
 import com.runanywhere.sdk.features.llm.LLMComponent
-import com.runanywhere.sdk.features.llm.LLMConfiguration
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.LLMGenerationOptions
-import com.runanywhere.sdk.services.analytics.AnalyticsService
+import com.runanywhere.sdk.models.LoadedModelWithService
 import com.runanywhere.sdk.services.analytics.PerformanceMetrics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +15,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.UUID
 
 /**
  * Service for text generation with LLM models
@@ -27,9 +24,8 @@ import java.util.UUID
  * Reference: iOS GenerationService.swift
  */
 class GenerationService(
-    private val streamingService: StreamingService = StreamingService()
+    private val streamingService: StreamingService = StreamingService(),
 ) {
-
     private val logger = SDKLogger("GenerationService")
     private val optionsResolver = GenerationOptionsResolver()
     private val mutex = Mutex()
@@ -50,13 +46,14 @@ class GenerationService(
      */
     suspend fun generate(
         prompt: String,
-        options: LLMGenerationOptions
+        options: LLMGenerationOptions,
     ): GenerationResult {
-        val convertedOptions = GenerationOptions(
-            temperature = options.temperature,
-            maxTokens = options.maxTokens,
-            streaming = options.streamingEnabled
-        )
+        val convertedOptions =
+            GenerationOptions(
+                temperature = options.temperature,
+                maxTokens = options.maxTokens,
+                streaming = options.streamingEnabled,
+            )
         return generate(prompt, convertedOptions)
     }
 
@@ -65,19 +62,20 @@ class GenerationService(
      */
     suspend fun generate(
         prompt: String,
-        options: GenerationOptions? = null
+        options: GenerationOptions? = null,
     ): GenerationResult {
         val resolvedOptions = optionsResolver.resolve(options)
         val sessionId = createSessionId()
 
         logger.info("Starting generation session: $sessionId")
 
-        val session = GenerationSession(
-            id = sessionId,
-            prompt = prompt,
-            options = resolvedOptions,
-            startTime = System.currentTimeMillis()
-        )
+        val session =
+            GenerationSession(
+                id = sessionId,
+                prompt = prompt,
+                options = resolvedOptions,
+                startTime = System.currentTimeMillis(),
+            )
 
         mutex.withLock {
             activeSessions[sessionId] = session
@@ -90,13 +88,14 @@ class GenerationService(
             // Perform generation (mock implementation for now)
             val response = performGeneration(prompt, resolvedOptions)
 
-            val result = GenerationResult(
-                text = response,
-                tokensUsed = calculateTokens(prompt, response),
-                latencyMs = System.currentTimeMillis() - session.startTime,
-                sessionId = sessionId,
-                model = resolvedOptions.model
-            )
+            val result =
+                GenerationResult(
+                    text = response,
+                    tokensUsed = calculateTokens(prompt, response),
+                    latencyMs = System.currentTimeMillis() - session.startTime,
+                    sessionId = sessionId,
+                    model = resolvedOptions.model,
+                )
 
             // Publish generation completed event
             publishGenerationCompleted(sessionId, result)
@@ -108,11 +107,10 @@ class GenerationService(
                 prompt = prompt,
                 response = response,
                 latencyMs = result.latencyMs,
-                success = true
+                success = true,
             )
 
             return result
-
         } catch (e: Exception) {
             logger.error("Generation failed for session $sessionId: ${e.message}")
             publishGenerationFailed(sessionId, e)
@@ -124,7 +122,7 @@ class GenerationService(
                 prompt = prompt,
                 response = "",
                 latencyMs = System.currentTimeMillis() - session.startTime,
-                success = false
+                success = false,
             )
 
             throw e
@@ -140,13 +138,14 @@ class GenerationService(
      */
     fun streamGenerate(
         prompt: String,
-        options: LLMGenerationOptions
+        options: LLMGenerationOptions,
     ): Flow<GenerationChunk> {
-        val convertedOptions = GenerationOptions(
-            temperature = options.temperature,
-            maxTokens = options.maxTokens,
-            streaming = true
-        )
+        val convertedOptions =
+            GenerationOptions(
+                temperature = options.temperature,
+                maxTokens = options.maxTokens,
+                streaming = true,
+            )
         return streamGenerate(prompt, convertedOptions)
     }
 
@@ -155,140 +154,152 @@ class GenerationService(
      */
     fun streamGenerate(
         prompt: String,
-        options: GenerationOptions? = null
-    ): Flow<GenerationChunk> = flow {
-        val resolvedOptions = optionsResolver.resolve(options)
-        val sessionId = createSessionId()
+        options: GenerationOptions? = null,
+    ): Flow<GenerationChunk> =
+        flow {
+            val resolvedOptions = optionsResolver.resolve(options)
+            val sessionId = createSessionId()
 
-        logger.info("Starting streaming generation session: $sessionId")
+            logger.info("Starting streaming generation session: $sessionId")
 
-        val session = GenerationSession(
-            id = sessionId,
-            prompt = prompt,
-            options = resolvedOptions,
-            startTime = System.currentTimeMillis(),
-            isStreaming = true
-        )
+            val session =
+                GenerationSession(
+                    id = sessionId,
+                    prompt = prompt,
+                    options = resolvedOptions,
+                    startTime = System.currentTimeMillis(),
+                    isStreaming = true,
+                )
 
-        mutex.withLock {
-            activeSessions[sessionId] = session
-        }
-
-        try {
-            // Publish generation started event
-            publishGenerationStarted(sessionId, prompt)
-
-            // Stream generation
-            streamingService.stream(prompt, resolvedOptions).collect { chunk ->
-                emit(chunk)
-
-                // Update session with partial response
-                session.partialResponse += chunk.text
-            }
-
-            // Publish generation completed event
-            val result = GenerationResult(
-                text = session.partialResponse,
-                tokensUsed = calculateTokens(prompt, session.partialResponse),
-                latencyMs = System.currentTimeMillis() - session.startTime,
-                sessionId = sessionId,
-                model = resolvedOptions.model
-            )
-            publishGenerationCompleted(sessionId, result)
-
-            // Submit analytics (non-blocking, matching iOS pattern and non-streaming generate())
-            submitGenerationAnalytics(
-                generationId = sessionId,
-                modelId = currentModel?.model?.id ?: "unknown",
-                prompt = prompt,
-                response = session.partialResponse,
-                latencyMs = result.latencyMs,
-                success = true
-            )
-
-        } catch (e: Exception) {
-            logger.error("Streaming generation failed for session $sessionId: ${e.message}")
-            publishGenerationFailed(sessionId, e)
-
-            // Submit analytics for failure (matching non-streaming generate())
-            submitGenerationAnalytics(
-                generationId = sessionId,
-                modelId = currentModel?.model?.id ?: "unknown",
-                prompt = prompt,
-                response = "",
-                latencyMs = System.currentTimeMillis() - session.startTime,
-                success = false
-            )
-
-            throw e
-        } finally {
             mutex.withLock {
-                activeSessions.remove(sessionId)
+                activeSessions[sessionId] = session
+            }
+
+            try {
+                // Publish generation started event
+                publishGenerationStarted(sessionId, prompt)
+
+                // Stream generation
+                streamingService.stream(prompt, resolvedOptions).collect { chunk ->
+                    emit(chunk)
+
+                    // Update session with partial response
+                    session.partialResponse += chunk.text
+                }
+
+                // Publish generation completed event
+                val result =
+                    GenerationResult(
+                        text = session.partialResponse,
+                        tokensUsed = calculateTokens(prompt, session.partialResponse),
+                        latencyMs = System.currentTimeMillis() - session.startTime,
+                        sessionId = sessionId,
+                        model = resolvedOptions.model,
+                    )
+                publishGenerationCompleted(sessionId, result)
+
+                // Submit analytics (non-blocking, matching iOS pattern and non-streaming generate())
+                submitGenerationAnalytics(
+                    generationId = sessionId,
+                    modelId = currentModel?.model?.id ?: "unknown",
+                    prompt = prompt,
+                    response = session.partialResponse,
+                    latencyMs = result.latencyMs,
+                    success = true,
+                )
+            } catch (e: Exception) {
+                logger.error("Streaming generation failed for session $sessionId: ${e.message}")
+                publishGenerationFailed(sessionId, e)
+
+                // Submit analytics for failure (matching non-streaming generate())
+                submitGenerationAnalytics(
+                    generationId = sessionId,
+                    modelId = currentModel?.model?.id ?: "unknown",
+                    prompt = prompt,
+                    response = "",
+                    latencyMs = System.currentTimeMillis() - session.startTime,
+                    success = false,
+                )
+
+                throw e
+            } finally {
+                mutex.withLock {
+                    activeSessions.remove(sessionId)
+                }
             }
         }
-    }
 
     /**
      * Cancel an active generation session
      */
-    suspend fun cancelGeneration(sessionId: String): Boolean {
-        return mutex.withLock {
+    suspend fun cancelGeneration(sessionId: String): Boolean =
+        mutex.withLock {
             activeSessions.remove(sessionId)?.let { session ->
                 logger.info("Cancelled generation session: $sessionId")
                 publishGenerationCancelled(sessionId)
                 true
             } ?: false
         }
-    }
 
     /**
      * Get active generation sessions
      */
-    fun getActiveSessions(): List<GenerationSession> {
-        return activeSessions.values.toList()
-    }
+    fun getActiveSessions(): List<GenerationSession> = activeSessions.values.toList()
 
     // Private helpers
 
     private suspend fun performGeneration(
         prompt: String,
-        options: GenerationOptions
+        options: GenerationOptions,
     ): String {
         // Use LLM component for actual generation
         val component = llmComponent ?: throw IllegalStateException("LLM component not initialized")
 
-        // Convert GenerationOptions to LLMGenerationOptions
-        val llmOptions = LLMGenerationOptions(
-            maxTokens = options.maxTokens,
-            temperature = options.temperature,
-            streamingEnabled = options.streaming
-        )
+        // Note: LLMGenerationOptions created for future use with enhanced generate() method
+        // Currently component.generate() only takes prompt, options support coming soon
+        @Suppress("UNUSED_VARIABLE")
+        val llmOptions =
+            LLMGenerationOptions(
+                maxTokens = options.maxTokens,
+                temperature = options.temperature,
+                streamingEnabled = options.streaming,
+            )
 
         // Generate using LLM component
         val result = component.generate(prompt)
         return result.text
     }
 
-    private fun calculateTokens(prompt: String, response: String): Int {
+    private fun calculateTokens(
+        prompt: String,
+        response: String,
+    ): Int {
         // Simple token estimation (4 chars per token on average)
         return (prompt.length + response.length) / 4
     }
 
-    private fun createSessionId(): String {
-        return "gen_${System.currentTimeMillis()}_${(0..9999).random()}"
-    }
+    private fun createSessionId(): String = "gen_${System.currentTimeMillis()}_${(0..9999).random()}"
 
-    private fun publishGenerationStarted(sessionId: String, prompt: String) {
+    private fun publishGenerationStarted(
+        sessionId: String,
+        prompt: String,
+    ) {
         EventPublisher.track(SDKGenerationEvent.Started(prompt, sessionId))
         logger.debug("Generation started: $sessionId")
     }
 
-    private fun publishGenerationCompleted(sessionId: String, result: GenerationResult) {
+    private fun publishGenerationCompleted(
+        sessionId: String,
+        result: GenerationResult,
+    ) {
         EventPublisher.track(SDKGenerationEvent.Completed(result.text, result.tokensUsed, result.latencyMs.toDouble()))
         logger.debug("Generation completed: $sessionId")
     }
 
-    private fun publishGenerationFailed(sessionId: String, error: Exception) {
+    private fun publishGenerationFailed(
+        sessionId: String,
+        error: Exception,
+    ) {
         EventPublisher.track(SDKGenerationEvent.Failed(error))
         logger.debug("Generation failed: $sessionId - ${error.message}")
     }
@@ -310,7 +321,7 @@ class GenerationService(
         prompt: String,
         response: String,
         latencyMs: Long,
-        success: Boolean
+        success: Boolean,
     ) {
         // Get analytics service from ServiceContainer
         val analytics = com.runanywhere.sdk.foundation.ServiceContainer.shared.analyticsService
@@ -326,17 +337,19 @@ class GenerationService(
             try {
                 val inputTokens = estimateTokenCount(prompt)
                 val outputTokens = if (success) estimateTokenCount(response) else 0
-                val tokensPerSecond = if (latencyMs > 0 && outputTokens > 0) {
-                    (outputTokens / (latencyMs / 1000.0))
-                } else {
-                    0.0
-                }
+                val tokensPerSecond =
+                    if (latencyMs > 0 && outputTokens > 0) {
+                        (outputTokens / (latencyMs / 1000.0))
+                    } else {
+                        0.0
+                    }
 
-                val performanceMetrics = PerformanceMetrics(
-                    inferenceTimeMs = latencyMs.toDouble(),
-                    tokensPerSecond = tokensPerSecond,
-                    timeToFirstTokenMs = null // TODO: Track in streaming
-                )
+                val performanceMetrics =
+                    PerformanceMetrics(
+                        inferenceTimeMs = latencyMs.toDouble(),
+                        tokensPerSecond = tokensPerSecond,
+                        timeToFirstTokenMs = null, // TODO: Track in streaming
+                    )
 
                 analytics.submitGenerationAnalytics(
                     generationId = generationId,
@@ -345,7 +358,7 @@ class GenerationService(
                     inputTokens = inputTokens,
                     outputTokens = outputTokens,
                     success = success,
-                    executionTarget = "onDevice" // Always on-device for now
+                    executionTarget = "onDevice", // Always on-device for now
                 )
             } catch (e: Exception) {
                 // Fail silently - analytics should never break generation
@@ -358,9 +371,7 @@ class GenerationService(
      * Estimate token count for text (simple word-based approximation)
      * Matches iOS estimateTokenCount()
      */
-    private fun estimateTokenCount(text: String): Int {
-        return text.split(Regex("\\s+")).size.coerceAtLeast(1)
-    }
+    private fun estimateTokenCount(text: String): Int = text.split(Regex("\\s+")).size.coerceAtLeast(1)
 
     /**
      * Cancel the current generation session
@@ -391,9 +402,7 @@ class GenerationService(
     /**
      * Get the currently loaded model - matches iOS API
      */
-    fun getCurrentModel(): LoadedModelWithService? {
-        return currentModel
-    }
+    fun getCurrentModel(): LoadedModelWithService? = currentModel
 
     /**
      * Initialize the generation service with an LLM component
@@ -406,9 +415,7 @@ class GenerationService(
     /**
      * Check if the service is ready for generation
      */
-    fun isReady(): Boolean {
-        return llmComponent?.isReady == true
-    }
+    fun isReady(): Boolean = llmComponent?.isReady == true
 }
 
 /**
@@ -420,7 +427,7 @@ data class GenerationSession(
     val options: GenerationOptions,
     val startTime: Long,
     val isStreaming: Boolean = false,
-    var partialResponse: String = ""
+    var partialResponse: String = "",
 )
 
 /**
@@ -432,7 +439,7 @@ data class GenerationResult(
     val latencyMs: Long,
     val sessionId: String,
     val model: String?,
-    val savedAmount: Double = 0.0
+    val savedAmount: Double = 0.0,
 )
 
 /**
@@ -441,7 +448,7 @@ data class GenerationResult(
 data class GenerationChunk(
     val text: String,
     val isComplete: Boolean = false,
-    val tokenCount: Int = 0
+    val tokenCount: Int = 0,
 )
 
 /**
@@ -455,5 +462,5 @@ data class GenerationOptions(
     val topK: Int = 40,
     val stopSequences: List<String> = emptyList(),
     val streaming: Boolean = false,
-    val seed: Int? = null
+    val seed: Int? = null,
 )

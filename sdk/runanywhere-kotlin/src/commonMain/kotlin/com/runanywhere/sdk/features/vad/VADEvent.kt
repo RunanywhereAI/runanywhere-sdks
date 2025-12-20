@@ -18,12 +18,11 @@ import com.runanywhere.sdk.models.enums.InferenceFramework
  * This is a documented naming drift that will be resolved in a future iteration.
  */
 sealed class VADEvent : BaseSDKEvent(EventCategory.VOICE) {
-
     // MARK: - Service Lifecycle
 
     /** VAD initialized (no model load for simple VAD, uses built-in algorithms) */
     data class Initialized(
-        val framework: InferenceFramework = InferenceFramework.BUILT_IN
+        val framework: InferenceFramework = InferenceFramework.BUILT_IN,
     ) : VADEvent() {
         override val type: String = "vad_initialized"
         override val properties: Map<String, String>
@@ -33,14 +32,15 @@ sealed class VADEvent : BaseSDKEvent(EventCategory.VOICE) {
     /** VAD initialization failed */
     data class InitializationFailed(
         val error: String,
-        val framework: InferenceFramework = InferenceFramework.BUILT_IN
+        val framework: InferenceFramework = InferenceFramework.BUILT_IN,
     ) : VADEvent() {
         override val type: String = "vad_initialization_failed"
         override val properties: Map<String, String>
-            get() = mapOf(
-                "error" to error,
-                "framework" to framework.value
-            )
+            get() =
+                mapOf(
+                    "error" to error,
+                    "framework" to framework.value,
+                )
     }
 
     /** VAD cleaned up */
@@ -56,17 +56,18 @@ sealed class VADEvent : BaseSDKEvent(EventCategory.VOICE) {
     data class ModelLoadStarted(
         val modelId: String,
         val modelSizeBytes: Long = 0,
-        val framework: InferenceFramework = InferenceFramework.UNKNOWN
+        val framework: InferenceFramework = InferenceFramework.UNKNOWN,
     ) : VADEvent() {
         override val type: String = "vad_model_load_started"
         override val properties: Map<String, String>
-            get() = buildMap {
-                put("model_id", modelId)
-                put("framework", framework.value)
-                if (modelSizeBytes > 0) {
-                    put("model_size_bytes", modelSizeBytes.toString())
+            get() =
+                buildMap {
+                    put("model_id", modelId)
+                    put("framework", framework.value)
+                    if (modelSizeBytes > 0) {
+                        put("model_size_bytes", modelSizeBytes.toString())
+                    }
                 }
-            }
     }
 
     /** Model loading completed */
@@ -74,37 +75,41 @@ sealed class VADEvent : BaseSDKEvent(EventCategory.VOICE) {
         val modelId: String,
         val durationMs: Double,
         val modelSizeBytes: Long = 0,
-        val framework: InferenceFramework = InferenceFramework.UNKNOWN
+        val framework: InferenceFramework = InferenceFramework.UNKNOWN,
     ) : VADEvent() {
         override val type: String = "vad_model_load_completed"
         override val properties: Map<String, String>
-            get() = buildMap {
-                put("model_id", modelId)
-                put("duration_ms", String.format("%.1f", durationMs))
-                put("framework", framework.value)
-                if (modelSizeBytes > 0) {
-                    put("model_size_bytes", modelSizeBytes.toString())
+            get() =
+                buildMap {
+                    put("model_id", modelId)
+                    put("duration_ms", String.format("%.1f", durationMs))
+                    put("framework", framework.value)
+                    if (modelSizeBytes > 0) {
+                        put("model_size_bytes", modelSizeBytes.toString())
+                    }
                 }
-            }
     }
 
     /** Model loading failed */
     data class ModelLoadFailed(
         val modelId: String,
         val error: String,
-        val framework: InferenceFramework = InferenceFramework.UNKNOWN
+        val framework: InferenceFramework = InferenceFramework.UNKNOWN,
     ) : VADEvent() {
         override val type: String = "vad_model_load_failed"
         override val properties: Map<String, String>
-            get() = mapOf(
-                "model_id" to modelId,
-                "error" to error,
-                "framework" to framework.value
-            )
+            get() =
+                mapOf(
+                    "model_id" to modelId,
+                    "error" to error,
+                    "framework" to framework.value,
+                )
     }
 
     /** Model unloaded */
-    data class ModelUnloaded(val modelId: String) : VADEvent() {
+    data class ModelUnloaded(
+        val modelId: String,
+    ) : VADEvent() {
         override val type: String = "vad_model_unloaded"
         override val properties: Map<String, String>
             get() = mapOf("model_id" to modelId)
@@ -142,7 +147,9 @@ sealed class VADEvent : BaseSDKEvent(EventCategory.VOICE) {
      * This event is analytics-only (too chatty for public API).
      * @param durationMs Duration of the speech segment in milliseconds
      */
-    data class SpeechEnded(val durationMs: Double) : VADEvent() {
+    data class SpeechEnded(
+        val durationMs: Double,
+    ) : VADEvent() {
         override val type: String = "vad_speech_ended"
         override val destination: EventDestination = EventDestination.ANALYTICS_ONLY
         override val properties: Map<String, String>
@@ -184,5 +191,5 @@ data class VADMetrics(
     /** Average duration of speech segments in milliseconds (-1 if N/A) */
     val averageSpeechDurationMs: Double = -1.0,
     /** The inference framework being used */
-    val framework: InferenceFramework = InferenceFramework.BUILT_IN
+    val framework: InferenceFramework = InferenceFramework.BUILT_IN,
 )

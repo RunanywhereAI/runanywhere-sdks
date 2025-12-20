@@ -1,9 +1,9 @@
 package com.runanywhere.sdk.voice.vad
 
-import com.runanywhere.sdk.features.vad.VADService
+import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.vad.VADResult
-import com.runanywhere.sdk.features.vad.SpeechActivityEvent
+import com.runanywhere.sdk.features.vad.VADService
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlin.math.sqrt
 
@@ -13,9 +13,8 @@ import kotlin.math.sqrt
  * Based on iOS VADComponent with SimpleEnergyVAD service
  */
 class SimpleEnergyVAD(
-    private var vadConfig: VADConfiguration = VADConfiguration()
+    private var vadConfig: VADConfiguration = VADConfiguration(),
 ) : VADService {
-
     override val configuration: VADConfiguration
         get() = vadConfig
 
@@ -45,8 +44,8 @@ class SimpleEnergyVAD(
     private var consecutiveVoiceFrames = 0
 
     // Hysteresis parameters (exactly matching iOS values)
-    private val voiceStartThreshold = 2   // frames of voice to start (iOS value)
-    private val voiceEndThreshold = 10    // frames of silence to end (iOS value)
+    private val voiceStartThreshold = 2 // frames of voice to start (iOS value)
+    private val voiceEndThreshold = 10 // frames of silence to end (iOS value)
 
     // Callbacks matching iOS VADService protocol
     override var onSpeechActivity: ((SpeechActivityEvent) -> Unit)? = null
@@ -65,9 +64,7 @@ class SimpleEnergyVAD(
     }
 
     // Additional method matching iOS VADService
-    override fun processAudioData(audioData: FloatArray): Boolean {
-        return processAudioChunk(audioData).isSpeechDetected
-    }
+    override fun processAudioData(audioData: FloatArray): Boolean = processAudioChunk(audioData).isSpeechDetected
 
     override fun processAudioChunk(audioSamples: FloatArray): VADResult {
         if (!isActive) {
@@ -85,7 +82,7 @@ class SimpleEnergyVAD(
 
         return VADResult(
             isSpeechDetected = isCurrentlySpeaking, // Use state, not just current frame
-            confidence = if (hasVoice) energy.coerceIn(0.5f, 1.0f) else energy.coerceIn(0.0f, 0.5f)
+            confidence = if (hasVoice) energy.coerceIn(0.5f, 1.0f) else energy.coerceIn(0.0f, 0.5f),
         )
     }
 
@@ -136,7 +133,6 @@ class SimpleEnergyVAD(
         logger.info("SimpleEnergyVAD stopped")
     }
 
-
     // MARK: - Private Methods
 
     /**
@@ -161,7 +157,10 @@ class SimpleEnergyVAD(
     /**
      * Update speech state with hysteresis
      */
-    private fun updateSpeechState(hasVoice: Boolean, energy: Float) {
+    private fun updateSpeechState(
+        hasVoice: Boolean,
+        energy: Float,
+    ) {
         if (hasVoice) {
             consecutiveVoiceFrames++
             consecutiveSilentFrames = 0
@@ -184,5 +183,4 @@ class SimpleEnergyVAD(
             }
         }
     }
-
 }

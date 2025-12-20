@@ -24,7 +24,6 @@ import kotlinx.coroutines.sync.withLock
  * ```
  */
 class VADAnalyticsService {
-
     // MARK: - Properties
 
     private val logger = SDKLogger("VADAnalytics")
@@ -69,7 +68,10 @@ class VADAnalyticsService {
      * @param error Error description
      * @param framework The inference framework that was attempted
      */
-    suspend fun trackInitializationFailed(error: String, framework: InferenceFramework) {
+    suspend fun trackInitializationFailed(
+        error: String,
+        framework: InferenceFramework,
+    ) {
         mutex.withLock {
             currentFramework = framework
             lastEventTime = System.currentTimeMillis()
@@ -179,7 +181,7 @@ class VADAnalyticsService {
     suspend fun trackModelLoadStarted(
         modelId: String,
         modelSizeBytes: Long = 0,
-        framework: InferenceFramework
+        framework: InferenceFramework,
     ) {
         mutex.withLock {
             currentFramework = framework
@@ -190,8 +192,8 @@ class VADAnalyticsService {
             VADEvent.ModelLoadStarted(
                 modelId = modelId,
                 modelSizeBytes = modelSizeBytes,
-                framework = framework
-            )
+                framework = framework,
+            ),
         )
     }
 
@@ -204,7 +206,7 @@ class VADAnalyticsService {
     suspend fun trackModelLoadCompleted(
         modelId: String,
         durationMs: Double,
-        modelSizeBytes: Long = 0
+        modelSizeBytes: Long = 0,
     ) {
         val framework: InferenceFramework
         mutex.withLock {
@@ -217,8 +219,8 @@ class VADAnalyticsService {
                 modelId = modelId,
                 durationMs = durationMs,
                 modelSizeBytes = modelSizeBytes,
-                framework = framework
-            )
+                framework = framework,
+            ),
         )
     }
 
@@ -227,7 +229,10 @@ class VADAnalyticsService {
      * @param modelId Model identifier
      * @param error Error description
      */
-    suspend fun trackModelLoadFailed(modelId: String, error: String) {
+    suspend fun trackModelLoadFailed(
+        modelId: String,
+        error: String,
+    ) {
         val framework: InferenceFramework
         mutex.withLock {
             lastEventTime = System.currentTimeMillis()
@@ -238,8 +243,8 @@ class VADAnalyticsService {
             VADEvent.ModelLoadFailed(
                 modelId = modelId,
                 error = error,
-                framework = framework
-            )
+                framework = framework,
+            ),
         )
     }
 
@@ -261,23 +266,23 @@ class VADAnalyticsService {
      * Get current VAD analytics metrics
      * @return VADMetrics with aggregated statistics
      */
-    suspend fun getMetrics(): VADMetrics {
-        return mutex.withLock {
+    suspend fun getMetrics(): VADMetrics =
+        mutex.withLock {
             VADMetrics(
                 totalEvents = totalSpeechSegments,
                 startTime = startTime,
                 lastEventTime = lastEventTime,
                 totalSpeechSegments = totalSpeechSegments,
                 totalSpeechDurationMs = totalSpeechDurationMs,
-                averageSpeechDurationMs = if (totalSpeechSegments > 0) {
-                    totalSpeechDurationMs / totalSpeechSegments
-                } else {
-                    -1.0 // -1 indicates N/A, matching iOS
-                },
-                framework = currentFramework
+                averageSpeechDurationMs =
+                    if (totalSpeechSegments > 0) {
+                        totalSpeechDurationMs / totalSpeechSegments
+                    } else {
+                        -1.0 // -1 indicates N/A, matching iOS
+                    },
+                framework = currentFramework,
             )
         }
-    }
 
     /**
      * Reset metrics (useful for testing or session reset)

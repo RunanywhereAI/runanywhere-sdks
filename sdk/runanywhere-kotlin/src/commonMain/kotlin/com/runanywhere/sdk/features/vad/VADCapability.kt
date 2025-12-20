@@ -4,7 +4,6 @@ import com.runanywhere.sdk.core.capabilities.ComponentState
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
 // All VAD types (VADComponent, VADConfiguration, VADInput, VADOutput, SpeechActivityEvent)
 // are defined in this package's VADModels.kt - no explicit imports needed
@@ -26,7 +25,7 @@ import kotlinx.coroutines.flow.map
  * it doesn't require loading a model, just initializing the service.
  */
 class VADCapability internal constructor(
-    private val getComponent: () -> VADComponent
+    private val getComponent: () -> VADComponent,
 ) {
     private val logger = SDKLogger("VADCapability")
 
@@ -71,7 +70,9 @@ class VADCapability internal constructor(
      * @param config VAD configuration
      * @throws SDKError if initialization fails
      */
-    suspend fun initialize(config: VADConfiguration) {
+    suspend fun initialize(
+        @Suppress("UNUSED_PARAMETER") config: VADConfiguration,
+    ) {
         logger.info("Initializing VAD")
 
         try {
@@ -126,14 +127,18 @@ class VADCapability internal constructor(
      * @return VADOutput with detection result
      * @throws SDKError if VAD is not ready
      */
-    fun detectSpeech(samples: FloatArray, energyThresholdOverride: Float? = null): VADOutput {
+    fun detectSpeech(
+        samples: FloatArray,
+        energyThresholdOverride: Float? = null,
+    ): VADOutput {
         ensureReady()
 
         val component = getComponent()
-        val input = VADInput(
-            audioSamples = samples,
-            energyThresholdOverride = energyThresholdOverride
-        )
+        val input =
+            VADInput(
+                audioSamples = samples,
+                energyThresholdOverride = energyThresholdOverride,
+            )
         return component.process(input)
     }
 
@@ -161,7 +166,7 @@ class VADCapability internal constructor(
     fun detectSpeechSegments(
         audioStream: Flow<FloatArray>,
         onSpeechStart: () -> Unit = {},
-        onSpeechEnd: () -> Unit = {}
+        onSpeechEnd: () -> Unit = {},
     ): Flow<VADOutput> {
         ensureReady()
 
@@ -258,9 +263,7 @@ class VADCapability internal constructor(
      *
      * @return VADMetrics with aggregated statistics
      */
-    suspend fun getAnalyticsMetrics(): VADMetrics {
-        return getComponent().getAnalyticsMetrics()
-    }
+    suspend fun getAnalyticsMetrics(): VADMetrics = getComponent().getAnalyticsMetrics()
 
     // ============================================================================
     // MARK: - Private Helpers
@@ -271,7 +274,6 @@ class VADCapability internal constructor(
             throw SDKError.ComponentNotReady("VAD not initialized. Call initializeVAD() first.")
         }
     }
-
 }
 
 // VADOutput is defined in VADModels.kt - no duplicate definition needed
@@ -290,18 +292,17 @@ data class VADCapabilityConfiguration(
     /** Enable automatic calibration */
     val enableAutoCalibration: Boolean = false,
     /** Calibration multiplier */
-    val calibrationMultiplier: Float = 2.0f
+    val calibrationMultiplier: Float = 2.0f,
 ) {
     /**
      * Convert to component configuration
      */
-    fun toComponentConfiguration(): VADConfiguration {
-        return VADConfiguration(
+    fun toComponentConfiguration(): VADConfiguration =
+        VADConfiguration(
             energyThreshold = energyThreshold,
             sampleRate = sampleRate,
-            frameLength = frameLength
+            frameLength = frameLength,
         )
-    }
 
     companion object {
         /**
@@ -318,19 +319,22 @@ data class VADCapabilityConfiguration(
         private var calibrationMultiplier: Float = 2.0f
 
         fun energyThreshold(threshold: Float) = apply { this.energyThreshold = threshold }
+
         fun sampleRate(rate: Int) = apply { this.sampleRate = rate }
+
         fun frameLength(length: Float) = apply { this.frameLength = length }
+
         fun enableAutoCalibration(enabled: Boolean) = apply { this.enableAutoCalibration = enabled }
+
         fun calibrationMultiplier(multiplier: Float) = apply { this.calibrationMultiplier = multiplier }
 
-        fun build(): VADCapabilityConfiguration {
-            return VADCapabilityConfiguration(
+        fun build(): VADCapabilityConfiguration =
+            VADCapabilityConfiguration(
                 energyThreshold = energyThreshold,
                 sampleRate = sampleRate,
                 frameLength = frameLength,
                 enableAutoCalibration = enableAutoCalibration,
-                calibrationMultiplier = calibrationMultiplier
+                calibrationMultiplier = calibrationMultiplier,
             )
-        }
     }
 }

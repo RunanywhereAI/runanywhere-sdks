@@ -1,15 +1,15 @@
 package com.runanywhere.sdk.data.network
 
+import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.services.AuthenticationService
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.serialization.json.Json
 import kotlinx.coroutines.delay
+import kotlinx.serialization.json.Json
 import kotlin.math.pow
 import kotlin.random.Random
 
@@ -23,18 +23,18 @@ class KtorNetworkService(
     private val baseURL: String,
     private val authenticationService: AuthenticationService? = null,
     private val maxRetryAttempts: Int = 3,
-    private val baseDelayMs: Long = 1000
+    private val baseDelayMs: Long = 1000,
 ) : NetworkService {
-
     private val logger = SDKLogger("KtorNetworkService")
 
-    private val jsonSerializer = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = false
-        prettyPrint = false
-        coerceInputValues = true
-    }
+    private val jsonSerializer =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            encodeDefaults = false
+            prettyPrint = false
+            coerceInputValues = true
+        }
 
     /**
      * POST request with JSON payload and typed response
@@ -43,10 +43,8 @@ class KtorNetworkService(
     override suspend fun <T : Any, R : Any> post(
         endpoint: APIEndpoint,
         payload: T,
-        requiresAuth: Boolean
-    ): R {
-        throw UnsupportedOperationException("Use postTyped extension function with reified types instead")
-    }
+        requiresAuth: Boolean,
+    ): R = throw UnsupportedOperationException("Use postTyped extension function with reified types instead")
 
     /**
      * GET request with typed response
@@ -54,10 +52,8 @@ class KtorNetworkService(
      */
     override suspend fun <R : Any> get(
         endpoint: APIEndpoint,
-        requiresAuth: Boolean
-    ): R {
-        throw UnsupportedOperationException("Use getTyped extension function with reified types instead")
-    }
+        requiresAuth: Boolean,
+    ): R = throw UnsupportedOperationException("Use getTyped extension function with reified types instead")
 
     /**
      * POST request with raw data payload
@@ -65,7 +61,7 @@ class KtorNetworkService(
     override suspend fun postRaw(
         endpoint: APIEndpoint,
         payload: ByteArray,
-        requiresAuth: Boolean
+        requiresAuth: Boolean,
     ): ByteArray {
         logger.debug("POST raw request to: ${endpoint.url}")
         return executeWithRetry("POST", endpoint, payload, requiresAuth)
@@ -76,7 +72,7 @@ class KtorNetworkService(
      */
     override suspend fun getRaw(
         endpoint: APIEndpoint,
-        requiresAuth: Boolean
+        requiresAuth: Boolean,
     ): ByteArray {
         logger.debug("GET raw request from: ${endpoint.url}")
         return executeWithRetry("GET", endpoint, null, requiresAuth)
@@ -89,7 +85,7 @@ class KtorNetworkService(
         method: String,
         endpoint: APIEndpoint,
         payload: ByteArray?,
-        requiresAuth: Boolean
+        requiresAuth: Boolean,
     ): ByteArray {
         var attempt = 0
         var lastException: Exception? = null
@@ -99,18 +95,21 @@ class KtorNetworkService(
                 val url = buildFullUrl(endpoint)
                 logger.debug("$method request to: $url (attempt ${attempt + 1}/$maxRetryAttempts)")
 
-                val response: HttpResponse = when (method) {
-                    "GET" -> ktorClient.get(url) {
-                        setupRequest(endpoint, requiresAuth, null)
+                val response: HttpResponse =
+                    when (method) {
+                        "GET" ->
+                            ktorClient.get(url) {
+                                setupRequest(endpoint, requiresAuth, null)
+                            }
+                        "POST" ->
+                            ktorClient.post(url) {
+                                setupRequest(endpoint, requiresAuth, payload)
+                                if (payload != null) {
+                                    setBody(payload)
+                                }
+                            }
+                        else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
                     }
-                    "POST" -> ktorClient.post(url) {
-                        setupRequest(endpoint, requiresAuth, payload)
-                        if (payload != null) {
-                            setBody(payload)
-                        }
-                    }
-                    else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
-                }
 
                 if (response.status.isSuccess()) {
                     logger.debug("$method request successful: $url")
@@ -167,7 +166,7 @@ class KtorNetworkService(
     private suspend fun HttpRequestBuilder.setupRequest(
         endpoint: APIEndpoint,
         requiresAuth: Boolean,
-        payload: ByteArray?
+        payload: ByteArray?,
     ) {
         // Set basic headers
         headers {
@@ -180,11 +179,12 @@ class KtorNetworkService(
 
         // Set content type based on payload
         if (payload != null) {
-            val contentType = if (isJsonPayload(payload)) {
-                ContentType.Application.Json
-            } else {
-                ContentType.Application.OctetStream
-            }
+            val contentType =
+                if (isJsonPayload(payload)) {
+                    ContentType.Application.Json
+                } else {
+                    ContentType.Application.OctetStream
+                }
             contentType(contentType)
         }
 
@@ -202,8 +202,8 @@ class KtorNetworkService(
             when {
                 // Authentication endpoints - DO NOT add Authorization header
                 endpoint.url.contains("/auth/sdk/authenticate") ||
-                endpoint.url.contains("/auth/sdk/refresh") ||
-                endpoint.url.contains("/auth/token") -> {
+                    endpoint.url.contains("/auth/sdk/refresh") ||
+                    endpoint.url.contains("/auth/token") -> {
                     logger.debug("Skipping Authorization header for authentication endpoint: ${endpoint.url}")
                 }
                 // All other endpoints - use access token
@@ -230,13 +230,12 @@ class KtorNetworkService(
     /**
      * Build full URL from endpoint
      */
-    private fun buildFullUrl(endpoint: APIEndpoint): String {
-        return if (endpoint.url.startsWith("http")) {
+    private fun buildFullUrl(endpoint: APIEndpoint): String =
+        if (endpoint.url.startsWith("http")) {
             endpoint.url
         } else {
             "$baseURL${if (!endpoint.url.startsWith("/")) "/" else ""}${endpoint.url}"
         }
-    }
 
     /**
      * Check if payload appears to be JSON
@@ -250,12 +249,17 @@ class KtorNetworkService(
     /**
      * Handle Ktor HTTP errors and create appropriate SDKError
      */
-    private suspend fun handleKtorHttpError(response: HttpResponse, endpoint: APIEndpoint, method: String): SDKError {
-        val responseBody = try {
-            response.bodyAsText()
-        } catch (e: Exception) {
-            null
-        }
+    private suspend fun handleKtorHttpError(
+        response: HttpResponse,
+        endpoint: APIEndpoint,
+        method: String,
+    ): SDKError {
+        val responseBody =
+            try {
+                response.bodyAsText()
+            } catch (e: Exception) {
+                null
+            }
 
         // Log detailed error info for debugging
         logger.error("HTTP ${response.status.value} for $method ${endpoint.url}${if (responseBody != null) ": $responseBody" else ""}")
@@ -265,7 +269,10 @@ class KtorNetworkService(
             403 -> SDKError.InvalidAPIKey("Access forbidden for $method ${endpoint.url}")
             404 -> SDKError.NetworkError("Endpoint not found: $method ${endpoint.url}")
             408 -> SDKError.NetworkError("Request timeout for $method ${endpoint.url}")
-            422 -> SDKError.NetworkError("Validation error for $method ${endpoint.url}${if (responseBody != null) ": $responseBody" else ""}")
+            422 ->
+                SDKError.NetworkError(
+                    "Validation error for $method ${endpoint.url}${if (responseBody != null) ": $responseBody" else ""}",
+                )
             429 -> SDKError.NetworkError("Rate limit exceeded for $method ${endpoint.url}")
             in 500..599 -> SDKError.NetworkError("Server error ${response.status.value} for $method ${endpoint.url}")
             else -> SDKError.NetworkError("HTTP ${response.status.value} for $method ${endpoint.url}")
@@ -275,32 +282,38 @@ class KtorNetworkService(
     /**
      * Determine if we should retry based on HTTP status code
      */
-    private fun shouldRetry(statusCode: Int, attempt: Int): Boolean {
+    private fun shouldRetry(
+        statusCode: Int,
+        attempt: Int,
+    ): Boolean {
         if (attempt >= maxRetryAttempts - 1) return false
 
         return when (statusCode) {
-            408, 429 -> true  // Timeout, Rate limit
-            in 500..599 -> true  // Server errors
-            else -> false  // Client errors should not be retried
+            408, 429 -> true // Timeout, Rate limit
+            in 500..599 -> true // Server errors
+            else -> false // Client errors should not be retried
         }
     }
 
     /**
      * Determine if we should retry based on exception type
      */
-    private fun shouldRetryException(exception: Exception, attempt: Int): Boolean {
+    private fun shouldRetryException(
+        exception: Exception,
+        attempt: Int,
+    ): Boolean {
         if (attempt >= maxRetryAttempts - 1) return false
 
         return when (exception) {
-            is SDKError.InvalidAPIKey -> false  // Don't retry auth errors
+            is SDKError.InvalidAPIKey -> false // Don't retry auth errors
             is SDKError.NetworkError -> {
                 val message = exception.message?.lowercase() ?: ""
                 message.contains("timeout") ||
-                message.contains("connection") ||
-                message.contains("network") ||
-                message.contains("host")
+                    message.contains("connection") ||
+                    message.contains("network") ||
+                    message.contains("host")
             }
-            else -> true  // Retry on other exceptions
+            else -> true // Retry on other exceptions
         }
     }
 
@@ -327,23 +340,25 @@ class KtorNetworkService(
 suspend inline fun <reified T : Any, reified R : Any> KtorNetworkService.postTyped(
     endpoint: APIEndpoint,
     payload: T,
-    requiresAuth: Boolean = true
+    requiresAuth: Boolean = true,
 ): R {
-    val jsonSerializer = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = false
-    }
+    val jsonSerializer =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            encodeDefaults = false
+        }
 
     // Serialize payload to JSON
     val jsonPayload = jsonSerializer.encodeToString(payload)
 
     // Make raw request
-    val responseBytes = this.postRaw(
-        endpoint = endpoint,
-        payload = jsonPayload.encodeToByteArray(),
-        requiresAuth = requiresAuth
-    )
+    val responseBytes =
+        this.postRaw(
+            endpoint = endpoint,
+            payload = jsonPayload.encodeToByteArray(),
+            requiresAuth = requiresAuth,
+        )
 
     // Deserialize response
     val responseString = responseBytes.decodeToString()
@@ -352,18 +367,20 @@ suspend inline fun <reified T : Any, reified R : Any> KtorNetworkService.postTyp
 
 suspend inline fun <reified R : Any> KtorNetworkService.getTyped(
     endpoint: APIEndpoint,
-    requiresAuth: Boolean = true
+    requiresAuth: Boolean = true,
 ): R {
-    val jsonSerializer = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
+    val jsonSerializer =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
 
     // Make raw request
-    val responseBytes = this.getRaw(
-        endpoint = endpoint,
-        requiresAuth = requiresAuth
-    )
+    val responseBytes =
+        this.getRaw(
+            endpoint = endpoint,
+            requiresAuth = requiresAuth,
+        )
 
     // Deserialize response
     val responseString = responseBytes.decodeToString()

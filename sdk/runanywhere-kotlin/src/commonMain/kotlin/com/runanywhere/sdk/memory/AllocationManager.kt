@@ -8,7 +8,6 @@ import kotlinx.coroutines.sync.withLock
  * Tracks loaded models and their memory usage
  */
 class AllocationManager {
-
     private val models = mutableMapOf<String, ModelMemoryInfo>()
     private val mutex = Mutex()
     private var totalAllocated: Long = 0L
@@ -18,14 +17,14 @@ class AllocationManager {
         val size: Long,
         val service: Any,
         val priority: MemoryPriority,
-        var lastAccessed: Long = System.currentTimeMillis()
+        var lastAccessed: Long = System.currentTimeMillis(),
     )
 
     suspend fun registerModel(
         model: MemoryLoadedModel,
         size: Long,
         service: Any,
-        priority: MemoryPriority
+        priority: MemoryPriority,
     ) {
         mutex.withLock {
             models[model.id] = ModelMemoryInfo(model, size, service, priority)
@@ -48,7 +47,10 @@ class AllocationManager {
         }
     }
 
-    suspend fun requestMemory(size: Long, priority: MemoryPriority): Boolean {
+    suspend fun requestMemory(
+        size: Long,
+        priority: MemoryPriority,
+    ): Boolean {
         mutex.withLock {
             // Simple allocation check - can be enhanced with eviction logic
             val memoryMonitor = MemoryMonitor()
@@ -79,19 +81,21 @@ class AllocationManager {
 
     fun getLoadedModelCount(): Int = models.size
 
-    fun getLoadedModels(): List<LoadedModel> {
-        return models.values.map { info ->
+    fun getLoadedModels(): List<LoadedModel> =
+        models.values.map { info ->
             LoadedModel(model = info.model, service = info.service)
         }
-    }
 
     fun getModelsForEviction(targetSize: Long): List<String> {
         // Sort by priority and last accessed time
-        val sortedModels = models.entries
-            .sortedWith(compareBy(
-                { it.value.priority.ordinal },
-                { it.value.lastAccessed }
-            ))
+        val sortedModels =
+            models.entries
+                .sortedWith(
+                    compareBy(
+                        { it.value.priority.ordinal },
+                        { it.value.lastAccessed },
+                    ),
+                )
 
         val modelsToEvict = mutableListOf<String>()
         var freedMemory = 0L

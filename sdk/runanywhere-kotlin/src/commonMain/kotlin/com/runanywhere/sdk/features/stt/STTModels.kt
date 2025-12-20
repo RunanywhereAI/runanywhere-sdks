@@ -2,8 +2,8 @@ package com.runanywhere.sdk.features.stt
 
 import com.runanywhere.sdk.core.AudioFormat
 import com.runanywhere.sdk.core.capabilities.*
-import com.runanywhere.sdk.features.vad.VADOutput
 import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.features.vad.VADOutput
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.flow.Flow
@@ -16,8 +16,9 @@ import kotlinx.coroutines.flow.Flow
 enum class STTServiceAudioFormat {
     /** Service prefers raw ByteArray data */
     DATA,
+
     /** Service prefers FloatArray samples */
-    FLOAT_ARRAY
+    FLOAT_ARRAY,
 }
 
 // MARK: - STT Mode
@@ -25,7 +26,9 @@ enum class STTServiceAudioFormat {
 /**
  * Transcription mode for speech-to-text (matches iOS STTMode exactly)
  */
-enum class STTMode(val value: String) {
+enum class STTMode(
+    val value: String,
+) {
     /**
      * Batch mode: Record all audio first, then transcribe everything at once
      * Best for: Short recordings, offline processing, higher accuracy
@@ -36,35 +39,39 @@ enum class STTMode(val value: String) {
      * Live/Streaming mode: Transcribe audio in real-time as it's recorded
      * Best for: Live captions, real-time feedback, long recordings
      */
-    LIVE("live");
+    LIVE("live"),
+    ;
 
     /**
      * Display name for UI (matches iOS displayName)
      */
     val displayName: String
-        get() = when (this) {
-            BATCH -> "Batch"
-            LIVE -> "Live"
-        }
+        get() =
+            when (this) {
+                BATCH -> "Batch"
+                LIVE -> "Live"
+            }
 
     /**
      * Description of the mode (matches iOS description)
      */
     val description: String
-        get() = when (this) {
-            BATCH -> "Record audio, then transcribe all at once"
-            LIVE -> "Real-time transcription as you speak"
-        }
+        get() =
+            when (this) {
+                BATCH -> "Record audio, then transcribe all at once"
+                LIVE -> "Real-time transcription as you speak"
+            }
 
     /**
      * Icon identifier for the mode (matches iOS icon)
      * Uses SF Symbol names for cross-platform icon lookup
      */
     val icon: String
-        get() = when (this) {
-            BATCH -> "waveform.badge.mic"
-            LIVE -> "waveform"
-        }
+        get() =
+            when (this) {
+                BATCH -> "waveform.badge.mic"
+                LIVE -> "waveform"
+            }
 
     companion object {
         /**
@@ -85,7 +92,7 @@ data class STTResult(
     val language: String? = null,
     val confidence: Float = 1.0f,
     val duration: Double = 0.0,
-    val alternatives: List<STTAlternative> = emptyList()
+    val alternatives: List<STTAlternative> = emptyList(),
 )
 
 /**
@@ -96,7 +103,7 @@ data class STTSegment(
     val startTime: Double,
     val endTime: Double,
     val confidence: Float = 1.0f,
-    val speaker: Int? = null
+    val speaker: Int? = null,
 )
 
 /**
@@ -104,7 +111,7 @@ data class STTSegment(
  */
 data class STTAlternative(
     val text: String,
-    val confidence: Float
+    val confidence: Float,
 )
 
 // MARK: - STT Options
@@ -132,7 +139,7 @@ data class STTOptions(
     /** Sample rate of input audio (default: 16000 Hz for STT models) */
     val sampleRate: Int = 16000,
     /** Preferred framework for transcription (WhisperKit, ONNX, etc.) - matches iOS */
-    val preferredFramework: InferenceFramework? = null
+    val preferredFramework: InferenceFramework? = null,
 ) {
     companion object {
         /**
@@ -150,10 +157,8 @@ data class STTOptions(
 data class STTConfiguration(
     // Component type
     override val componentType: SDKComponent = SDKComponent.STT,
-
     // Model ID
     override val modelId: String? = null,
-
     // Model parameters
     val language: String = "en-US",
     val sampleRate: Int = 16000,
@@ -162,9 +167,9 @@ data class STTConfiguration(
     val vocabularyList: List<String> = emptyList(),
     val maxAlternatives: Int = 1,
     val enableTimestamps: Boolean = true,
-    val useGPUIfAvailable: Boolean = true
-) : ComponentConfiguration, ComponentInitParameters {
-
+    val useGPUIfAvailable: Boolean = true,
+) : ComponentConfiguration,
+    ComponentInitParameters {
     override fun validate() {
         if (sampleRate <= 0 || sampleRate > 48000) {
             throw SDKError.ValidationFailed("Sample rate must be between 1 and 48000 Hz")
@@ -183,23 +188,17 @@ data class STTConfiguration(
 data class STTInput(
     // Audio data to transcribe
     val audioData: ByteArray = byteArrayOf(),
-
     // Audio buffer (alternative to data)
     val audioBuffer: FloatArray? = null,
-
     // Audio format information
     val format: AudioFormat = AudioFormat.WAV,
-
     // Language code override (e.g., "en-US")
     val language: String? = null,
-
     // Optional VAD output for context
     val vadOutput: VADOutput? = null,
-
     // Custom options override
-    val options: STTOptions? = null
+    val options: STTOptions? = null,
 ) : ComponentInput {
-
     override fun validate() {
         if (audioData.isEmpty() && audioBuffer == null) {
             throw SDKError.ValidationFailed("STTInput must contain either audioData or audioBuffer")
@@ -210,13 +209,13 @@ data class STTInput(
         if (this === other) return true
         if (other !is STTInput) return false
         return audioData.contentEquals(other.audioData) &&
-                audioBuffer?.contentEquals(
-                    other.audioBuffer ?: floatArrayOf()
-                ) ?: (other.audioBuffer == null) &&
-                format == other.format &&
-                language == other.language &&
-                vadOutput == other.vadOutput &&
-                options == other.options
+            audioBuffer?.contentEquals(
+                other.audioBuffer ?: floatArrayOf(),
+            ) ?: (other.audioBuffer == null) &&
+            format == other.format &&
+            language == other.language &&
+            vadOutput == other.vadOutput &&
+            options == other.options
     }
 
     override fun hashCode(): Int {
@@ -236,24 +235,18 @@ data class STTInput(
 data class STTOutput(
     /** Transcribed text */
     val text: String,
-
     /** Confidence score (0.0 to 1.0) */
     val confidence: Float,
-
     /** Word-level timestamps if available */
     val wordTimestamps: List<WordTimestamp>? = null,
-
     /** Detected language if auto-detected */
     val detectedLanguage: String? = null,
-
     /** Alternative transcriptions if available */
     val alternatives: List<TranscriptionAlternative>? = null,
-
     /** Processing metadata */
     val metadata: TranscriptionMetadata,
-
     /** Timestamp (required by ComponentOutput) */
-    override val timestamp: Long = getCurrentTimeMillis()
+    override val timestamp: Long = getCurrentTimeMillis(),
 ) : ComponentOutput
 
 // MARK: - Supporting Data Classes
@@ -265,7 +258,7 @@ data class TranscriptionMetadata(
     val modelId: String,
     val processingTime: Double, // in seconds
     val audioLength: Double, // in seconds
-    val realTimeFactor: Double = if (audioLength > 0) processingTime / audioLength else 0.0
+    val realTimeFactor: Double = if (audioLength > 0) processingTime / audioLength else 0.0,
 )
 
 /**
@@ -275,7 +268,7 @@ data class WordTimestamp(
     val word: String,
     val startTime: Double, // in seconds
     val endTime: Double, // in seconds
-    val confidence: Float
+    val confidence: Float,
 )
 
 /**
@@ -283,7 +276,7 @@ data class WordTimestamp(
  */
 data class TranscriptionAlternative(
     val text: String,
-    val confidence: Float
+    val confidence: Float,
 )
 
 /**
@@ -294,18 +287,18 @@ data class STTTranscriptionResult(
     val confidence: Float? = null,
     val timestamps: List<TimestampInfo>? = null,
     val language: String? = null,
-    val alternatives: List<AlternativeTranscription>? = null
+    val alternatives: List<AlternativeTranscription>? = null,
 ) {
     data class TimestampInfo(
         val word: String,
         val startTime: Double, // in seconds
         val endTime: Double, // in seconds
-        val confidence: Float? = null
+        val confidence: Float? = null,
     )
 
     data class AlternativeTranscription(
         val transcript: String,
-        val confidence: Float
+        val confidence: Float,
     )
 }
 
@@ -313,34 +306,51 @@ data class STTTranscriptionResult(
 
 sealed class STTError : Exception() {
     object serviceNotInitialized : STTError()
-    data class transcriptionFailed(override val cause: Throwable) : STTError()
+
+    data class transcriptionFailed(
+        override val cause: Throwable,
+    ) : STTError()
+
     object streamingNotSupported : STTError()
-    data class languageNotSupported(val language: String) : STTError()
-    data class modelNotFound(val model: String) : STTError()
+
+    data class languageNotSupported(
+        val language: String,
+    ) : STTError()
+
+    data class modelNotFound(
+        val model: String,
+    ) : STTError()
+
     object audioFormatNotSupported : STTError()
+
     object insufficientAudioData : STTError()
+
     object noVoiceServiceAvailable : STTError()
+
     object audioSessionNotConfigured : STTError()
+
     object audioSessionActivationFailed : STTError()
+
     object microphonePermissionDenied : STTError()
 
     /**
      * Localized error description (matches iOS errorDescription)
      */
     val errorDescription: String
-        get() = when (this) {
-            is serviceNotInitialized -> "STT service is not initialized"
-            is transcriptionFailed -> "Transcription failed: ${cause.message ?: cause.toString()}"
-            is streamingNotSupported -> "Streaming transcription is not supported"
-            is languageNotSupported -> "Language not supported: $language"
-            is modelNotFound -> "Model not found: $model"
-            is audioFormatNotSupported -> "Audio format is not supported"
-            is insufficientAudioData -> "Insufficient audio data for transcription"
-            is noVoiceServiceAvailable -> "No STT service available for transcription"
-            is audioSessionNotConfigured -> "Audio session is not configured"
-            is audioSessionActivationFailed -> "Failed to activate audio session"
-            is microphonePermissionDenied -> "Microphone permission was denied"
-        }
+        get() =
+            when (this) {
+                is serviceNotInitialized -> "STT service is not initialized"
+                is transcriptionFailed -> "Transcription failed: ${cause.message ?: cause.toString()}"
+                is streamingNotSupported -> "Streaming transcription is not supported"
+                is languageNotSupported -> "Language not supported: $language"
+                is modelNotFound -> "Model not found: $model"
+                is audioFormatNotSupported -> "Audio format is not supported"
+                is insufficientAudioData -> "Insufficient audio data for transcription"
+                is noVoiceServiceAvailable -> "No STT service available for transcription"
+                is audioSessionNotConfigured -> "Audio session is not configured"
+                is audioSessionActivationFailed -> "Failed to activate audio session"
+                is microphonePermissionDenied -> "Microphone permission was denied"
+            }
 
     override val message: String get() = errorDescription
 }
@@ -359,7 +369,10 @@ interface STTService {
     /**
      * Transcribe audio data (batch mode)
      */
-    suspend fun transcribe(audioData: ByteArray, options: STTOptions): STTTranscriptionResult
+    suspend fun transcribe(
+        audioData: ByteArray,
+        options: STTOptions,
+    ): STTTranscriptionResult
 
     /**
      * Stream transcription for real-time processing (live mode)
@@ -368,7 +381,7 @@ interface STTService {
     suspend fun streamTranscribe(
         audioStream: Flow<ByteArray>,
         options: STTOptions,
-        onPartial: (String) -> Unit
+        onPartial: (String) -> Unit,
     ): STTTranscriptionResult
 
     /**
@@ -400,7 +413,9 @@ interface STTService {
 /**
  * Wrapper class to allow protocol-based STT service to work with BaseComponent
  */
-class STTServiceWrapper(service: STTService? = null) : ServiceWrapper<STTService> {
+class STTServiceWrapper(
+    service: STTService? = null,
+) : ServiceWrapper<STTService> {
     override var wrappedService: STTService? = service
 }
 
@@ -415,34 +430,40 @@ class STTServiceWrapper(service: STTService? = null) : ServiceWrapper<STTService
  */
 sealed class STTStreamEvent {
     object SpeechStarted : STTStreamEvent()
+
     object SpeechEnded : STTStreamEvent()
+
     object SilenceDetected : STTStreamEvent()
 
     data class PartialTranscription(
         val text: String,
         val confidence: Float = 0.0f,
         val wordTimestamps: List<WordTimestamp>? = null,
-        val isFinal: Boolean = false
+        val isFinal: Boolean = false,
     ) : STTStreamEvent()
 
-    data class FinalTranscription(val result: STTTranscriptionResult) : STTStreamEvent()
+    data class FinalTranscription(
+        val result: STTTranscriptionResult,
+    ) : STTStreamEvent()
 
     data class LanguageDetected(
         val language: String,
-        val confidence: Float
+        val confidence: Float,
     ) : STTStreamEvent()
 
     data class SpeakerChanged(
         val speakerId: String,
-        val timestamp: Double
+        val timestamp: Double,
     ) : STTStreamEvent()
 
     data class AudioLevelChanged(
         val level: Float, // 0.0 to 1.0
-        val timestamp: Double
+        val timestamp: Double,
     ) : STTStreamEvent()
 
-    data class Error(val error: STTError) : STTStreamEvent()
+    data class Error(
+        val error: STTError,
+    ) : STTStreamEvent()
 }
 
 /**
@@ -459,5 +480,5 @@ data class STTStreamingOptions(
     val audioLevelUpdateInterval: Double = 0.1, // seconds
     val minConfidenceThreshold: Float = 0.3f,
     val endOnSilence: Boolean = true,
-    val maxDuration: Double? = null // Max recording duration
+    val maxDuration: Double? = null, // Max recording duration
 )

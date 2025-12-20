@@ -12,7 +12,6 @@ import java.net.URL
  * This is a temporary solution to avoid Ktor's memory buffering issues
  */
 object AndroidSimpleDownloader {
-
     private val logger = SDKLogger("AndroidSimpleDownloader")
 
     /**
@@ -22,73 +21,73 @@ object AndroidSimpleDownloader {
     suspend fun download(
         url: String,
         destinationPath: String,
-        progressCallback: ((bytesDownloaded: Long, totalBytes: Long) -> Unit)? = null
-    ): Long = withContext(Dispatchers.IO) {
-        logger.info("Starting simple download - url: $url, destination: $destinationPath")
+        progressCallback: ((bytesDownloaded: Long, totalBytes: Long) -> Unit)? = null,
+    ): Long =
+        withContext(Dispatchers.IO) {
+            logger.info("Starting simple download - url: $url, destination: $destinationPath")
 
-        val urlConnection = URL(url).openConnection() as HttpURLConnection
-        urlConnection.requestMethod = "GET"
-        urlConnection.connectTimeout = 30000 // 30 seconds
-        urlConnection.readTimeout = 30000 // 30 seconds
+            val urlConnection = URL(url).openConnection() as HttpURLConnection
+            urlConnection.requestMethod = "GET"
+            urlConnection.connectTimeout = 30000 // 30 seconds
+            urlConnection.readTimeout = 30000 // 30 seconds
 
-        try {
-            urlConnection.connect()
+            try {
+                urlConnection.connect()
 
-            val responseCode = urlConnection.responseCode
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw Exception("HTTP error: $responseCode")
-            }
+                val responseCode = urlConnection.responseCode
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    throw Exception("HTTP error: $responseCode")
+                }
 
-            val totalBytes = urlConnection.contentLengthLong
-            logger.info("Download started - totalBytes: $totalBytes")
+                val totalBytes = urlConnection.contentLengthLong
+                logger.info("Download started - totalBytes: $totalBytes")
 
-            // Create temp file
-            val tempPath = "$destinationPath.tmp"
+                // Create temp file
+                val tempPath = "$destinationPath.tmp"
 
-            FileOutputStream(tempPath).use { output ->
-                urlConnection.inputStream.use { input ->
-                    val buffer = ByteArray(8192) // 8KB buffer
-                    var bytesDownloaded = 0L
-                    var bytesRead: Int
-                    var lastReportTime = System.currentTimeMillis()
+                FileOutputStream(tempPath).use { output ->
+                    urlConnection.inputStream.use { input ->
+                        val buffer = ByteArray(8192) // 8KB buffer
+                        var bytesDownloaded = 0L
+                        var bytesRead: Int
+                        var lastReportTime = System.currentTimeMillis()
 
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                        bytesDownloaded += bytesRead
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            bytesDownloaded += bytesRead
 
-                        // Report progress every 100ms
-                        val currentTime = System.currentTimeMillis()
-                        if (currentTime - lastReportTime >= 100) {
-                            progressCallback?.invoke(bytesDownloaded, totalBytes)
-                            lastReportTime = currentTime
+                            // Report progress every 100ms
+                            val currentTime = System.currentTimeMillis()
+                            if (currentTime - lastReportTime >= 100) {
+                                progressCallback?.invoke(bytesDownloaded, totalBytes)
+                                lastReportTime = currentTime
 
-                            // Log every 10%
-                            if (totalBytes > 0) {
-                                val percent = (bytesDownloaded.toDouble() / totalBytes * 100).toInt()
-                                if (percent % 10 == 0) {
-                                    logger.debug("Download progress: $percent% ($bytesDownloaded / $totalBytes bytes)")
+                                // Log every 10%
+                                if (totalBytes > 0) {
+                                    val percent = (bytesDownloaded.toDouble() / totalBytes * 100).toInt()
+                                    if (percent % 10 == 0) {
+                                        logger.debug("Download progress: $percent% ($bytesDownloaded / $totalBytes bytes)")
+                                    }
                                 }
                             }
                         }
+
+                        logger.info("Download completed - bytesDownloaded: $bytesDownloaded")
                     }
-
-                    logger.info("Download completed - bytesDownloaded: $bytesDownloaded")
                 }
+
+                // Move temp to final destination
+                val tempFile = java.io.File(tempPath)
+                val destFile = java.io.File(destinationPath)
+                destFile.parentFile?.mkdirs()
+                tempFile.renameTo(destFile)
+
+                val finalSize = destFile.length()
+                logger.info("File moved to destination - size: $finalSize")
+
+                finalSize
+            } finally {
+                urlConnection.disconnect()
             }
-
-            // Move temp to final destination
-            val tempFile = java.io.File(tempPath)
-            val destFile = java.io.File(destinationPath)
-            destFile.parentFile?.mkdirs()
-            tempFile.renameTo(destFile)
-
-            val finalSize = destFile.length()
-            logger.info("File moved to destination - size: $finalSize")
-
-            finalSize
-
-        } finally {
-            urlConnection.disconnect()
         }
-    }
 }

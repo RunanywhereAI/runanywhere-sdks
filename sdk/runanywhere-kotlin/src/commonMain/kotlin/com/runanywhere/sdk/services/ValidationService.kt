@@ -9,21 +9,27 @@ import com.runanywhere.sdk.storage.FileSystem
  * Provides model file validation, integrity checks, and format verification
  */
 class ValidationService(
-    private val fileSystem: FileSystem
+    private val fileSystem: FileSystem,
 ) {
     private val logger = SDKLogger("ValidationService")
 
     companion object {
         private val SUPPORTED_EXTENSIONS = setOf("gguf", "bin", "mlmodel")
-        private val WHISPER_MODEL_SIGNATURES = setOf(
-            "whisper", "openai_whisper", "whisperkit"
-        )
+        private val WHISPER_MODEL_SIGNATURES =
+            setOf(
+                "whisper",
+                "openai_whisper",
+                "whisperkit",
+            )
     }
 
     /**
      * Validate a downloaded model file
      */
-    suspend fun validateModel(model: ModelInfo, filePath: String): ValidationResult {
+    suspend fun validateModel(
+        model: ModelInfo,
+        filePath: String,
+    ): ValidationResult {
         try {
             logger.info("Validating model ${model.id} at $filePath")
 
@@ -56,12 +62,13 @@ class ValidationService(
             }
 
             // Check if it's a valid model file based on content
-            val isValidFormat = when (extension) {
-                "gguf" -> validateGGUFFile(filePath)
-                "mlmodel" -> validateMLModelFile(filePath)
-                "bin" -> validateBinaryFile(filePath)
-                else -> true // Default to valid for unknown extensions
-            }
+            val isValidFormat =
+                when (extension) {
+                    "gguf" -> validateGGUFFile(filePath)
+                    "mlmodel" -> validateMLModelFile(filePath)
+                    "bin" -> validateBinaryFile(filePath)
+                    else -> true // Default to valid for unknown extensions
+                }
 
             if (!isValidFormat) {
                 return ValidationResult.Invalid("Invalid file format for extension: $extension")
@@ -77,7 +84,6 @@ class ValidationService(
 
             logger.info("Model validation successful for ${model.id}")
             return ValidationResult.Valid(filePath)
-
         } catch (e: Exception) {
             logger.error("Error during model validation", e)
             return ValidationResult.Invalid("Validation failed: ${e.message}")
@@ -114,8 +120,8 @@ class ValidationService(
     /**
      * Validate ML Model file format (Core ML)
      */
-    private suspend fun validateMLModelFile(filePath: String): Boolean {
-        return try {
+    private suspend fun validateMLModelFile(filePath: String): Boolean =
+        try {
             // For Core ML models, check if it's a directory with required files
             if (fileSystem.isDirectory(filePath)) {
                 val requiredFiles = listOf("model.mlmodel", "metadata.json")
@@ -130,20 +136,18 @@ class ValidationService(
             logger.error("Error validating MLModel file", e)
             false
         }
-    }
 
     /**
      * Validate generic binary file
      */
-    private suspend fun validateBinaryFile(filePath: String): Boolean {
-        return try {
+    private suspend fun validateBinaryFile(filePath: String): Boolean =
+        try {
             // Basic validation - file exists and has content
             fileSystem.exists(filePath) && fileSystem.fileSize(filePath) > 0
         } catch (e: Exception) {
             logger.error("Error validating binary file", e)
             false
         }
-    }
 
     /**
      * Check if model is a Whisper model
@@ -160,8 +164,8 @@ class ValidationService(
     /**
      * Validate Whisper model specific requirements
      */
-    private suspend fun validateWhisperModel(filePath: String): ValidationResult {
-        return try {
+    private suspend fun validateWhisperModel(filePath: String): ValidationResult =
+        try {
             // For Whisper models, ensure minimum size (tiny model is ~39MB)
             val minSize = 10 * 1024 * 1024 // 10MB minimum
             val fileSize = fileSystem.fileSize(filePath)
@@ -174,25 +178,26 @@ class ValidationService(
         } catch (e: Exception) {
             ValidationResult.Invalid("Whisper validation failed: ${e.message}")
         }
-    }
 
     /**
      * Calculate MD5 checksum for a file
      */
-    suspend fun calculateChecksum(filePath: String): String {
-        return try {
+    suspend fun calculateChecksum(filePath: String): String =
+        try {
             val data = fileSystem.readBytes(filePath)
             calculateMD5(data)
         } catch (e: Exception) {
             logger.error("Error calculating checksum for $filePath", e)
             throw e
         }
-    }
 
     /**
      * Validate checksum if provided
      */
-    suspend fun validateChecksum(filePath: String, expectedChecksum: String?): Boolean {
+    suspend fun validateChecksum(
+        filePath: String,
+        expectedChecksum: String?,
+    ): Boolean {
         if (expectedChecksum.isNullOrBlank()) {
             logger.info("No checksum provided, skipping validation")
             return true
@@ -209,7 +214,6 @@ class ValidationService(
             }
 
             isValid
-
         } catch (e: Exception) {
             logger.error("Error during checksum validation", e)
             false
@@ -222,11 +226,15 @@ class ValidationService(
     sealed class ValidationResult {
         abstract val isValid: Boolean
 
-        data class Valid(val filePath: String) : ValidationResult() {
+        data class Valid(
+            val filePath: String,
+        ) : ValidationResult() {
             override val isValid: Boolean = true
         }
 
-        data class Invalid(val reason: String) : ValidationResult() {
+        data class Invalid(
+            val reason: String,
+        ) : ValidationResult() {
             override val isValid: Boolean = false
         }
     }

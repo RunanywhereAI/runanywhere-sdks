@@ -1,10 +1,9 @@
 package com.runanywhere.sdk.network
 
-import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.delay
 
 /**
  * Circuit breaker pattern implementation for network resilience
@@ -15,9 +14,8 @@ class CircuitBreaker(
     private val failureThreshold: Int = 5,
     private val recoveryTimeoutMs: Long = 30_000, // 30 seconds
     private val halfOpenMaxCalls: Int = 3,
-    private val name: String = "CircuitBreaker"
+    private val name: String = "CircuitBreaker",
 ) {
-
     private val logger = SDKLogger("CircuitBreaker[$name]")
     private val mutex = Mutex()
 
@@ -71,8 +69,8 @@ class CircuitBreaker(
     /**
      * Execute operation and handle success/failure
      */
-    private suspend fun <T> executeAndHandleResult(operation: suspend () -> T): T {
-        return try {
+    private suspend fun <T> executeAndHandleResult(operation: suspend () -> T): T =
+        try {
             val result = operation()
             onSuccess()
             result
@@ -80,7 +78,6 @@ class CircuitBreaker(
             onFailure(e)
             throw e
         }
-    }
 
     /**
      * Handle successful operation
@@ -146,48 +143,44 @@ class CircuitBreaker(
     /**
      * Check if enough time has passed to attempt reset
      */
-    private fun shouldAttemptReset(): Boolean {
-        return System.currentTimeMillis() - lastFailureTime >= recoveryTimeoutMs
-    }
+    private fun shouldAttemptReset(): Boolean = System.currentTimeMillis() - lastFailureTime >= recoveryTimeoutMs
 
     /**
      * Determine if an exception should count towards circuit breaker failures
      * Only network-related and server errors should trigger the circuit breaker
      */
-    private fun isFailureCountable(exception: Exception): Boolean {
-        return when (exception) {
+    private fun isFailureCountable(exception: Exception): Boolean =
+        when (exception) {
             is SDKError.NetworkError -> {
                 val message = exception.message?.lowercase() ?: ""
                 // Count timeouts, connection errors, and server errors
                 message.contains("timeout") ||
-                message.contains("connection") ||
-                message.contains("server error") ||
-                message.contains("rate limit") ||
-                message.contains("service unavailable")
+                    message.contains("connection") ||
+                    message.contains("server error") ||
+                    message.contains("rate limit") ||
+                    message.contains("service unavailable")
             }
-            is SDKError.InvalidAPIKey -> false  // Auth errors shouldn't trigger circuit breaker
+            is SDKError.InvalidAPIKey -> false // Auth errors shouldn't trigger circuit breaker
             else -> {
                 // Count general network-related exceptions
                 val exceptionName = exception::class.simpleName?.lowercase() ?: ""
                 exceptionName.contains("timeout") ||
-                exceptionName.contains("connection") ||
-                exceptionName.contains("socket") ||
-                exceptionName.contains("network")
+                    exceptionName.contains("connection") ||
+                    exceptionName.contains("socket") ||
+                    exceptionName.contains("network")
             }
         }
-    }
 
     /**
      * Get current circuit breaker status
      */
-    fun getStatus(): CircuitBreakerStatus {
-        return CircuitBreakerStatus(
+    fun getStatus(): CircuitBreakerStatus =
+        CircuitBreakerStatus(
             state = state,
             failureCount = failureCount,
             lastFailureTime = lastFailureTime,
-            halfOpenCallsCount = halfOpenCallsCount
+            halfOpenCallsCount = halfOpenCallsCount,
         )
-    }
 
     /**
      * Manually reset the circuit breaker (for testing or admin purposes)
@@ -218,9 +211,9 @@ class CircuitBreaker(
  * Circuit breaker states
  */
 enum class CircuitBreakerState {
-    CLOSED,    // Normal operation
-    OPEN,      // Blocking all calls due to failures
-    HALF_OPEN  // Testing if service has recovered
+    CLOSED, // Normal operation
+    OPEN, // Blocking all calls due to failures
+    HALF_OPEN, // Testing if service has recovered
 }
 
 /**
@@ -230,17 +223,18 @@ data class CircuitBreakerStatus(
     val state: CircuitBreakerState,
     val failureCount: Int,
     val lastFailureTime: Long,
-    val halfOpenCallsCount: Int
+    val halfOpenCallsCount: Int,
 ) {
     val isHealthy: Boolean
         get() = state == CircuitBreakerState.CLOSED && failureCount == 0
 
     val timeUntilRetryMs: Long
-        get() = if (state == CircuitBreakerState.OPEN) {
-            maxOf(0, 30_000 - (System.currentTimeMillis() - lastFailureTime))
-        } else {
-            0
-        }
+        get() =
+            if (state == CircuitBreakerState.OPEN) {
+                maxOf(0, 30_000 - (System.currentTimeMillis() - lastFailureTime))
+            } else {
+                0
+            }
 }
 
 /**
@@ -263,30 +257,28 @@ object CircuitBreakerRegistry {
         name: String,
         failureThreshold: Int = 5,
         recoveryTimeoutMs: Long = 30_000,
-        halfOpenMaxCalls: Int = 3
-    ): CircuitBreaker {
-        return synchronized(_circuitBreakers) {
+        halfOpenMaxCalls: Int = 3,
+    ): CircuitBreaker =
+        synchronized(_circuitBreakers) {
             _circuitBreakers.getOrPut(name) {
                 logger.info("Creating new circuit breaker for service: $name")
                 CircuitBreaker(
                     failureThreshold = failureThreshold,
                     recoveryTimeoutMs = recoveryTimeoutMs,
                     halfOpenMaxCalls = halfOpenMaxCalls,
-                    name = name
+                    name = name,
                 )
             }
         }
-    }
 
     /**
      * Get all circuit breaker statuses
      * Thread-safe: Returns a snapshot of current statuses
      */
-    fun getAllStatuses(): Map<String, CircuitBreakerStatus> {
-        return synchronized(_circuitBreakers) {
+    fun getAllStatuses(): Map<String, CircuitBreakerStatus> =
+        synchronized(_circuitBreakers) {
             _circuitBreakers.mapValues { it.value.getStatus() }
         }
-    }
 
     /**
      * Reset all circuit breakers
@@ -294,9 +286,10 @@ object CircuitBreakerRegistry {
      */
     suspend fun resetAll() {
         logger.info("Resetting all circuit breakers")
-        val breakers = synchronized(_circuitBreakers) {
-            _circuitBreakers.values.toList()
-        }
+        val breakers =
+            synchronized(_circuitBreakers) {
+                _circuitBreakers.values.toList()
+            }
         breakers.forEach { it.reset() }
     }
 

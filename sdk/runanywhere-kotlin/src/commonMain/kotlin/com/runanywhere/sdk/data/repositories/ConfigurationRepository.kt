@@ -43,13 +43,9 @@ interface ConfigurationRepository {
     suspend fun syncToRemote(configuration: ConfigurationData)
 
     // Legacy methods for backward compatibility
-    suspend fun getConfiguration(): ConfigurationData? {
-        return getLocalConfiguration()
-    }
+    suspend fun getConfiguration(): ConfigurationData? = getLocalConfiguration()
 
-    suspend fun saveConfiguration(configuration: ConfigurationData) {
-        return saveLocalConfiguration(configuration)
-    }
+    suspend fun saveConfiguration(configuration: ConfigurationData) = saveLocalConfiguration(configuration)
 
     suspend fun clearConfiguration() {
         // Implementation specific - clear local storage

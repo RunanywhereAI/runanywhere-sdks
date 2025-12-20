@@ -77,7 +77,7 @@ object WhisperJNI {
         audioData: FloatArray,
         language: String?,
         enableTimestamps: Boolean,
-        enableTranslate: Boolean
+        enableTranslate: Boolean,
     ): WhisperResult
 
     /**
@@ -90,7 +90,7 @@ object WhisperJNI {
     external fun whisperTranscribeWithParams(
         contextHandle: Long,
         audioData: FloatArray,
-        params: WhisperParams
+        params: WhisperParams,
     ): WhisperResult
 
     /**
@@ -117,7 +117,7 @@ object WhisperJNI {
     external fun convertPcmToFloat(
         pcmData: ByteArray,
         sampleRate: Int,
-        targetSampleRate: Int
+        targetSampleRate: Int,
     ): FloatArray
 
     /**
@@ -157,7 +157,7 @@ data class WhisperModelInfo(
     val nTextState: Int,
     val nTextHead: Int,
     val nTextLayer: Int,
-    val isMultilingual: Boolean
+    val isMultilingual: Boolean,
 )
 
 /**
@@ -181,7 +181,7 @@ data class WhisperParams(
     val compressionRatioThreshold: Float = 2.4f,
     val prompt: String? = null,
     val suppressBlank: Boolean = true,
-    val suppressNonSpeech: Boolean = false
+    val suppressNonSpeech: Boolean = false,
 )
 
 /**
@@ -193,7 +193,7 @@ data class WhisperResult(
     val language: String,
     val segments: List<WhisperSegment> = emptyList(),
     val languageProbs: Map<String, Float> = emptyMap(),
-    val processingTimeMs: Long = 0
+    val processingTimeMs: Long = 0,
 )
 
 /**
@@ -203,9 +203,9 @@ data class WhisperResult(
 data class WhisperSegment(
     val text: String,
     val startTime: Double, // seconds
-    val endTime: Double,   // seconds
+    val endTime: Double, // seconds
     val confidence: Float = 1.0f,
-    val tokens: List<WhisperToken> = emptyList()
+    val tokens: List<WhisperToken> = emptyList(),
 )
 
 /**
@@ -217,7 +217,7 @@ data class WhisperToken(
     val startTime: Double,
     val endTime: Double,
     val confidence: Float,
-    val id: Int
+    val id: Int,
 )
 
 /**
@@ -226,7 +226,7 @@ data class WhisperToken(
 @Serializable
 data class WhisperLanguageProb(
     val language: String,
-    val probability: Float
+    val probability: Float,
 )
 
 /**
@@ -304,27 +304,28 @@ class WhisperService {
         audioData: FloatArray,
         language: String? = null,
         enableTimestamps: Boolean = false,
-        enableTranslate: Boolean = false
+        enableTranslate: Boolean = false,
     ): WhisperResult {
         if (!isInitialized) {
             throw IllegalStateException("Whisper service not initialized")
         }
 
         return try {
-            val result = WhisperJNI.whisperTranscribe(
-                contextHandle = contextHandle,
-                audioData = audioData,
-                language = language,
-                enableTimestamps = enableTimestamps,
-                enableTranslate = enableTranslate
-            )
+            val result =
+                WhisperJNI.whisperTranscribe(
+                    contextHandle = contextHandle,
+                    audioData = audioData,
+                    language = language,
+                    enableTimestamps = enableTimestamps,
+                    enableTranslate = enableTranslate,
+                )
             logger.debug("Transcription completed: ${result.text.take(50)}...")
             result
         } catch (e: Exception) {
             logger.error("Error during transcription", e)
             WhisperResult(
                 text = "",
-                language = language ?: "unknown"
+                language = language ?: "unknown",
             )
         }
     }
@@ -334,25 +335,26 @@ class WhisperService {
      */
     suspend fun transcribeWithParams(
         audioData: FloatArray,
-        params: WhisperParams
+        params: WhisperParams,
     ): WhisperResult {
         if (!isInitialized) {
             throw IllegalStateException("Whisper service not initialized")
         }
 
         return try {
-            val result = WhisperJNI.whisperTranscribeWithParams(
-                contextHandle = contextHandle,
-                audioData = audioData,
-                params = params
-            )
+            val result =
+                WhisperJNI.whisperTranscribeWithParams(
+                    contextHandle = contextHandle,
+                    audioData = audioData,
+                    params = params,
+                )
             logger.debug("Advanced transcription completed: ${result.text.take(50)}...")
             result
         } catch (e: Exception) {
             logger.error("Error during advanced transcription", e)
             WhisperResult(
                 text = "",
-                language = params.language ?: "unknown"
+                language = params.language ?: "unknown",
             )
         }
     }
@@ -360,9 +362,10 @@ class WhisperService {
     /**
      * Convert PCM audio to float array suitable for whisper
      */
-    fun convertPcmAudio(pcmData: ByteArray, sampleRate: Int): FloatArray {
-        return WhisperJNI.convertPcmToFloat(pcmData, sampleRate, 16000)
-    }
+    fun convertPcmAudio(
+        pcmData: ByteArray,
+        sampleRate: Int,
+    ): FloatArray = WhisperJNI.convertPcmToFloat(pcmData, sampleRate, 16000)
 
     /**
      * Get detected language probabilities

@@ -3,48 +3,45 @@ package com.runanywhere.sdk.data.repositories
 import com.runanywhere.sdk.data.database.RunAnywhereDatabase
 import com.runanywhere.sdk.data.database.entities.DeviceInfoEntity
 import com.runanywhere.sdk.data.models.DeviceInfoData
-import com.runanywhere.sdk.data.repositories.DeviceInfoRepository
 import com.runanywhere.sdk.foundation.SDKLogger
 
 /**
  * Android implementation of DeviceInfoRepository using Room database
  */
 class DeviceInfoRepositoryImpl(
-    private val database: RunAnywhereDatabase
+    private val database: RunAnywhereDatabase,
 ) : DeviceInfoRepository {
-
     private val logger = SDKLogger("DeviceInfoRepository")
 
-    override suspend fun getCurrentDeviceInfo(): DeviceInfoData? {
-        return try {
+    override suspend fun getCurrentDeviceInfo(): DeviceInfoData? =
+        try {
             val entity = database.deviceInfoDao().getCurrentDeviceInfo()
             entity?.toDeviceInfoData()
         } catch (e: Exception) {
             logger.error("Failed to get device info from database", e)
             null
         }
-    }
 
     // Additional helper methods (not from interface)
-    suspend fun getDeviceInfoByDeviceId(deviceId: String): DeviceInfoData? {
-        return try {
+    suspend fun getDeviceInfoByDeviceId(deviceId: String): DeviceInfoData? =
+        try {
             val entity = database.deviceInfoDao().getDeviceInfoById(deviceId)
             entity?.toDeviceInfoData()
         } catch (e: Exception) {
             logger.error("Failed to get device info by ID from database", e)
             null
         }
-    }
 
-    suspend fun getAllDeviceInfo(): List<DeviceInfoData> {
-        return try {
-            database.deviceInfoDao().getAllDeviceInfo()
+    suspend fun getAllDeviceInfo(): List<DeviceInfoData> =
+        try {
+            database
+                .deviceInfoDao()
+                .getAllDeviceInfo()
                 .map { it.toDeviceInfoData() }
         } catch (e: Exception) {
             logger.error("Failed to get all device info from database", e)
             emptyList()
         }
-    }
 
     override suspend fun saveDeviceInfo(deviceInfo: DeviceInfoData) {
         try {
@@ -88,14 +85,13 @@ class DeviceInfoRepositoryImpl(
         }
     }
 
-    suspend fun getDeviceInfoCount(): Int {
-        return try {
+    suspend fun getDeviceInfoCount(): Int =
+        try {
             database.deviceInfoDao().getDeviceInfoCount()
         } catch (e: Exception) {
             logger.error("Failed to get device info count from database", e)
             0
         }
-    }
 
     suspend fun deleteOldDeviceInfo(olderThanTimestamp: Long) {
         try {

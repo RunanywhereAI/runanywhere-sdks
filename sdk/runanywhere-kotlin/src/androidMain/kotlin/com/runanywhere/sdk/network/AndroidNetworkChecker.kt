@@ -8,29 +8,31 @@ import com.runanywhere.sdk.foundation.SDKLogger
 /**
  * Android implementation of NetworkChecker
  */
-class AndroidNetworkChecker(private val context: Context) : NetworkChecker {
+class AndroidNetworkChecker(
+    private val context: Context,
+) : NetworkChecker {
     private val logger = SDKLogger("AndroidNetworkChecker")
 
-    override suspend fun isNetworkAvailable(): Boolean {
-        return try {
+    override suspend fun isNetworkAvailable(): Boolean =
+        try {
             val connectivityManager =
                 context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             val network = connectivityManager.activeNetwork
             val capabilities = connectivityManager.getNetworkCapabilities(network)
 
-            capabilities != null && (
+            capabilities != null &&
+                (
                     capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
-                    )
+                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                )
         } catch (e: Exception) {
             logger.error("Failed to check network availability - ${e.message}")
             false
         }
-    }
 
-    override suspend fun getNetworkType(): String {
-        return try {
+    override suspend fun getNetworkType(): String =
+        try {
             val connectivityManager =
                 context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             val network = connectivityManager.activeNetwork
@@ -47,5 +49,4 @@ class AndroidNetworkChecker(private val context: Context) : NetworkChecker {
             logger.error("Failed to get network type - ${e.message}")
             "unknown"
         }
-    }
 }

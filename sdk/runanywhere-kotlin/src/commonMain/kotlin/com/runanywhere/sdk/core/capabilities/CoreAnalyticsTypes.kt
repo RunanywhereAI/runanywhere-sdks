@@ -30,21 +30,22 @@ interface AnalyticsMetrics {
  * Note: This is for analytics tracking. For the main framework enum, see
  * [com.runanywhere.sdk.models.enums.InferenceFramework]
  */
-enum class InferenceFrameworkType(val value: String) {
+enum class InferenceFrameworkType(
+    val value: String,
+) {
     LLAMA_CPP("llama_cpp"),
     WHISPER_KIT("whisper_kit"),
     ONNX("onnx"),
     CORE_ML("core_ml"),
     FOUNDATION_MODELS("foundation_models"),
     MLX("mlx"),
-    BUILT_IN("built_in"),  // For simple services like energy-based VAD
-    NONE("none"),          // For services that don't use a model
-    UNKNOWN("unknown");
+    BUILT_IN("built_in"), // For simple services like energy-based VAD
+    NONE("none"), // For services that don't use a model
+    UNKNOWN("unknown"),
+    ;
 
     companion object {
-        fun fromValue(value: String): InferenceFrameworkType {
-            return entries.find { it.value == value } ?: UNKNOWN
-        }
+        fun fromValue(value: String): InferenceFrameworkType = entries.find { it.value == value } ?: UNKNOWN
     }
 }
 
@@ -54,7 +55,9 @@ enum class InferenceFrameworkType(val value: String) {
  * Event types for model lifecycle across all capabilities.
  * Matches iOS ModelLifecycleEventType enum.
  */
-enum class ModelLifecycleEventType(val value: String) {
+enum class ModelLifecycleEventType(
+    val value: String,
+) {
     LOADING_STARTED("model_loading_started"),
     LOAD_COMPLETED("model_load_completed"),
     LOAD_FAILED("model_load_failed"),
@@ -63,12 +66,11 @@ enum class ModelLifecycleEventType(val value: String) {
     DOWNLOAD_PROGRESS("model_download_progress"),
     DOWNLOAD_COMPLETED("model_download_completed"),
     DOWNLOAD_FAILED("model_download_failed"),
-    ERROR("model_lifecycle_error");
+    ERROR("model_lifecycle_error"),
+    ;
 
     companion object {
-        fun fromValue(value: String): ModelLifecycleEventType? {
-            return entries.find { it.value == value }
-        }
+        fun fromValue(value: String): ModelLifecycleEventType? = entries.find { it.value == value }
     }
 }
 
@@ -85,11 +87,11 @@ data class ModelLifecycleMetrics(
     val totalLoads: Int = 0,
     val successfulLoads: Int = 0,
     val failedLoads: Int = 0,
-    val averageLoadTimeMs: Double = -1.0,  // -1 indicates N/A for services without models
+    val averageLoadTimeMs: Double = -1.0, // -1 indicates N/A for services without models
     val totalUnloads: Int = 0,
     val totalDownloads: Int = 0,
     val successfulDownloads: Int = 0,
     val failedDownloads: Int = 0,
     val totalBytesDownloaded: Long = 0,
-    val framework: InferenceFrameworkType = InferenceFrameworkType.UNKNOWN
+    val framework: InferenceFrameworkType = InferenceFrameworkType.UNKNOWN,
 ) : AnalyticsMetrics

@@ -7,7 +7,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * Applies defaults and ensures options are within valid ranges
  */
 class GenerationOptionsResolver {
-
     private val logger = SDKLogger("GenerationOptionsResolver")
 
     companion object {
@@ -38,7 +37,7 @@ class GenerationOptionsResolver {
             topK = clampTopK(input.topK),
             stopSequences = input.stopSequences,
             streaming = input.streaming,
-            seed = input.seed
+            seed = input.seed,
         )
     }
 
@@ -47,7 +46,7 @@ class GenerationOptionsResolver {
      */
     fun merge(
         base: GenerationOptions,
-        override: GenerationOptions?
+        override: GenerationOptions?,
     ): GenerationOptions {
         if (override == null) return base
 
@@ -57,58 +56,63 @@ class GenerationOptionsResolver {
             maxTokens = override.maxTokens,
             topP = override.topP,
             topK = override.topK,
-            stopSequences = if (override.stopSequences.isNotEmpty()) {
-                override.stopSequences
-            } else {
-                base.stopSequences
-            },
+            stopSequences =
+                if (override.stopSequences.isNotEmpty()) {
+                    override.stopSequences
+                } else {
+                    base.stopSequences
+                },
             streaming = override.streaming,
-            seed = override.seed ?: base.seed
+            seed = override.seed ?: base.seed,
         )
     }
 
     /**
      * Create options optimized for different use cases
      */
-    fun createForUseCase(useCase: GenerationUseCase): GenerationOptions {
-        return when (useCase) {
-            GenerationUseCase.CREATIVE_WRITING -> GenerationOptions(
-                temperature = 0.9f,
-                topP = 0.95f,
-                topK = 50,
-                maxTokens = 2000
-            )
+    fun createForUseCase(useCase: GenerationUseCase): GenerationOptions =
+        when (useCase) {
+            GenerationUseCase.CREATIVE_WRITING ->
+                GenerationOptions(
+                    temperature = 0.9f,
+                    topP = 0.95f,
+                    topK = 50,
+                    maxTokens = 2000,
+                )
 
-            GenerationUseCase.CODE_GENERATION -> GenerationOptions(
-                temperature = 0.3f,
-                topP = 0.9f,
-                topK = 20,
-                maxTokens = 1500,
-                stopSequences = listOf("```", "\n\n\n")
-            )
+            GenerationUseCase.CODE_GENERATION ->
+                GenerationOptions(
+                    temperature = 0.3f,
+                    topP = 0.9f,
+                    topK = 20,
+                    maxTokens = 1500,
+                    stopSequences = listOf("```", "\n\n\n"),
+                )
 
-            GenerationUseCase.FACTUAL_QA -> GenerationOptions(
-                temperature = 0.1f,
-                topP = 0.8f,
-                topK = 10,
-                maxTokens = 500
-            )
+            GenerationUseCase.FACTUAL_QA ->
+                GenerationOptions(
+                    temperature = 0.1f,
+                    topP = 0.8f,
+                    topK = 10,
+                    maxTokens = 500,
+                )
 
-            GenerationUseCase.CONVERSATION -> GenerationOptions(
-                temperature = 0.7f,
-                topP = 0.9f,
-                topK = 40,
-                maxTokens = 1000
-            )
+            GenerationUseCase.CONVERSATION ->
+                GenerationOptions(
+                    temperature = 0.7f,
+                    topP = 0.9f,
+                    topK = 40,
+                    maxTokens = 1000,
+                )
 
-            GenerationUseCase.SUMMARIZATION -> GenerationOptions(
-                temperature = 0.3f,
-                topP = 0.85f,
-                topK = 20,
-                maxTokens = 300
-            )
+            GenerationUseCase.SUMMARIZATION ->
+                GenerationOptions(
+                    temperature = 0.3f,
+                    topP = 0.85f,
+                    topK = 20,
+                    maxTokens = 300,
+                )
         }
-    }
 
     // Private validation methods
 
@@ -117,41 +121,37 @@ class GenerationOptionsResolver {
         return model
     }
 
-    private fun clampTemperature(temp: Float): Float {
-        return if (temp in TEMPERATURE_RANGE) {
+    private fun clampTemperature(temp: Float): Float =
+        if (temp in TEMPERATURE_RANGE) {
             temp
         } else {
             logger.warning("Temperature $temp out of range, using default")
             DEFAULT_TEMPERATURE
         }
-    }
 
-    private fun clampMaxTokens(tokens: Int): Int {
-        return if (tokens in MAX_TOKENS_RANGE) {
+    private fun clampMaxTokens(tokens: Int): Int =
+        if (tokens in MAX_TOKENS_RANGE) {
             tokens
         } else {
             logger.warning("Max tokens $tokens out of range, using default")
             DEFAULT_MAX_TOKENS
         }
-    }
 
-    private fun clampTopP(topP: Float): Float {
-        return if (topP in TOP_P_RANGE) {
+    private fun clampTopP(topP: Float): Float =
+        if (topP in TOP_P_RANGE) {
             topP
         } else {
             logger.warning("Top-p $topP out of range, using default")
             DEFAULT_TOP_P
         }
-    }
 
-    private fun clampTopK(topK: Int): Int {
-        return if (topK in TOP_K_RANGE) {
+    private fun clampTopK(topK: Int): Int =
+        if (topK in TOP_K_RANGE) {
             topK
         } else {
             logger.warning("Top-k $topK out of range, using default")
             DEFAULT_TOP_K
         }
-    }
 }
 
 /**
@@ -162,5 +162,5 @@ enum class GenerationUseCase {
     CODE_GENERATION,
     FACTUAL_QA,
     CONVERSATION,
-    SUMMARIZATION
+    SUMMARIZATION,
 }

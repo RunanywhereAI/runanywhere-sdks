@@ -11,7 +11,6 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.security.MessageDigest
 
 /**
  * JVM Model Storage implementation for WhisperJNI models.
@@ -23,30 +22,33 @@ class JvmModelStorage {
     private val logger = SDKLogger("JvmModelStorage")
 
     // Model storage directory (following iOS pattern)
-    private val modelStorageDir: Path = Paths.get(
-        System.getProperty("user.home"),
-        ".runanywhere",
-        "models"
-    )
+    private val modelStorageDir: Path =
+        Paths.get(
+            System.getProperty("user.home"),
+            ".runanywhere",
+            "models",
+        )
 
     // Whisper model download URLs (standard whisper.cpp models)
-    private val modelDownloadUrls = mapOf(
-        "ggml-tiny.bin" to "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
-        "ggml-base.bin" to "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
-        "ggml-small.bin" to "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
-        "ggml-medium.bin" to "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
-        "ggml-large-v3.bin" to "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin"
-    )
+    private val modelDownloadUrls =
+        mapOf(
+            "ggml-tiny.bin" to "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+            "ggml-base.bin" to "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+            "ggml-small.bin" to "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+            "ggml-medium.bin" to "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
+            "ggml-large-v3.bin" to "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
+        )
 
     // Expected model sizes for validation (in bytes)
     // Updated sizes based on actual Hugging Face repository
-    private val modelSizes = mapOf(
-        "ggml-tiny.bin" to 77_700_000L,      // ~77.7 MB
-        "ggml-base.bin" to 147_951_465L,     // ~148 MB (exact size from logs)
-        "ggml-small.bin" to 488_000_000L,    // ~488 MB
-        "ggml-medium.bin" to 1_530_000_000L, // ~1.53 GB
-        "ggml-large-v3.bin" to 3_100_000_000L // ~3.1 GB
-    )
+    private val modelSizes =
+        mapOf(
+            "ggml-tiny.bin" to 77_700_000L, // ~77.7 MB
+            "ggml-base.bin" to 147_951_465L, // ~148 MB (exact size from logs)
+            "ggml-small.bin" to 488_000_000L, // ~488 MB
+            "ggml-medium.bin" to 1_530_000_000L, // ~1.53 GB
+            "ggml-large-v3.bin" to 3_100_000_000L, // ~3.1 GB
+        )
 
     init {
         // Ensure storage directory exists
@@ -83,54 +85,55 @@ class JvmModelStorage {
      * Download a model with progress tracking (iOS pattern)
      * Returns Flow<Float> where values are between 0.0 and 1.0
      */
-    fun downloadModel(modelId: String?): Flow<Float> = flow {
-        val fileName = JvmWhisperJNIModelMapper.mapModelIdToFileName(modelId)
-        val modelFile = modelStorageDir.resolve(fileName).toFile()
+    fun downloadModel(modelId: String?): Flow<Float> =
+        flow {
+            val fileName = JvmWhisperJNIModelMapper.mapModelIdToFileName(modelId)
+            val modelFile = modelStorageDir.resolve(fileName).toFile()
 
-        // Check if model already exists and is valid
-        if (modelFile.exists() && validateModel(fileName)) {
-            logger.info("Model $fileName already exists and is valid")
-            emit(1.0f)
-            return@flow
-        }
+            // Check if model already exists and is valid
+            if (modelFile.exists() && validateModel(fileName)) {
+                logger.info("Model $fileName already exists and is valid")
+                emit(1.0f)
+                return@flow
+            }
 
-        val downloadUrl = modelDownloadUrls[fileName]
-            ?: throw ModelDownloadException("No download URL for model: $fileName")
+            val downloadUrl =
+                modelDownloadUrls[fileName]
+                    ?: throw ModelDownloadException("No download URL for model: $fileName")
 
-        logger.info("Downloading model $fileName from $downloadUrl")
+            logger.info("Downloading model $fileName from $downloadUrl")
 
-        withContext(Dispatchers.IO) {
-            try {
-                downloadModelFromUrl(downloadUrl, modelFile) { progress ->
-                    // Emit progress to flow - removed nested runCatching
-                    emit(progress)
-                }
+            withContext(Dispatchers.IO) {
+                try {
+                    downloadModelFromUrl(downloadUrl, modelFile) { progress ->
+                        // Emit progress to flow - removed nested runCatching
+                        emit(progress)
+                    }
 
-                // Validate downloaded model
-                if (validateModel(fileName)) {
-                    logger.info("Model $fileName downloaded and validated successfully")
-                    emit(1.0f)
-                } else {
-                    logger.error("Downloaded model $fileName failed validation")
-                    modelFile.delete()
-                    throw ModelDownloadException("Downloaded model failed validation: $fileName")
-                }
+                    // Validate downloaded model
+                    if (validateModel(fileName)) {
+                        logger.info("Model $fileName downloaded and validated successfully")
+                        emit(1.0f)
+                    } else {
+                        logger.error("Downloaded model $fileName failed validation")
+                        modelFile.delete()
+                        throw ModelDownloadException("Downloaded model failed validation: $fileName")
+                    }
+                } catch (e: Exception) {
+                    logger.error("Failed to download model $fileName", e)
 
-            } catch (e: Exception) {
-                logger.error("Failed to download model $fileName", e)
+                    // Clean up partial download
+                    if (modelFile.exists()) {
+                        modelFile.delete()
+                    }
 
-                // Clean up partial download
-                if (modelFile.exists()) {
-                    modelFile.delete()
-                }
-
-                throw when (e) {
-                    is ModelDownloadException -> e
-                    else -> ModelDownloadException("Download failed for $fileName: ${e.message}", e)
+                    throw when (e) {
+                        is ModelDownloadException -> e
+                        else -> ModelDownloadException("Download failed for $fileName: ${e.message}", e)
+                    }
                 }
             }
         }
-    }
 
     /**
      * Validate a downloaded model
@@ -149,8 +152,9 @@ class JvmModelStorage {
         if (expectedSize != null) {
             // Allow 5% variance in size for different versions/compressions
             val sizeVariance = expectedSize * 0.05
-            val isValidSize = actualSize >= (expectedSize - sizeVariance) &&
-                             actualSize <= (expectedSize + sizeVariance)
+            val isValidSize =
+                actualSize >= (expectedSize - sizeVariance) &&
+                    actualSize <= (expectedSize + sizeVariance)
 
             if (!isValidSize) {
                 logger.warn("Model $fileName size validation failed: expected ~$expectedSize, got $actualSize")
@@ -189,9 +193,8 @@ class JvmModelStorage {
     private suspend fun downloadModelFromUrl(
         url: String,
         destinationFile: File,
-        onProgress: suspend (Float) -> Unit
+        onProgress: suspend (Float) -> Unit,
     ) = withContext(Dispatchers.IO) {
-
         var connection: HttpURLConnection? = null
         var inputStream: InputStream? = null
         var outputStream: FileOutputStream? = null
@@ -208,12 +211,12 @@ class JvmModelStorage {
 
             if (connection.responseCode != HttpURLConnection.HTTP_OK) {
                 throw ModelDownloadException(
-                    "HTTP error ${connection.responseCode}: ${connection.responseMessage}"
+                    "HTTP error ${connection.responseCode}: ${connection.responseMessage}",
                 )
             }
 
             val contentLength = connection.contentLengthLong
-            logger.info("Downloading ${contentLength} bytes to ${destinationFile.name}")
+            logger.info("Downloading $contentLength bytes to ${destinationFile.name}")
 
             // Create temporary file for atomic download
             val tempFile = File(destinationFile.absolutePath + ".tmp")
@@ -261,8 +264,7 @@ class JvmModelStorage {
                 }
             }
 
-            logger.info("Download completed: ${destinationFile.name} (${totalBytesRead} bytes)")
-
+            logger.info("Download completed: ${destinationFile.name} ($totalBytesRead bytes)")
         } finally {
             try {
                 inputStream?.close()
@@ -303,24 +305,25 @@ class JvmModelStorage {
     /**
      * Get all available models (downloaded and available for download)
      */
-    fun getAllAvailableModels(): List<JvmModelInfo> {
-        return JvmWhisperJNIModelMapper.getSupportedModelIds().map { modelId ->
-            val fileName = JvmWhisperJNIModelMapper.mapModelIdToFileName(modelId)
-            val isDownloaded = isModelAvailable(modelId)
-            val localPath = if (isDownloaded) getModelPath(modelId) else null
+    fun getAllAvailableModels(): List<JvmModelInfo> =
+        JvmWhisperJNIModelMapper
+            .getSupportedModelIds()
+            .map { modelId ->
+                val fileName = JvmWhisperJNIModelMapper.mapModelIdToFileName(modelId)
+                val isDownloaded = isModelAvailable(modelId)
+                val localPath = if (isDownloaded) getModelPath(modelId) else null
 
-            JvmModelInfo(
-                modelId = modelId,
-                fileName = fileName,
-                displayName = formatDisplayName(modelId),
-                size = JvmWhisperJNIModelMapper.getModelSize(modelId) * 1024 * 1024, // Convert MB to bytes
-                downloadUrl = modelDownloadUrls[fileName],
-                localPath = localPath,
-                isDownloaded = isDownloaded,
-                modelType = JvmWhisperJNIModelMapper.getModelType(modelId)
-            )
-        }.sortedBy { it.size }
-    }
+                JvmModelInfo(
+                    modelId = modelId,
+                    fileName = fileName,
+                    displayName = formatDisplayName(modelId),
+                    size = JvmWhisperJNIModelMapper.getModelSize(modelId) * 1024 * 1024, // Convert MB to bytes
+                    downloadUrl = modelDownloadUrls[fileName],
+                    localPath = localPath,
+                    isDownloaded = isDownloaded,
+                    modelType = JvmWhisperJNIModelMapper.getModelType(modelId),
+                )
+            }.sortedBy { it.size }
 
     /**
      * Get storage statistics
@@ -330,19 +333,20 @@ class JvmModelStorage {
         val downloadedModels = allModels.filter { it.isDownloaded }
 
         val totalSize = downloadedModels.sumOf { it.size }
-        val availableSpace = try {
-            Files.getFileStore(modelStorageDir).usableSpace
-        } catch (e: IOException) {
-            logger.error("Error getting available space", e)
-            -1L
-        }
+        val availableSpace =
+            try {
+                Files.getFileStore(modelStorageDir).usableSpace
+            } catch (e: IOException) {
+                logger.error("Error getting available space", e)
+                -1L
+            }
 
         return StorageStats(
             storageDirectory = modelStorageDir.toAbsolutePath().toString(),
             totalModels = allModels.size,
             downloadedModels = downloadedModels.size,
             totalSizeBytes = totalSize,
-            availableSpaceBytes = availableSpace
+            availableSpaceBytes = availableSpace,
         )
     }
 
@@ -373,22 +377,20 @@ class JvmModelStorage {
                     }
                 }
             }
-
         } catch (e: Exception) {
             logger.error("Error during cleanup", e)
         }
 
         return CleanupResult(
             tempFilesDeleted = tempFilesDeleted,
-            invalidModelsDeleted = invalidModelsDeleted
+            invalidModelsDeleted = invalidModelsDeleted,
         )
     }
 
-    private fun formatDisplayName(modelId: String): String {
-        return modelId.split("-", "_").joinToString(" ") { word ->
+    private fun formatDisplayName(modelId: String): String =
+        modelId.split("-", "_").joinToString(" ") { word ->
             word.lowercase().replaceFirstChar { it.uppercase() }
         }
-    }
 }
 
 /**
@@ -402,7 +404,7 @@ data class JvmModelInfo(
     val downloadUrl: String?,
     val localPath: String?,
     val isDownloaded: Boolean,
-    val modelType: String
+    val modelType: String,
 )
 
 data class StorageStats(
@@ -410,12 +412,12 @@ data class StorageStats(
     val totalModels: Int,
     val downloadedModels: Int,
     val totalSizeBytes: Long,
-    val availableSpaceBytes: Long
+    val availableSpaceBytes: Long,
 )
 
 data class CleanupResult(
     val tempFilesDeleted: Int,
-    val invalidModelsDeleted: Int
+    val invalidModelsDeleted: Int,
 )
 
 /**
@@ -423,5 +425,5 @@ data class CleanupResult(
  */
 class ModelDownloadException(
     message: String,
-    cause: Throwable? = null
+    cause: Throwable? = null,
 ) : Exception(message, cause)

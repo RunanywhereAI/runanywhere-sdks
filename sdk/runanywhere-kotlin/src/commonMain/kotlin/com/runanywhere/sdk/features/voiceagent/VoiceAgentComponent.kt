@@ -2,17 +2,16 @@ package com.runanywhere.sdk.features.voiceagent
 
 import com.runanywhere.sdk.core.capabilities.BaseComponent
 import com.runanywhere.sdk.core.capabilities.SDKComponent
+import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.events.EventPublisher
+import com.runanywhere.sdk.events.SDKVoiceEvent
 import com.runanywhere.sdk.features.llm.LLMComponent
 import com.runanywhere.sdk.features.stt.STTComponent
 import com.runanywhere.sdk.features.stt.STTInput
 import com.runanywhere.sdk.features.stt.STTOptions
+import com.runanywhere.sdk.features.tts.TTSComponent
 import com.runanywhere.sdk.features.vad.VADComponent
 import com.runanywhere.sdk.features.vad.VADInput
-import com.runanywhere.sdk.features.tts.TTSComponent
-import com.runanywhere.sdk.features.tts.TTSOptions
-import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.events.EventPublisher
-import com.runanywhere.sdk.events.SDKVoiceEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import kotlinx.coroutines.flow.Flow
@@ -32,9 +31,8 @@ import kotlinx.coroutines.sync.Mutex
  */
 class VoiceAgentComponent(
     private val agentConfiguration: VoiceAgentConfiguration,
-    serviceContainer: ServiceContainer? = null
+    serviceContainer: ServiceContainer? = null,
 ) : BaseComponent<VoiceAgentService>(agentConfiguration, serviceContainer) {
-
     private val logger = SDKLogger("VoiceAgentComponent")
 
     override val componentType: SDKComponent = SDKComponent.VOICE_AGENT
@@ -259,7 +257,6 @@ class VoiceAgentComponent(
 
             pipelineState = VoiceAgentPipelineState.COMPLETED
             return result
-
         } catch (e: Exception) {
             pipelineState = VoiceAgentPipelineState.ERROR
             logger.error("Pipeline processing failed", e)
@@ -277,22 +274,23 @@ class VoiceAgentComponent(
      * @param audioStream Flow of audio data chunks
      * @return Flow of VoiceAgentEvent for reactive consumption
      */
-    fun processStream(audioStream: Flow<ByteArray>): Flow<VoiceAgentEvent> = flow {
-        ensureReady()
+    fun processStream(audioStream: Flow<ByteArray>): Flow<VoiceAgentEvent> =
+        flow {
+            ensureReady()
 
-        try {
-            audioStream.collect { audioData ->
-                try {
-                    val result = processAudio(audioData)
-                    emit(VoiceAgentEvent.Processed(result))
-                } catch (e: Exception) {
-                    emit(VoiceAgentEvent.Error(e))
+            try {
+                audioStream.collect { audioData ->
+                    try {
+                        val result = processAudio(audioData)
+                        emit(VoiceAgentEvent.Processed(result))
+                    } catch (e: Exception) {
+                        emit(VoiceAgentEvent.Error(e))
+                    }
                 }
+            } catch (e: Exception) {
+                emit(VoiceAgentEvent.Error(e))
             }
-        } catch (e: Exception) {
-            emit(VoiceAgentEvent.Error(e))
         }
-    }
 
     // MARK: - Individual Component Access (for custom orchestration)
 
@@ -304,8 +302,9 @@ class VoiceAgentComponent(
      * @return true if speech is detected
      */
     fun detectVoiceActivity(audioSamples: FloatArray): Boolean {
-        val vad = vadComponent
-            ?: throw SDKError.ComponentNotReady("VAD component is not initialized")
+        val vad =
+            vadComponent
+                ?: throw SDKError.ComponentNotReady("VAD component is not initialized")
 
         val vadInput = VADInput(audioSamples = audioSamples)
         val vadOutput = vad.process(vadInput)
@@ -315,9 +314,7 @@ class VoiceAgentComponent(
     /**
      * Convenience method for ByteArray input
      */
-    fun detectVoiceActivity(audioData: ByteArray): Boolean {
-        return detectVoiceActivity(audioData.toFloatArray())
-    }
+    fun detectVoiceActivity(audioData: ByteArray): Boolean = detectVoiceActivity(audioData.toFloatArray())
 
     /**
      * Process only STT - Speech to Text
@@ -327,18 +324,21 @@ class VoiceAgentComponent(
      * @return Transcribed text or null if transcription fails
      */
     suspend fun transcribe(audioData: ByteArray): String? {
-        val stt = sttComponent
-            ?: throw SDKError.ComponentNotReady("STT component is not initialized")
+        val stt =
+            sttComponent
+                ?: throw SDKError.ComponentNotReady("STT component is not initialized")
 
         return try {
-            val sttInput = STTInput(
-                audioData = audioData,
-                options = STTOptions(
-                    language = agentConfiguration.sttConfig.language,
-                    enablePunctuation = agentConfiguration.sttConfig.enablePunctuation,
-                    enableTimestamps = agentConfiguration.sttConfig.enableTimestamps
+            val sttInput =
+                STTInput(
+                    audioData = audioData,
+                    options =
+                        STTOptions(
+                            language = agentConfiguration.sttConfig.language,
+                            enablePunctuation = agentConfiguration.sttConfig.enablePunctuation,
+                            enableTimestamps = agentConfiguration.sttConfig.enableTimestamps,
+                        ),
                 )
-            )
             val sttOutput = stt.process(sttInput)
             sttOutput.text.takeIf { it.isNotBlank() }
         } catch (e: Exception) {
@@ -355,14 +355,16 @@ class VoiceAgentComponent(
      * @return Generated response or null if generation fails
      */
     suspend fun generateResponse(prompt: String): String? {
-        val llm = llmComponent
-            ?: throw SDKError.ComponentNotReady("LLM component is not initialized")
+        val llm =
+            llmComponent
+                ?: throw SDKError.ComponentNotReady("LLM component is not initialized")
 
         return try {
-            val llmOutput = llm.generate(
-                prompt = prompt,
-                systemPrompt = agentConfiguration.llmConfig.systemPrompt
-            )
+            val llmOutput =
+                llm.generate(
+                    prompt = prompt,
+                    systemPrompt = agentConfiguration.llmConfig.systemPrompt,
+                )
             llmOutput.text.takeIf { it.isNotBlank() }
         } catch (e: Exception) {
             logger.error("LLM generation failed", e)
@@ -378,15 +380,17 @@ class VoiceAgentComponent(
      * @return Synthesized audio data or null if synthesis fails
      */
     suspend fun synthesizeSpeech(text: String): ByteArray? {
-        val tts = ttsComponent
-            ?: throw SDKError.ComponentNotReady("TTS component is not initialized")
+        val tts =
+            ttsComponent
+                ?: throw SDKError.ComponentNotReady("TTS component is not initialized")
 
         return try {
-            val ttsOutput = tts.synthesize(
-                text = text,
-                voice = agentConfiguration.ttsConfig.voice,
-                language = agentConfiguration.ttsConfig.language
-            )
+            val ttsOutput =
+                tts.synthesize(
+                    text = text,
+                    voice = agentConfiguration.ttsConfig.voice,
+                    language = agentConfiguration.ttsConfig.language,
+                )
             ttsOutput.audioData.takeIf { it.isNotEmpty() }
         } catch (e: Exception) {
             logger.error("TTS synthesis failed", e)
@@ -409,12 +413,11 @@ class VoiceAgentComponent(
     /**
      * Check if all sub-components are ready
      */
-    fun areAllComponentsReady(): Boolean {
-        return vadComponent?.isReady == true &&
-                sttComponent?.isReady == true &&
-                llmComponent?.isReady == true &&
-                ttsComponent?.isReady == true
-    }
+    fun areAllComponentsReady(): Boolean =
+        vadComponent?.isReady == true &&
+            sttComponent?.isReady == true &&
+            llmComponent?.isReady == true &&
+            ttsComponent?.isReady == true
 
     companion object {
         val componentType: SDKComponent = SDKComponent.VOICE_AGENT

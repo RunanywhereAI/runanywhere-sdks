@@ -10,17 +10,16 @@ object AndroidPlatformContext {
     private var _applicationContext: Context? = null
 
     val applicationContext: Context
-        get() = _applicationContext ?: throw IllegalStateException(
-            "AndroidPlatformContext must be initialized with Context before use"
-        )
+        get() =
+            _applicationContext ?: throw IllegalStateException(
+                "AndroidPlatformContext must be initialized with Context before use",
+            )
 
     fun initialize(context: Context) {
         _applicationContext = context.applicationContext
     }
 
-    fun isInitialized(): Boolean {
-        return _applicationContext != null
-    }
+    fun isInitialized(): Boolean = _applicationContext != null
 
     /**
      * Get the application context (alias for applicationContext for compatibility)

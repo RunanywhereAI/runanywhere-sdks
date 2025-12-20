@@ -1,83 +1,77 @@
 package com.runanywhere.sdk.foundation
 
-import com.runanywhere.sdk.features.stt.STTComponent
-import com.runanywhere.sdk.features.stt.STTConfiguration
-import com.runanywhere.sdk.features.vad.VADComponent
-import com.runanywhere.sdk.features.vad.VADConfiguration
-import com.runanywhere.sdk.features.llm.LLMComponent
-import com.runanywhere.sdk.features.llm.LLMConfiguration
-import com.runanywhere.sdk.features.tts.TTSComponent
-import com.runanywhere.sdk.features.tts.TTSConfiguration
-import com.runanywhere.sdk.features.stt.STTCapability
-import com.runanywhere.sdk.features.tts.TTSCapability
-import com.runanywhere.sdk.features.llm.LLMCapability
-import com.runanywhere.sdk.features.vad.VADCapability
-import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationCapability
-import com.runanywhere.sdk.features.voiceagent.VoiceAgentCapability
-import com.runanywhere.sdk.features.voiceagent.VoiceAgentComponent
-import com.runanywhere.sdk.features.voiceagent.VoiceAgentConfiguration
-import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationComponent
-import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration
 import com.runanywhere.sdk.core.ModuleRegistry
+import com.runanywhere.sdk.data.datasources.RemoteTelemetryDataSource
 import com.runanywhere.sdk.data.models.ConfigurationData
-import com.runanywhere.sdk.data.models.SDKInitParams
 import com.runanywhere.sdk.data.models.SDKEnvironment
+import com.runanywhere.sdk.data.models.SDKInitParams
+import com.runanywhere.sdk.data.network.NetworkService
+import com.runanywhere.sdk.data.network.NetworkServiceFactory
+import com.runanywhere.sdk.data.network.services.AnalyticsNetworkService
 import com.runanywhere.sdk.data.repositories.ModelInfoRepository
 import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
+import com.runanywhere.sdk.data.repositories.TelemetryRepository
+import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.EventPublisher
+import com.runanywhere.sdk.events.SDKBootstrapEvent
+import com.runanywhere.sdk.events.SDKEvent
+import com.runanywhere.sdk.events.SDKInitializationEvent
+import com.runanywhere.sdk.features.llm.LLMCapability
+import com.runanywhere.sdk.features.llm.LLMComponent
+import com.runanywhere.sdk.features.llm.LLMConfiguration
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationCapability
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationComponent
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration
+import com.runanywhere.sdk.features.stt.STTCapability
+import com.runanywhere.sdk.features.stt.STTComponent
+import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.tts.TTSCapability
+import com.runanywhere.sdk.features.tts.TTSComponent
+import com.runanywhere.sdk.features.tts.TTSConfiguration
+import com.runanywhere.sdk.features.vad.VADCapability
+import com.runanywhere.sdk.features.vad.VADComponent
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentCapability
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentComponent
+import com.runanywhere.sdk.foundation.analytics.AnalyticsEvent
+import com.runanywhere.sdk.foundation.analytics.AnalyticsQueueManager
 import com.runanywhere.sdk.generation.GenerationService
 import com.runanywhere.sdk.generation.StreamingService
-import com.runanywhere.sdk.models.ModelManager
-import com.runanywhere.sdk.models.ModelRegistry
+import com.runanywhere.sdk.memory.MemoryManager
+import com.runanywhere.sdk.memory.MemoryService
 import com.runanywhere.sdk.models.DefaultModelRegistry
-import com.runanywhere.sdk.models.ModelLoadingService
+import com.runanywhere.sdk.models.DeviceInfo
 import com.runanywhere.sdk.models.ModelHandle
 import com.runanywhere.sdk.models.ModelInfo
+import com.runanywhere.sdk.models.ModelLoadingService
+import com.runanywhere.sdk.models.ModelManager
+import com.runanywhere.sdk.models.ModelRegistry
+import com.runanywhere.sdk.models.collectDeviceInfo
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.network.createHttpClient
+import com.runanywhere.sdk.security.SecureStorageFactory
 import com.runanywhere.sdk.services.AuthenticationService
+import com.runanywhere.sdk.services.ValidationService
+import com.runanywhere.sdk.services.analytics.AnalyticsService
+import com.runanywhere.sdk.services.download.DownloadConfiguration
 import com.runanywhere.sdk.services.download.DownloadService
 import com.runanywhere.sdk.services.download.KtorDownloadService
 import com.runanywhere.sdk.services.download.KtorDownloadServiceAdapter
-import com.runanywhere.sdk.services.download.DownloadConfiguration
-import com.runanywhere.sdk.services.ValidationService
 import com.runanywhere.sdk.services.modelinfo.ModelInfoService
-import com.runanywhere.sdk.storage.createFileSystem
-import com.runanywhere.sdk.security.SecureStorageFactory
-import com.runanywhere.sdk.storage.FileSystem
-import com.runanywhere.sdk.data.network.NetworkService
-import com.runanywhere.sdk.data.network.NetworkServiceFactory
-import com.runanywhere.sdk.data.network.models.APIEndpoint
-import com.runanywhere.sdk.models.DeviceInfo
-import com.runanywhere.sdk.models.collectDeviceInfo
-import com.runanywhere.sdk.services.analytics.AnalyticsService
-import com.runanywhere.sdk.data.repositories.TelemetryRepository
 import com.runanywhere.sdk.services.sync.SyncCoordinator
-import com.runanywhere.sdk.data.network.services.AnalyticsNetworkService
-import com.runanywhere.sdk.data.datasources.RemoteTelemetryDataSource
-import com.runanywhere.sdk.memory.MemoryService
+import com.runanywhere.sdk.storage.createFileSystem
 import io.ktor.serialization.kotlinx.json.*
-import com.runanywhere.sdk.memory.MemoryManager
-import com.runanywhere.sdk.events.SDKInitializationEvent
-import com.runanywhere.sdk.events.SDKBootstrapEvent
-import com.runanywhere.sdk.events.SDKDeviceEvent
-import com.runanywhere.sdk.events.EventBus
-import com.runanywhere.sdk.events.EventPublisher
-import com.runanywhere.sdk.events.SDKEvent
-import com.runanywhere.sdk.foundation.analytics.AnalyticsQueueManager
-import com.runanywhere.sdk.foundation.analytics.AnalyticsEvent
-import com.runanywhere.sdk.foundation.currentTimeMillis
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
 
 /**
  * Adapter to wrap SDKEvent as AnalyticsEvent for the analytics queue.
  * Enables dual-path routing: EventPublisher -> AnalyticsQueueManager
  */
-private class SDKEventAnalyticsAdapter(private val sdkEvent: SDKEvent) : AnalyticsEvent {
+private class SDKEventAnalyticsAdapter(
+    private val sdkEvent: SDKEvent,
+) : AnalyticsEvent {
     override val type: String = sdkEvent.type
     override val eventData: Any = sdkEvent.properties
     override val timestamp: Long = sdkEvent.timestamp
@@ -88,7 +82,6 @@ private class SDKEventAnalyticsAdapter(private val sdkEvent: SDKEvent) : Analyti
  * Platform-specific initialization is handled through expect/actual
  */
 class ServiceContainer {
-
     companion object {
         val shared = ServiceContainer()
     }
@@ -110,7 +103,7 @@ class ServiceContainer {
     val modelInfoService: ModelInfoService by lazy {
         ModelInfoService(
             modelInfoRepository = modelInfoRepository,
-            syncCoordinator = null
+            syncCoordinator = null,
         )
     }
 
@@ -189,8 +182,7 @@ class ServiceContainer {
             getSTTCapability = { sttCapability },
             getLLMCapability = { llmCapability },
             getTTSCapability = { ttsCapability },
-            getVADCapability = { vadCapability },
-            getOrCreateComponent = { config -> VoiceAgentComponent(config, this) }
+            getOrCreateComponent = { config -> VoiceAgentComponent(config, this) },
         )
     }
 
@@ -205,10 +197,11 @@ class ServiceContainer {
 
     val downloadService: DownloadService by lazy {
         // Use real KtorDownloadService with default configuration
-        val ktorService = KtorDownloadService(
-            configuration = DownloadConfiguration(),
-            fileSystem = fileSystem
-        )
+        val ktorService =
+            KtorDownloadService(
+                configuration = DownloadConfiguration(),
+                fileSystem = fileSystem,
+            )
         KtorDownloadServiceAdapter(ktorService)
     }
 
@@ -224,8 +217,7 @@ class ServiceContainer {
     val modelLoadingService: ModelLoadingService by lazy {
         ModelLoadingService(
             registry = modelRegistry,
-            memoryService = memoryManager,
-            fileSystem = fileSystem
+            fileSystem = fileSystem,
         )
     }
 
@@ -281,24 +273,31 @@ class ServiceContainer {
      * Returns a consistent identifier based on device info
      */
     val deviceId: String
-        get() = _deviceInfoData?.deviceId
-            ?: _deviceInfo?.let { "${it.platformName}-${it.deviceModel}" }
-            ?: "unknown"
+        get() =
+            _deviceInfoData?.deviceId
+                ?: _deviceInfo?.let { "${it.platformName}-${it.deviceModel}" }
+                ?: "unknown"
 
     /**
      * Initialize the service container with platform-specific context
      * This is implemented differently for each platform
      */
-    fun initialize(platformContext: PlatformContext, environment: SDKEnvironment = SDKEnvironment.PRODUCTION, apiKey: String? = null, baseURL: String? = null) {
+    fun initialize(
+        platformContext: PlatformContext,
+        environment: SDKEnvironment = SDKEnvironment.PRODUCTION,
+        apiKey: String? = null,
+        baseURL: String? = null,
+    ) {
         platformContext.initialize()
         currentEnvironment = environment
 
         // Create the appropriate network service based on environment
-        networkService = NetworkServiceFactory.create(
-            environment = environment,
-            baseURL = baseURL,
-            apiKey = apiKey
-        )
+        networkService =
+            NetworkServiceFactory.create(
+                environment = environment,
+                baseURL = baseURL,
+                apiKey = apiKey,
+            )
 
         logger.info("ServiceContainer initialized with $environment environment")
     }
@@ -317,11 +316,12 @@ class ServiceContainer {
         logger.info("Initializing network services lazily...")
 
         // Create network service based on environment
-        networkService = NetworkServiceFactory.create(
-            environment = params.environment,
-            baseURL = params.baseURL,
-            apiKey = params.apiKey
-        )
+        networkService =
+            NetworkServiceFactory.create(
+                environment = params.environment,
+                baseURL = params.baseURL,
+                apiKey = params.apiKey,
+            )
 
         logger.info("✅ Network services initialized")
     }
@@ -355,7 +355,13 @@ class ServiceContainer {
                 EventBus.publish(SDKBootstrapEvent.DeviceInfoSyncFailed(e.message ?: "Unknown error"))
             }
 
-            EventPublisher.track(SDKInitializationEvent.StepCompleted(1, "Platform initialization & device info collection", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(
+                SDKInitializationEvent.StepCompleted(
+                    1,
+                    "Platform initialization & device info collection",
+                    currentTimeMillis() - stepStartTime,
+                ),
+            )
 
             // Step 2: Configuration loading (from multiple sources)
             stepStartTime = currentTimeMillis()
@@ -379,7 +385,13 @@ class ServiceContainer {
 
             authenticationService.authenticate(params.apiKey)
 
-            EventPublisher.track(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(
+                SDKInitializationEvent.StepCompleted(
+                    3,
+                    "Authentication service initialization",
+                    currentTimeMillis() - stepStartTime,
+                ),
+            )
 
             // Step 4: Model repository sync
             stepStartTime = currentTimeMillis()
@@ -389,7 +401,9 @@ class ServiceContainer {
 
             // Scan file system for already downloaded models
             // Uses centralized ModelPathUtils for path consistency
-            val modelsPath = com.runanywhere.sdk.foundation.utils.ModelPathUtils.getModelsDirectory()
+            val modelsPath =
+                com.runanywhere.sdk.foundation.utils.ModelPathUtils
+                    .getModelsDirectory()
             (modelInfoRepository as? ModelInfoRepositoryImpl)?.scanAndUpdateDownloadedModels(modelsPath, fileSystem)
             logger.info("🔍 Scanned file system for downloaded models at: $modelsPath")
 
@@ -404,69 +418,80 @@ class ServiceContainer {
 
             try {
                 // Create analytics network services for production mode
-                logger.info("🔍 Analytics setup - environment=${params.environment}, baseURL=${if (params.baseURL != null) "SET (${params.baseURL})" else "NULL"}")
+                logger.info(
+                    "🔍 Analytics setup - environment=${params.environment}, baseURL=${if (params.baseURL != null) "SET (${params.baseURL})" else "NULL"}",
+                )
                 if (params.environment == SDKEnvironment.PRODUCTION && params.baseURL != null) {
                     logger.info("Creating production analytics network services...")
 
                     // Create a dedicated Ktor HttpClient for analytics
-                    val analyticsKtorClient = io.ktor.client.HttpClient {
-                        install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-                            json(kotlinx.serialization.json.Json {
-                                ignoreUnknownKeys = true
-                                prettyPrint = false
-                                isLenient = true
-                            })
+                    val analyticsKtorClient =
+                        io.ktor.client.HttpClient {
+                            install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+                                json(
+                                    kotlinx.serialization.json.Json {
+                                        ignoreUnknownKeys = true
+                                        prettyPrint = false
+                                        isLenient = true
+                                    },
+                                )
+                            }
+                            install(io.ktor.client.plugins.HttpTimeout) {
+                                requestTimeoutMillis = 30000
+                                connectTimeoutMillis = 10000
+                            }
                         }
-                        install(io.ktor.client.plugins.HttpTimeout) {
-                            requestTimeoutMillis = 30000
-                            connectTimeoutMillis = 10000
-                        }
-                    }
 
                     // Create AnalyticsNetworkService
-                    val analyticsService = AnalyticsNetworkService(
-                        httpClient = analyticsKtorClient,
-                        baseURL = params.baseURL,
-                        apiKey = params.apiKey,
-                        authenticationService = authenticationService
-                    )
+                    val analyticsService =
+                        AnalyticsNetworkService(
+                            httpClient = analyticsKtorClient,
+                            baseURL = params.baseURL,
+                            apiKey = params.apiKey,
+                            authenticationService = authenticationService,
+                        )
                     _analyticsNetworkService = analyticsService
 
                     // Create RemoteTelemetryDataSource
-                    _remoteTelemetryDataSource = RemoteTelemetryDataSource(
-                        analyticsNetworkService = analyticsService
-                    )
+                    _remoteTelemetryDataSource =
+                        RemoteTelemetryDataSource(
+                            analyticsNetworkService = analyticsService,
+                        )
 
                     logger.info("✅ Production analytics network services created - remoteTelemetryDataSource is READY")
                 } else {
-                    logger.warn("⚠️ SKIPPING production analytics - remoteTelemetryDataSource will be NULL! Reason: environment=${params.environment}, baseURL=${params.baseURL}")
+                    logger.warn(
+                        "⚠️ SKIPPING production analytics - remoteTelemetryDataSource will be NULL! Reason: environment=${params.environment}, baseURL=${params.baseURL}",
+                    )
                 }
 
                 // AnalyticsService will get device ID dynamically from BaseRunAnywhereSDK.sharedDeviceId
-                _analyticsService = AnalyticsService(
-                    telemetryRepository = telemetryRepository,
-                    syncCoordinator = syncCoordinator,
-                    supabaseConfig = params.supabaseConfig,
-                    environment = params.environment
-                )
+                _analyticsService =
+                    AnalyticsService(
+                        telemetryRepository = telemetryRepository,
+                        syncCoordinator = syncCoordinator,
+                        supabaseConfig = params.supabaseConfig,
+                        environment = params.environment,
+                    )
                 _analyticsService?.initialize()
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitialized)
                 logger.info("✅ Analytics service initialized successfully")
 
                 // Initialize TelemetryService for production event tracking (STT/TTS/LLM)
                 // Matches iOS ServiceContainer.shared.telemetryService
-                _telemetryService = com.runanywhere.sdk.services.telemetry.TelemetryService(
-                    telemetryRepository = telemetryRepository,
-                    syncCoordinator = syncCoordinator
-                )
+                _telemetryService =
+                    com.runanywhere.sdk.services.telemetry.TelemetryService(
+                        telemetryRepository = telemetryRepository,
+                        syncCoordinator = syncCoordinator,
+                    )
                 _telemetryService?.initialize()
 
                 // Set telemetry context with device info
                 val deviceId = _deviceInfoData?.deviceId ?: "unknown-device"
                 _telemetryService?.setContext(
                     deviceId = deviceId,
-                    appVersion = null,  // App version not available at SDK init time
-                    sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
+                    appVersion = null, // App version not available at SDK init time
+                    sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION,
                 )
                 logger.info("✅ Telemetry service initialized successfully with device ID: $deviceId")
 
@@ -478,7 +503,8 @@ class ServiceContainer {
                 logger.error("Analytics initialization failed: ${e.message}")
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitializationFailed(e.message ?: "Unknown error"))
                 // Analytics is critical in production - throw error
-                throw com.runanywhere.sdk.data.models.SDKError.InitializationFailed("Analytics service initialization failed: ${e.message}")
+                throw com.runanywhere.sdk.data.models.SDKError
+                    .InitializationFailed("Analytics service initialization failed: ${e.message}")
             }
 
             EventPublisher.track(SDKInitializationEvent.StepCompleted(5, "Analytics service setup", currentTimeMillis() - stepStartTime))
@@ -514,7 +540,6 @@ class ServiceContainer {
             logger.info("✅ 8-step bootstrap process completed successfully (Production Mode)")
 
             return configData
-
         } catch (error: Exception) {
             logger.error("❌ Bootstrap process failed: ${error.message}")
             EventBus.publish(SDKBootstrapEvent.BootstrapFailed("Bootstrap", error.message ?: "Unknown error"))
@@ -544,7 +569,13 @@ class ServiceContainer {
             EventBus.publish(SDKBootstrapEvent.DeviceInfoCollected(_deviceInfoData!!))
             logger.info("   Device: ${_deviceInfo!!.description}")
 
-            EventPublisher.track(SDKInitializationEvent.StepCompleted(1, "Platform initialization & device info collection", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(
+                SDKInitializationEvent.StepCompleted(
+                    1,
+                    "Platform initialization & device info collection",
+                    currentTimeMillis() - stepStartTime,
+                ),
+            )
             logger.info("✅ Step 1 completed")
 
             // Step 2: Configuration loading (mock in dev mode)
@@ -566,7 +597,13 @@ class ServiceContainer {
             // NO AUTHENTICATION IN DEVELOPMENT MODE - Following iOS pattern exactly
             logger.info("   Authentication skipped - using mock/local services only")
 
-            EventPublisher.track(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", currentTimeMillis() - stepStartTime))
+            EventPublisher.track(
+                SDKInitializationEvent.StepCompleted(
+                    3,
+                    "Authentication service initialization",
+                    currentTimeMillis() - stepStartTime,
+                ),
+            )
             logger.info("✅ Step 3 completed (authentication skipped)")
 
             // Step 4: Model repository sync (fetch mock models)
@@ -579,7 +616,9 @@ class ServiceContainer {
 
             // Scan file system for already downloaded models
             // Uses centralized ModelPathUtils for path consistency
-            val modelsPath = com.runanywhere.sdk.foundation.utils.ModelPathUtils.getModelsDirectory()
+            val modelsPath =
+                com.runanywhere.sdk.foundation.utils.ModelPathUtils
+                    .getModelsDirectory()
             (modelInfoRepository as? ModelInfoRepositoryImpl)?.scanAndUpdateDownloadedModels(modelsPath, fileSystem)
             logger.info("🔍 Scanned file system for downloaded models at: $modelsPath")
 
@@ -596,30 +635,32 @@ class ServiceContainer {
 
             try {
                 // AnalyticsService will get device ID dynamically from BaseRunAnywhereSDK.sharedDeviceId
-                _analyticsService = AnalyticsService(
-                    telemetryRepository = telemetryRepository,
-                    syncCoordinator = syncCoordinator,
-                    supabaseConfig = params.supabaseConfig,
-                    environment = params.environment
-                )
+                _analyticsService =
+                    AnalyticsService(
+                        telemetryRepository = telemetryRepository,
+                        syncCoordinator = syncCoordinator,
+                        supabaseConfig = params.supabaseConfig,
+                        environment = params.environment,
+                    )
                 _analyticsService?.initialize()
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitialized)
                 logger.info("✅ Analytics service initialized with Supabase support")
 
                 // Initialize TelemetryService for event tracking (STT/TTS/LLM)
                 // Matches iOS ServiceContainer.shared.telemetryService
-                _telemetryService = com.runanywhere.sdk.services.telemetry.TelemetryService(
-                    telemetryRepository = telemetryRepository,
-                    syncCoordinator = syncCoordinator
-                )
+                _telemetryService =
+                    com.runanywhere.sdk.services.telemetry.TelemetryService(
+                        telemetryRepository = telemetryRepository,
+                        syncCoordinator = syncCoordinator,
+                    )
                 _telemetryService?.initialize()
 
                 // Set telemetry context with device info
                 val deviceId = _deviceInfoData?.deviceId ?: "unknown-device"
                 _telemetryService?.setContext(
                     deviceId = deviceId,
-                    appVersion = null,  // App version not available at SDK init time
-                    sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
+                    appVersion = null, // App version not available at SDK init time
+                    sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION,
                 )
                 logger.info("✅ Telemetry service initialized successfully with device ID: $deviceId")
 
@@ -672,7 +713,6 @@ class ServiceContainer {
             logger.info("🎉 8-step bootstrap process completed successfully (Development Mode)")
 
             return configData
-
         } catch (error: Exception) {
             logger.error("❌ Development bootstrap process failed: ${error.message}")
             EventBus.publish(SDKBootstrapEvent.BootstrapFailed("Development Bootstrap", error.message ?: "Unknown error"))
@@ -681,7 +721,8 @@ class ServiceContainer {
     }
 
     // Dynamic component storage for runtime replacement
-    private val _dynamicComponents = mutableMapOf<com.runanywhere.sdk.core.capabilities.SDKComponent, com.runanywhere.sdk.core.capabilities.Component>()
+    private val _dynamicComponents =
+        mutableMapOf<com.runanywhere.sdk.core.capabilities.SDKComponent, com.runanywhere.sdk.core.capabilities.Component>()
 
     /**
      * Get component by type
@@ -699,7 +740,10 @@ class ServiceContainer {
     /**
      * Set component by type (for runtime component creation)
      */
-    fun setComponent(component: com.runanywhere.sdk.core.capabilities.SDKComponent, instance: com.runanywhere.sdk.core.capabilities.Component) {
+    fun setComponent(
+        component: com.runanywhere.sdk.core.capabilities.SDKComponent,
+        instance: com.runanywhere.sdk.core.capabilities.Component,
+    ) {
         _dynamicComponents[component] = instance
     }
 
@@ -715,10 +759,12 @@ class ServiceContainer {
      */
     private fun initializeEventPublisher() {
         // First initialize AnalyticsQueueManager with telemetry repository and device info
-        val deviceInfoService = com.runanywhere.sdk.foundation.device.DeviceInfoService()
+        val deviceInfoService =
+            com.runanywhere.sdk.foundation.device
+                .DeviceInfoService()
         AnalyticsQueueManager.initialize(
             telemetryRepository = telemetryRepository,
-            deviceInfoService = deviceInfoService
+            deviceInfoService = deviceInfoService,
         )
 
         // Wire EventPublisher to AnalyticsQueueManager
@@ -734,8 +780,8 @@ class ServiceContainer {
     /**
      * Convert simple DeviceInfo to comprehensive DeviceInfoData
      */
-    private fun convertToDeviceInfoData(info: DeviceInfo): com.runanywhere.sdk.data.models.DeviceInfoData {
-        return com.runanywhere.sdk.data.models.DeviceInfoData(
+    private fun convertToDeviceInfoData(info: DeviceInfo): com.runanywhere.sdk.data.models.DeviceInfoData =
+        com.runanywhere.sdk.data.models.DeviceInfoData(
             deviceId = "${info.platformName}-${info.deviceModel}",
             deviceName = info.deviceModel,
             systemName = info.platformName,
@@ -750,9 +796,8 @@ class ServiceContainer {
             totalStorageMB = 8192L, // Default 8GB storage
             availableStorageMB = 2048L, // Default 2GB available
             gpuType = com.runanywhere.sdk.data.models.GPUType.UNKNOWN,
-            updatedAt = currentTimeMillis()
+            updatedAt = currentTimeMillis(),
         )
-    }
 
     private fun registerDefaultModules() {
         logger.info("Registering default modules")
@@ -843,17 +888,18 @@ class ServiceContainer {
      * Register simple energy VAD provider for development
      */
     private fun registerSimpleEnergyVADProvider() {
-        val simpleVADProvider = object : com.runanywhere.sdk.core.VADServiceProvider {
-            override suspend fun createVADService(configuration: VADConfiguration): com.runanywhere.sdk.features.vad.VADService {
-                return com.runanywhere.sdk.voice.vad.SimpleEnergyVAD(
-                    vadConfig = configuration
-                )
+        val simpleVADProvider =
+            object : com.runanywhere.sdk.core.VADServiceProvider {
+                override suspend fun createVADService(configuration: VADConfiguration): com.runanywhere.sdk.features.vad.VADService =
+                    com.runanywhere.sdk.voice.vad.SimpleEnergyVAD(
+                        vadConfig = configuration,
+                    )
+
+                override fun canHandle(modelId: String): Boolean =
+                    modelId.contains("simple", ignoreCase = true) || modelId.contains("energy", ignoreCase = true)
+
+                override val name: String = "SimpleEnergyVAD"
             }
-
-            override fun canHandle(modelId: String): Boolean = modelId.contains("simple", ignoreCase = true) || modelId.contains("energy", ignoreCase = true)
-
-            override val name: String = "SimpleEnergyVAD"
-        }
 
         ModuleRegistry.registerVAD(simpleVADProvider)
     }
@@ -894,43 +940,51 @@ class ServiceContainer {
 
         try {
             // Use hardcoded mock models instead of network calls to avoid any JSON/network issues
-            val models = listOf(
-                // Whisper Base - Real GGML model for JVM/Android
-                com.runanywhere.sdk.models.ModelInfo(
-                    id = "whisper-base",
-                    name = "Whisper Base",
-                    category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_RECOGNITION,
-                    format = com.runanywhere.sdk.models.enums.ModelFormat.GGML,
-                    downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
-                    localPath = null,
-                    downloadSize = 74_000_000L, // ~74MB
-                    memoryRequired = 74_000_000L, // 74MB
-                    compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT),
-                    preferredFramework = com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT,
-                    contextLength = 0,
-                    supportsThinking = false,
-                    createdAt = com.runanywhere.sdk.utils.SimpleInstant.now(),
-                    updatedAt = com.runanywhere.sdk.utils.SimpleInstant.now()
-                ),
-
-                // Whisper Tiny - Smaller model for faster testing
-                com.runanywhere.sdk.models.ModelInfo(
-                    id = "whisper-tiny",
-                    name = "Whisper Tiny",
-                    category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_RECOGNITION,
-                    format = com.runanywhere.sdk.models.enums.ModelFormat.GGML,
-                    downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
-                    localPath = null,
-                    downloadSize = 39_000_000L, // ~39MB
-                    memoryRequired = 39_000_000L, // 39MB
-                    compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT),
-                    preferredFramework = com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT,
-                    contextLength = 0,
-                    supportsThinking = false,
-                    createdAt = com.runanywhere.sdk.utils.SimpleInstant.now(),
-                    updatedAt = com.runanywhere.sdk.utils.SimpleInstant.now()
+            val models =
+                listOf(
+                    // Whisper Base - Real GGML model for JVM/Android
+                    com.runanywhere.sdk.models.ModelInfo(
+                        id = "whisper-base",
+                        name = "Whisper Base",
+                        category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_RECOGNITION,
+                        format = com.runanywhere.sdk.models.enums.ModelFormat.GGML,
+                        downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                        localPath = null,
+                        downloadSize = 74_000_000L, // ~74MB
+                        memoryRequired = 74_000_000L, // 74MB
+                        compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT),
+                        preferredFramework = com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT,
+                        contextLength = 0,
+                        supportsThinking = false,
+                        createdAt =
+                            com.runanywhere.sdk.utils.SimpleInstant
+                                .now(),
+                        updatedAt =
+                            com.runanywhere.sdk.utils.SimpleInstant
+                                .now(),
+                    ),
+                    // Whisper Tiny - Smaller model for faster testing
+                    com.runanywhere.sdk.models.ModelInfo(
+                        id = "whisper-tiny",
+                        name = "Whisper Tiny",
+                        category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_RECOGNITION,
+                        format = com.runanywhere.sdk.models.enums.ModelFormat.GGML,
+                        downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+                        localPath = null,
+                        downloadSize = 39_000_000L, // ~39MB
+                        memoryRequired = 39_000_000L, // 39MB
+                        compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT),
+                        preferredFramework = com.runanywhere.sdk.models.enums.InferenceFramework.WHISPER_KIT,
+                        contextLength = 0,
+                        supportsThinking = false,
+                        createdAt =
+                            com.runanywhere.sdk.utils.SimpleInstant
+                                .now(),
+                        updatedAt =
+                            com.runanywhere.sdk.utils.SimpleInstant
+                                .now(),
+                    ),
                 )
-            )
 
             logger.info("📦 Using ${models.size} hardcoded mock models for development")
 
@@ -951,7 +1005,6 @@ class ServiceContainer {
             } else {
                 logger.error("❌ Whisper Base model not found after adding hardcoded models!")
             }
-
         } catch (e: Exception) {
             logger.error("❌ Failed to populate hardcoded models: ${e.message}", e)
         }
@@ -973,22 +1026,23 @@ class ServiceContainer {
         format: ModelFormat = ModelFormat.GGUF,
         downloadSize: Long? = null,
         sha256Checksum: String? = null,
-        compatibleFrameworks: List<InferenceFramework> = listOf(InferenceFramework.LLAMACPP)
+        compatibleFrameworks: List<InferenceFramework> = listOf(InferenceFramework.LLAMACPP),
     ): ModelHandle {
         logger.info("🚀 Adding model from URL: $modelId")
 
         // Step 1: Create ModelInfo with URL
-        val modelInfo = ModelInfo(
-            id = modelId,
-            name = modelName,
-            category = category,
-            format = format,
-            downloadURL = downloadURL,
-            downloadSize = downloadSize,
-            sha256Checksum = sha256Checksum,
-            compatibleFrameworks = compatibleFrameworks,
-            preferredFramework = compatibleFrameworks.firstOrNull()
-        )
+        val modelInfo =
+            ModelInfo(
+                id = modelId,
+                name = modelName,
+                category = category,
+                format = format,
+                downloadURL = downloadURL,
+                downloadSize = downloadSize,
+                sha256Checksum = sha256Checksum,
+                compatibleFrameworks = compatibleFrameworks,
+                preferredFramework = compatibleFrameworks.firstOrNull(),
+            )
 
         // Step 2: Save to model repository
         logger.info("💾 Saving model to repository: $modelId")
@@ -1032,8 +1086,8 @@ class ServiceContainer {
      * Example: Add a popular model for testing
      * This demonstrates the complete workflow for adding models from URLs
      */
-    suspend fun addExampleModel(): ModelHandle {
-        return addModelFromURL(
+    suspend fun addExampleModel(): ModelHandle =
+        addModelFromURL(
             modelId = "llama-2-7b-chat-q4_0",
             modelName = "Llama 2 7B Chat (Q4_0)",
             downloadURL = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.q4_0.gguf",
@@ -1041,29 +1095,26 @@ class ServiceContainer {
             format = ModelFormat.GGUF,
             downloadSize = 3825866240L, // ~3.8GB
             sha256Checksum = null, // Optional - add real checksum for verification
-            compatibleFrameworks = listOf(InferenceFramework.LLAMACPP)
+            compatibleFrameworks = listOf(InferenceFramework.LLAMACPP),
         )
-    }
 
     /**
      * List all downloaded models
      */
-    suspend fun getDownloadedModels(): List<ModelInfo> {
-        return modelInfoService.getAllModels().filter { it.isDownloaded }
-    }
+    suspend fun getDownloadedModels(): List<ModelInfo> = modelInfoService.getAllModels().filter { it.isDownloaded }
 
     /**
      * Get model download progress (if downloading)
      */
-    suspend fun getModelDownloadProgress(modelId: String): Double? {
-        return downloadService.getActiveDownloads()
+    suspend fun getModelDownloadProgress(modelId: String): Double? =
+        downloadService
+            .getActiveDownloads()
             .find { it.modelId == modelId }
             ?.let { task ->
                 // Get the latest progress (simplified)
                 // In real usage, you'd collect from the Flow
                 null // Progress would be tracked through events
             }
-    }
 
     /**
      * Cleanup all services
@@ -1095,47 +1146,6 @@ class ServiceContainer {
  */
 expect class PlatformContext {
     fun initialize()
-}
-
-/**
- * Simple DownloadService implementation that uses existing FileSystem
- */
-private class SimpleDownloadService(
-    private val fileSystem: FileSystem
-) : DownloadService {
-
-    override suspend fun downloadModel(
-        model: com.runanywhere.sdk.models.ModelInfo,
-        progressHandler: ((com.runanywhere.sdk.services.download.DownloadProgress) -> Unit)?
-    ): String {
-        // For now, return a placeholder path
-        val fileName = model.downloadURL?.substringAfterLast("/") ?: "${model.id}.bin"
-        return "models/$fileName"
-    }
-
-    override fun downloadModelStream(model: com.runanywhere.sdk.models.ModelInfo): Flow<com.runanywhere.sdk.services.download.DownloadProgress> = flow {
-        emit(com.runanywhere.sdk.services.download.DownloadProgress(
-            bytesDownloaded = 0,
-            totalBytes = model.downloadSize ?: 0,
-            state = com.runanywhere.sdk.services.download.DownloadState.Pending
-        ))
-    }
-
-    override fun cancelDownload(modelId: String) {
-        // No-op for now
-    }
-
-    override fun getActiveDownloads(): List<com.runanywhere.sdk.services.download.DownloadTask> {
-        return emptyList()
-    }
-
-    override fun isDownloading(modelId: String): Boolean {
-        return false
-    }
-
-    override suspend fun resumeDownload(modelId: String): String? {
-        return null
-    }
 }
 
 /**

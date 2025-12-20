@@ -19,7 +19,6 @@ import com.runanywhere.sdk.models.enums.ModelFormat
  * Reference: Matches iOS ModelPathUtils.swift structure (adapted for Android conventions)
  */
 object ModelPathUtils {
-
     // ============================================================
     // MARK: - Base Directories
     // ============================================================
@@ -29,18 +28,14 @@ object ModelPathUtils {
      * iOS equivalent: Documents/RunAnywhere/
      * Android equivalent: filesDir/runanywhere/
      */
-    fun getBaseDirectory(): String {
-        return SimplifiedFileManager.shared.baseDirectory.toString()
-    }
+    fun getBaseDirectory(): String = SimplifiedFileManager.shared.baseDirectory.toString()
 
     /**
      * Get the models directory
      * This is where all downloaded models are stored
      * Pattern: {baseDir}/Models/
      */
-    fun getModelsDirectory(): String {
-        return SimplifiedFileManager.shared.modelsDirectory.toString()
-    }
+    fun getModelsDirectory(): String = SimplifiedFileManager.shared.modelsDirectory.toString()
 
     // ============================================================
     // MARK: - Framework-Specific Paths
@@ -65,7 +60,10 @@ object ModelPathUtils {
      * @param framework The framework the model is associated with
      * @return The full path to the model folder
      */
-    fun getModelFolder(modelId: String, framework: InferenceFramework): String {
+    fun getModelFolder(
+        modelId: String,
+        framework: InferenceFramework,
+    ): String {
         val modelsDir = getModelsDirectory()
         return "$modelsDir/${framework.value}/$modelId"
     }
@@ -99,7 +97,11 @@ object ModelPathUtils {
      * @param format The model format (determines file extension)
      * @return The full path to the model file
      */
-    fun getModelFilePath(modelId: String, framework: InferenceFramework, format: ModelFormat): String {
+    fun getModelFilePath(
+        modelId: String,
+        framework: InferenceFramework,
+        format: ModelFormat,
+    ): String {
         val folder = getModelFolder(modelId, framework)
         val extension = format.value
         return "$folder/$modelId.$extension"
@@ -113,7 +115,10 @@ object ModelPathUtils {
      * @param format The model format (determines file extension)
      * @return The full path to the model file
      */
-    fun getModelFilePath(modelId: String, format: ModelFormat): String {
+    fun getModelFilePath(
+        modelId: String,
+        format: ModelFormat,
+    ): String {
         val folder = getModelFolder(modelId)
         val extension = format.value
         return "$folder/$modelId.$extension"
@@ -127,8 +132,9 @@ object ModelPathUtils {
      * @return The full path to the model file
      */
     fun getModelPath(modelInfo: ModelInfo): String {
-        val framework = modelInfo.preferredFramework
-            ?: modelInfo.compatibleFrameworks.firstOrNull()
+        val framework =
+            modelInfo.preferredFramework
+                ?: modelInfo.compatibleFrameworks.firstOrNull()
 
         return if (framework != null) {
             getModelFilePath(modelInfo.id, framework, modelInfo.format)
@@ -146,13 +152,16 @@ object ModelPathUtils {
      * @param format The model format
      * @return The full path to the expected model file
      */
-    fun getExpectedModelPath(modelId: String, framework: InferenceFramework?, format: ModelFormat): String {
-        return if (framework != null) {
+    fun getExpectedModelPath(
+        modelId: String,
+        framework: InferenceFramework?,
+        format: ModelFormat,
+    ): String =
+        if (framework != null) {
             getModelFilePath(modelId, framework, format)
         } else {
             getModelFilePath(modelId, format)
         }
-    }
 
     // ============================================================
     // MARK: - Other Directories
@@ -161,23 +170,17 @@ object ModelPathUtils {
     /**
      * Get the cache directory for SDK operations
      */
-    fun getCacheDirectory(): String {
-        return SimplifiedFileManager.shared.cacheDirectory.toString()
-    }
+    fun getCacheDirectory(): String = SimplifiedFileManager.shared.cacheDirectory.toString()
 
     /**
      * Get the temporary directory for downloads and processing
      */
-    fun getTempDirectory(): String {
-        return SimplifiedFileManager.shared.temporaryDirectory.toString()
-    }
+    fun getTempDirectory(): String = SimplifiedFileManager.shared.temporaryDirectory.toString()
 
     /**
      * Get the downloads directory for in-progress downloads
      */
-    fun getDownloadsDirectory(): String {
-        return SimplifiedFileManager.shared.downloadsDirectory.toString()
-    }
+    fun getDownloadsDirectory(): String = SimplifiedFileManager.shared.downloadsDirectory.toString()
 
     // ============================================================
     // MARK: - Path Analysis Utilities
@@ -236,9 +239,7 @@ object ModelPathUtils {
      * @param path The path to check
      * @return True if the path is within the models directory
      */
-    fun isModelPath(path: String): Boolean {
-        return path.startsWith(getModelsDirectory())
-    }
+    fun isModelPath(path: String): Boolean = path.startsWith(getModelsDirectory())
 
     // ============================================================
     // MARK: - Common Model Paths (for model discovery)
@@ -261,7 +262,7 @@ object ModelPathUtils {
             "$modelsDir/${InferenceFramework.ONNX.value}/$modelId",
             "$modelsDir/${InferenceFramework.WHISPER_KIT.value}/$modelId",
             "$modelsDir/${InferenceFramework.CORE_ML.value}/$modelId",
-            "$modelsDir/${InferenceFramework.MLC.value}/$modelId"
+            "$modelsDir/${InferenceFramework.MLC.value}/$modelId",
         )
     }
 

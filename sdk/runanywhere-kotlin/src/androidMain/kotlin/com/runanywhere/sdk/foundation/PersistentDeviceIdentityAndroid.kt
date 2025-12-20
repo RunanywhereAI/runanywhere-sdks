@@ -11,15 +11,17 @@ import java.security.MessageDigest
  * Uses Android system APIs to gather device information
  */
 
-// Get the Android context from the platform context
-private fun getAndroidContext(): Context? {
-    return try {
+/**
+ * Get the Android context from the platform context
+ */
+private fun getAndroidContext(): Context? =
+    try {
         // This will be provided by the Android platform setup
-        com.runanywhere.sdk.foundation.getAndroidApplicationContext()
+        com.runanywhere.sdk.foundation
+            .getAndroidApplicationContext()
     } catch (e: Exception) {
         null
     }
-}
 
 /**
  * Get platform vendor UUID - uses Android ID when available
@@ -30,10 +32,11 @@ actual suspend fun getPlatformVendorUUID(): String? {
         val context = getAndroidContext() ?: return null
 
         // Use Android ID as vendor UUID
-        val androidId = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ANDROID_ID
-        )
+        val androidId =
+            Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ANDROID_ID,
+            )
 
         if (androidId != null && androidId != "9774d56d682e549c") { // Default emulator ID
             // Format as UUID
@@ -46,11 +49,22 @@ actual suspend fun getPlatformVendorUUID(): String? {
             bytes[8] = (bytes[8].toInt() and 0x3f or 0x80).toByte() // Variant bits
 
             "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x".format(
-                bytes[0], bytes[1], bytes[2], bytes[3],
-                bytes[4], bytes[5],
-                bytes[6], bytes[7],
-                bytes[8], bytes[9],
-                bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+                bytes[0],
+                bytes[1],
+                bytes[2],
+                bytes[3],
+                bytes[4],
+                bytes[5],
+                bytes[6],
+                bytes[7],
+                bytes[8],
+                bytes[9],
+                bytes[10],
+                bytes[11],
+                bytes[12],
+                bytes[13],
+                bytes[14],
+                bytes[15],
             )
         } else {
             null
@@ -70,11 +84,12 @@ actual fun getPlatformDeviceInfo(): PlatformDeviceInfo {
     val totalMemory = runtime.maxMemory()
 
     // Get architecture
-    val architecture = when {
-        Build.SUPPORTED_64_BIT_ABIS.isNotEmpty() -> "arm64"
-        Build.SUPPORTED_32_BIT_ABIS.isNotEmpty() -> "arm32"
-        else -> Build.CPU_ABI ?: "unknown"
-    }
+    val architecture =
+        when {
+            Build.SUPPORTED_64_BIT_ABIS.isNotEmpty() -> "arm64"
+            Build.SUPPORTED_32_BIT_ABIS.isNotEmpty() -> "arm32"
+            else -> Build.CPU_ABI ?: "unknown"
+        }
 
     // Get core count
     val coreCount = runtime.availableProcessors()
@@ -90,15 +105,15 @@ actual fun getPlatformDeviceInfo(): PlatformDeviceInfo {
         architecture = architecture,
         coreCount = coreCount,
         deviceModel = deviceModel,
-        osMajorVersion = osMajorVersion
+        osMajorVersion = osMajorVersion,
     )
 }
 
 /**
  * Platform-specific SHA256 implementation
  */
-actual fun platformSha256(input: String): String {
-    return try {
+actual fun platformSha256(input: String): String =
+    try {
         val digest = MessageDigest.getInstance("SHA-256")
         val hash = digest.digest(input.toByteArray(Charsets.UTF_8))
         hash.joinToString("") { "%02x".format(it) }
@@ -106,14 +121,12 @@ actual fun platformSha256(input: String): String {
         // Fallback to hashCode if SHA256 is not available
         input.hashCode().toString(16)
     }
-}
 
 /**
  * Extended Android device information collector
  * Provides comprehensive system information for device registration
  */
 object AndroidDeviceInfoCollector {
-
     /**
      * Collect comprehensive device information for registration
      */
@@ -171,7 +184,6 @@ object AndroidDeviceInfoCollector {
             // Bootloader and fingerprint
             info["bootloader"] = Build.BOOTLOADER
             info["fingerprint"] = Build.FINGERPRINT
-
         } catch (e: Exception) {
             info["collection_error"] = e.message ?: "Unknown error"
         }
@@ -192,62 +204,68 @@ object AndroidDeviceInfoCollector {
             val sdkInt = Build.VERSION.SDK_INT
 
             // Memory capability
-            capabilities["memory_tier"] = when {
-                maxMemoryMB >= 8192 -> "high"     // 8GB+
-                maxMemoryMB >= 6144 -> "medium"   // 6GB+
-                maxMemoryMB >= 4096 -> "low"      // 4GB+
-                else -> "minimal"                 // < 4GB
-            }
+            capabilities["memory_tier"] =
+                when {
+                    maxMemoryMB >= 8192 -> "high" // 8GB+
+                    maxMemoryMB >= 6144 -> "medium" // 6GB+
+                    maxMemoryMB >= 4096 -> "low" // 4GB+
+                    else -> "minimal" // < 4GB
+                }
 
             // CPU capability
-            capabilities["cpu_tier"] = when {
-                processors >= 8 -> "high"        // 8+ cores
-                processors >= 6 -> "medium"      // 6+ cores
-                processors >= 4 -> "low"         // 4+ cores
-                else -> "minimal"                 // < 4 cores
-            }
+            capabilities["cpu_tier"] =
+                when {
+                    processors >= 8 -> "high" // 8+ cores
+                    processors >= 6 -> "medium" // 6+ cores
+                    processors >= 4 -> "low" // 4+ cores
+                    else -> "minimal" // < 4 cores
+                }
 
             // OS capability
-            capabilities["os_tier"] = when {
-                sdkInt >= 33 -> "high"           // Android 13+
-                sdkInt >= 30 -> "medium"         // Android 11+
-                sdkInt >= 26 -> "low"            // Android 8+
-                else -> "minimal"                // < Android 8
-            }
+            capabilities["os_tier"] =
+                when {
+                    sdkInt >= 33 -> "high" // Android 13+
+                    sdkInt >= 30 -> "medium" // Android 11+
+                    sdkInt >= 26 -> "low" // Android 8+
+                    else -> "minimal" // < Android 8
+                }
 
             // Overall capability score (0-100)
             var score = 0
-            score += when {
-                maxMemoryMB >= 8192 -> 35
-                maxMemoryMB >= 6144 -> 25
-                maxMemoryMB >= 4096 -> 15
-                else -> 5
-            }
-            score += when {
-                processors >= 8 -> 25
-                processors >= 6 -> 20
-                processors >= 4 -> 15
-                else -> 5
-            }
-            score += when {
-                sdkInt >= 33 -> 20
-                sdkInt >= 30 -> 15
-                sdkInt >= 26 -> 10
-                else -> 5
-            }
+            score +=
+                when {
+                    maxMemoryMB >= 8192 -> 35
+                    maxMemoryMB >= 6144 -> 25
+                    maxMemoryMB >= 4096 -> 15
+                    else -> 5
+                }
+            score +=
+                when {
+                    processors >= 8 -> 25
+                    processors >= 6 -> 20
+                    processors >= 4 -> 15
+                    else -> 5
+                }
+            score +=
+                when {
+                    sdkInt >= 33 -> 20
+                    sdkInt >= 30 -> 15
+                    sdkInt >= 26 -> 10
+                    else -> 5
+                }
             // Add bonus for 64-bit support
             if (Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()) {
                 score += 15
             }
 
             capabilities["capability_score"] = minOf(score, 100)
-            capabilities["recommended_models"] = when {
-                score >= 80 -> listOf("medium", "small", "tiny")
-                score >= 60 -> listOf("small", "tiny")
-                score >= 40 -> listOf("tiny")
-                else -> listOf("tiny")
-            }
-
+            capabilities["recommended_models"] =
+                when {
+                    score >= 80 -> listOf("medium", "small", "tiny")
+                    score >= 60 -> listOf("small", "tiny")
+                    score >= 40 -> listOf("tiny")
+                    else -> listOf("tiny")
+                }
         } catch (e: Exception) {
             capabilities["error"] = e.message ?: "Unknown error"
         }
@@ -260,6 +278,4 @@ object AndroidDeviceInfoCollector {
  * Function to get Android application context
  * Uses the existing AndroidPlatformContext
  */
-private fun getAndroidApplicationContext(): Context {
-    return com.runanywhere.sdk.storage.AndroidPlatformContext.applicationContext
-}
+private fun getAndroidApplicationContext(): Context = com.runanywhere.sdk.storage.AndroidPlatformContext.applicationContext

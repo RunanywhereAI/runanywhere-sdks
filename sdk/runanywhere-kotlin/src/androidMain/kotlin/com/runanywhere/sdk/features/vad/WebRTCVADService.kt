@@ -18,7 +18,6 @@ actual fun createPlatformVADService(): VADService = WebRTCVADService()
  * Provides robust voice activity detection using the WebRTC GMM-based algorithm
  */
 class WebRTCVADService : VADService {
-
     private val logger = SDKLogger("WebRTCVADService")
     private var config: VADConfiguration? = null
     private var vadInstance: VadWebRTC? = null
@@ -54,18 +53,18 @@ class WebRTCVADService : VADService {
                 val mode = Mode.AGGRESSIVE // Default to aggressive mode
 
                 // Create VAD instance with speech and silence duration settings
-                vadInstance = VadWebRTC(
-                    sampleRate = sampleRate,
-                    frameSize = frameSize,
-                    mode = mode,
-                    speechDurationMs = 50, // Minimum speech duration in ms
-                    silenceDurationMs = 500 // Default silence duration in ms
-                )
+                vadInstance =
+                    VadWebRTC(
+                        sampleRate = sampleRate,
+                        frameSize = frameSize,
+                        mode = mode,
+                        speechDurationMs = 50, // Minimum speech duration in ms
+                        silenceDurationMs = 500, // Default silence duration in ms
+                    )
 
                 isInitialized = true
                 logger.info("WebRTC VAD Service initialized successfully")
                 logger.info("Sample Rate: ${sampleRate.value}Hz, Frame Size: ${frameSize.value}, Mode: $mode")
-
             } catch (e: Exception) {
                 logger.error("Failed to initialize WebRTC VAD", e)
                 throw VADError.ConfigurationError
@@ -88,9 +87,7 @@ class WebRTCVADService : VADService {
         logger.info("WebRTC VAD stopped")
     }
 
-    override fun processAudioData(audioData: FloatArray): Boolean {
-        return processAudioChunk(audioData).isSpeechDetected
-    }
+    override fun processAudioData(audioData: FloatArray): Boolean = processAudioChunk(audioData).isSpeechDetected
 
     override fun processAudioChunk(audioSamples: FloatArray): VADResult {
         if (!isInitialized || vadInstance == null || !isActive) {
@@ -108,16 +105,17 @@ class WebRTCVADService : VADService {
             onAudioBuffer?.invoke(floatArrayToByteArray(audioSamples))
 
             // Calculate confidence based on the audio energy
-            val confidence = if (isSpeech) {
-                0.85f // WebRTC VAD doesn't provide confidence, use high value for speech
-            } else {
-                0.15f // Low confidence for non-speech
-            }
+            val confidence =
+                if (isSpeech) {
+                    0.85f // WebRTC VAD doesn't provide confidence, use high value for speech
+                } else {
+                    0.15f // Low confidence for non-speech
+                }
 
             VADResult(
                 isSpeechDetected = isSpeech,
                 confidence = confidence,
-                timestamp = System.currentTimeMillis()
+                timestamp = System.currentTimeMillis(),
             )
         } catch (e: Exception) {
             logger.error("Error processing audio chunk", e)
@@ -136,13 +134,14 @@ class WebRTCVADService : VADService {
                 val frameSize = mapFrameSize(config!!.sampleRate, config!!.frameLength)
                 val mode = Mode.AGGRESSIVE // Default to aggressive mode
 
-                vadInstance = VadWebRTC(
-                    sampleRate = sampleRate,
-                    frameSize = frameSize,
-                    mode = mode,
-                    speechDurationMs = 50,
-                    silenceDurationMs = 500 // Default silence duration
-                )
+                vadInstance =
+                    VadWebRTC(
+                        sampleRate = sampleRate,
+                        frameSize = frameSize,
+                        mode = mode,
+                        speechDurationMs = 50,
+                        silenceDurationMs = 500, // Default silence duration
+                    )
 
                 logger.debug("VAD state reset")
             } catch (e: Exception) {
@@ -171,8 +170,8 @@ class WebRTCVADService : VADService {
     /**
      * Map our sample rate to WebRTC VAD sample rate
      */
-    private fun mapSampleRate(sampleRate: Int): SampleRate {
-        return when (sampleRate) {
+    private fun mapSampleRate(sampleRate: Int): SampleRate =
+        when (sampleRate) {
             8000 -> SampleRate.SAMPLE_RATE_8K
             16000 -> SampleRate.SAMPLE_RATE_16K
             32000 -> SampleRate.SAMPLE_RATE_32K
@@ -182,44 +181,50 @@ class WebRTCVADService : VADService {
                 SampleRate.SAMPLE_RATE_16K
             }
         }
-    }
 
     /**
      * Map frame duration to WebRTC VAD frame size based on sample rate
      */
-    private fun mapFrameSize(sampleRate: Int, frameLength: Float): FrameSize {
+    private fun mapFrameSize(
+        sampleRate: Int,
+        frameLength: Float,
+    ): FrameSize {
         val frameDurationMs = (frameLength * 1000).toInt()
         // Calculate frame size in samples
         val frameSizeSamples = (sampleRate * frameDurationMs) / 1000
 
         return when (sampleRate) {
-            8000 -> when (frameSizeSamples) {
-                80 -> FrameSize.FRAME_SIZE_80
-                160 -> FrameSize.FRAME_SIZE_160
-                240 -> FrameSize.FRAME_SIZE_240
-                else -> FrameSize.FRAME_SIZE_160 // Default for 8kHz
-            }
+            8000 ->
+                when (frameSizeSamples) {
+                    80 -> FrameSize.FRAME_SIZE_80
+                    160 -> FrameSize.FRAME_SIZE_160
+                    240 -> FrameSize.FRAME_SIZE_240
+                    else -> FrameSize.FRAME_SIZE_160 // Default for 8kHz
+                }
 
-            16000 -> when (frameSizeSamples) {
-                160 -> FrameSize.FRAME_SIZE_160
-                320 -> FrameSize.FRAME_SIZE_320
-                480 -> FrameSize.FRAME_SIZE_480
-                else -> FrameSize.FRAME_SIZE_320 // Default for 16kHz
-            }
+            16000 ->
+                when (frameSizeSamples) {
+                    160 -> FrameSize.FRAME_SIZE_160
+                    320 -> FrameSize.FRAME_SIZE_320
+                    480 -> FrameSize.FRAME_SIZE_480
+                    else -> FrameSize.FRAME_SIZE_320 // Default for 16kHz
+                }
 
-            32000 -> when (frameSizeSamples) {
-                320 -> FrameSize.FRAME_SIZE_320
-                640 -> FrameSize.FRAME_SIZE_640
-                960 -> FrameSize.FRAME_SIZE_960
-                else -> FrameSize.FRAME_SIZE_640 // Default for 32kHz
-            }
+            32000 ->
+                when (frameSizeSamples) {
+                    320 -> FrameSize.FRAME_SIZE_320
+                    640 -> FrameSize.FRAME_SIZE_640
+                    960 -> FrameSize.FRAME_SIZE_960
+                    else -> FrameSize.FRAME_SIZE_640 // Default for 32kHz
+                }
 
-            48000 -> when (frameSizeSamples) {
-                480 -> FrameSize.FRAME_SIZE_480
-                960 -> FrameSize.FRAME_SIZE_960
-                1440 -> FrameSize.FRAME_SIZE_1440
-                else -> FrameSize.FRAME_SIZE_960 // Default for 48kHz
-            }
+            48000 ->
+                when (frameSizeSamples) {
+                    480 -> FrameSize.FRAME_SIZE_480
+                    960 -> FrameSize.FRAME_SIZE_960
+                    1440 -> FrameSize.FRAME_SIZE_1440
+                    else -> FrameSize.FRAME_SIZE_960 // Default for 48kHz
+                }
 
             else -> {
                 logger.warning("Using default frame size for sample rate $sampleRate")
@@ -232,7 +237,7 @@ class WebRTCVADService : VADService {
         if (isSpeech != currentSpeechState) {
             currentSpeechState = isSpeech
             onSpeechActivity?.invoke(
-                if (isSpeech) SpeechActivityEvent.STARTED else SpeechActivityEvent.ENDED
+                if (isSpeech) SpeechActivityEvent.STARTED else SpeechActivityEvent.ENDED,
             )
         }
     }

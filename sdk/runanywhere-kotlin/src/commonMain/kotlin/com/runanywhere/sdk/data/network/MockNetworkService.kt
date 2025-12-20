@@ -12,7 +12,6 @@ import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.utils.SimpleInstant
 import kotlinx.coroutines.delay
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 /**
@@ -21,12 +20,12 @@ import kotlinx.serialization.json.Json
  * Enhanced to support generic type methods
  */
 class MockNetworkService : NetworkService {
-
     private val logger = SDKLogger("MockNetworkService")
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
 
     /**
      * Simulated network delay in milliseconds
@@ -39,7 +38,7 @@ class MockNetworkService : NetworkService {
     override suspend fun <T : Any, R : Any> post(
         endpoint: APIEndpoint,
         payload: T,
-        requiresAuth: Boolean
+        requiresAuth: Boolean,
     ): R {
         logger.debug("Mock POST with typed payload to ${endpoint.url}")
 
@@ -54,7 +53,7 @@ class MockNetworkService : NetworkService {
      */
     override suspend fun <R : Any> get(
         endpoint: APIEndpoint,
-        requiresAuth: Boolean
+        requiresAuth: Boolean,
     ): R {
         logger.debug("Mock GET with typed response from ${endpoint.url}")
 
@@ -67,7 +66,7 @@ class MockNetworkService : NetworkService {
     override suspend fun postRaw(
         endpoint: APIEndpoint,
         payload: ByteArray,
-        requiresAuth: Boolean
+        requiresAuth: Boolean,
     ): ByteArray {
         // Simulate network delay
         delay(mockDelay)
@@ -80,7 +79,7 @@ class MockNetworkService : NetworkService {
 
     override suspend fun getRaw(
         endpoint: APIEndpoint,
-        requiresAuth: Boolean
+        requiresAuth: Boolean,
     ): ByteArray {
         // Simulate network delay
         delay(mockDelay)
@@ -94,8 +93,12 @@ class MockNetworkService : NetworkService {
     /**
      * Get mock response for any endpoint
      */
-    private fun getMockResponse(endpoint: APIEndpoint, method: String): ByteArray {
-        return when (endpoint) {
+    @Suppress("UNUSED_PARAMETER")
+    private fun getMockResponse(
+        endpoint: APIEndpoint,
+        method: String,
+    ): ByteArray =
+        when (endpoint) {
             APIEndpoint.models -> getMockModelsResponse()
             APIEndpoint.configuration -> getMockConfigurationResponse()
             APIEndpoint.telemetry -> ByteArray(0) // Empty response for telemetry
@@ -109,18 +112,18 @@ class MockNetworkService : NetworkService {
             APIEndpoint.history -> getMockHistoryResponse()
             APIEndpoint.preferences -> getMockPreferencesResponse()
         }
-    }
 
     /**
      * Get mock auth response
      */
     private fun getMockAuthResponse(): ByteArray {
-        val response = mapOf(
-            "accessToken" to "mock-access-token-${System.currentTimeMillis()}",
-            "refreshToken" to "mock-refresh-token-${System.currentTimeMillis()}",
-            "expiresIn" to 3600,
-            "tokenType" to "Bearer"
-        )
+        val response =
+            mapOf(
+                "accessToken" to "mock-access-token-${System.currentTimeMillis()}",
+                "refreshToken" to "mock-refresh-token-${System.currentTimeMillis()}",
+                "expiresIn" to 3600,
+                "tokenType" to "Bearer",
+            )
         return json.encodeToString(response).encodeToByteArray()
     }
 
@@ -128,12 +131,13 @@ class MockNetworkService : NetworkService {
      * Get mock refresh token response
      */
     private fun getMockRefreshTokenResponse(): ByteArray {
-        val response = mapOf(
-            "accessToken" to "mock-new-access-token-${System.currentTimeMillis()}",
-            "refreshToken" to "mock-new-refresh-token-${System.currentTimeMillis()}",
-            "expiresIn" to 3600,
-            "tokenType" to "Bearer"
-        )
+        val response =
+            mapOf(
+                "accessToken" to "mock-new-access-token-${System.currentTimeMillis()}",
+                "refreshToken" to "mock-new-refresh-token-${System.currentTimeMillis()}",
+                "expiresIn" to 3600,
+                "tokenType" to "Bearer",
+            )
         return json.encodeToString(response).encodeToByteArray()
     }
 
@@ -149,11 +153,12 @@ class MockNetworkService : NetworkService {
      * Get mock preferences response
      */
     private fun getMockPreferencesResponse(): ByteArray {
-        val preferences = mapOf(
-            "preferOnDevice" to true,
-            "maxCostPerRequest" to 0.01,
-            "preferredModels" to emptyList<String>()
-        )
+        val preferences =
+            mapOf(
+                "preferOnDevice" to true,
+                "maxCostPerRequest" to 0.01,
+                "preferredModels" to emptyList<String>(),
+            )
         return json.encodeToString(preferences).encodeToByteArray()
     }
 
@@ -162,10 +167,11 @@ class MockNetworkService : NetworkService {
      */
     private fun getMockModelsResponse(): ByteArray {
         val models = createComprehensiveMockModels()
-        val response = mapOf(
-            "models" to models,
-            "timestamp" to SimpleInstant.now().toEpochMilliseconds()
-        )
+        val response =
+            mapOf(
+                "models" to models,
+                "timestamp" to SimpleInstant.now().toEpochMilliseconds(),
+            )
         return json.encodeToString(response).encodeToByteArray()
     }
 
@@ -173,12 +179,13 @@ class MockNetworkService : NetworkService {
      * Get mock device info response
      */
     private fun getMockDeviceInfoResponse(): ByteArray {
-        val deviceInfo = mapOf(
-            "deviceId" to "mock-device-id",
-            "platform" to "KMP",
-            "osVersion" to "1.0.0",
-            "appVersion" to "1.0.0"
-        )
+        val deviceInfo =
+            mapOf(
+                "deviceId" to "mock-device-id",
+                "platform" to "KMP",
+                "osVersion" to "1.0.0",
+                "appVersion" to "1.0.0",
+            )
         return json.encodeToString(deviceInfo).encodeToByteArray()
     }
 
@@ -186,20 +193,23 @@ class MockNetworkService : NetworkService {
      * Get mock configuration response
      */
     private fun getMockConfigurationResponse(): ByteArray {
-        val config = mapOf(
-            "version" to "1.0.0",
-            "minSdkVersion" to "1.0.0",
-            "features" to mapOf(
-                "stt" to true,
-                "tts" to true,
-                "llm" to true,
-                "vad" to true
-            ),
-            "endpoints" to mapOf(
-                "api" to "https://api.runanywhere.ai",
-                "cdn" to "https://cdn.runanywhere.ai"
+        val config =
+            mapOf(
+                "version" to "1.0.0",
+                "minSdkVersion" to "1.0.0",
+                "features" to
+                    mapOf(
+                        "stt" to true,
+                        "tts" to true,
+                        "llm" to true,
+                        "vad" to true,
+                    ),
+                "endpoints" to
+                    mapOf(
+                        "api" to "https://api.runanywhere.ai",
+                        "cdn" to "https://cdn.runanywhere.ai",
+                    ),
             )
-        )
         return json.encodeToString(config).encodeToByteArray()
     }
 
@@ -207,11 +217,12 @@ class MockNetworkService : NetworkService {
      * Get mock status response
      */
     private fun getMockStatusResponse(): ByteArray {
-        val status = mapOf(
-            "status" to "healthy",
-            "version" to "1.0.0",
-            "timestamp" to SimpleInstant.now().toEpochMilliseconds()
-        )
+        val status =
+            mapOf(
+                "status" to "healthy",
+                "version" to "1.0.0",
+                "timestamp" to SimpleInstant.now().toEpochMilliseconds(),
+            )
         return json.encodeToString(status).encodeToByteArray()
     }
 
@@ -234,8 +245,8 @@ class MockNetworkService : NetworkService {
         return models
     }
 
-    private fun createWhisperModels(): List<ModelInfo> {
-        return listOf(
+    private fun createWhisperModels(): List<ModelInfo> =
+        listOf(
             ModelInfo(
                 id = "whisper-tiny",
                 name = "Whisper Tiny",
@@ -246,12 +257,13 @@ class MockNetworkService : NetworkService {
                 memoryRequired = 100_000_000L,
                 compatibleFrameworks = listOf(InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP),
                 preferredFramework = InferenceFramework.WHISPER_KIT,
-                metadata = ModelInfoMetadata(
-                    description = "Smallest and fastest Whisper model",
-                    version = "1.0.0",
-                    quantizationLevel = QuantizationLevel.F16
-                ),
-                source = ConfigurationSource.REMOTE
+                metadata =
+                    ModelInfoMetadata(
+                        description = "Smallest and fastest Whisper model",
+                        version = "1.0.0",
+                        quantizationLevel = QuantizationLevel.F16,
+                    ),
+                source = ConfigurationSource.REMOTE,
             ),
             ModelInfo(
                 id = "whisper-base",
@@ -263,12 +275,13 @@ class MockNetworkService : NetworkService {
                 memoryRequired = 200_000_000L,
                 compatibleFrameworks = listOf(InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP),
                 preferredFramework = InferenceFramework.WHISPER_KIT,
-                metadata = ModelInfoMetadata(
-                    description = "Good balance between speed and accuracy",
-                    version = "1.0.0",
-                    quantizationLevel = QuantizationLevel.F16
-                ),
-                source = ConfigurationSource.REMOTE
+                metadata =
+                    ModelInfoMetadata(
+                        description = "Good balance between speed and accuracy",
+                        version = "1.0.0",
+                        quantizationLevel = QuantizationLevel.F16,
+                    ),
+                source = ConfigurationSource.REMOTE,
             ),
             ModelInfo(
                 id = "whisper-small",
@@ -280,18 +293,18 @@ class MockNetworkService : NetworkService {
                 memoryRequired = 500_000_000L,
                 compatibleFrameworks = listOf(InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP),
                 preferredFramework = InferenceFramework.WHISPER_KIT,
-                metadata = ModelInfoMetadata(
-                    description = "Better accuracy with reasonable performance",
-                    version = "1.0.0",
-                    quantizationLevel = QuantizationLevel.F16
-                ),
-                source = ConfigurationSource.REMOTE
-            )
+                metadata =
+                    ModelInfoMetadata(
+                        description = "Better accuracy with reasonable performance",
+                        version = "1.0.0",
+                        quantizationLevel = QuantizationLevel.F16,
+                    ),
+                source = ConfigurationSource.REMOTE,
+            ),
         )
-    }
 
-    private fun createLLMModels(): List<ModelInfo> {
-        return listOf(
+    private fun createLLMModels(): List<ModelInfo> =
+        listOf(
             ModelInfo(
                 id = "llama-3.2-1b",
                 name = "Llama 3.2 1B",
@@ -302,12 +315,13 @@ class MockNetworkService : NetworkService {
                 memoryRequired = 2_000_000_000L,
                 compatibleFrameworks = listOf(InferenceFramework.LLAMA_CPP, InferenceFramework.MLX),
                 preferredFramework = InferenceFramework.LLAMA_CPP,
-                metadata = ModelInfoMetadata(
-                    description = "Small but capable language model",
-                    version = "3.2",
-                    quantizationLevel = QuantizationLevel.Q4_K_M
-                ),
-                source = ConfigurationSource.REMOTE
+                metadata =
+                    ModelInfoMetadata(
+                        description = "Small but capable language model",
+                        version = "3.2",
+                        quantizationLevel = QuantizationLevel.Q4_K_M,
+                    ),
+                source = ConfigurationSource.REMOTE,
             ),
             ModelInfo(
                 id = "llama-3.2-3b",
@@ -319,18 +333,18 @@ class MockNetworkService : NetworkService {
                 memoryRequired = 4_000_000_000L,
                 compatibleFrameworks = listOf(InferenceFramework.LLAMA_CPP, InferenceFramework.MLX),
                 preferredFramework = InferenceFramework.LLAMA_CPP,
-                metadata = ModelInfoMetadata(
-                    description = "Balanced performance and capability",
-                    version = "3.2",
-                    quantizationLevel = QuantizationLevel.Q4_K_M
-                ),
-                source = ConfigurationSource.REMOTE
-            )
+                metadata =
+                    ModelInfoMetadata(
+                        description = "Balanced performance and capability",
+                        version = "3.2",
+                        quantizationLevel = QuantizationLevel.Q4_K_M,
+                    ),
+                source = ConfigurationSource.REMOTE,
+            ),
         )
-    }
 
-    private fun createTTSModels(): List<ModelInfo> {
-        return listOf(
+    private fun createTTSModels(): List<ModelInfo> =
+        listOf(
             ModelInfo(
                 id = "piper-en-us",
                 name = "Piper English US",
@@ -341,13 +355,13 @@ class MockNetworkService : NetworkService {
                 memoryRequired = 150_000_000L,
                 compatibleFrameworks = listOf(InferenceFramework.ONNX),
                 preferredFramework = InferenceFramework.ONNX,
-                metadata = ModelInfoMetadata(
-                    description = "Natural English voice synthesis",
-                    version = "1.0.0",
-                    quantizationLevel = QuantizationLevel.F32
-                ),
-                source = ConfigurationSource.REMOTE
-            )
+                metadata =
+                    ModelInfoMetadata(
+                        description = "Natural English voice synthesis",
+                        version = "1.0.0",
+                        quantizationLevel = QuantizationLevel.F32,
+                    ),
+                source = ConfigurationSource.REMOTE,
+            ),
         )
-    }
 }

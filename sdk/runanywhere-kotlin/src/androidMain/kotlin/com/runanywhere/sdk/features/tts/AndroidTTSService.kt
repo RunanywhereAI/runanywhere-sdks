@@ -4,10 +4,6 @@ import android.content.Context
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import com.runanywhere.sdk.features.tts.TTSService
-import com.runanywhere.sdk.features.tts.TTSVoice
-import com.runanywhere.sdk.features.tts.TTSGender
-import com.runanywhere.sdk.features.tts.TTSOptions
 import com.runanywhere.sdk.data.models.ModelInfo
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
@@ -19,7 +15,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Locale
 import kotlin.coroutines.resume
@@ -37,73 +32,75 @@ import kotlin.coroutines.resumeWithException
  * - Comprehensive error handling
  * - Audio file generation support
  */
-class AndroidTTSService(private val context: Context) : TTSService {
-
+class AndroidTTSService(
+    private val context: Context,
+) : TTSService {
     private val logger = SDKLogger("AndroidTTSService")
     private var textToSpeech: TextToSpeech? = null
-    private var _isInitialized = false
+    private var isInitialized = false
     private var _isSynthesizing = false
     private val availableTTSVoices = mutableListOf<TTSVoice>()
     private val synthesisLock = Mutex()
 
-    companion object {
-        private const val DEFAULT_SAMPLE_RATE = 16000
-    }
-
     /**
      * Initialize the TTS engine (iOS equivalent)
      */
-    override suspend fun initialize() = suspendCancellableCoroutine { cont ->
-        logger.info("Initializing Android TTS service")
+    override suspend fun initialize() =
+        suspendCancellableCoroutine { cont ->
+            logger.info("Initializing Android TTS service")
 
-        textToSpeech = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                try {
-                    // Set language to US English by default
-                    val result = textToSpeech?.setLanguage(Locale.US)
+            textToSpeech =
+                TextToSpeech(context) { status ->
+                    if (status == TextToSpeech.SUCCESS) {
+                        try {
+                            // Set language to US English by default
+                            val result = textToSpeech?.setLanguage(Locale.US)
 
-                    _isInitialized = result != TextToSpeech.LANG_MISSING_DATA &&
-                            result != TextToSpeech.LANG_NOT_SUPPORTED
+                            isInitialized = result != TextToSpeech.LANG_MISSING_DATA &&
+                                result != TextToSpeech.LANG_NOT_SUPPORTED
 
-                    if (!_isInitialized) {
-                        cont.resumeWithException(SDKError.ComponentFailure("Language not supported"))
-                        return@TextToSpeech
+                            if (!isInitialized) {
+                                cont.resumeWithException(SDKError.ComponentFailure("Language not supported"))
+                                return@TextToSpeech
+                            }
+
+                            // Configure TTS parameters
+                            textToSpeech?.apply {
+                                setSpeechRate(1.0f) // Normal speed
+                                setPitch(1.0f) // Normal pitch
+                            }
+
+                            // Load available voices
+                            loadAvailableVoices()
+
+                            logger.info("Android TTS service initialized with ${availableTTSVoices.size} voices")
+                            cont.resume(Unit)
+                        } catch (e: Exception) {
+                            isInitialized = false
+                            logger.error("Failed to initialize TTS", e)
+                            cont.resumeWithException(e)
+                        }
+                    } else {
+                        isInitialized = false
+                        logger.error("TTS initialization failed with status: $status")
+                        cont.resumeWithException(SDKError.ComponentFailure("TTS initialization failed"))
                     }
-
-                    // Configure TTS parameters
-                    textToSpeech?.apply {
-                        setSpeechRate(1.0f) // Normal speed
-                        setPitch(1.0f) // Normal pitch
-                    }
-
-                    // Load available voices
-                    loadAvailableVoices()
-
-                    logger.info("Android TTS service initialized with ${availableTTSVoices.size} voices")
-                    cont.resume(Unit)
-                } catch (e: Exception) {
-                    _isInitialized = false
-                    logger.error("Failed to initialize TTS", e)
-                    cont.resumeWithException(e)
                 }
-            } else {
-                _isInitialized = false
-                logger.error("TTS initialization failed with status: $status")
-                cont.resumeWithException(SDKError.ComponentFailure("TTS initialization failed"))
+
+            cont.invokeOnCancellation {
+                textToSpeech?.shutdown()
             }
         }
-
-        cont.invokeOnCancellation {
-            textToSpeech?.shutdown()
-        }
-    }
 
     /**
      * iOS-style synthesize method with TTSOptions
      * Matches: func synthesize(text: String, options: TTSOptions) async throws -> Data
      */
-    override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
-        if (!_isInitialized) {
+    override suspend fun synthesize(
+        text: String,
+        options: TTSOptions,
+    ): ByteArray {
+        if (!isInitialized) {
             throw SDKError.ComponentNotReady("TTS service not initialized")
         }
 
@@ -126,9 +123,9 @@ class AndroidTTSService(private val context: Context) : TTSService {
     override suspend fun synthesizeStream(
         text: String,
         options: TTSOptions,
-        onChunk: suspend (ByteArray) -> Unit
+        onChunk: suspend (ByteArray) -> Unit,
     ) {
-        if (!_isInitialized) {
+        if (!isInitialized) {
             throw SDKError.ComponentNotReady("TTS service not initialized")
         }
 
@@ -155,29 +152,33 @@ class AndroidTTSService(private val context: Context) : TTSService {
     /**
      * KMP Flow-based streaming (Kotlin-native pattern)
      */
-    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> = flow {
-        if (!_isInitialized) {
-            throw SDKError.ComponentNotReady("TTS service not initialized")
-        }
-
-        _isSynthesizing = true
-        try {
-            logger.debug("Starting Flow-based streaming synthesis")
-
-            // Split text into sentences and synthesize each
-            val sentences = text.split(Regex("[.!?]+")).filter { it.trim().isNotEmpty() }
-
-            for (sentence in sentences) {
-                val audioData = synthesize(sentence.trim(), options)
-                if (audioData.isNotEmpty()) {
-                    emit(audioData)
-                }
-                delay(100)
+    override fun synthesizeStream(
+        text: String,
+        options: TTSOptions,
+    ): Flow<ByteArray> =
+        flow {
+            if (!isInitialized) {
+                throw SDKError.ComponentNotReady("TTS service not initialized")
             }
-        } finally {
-            _isSynthesizing = false
+
+            _isSynthesizing = true
+            try {
+                logger.debug("Starting Flow-based streaming synthesis")
+
+                // Split text into sentences and synthesize each
+                val sentences = text.split(Regex("[.!?]+")).filter { it.trim().isNotEmpty() }
+
+                for (sentence in sentences) {
+                    val audioData = synthesize(sentence.trim(), options)
+                    if (audioData.isNotEmpty()) {
+                        emit(audioData)
+                    }
+                    delay(100)
+                }
+            } finally {
+                _isSynthesizing = false
+            }
         }
-    }
 
     /**
      * Stop current synthesis (iOS equivalent)
@@ -197,9 +198,7 @@ class AndroidTTSService(private val context: Context) : TTSService {
     /**
      * Get rich voice objects (KMP enhancement)
      */
-    override fun getAllVoices(): List<TTSVoice> {
-        return availableTTSVoices.toList()
-    }
+    override fun getAllVoices(): List<TTSVoice> = availableTTSVoices.toList()
 
     /**
      * Check if currently synthesizing
@@ -229,7 +228,7 @@ class AndroidTTSService(private val context: Context) : TTSService {
             textToSpeech?.stop()
             textToSpeech?.shutdown()
             textToSpeech = null
-            _isInitialized = false
+            isInitialized = false
             _isSynthesizing = false
             availableTTSVoices.clear()
             logger.info("Android TTS service cleaned up")
@@ -247,16 +246,18 @@ class AndroidTTSService(private val context: Context) : TTSService {
         textToSpeech?.voices?.forEach { voice ->
             // Only include local voices (not network-dependent)
             if (!voice.isNetworkConnectionRequired) {
-                val ttsVoice = TTSVoice(
-                    id = voice.name,
-                    name = voice.name,
-                    language = voice.locale.toString(),
-                    gender = when {
-                        voice.name.contains("female", ignoreCase = true) -> TTSGender.FEMALE
-                        voice.name.contains("male", ignoreCase = true) -> TTSGender.MALE
-                        else -> TTSGender.NEUTRAL
-                    }
-                )
+                val ttsVoice =
+                    TTSVoice(
+                        id = voice.name,
+                        name = voice.name,
+                        language = voice.locale.toString(),
+                        gender =
+                            when {
+                                voice.name.contains("female", ignoreCase = true) -> TTSGender.FEMALE
+                                voice.name.contains("male", ignoreCase = true) -> TTSGender.MALE
+                                else -> TTSGender.NEUTRAL
+                            },
+                    )
                 availableTTSVoices.add(ttsVoice)
             }
         }
@@ -318,8 +319,8 @@ class AndroidTTSService(private val context: Context) : TTSService {
     /**
      * Parse locale string to Locale object
      */
-    private fun parseLocale(language: String): Locale {
-        return try {
+    private fun parseLocale(language: String): Locale =
+        try {
             val parts = language.split("-", "_")
             when (parts.size) {
                 1 -> Locale(parts[0])
@@ -330,13 +331,15 @@ class AndroidTTSService(private val context: Context) : TTSService {
             logger.warn("Failed to parse locale: $language, using US")
             Locale.US
         }
-    }
 
     /**
      * Synthesize text to byte array (audio data)
      */
-    private suspend fun synthesizeToByteArray(text: String, options: TTSOptions): ByteArray {
-        return suspendCancellableCoroutine { cont ->
+    private suspend fun synthesizeToByteArray(
+        text: String,
+        options: TTSOptions,
+    ): ByteArray =
+        suspendCancellableCoroutine { cont ->
             try {
                 // Configure TTS engine with options
                 configureTTSEngine(options)
@@ -347,47 +350,53 @@ class AndroidTTSService(private val context: Context) : TTSService {
                 val utteranceId = "tts_${System.currentTimeMillis()}"
 
                 // Set up utterance listener
-                textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {
-                        logger.debug("TTS synthesis started for utterance: $utteranceId")
-                    }
-
-                    override fun onDone(utteranceId: String?) {
-                        try {
-                            // Read the generated audio file
-                            if (outputFile.exists() && outputFile.length() > 0) {
-                                val audioData = outputFile.readBytes()
-                                outputFile.delete()
-                                logger.debug("TTS synthesis completed: ${audioData.size} bytes")
-                                cont.resume(audioData)
-                            } else {
-                                logger.error("TTS output file is empty or doesn't exist")
-                                cont.resumeWithException(SDKError.ComponentFailure("TTS failed to generate audio"))
-                            }
-                        } catch (e: Exception) {
-                            logger.error("Error reading TTS output", e)
-                            cont.resumeWithException(e)
+                textToSpeech?.setOnUtteranceProgressListener(
+                    object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            logger.debug("TTS synthesis started for utterance: $utteranceId")
                         }
-                    }
 
-                    override fun onError(utteranceId: String?) {
-                        outputFile.delete()
-                        logger.error("TTS synthesis error for utterance: $utteranceId")
-                        cont.resumeWithException(SDKError.ComponentFailure("TTS synthesis failed"))
-                    }
+                        override fun onDone(utteranceId: String?) {
+                            try {
+                                // Read the generated audio file
+                                if (outputFile.exists() && outputFile.length() > 0) {
+                                    val audioData = outputFile.readBytes()
+                                    outputFile.delete()
+                                    logger.debug("TTS synthesis completed: ${audioData.size} bytes")
+                                    cont.resume(audioData)
+                                } else {
+                                    logger.error("TTS output file is empty or doesn't exist")
+                                    cont.resumeWithException(SDKError.ComponentFailure("TTS failed to generate audio"))
+                                }
+                            } catch (e: Exception) {
+                                logger.error("Error reading TTS output", e)
+                                cont.resumeWithException(e)
+                            }
+                        }
 
-                    @Deprecated("Deprecated in Java")
-                    override fun onError(utteranceId: String?, errorCode: Int) {
-                        outputFile.delete()
-                        logger.error("TTS synthesis error for utterance: $utteranceId, code: $errorCode")
-                        cont.resumeWithException(SDKError.ComponentFailure("TTS synthesis failed with code: $errorCode"))
-                    }
-                })
+                        override fun onError(utteranceId: String?) {
+                            outputFile.delete()
+                            logger.error("TTS synthesis error for utterance: $utteranceId")
+                            cont.resumeWithException(SDKError.ComponentFailure("TTS synthesis failed"))
+                        }
+
+                        @Deprecated("Deprecated in Java")
+                        override fun onError(
+                            utteranceId: String?,
+                            errorCode: Int,
+                        ) {
+                            outputFile.delete()
+                            logger.error("TTS synthesis error for utterance: $utteranceId, code: $errorCode")
+                            cont.resumeWithException(SDKError.ComponentFailure("TTS synthesis failed with code: $errorCode"))
+                        }
+                    },
+                )
 
                 // Synthesize to file
-                val params = Bundle().apply {
-                    putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
-                }
+                val params =
+                    Bundle().apply {
+                        putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
+                    }
 
                 val result = textToSpeech?.synthesizeToFile(text, params, outputFile, utteranceId)
 
@@ -405,35 +414,43 @@ class AndroidTTSService(private val context: Context) : TTSService {
                 cont.resumeWithException(e)
             }
         }
-    }
 
     /**
      * Create temporary file with automatic cleanup
      */
-    private fun createTempFile(prefix: String, suffix: String, directory: File): File {
-        return File.createTempFile(prefix, suffix, directory).apply {
+    private fun createTempFile(
+        prefix: String,
+        suffix: String,
+        directory: File,
+    ): File =
+        File.createTempFile(prefix, suffix, directory).apply {
             deleteOnExit()
         }
-    }
 }
 
 /**
  * Android TTS Service Provider for integration with ModuleRegistry
  */
-class AndroidTTSServiceProvider(private val context: Context) :
-    com.runanywhere.sdk.core.TTSServiceProvider {
-
+class AndroidTTSServiceProvider(
+    private val context: Context,
+) : com.runanywhere.sdk.core.TTSServiceProvider {
     private val service by lazy { AndroidTTSService(context) }
 
-    override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
+    override suspend fun synthesize(
+        text: String,
+        options: TTSOptions,
+    ): ByteArray {
         if (!service.isSynthesizing) {
             service.initialize()
         }
         return service.synthesize(text = text, options = options)
     }
 
-    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> {
-        return flow {
+    override fun synthesizeStream(
+        text: String,
+        options: TTSOptions,
+    ): Flow<ByteArray> =
+        flow {
             if (!service.isSynthesizing) {
                 service.initialize()
             }
@@ -441,7 +458,6 @@ class AndroidTTSServiceProvider(private val context: Context) :
                 emit(chunk)
             }
         }
-    }
 
     override fun canHandle(modelId: String): Boolean {
         // Android TTS can handle system TTS requests

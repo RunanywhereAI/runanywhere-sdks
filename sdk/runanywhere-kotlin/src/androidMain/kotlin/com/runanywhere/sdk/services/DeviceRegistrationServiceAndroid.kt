@@ -1,20 +1,15 @@
 package com.runanywhere.sdk.services
 
-import android.annotation.SuppressLint
 import android.app.ActivityManager
-import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.content.pm.PackageManager
-import android.hardware.camera2.CameraManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.telephony.TelephonyManager
-import com.runanywhere.sdk.data.models.GPUType
 import com.runanywhere.sdk.data.models.BatteryState
+import com.runanywhere.sdk.data.models.GPUType
 import com.runanywhere.sdk.data.models.ThermalState
 import com.runanywhere.sdk.foundation.AndroidDeviceInfoCollector
 import com.runanywhere.sdk.storage.AndroidPlatformContext
@@ -22,6 +17,9 @@ import com.runanywhere.sdk.storage.AndroidPlatformContext
 /**
  * Android-specific implementations for DeviceRegistrationService
  * Provides comprehensive device information collection using Android system APIs
+ *
+ * This file contains the actual implementations of the expect declarations in
+ * commonMain for the DeviceRegistrationService.
  */
 
 /**
@@ -43,11 +41,12 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
 
         // CPU information
         info["cpu_type"] = Build.HARDWARE
-        info["cpu_architecture"] = when {
-            Build.SUPPORTED_64_BIT_ABIS.isNotEmpty() -> "arm64"
-            Build.SUPPORTED_32_BIT_ABIS.isNotEmpty() -> "arm32"
-            else -> Build.CPU_ABI ?: "unknown"
-        }
+        info["cpu_architecture"] =
+            when {
+                Build.SUPPORTED_64_BIT_ABIS.isNotEmpty() -> "arm64"
+                Build.SUPPORTED_32_BIT_ABIS.isNotEmpty() -> "arm32"
+                else -> Build.CPU_ABI ?: "unknown"
+            }
         info["cpu_core_count"] = runtime.availableProcessors()
         info["cpu_frequency_mhz"] = getCpuFrequency() // Custom method to read CPU freq
 
@@ -99,7 +98,6 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
         // Add comprehensive device info from collector
         val collectorInfo = AndroidDeviceInfoCollector.collectDeviceInfo()
         info.putAll(collectorInfo.filterKeys { !info.containsKey(it) })
-
     } catch (e: Exception) {
         info["collection_error"] = e.message ?: "Unknown error"
     }
@@ -110,46 +108,48 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
 /**
  * Get platform-specific capabilities for Android
  */
-actual fun getPlatformCapabilities(): Map<String, Any> {
-    return try {
+actual fun getPlatformCapabilities(): Map<String, Any> =
+    try {
         AndroidDeviceInfoCollector.getDeviceCapabilities()
     } catch (e: Exception) {
         mapOf("error" to (e.message ?: "Unknown error"))
     }
-}
 
 // MARK: - Private helper methods
 
 /**
  * Get CPU frequency from /proc/cpuinfo if available
  */
-private fun getCpuFrequency(): Int? {
-    return try {
+private fun getCpuFrequency(): Int? =
+    try {
         val cpuInfo = java.io.File("/proc/cpuinfo").readText()
         val freqLine = cpuInfo.lines().find { it.contains("cpu MHz") || it.contains("BogoMIPS") }
-        freqLine?.substringAfter(":")?.trim()?.substringBefore(" ")?.toFloatOrNull()?.toInt()
+        freqLine
+            ?.substringAfter(":")
+            ?.trim()
+            ?.substringBefore(" ")
+            ?.toFloatOrNull()
+            ?.toInt()
     } catch (e: Exception) {
         null
     }
-}
 
 /**
  * Get storage information
  */
-private fun getStorageInfo(): Pair<Long, Long> {
-    return try {
+private fun getStorageInfo(): Pair<Long, Long> =
+    try {
         val stat = StatFs(Environment.getDataDirectory().path)
         val totalBytes = stat.blockCountLong * stat.blockSizeLong
         val availableBytes = stat.availableBlocksLong * stat.blockSizeLong
 
         Pair(
-            totalBytes / (1024 * 1024),      // Total storage in MB
-            availableBytes / (1024 * 1024)   // Available storage in MB
+            totalBytes / (1024 * 1024), // Total storage in MB
+            availableBytes / (1024 * 1024), // Available storage in MB
         )
     } catch (e: Exception) {
         Pair(0L, 0L)
     }
-}
 
 /**
  * Get GPU information
@@ -166,14 +166,15 @@ private fun getGpuInfo(): Pair<GPUType, Map<String, String?>> {
         gpuInfo["vendor"] = null // Not easily available
 
         // Determine GPU type based on known patterns
-        val gpuType = when {
-            renderer.contains("adreno", true) || gpu.contains("adreno", true) -> GPUType.ADRENO
-            renderer.contains("mali", true) || gpu.contains("mali", true) -> GPUType.MALI
-            renderer.contains("powervr", true) || gpu.contains("powervr", true) -> GPUType.POWER_VR
-            renderer.contains("tegra", true) || gpu.contains("tegra", true) -> GPUType.TEGRA
-            renderer.contains("vivante", true) || gpu.contains("vivante", true) -> GPUType.VIVANTE
-            else -> GPUType.UNKNOWN
-        }
+        val gpuType =
+            when {
+                renderer.contains("adreno", true) || gpu.contains("adreno", true) -> GPUType.ADRENO
+                renderer.contains("mali", true) || gpu.contains("mali", true) -> GPUType.MALI
+                renderer.contains("powervr", true) || gpu.contains("powervr", true) -> GPUType.POWER_VR
+                renderer.contains("tegra", true) || gpu.contains("tegra", true) -> GPUType.TEGRA
+                renderer.contains("vivante", true) || gpu.contains("vivante", true) -> GPUType.VIVANTE
+                else -> GPUType.UNKNOWN
+            }
 
         return Pair(gpuType, gpuInfo)
     } catch (e: Exception) {
@@ -184,8 +185,8 @@ private fun getGpuInfo(): Pair<GPUType, Map<String, String?>> {
 /**
  * Check Vulkan support
  */
-private fun checkVulkanSupport(context: Context): Boolean {
-    return try {
+private fun checkVulkanSupport(context: Context): Boolean =
+    try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             context.packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_LEVEL)
         } else {
@@ -194,21 +195,19 @@ private fun checkVulkanSupport(context: Context): Boolean {
     } catch (e: Exception) {
         false
     }
-}
 
 /**
  * Check OpenCL support (limited detection)
  */
-private fun checkOpenCLSupport(): Boolean {
-    return try {
+private fun checkOpenCLSupport(): Boolean =
+    try {
         // OpenCL support is harder to detect on Android
         // This is a basic check that can be improved
         java.io.File("/system/vendor/lib/libOpenCL.so").exists() ||
-        java.io.File("/system/lib/libOpenCL.so").exists()
+            java.io.File("/system/lib/libOpenCL.so").exists()
     } catch (e: Exception) {
         false
     }
-}
 
 /**
  * Get battery information
@@ -225,12 +224,13 @@ private fun getBatteryInfo(context: Context): Map<String, Any?> {
 
         // Battery state
         val status = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS)
-        batteryInfo["state"] = when (status) {
-            BatteryManager.BATTERY_STATUS_CHARGING -> BatteryState.CHARGING
-            BatteryManager.BATTERY_STATUS_FULL -> BatteryState.FULL
-            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> BatteryState.UNPLUGGED
-            else -> BatteryState.UNKNOWN
-        }
+        batteryInfo["state"] =
+            when (status) {
+                BatteryManager.BATTERY_STATUS_CHARGING -> BatteryState.CHARGING
+                BatteryManager.BATTERY_STATUS_FULL -> BatteryState.FULL
+                BatteryManager.BATTERY_STATUS_NOT_CHARGING -> BatteryState.UNPLUGGED
+                else -> BatteryState.UNKNOWN
+            }
 
         // Low power mode (Power Saver)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -239,7 +239,6 @@ private fun getBatteryInfo(context: Context): Map<String, Any?> {
         } else {
             batteryInfo["isLowPowerMode"] = false
         }
-
     } catch (e: Exception) {
         batteryInfo["level"] = null
         batteryInfo["state"] = BatteryState.UNKNOWN
@@ -252,8 +251,8 @@ private fun getBatteryInfo(context: Context): Map<String, Any?> {
 /**
  * Get thermal state
  */
-private fun getThermalState(): ThermalState {
-    return try {
+private fun getThermalState(): ThermalState =
+    try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Android 10+ has thermal API but it's restricted
             ThermalState.NOMINAL
@@ -263,81 +262,74 @@ private fun getThermalState(): ThermalState {
     } catch (e: Exception) {
         ThermalState.NOMINAL
     }
-}
 
 /**
  * Check cellular capability
  */
-private fun hasCellular(context: Context): Boolean {
-    return try {
+private fun hasCellular(context: Context): Boolean =
+    try {
         val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         telephonyManager.phoneType != TelephonyManager.PHONE_TYPE_NONE
     } catch (e: Exception) {
         false
     }
-}
 
 /**
  * Check WiFi capability
  */
-private fun hasWifi(context: Context): Boolean {
-    return try {
+private fun hasWifi(context: Context): Boolean =
+    try {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI)
     } catch (e: Exception) {
         false
     }
-}
 
 /**
  * Check Bluetooth capability
  */
-private fun hasBluetooth(context: Context): Boolean {
-    return try {
+private fun hasBluetooth(context: Context): Boolean =
+    try {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)
     } catch (e: Exception) {
         false
     }
-}
 
 /**
  * Check camera capability
  */
-private fun hasCamera(context: Context): Boolean {
-    return try {
+private fun hasCamera(context: Context): Boolean =
+    try {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
     } catch (e: Exception) {
         false
     }
-}
 
 /**
  * Check microphone capability
  */
-private fun hasMicrophone(context: Context): Boolean {
-    return try {
+private fun hasMicrophone(context: Context): Boolean =
+    try {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)
     } catch (e: Exception) {
         false
     }
-}
 
 /**
  * Check speakers capability
  */
-private fun hasSpeakers(context: Context): Boolean {
-    return try {
+private fun hasSpeakers(context: Context): Boolean =
+    try {
         // Most Android devices have speakers, check audio feature
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_AUDIO_OUTPUT)
     } catch (e: Exception) {
         true // Assume true if we can't check
     }
-}
 
 /**
  * Check biometric capability
  */
-private fun hasBiometric(context: Context): Boolean {
-    return try {
+private fun hasBiometric(context: Context): Boolean =
+    try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             context.packageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)
         } else {
@@ -346,45 +338,44 @@ private fun hasBiometric(context: Context): Boolean {
     } catch (e: Exception) {
         false
     }
-}
 
 /**
  * Get basic device benchmark score
  */
-private fun getDeviceBenchmarkScore(): Int? {
-    return try {
+private fun getDeviceBenchmarkScore(): Int? =
+    try {
         // Simple benchmark based on known device characteristics
-        val score = when {
-            Build.VERSION.SDK_INT >= 33 -> 80  // Android 13+
-            Build.VERSION.SDK_INT >= 30 -> 70  // Android 11+
-            Build.VERSION.SDK_INT >= 26 -> 60  // Android 8+
-            else -> 40
-        }
+        val score =
+            when {
+                Build.VERSION.SDK_INT >= 33 -> 80 // Android 13+
+                Build.VERSION.SDK_INT >= 30 -> 70 // Android 11+
+                Build.VERSION.SDK_INT >= 26 -> 60 // Android 8+
+                else -> 40
+            }
 
         // Adjust based on RAM
         val runtime = Runtime.getRuntime()
         val memoryMB = runtime.maxMemory() / (1024 * 1024)
-        val memoryBonus = when {
-            memoryMB >= 8192 -> 20
-            memoryMB >= 6144 -> 15
-            memoryMB >= 4096 -> 10
-            else -> 0
-        }
+        val memoryBonus =
+            when {
+                memoryMB >= 8192 -> 20
+                memoryMB >= 6144 -> 15
+                memoryMB >= 4096 -> 10
+                else -> 0
+            }
 
         minOf(score + memoryBonus, 100)
     } catch (e: Exception) {
         null
     }
-}
 
 /**
  * Calculate memory pressure
  */
-private fun getMemoryPressure(memoryInfo: ActivityManager.MemoryInfo): Float {
-    return try {
+private fun getMemoryPressure(memoryInfo: ActivityManager.MemoryInfo): Float =
+    try {
         val usedMemory = memoryInfo.totalMem - memoryInfo.availMem
         (usedMemory.toFloat() / memoryInfo.totalMem.toFloat()).coerceAtMost(1.0f)
     } catch (e: Exception) {
         0.0f
     }
-}

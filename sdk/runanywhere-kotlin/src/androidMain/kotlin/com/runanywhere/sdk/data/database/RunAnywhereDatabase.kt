@@ -1,13 +1,20 @@
 package com.runanywhere.sdk.data.database
 
+import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import android.content.Context
-import com.runanywhere.sdk.data.database.dao.*
-import com.runanywhere.sdk.data.database.entities.*
-import com.runanywhere.sdk.data.models.*
+import com.runanywhere.sdk.data.database.dao.AuthTokenDao
+import com.runanywhere.sdk.data.database.dao.ConfigurationDao
+import com.runanywhere.sdk.data.database.dao.DeviceInfoDao
+import com.runanywhere.sdk.data.database.dao.ModelInfoDao
+import com.runanywhere.sdk.data.database.dao.TelemetryDao
+import com.runanywhere.sdk.data.database.entities.AuthTokenEntity
+import com.runanywhere.sdk.data.database.entities.ConfigurationEntity
+import com.runanywhere.sdk.data.database.entities.DeviceInfoEntity
+import com.runanywhere.sdk.data.database.entities.ModelInfoEntity
+import com.runanywhere.sdk.data.database.entities.TelemetryEventEntity
 
 /**
  * RunAnywhere Room Database
@@ -20,46 +27,50 @@ import com.runanywhere.sdk.data.models.*
         ModelInfoEntity::class,
         DeviceInfoEntity::class,
         TelemetryEventEntity::class,
-        AuthTokenEntity::class
+        AuthTokenEntity::class,
     ],
     version = 1,
-    exportSchema = true
+    exportSchema = true,
 )
 @TypeConverters(DatabaseConverters::class)
 abstract class RunAnywhereDatabase : RoomDatabase() {
-
     // DAOs - following iOS repository patterns
     abstract fun configurationDao(): ConfigurationDao
+
     abstract fun modelInfoDao(): ModelInfoDao
+
     abstract fun deviceInfoDao(): DeviceInfoDao
+
     abstract fun telemetryDao(): TelemetryDao
+
     abstract fun authTokenDao(): AuthTokenDao
 
     companion object {
         private const val DATABASE_NAME = "runanywhere_database"
 
         @Volatile
-        private var INSTANCE: RunAnywhereDatabase? = null
+        private var instance: RunAnywhereDatabase? = null
 
-        fun getDatabase(context: Context): RunAnywhereDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    RunAnywhereDatabase::class.java,
-                    DATABASE_NAME
-                ).apply {
-                    // Database configuration
-                    fallbackToDestructiveMigration() // For development
-                    enableMultiInstanceInvalidation()
+        fun getDatabase(context: Context): RunAnywhereDatabase =
+            instance ?: synchronized(this) {
+                val newInstance =
+                    Room
+                        .databaseBuilder(
+                            context.applicationContext,
+                            RunAnywhereDatabase::class.java,
+                            DATABASE_NAME,
+                        ).apply {
+                            // Database configuration
+                            fallbackToDestructiveMigration() // For development
+                            enableMultiInstanceInvalidation()
 
-                    // Add migrations when ready for production
-                    // addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                }.build()
+                            // Add migrations when ready for production
+                            // addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                        }.build()
 
-                INSTANCE = instance
-                instance
+                instance = newInstance
+                newInstance
             }
-        }
 
         // Database migration examples for future versions
         // private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -78,9 +89,7 @@ class DatabaseManager {
     private lateinit var context: Context
     private var database: RunAnywhereDatabase? = null
 
-    suspend fun getDatabase(): RunAnywhereDatabase {
-        return database ?: RunAnywhereDatabase.getDatabase(context).also { database = it }
-    }
+    suspend fun getDatabase(): RunAnywhereDatabase = database ?: RunAnywhereDatabase.getDatabase(context).also { database = it }
 
     suspend fun closeDatabase() {
         database?.close()
@@ -103,13 +112,12 @@ class DatabaseManager {
 }
 
 // Keep the original for backwards compatibility if needed
-class AndroidDatabaseManager(private val context: Context) {
-
+class AndroidDatabaseManager(
+    private val context: Context,
+) {
     private var database: RunAnywhereDatabase? = null
 
-    suspend fun getDatabase(): RunAnywhereDatabase {
-        return database ?: RunAnywhereDatabase.getDatabase(context).also { database = it }
-    }
+    suspend fun getDatabase(): RunAnywhereDatabase = database ?: RunAnywhereDatabase.getDatabase(context).also { database = it }
 
     suspend fun closeDatabase() {
         database?.close()

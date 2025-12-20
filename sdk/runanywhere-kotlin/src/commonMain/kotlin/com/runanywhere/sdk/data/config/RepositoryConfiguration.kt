@@ -1,11 +1,11 @@
 package com.runanywhere.sdk.data.config
 
+import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.math.pow
 
 /**
  * Comprehensive configuration for repository behavior including caching, sync, and retry policies.
@@ -16,7 +16,7 @@ data class RepositoryConfiguration(
     val sync: SyncConfiguration = SyncConfiguration(),
     val retry: RetryConfiguration = RetryConfiguration(),
     val timeout: TimeoutConfiguration = TimeoutConfiguration(),
-    val security: SecurityConfiguration = SecurityConfiguration()
+    val security: SecurityConfiguration = SecurityConfiguration(),
 ) {
     companion object {
         /**
@@ -27,48 +27,57 @@ data class RepositoryConfiguration(
         /**
          * Configuration optimized for high-performance scenarios
          */
-        val highPerformance = RepositoryConfiguration(
-            cache = CacheConfiguration(
-                maxSize = 1000,
-                ttl = 1.hours,
-                evictionPolicy = EvictionPolicy.LRU
-            ),
-            sync = SyncConfiguration(
-                strategy = SyncStrategy.IMMEDIATE,
-                batchSize = 100
+        val highPerformance =
+            RepositoryConfiguration(
+                cache =
+                    CacheConfiguration(
+                        maxSize = 1000,
+                        ttl = 1.hours,
+                        evictionPolicy = EvictionPolicy.LRU,
+                    ),
+                sync =
+                    SyncConfiguration(
+                        strategy = SyncStrategy.IMMEDIATE,
+                        batchSize = 100,
+                    ),
             )
-        )
 
         /**
          * Configuration optimized for low-memory environments
          */
-        val lowMemory = RepositoryConfiguration(
-            cache = CacheConfiguration(
-                maxSize = 100,
-                ttl = 30.minutes,
-                evictionPolicy = EvictionPolicy.LRU
-            ),
-            sync = SyncConfiguration(
-                strategy = SyncStrategy.BATCH,
-                batchSize = 20
+        val lowMemory =
+            RepositoryConfiguration(
+                cache =
+                    CacheConfiguration(
+                        maxSize = 100,
+                        ttl = 30.minutes,
+                        evictionPolicy = EvictionPolicy.LRU,
+                    ),
+                sync =
+                    SyncConfiguration(
+                        strategy = SyncStrategy.BATCH,
+                        batchSize = 20,
+                    ),
             )
-        )
 
         /**
          * Configuration optimized for offline-first scenarios
          */
-        val offlineFirst = RepositoryConfiguration(
-            cache = CacheConfiguration(
-                maxSize = 500,
-                ttl = 24.hours,
-                evictionPolicy = EvictionPolicy.LFU
-            ),
-            sync = SyncConfiguration(
-                strategy = SyncStrategy.PERIODIC,
-                batchSize = 50,
-                conflictResolution = ConflictResolution.LAST_WRITE_WINS
+        val offlineFirst =
+            RepositoryConfiguration(
+                cache =
+                    CacheConfiguration(
+                        maxSize = 500,
+                        ttl = 24.hours,
+                        evictionPolicy = EvictionPolicy.LFU,
+                    ),
+                sync =
+                    SyncConfiguration(
+                        strategy = SyncStrategy.PERIODIC,
+                        batchSize = 50,
+                        conflictResolution = ConflictResolution.LAST_WRITE_WINS,
+                    ),
             )
-        )
     }
 }
 
@@ -82,7 +91,7 @@ data class CacheConfiguration(
     val evictionPolicy: EvictionPolicy = EvictionPolicy.LRU,
     val preloadStrategy: PreloadStrategy = PreloadStrategy.LAZY,
     val compressionEnabled: Boolean = false,
-    val encryptionEnabled: Boolean = false
+    val encryptionEnabled: Boolean = false,
 ) {
     init {
         require(maxSize > 0) { "Cache max size must be positive" }
@@ -92,9 +101,7 @@ data class CacheConfiguration(
     /**
      * Calculate memory usage estimate in bytes
      */
-    fun estimateMemoryUsage(avgEntitySize: Int): Long {
-        return maxSize * avgEntitySize * (if (compressionEnabled) 0.7 else 1.0).toLong()
-    }
+    fun estimateMemoryUsage(avgEntitySize: Int): Long = maxSize * avgEntitySize * (if (compressionEnabled) 0.7 else 1.0).toLong()
 }
 
 /**
@@ -105,7 +112,7 @@ enum class EvictionPolicy {
     LFU, // Least Frequently Used
     FIFO, // First In, First Out
     RANDOM, // Random eviction
-    TTL_BASED // Time-to-live based
+    TTL_BASED, // Time-to-live based
 }
 
 /**
@@ -115,7 +122,7 @@ enum class PreloadStrategy {
     LAZY, // Load on demand
     EAGER, // Load immediately
     BACKGROUND, // Load in background
-    PREDICTIVE // Predictive preloading
+    PREDICTIVE, // Predictive preloading
 }
 
 /**
@@ -129,7 +136,7 @@ data class SyncConfiguration(
     val conflictResolution: ConflictResolution = ConflictResolution.MANUAL,
     val priority: SyncPriority = SyncPriority.NORMAL,
     val networkRequirement: NetworkRequirement = NetworkRequirement.ANY,
-    val maxSyncRetries: Int = 3
+    val maxSyncRetries: Int = 3,
 ) {
     init {
         require(batchSize > 0) { "Sync batch size must be positive" }
@@ -146,7 +153,7 @@ enum class SyncStrategy {
     BATCH, // Batch changes and sync periodically
     PERIODIC, // Sync at regular intervals
     MANUAL, // Sync only when explicitly requested
-    ADAPTIVE // Adaptive strategy based on network and usage
+    ADAPTIVE, // Adaptive strategy based on network and usage
 }
 
 /**
@@ -158,14 +165,17 @@ enum class ConflictResolution {
     MERGE, // Attempt to merge changes
     MANUAL, // Require manual resolution
     LOCAL_WINS, // Local changes always win
-    REMOTE_WINS // Remote changes always win
+    REMOTE_WINS, // Remote changes always win
 }
 
 /**
  * Sync priority levels
  */
 enum class SyncPriority {
-    LOW, NORMAL, HIGH, CRITICAL
+    LOW,
+    NORMAL,
+    HIGH,
+    CRITICAL,
 }
 
 /**
@@ -175,7 +185,7 @@ enum class NetworkRequirement {
     ANY, // Any network connection
     WIFI, // WiFi only
     HIGH_SPEED, // High-speed connection required
-    UNMETERED // Unmetered connection only
+    UNMETERED, // Unmetered connection only
 }
 
 /**
@@ -188,11 +198,12 @@ data class RetryConfiguration(
     val maxDelay: Duration = 30.seconds,
     val backoffStrategy: BackoffStrategy = BackoffStrategy.EXPONENTIAL,
     val jitterEnabled: Boolean = true,
-    val retryableErrors: Set<String> = setOf(
-        "NETWORK_ERROR",
-        "TIMEOUT_ERROR",
-        "SERVICE_UNAVAILABLE"
-    )
+    val retryableErrors: Set<String> =
+        setOf(
+            "NETWORK_ERROR",
+            "TIMEOUT_ERROR",
+            "SERVICE_UNAVAILABLE",
+        ),
 ) {
     init {
         require(maxAttempts > 0) { "Max retry attempts must be positive" }
@@ -204,11 +215,12 @@ data class RetryConfiguration(
      * Calculate delay for a given attempt number
      */
     fun calculateDelay(attempt: Int): Duration {
-        val delay = when (backoffStrategy) {
-            BackoffStrategy.FIXED -> baseDelay
-            BackoffStrategy.LINEAR -> baseDelay * attempt
-            BackoffStrategy.EXPONENTIAL -> (baseDelay.inWholeMilliseconds * 2.0.pow(attempt.toDouble())).toLong().milliseconds
-        }
+        val delay =
+            when (backoffStrategy) {
+                BackoffStrategy.FIXED -> baseDelay
+                BackoffStrategy.LINEAR -> baseDelay * attempt
+                BackoffStrategy.EXPONENTIAL -> (baseDelay.inWholeMilliseconds * 2.0.pow(attempt.toDouble())).toLong().milliseconds
+            }
 
         val actualDelay = minOf(delay, maxDelay)
 
@@ -227,7 +239,7 @@ data class RetryConfiguration(
 enum class BackoffStrategy {
     FIXED, // Fixed delay between retries
     LINEAR, // Linear increase in delay
-    EXPONENTIAL // Exponential backoff
+    EXPONENTIAL, // Exponential backoff
 }
 
 /**
@@ -238,7 +250,7 @@ data class TimeoutConfiguration(
     val write: Duration = 30.seconds,
     val sync: Duration = 2.minutes,
     val connect: Duration = 10.seconds,
-    val total: Duration = 5.minutes
+    val total: Duration = 5.minutes,
 ) {
     init {
         require(read > Duration.ZERO) { "Read timeout must be positive" }
@@ -258,7 +270,7 @@ data class SecurityConfiguration(
     val keyRotationInterval: Duration = 24.hours,
     val auditLoggingEnabled: Boolean = false,
     val sensitiveDataMasking: Boolean = true,
-    val accessLoggingEnabled: Boolean = false
+    val accessLoggingEnabled: Boolean = false,
 )
 
 /**
@@ -296,9 +308,7 @@ class RepositoryConfigurationBuilder {
         return this
     }
 
-    fun build(): RepositoryConfiguration {
-        return RepositoryConfiguration(cache, sync, retry, timeout, security)
-    }
+    fun build(): RepositoryConfiguration = RepositoryConfiguration(cache, sync, retry, timeout, security)
 }
 
 // Configuration builders for each section
@@ -311,9 +321,16 @@ class CacheConfigurationBuilder {
     var compressionEnabled = false
     var encryptionEnabled = false
 
-    fun build() = CacheConfiguration(
-        enabled, maxSize, ttl, evictionPolicy, preloadStrategy, compressionEnabled, encryptionEnabled
-    )
+    fun build() =
+        CacheConfiguration(
+            enabled,
+            maxSize,
+            ttl,
+            evictionPolicy,
+            preloadStrategy,
+            compressionEnabled,
+            encryptionEnabled,
+        )
 }
 
 class SyncConfigurationBuilder {
@@ -326,9 +343,17 @@ class SyncConfigurationBuilder {
     var networkRequirement = NetworkRequirement.ANY
     var maxSyncRetries = 3
 
-    fun build() = SyncConfiguration(
-        enabled, strategy, batchSize, syncInterval, conflictResolution, priority, networkRequirement, maxSyncRetries
-    )
+    fun build() =
+        SyncConfiguration(
+            enabled,
+            strategy,
+            batchSize,
+            syncInterval,
+            conflictResolution,
+            priority,
+            networkRequirement,
+            maxSyncRetries,
+        )
 }
 
 class RetryConfigurationBuilder {
@@ -340,9 +365,16 @@ class RetryConfigurationBuilder {
     var jitterEnabled = true
     var retryableErrors = setOf("NETWORK_ERROR", "TIMEOUT_ERROR", "SERVICE_UNAVAILABLE")
 
-    fun build() = RetryConfiguration(
-        enabled, maxAttempts, baseDelay, maxDelay, backoffStrategy, jitterEnabled, retryableErrors
-    )
+    fun build() =
+        RetryConfiguration(
+            enabled,
+            maxAttempts,
+            baseDelay,
+            maxDelay,
+            backoffStrategy,
+            jitterEnabled,
+            retryableErrors,
+        )
 }
 
 class TimeoutConfigurationBuilder {
@@ -363,14 +395,19 @@ class SecurityConfigurationBuilder {
     var sensitiveDataMasking = true
     var accessLoggingEnabled = false
 
-    fun build() = SecurityConfiguration(
-        encryptionEnabled, encryptionAlgorithm, keyRotationInterval, auditLoggingEnabled, sensitiveDataMasking, accessLoggingEnabled
-    )
+    fun build() =
+        SecurityConfiguration(
+            encryptionEnabled,
+            encryptionAlgorithm,
+            keyRotationInterval,
+            auditLoggingEnabled,
+            sensitiveDataMasking,
+            accessLoggingEnabled,
+        )
 }
 
 /**
  * DSL function for creating repository configurations
  */
-fun repositoryConfiguration(block: RepositoryConfigurationBuilder.() -> Unit): RepositoryConfiguration {
-    return RepositoryConfigurationBuilder().apply(block).build()
-}
+fun repositoryConfiguration(block: RepositoryConfigurationBuilder.() -> Unit): RepositoryConfiguration =
+    RepositoryConfigurationBuilder().apply(block).build()

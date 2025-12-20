@@ -4,12 +4,9 @@ package com.runanywhere.sdk.memory
  * JVM implementation of memory monitoring
  */
 actual class MemoryMonitor {
-
     private val runtime = Runtime.getRuntime()
 
-    actual fun getTotalMemory(): Long {
-        return runtime.maxMemory()
-    }
+    actual fun getTotalMemory(): Long = runtime.maxMemory()
 
     actual fun getAvailableMemory(): Long {
         val maxMemory = runtime.maxMemory()
@@ -20,7 +17,5 @@ actual class MemoryMonitor {
         return freeMemory + (maxMemory - totalMemory)
     }
 
-    actual fun getUsedMemory(): Long {
-        return runtime.totalMemory() - runtime.freeMemory()
-    }
+    actual fun getUsedMemory(): Long = runtime.totalMemory() - runtime.freeMemory()
 }

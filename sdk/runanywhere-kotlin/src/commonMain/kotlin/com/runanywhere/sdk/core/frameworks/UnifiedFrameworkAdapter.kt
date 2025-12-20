@@ -18,7 +18,6 @@ import com.runanywhere.sdk.models.enums.ModelFormat
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Protocols/Frameworks/UnifiedFrameworkAdapter.swift
  */
 interface UnifiedFrameworkAdapter {
-
     /**
      * The framework this adapter handles
      */
@@ -54,7 +53,10 @@ interface UnifiedFrameworkAdapter {
      * @param modality The modality to use
      * @return A service instance with the loaded model
      */
-    suspend fun loadModel(model: ModelInfo, modality: FrameworkModality): Any
+    suspend fun loadModel(
+        model: ModelInfo,
+        modality: FrameworkModality,
+    ): Any
 
     /**
      * Configure the adapter with hardware settings
@@ -107,7 +109,10 @@ interface UnifiedFrameworkAdapter {
      * @param modality The modality to initialize for
      * @return Initialized service ready for use
      */
-    suspend fun initializeComponent(parameters: ComponentInitParameters, modality: FrameworkModality): Any?
+    suspend fun initializeComponent(
+        parameters: ComponentInitParameters,
+        modality: FrameworkModality,
+    ): Any?
 }
 
 /**
@@ -138,7 +143,7 @@ interface DownloadStrategy {
     suspend fun download(
         model: ModelInfo,
         destinationFolder: String,
-        progressHandler: ((Double) -> Unit)?
+        progressHandler: ((Double) -> Unit)?,
     ): String
 }
 
@@ -150,7 +155,10 @@ interface ModelStorageStrategy {
     /**
      * Find model path for a given model ID in the folder
      */
-    fun findModelPath(modelId: String, modelFolder: String): String?
+    fun findModelPath(
+        modelId: String,
+        modelFolder: String,
+    ): String?
 
     /**
      * Detect model format and size in the folder

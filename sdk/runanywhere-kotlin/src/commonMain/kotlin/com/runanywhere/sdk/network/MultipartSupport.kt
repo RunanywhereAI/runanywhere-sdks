@@ -8,12 +8,16 @@ package com.runanywhere.sdk.network
  * Multipart form data part definitions
  */
 sealed class MultipartPart {
-    data class FormField(val name: String, val value: String) : MultipartPart()
+    data class FormField(
+        val name: String,
+        val value: String,
+    ) : MultipartPart()
+
     data class FileField(
         val name: String,
         val filename: String,
         val data: ByteArray,
-        val contentType: String? = null
+        val contentType: String? = null,
     ) : MultipartPart() {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -40,6 +44,7 @@ sealed class MultipartPart {
  */
 interface CancellableRequest {
     fun cancel()
+
     val isCancelled: Boolean
 }
 
@@ -51,29 +56,36 @@ class HttpRequestBuilder {
     private var body: ByteArray? = null
     private var multipartParts: List<MultipartPart>? = null
 
-    fun header(name: String, value: String) = apply {
+    fun header(
+        name: String,
+        value: String,
+    ) = apply {
         headers[name] = value
     }
 
-    fun headers(headerMap: Map<String, String>) = apply {
-        headers.putAll(headerMap)
-    }
+    fun headers(headerMap: Map<String, String>) =
+        apply {
+            headers.putAll(headerMap)
+        }
 
-    fun body(data: ByteArray) = apply {
-        this.body = data
-        this.multipartParts = null // Clear multipart if body is set
-    }
+    fun body(data: ByteArray) =
+        apply {
+            this.body = data
+            this.multipartParts = null // Clear multipart if body is set
+        }
 
-    fun multipart(parts: List<MultipartPart>) = apply {
-        this.multipartParts = parts
-        this.body = null // Clear body if multipart is set
-    }
+    fun multipart(parts: List<MultipartPart>) =
+        apply {
+            this.multipartParts = parts
+            this.body = null // Clear body if multipart is set
+        }
 
-    internal fun build() = HttpRequestData(
-        headers = headers.toMap(),
-        body = body,
-        multipartParts = multipartParts
-    )
+    internal fun build() =
+        HttpRequestData(
+            headers = headers.toMap(),
+            body = body,
+            multipartParts = multipartParts,
+        )
 }
 
 /**
@@ -82,7 +94,7 @@ class HttpRequestBuilder {
 internal data class HttpRequestData(
     val headers: Map<String, String>,
     val body: ByteArray?,
-    val multipartParts: List<MultipartPart>?
+    val multipartParts: List<MultipartPart>?,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -91,7 +103,9 @@ internal data class HttpRequestData(
         if (body != null) {
             if (other.body == null) return false
             if (!body.contentEquals(other.body)) return false
-        } else if (other.body != null) return false
+        } else if (other.body != null) {
+            return false
+        }
         if (multipartParts != other.multipartParts) return false
         return true
     }

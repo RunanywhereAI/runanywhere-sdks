@@ -20,9 +20,8 @@ abstract class BaseRepository<T : Any>(
     protected val localDataSource: LocalDataSource<T>,
     protected val remoteDataSource: RemoteDataSource<T>? = null,
     protected val configuration: RepositoryConfiguration = RepositoryConfiguration.default,
-    protected val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    protected val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
 ) {
-
     private val mutex = Mutex()
     private var isInitialized = false
 
@@ -60,8 +59,8 @@ abstract class BaseRepository<T : Any>(
     /**
      * Save an entity to the repository
      */
-    open suspend fun save(entity: T): Result<T> {
-        return try {
+    open suspend fun save(entity: T): Result<T> =
+        try {
             // Save to local storage first (cache-first strategy)
             localDataSource.save(entity).getOrThrow()
 
@@ -78,13 +77,12 @@ abstract class BaseRepository<T : Any>(
             updateStats { copy(errors = errors + 1) }
             Result.failure(e.toRepositoryError())
         }
-    }
 
     /**
      * Save multiple entities
      */
-    open suspend fun saveAll(entities: List<T>): Result<List<T>> {
-        return try {
+    open suspend fun saveAll(entities: List<T>): Result<List<T>> =
+        try {
             localDataSource.saveAll(entities).getOrThrow()
 
             if (shouldSyncImmediately()) {
@@ -99,13 +97,12 @@ abstract class BaseRepository<T : Any>(
             updateStats { copy(errors = errors + 1) }
             Result.failure(e.toRepositoryError())
         }
-    }
 
     /**
      * Fetch an entity by ID
      */
-    open suspend fun fetchById(id: String): Result<T?> {
-        return try {
+    open suspend fun fetchById(id: String): Result<T?> =
+        try {
             // Try local first
             val localResult = localDataSource.fetch(id).getOrThrow()
 
@@ -114,25 +111,26 @@ abstract class BaseRepository<T : Any>(
                 Result.success(localResult)
             } else {
                 // Try remote if configured
-                val remoteResult = if (remoteDataSource != null && shouldFetchFromRemote()) {
-                    try {
-                        val remote = remoteDataSource.fetchRemote(id).getOrThrow()
-                        remote?.let {
-                            // Cache the remote result
-                            localDataSource.save(it).getOrNull()
+                val remoteResult =
+                    if (remoteDataSource != null && shouldFetchFromRemote()) {
+                        try {
+                            val remote = remoteDataSource.fetchRemote(id).getOrThrow()
+                            remote?.let {
+                                // Cache the remote result
+                                localDataSource.save(it).getOrNull()
+                            }
+                            remote
+                        } catch (e: Exception) {
+                            null
                         }
-                        remote
-                    } catch (e: Exception) {
+                    } else {
                         null
                     }
-                } else {
-                    null
-                }
 
                 updateStats {
                     copy(
                         cacheMisses = cacheMisses + 1,
-                        reads = reads + 1
+                        reads = reads + 1,
                     )
                 }
                 Result.success(remoteResult)
@@ -141,13 +139,12 @@ abstract class BaseRepository<T : Any>(
             updateStats { copy(errors = errors + 1) }
             Result.failure(e.toRepositoryError())
         }
-    }
 
     /**
      * Fetch all entities
      */
-    open suspend fun fetchAll(): Result<List<T>> {
-        return try {
+    open suspend fun fetchAll(): Result<List<T>> =
+        try {
             val localEntities = localDataSource.fetchAll().getOrThrow()
             updateStats { copy(reads = reads + localEntities.size) }
             Result.success(localEntities)
@@ -155,13 +152,12 @@ abstract class BaseRepository<T : Any>(
             updateStats { copy(errors = errors + 1) }
             Result.failure(e.toRepositoryError())
         }
-    }
 
     /**
      * Delete an entity by ID
      */
-    open suspend fun delete(id: String): Result<Unit> {
-        return try {
+    open suspend fun delete(id: String): Result<Unit> =
+        try {
             localDataSource.delete(id).getOrThrow()
 
             // Delete from remote if configured
@@ -175,13 +171,12 @@ abstract class BaseRepository<T : Any>(
             updateStats { copy(errors = errors + 1) }
             Result.failure(e.toRepositoryError())
         }
-    }
 
     /**
      * Clear all entities
      */
-    open suspend fun clear(): Result<Unit> {
-        return try {
+    open suspend fun clear(): Result<Unit> =
+        try {
             localDataSource.clear().getOrThrow()
             updateStats { copy(clears = clears + 1) }
             Result.success(Unit)
@@ -189,36 +184,33 @@ abstract class BaseRepository<T : Any>(
             updateStats { copy(errors = errors + 1) }
             Result.failure(e.toRepositoryError())
         }
-    }
 
     // Observable Operations
 
     /**
      * Observe all entities
      */
-    open fun observeAll(): Flow<List<T>> {
-        return localDataSource.observeAll()
-    }
+    open fun observeAll(): Flow<List<T>> = localDataSource.observeAll()
 
     /**
      * Observe a specific entity by ID
      */
-    open fun observe(id: String): Flow<T?> {
-        return localDataSource.observe(id)
-    }
+    open fun observe(id: String): Flow<T?> = localDataSource.observe(id)
 
     // Sync Operations
 
     /**
      * Manually trigger sync with remote
      */
-    open suspend fun sync(): Result<SyncResult<T>> {
-        return try {
+    open suspend fun sync(): Result<SyncResult<T>> =
+        try {
             if (remoteDataSource == null) {
-                Result.failure(RepositoryError.ConfigurationError(
-                    configKey = "remoteDataSource",
-                    issue = "Remote data source not configured"
-                ))
+                Result.failure(
+                    RepositoryError.ConfigurationError(
+                        configKey = "remoteDataSource",
+                        issue = "Remote data source not configured",
+                    ),
+                )
             } else {
                 // Direct sync without coordinator
                 val localEntities = localDataSource.fetchAll().getOrThrow()
@@ -227,70 +219,66 @@ abstract class BaseRepository<T : Any>(
         } catch (e: Exception) {
             Result.failure(e.toRepositoryError())
         }
-    }
 
     /**
      * Get sync status
      */
-    open suspend fun getSyncStatus(): Result<Map<String, Any>> {
-        return try {
-            Result.success(mapOf(
-                "syncEnabled" to configuration.sync.enabled,
-                "repositoryId" to repositoryId
-            ))
+    open suspend fun getSyncStatus(): Result<Map<String, Any>> =
+        try {
+            Result.success(
+                mapOf(
+                    "syncEnabled" to configuration.sync.enabled,
+                    "repositoryId" to repositoryId,
+                ),
+            )
         } catch (e: Exception) {
             Result.failure(e.toRepositoryError())
         }
-    }
 
     // Health and Statistics
 
     /**
      * Perform health check on repository
      */
-    open suspend fun healthCheck(): Result<RepositoryHealth> {
-        return try {
+    open suspend fun healthCheck(): Result<RepositoryHealth> =
+        try {
             val localHealth = localDataSource.healthCheck()
             val remoteHealth = remoteDataSource?.healthCheck()
 
             val isHealthy = localHealth.isHealthy && (remoteHealth?.isHealthy != false)
             val errors = localHealth.errors + (remoteHealth?.errors ?: emptyList())
 
-            val health = RepositoryHealth(
-                repositoryId = repositoryId,
-                isHealthy = isHealthy,
-                localDataSourceHealth = localHealth,
-                remoteDataSourceHealth = remoteHealth,
-                errors = errors,
-                lastCheck = System.currentTimeMillis(),
-                statistics = repositoryStats
-            )
+            val health =
+                RepositoryHealth(
+                    repositoryId = repositoryId,
+                    isHealthy = isHealthy,
+                    localDataSourceHealth = localHealth,
+                    remoteDataSourceHealth = remoteHealth,
+                    errors = errors,
+                    lastCheck = System.currentTimeMillis(),
+                    statistics = repositoryStats,
+                )
 
             Result.success(health)
         } catch (e: Exception) {
             Result.failure(e.toRepositoryError())
         }
-    }
 
     /**
      * Get repository statistics
      */
-    open suspend fun getStatistics(): RepositoryStatistics {
-        return mutex.withLock { repositoryStats }
-    }
+    open suspend fun getStatistics(): RepositoryStatistics = mutex.withLock { repositoryStats }
 
     // Private Helper Methods
 
-    private fun shouldSyncImmediately(): Boolean {
-        return configuration.sync.enabled &&
-               configuration.sync.strategy == SyncStrategy.IMMEDIATE &&
-               remoteDataSource != null
-    }
+    private fun shouldSyncImmediately(): Boolean =
+        configuration.sync.enabled &&
+            configuration.sync.strategy == SyncStrategy.IMMEDIATE &&
+            remoteDataSource != null
 
-    private fun shouldFetchFromRemote(): Boolean {
-        return remoteDataSource != null &&
-               configuration.sync.enabled
-    }
+    private fun shouldFetchFromRemote(): Boolean =
+        remoteDataSource != null &&
+            configuration.sync.enabled
 
     private suspend fun syncWithRemote(entities: List<T>) {
         try {
@@ -334,7 +322,7 @@ data class RepositoryHealth(
     val remoteDataSourceHealth: DataSourceHealth?,
     val errors: List<String>,
     val lastCheck: Long,
-    val statistics: RepositoryStatistics
+    val statistics: RepositoryStatistics,
 )
 
 /**
@@ -348,17 +336,18 @@ data class RepositoryStatistics(
     val cacheHits: Long = 0,
     val cacheMisses: Long = 0,
     val errors: Long = 0,
-    val startTime: Long = System.currentTimeMillis()
+    val startTime: Long = System.currentTimeMillis(),
 ) {
     /**
      * Calculate cache hit ratio
      */
     val cacheHitRatio: Double
-        get() = if (cacheHits + cacheMisses > 0) {
-            cacheHits.toDouble() / (cacheHits + cacheMisses)
-        } else {
-            0.0
-        }
+        get() =
+            if (cacheHits + cacheMisses > 0) {
+                cacheHits.toDouble() / (cacheHits + cacheMisses)
+            } else {
+                0.0
+            }
 
     /**
      * Calculate total operations
@@ -370,57 +359,65 @@ data class RepositoryStatistics(
 /**
  * Extension function to convert exceptions to RepositoryError
  */
-private fun Throwable.toRepositoryError(): RepositoryError {
-    return when (this) {
+private fun Throwable.toRepositoryError(): RepositoryError =
+    when (this) {
         is RepositoryError -> this
-        is IllegalArgumentException -> RepositoryError.ValidationError(
-            field = "unknown",
-            value = null,
-            validationRule = message ?: "Invalid argument"
-        )
-        is IllegalStateException -> RepositoryError.ConfigurationError(
-            configKey = "state",
-            issue = message ?: "Invalid state"
-        )
+        is IllegalArgumentException ->
+            RepositoryError.ValidationError(
+                field = "unknown",
+                value = null,
+                validationRule = message ?: "Invalid argument",
+            )
+        is IllegalStateException ->
+            RepositoryError.ConfigurationError(
+                configKey = "state",
+                issue = message ?: "Invalid state",
+            )
         else -> RepositoryError.UnknownError(cause = this)
     }
-}
 
 /**
  * Repository builder for easy configuration
  */
-class RepositoryBuilder<T : Any>(private val repositoryId: String) {
+class RepositoryBuilder<T : Any>(
+    private val repositoryId: String,
+) {
     private var localDataSource: LocalDataSource<T>? = null
     private var remoteDataSource: RemoteDataSource<T>? = null
     private var configuration: RepositoryConfiguration = RepositoryConfiguration.default
     private var coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    fun withLocalDataSource(dataSource: LocalDataSource<T>) = apply {
-        this.localDataSource = dataSource
-    }
+    fun withLocalDataSource(dataSource: LocalDataSource<T>) =
+        apply {
+            this.localDataSource = dataSource
+        }
 
-    fun withRemoteDataSource(dataSource: RemoteDataSource<T>) = apply {
-        this.remoteDataSource = dataSource
-    }
+    fun withRemoteDataSource(dataSource: RemoteDataSource<T>) =
+        apply {
+            this.remoteDataSource = dataSource
+        }
 
-    fun withConfiguration(config: RepositoryConfiguration) = apply {
-        this.configuration = config
-    }
+    fun withConfiguration(config: RepositoryConfiguration) =
+        apply {
+            this.configuration = config
+        }
 
-    fun withCoroutineScope(scope: CoroutineScope) = apply {
-        this.coroutineScope = scope
-    }
+    fun withCoroutineScope(scope: CoroutineScope) =
+        apply {
+            this.coroutineScope = scope
+        }
 
     fun build(): BaseRepository<T> {
-        val localDs = localDataSource
-            ?: throw IllegalArgumentException("Local data source is required")
+        val localDs =
+            localDataSource
+                ?: throw IllegalArgumentException("Local data source is required")
 
         return object : BaseRepository<T>(
             repositoryId = repositoryId,
             localDataSource = localDs,
             remoteDataSource = remoteDataSource,
             configuration = configuration,
-            coroutineScope = coroutineScope
+            coroutineScope = coroutineScope,
         ) {}
     }
 }
@@ -430,7 +427,5 @@ class RepositoryBuilder<T : Any>(private val repositoryId: String) {
  */
 fun <T : Any> repository(
     repositoryId: String,
-    block: RepositoryBuilder<T>.() -> Unit
-): BaseRepository<T> {
-    return RepositoryBuilder<T>(repositoryId).apply(block).build()
-}
+    block: RepositoryBuilder<T>.() -> Unit,
+): BaseRepository<T> = RepositoryBuilder<T>(repositoryId).apply(block).build()

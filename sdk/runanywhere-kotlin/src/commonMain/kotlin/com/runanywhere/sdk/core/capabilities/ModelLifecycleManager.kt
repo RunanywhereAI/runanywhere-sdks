@@ -16,7 +16,7 @@ import kotlinx.coroutines.sync.withLock
 class ModelLifecycleManager<ServiceType : Any>(
     category: String,
     private val loadResource: suspend (String, ComponentConfiguration?) -> ServiceType,
-    private val unloadResource: suspend (ServiceType) -> Unit
+    private val unloadResource: suspend (ServiceType) -> Unit,
 ) {
     // MARK: - State
 
@@ -39,28 +39,32 @@ class ModelLifecycleManager<ServiceType : Any>(
     // MARK: - State Properties
 
     /** Whether a resource is currently loaded */
-    suspend fun isLoaded(): Boolean = mutex.withLock {
-        service != null
-    }
+    suspend fun isLoaded(): Boolean =
+        mutex.withLock {
+            service != null
+        }
 
     /** The currently loaded resource ID */
-    suspend fun currentResourceId(): String? = mutex.withLock {
-        loadedResourceId
-    }
+    suspend fun currentResourceId(): String? =
+        mutex.withLock {
+            loadedResourceId
+        }
 
     /** The currently loaded service */
-    suspend fun currentService(): ServiceType? = mutex.withLock {
-        service
-    }
+    suspend fun currentService(): ServiceType? =
+        mutex.withLock {
+            service
+        }
 
     /** Current loading state */
-    suspend fun state(): CapabilityLoadingState = mutex.withLock {
-        when {
-            loadedResourceId != null -> CapabilityLoadingState.Loaded(loadedResourceId!!)
-            inflightJob?.isActive == true -> CapabilityLoadingState.Loading("")
-            else -> CapabilityLoadingState.Idle
+    suspend fun state(): CapabilityLoadingState =
+        mutex.withLock {
+            when {
+                loadedResourceId != null -> CapabilityLoadingState.Loaded(loadedResourceId!!)
+                inflightJob?.isActive == true -> CapabilityLoadingState.Loading("")
+                else -> CapabilityLoadingState.Idle
+            }
         }
-    }
 
     // MARK: - Configuration
 
@@ -141,9 +145,10 @@ class ModelLifecycleManager<ServiceType : Any>(
      * Unload the currently loaded resource.
      */
     suspend fun unload() {
-        val (currentService, currentResourceId) = mutex.withLock {
-            Pair(service, loadedResourceId)
-        }
+        val (currentService, currentResourceId) =
+            mutex.withLock {
+                Pair(service, loadedResourceId)
+            }
 
         if (currentService == null) return
 
@@ -182,9 +187,8 @@ class ModelLifecycleManager<ServiceType : Any>(
      *
      * @throws CapabilityError.ResourceNotLoaded if no service is loaded
      */
-    suspend fun requireService(): ServiceType {
-        return mutex.withLock {
+    suspend fun requireService(): ServiceType =
+        mutex.withLock {
             service ?: throw CapabilityError.ResourceNotLoaded("resource")
         }
-    }
 }

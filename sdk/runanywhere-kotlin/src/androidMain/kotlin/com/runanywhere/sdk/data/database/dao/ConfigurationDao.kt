@@ -1,6 +1,11 @@
 package com.runanywhere.sdk.data.database.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import com.runanywhere.sdk.data.database.entities.ConfigurationEntity
 import com.runanywhere.sdk.data.models.ConfigurationSource
 import com.runanywhere.sdk.data.models.SDKEnvironment
@@ -11,7 +16,6 @@ import com.runanywhere.sdk.data.models.SDKEnvironment
  */
 @Dao
 interface ConfigurationDao {
-
     @Query("SELECT * FROM configurations ORDER BY last_updated DESC LIMIT 1")
     suspend fun getCurrentConfiguration(): ConfigurationEntity?
 

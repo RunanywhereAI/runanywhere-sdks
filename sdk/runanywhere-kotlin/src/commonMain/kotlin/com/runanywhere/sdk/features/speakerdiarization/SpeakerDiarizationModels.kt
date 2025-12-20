@@ -1,10 +1,9 @@
 package com.runanywhere.sdk.features.speakerdiarization
 
 import com.runanywhere.sdk.core.capabilities.*
-import com.runanywhere.sdk.features.stt.STTOutput
 import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.features.stt.STTOutput
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
-import kotlinx.coroutines.flow.Flow
 
 // MARK: - Speaker Diarization Configuration
 
@@ -14,31 +13,26 @@ import kotlinx.coroutines.flow.Flow
 data class SpeakerDiarizationConfiguration(
     // Component type
     override val componentType: SDKComponent = SDKComponent.SPEAKER_DIARIZATION,
-
     // Model ID
     override val modelId: String? = null,
-
     // Speaker detection parameters
     val maxSpeakers: Int = 10,
     val minSpeechDuration: Double = 0.5, // seconds
     val speakerChangeThreshold: Float = 0.7f, // cosine similarity threshold
     val windowSize: Double = 2.0, // seconds
     val stepSize: Double = 0.5, // seconds
-
     // Audio processing parameters
     val sampleRate: Int = 16000,
     val embeddingSize: Int = 128,
-
     // Energy-based detection settings
     val energyThreshold: Float = 0.01f,
     val silenceThreshold: Float = 0.005f,
-
     // Performance optimization
     val useGPUIfAvailable: Boolean = true,
     val enableRealTimeProcessing: Boolean = true,
-    val batchProcessingMode: Boolean = false
-) : ComponentConfiguration, ComponentInitParameters {
-
+    val batchProcessingMode: Boolean = false,
+) : ComponentConfiguration,
+    ComponentInitParameters {
     override fun validate() {
         if (maxSpeakers <= 0 || maxSpeakers > 50) {
             throw SDKError.ValidationFailed("Max speakers must be between 1 and 50")
@@ -74,17 +68,17 @@ data class SpeakerInfo(
     val name: String? = null,
     val confidence: Float? = null,
     val embedding: FloatArray? = null,
-    val createdAt: Long = getCurrentTimeMillis()
+    val createdAt: Long = getCurrentTimeMillis(),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is SpeakerInfo) return false
 
         return id == other.id &&
-                name == other.name &&
-                confidence == other.confidence &&
-                embedding?.contentEquals(other.embedding ?: FloatArray(0)) ?: (other.embedding == null) &&
-                createdAt == other.createdAt
+            name == other.name &&
+            confidence == other.confidence &&
+            embedding?.contentEquals(other.embedding ?: FloatArray(0)) ?: (other.embedding == null) &&
+            createdAt == other.createdAt
     }
 
     override fun hashCode(): Int {
@@ -107,19 +101,19 @@ data class SpeakerProfile(
     val segmentCount: Int = 0,
     val name: String? = null,
     val averageConfidence: Float = 0.0f,
-    val lastUpdated: Long = getCurrentTimeMillis()
+    val lastUpdated: Long = getCurrentTimeMillis(),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is SpeakerProfile) return false
 
         return id == other.id &&
-                embedding?.contentEquals(other.embedding ?: FloatArray(0)) ?: (other.embedding == null) &&
-                totalSpeakingTime == other.totalSpeakingTime &&
-                segmentCount == other.segmentCount &&
-                name == other.name &&
-                averageConfidence == other.averageConfidence &&
-                lastUpdated == other.lastUpdated
+            embedding?.contentEquals(other.embedding ?: FloatArray(0)) ?: (other.embedding == null) &&
+            totalSpeakingTime == other.totalSpeakingTime &&
+            segmentCount == other.segmentCount &&
+            name == other.name &&
+            averageConfidence == other.averageConfidence &&
+            lastUpdated == other.lastUpdated
     }
 
     override fun hashCode(): Int {
@@ -143,7 +137,7 @@ data class SpeakerSegment(
     val endTime: Double, // seconds
     val confidence: Float,
     val energy: Float = 0.0f,
-    val speechDuration: Double = endTime - startTime
+    val speechDuration: Double = endTime - startTime,
 ) {
     init {
         require(endTime >= startTime) { "End time must be >= start time" }
@@ -157,7 +151,7 @@ data class SpeakerSegment(
 data class LabeledTranscription(
     val segments: List<LabeledSegment>,
     val speakers: List<SpeakerProfile>,
-    val totalDuration: Double = segments.maxOfOrNull { it.endTime } ?: 0.0
+    val totalDuration: Double = segments.maxOfOrNull { it.endTime } ?: 0.0,
 ) {
     /**
      * Labeled segment with speaker ID and text (matches iOS LabeledSegment)
@@ -167,7 +161,7 @@ data class LabeledTranscription(
         val text: String,
         val startTime: Double, // seconds
         val endTime: Double, // seconds
-        val confidence: Float = 1.0f
+        val confidence: Float = 1.0f,
     ) {
         init {
             require(endTime >= startTime) { "End time must be >= start time" }
@@ -179,10 +173,11 @@ data class LabeledTranscription(
      * Format transcription for display with speaker labels
      */
     val formattedTranscript: String
-        get() = segments.joinToString("\n") { segment ->
-            val speakerName = speakers.find { it.id == segment.speakerId }?.name ?: segment.speakerId
-            "[$speakerName]: ${segment.text}"
-        }
+        get() =
+            segments.joinToString("\n") { segment ->
+                val speakerName = speakers.find { it.id == segment.speakerId }?.name ?: segment.speakerId
+                "[$speakerName]: ${segment.text}"
+            }
 }
 
 /**
@@ -195,7 +190,7 @@ data class DiarizationMetadata(
     val method: String, // "energy", "ml", "hybrid"
     val realTimeFactor: Double = if (audioLength > 0) processingTime / audioLength else 0.0,
     val averageConfidence: Float = 0.0f,
-    val segmentCount: Int = 0
+    val segmentCount: Int = 0,
 )
 
 // MARK: - Input/Output Models
@@ -206,20 +201,15 @@ data class DiarizationMetadata(
 data class SpeakerDiarizationInput(
     // Audio data to process
     val audioData: ByteArray = byteArrayOf(),
-
     // Audio buffer (alternative to data)
     val audioBuffer: FloatArray? = null,
-
     // Sample rate of audio
     val sampleRate: Int = 16000,
-
     // Optional transcription for labeling
     val transcription: STTOutput? = null,
-
     // Processing options
-    val options: SpeakerDiarizationOptions? = null
+    val options: SpeakerDiarizationOptions? = null,
 ) : ComponentInput {
-
     override fun validate() {
         if (audioData.isEmpty() && audioBuffer == null) {
             throw SDKError.ValidationFailed("SpeakerDiarizationInput must contain either audioData or audioBuffer")
@@ -234,10 +224,10 @@ data class SpeakerDiarizationInput(
         if (other !is SpeakerDiarizationInput) return false
 
         return audioData.contentEquals(other.audioData) &&
-                audioBuffer?.contentEquals(other.audioBuffer ?: FloatArray(0)) ?: (other.audioBuffer == null) &&
-                sampleRate == other.sampleRate &&
-                transcription == other.transcription &&
-                options == other.options
+            audioBuffer?.contentEquals(other.audioBuffer ?: FloatArray(0)) ?: (other.audioBuffer == null) &&
+            sampleRate == other.sampleRate &&
+            transcription == other.transcription &&
+            options == other.options
     }
 
     override fun hashCode(): Int {
@@ -256,18 +246,14 @@ data class SpeakerDiarizationInput(
 data class SpeakerDiarizationOutput(
     // Temporal segments with speaker assignments
     val segments: List<SpeakerSegment>,
-
     // Speaker profiles with statistics
     val speakers: List<SpeakerProfile>,
-
     // Labeled transcription if input transcription provided
     val labeledTranscription: LabeledTranscription? = null,
-
     // Processing metadata
     val metadata: DiarizationMetadata,
-
     // Timestamp (required by ComponentOutput)
-    override val timestamp: Long = getCurrentTimeMillis()
+    override val timestamp: Long = getCurrentTimeMillis(),
 ) : ComponentOutput
 
 /**
@@ -278,7 +264,7 @@ data class SpeakerDiarizationOptions(
     val minSpeechDuration: Double? = null,
     val speakerChangeThreshold: Float? = null,
     val enableLabeling: Boolean = true,
-    val preserveSpeakerHistory: Boolean = true
+    val preserveSpeakerHistory: Boolean = true,
 )
 
 // MARK: - Speaker Diarization Results
@@ -290,7 +276,7 @@ data class SpeakerDiarizationResult(
     val speakers: List<SpeakerInfo>,
     val segments: List<SpeakerSegment>,
     val processingTime: Double,
-    val confidence: Float
+    val confidence: Float,
 )
 
 // MARK: - Speaker Detection Events
@@ -300,11 +286,25 @@ data class SpeakerDiarizationResult(
  */
 sealed class SpeakerDiarizationEvent {
     object ProcessingStarted : SpeakerDiarizationEvent()
+
     object ProcessingCompleted : SpeakerDiarizationEvent()
-    data class SpeakerDetected(val speaker: SpeakerInfo) : SpeakerDiarizationEvent()
-    data class SpeakerChanged(val previous: SpeakerInfo?, val current: SpeakerInfo) : SpeakerDiarizationEvent()
-    data class SegmentCompleted(val segment: SpeakerSegment) : SpeakerDiarizationEvent()
-    data class Error(val error: SpeakerDiarizationError) : SpeakerDiarizationEvent()
+
+    data class SpeakerDetected(
+        val speaker: SpeakerInfo,
+    ) : SpeakerDiarizationEvent()
+
+    data class SpeakerChanged(
+        val previous: SpeakerInfo?,
+        val current: SpeakerInfo,
+    ) : SpeakerDiarizationEvent()
+
+    data class SegmentCompleted(
+        val segment: SpeakerSegment,
+    ) : SpeakerDiarizationEvent()
+
+    data class Error(
+        val error: SpeakerDiarizationError,
+    ) : SpeakerDiarizationEvent()
 }
 
 // MARK: - Speaker Diarization Errors
@@ -314,25 +314,31 @@ sealed class SpeakerDiarizationEvent {
  * Matches iOS SpeakerDiarizationError exactly
  */
 sealed class SpeakerDiarizationError : Exception() {
-
     // MARK: - Initialization Errors
 
     /** No provider found for the requested model */
-    data class NoProviderFound(val modelId: String?) : SpeakerDiarizationError() {
-        override val message: String = if (modelId != null) {
-            "No speaker diarization provider found for model: $modelId"
-        } else {
-            "No speaker diarization provider available"
-        }
+    data class NoProviderFound(
+        val modelId: String?,
+    ) : SpeakerDiarizationError() {
+        override val message: String =
+            if (modelId != null) {
+                "No speaker diarization provider found for model: $modelId"
+            } else {
+                "No speaker diarization provider available"
+            }
     }
 
     /** Service failed to initialize */
-    data class InitializationFailed(override val cause: Throwable) : SpeakerDiarizationError() {
+    data class InitializationFailed(
+        override val cause: Throwable,
+    ) : SpeakerDiarizationError() {
         override val message: String = "Speaker diarization initialization failed: ${cause.message}"
     }
 
     /** Model file not found at path */
-    data class ModelNotFound(val path: String) : SpeakerDiarizationError() {
+    data class ModelNotFound(
+        val path: String,
+    ) : SpeakerDiarizationError() {
         override val message: String = "Speaker diarization model not found at: $path"
     }
 
@@ -344,17 +350,24 @@ sealed class SpeakerDiarizationError : Exception() {
     }
 
     /** Diarization processing failed */
-    data class ProcessingFailed(val reason: String) : SpeakerDiarizationError() {
+    data class ProcessingFailed(
+        val reason: String,
+    ) : SpeakerDiarizationError() {
         override val message: String = "Speaker diarization processing failed: $reason"
     }
 
     /** Invalid audio format */
-    data class InvalidAudioFormat(val expected: String, val received: String) : SpeakerDiarizationError() {
+    data class InvalidAudioFormat(
+        val expected: String,
+        val received: String,
+    ) : SpeakerDiarizationError() {
         override val message: String = "Invalid audio format. Expected $expected, received $received"
     }
 
     /** Audio too short for diarization */
-    data class AudioTooShort(val minimumSeconds: Double) : SpeakerDiarizationError() {
+    data class AudioTooShort(
+        val minimumSeconds: Double,
+    ) : SpeakerDiarizationError() {
         override val message: String = "Audio too short. Minimum $minimumSeconds seconds required."
     }
 
@@ -366,24 +379,33 @@ sealed class SpeakerDiarizationError : Exception() {
     // MARK: - Configuration Errors
 
     /** Invalid configuration provided */
-    data class InvalidConfiguration(val reason: String) : SpeakerDiarizationError() {
+    data class InvalidConfiguration(
+        val reason: String,
+    ) : SpeakerDiarizationError() {
         override val message: String = "Invalid configuration: $reason"
     }
 
     /** Max speakers must be between 1 and 100 */
-    data class InvalidMaxSpeakers(val value: Int) : SpeakerDiarizationError() {
+    data class InvalidMaxSpeakers(
+        val value: Int,
+    ) : SpeakerDiarizationError() {
         override val message: String = "Invalid max speakers value: $value. Must be between 1 and 100."
     }
 
     /** Invalid threshold value */
-    data class InvalidThreshold(val value: Float) : SpeakerDiarizationError() {
+    data class InvalidThreshold(
+        val value: Float,
+    ) : SpeakerDiarizationError() {
         override val message: String = "Invalid threshold value: $value. Must be between 0 and 1."
     }
 
     // MARK: - Resource Errors
 
     /** Insufficient memory for model */
-    data class InsufficientMemory(val required: Long, val available: Long) : SpeakerDiarizationError() {
+    data class InsufficientMemory(
+        val required: Long,
+        val available: Long,
+    ) : SpeakerDiarizationError() {
         override val message: String = "Insufficient memory. Required: $required bytes, Available: $available bytes"
     }
 
@@ -402,7 +424,7 @@ data class AudioChunk(
     val samples: FloatArray,
     val startTime: Double,
     val endTime: Double,
-    val sampleRate: Int
+    val sampleRate: Int,
 ) {
     val duration: Double = endTime - startTime
 
@@ -411,9 +433,9 @@ data class AudioChunk(
         if (other !is AudioChunk) return false
 
         return samples.contentEquals(other.samples) &&
-                startTime == other.startTime &&
-                endTime == other.endTime &&
-                sampleRate == other.sampleRate
+            startTime == other.startTime &&
+            endTime == other.endTime &&
+            sampleRate == other.sampleRate
     }
 
     override fun hashCode(): Int {
@@ -432,16 +454,16 @@ data class AudioFeatures(
     val rmsEnergy: Float,
     val zeroCrossingRate: Float,
     val spectralCentroid: Float,
-    val embedding: FloatArray
+    val embedding: FloatArray,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is AudioFeatures) return false
 
         return rmsEnergy == other.rmsEnergy &&
-                zeroCrossingRate == other.zeroCrossingRate &&
-                spectralCentroid == other.spectralCentroid &&
-                embedding.contentEquals(other.embedding)
+            zeroCrossingRate == other.zeroCrossingRate &&
+            spectralCentroid == other.spectralCentroid &&
+            embedding.contentEquals(other.embedding)
     }
 
     override fun hashCode(): Int {

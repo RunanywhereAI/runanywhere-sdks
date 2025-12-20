@@ -20,7 +20,6 @@ import kotlin.uuid.Uuid
  * For precise token counts, use the model's actual tokenizer.
  */
 class GenerationAnalyticsService {
-
     private val logger = SDKLogger("GenerationAnalytics")
 
     // Active generations
@@ -30,8 +29,8 @@ class GenerationAnalyticsService {
     private var totalGenerations = 0
     private var streamingGenerations = 0
     private var nonStreamingGenerations = 0
-    private var totalTimeToFirstToken = 0.0  // Only for streaming with TTFT recorded
-    private var streamingTTFTCount = 0       // Only count TTFT for streaming generations that recorded it
+    private var totalTimeToFirstToken = 0.0 // Only for streaming with TTFT recorded
+    private var streamingTTFTCount = 0 // Only count TTFT for streaming generations that recorded it
     private var totalTokensPerSecond = 0.0
     private var totalInputTokens = 0
     private var totalOutputTokens = 0
@@ -45,7 +44,7 @@ class GenerationAnalyticsService {
         val modelId: String,
         val isStreaming: Boolean,
         val framework: InferenceFramework,
-        var firstTokenTime: Long? = null
+        var firstTokenTime: Long? = null,
     )
 
     // MARK: - Generation Tracking
@@ -59,27 +58,28 @@ class GenerationAnalyticsService {
     @OptIn(ExperimentalUuidApi::class)
     fun startGeneration(
         modelId: String,
-        framework: InferenceFramework = InferenceFramework.LLAMA_CPP
+        framework: InferenceFramework = InferenceFramework.LLAMA_CPP,
     ): String {
         val id = Uuid.random().toString()
 
         synchronized(activeGenerations) {
-            activeGenerations[id] = GenerationTracker(
-                startTime = currentTimeMillis(),
-                modelId = modelId,
-                isStreaming = false,
-                framework = framework
-            )
+            activeGenerations[id] =
+                GenerationTracker(
+                    startTime = currentTimeMillis(),
+                    modelId = modelId,
+                    isStreaming = false,
+                    framework = framework,
+                )
         }
 
         EventPublisher.track(
             LLMEvent.GenerationStarted(
                 generationId = id,
                 modelId = modelId,
-                prompt = null,  // Privacy: don't log prompts by default
+                prompt = null, // Privacy: don't log prompts by default
                 isStreaming = false,
-                framework = framework
-            )
+                framework = framework,
+            ),
         )
 
         logger.debug("Non-streaming generation started: $id")
@@ -95,27 +95,28 @@ class GenerationAnalyticsService {
     @OptIn(ExperimentalUuidApi::class)
     fun startStreamingGeneration(
         modelId: String,
-        framework: InferenceFramework = InferenceFramework.LLAMA_CPP
+        framework: InferenceFramework = InferenceFramework.LLAMA_CPP,
     ): String {
         val id = Uuid.random().toString()
 
         synchronized(activeGenerations) {
-            activeGenerations[id] = GenerationTracker(
-                startTime = currentTimeMillis(),
-                modelId = modelId,
-                isStreaming = true,
-                framework = framework
-            )
+            activeGenerations[id] =
+                GenerationTracker(
+                    startTime = currentTimeMillis(),
+                    modelId = modelId,
+                    isStreaming = true,
+                    framework = framework,
+                )
         }
 
         EventPublisher.track(
             LLMEvent.GenerationStarted(
                 generationId = id,
                 modelId = modelId,
-                prompt = null,  // Privacy: don't log prompts by default
+                prompt = null, // Privacy: don't log prompts by default
                 isStreaming = true,
-                framework = framework
-            )
+                framework = framework,
+            ),
         )
 
         logger.debug("Streaming generation started: $id")
@@ -128,9 +129,10 @@ class GenerationAnalyticsService {
      * @param generationId The generation ID from startStreamingGeneration
      */
     fun trackFirstToken(generationId: String) {
-        val tracker = synchronized(activeGenerations) {
-            activeGenerations[generationId]
-        } ?: return
+        val tracker =
+            synchronized(activeGenerations) {
+                activeGenerations[generationId]
+            } ?: return
 
         // Only track for streaming generations
         if (!tracker.isStreaming) {
@@ -153,8 +155,8 @@ class GenerationAnalyticsService {
         EventPublisher.track(
             LLMEvent.FirstToken(
                 generationId = generationId,
-                latencyMs = latencyMs
-            )
+                latencyMs = latencyMs,
+            ),
         )
 
         logger.debug("First token: $generationId, latency: ${String.format("%.1f", latencyMs)}ms")
@@ -165,10 +167,14 @@ class GenerationAnalyticsService {
      * @param generationId The generation ID from startStreamingGeneration
      * @param tokensGenerated Number of tokens generated so far
      */
-    fun trackStreamingUpdate(generationId: String, tokensGenerated: Int) {
-        val tracker = synchronized(activeGenerations) {
-            activeGenerations[generationId]
-        } ?: return
+    fun trackStreamingUpdate(
+        generationId: String,
+        tokensGenerated: Int,
+    ) {
+        val tracker =
+            synchronized(activeGenerations) {
+                activeGenerations[generationId]
+            } ?: return
 
         // Only track for streaming generations
         if (!tracker.isStreaming) {
@@ -178,8 +184,8 @@ class GenerationAnalyticsService {
         EventPublisher.track(
             LLMEvent.StreamingUpdate(
                 generationId = generationId,
-                tokensGenerated = tokensGenerated
-            )
+                tokensGenerated = tokensGenerated,
+            ),
         )
     }
 
@@ -195,29 +201,32 @@ class GenerationAnalyticsService {
         generationId: String,
         inputTokens: Int,
         outputTokens: Int,
-        modelId: String
+        modelId: String,
     ) {
-        val tracker = synchronized(activeGenerations) {
-            activeGenerations.remove(generationId)
-        } ?: return
+        val tracker =
+            synchronized(activeGenerations) {
+                activeGenerations.remove(generationId)
+            } ?: return
 
         val endTime = currentTimeMillis()
         val totalTimeMs = (endTime - tracker.startTime).toDouble()
         val totalTimeSeconds = totalTimeMs / 1000.0
 
         // Calculate tokens per second
-        val tokensPerSecond = if (totalTimeSeconds > 0) {
-            outputTokens.toDouble() / totalTimeSeconds
-        } else {
-            0.0
-        }
+        val tokensPerSecond =
+            if (totalTimeSeconds > 0) {
+                outputTokens.toDouble() / totalTimeSeconds
+            } else {
+                0.0
+            }
 
         // Calculate TTFT for streaming only
-        val timeToFirstTokenMs: Double? = if (tracker.isStreaming && tracker.firstTokenTime != null) {
-            (tracker.firstTokenTime!! - tracker.startTime).toDouble()
-        } else {
-            null
-        }
+        val timeToFirstTokenMs: Double? =
+            if (tracker.isStreaming && tracker.firstTokenTime != null) {
+                (tracker.firstTokenTime!! - tracker.startTime).toDouble()
+            } else {
+                null
+            }
 
         // Update metrics
         synchronized(this) {
@@ -248,15 +257,15 @@ class GenerationAnalyticsService {
                 tokensPerSecond = tokensPerSecond,
                 isStreaming = tracker.isStreaming,
                 timeToFirstTokenMs = timeToFirstTokenMs,
-                framework = tracker.framework
-            )
+                framework = tracker.framework,
+            ),
         )
 
         logger.debug(
             "Generation completed: $generationId, " +
-            "in: $inputTokens, out: $outputTokens, " +
-            "time: ${String.format("%.1f", totalTimeMs)}ms, " +
-            "speed: ${String.format("%.2f", tokensPerSecond)} tok/s"
+                "in: $inputTokens, out: $outputTokens, " +
+                "time: ${String.format("%.1f", totalTimeMs)}ms, " +
+                "speed: ${String.format("%.2f", tokensPerSecond)} tok/s",
         )
     }
 
@@ -265,7 +274,10 @@ class GenerationAnalyticsService {
      * @param generationId The generation ID
      * @param error The error that occurred
      */
-    fun trackGenerationFailed(generationId: String, error: Throwable) {
+    fun trackGenerationFailed(
+        generationId: String,
+        error: Throwable,
+    ) {
         synchronized(activeGenerations) {
             activeGenerations.remove(generationId)
         }
@@ -274,8 +286,8 @@ class GenerationAnalyticsService {
         EventPublisher.track(
             LLMEvent.GenerationFailed(
                 generationId = generationId,
-                error = error.message ?: "Unknown error"
-            )
+                error = error.message ?: "Unknown error",
+            ),
         )
 
         logger.error("Generation failed: $generationId, error: ${error.message}")
@@ -286,7 +298,10 @@ class GenerationAnalyticsService {
      * @param generationId The generation ID
      * @param errorMessage The error message
      */
-    fun trackGenerationFailed(generationId: String, errorMessage: String) {
+    fun trackGenerationFailed(
+        generationId: String,
+        errorMessage: String,
+    ) {
         synchronized(activeGenerations) {
             activeGenerations.remove(generationId)
         }
@@ -295,8 +310,8 @@ class GenerationAnalyticsService {
         EventPublisher.track(
             LLMEvent.GenerationFailed(
                 generationId = generationId,
-                error = errorMessage
-            )
+                error = errorMessage,
+            ),
         )
 
         logger.error("Generation failed: $generationId, error: $errorMessage")
@@ -307,7 +322,10 @@ class GenerationAnalyticsService {
      * @param error The error that occurred
      * @param operation Description of the operation that failed
      */
-    fun trackError(error: Throwable, operation: String) {
+    fun trackError(
+        error: Throwable,
+        operation: String,
+    ) {
         lastEventTime = currentTimeMillis()
         logger.error("LLM error during $operation: ${error.message}")
         // Error events can be added via a generic ErrorEvent if needed
@@ -318,8 +336,8 @@ class GenerationAnalyticsService {
     /**
      * Get current generation metrics.
      */
-    fun getMetrics(): GenerationMetrics {
-        return synchronized(this) {
+    fun getMetrics(): GenerationMetrics =
+        synchronized(this) {
             GenerationMetrics(
                 totalEvents = totalGenerations,
                 startTime = startTime,
@@ -327,21 +345,22 @@ class GenerationAnalyticsService {
                 totalGenerations = totalGenerations,
                 streamingGenerations = streamingGenerations,
                 nonStreamingGenerations = nonStreamingGenerations,
-                averageTimeToFirstToken = if (streamingTTFTCount > 0) {
-                    totalTimeToFirstToken / streamingTTFTCount
-                } else {
-                    0.0
-                },
-                averageTokensPerSecond = if (totalGenerations > 0) {
-                    totalTokensPerSecond / totalGenerations
-                } else {
-                    0.0
-                },
+                averageTimeToFirstToken =
+                    if (streamingTTFTCount > 0) {
+                        totalTimeToFirstToken / streamingTTFTCount
+                    } else {
+                        0.0
+                    },
+                averageTokensPerSecond =
+                    if (totalGenerations > 0) {
+                        totalTokensPerSecond / totalGenerations
+                    } else {
+                        0.0
+                    },
                 totalInputTokens = totalInputTokens,
-                totalOutputTokens = totalOutputTokens
+                totalOutputTokens = totalOutputTokens,
             )
         }
-    }
 }
 
 // MARK: - Generation Metrics
@@ -370,5 +389,5 @@ data class GenerationMetrics(
     /** Total input tokens processed across all generations */
     val totalInputTokens: Int = 0,
     /** Total output tokens generated across all generations */
-    val totalOutputTokens: Int = 0
+    val totalOutputTokens: Int = 0,
 )

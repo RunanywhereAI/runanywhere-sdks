@@ -4,14 +4,14 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.InferenceFramework
-import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.models.enums.ModelCategory
+import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.storage.FileSystem
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.utils.io.*
 import io.ktor.http.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.*
 
 /**
@@ -20,21 +20,21 @@ import kotlinx.coroutines.*
  */
 class WhisperKitDownloadStrategy(
     private val httpClient: HttpClient = HttpClient(),
-    private val fileSystem: FileSystem = ServiceContainer.shared.fileSystem
+    private val fileSystem: FileSystem = ServiceContainer.shared.fileSystem,
 ) : DownloadStrategy {
-
     private val logger = SDKLogger("WhisperKitDownloadStrategy")
 
     companion object {
         // WhisperKit model file structure
-        private val WHISPERKIT_MODEL_FILES = listOf(
-            "AudioEncoder.mlmodelc",
-            "TextDecoder.mlmodelc",
-            "MelSpectrogram.mlmodelc",
-            "LogitFilter.mlmodelc",
-            "AudioEncoder.mlpackage",
-            "TextDecoder.mlpackage"
-        )
+        private val WHISPERKIT_MODEL_FILES =
+            listOf(
+                "AudioEncoder.mlmodelc",
+                "TextDecoder.mlmodelc",
+                "MelSpectrogram.mlmodelc",
+                "LogitFilter.mlmodelc",
+                "AudioEncoder.mlpackage",
+                "TextDecoder.mlpackage",
+            )
 
         // Base URL for WhisperKit models on HuggingFace
         private const val WHISPERKIT_BASE_URL = "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main"
@@ -43,11 +43,12 @@ class WhisperKitDownloadStrategy(
     /**
      * Check if this strategy can handle the model
      */
-    override fun canHandle(model: ModelInfo): Boolean {
-        return model.preferredFramework == InferenceFramework.WHISPER_KIT ||
-               (model.format == ModelFormat.MLMODEL &&
-                model.category == ModelCategory.SPEECH_RECOGNITION)
-    }
+    override fun canHandle(model: ModelInfo): Boolean =
+        model.preferredFramework == InferenceFramework.WHISPER_KIT ||
+            (
+                model.format == ModelFormat.MLMODEL &&
+                    model.category == ModelCategory.SPEECH_RECOGNITION
+            )
 
     /**
      * Download WhisperKit model with multiple files
@@ -55,7 +56,7 @@ class WhisperKitDownloadStrategy(
     override suspend fun download(
         model: ModelInfo,
         destinationFolder: String,
-        progressHandler: ((Double) -> Unit)?
+        progressHandler: ((Double) -> Unit)?,
     ): String {
         logger.info("Starting WhisperKit download for model: ${model.id}")
 
@@ -97,9 +98,12 @@ class WhisperKitDownloadStrategy(
                         bytesDownloaded += bytesRead
 
                         // Calculate overall progress across all files
-                        val fileProgress = if (contentLength > 0) {
-                            bytesDownloaded.toDouble() / contentLength
-                        } else 0.0
+                        val fileProgress =
+                            if (contentLength > 0) {
+                                bytesDownloaded.toDouble() / contentLength
+                            } else {
+                                0.0
+                            }
 
                         overallProgress = (downloadedFiles + fileProgress) / totalFiles
                         progressHandler?.invoke(overallProgress)
@@ -117,7 +121,6 @@ class WhisperKitDownloadStrategy(
 
                 downloadedFiles++
                 logger.debug("Successfully downloaded: $file ($downloadedFiles/$totalFiles)")
-
             } catch (e: Exception) {
                 // Some files might not exist (404) - continue with others
                 logger.warn("Failed to download $file: ${e.message}")
@@ -130,10 +133,12 @@ class WhisperKitDownloadStrategy(
         }
 
         // Verify at least the core files were downloaded
-        val hasAudioEncoder = fileSystem.exists("$destinationFolder/AudioEncoder.mlmodelc") ||
-                             fileSystem.exists("$destinationFolder/AudioEncoder.mlpackage")
-        val hasTextDecoder = fileSystem.exists("$destinationFolder/TextDecoder.mlmodelc") ||
-                            fileSystem.exists("$destinationFolder/TextDecoder.mlpackage")
+        val hasAudioEncoder =
+            fileSystem.exists("$destinationFolder/AudioEncoder.mlmodelc") ||
+                fileSystem.exists("$destinationFolder/AudioEncoder.mlpackage")
+        val hasTextDecoder =
+            fileSystem.exists("$destinationFolder/TextDecoder.mlmodelc") ||
+                fileSystem.exists("$destinationFolder/TextDecoder.mlpackage")
 
         if (!hasAudioEncoder || !hasTextDecoder) {
             throw Exception("Failed to download required WhisperKit model files")
@@ -149,8 +154,8 @@ class WhisperKitDownloadStrategy(
     /**
      * Map model ID to WhisperKit variant name
      */
-    private fun mapModelIdToWhisperKitVariant(modelId: String): String {
-        return when (modelId) {
+    private fun mapModelIdToWhisperKitVariant(modelId: String): String =
+        when (modelId) {
             "whisperkit-tiny" -> "openai_whisper-tiny"
             "whisperkit-base" -> "openai_whisper-base"
             "whisperkit-small" -> "openai_whisper-small"
@@ -158,5 +163,4 @@ class WhisperKitDownloadStrategy(
             "whisperkit-large" -> "openai_whisper-large-v3"
             else -> "openai_whisper-base" // Default to base
         }
-    }
 }

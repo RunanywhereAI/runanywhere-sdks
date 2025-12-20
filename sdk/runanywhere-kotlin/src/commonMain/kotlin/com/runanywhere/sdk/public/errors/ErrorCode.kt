@@ -5,7 +5,10 @@ package com.runanywhere.sdk.public.errors
  *
  * Aligned with iOS: `RunAnywhere/Foundation/ErrorTypes/ErrorCodes.swift`
  */
-enum class ErrorCode(val code: Int, val message: String) {
+enum class ErrorCode(
+    val code: Int,
+    val message: String,
+) {
     // General errors (1000-1099)
     UNKNOWN(1000, "An unknown error occurred"),
     INVALID_INPUT(1001, "Invalid input provided"),
@@ -50,5 +53,5 @@ enum class ErrorCode(val code: Int, val message: String) {
     GENERATION_TIMEOUT(1701, "Generation timed out"),
     TOKEN_LIMIT_EXCEEDED(1702, "Token limit exceeded"),
     COST_LIMIT_EXCEEDED(1703, "Cost limit exceeded"),
-    CONTEXT_TOO_LONG(1704, "Context too long")
+    CONTEXT_TOO_LONG(1704, "Context too long"),
 }

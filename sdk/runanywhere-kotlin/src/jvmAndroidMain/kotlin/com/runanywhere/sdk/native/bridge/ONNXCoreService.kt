@@ -25,7 +25,6 @@ import kotlin.concurrent.Volatile
  * - Operations are dispatched to IO dispatcher for JNI calls
  */
 class ONNXCoreService : NativeCoreService {
-
     private val logger = SDKLogger("ONNXCoreService")
 
     @Volatile
@@ -67,39 +66,40 @@ class ONNXCoreService : NativeCoreService {
     // Lifecycle
     // =============================================================================
 
-    override suspend fun initialize(configJson: String?) = withContext(Dispatchers.IO) {
-        synchronized(lock) {
-            if (_isInitialized) {
-                logger.debug("Already initialized")
-                return@synchronized
+    override suspend fun initialize(configJson: String?) =
+        withContext(Dispatchers.IO) {
+            synchronized(lock) {
+                if (_isInitialized) {
+                    logger.debug("Already initialized")
+                    return@synchronized
+                }
+
+                // Ensure library is loaded
+                RunAnywhereBridge.loadLibrary()
+
+                logger.info("Creating ONNX backend...")
+                backendHandle = RunAnywhereBridge.nativeCreateBackend("onnx")
+
+                if (backendHandle == 0L) {
+                    throw NativeBridgeException(
+                        NativeResultCode.ERROR_INIT_FAILED,
+                        "Failed to create ONNX backend",
+                    )
+                }
+
+                val resultCode = RunAnywhereBridge.nativeInitialize(backendHandle, configJson)
+                val result = NativeResultCode.fromValue(resultCode)
+
+                if (!result.isSuccess) {
+                    RunAnywhereBridge.nativeDestroy(backendHandle)
+                    backendHandle = 0
+                    throw NativeBridgeException(result, "Failed to initialize ONNX backend")
+                }
+
+                _isInitialized = true
+                logger.info("✅ ONNX backend initialized")
             }
-
-            // Ensure library is loaded
-            RunAnywhereBridge.loadLibrary()
-
-            logger.info("Creating ONNX backend...")
-            backendHandle = RunAnywhereBridge.nativeCreateBackend("onnx")
-
-            if (backendHandle == 0L) {
-                throw NativeBridgeException(
-                    NativeResultCode.ERROR_INIT_FAILED,
-                    "Failed to create ONNX backend"
-                )
-            }
-
-            val resultCode = RunAnywhereBridge.nativeInitialize(backendHandle, configJson)
-            val result = NativeResultCode.fromValue(resultCode)
-
-            if (!result.isSuccess) {
-                RunAnywhereBridge.nativeDestroy(backendHandle)
-                backendHandle = 0
-                throw NativeBridgeException(result, "Failed to initialize ONNX backend")
-            }
-
-            _isInitialized = true
-            logger.info("✅ ONNX backend initialized")
         }
-    }
 
     override fun destroy() {
         synchronized(lock) {
@@ -126,17 +126,18 @@ class ONNXCoreService : NativeCoreService {
     override suspend fun loadSTTModel(
         modelPath: String,
         modelType: String,
-        configJson: String?
+        configJson: String?,
     ) = withContext(Dispatchers.IO) {
         ensureInitialized()
 
         logger.info("Loading STT model: $modelPath (type: $modelType)")
-        val resultCode = RunAnywhereBridge.nativeSTTLoadModel(
-            backendHandle,
-            modelPath,
-            modelType,
-            configJson
-        )
+        val resultCode =
+            RunAnywhereBridge.nativeSTTLoadModel(
+                backendHandle,
+                modelPath,
+                modelType,
+                configJson,
+            )
         val result = NativeResultCode.fromValue(resultCode)
 
         if (!result.isSuccess) {
@@ -145,38 +146,41 @@ class ONNXCoreService : NativeCoreService {
         logger.info("✅ STT model loaded")
     }
 
-    override suspend fun unloadSTTModel() = withContext(Dispatchers.IO) {
-        ensureInitialized()
+    override suspend fun unloadSTTModel() =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
 
-        val resultCode = RunAnywhereBridge.nativeSTTUnloadModel(backendHandle)
-        val result = NativeResultCode.fromValue(resultCode)
+            val resultCode = RunAnywhereBridge.nativeSTTUnloadModel(backendHandle)
+            val result = NativeResultCode.fromValue(resultCode)
 
-        if (!result.isSuccess) {
-            throw NativeBridgeException(result, "Failed to unload STT model")
+            if (!result.isSuccess) {
+                throw NativeBridgeException(result, "Failed to unload STT model")
+            }
+            logger.debug("STT model unloaded")
         }
-        logger.debug("STT model unloaded")
-    }
 
     override suspend fun transcribe(
         audioSamples: FloatArray,
         sampleRate: Int,
-        language: String?
-    ): String = withContext(Dispatchers.IO) {
-        ensureInitialized()
-        ensureSTTModelLoaded()
+        language: String?,
+    ): String =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
+            ensureSTTModelLoaded()
 
-        val result = RunAnywhereBridge.nativeSTTTranscribe(
-            backendHandle,
-            audioSamples,
-            sampleRate,
-            language
-        )
+            val result =
+                RunAnywhereBridge.nativeSTTTranscribe(
+                    backendHandle,
+                    audioSamples,
+                    sampleRate,
+                    language,
+                )
 
-        result ?: throw NativeBridgeException(
-            NativeResultCode.ERROR_INFERENCE_FAILED,
-            "Transcription failed: ${RunAnywhereBridge.nativeGetLastError()}"
-        )
-    }
+            result ?: throw NativeBridgeException(
+                NativeResultCode.ERROR_INFERENCE_FAILED,
+                "Transcription failed: ${RunAnywhereBridge.nativeGetLastError()}",
+            )
+        }
 
     // =============================================================================
     // TTS Operations
@@ -188,17 +192,18 @@ class ONNXCoreService : NativeCoreService {
     override suspend fun loadTTSModel(
         modelPath: String,
         modelType: String,
-        configJson: String?
+        configJson: String?,
     ) = withContext(Dispatchers.IO) {
         ensureInitialized()
 
         logger.info("Loading TTS model: $modelPath (type: $modelType)")
-        val resultCode = RunAnywhereBridge.nativeTTSLoadModel(
-            backendHandle,
-            modelPath,
-            modelType,
-            configJson
-        )
+        val resultCode =
+            RunAnywhereBridge.nativeTTSLoadModel(
+                backendHandle,
+                modelPath,
+                modelType,
+                configJson,
+            )
         val result = NativeResultCode.fromValue(resultCode)
 
         if (!result.isSuccess) {
@@ -207,45 +212,49 @@ class ONNXCoreService : NativeCoreService {
         logger.info("✅ TTS model loaded")
     }
 
-    override suspend fun unloadTTSModel() = withContext(Dispatchers.IO) {
-        ensureInitialized()
+    override suspend fun unloadTTSModel() =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
 
-        val resultCode = RunAnywhereBridge.nativeTTSUnloadModel(backendHandle)
-        val result = NativeResultCode.fromValue(resultCode)
+            val resultCode = RunAnywhereBridge.nativeTTSUnloadModel(backendHandle)
+            val result = NativeResultCode.fromValue(resultCode)
 
-        if (!result.isSuccess) {
-            throw NativeBridgeException(result, "Failed to unload TTS model")
+            if (!result.isSuccess) {
+                throw NativeBridgeException(result, "Failed to unload TTS model")
+            }
+            logger.debug("TTS model unloaded")
         }
-        logger.debug("TTS model unloaded")
-    }
 
     override suspend fun synthesize(
         text: String,
         voiceId: String?,
         speedRate: Float,
-        pitchShift: Float
-    ): NativeTTSSynthesisResult = withContext(Dispatchers.IO) {
-        ensureInitialized()
-        ensureTTSModelLoaded()
+        pitchShift: Float,
+    ): NativeTTSSynthesisResult =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
+            ensureTTSModelLoaded()
 
-        val result = RunAnywhereBridge.nativeTTSSynthesize(
-            backendHandle,
-            text,
-            voiceId,
-            speedRate,
-            pitchShift
-        )
+            val result =
+                RunAnywhereBridge.nativeTTSSynthesize(
+                    backendHandle,
+                    text,
+                    voiceId,
+                    speedRate,
+                    pitchShift,
+                )
 
-        result ?: throw NativeBridgeException(
-            NativeResultCode.ERROR_INFERENCE_FAILED,
-            "TTS synthesis failed: ${RunAnywhereBridge.nativeGetLastError()}"
-        )
-    }
+            result ?: throw NativeBridgeException(
+                NativeResultCode.ERROR_INFERENCE_FAILED,
+                "TTS synthesis failed: ${RunAnywhereBridge.nativeGetLastError()}",
+            )
+        }
 
-    override suspend fun getVoices(): String = withContext(Dispatchers.IO) {
-        ensureInitialized()
-        RunAnywhereBridge.nativeTTSGetVoices(backendHandle)
-    }
+    override suspend fun getVoices(): String =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
+            RunAnywhereBridge.nativeTTSGetVoices(backendHandle)
+        }
 
     // =============================================================================
     // VAD Operations
@@ -256,16 +265,17 @@ class ONNXCoreService : NativeCoreService {
 
     override suspend fun loadVADModel(
         modelPath: String?,
-        configJson: String?
+        configJson: String?,
     ) = withContext(Dispatchers.IO) {
         ensureInitialized()
 
         logger.info("Loading VAD model: ${modelPath ?: "built-in"}")
-        val resultCode = RunAnywhereBridge.nativeVADLoadModel(
-            backendHandle,
-            modelPath,
-            configJson
-        )
+        val resultCode =
+            RunAnywhereBridge.nativeVADLoadModel(
+                backendHandle,
+                modelPath,
+                configJson,
+            )
         val result = NativeResultCode.fromValue(resultCode)
 
         if (!result.isSuccess) {
@@ -274,55 +284,60 @@ class ONNXCoreService : NativeCoreService {
         logger.info("✅ VAD model loaded")
     }
 
-    override suspend fun unloadVADModel() = withContext(Dispatchers.IO) {
-        ensureInitialized()
+    override suspend fun unloadVADModel() =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
 
-        val resultCode = RunAnywhereBridge.nativeVADUnloadModel(backendHandle)
-        val result = NativeResultCode.fromValue(resultCode)
+            val resultCode = RunAnywhereBridge.nativeVADUnloadModel(backendHandle)
+            val result = NativeResultCode.fromValue(resultCode)
 
-        if (!result.isSuccess) {
-            throw NativeBridgeException(result, "Failed to unload VAD model")
+            if (!result.isSuccess) {
+                throw NativeBridgeException(result, "Failed to unload VAD model")
+            }
+            logger.debug("VAD model unloaded")
         }
-        logger.debug("VAD model unloaded")
-    }
 
     override suspend fun processVAD(
         audioSamples: FloatArray,
-        sampleRate: Int
-    ): NativeVADResult = withContext(Dispatchers.IO) {
-        ensureInitialized()
-        ensureVADModelLoaded()
+        sampleRate: Int,
+    ): NativeVADResult =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
+            ensureVADModelLoaded()
 
-        val result = RunAnywhereBridge.nativeVADProcess(
-            backendHandle,
-            audioSamples,
-            sampleRate
-        )
+            val result =
+                RunAnywhereBridge.nativeVADProcess(
+                    backendHandle,
+                    audioSamples,
+                    sampleRate,
+                )
 
-        result ?: throw NativeBridgeException(
-            NativeResultCode.ERROR_INFERENCE_FAILED,
-            "VAD processing failed: ${RunAnywhereBridge.nativeGetLastError()}"
-        )
-    }
+            result ?: throw NativeBridgeException(
+                NativeResultCode.ERROR_INFERENCE_FAILED,
+                "VAD processing failed: ${RunAnywhereBridge.nativeGetLastError()}",
+            )
+        }
 
     override suspend fun detectVADSegments(
         audioSamples: FloatArray,
-        sampleRate: Int
-    ): String = withContext(Dispatchers.IO) {
-        ensureInitialized()
-        ensureVADModelLoaded()
+        sampleRate: Int,
+    ): String =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
+            ensureVADModelLoaded()
 
-        val result = RunAnywhereBridge.nativeVADDetectSegments(
-            backendHandle,
-            audioSamples,
-            sampleRate
-        )
+            val result =
+                RunAnywhereBridge.nativeVADDetectSegments(
+                    backendHandle,
+                    audioSamples,
+                    sampleRate,
+                )
 
-        result ?: throw NativeBridgeException(
-            NativeResultCode.ERROR_INFERENCE_FAILED,
-            "VAD segment detection failed: ${RunAnywhereBridge.nativeGetLastError()}"
-        )
-    }
+            result ?: throw NativeBridgeException(
+                NativeResultCode.ERROR_INFERENCE_FAILED,
+                "VAD segment detection failed: ${RunAnywhereBridge.nativeGetLastError()}",
+            )
+        }
 
     // =============================================================================
     // Embedding Operations
@@ -339,16 +354,17 @@ class ONNXCoreService : NativeCoreService {
 
     override suspend fun loadEmbeddingModel(
         modelPath: String,
-        configJson: String?
+        configJson: String?,
     ) = withContext(Dispatchers.IO) {
         ensureInitialized()
 
         logger.info("Loading embedding model: $modelPath")
-        val resultCode = RunAnywhereBridge.nativeEmbedLoadModel(
-            backendHandle,
-            modelPath,
-            configJson
-        )
+        val resultCode =
+            RunAnywhereBridge.nativeEmbedLoadModel(
+                backendHandle,
+                modelPath,
+                configJson,
+            )
         val result = NativeResultCode.fromValue(resultCode)
 
         if (!result.isSuccess) {
@@ -357,29 +373,31 @@ class ONNXCoreService : NativeCoreService {
         logger.info("✅ Embedding model loaded")
     }
 
-    override suspend fun unloadEmbeddingModel() = withContext(Dispatchers.IO) {
-        ensureInitialized()
+    override suspend fun unloadEmbeddingModel() =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
 
-        val resultCode = RunAnywhereBridge.nativeEmbedUnloadModel(backendHandle)
-        val result = NativeResultCode.fromValue(resultCode)
+            val resultCode = RunAnywhereBridge.nativeEmbedUnloadModel(backendHandle)
+            val result = NativeResultCode.fromValue(resultCode)
 
-        if (!result.isSuccess) {
-            throw NativeBridgeException(result, "Failed to unload embedding model")
+            if (!result.isSuccess) {
+                throw NativeBridgeException(result, "Failed to unload embedding model")
+            }
+            logger.debug("Embedding model unloaded")
         }
-        logger.debug("Embedding model unloaded")
-    }
 
-    override suspend fun embed(text: String): FloatArray = withContext(Dispatchers.IO) {
-        ensureInitialized()
-        ensureEmbeddingModelLoaded()
+    override suspend fun embed(text: String): FloatArray =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
+            ensureEmbeddingModelLoaded()
 
-        val result = RunAnywhereBridge.nativeEmbedText(backendHandle, text)
+            val result = RunAnywhereBridge.nativeEmbedText(backendHandle, text)
 
-        result ?: throw NativeBridgeException(
-            NativeResultCode.ERROR_INFERENCE_FAILED,
-            "Embedding failed: ${RunAnywhereBridge.nativeGetLastError()}"
-        )
-    }
+            result ?: throw NativeBridgeException(
+                NativeResultCode.ERROR_INFERENCE_FAILED,
+                "Embedding failed: ${RunAnywhereBridge.nativeGetLastError()}",
+            )
+        }
 
     // =============================================================================
     // Private Helpers
@@ -389,7 +407,7 @@ class ONNXCoreService : NativeCoreService {
         if (!_isInitialized || backendHandle == 0L) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_INVALID_HANDLE,
-                "ONNX backend not initialized. Call initialize() first."
+                "ONNX backend not initialized. Call initialize() first.",
             )
         }
     }
@@ -398,7 +416,7 @@ class ONNXCoreService : NativeCoreService {
         if (!isSTTModelLoaded) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_MODEL_LOAD_FAILED,
-                "STT model not loaded. Call loadSTTModel() first."
+                "STT model not loaded. Call loadSTTModel() first.",
             )
         }
     }
@@ -407,7 +425,7 @@ class ONNXCoreService : NativeCoreService {
         if (!isTTSModelLoaded) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_MODEL_LOAD_FAILED,
-                "TTS model not loaded. Call loadTTSModel() first."
+                "TTS model not loaded. Call loadTTSModel() first.",
             )
         }
     }
@@ -416,7 +434,7 @@ class ONNXCoreService : NativeCoreService {
         if (!isVADModelLoaded) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_MODEL_LOAD_FAILED,
-                "VAD model not loaded. Call loadVADModel() first."
+                "VAD model not loaded. Call loadVADModel() first.",
             )
         }
     }
@@ -425,7 +443,7 @@ class ONNXCoreService : NativeCoreService {
         if (!isEmbeddingModelLoaded) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_MODEL_LOAD_FAILED,
-                "Embedding model not loaded. Call loadEmbeddingModel() first."
+                "Embedding model not loaded. Call loadEmbeddingModel() first.",
             )
         }
     }

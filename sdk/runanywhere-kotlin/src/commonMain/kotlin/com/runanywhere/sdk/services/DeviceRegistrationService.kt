@@ -1,7 +1,6 @@
 package com.runanywhere.sdk.services
 
 import com.runanywhere.sdk.data.models.*
-import com.runanywhere.sdk.config.SDKConfig
 import com.runanywhere.sdk.data.network.NetworkService
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.DeviceIdentity
@@ -12,9 +11,9 @@ import com.runanywhere.sdk.utils.PlatformUtils
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /**
  * Service for handling one-time device registration
@@ -22,7 +21,7 @@ import kotlinx.serialization.decodeFromString
  * Head-to-head translation from iOS DeviceRegistrationService pattern
  */
 class DeviceRegistrationService(
-    private val networkService: NetworkService
+    private val networkService: NetworkService,
 ) {
     private val logger = SDKLogger("DeviceRegistrationService")
     private val secureStorage: SecureStorage by lazy { SecureStorageFactory.create() }
@@ -46,8 +45,9 @@ class DeviceRegistrationService(
         cachedRegistrationStatus?.let { return it }
 
         return try {
-            val isRegistered = secureStorage.containsKey(DEVICE_REGISTRATION_KEY) &&
-                               secureStorage.getSecureString(DEVICE_REGISTRATION_KEY) == "true"
+            val isRegistered =
+                secureStorage.containsKey(DEVICE_REGISTRATION_KEY) &&
+                    secureStorage.getSecureString(DEVICE_REGISTRATION_KEY) == "true"
 
             cachedRegistrationStatus = isRegistered
             logger.debug("Device registration status: $isRegistered")
@@ -61,14 +61,13 @@ class DeviceRegistrationService(
     /**
      * Get device registration timestamp if available
      */
-    suspend fun getRegistrationTimestamp(): Long? {
-        return try {
+    suspend fun getRegistrationTimestamp(): Long? =
+        try {
             secureStorage.getSecureString(DEVICE_REGISTRATION_TIMESTAMP_KEY)?.toLongOrNull()
         } catch (e: Exception) {
             logger.error("Failed to get registration timestamp", e)
             null
         }
-    }
 
     /**
      * Register device with server (one-time operation)
@@ -83,11 +82,13 @@ class DeviceRegistrationService(
                 // Check if already registered
                 if (isDeviceRegistered()) {
                     logger.info("Device is already registered, skipping registration")
-                    return Result.success(DeviceRegistrationResponse(
-                        deviceId = DeviceIdentity.persistentUUID,
-                        registered = true,
-                        message = "Device already registered"
-                    ))
+                    return Result.success(
+                        DeviceRegistrationResponse(
+                            deviceId = DeviceIdentity.persistentUUID,
+                            registered = true,
+                            message = "Device already registered",
+                        ),
+                    )
                 }
 
                 // Collect device information
@@ -95,25 +96,28 @@ class DeviceRegistrationService(
                 logger.debug("Collected device info for registration")
 
                 // Create registration payload with device_info wrapper
-                val registrationPayload = DeviceRegistrationPayload(
-                    deviceInfo = deviceInfo
-                )
+                val registrationPayload =
+                    DeviceRegistrationPayload(
+                        deviceInfo = deviceInfo,
+                    )
 
                 // Serialize and call registration endpoint
-                val json = Json {
-                    ignoreUnknownKeys = true
-                    encodeDefaults = false
-                    coerceInputValues = true  // Handle nulls properly
-                }
+                val json =
+                    Json {
+                        ignoreUnknownKeys = true
+                        encodeDefaults = false
+                        coerceInputValues = true // Handle nulls properly
+                    }
                 val jsonPayload = json.encodeToString(registrationPayload)
 
                 logger.debug("Sending device registration request")
 
-                val responseBytes = networkService.postRaw(
-                    endpoint = APIEndpoint.registerDevice,
-                    payload = jsonPayload.encodeToByteArray(),
-                    requiresAuth = true
-                )
+                val responseBytes =
+                    networkService.postRaw(
+                        endpoint = APIEndpoint.registerDevice,
+                        payload = jsonPayload.encodeToByteArray(),
+                        requiresAuth = true,
+                    )
 
                 val response = json.decodeFromString<DeviceRegistrationResult>(responseBytes.decodeToString())
 
@@ -121,12 +125,13 @@ class DeviceRegistrationService(
                 markDeviceAsRegistered()
 
                 logger.info("Device registration completed successfully")
-                Result.success(DeviceRegistrationResponse(
-                    deviceId = response.deviceId,
-                    registered = response.status == "registered" || response.status == "updated",
-                    message = "Device ${response.status} successfully"
-                ))
-
+                Result.success(
+                    DeviceRegistrationResponse(
+                        deviceId = response.deviceId,
+                        registered = response.status == "registered" || response.status == "updated",
+                        message = "Device ${response.status} successfully",
+                    ),
+                )
             } catch (e: Exception) {
                 logger.error("Device registration failed", e)
                 Result.failure(SDKError.DeviceRegistrationError("Registration failed: ${e.message}"))
@@ -155,31 +160,31 @@ class DeviceRegistrationService(
     /**
      * Update device information without full re-registration
      */
-    suspend fun updateDeviceInfo(): Result<DeviceInfoUpdateResponse> {
-        return try {
+    suspend fun updateDeviceInfo(): Result<DeviceInfoUpdateResponse> =
+        try {
             logger.info("Updating device information")
 
             val deviceInfo = collectDeviceInfo()
-            val updateRequest = DeviceInfoUpdateRequest(
-                deviceId = deviceInfo.deviceId,
-                deviceInfo = deviceInfo,
-                deviceFingerprint = DeviceIdentity.getDeviceFingerprint(),
-                updateTimestamp = System.currentTimeMillis()
-            )
+            val updateRequest =
+                DeviceInfoUpdateRequest(
+                    deviceId = deviceInfo.deviceId,
+                    deviceInfo = deviceInfo,
+                    deviceFingerprint = DeviceIdentity.getDeviceFingerprint(),
+                    updateTimestamp = System.currentTimeMillis(),
+                )
 
-            val response = networkService.post<DeviceInfoUpdateRequest, DeviceInfoUpdateResponse>(
-                endpoint = APIEndpoint.deviceInfo,
-                payload = updateRequest
-            )
+            val response =
+                networkService.post<DeviceInfoUpdateRequest, DeviceInfoUpdateResponse>(
+                    endpoint = APIEndpoint.deviceInfo,
+                    payload = updateRequest,
+                )
 
             logger.info("Device information updated successfully")
             Result.success(response)
-
         } catch (e: Exception) {
             logger.error("Failed to update device information", e)
             Result.failure(SDKError.DeviceRegistrationError("Device info update failed: ${e.message}"))
         }
-    }
 
     /**
      * Get cached device information or collect fresh data
@@ -232,7 +237,6 @@ class DeviceRegistrationService(
             hasNeuralEngine = platformInfo["has_neural_engine"] as? Boolean ?: false,
             neuralEngineCores = platformInfo["neural_engine_cores"] as? Int ?: 0,
             gpuFamily = platformInfo["gpu_family"] as? String ?: "none",
-
             // Keep existing fields for backward compatibility
             systemName = platformInfo["system_name"] as? String ?: "Unknown OS",
             systemVersion = platformInfo["system_version"] as? String ?: "Unknown Version",
@@ -263,22 +267,8 @@ class DeviceRegistrationService(
             hasSpeakers = platformInfo["has_speakers"] as? Boolean ?: true,
             hasBiometric = platformInfo["has_biometric"] as? Boolean ?: false,
             benchmarkScore = platformInfo["benchmark_score"] as? Int,
-            memoryPressure = platformInfo["memory_pressure"] as? Float ?: 0.0f
+            memoryPressure = platformInfo["memory_pressure"] as? Float ?: 0.0f,
         )
-    }
-
-    /**
-     * Collect platform-specific capabilities
-     */
-    private fun collectPlatformCapabilities(): Map<String, String> {
-        return try {
-            val capabilities = getPlatformCapabilities()
-            // Convert to string map for serialization
-            capabilities.mapValues { (_, value) -> value?.toString() ?: "null" }
-        } catch (e: Exception) {
-            logger.error("Failed to collect platform capabilities", e)
-            mapOf("error" to (e.message ?: "Unknown error"))
-        }
     }
 
     /**
@@ -321,7 +311,7 @@ data class DeviceRegistrationResponse(
     val registered: Boolean,
     val message: String,
     val serverTimestamp: Long = System.currentTimeMillis(),
-    val registrationId: String? = null
+    val registrationId: String? = null,
 )
 
 @Serializable
@@ -329,7 +319,7 @@ data class DeviceInfoUpdateRequest(
     val deviceId: String,
     val deviceInfo: DeviceInfoData,
     val deviceFingerprint: String,
-    val updateTimestamp: Long
+    val updateTimestamp: Long,
 )
 
 @Serializable
@@ -337,7 +327,7 @@ data class DeviceInfoUpdateResponse(
     val deviceId: String,
     val updated: Boolean,
     val message: String,
-    val serverTimestamp: Long = System.currentTimeMillis()
+    val serverTimestamp: Long = System.currentTimeMillis(),
 )
 
 // MARK: - Platform-specific functions

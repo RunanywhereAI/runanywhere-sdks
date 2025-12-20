@@ -1,10 +1,10 @@
 package com.runanywhere.sdk.native.bridge.providers
 
+import com.runanywhere.sdk.core.STTServiceProvider
 import com.runanywhere.sdk.features.stt.STTConfiguration
 import com.runanywhere.sdk.features.stt.STTOptions
 import com.runanywhere.sdk.features.stt.STTService
 import com.runanywhere.sdk.features.stt.STTTranscriptionResult
-import com.runanywhere.sdk.core.STTServiceProvider
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.native.bridge.NativeBridgeException
@@ -28,7 +28,6 @@ import kotlinx.serialization.json.Json
  * - Paraformer
  */
 class ONNXSTTProvider : STTServiceProvider {
-
     private val logger = SDKLogger("ONNXSTTProvider")
 
     override val name: String = "ONNX STT"
@@ -38,10 +37,14 @@ class ONNXSTTProvider : STTServiceProvider {
         if (modelId == null) return true
 
         // Handle models that are known to work with ONNX
-        val onnxModels = listOf(
-            "whisper", "zipformer", "paraformer",
-            "sherpa-onnx", "onnx-whisper"
-        )
+        val onnxModels =
+            listOf(
+                "whisper",
+                "zipformer",
+                "paraformer",
+                "sherpa-onnx",
+                "onnx-whisper",
+            )
         return onnxModels.any { modelId.lowercase().contains(it) }
     }
 
@@ -55,9 +58,8 @@ class ONNXSTTProvider : STTServiceProvider {
  * ONNX-based STT Service implementation
  */
 class ONNXSTTService(
-    private val configuration: STTConfiguration
+    private val configuration: STTConfiguration,
 ) : STTService {
-
     private val logger = SDKLogger("ONNXSTTService")
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -96,7 +98,10 @@ class ONNXSTTService(
         }
     }
 
-    override suspend fun transcribe(audioData: ByteArray, options: STTOptions): STTTranscriptionResult =
+    override suspend fun transcribe(
+        audioData: ByteArray,
+        options: STTOptions,
+    ): STTTranscriptionResult =
         withContext(Dispatchers.IO) {
             if (!isReady) {
                 throw IllegalStateException("STT service not ready. Call initialize() first.")
@@ -106,11 +111,12 @@ class ONNXSTTService(
             val samples = audioDataToFloatArray(audioData, options.audioFormat)
 
             // Call native transcription
-            val resultJson = coreService.transcribe(
-                audioSamples = samples,
-                sampleRate = options.sampleRate,
-                language = if (options.detectLanguage) null else options.language
-            )
+            val resultJson =
+                coreService.transcribe(
+                    audioSamples = samples,
+                    sampleRate = options.sampleRate,
+                    language = if (options.detectLanguage) null else options.language,
+                )
 
             // Parse JSON result
             parseTranscriptionResult(resultJson)
@@ -119,24 +125,25 @@ class ONNXSTTService(
     override suspend fun streamTranscribe(
         audioStream: Flow<ByteArray>,
         options: STTOptions,
-        onPartial: (String) -> Unit
-    ): STTTranscriptionResult = withContext(Dispatchers.IO) {
-        if (!isReady) {
-            throw IllegalStateException("STT service not ready. Call initialize() first.")
-        }
+        onPartial: (String) -> Unit,
+    ): STTTranscriptionResult =
+        withContext(Dispatchers.IO) {
+            if (!isReady) {
+                throw IllegalStateException("STT service not ready. Call initialize() first.")
+            }
 
-        // If streaming is not supported, fall back to batch mode
-        if (!supportsStreaming) {
-            logger.info("Streaming not supported, falling back to batch mode")
+            // If streaming is not supported, fall back to batch mode
+            if (!supportsStreaming) {
+                logger.info("Streaming not supported, falling back to batch mode")
+                val allAudio = audioStream.toList().reduce { acc, bytes -> acc + bytes }
+                return@withContext transcribe(allAudio, options)
+            }
+
+            // TODO: Implement streaming transcription using ra_stt_create_stream, etc.
+            // For now, fall back to batch mode
             val allAudio = audioStream.toList().reduce { acc, bytes -> acc + bytes }
-            return@withContext transcribe(allAudio, options)
+            transcribe(allAudio, options)
         }
-
-        // TODO: Implement streaming transcription using ra_stt_create_stream, etc.
-        // For now, fall back to batch mode
-        val allAudio = audioStream.toList().reduce { acc, bytes -> acc + bytes }
-        transcribe(allAudio, options)
-    }
 
     override suspend fun cleanup() {
         logger.info("Cleaning up ONNX STT service")
@@ -164,7 +171,11 @@ class ONNXSTTService(
         }
     }
 
-    private fun audioDataToFloatArray(audioData: ByteArray, format: com.runanywhere.sdk.core.AudioFormat): FloatArray {
+    @Suppress("UNUSED_PARAMETER")
+    private fun audioDataToFloatArray(
+        audioData: ByteArray,
+        format: com.runanywhere.sdk.core.AudioFormat,
+    ): FloatArray {
         // Assume 16-bit PCM audio
         // Convert byte pairs to float samples in range [-1.0, 1.0]
         val sampleCount = audioData.size / 2
@@ -180,37 +191,37 @@ class ONNXSTTService(
         return samples
     }
 
-    private fun parseTranscriptionResult(jsonResult: String): STTTranscriptionResult {
-        return try {
+    private fun parseTranscriptionResult(jsonResult: String): STTTranscriptionResult =
+        try {
             val parsed = json.decodeFromString<TranscriptionResponse>(jsonResult)
             STTTranscriptionResult(
                 transcript = parsed.text,
                 confidence = parsed.confidence,
-                timestamps = parsed.segments?.map {
-                    STTTranscriptionResult.TimestampInfo(
-                        word = it.text,
-                        startTime = it.start,
-                        endTime = it.end,
-                        confidence = it.confidence
-                    )
-                },
-                language = parsed.language
+                timestamps =
+                    parsed.segments?.map {
+                        STTTranscriptionResult.TimestampInfo(
+                            word = it.text,
+                            startTime = it.start,
+                            endTime = it.end,
+                            confidence = it.confidence,
+                        )
+                    },
+                language = parsed.language,
             )
         } catch (e: Exception) {
             // If parsing fails, return raw text
             STTTranscriptionResult(
                 transcript = jsonResult.trim().removeSurrounding("\""),
-                confidence = null
+                confidence = null,
             )
         }
-    }
 
     @Serializable
     private data class TranscriptionResponse(
         val text: String,
         val confidence: Float? = null,
         val language: String? = null,
-        val segments: List<SegmentResponse>? = null
+        val segments: List<SegmentResponse>? = null,
     )
 
     @Serializable
@@ -218,6 +229,6 @@ class ONNXSTTService(
         val text: String,
         val start: Double,
         val end: Double,
-        val confidence: Float? = null
+        val confidence: Float? = null,
     )
 }

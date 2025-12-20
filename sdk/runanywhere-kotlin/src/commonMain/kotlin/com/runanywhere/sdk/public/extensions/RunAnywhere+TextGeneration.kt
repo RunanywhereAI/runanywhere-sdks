@@ -1,12 +1,10 @@
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.features.llm.LLMCapability
-import com.runanywhere.sdk.models.LLMGenerationOptions
+import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.features.llm.LLMGenerationResult
 import com.runanywhere.sdk.features.llm.LLMStreamingResult
-import com.runanywhere.sdk.data.models.SDKError
-import kotlinx.coroutines.flow.Flow
+import com.runanywhere.sdk.models.LLMGenerationOptions
+import com.runanywhere.sdk.public.RunAnywhere
 
 // ═══════════════════════════════════════════════════════════════════════════
 // RunAnywhere Text Generation Extensions
@@ -27,8 +25,9 @@ suspend fun RunAnywhere.loadModel(modelId: String) {
     requireInitialized()
     ensureServicesReady()
 
-    val capability = llmCapability
-        ?: throw SDKError.ComponentNotInitialized("LLM capability not available")
+    val capability =
+        llmCapability
+            ?: throw SDKError.ComponentNotInitialized("LLM capability not available")
 
     capability.loadModel(modelId)
 }
@@ -75,8 +74,9 @@ suspend fun RunAnywhere.chat(prompt: String): String {
     requireInitialized()
     ensureServicesReady()
 
-    val capability = llmCapability
-        ?: throw SDKError.ComponentNotReady("LLM capability not available. Call loadModel() first.")
+    val capability =
+        llmCapability
+            ?: throw SDKError.ComponentNotReady("LLM capability not available. Call loadModel() first.")
 
     val result = capability.generate(prompt, LLMGenerationOptions())
     return result.text
@@ -91,13 +91,14 @@ suspend fun RunAnywhere.chat(prompt: String): String {
  */
 suspend fun RunAnywhere.generate(
     prompt: String,
-    options: LLMGenerationOptions = LLMGenerationOptions()
+    options: LLMGenerationOptions = LLMGenerationOptions(),
 ): LLMGenerationResult {
     requireInitialized()
     ensureServicesReady()
 
-    val capability = llmCapability
-        ?: throw SDKError.ComponentNotReady("LLM capability not available. Call loadModel() first.")
+    val capability =
+        llmCapability
+            ?: throw SDKError.ComponentNotReady("LLM capability not available. Call loadModel() first.")
 
     return capability.generate(prompt, options)
 }
@@ -111,13 +112,14 @@ suspend fun RunAnywhere.generate(
  */
 suspend fun RunAnywhere.generateStream(
     prompt: String,
-    options: LLMGenerationOptions = LLMGenerationOptions()
+    options: LLMGenerationOptions = LLMGenerationOptions(),
 ): LLMStreamingResult {
     requireInitialized()
     ensureServicesReady()
 
-    val capability = llmCapability
-        ?: throw SDKError.ComponentNotReady("LLM capability not available. Call loadModel() first.")
+    val capability =
+        llmCapability
+            ?: throw SDKError.ComponentNotReady("LLM capability not available. Call loadModel() first.")
 
     return capability.generateStream(prompt, options)
 }

@@ -4,7 +4,9 @@ package com.runanywhere.sdk.data.network.models
  * API endpoints - equivalent to iOS APIEndpoint
  * Matches Swift SDK APIEndpoint.swift exactly
  */
-enum class APIEndpoint(val url: String) {
+enum class APIEndpoint(
+    val url: String,
+) {
     // Authentication & Health
     authenticate("/api/v1/auth/sdk/authenticate"),
     refreshToken("/api/v1/auth/sdk/refresh"),
@@ -34,5 +36,5 @@ enum class APIEndpoint(val url: String) {
     configuration("/api/v1/configuration"),
     models("/api/v1/models"),
     history("/api/v1/history"),
-    preferences("/api/v1/preferences")
+    preferences("/api/v1/preferences"),
 }

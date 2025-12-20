@@ -6,7 +6,7 @@ package com.runanywhere.sdk.native.bridge
  */
 data class NativeTTSSynthesisResult(
     val samples: FloatArray,
-    val sampleRate: Int
+    val sampleRate: Int,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -33,7 +33,7 @@ data class NativeTTSSynthesisResult(
  */
 data class NativeVADResult(
     val isSpeech: Boolean,
-    val probability: Float
+    val probability: Float,
 )
 
 /**
@@ -41,5 +41,5 @@ data class NativeVADResult(
  */
 class NativeBridgeException(
     val resultCode: NativeResultCode,
-    message: String? = null
+    message: String? = null,
 ) : Exception(message ?: "Native operation failed with code: ${resultCode.name}")

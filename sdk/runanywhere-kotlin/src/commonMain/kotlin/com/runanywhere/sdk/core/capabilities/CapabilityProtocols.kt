@@ -16,9 +16,18 @@ package com.runanywhere.sdk.core.capabilities
  */
 sealed class CapabilityLoadingState {
     data object Idle : CapabilityLoadingState()
-    data class Loading(val resourceId: String) : CapabilityLoadingState()
-    data class Loaded(val resourceId: String) : CapabilityLoadingState()
-    data class Failed(val error: Throwable) : CapabilityLoadingState()
+
+    data class Loading(
+        val resourceId: String,
+    ) : CapabilityLoadingState()
+
+    data class Loaded(
+        val resourceId: String,
+    ) : CapabilityLoadingState()
+
+    data class Failed(
+        val error: Throwable,
+    ) : CapabilityLoadingState()
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -31,14 +40,13 @@ sealed class CapabilityLoadingState {
         }
     }
 
-    override fun hashCode(): Int {
-        return when (this) {
+    override fun hashCode(): Int =
+        when (this) {
             is Idle -> 0
             is Loading -> resourceId.hashCode()
             is Loaded -> resourceId.hashCode()
             is Failed -> error.hashCode()
         }
-    }
 }
 
 /**
@@ -48,7 +56,7 @@ sealed class CapabilityLoadingState {
 data class CapabilityOperationResult<T>(
     val value: T,
     val processingTimeMs: Double,
-    val resourceId: String? = null
+    val resourceId: String? = null,
 )
 
 // MARK: - Base Capability Protocol
@@ -150,7 +158,7 @@ interface CompositeCapability {
  * Matches iOS CapabilityMetrics struct.
  */
 class CapabilityMetrics(
-    val resourceId: String
+    val resourceId: String,
 ) {
     val startTime: Long = System.currentTimeMillis()
 
@@ -163,13 +171,12 @@ class CapabilityMetrics(
     /**
      * Create a result with the current metrics
      */
-    fun <T> result(value: T): CapabilityOperationResult<T> {
-        return CapabilityOperationResult(
+    fun <T> result(value: T): CapabilityOperationResult<T> =
+        CapabilityOperationResult(
             value = value,
             processingTimeMs = elapsedMs,
-            resourceId = resourceId
+            resourceId = resourceId,
         )
-    }
 }
 
 // MARK: - Capability Error
@@ -180,24 +187,32 @@ class CapabilityMetrics(
  */
 sealed class CapabilityError(
     override val message: String,
-    override val cause: Throwable? = null
+    override val cause: Throwable? = null,
 ) : Exception(message, cause) {
+    class NotInitialized(
+        capability: String,
+    ) : CapabilityError("$capability is not initialized")
 
-    class NotInitialized(capability: String) :
-        CapabilityError("$capability is not initialized")
+    class ResourceNotLoaded(
+        resource: String,
+    ) : CapabilityError("No $resource is loaded. Call load first.")
 
-    class ResourceNotLoaded(resource: String) :
-        CapabilityError("No $resource is loaded. Call load first.")
+    class LoadFailed(
+        resource: String,
+        cause: Throwable?,
+    ) : CapabilityError("Failed to load $resource: ${cause?.message ?: "Unknown error"}", cause)
 
-    class LoadFailed(resource: String, cause: Throwable?) :
-        CapabilityError("Failed to load $resource: ${cause?.message ?: "Unknown error"}", cause)
+    class OperationFailed(
+        operation: String,
+        cause: Throwable?,
+    ) : CapabilityError("$operation failed: ${cause?.message ?: "Unknown error"}", cause)
 
-    class OperationFailed(operation: String, cause: Throwable?) :
-        CapabilityError("$operation failed: ${cause?.message ?: "Unknown error"}", cause)
+    class ProviderNotFound(
+        provider: String,
+    ) : CapabilityError("No $provider provider registered. Please register a provider first.")
 
-    class ProviderNotFound(provider: String) :
-        CapabilityError("No $provider provider registered. Please register a provider first.")
-
-    class CompositeComponentFailed(component: String, cause: Throwable?) :
-        CapabilityError("$component component failed: ${cause?.message ?: "Unknown error"}", cause)
+    class CompositeComponentFailed(
+        component: String,
+        cause: Throwable?,
+    ) : CapabilityError("$component component failed: ${cause?.message ?: "Unknown error"}", cause)
 }

@@ -8,7 +8,6 @@ import android.os.Debug
  * Android implementation of memory monitoring
  */
 actual class MemoryMonitor {
-
     companion object {
         private var applicationContext: Context? = null
 

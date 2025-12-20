@@ -1,7 +1,6 @@
 package com.runanywhere.sdk.memory
 
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.events.EventBus
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -9,14 +8,13 @@ import kotlinx.coroutines.sync.withLock
  * Handles memory pressure events and coordinates model eviction
  */
 class PressureHandler {
-
     private val logger = SDKLogger("PressureHandler")
     private val mutex = Mutex()
     private var isHandlingPressure = false
 
     suspend fun handlePressure(
         level: MemoryPressureLevel,
-        modelsToEvict: List<String>
+        modelsToEvict: List<String>,
     ) {
         mutex.withLock {
             if (isHandlingPressure) {
@@ -52,7 +50,6 @@ class PressureHandler {
                     logger.debug("Memory pressure normal, no action needed")
                 }
             }
-
         } finally {
             mutex.withLock {
                 isHandlingPressure = false
@@ -69,7 +66,7 @@ class PressureHandler {
 
     private suspend fun evictModelsWithGracePeriod(
         modelIds: List<String>,
-        gracePeriodMs: Long
+        gracePeriodMs: Long,
     ) {
         logger.info("CRITICAL: Evicting ${modelIds.size} models with ${gracePeriodMs}ms grace period")
 
@@ -117,7 +114,10 @@ class PressureHandler {
         logger.debug("Publishing memory pressure event: $level")
     }
 
-    private fun publishModelEvictionWarning(modelIds: List<String>, gracePeriodMs: Long) {
+    private fun publishModelEvictionWarning(
+        modelIds: List<String>,
+        @Suppress("UNUSED_PARAMETER") gracePeriodMs: Long,
+    ) {
         // TODO: Define and publish model eviction warning event
         logger.debug("Publishing eviction warning for ${modelIds.size} models")
     }

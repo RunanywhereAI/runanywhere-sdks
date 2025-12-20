@@ -5,8 +5,8 @@ import com.runanywhere.sdk.core.capabilities.ComponentOutput
 import com.runanywhere.sdk.core.capabilities.SDKComponent
 import com.runanywhere.sdk.features.llm.LLMConfiguration
 import com.runanywhere.sdk.features.stt.STTConfiguration
-import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.tts.TTSConfiguration
+import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.serialization.Serializable
 
@@ -19,21 +19,16 @@ import kotlinx.serialization.Serializable
 data class VoiceAudioChunk(
     /** The audio samples as Float array (simplified - no Data conversion needed) */
     val samples: FloatArray,
-
     /** Timestamp when this chunk was captured */
     val timestamp: Double,
-
     /** Sample rate of the audio (e.g., 16000 for 16kHz) */
     val sampleRate: Int = 16000,
-
     /** Number of channels (1 for mono, 2 for stereo) */
     val channels: Int = 1,
-
     /** Sequence number for ordering chunks */
     val sequenceNumber: Int = 0,
-
     /** Whether this is the final chunk in a stream */
-    val isFinal: Boolean = false
+    val isFinal: Boolean = false,
 ) {
     /**
      * Convert Float samples to ByteArray (4 bytes per float, little-endian)
@@ -64,11 +59,11 @@ data class VoiceAudioChunk(
         if (other !is VoiceAudioChunk) return false
 
         return samples.contentEquals(other.samples) &&
-                timestamp == other.timestamp &&
-                sampleRate == other.sampleRate &&
-                channels == other.channels &&
-                sequenceNumber == other.sequenceNumber &&
-                isFinal == other.isFinal
+            timestamp == other.timestamp &&
+            sampleRate == other.sampleRate &&
+            channels == other.channels &&
+            sequenceNumber == other.sequenceNumber &&
+            isFinal == other.isFinal
     }
 
     override fun hashCode(): Int {
@@ -94,9 +89,8 @@ data class VoiceAgentConfiguration(
     val vadConfig: VADConfiguration = VADConfiguration(),
     val sttConfig: STTConfiguration = STTConfiguration(),
     val llmConfig: LLMConfiguration = LLMConfiguration(),
-    val ttsConfig: TTSConfiguration = TTSConfiguration()
+    val ttsConfig: TTSConfiguration = TTSConfiguration(),
 ) : ComponentConfiguration {
-
     /** The component type for this configuration */
     val componentType: SDKComponent
         get() = SDKComponent.VOICE_AGENT
@@ -124,20 +118,15 @@ data class VoiceAgentConfiguration(
 data class VoiceAgentResult(
     /** Whether speech was detected by VAD */
     val speechDetected: Boolean = false,
-
     /** Transcription from STT (null if no speech or STT not run) */
     val transcription: String? = null,
-
     /** LLM response text (null if transcription empty or LLM not run) */
     val response: String? = null,
-
     /** Synthesized audio from TTS (null if no response or TTS not run) */
     val synthesizedAudio: ByteArray? = null,
-
     /** Processing timestamp */
-    override val timestamp: Long = getCurrentTimeMillis()
+    override val timestamp: Long = getCurrentTimeMillis(),
 ) : ComponentOutput {
-
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
@@ -150,7 +139,9 @@ data class VoiceAgentResult(
         if (synthesizedAudio != null) {
             if (other.synthesizedAudio == null) return false
             if (!synthesizedAudio.contentEquals(other.synthesizedAudio)) return false
-        } else if (other.synthesizedAudio != null) return false
+        } else if (other.synthesizedAudio != null) {
+            return false
+        }
         if (timestamp != other.timestamp) return false
 
         return true
@@ -174,19 +165,29 @@ data class VoiceAgentResult(
  */
 sealed class VoiceAgentEvent {
     /** Full pipeline result */
-    data class Processed(val result: VoiceAgentResult) : VoiceAgentEvent()
+    data class Processed(
+        val result: VoiceAgentResult,
+    ) : VoiceAgentEvent()
 
     /** VAD detection result */
-    data class VadTriggered(val speechDetected: Boolean) : VoiceAgentEvent()
+    data class VadTriggered(
+        val speechDetected: Boolean,
+    ) : VoiceAgentEvent()
 
     /** STT transcription available */
-    data class TranscriptionAvailable(val text: String) : VoiceAgentEvent()
+    data class TranscriptionAvailable(
+        val text: String,
+    ) : VoiceAgentEvent()
 
     /** LLM response generated */
-    data class ResponseGenerated(val text: String) : VoiceAgentEvent()
+    data class ResponseGenerated(
+        val text: String,
+    ) : VoiceAgentEvent()
 
     /** TTS audio synthesized */
-    data class AudioSynthesized(val data: ByteArray) : VoiceAgentEvent() {
+    data class AudioSynthesized(
+        val data: ByteArray,
+    ) : VoiceAgentEvent() {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is AudioSynthesized) return false
@@ -197,7 +198,9 @@ sealed class VoiceAgentEvent {
     }
 
     /** Pipeline error */
-    data class Error(val error: Throwable) : VoiceAgentEvent()
+    data class Error(
+        val error: Throwable,
+    ) : VoiceAgentEvent()
 }
 
 // MARK: - VoiceAgent Service
@@ -223,29 +226,37 @@ sealed class VoiceAgentError : Exception() {
     }
 
     /** VAD component failed */
-    data class VADFailed(override val cause: Throwable) : VoiceAgentError() {
+    data class VADFailed(
+        override val cause: Throwable,
+    ) : VoiceAgentError() {
         override val message: String = "VAD processing failed: ${cause.message}"
     }
 
     /** STT component failed */
-    data class STTFailed(override val cause: Throwable) : VoiceAgentError() {
+    data class STTFailed(
+        override val cause: Throwable,
+    ) : VoiceAgentError() {
         override val message: String = "STT transcription failed: ${cause.message}"
     }
 
     /** LLM component failed */
-    data class LLMFailed(override val cause: Throwable) : VoiceAgentError() {
+    data class LLMFailed(
+        override val cause: Throwable,
+    ) : VoiceAgentError() {
         override val message: String = "LLM generation failed: ${cause.message}"
     }
 
     /** TTS component failed */
-    data class TTSFailed(override val cause: Throwable) : VoiceAgentError() {
+    data class TTSFailed(
+        override val cause: Throwable,
+    ) : VoiceAgentError() {
         override val message: String = "TTS synthesis failed: ${cause.message}"
     }
 
     /** Sub-component initialization failed */
     data class ComponentInitializationFailed(
         val componentName: String,
-        override val cause: Throwable
+        override val cause: Throwable,
     ) : VoiceAgentError() {
         override val message: String = "Failed to initialize $componentName: ${cause.message}"
     }
@@ -263,5 +274,5 @@ enum class VoiceAgentPipelineState {
     LLM_PROCESSING,
     TTS_PROCESSING,
     COMPLETED,
-    ERROR
+    ERROR,
 }

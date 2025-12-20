@@ -4,13 +4,12 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
-import java.util.*
+import java.util.UUID
 
 /**
  * Android implementation of platform utilities
  */
 actual object PlatformUtils {
-
     internal lateinit var applicationContext: Context
     private const val PREFS_NAME = "com.runanywhere.sdk.prefs"
     private const val DEVICE_ID_KEY = "device_id"
@@ -36,14 +35,15 @@ actual object PlatformUtils {
 
         if (deviceId == null) {
             // Try to get Android ID
-            deviceId = try {
-                Settings.Secure.getString(
-                    applicationContext.contentResolver,
-                    Settings.Secure.ANDROID_ID
-                )
-            } catch (e: Exception) {
-                null
-            }
+            deviceId =
+                try {
+                    Settings.Secure.getString(
+                        applicationContext.contentResolver,
+                        Settings.Secure.ANDROID_ID,
+                    )
+                } catch (e: Exception) {
+                    null
+                }
 
             // Fallback to UUID if Android ID is not available
             if (deviceId.isNullOrEmpty() || deviceId == "9774d56d682e549c") {
@@ -57,12 +57,10 @@ actual object PlatformUtils {
         return deviceId
     }
 
-    actual fun getPlatformName(): String {
-        return "android"
-    }
+    actual fun getPlatformName(): String = "android"
 
-    actual fun getDeviceInfo(): Map<String, String> {
-        return mapOf(
+    actual fun getDeviceInfo(): Map<String, String> =
+        mapOf(
             "platform" to getPlatformName(),
             "os_version" to getOSVersion(),
             "api_level" to Build.VERSION.SDK_INT.toString(),
@@ -74,17 +72,12 @@ actual object PlatformUtils {
             "device_board" to Build.BOARD,
             "device_display" to Build.DISPLAY,
             "device_fingerprint" to Build.FINGERPRINT,
-            "supported_abis" to Build.SUPPORTED_ABIS.joinToString(",")
+            "supported_abis" to Build.SUPPORTED_ABIS.joinToString(","),
         )
-    }
 
-    actual fun getOSVersion(): String {
-        return "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
-    }
+    actual fun getOSVersion(): String = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
 
-    actual fun getDeviceModel(): String {
-        return "${Build.MANUFACTURER} ${Build.MODEL}"
-    }
+    actual fun getDeviceModel(): String = "${Build.MANUFACTURER} ${Build.MODEL}"
 
     actual fun getAppVersion(): String? {
         if (!::applicationContext.isInitialized) {
@@ -92,8 +85,9 @@ actual object PlatformUtils {
         }
 
         return try {
-            val packageInfo = applicationContext.packageManager
-                .getPackageInfo(applicationContext.packageName, 0)
+            val packageInfo =
+                applicationContext.packageManager
+                    .getPackageInfo(applicationContext.packageName, 0)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 packageInfo.longVersionCode.toString()

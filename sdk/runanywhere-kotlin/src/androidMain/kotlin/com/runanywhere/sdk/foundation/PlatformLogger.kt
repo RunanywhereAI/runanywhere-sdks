@@ -5,8 +5,9 @@ import android.util.Log
 /**
  * Android implementation of PlatformLogger using Android Log
  */
-actual class PlatformLogger actual constructor(private val tag: String) {
-
+actual class PlatformLogger actual constructor(
+    private val tag: String,
+) {
     actual fun debug(message: String) {
         Log.d(tag, message)
     }
@@ -19,7 +20,10 @@ actual class PlatformLogger actual constructor(private val tag: String) {
         Log.w(tag, message)
     }
 
-    actual fun error(message: String, throwable: Throwable?) {
+    actual fun error(
+        message: String,
+        throwable: Throwable?,
+    ) {
         if (throwable != null) {
             Log.e(tag, message, throwable)
         } else {
