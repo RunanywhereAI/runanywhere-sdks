@@ -69,7 +69,6 @@ enum ModelCategory {
         return ModelCategory.multimodal;
       case FrameworkModality.voiceActivityDetection:
       case FrameworkModality.speakerDiarization:
-      case FrameworkModality.wakeWord:
       case FrameworkModality.textEmbedding:
         return ModelCategory.audio;
     }

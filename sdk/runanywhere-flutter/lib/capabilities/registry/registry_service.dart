@@ -174,6 +174,74 @@ class RegistryService implements ModelRegistry {
     logger.info('Removed model: $id');
   }
 
+  /// Add a model from a download URL
+  /// Matches iOS addModelFromURL pattern
+  ModelInfo addModelFromURL({
+    String? id,
+    required String name,
+    required Uri url,
+    required LLMFramework framework,
+    ModelCategory category = ModelCategory.language,
+    ModelArtifactType? artifactType,
+    int? estimatedSize,
+    bool supportsThinking = false,
+  }) {
+    // Generate ID from URL filename if not provided
+    final modelId = id ?? _generateIdFromURL(url);
+
+    // Infer format from URL if not provided
+    final format = ModelFormat.fromFilename(url.pathSegments.last);
+
+    // Create model info
+    final model = ModelInfo(
+      id: modelId,
+      name: name,
+      downloadURL: url,
+      format: format,
+      category: category,
+      compatibleFrameworks: [framework],
+      preferredFramework: framework,
+      downloadSize: estimatedSize,
+      supportsThinking: supportsThinking,
+    );
+
+    // Register the model
+    registerModel(model);
+
+    logger.info('Added model from URL: $modelId');
+    return model;
+  }
+
+  /// Generate a stable ID from URL filename
+  String _generateIdFromURL(Uri url) {
+    final filename = url.pathSegments.last;
+    // Remove extension to get base name
+    final dotIndex = filename.lastIndexOf('.');
+    if (dotIndex > 0) {
+      return filename.substring(0, dotIndex);
+    }
+    return filename;
+  }
+
+  /// Get models filtered by framework
+  List<ModelInfo> getModelsForFramework(LLMFramework framework) {
+    return _models.values
+        .where((m) => m.compatibleFrameworks.contains(framework))
+        .toList();
+  }
+
+  /// Get models filtered by category
+  List<ModelInfo> getModelsForCategory(ModelCategory category) {
+    return _models.values.where((m) => m.category == category).toList();
+  }
+
+  /// Clear model assignments cache
+  void clearCache() {
+    // For now, we don't have a separate cache - this is a no-op
+    // In a full implementation, this would clear any cached assignments from backend
+    logger.info('Cleared model assignments cache');
+  }
+
   @override
   List<ModelInfo> filterModels(ModelCriteria criteria) {
     if (!criteria.hasFilters) {

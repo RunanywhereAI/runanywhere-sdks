@@ -68,8 +68,7 @@ enum Modality {
   stt('stt', 'Speech Recognition'),
   tts('tts', 'Text to Speech'),
   vlm('vlm', 'Vision Model'),
-  speakerDiarization('speaker_diarization', 'Speaker Diarization'),
-  wakeWord('wake_word', 'Wake Word');
+  speakerDiarization('speaker_diarization', 'Speaker Diarization');
 
   final String rawValue;
   final String displayName;

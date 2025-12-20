@@ -10,6 +10,7 @@ import '../../capabilities/memory/pressure_handler.dart';
 import '../../capabilities/memory/cache_eviction.dart';
 import '../../capabilities/download/download_service.dart';
 import '../../capabilities/analytics/analytics_service.dart';
+import '../../core/protocols/storage/storage_analyzer.dart';
 import '../../foundation/logging/sdk_logger.dart';
 import '../../public/configuration/sdk_environment.dart';
 import '../../core/service_registry/unified_service_registry.dart';
@@ -37,6 +38,7 @@ class ServiceContainer {
   MemoryService? _memoryService;
   DownloadService? _downloadService;
   AnalyticsService? _analyticsService;
+  StorageAnalyzer? _storageAnalyzer;
   SDKLogger? _logger;
 
   // Analytics pipeline
@@ -105,6 +107,11 @@ class ServiceContainer {
     return _downloadService ??= DownloadService(
       modelRegistry: modelRegistry,
     );
+  }
+
+  /// Storage analyzer for storage info
+  StorageAnalyzer get storageAnalyzer {
+    return _storageAnalyzer ??= DefaultStorageAnalyzer();
   }
 
   /// Analytics service
