@@ -203,7 +203,9 @@ export function isSDKEvent(obj: unknown): obj is SDKEvent {
     Object.values(EventCategory).includes(event.category as EventCategory) &&
     event.timestamp instanceof Date &&
     typeof event.destination === 'string' &&
-    Object.values(EventDestination).includes(event.destination as EventDestination) &&
+    Object.values(EventDestination).includes(
+      event.destination as EventDestination
+    ) &&
     typeof event.properties === 'object' &&
     event.properties !== null
   );

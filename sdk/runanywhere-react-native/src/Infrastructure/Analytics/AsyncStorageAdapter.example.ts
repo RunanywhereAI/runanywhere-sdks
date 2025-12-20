@@ -51,7 +51,6 @@ export class AsyncStorageAdapter implements Storage {
  */
 export function setupAnalyticsWithAsyncStorage() {
   // This function would be called in your app initialization
-
   /*
   import AsyncStorage from '@react-native-async-storage/async-storage';
   import { AnalyticsQueueManager } from '@runanywhere/react-native';
@@ -147,9 +146,10 @@ export function getPlatformStorage(): Storage {
   if (typeof navigator !== 'undefined' && navigator.product === 'ReactNative') {
     try {
       // Try to import AsyncStorage
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const AsyncStorage =
+        require('@react-native-async-storage/async-storage').default;
       return new AsyncStorageAdapter(AsyncStorage);
-    } catch (error) {
+    } catch {
       console.warn('AsyncStorage not available, using in-memory storage');
       return new CustomStorageAdapter(undefined, true);
     }
@@ -158,7 +158,8 @@ export function getPlatformStorage(): Storage {
   // Web/Browser
   if (typeof window !== 'undefined' && window.localStorage) {
     return new CustomStorageAdapter({
-      getItem: (key: string) => Promise.resolve(window.localStorage.getItem(key)),
+      getItem: (key: string) =>
+        Promise.resolve(window.localStorage.getItem(key)),
       setItem: (key: string, value: string) => {
         window.localStorage.setItem(key, value);
         return Promise.resolve();
@@ -177,7 +178,7 @@ export function getPlatformStorage(): Storage {
 /**
  * Example: Initialize analytics with automatic platform detection
  */
-export function initializeAnalytics(telemetryRepository: any) {
+export function initializeAnalytics(_telemetryRepository: unknown) {
   /*
   import { AnalyticsQueueManager } from '@runanywhere/react-native';
   import { getPlatformStorage } from './AsyncStorageAdapter.example';

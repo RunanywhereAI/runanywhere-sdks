@@ -97,8 +97,9 @@ export class DeviceCapabilitiesImpl implements DeviceCapabilities {
     this.hasGPU = options.hasGPU ?? false;
     this.processorCount = options.processorCount;
     this.processorType = options.processorType ?? ProcessorType.Unknown;
-    this.supportedAccelerators =
-      options.supportedAccelerators ?? [HardwareAcceleration.CPU];
+    this.supportedAccelerators = options.supportedAccelerators ?? [
+      HardwareAcceleration.CPU,
+    ];
     this.osVersion = options.osVersion;
     this.modelIdentifier = options.modelIdentifier ?? 'Unknown';
   }

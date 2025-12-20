@@ -14,7 +14,8 @@ import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 /**
  * Configuration for TTS component (conforms to ComponentConfiguration and ComponentInitParameters protocols)
  */
-export interface TTSConfiguration extends ComponentConfiguration, ComponentInitParameters {
+export interface TTSConfiguration
+  extends ComponentConfiguration, ComponentInitParameters {
   readonly componentType: SDKComponent;
   readonly modelId: string | null; // Not typically used for TTS
   readonly voice: string;
@@ -42,17 +43,20 @@ export class TTSConfigurationImpl implements TTSConfiguration {
   public readonly useNeuralVoice: boolean;
   public readonly enableSSML: boolean;
 
-  constructor(options: {
-    voice?: string;
-    language?: string;
-    speakingRate?: number;
-    pitch?: number;
-    volume?: number;
-    audioFormat?: string;
-    useNeuralVoice?: boolean;
-    enableSSML?: boolean;
-  } = {}) {
-    this.voice = options.voice ?? 'com.apple.ttsbundle.siri_female_en-US_compact';
+  constructor(
+    options: {
+      voice?: string;
+      language?: string;
+      speakingRate?: number;
+      pitch?: number;
+      volume?: number;
+      audioFormat?: string;
+      useNeuralVoice?: boolean;
+      enableSSML?: boolean;
+    } = {}
+  ) {
+    this.voice =
+      options.voice ?? 'com.apple.ttsbundle.siri_female_en-US_compact';
     this.language = options.language ?? 'en-US';
     this.speakingRate = options.speakingRate ?? 1.0;
     this.pitch = options.pitch ?? 1.0;

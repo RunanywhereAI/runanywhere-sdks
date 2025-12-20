@@ -9,12 +9,8 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Events/CommonEvents.swift
  */
 
-import {
-  SDKEvent,
-  EventCategory,
-  EventDestination,
-  createSDKEvent,
-} from './SDKEvent';
+import type { SDKEvent } from './SDKEvent';
+import { EventCategory, EventDestination, createSDKEvent } from './SDKEvent';
 
 // ============================================================================
 // SDK Lifecycle Events
@@ -33,7 +29,12 @@ export type SDKLifecycleEventType =
  * Create SDK initialization started event.
  */
 export function createSDKInitStartedEvent(sessionId?: string): SDKEvent {
-  return createSDKEvent('sdk_init_started', EventCategory.SDK, {}, { sessionId });
+  return createSDKEvent(
+    'sdk_init_started',
+    EventCategory.SDK,
+    {},
+    { sessionId }
+  );
 }
 
 /**
@@ -341,7 +342,9 @@ export function createStorageTempFilesCleanedEvent(
 /**
  * Device Event Types
  */
-export type DeviceEventType = 'device_registered' | 'device_registration_failed';
+export type DeviceEventType =
+  | 'device_registered'
+  | 'device_registration_failed';
 
 /**
  * Create device registered event.
@@ -415,10 +418,15 @@ export function createNetworkRequestFailedEvent(
     properties.status_code = String(statusCode);
   }
 
-  return createSDKEvent('network_request_failed', EventCategory.Network, properties, {
-    sessionId,
-    destination: EventDestination.AnalyticsOnly,
-  });
+  return createSDKEvent(
+    'network_request_failed',
+    EventCategory.Network,
+    properties,
+    {
+      sessionId,
+      destination: EventDestination.AnalyticsOnly,
+    }
+  );
 }
 
 // ============================================================================
@@ -515,7 +523,12 @@ export type VoicePipelineEventType =
  * Create voice pipeline started event.
  */
 export function createVoicePipelineStartedEvent(sessionId?: string): SDKEvent {
-  return createSDKEvent('voice_pipeline_started', EventCategory.Voice, {}, { sessionId });
+  return createSDKEvent(
+    'voice_pipeline_started',
+    EventCategory.Voice,
+    {},
+    { sessionId }
+  );
 }
 
 /**
@@ -559,14 +572,24 @@ export function createVADStartedEvent(sessionId?: string): SDKEvent {
  * Create speech detected event.
  */
 export function createSpeechDetectedEvent(sessionId?: string): SDKEvent {
-  return createSDKEvent('vad_speech_detected', EventCategory.Voice, {}, { sessionId });
+  return createSDKEvent(
+    'vad_speech_detected',
+    EventCategory.Voice,
+    {},
+    { sessionId }
+  );
 }
 
 /**
  * Create speech ended event.
  */
 export function createSpeechEndedEvent(sessionId?: string): SDKEvent {
-  return createSDKEvent('vad_speech_ended', EventCategory.Voice, {}, { sessionId });
+  return createSDKEvent(
+    'vad_speech_ended',
+    EventCategory.Voice,
+    {},
+    { sessionId }
+  );
 }
 
 /**

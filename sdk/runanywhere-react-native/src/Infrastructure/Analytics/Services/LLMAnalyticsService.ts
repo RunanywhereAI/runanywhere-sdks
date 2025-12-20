@@ -6,13 +6,12 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Analytics/Generation/GenerationAnalyticsService.swift
  */
 
-import {
+import type {
   AnalyticsContext,
   AnalyticsEvent,
   ErrorEventData,
   FirstTokenData,
   GenerationCompletionData,
-  GenerationEventType,
   GenerationMetrics,
   GenerationStartData,
   ModelLoadingData,
@@ -22,6 +21,7 @@ import {
   SessionStartedData,
   StreamingUpdateData,
 } from '../../../types/analytics';
+import { GenerationEventType } from '../../../types/analytics';
 import { AnalyticsQueueManager } from '../AnalyticsQueueManager';
 
 /**
@@ -113,12 +113,19 @@ export class LLMAnalyticsService {
     return {
       totalEvents: this.events.length,
       startTime: this.metricsStartTime,
-      lastEventTime: this.events.length > 0 ? this.events[this.events.length - 1].timestamp : undefined,
+      lastEventTime:
+        this.events.length > 0
+          ? this.events[this.events.length - 1].timestamp
+          : undefined,
       totalGenerations: this.totalGenerations,
       averageTimeToFirstToken:
-        this.totalGenerations > 0 ? this.totalTimeToFirstToken / this.totalGenerations : 0,
+        this.totalGenerations > 0
+          ? this.totalTimeToFirstToken / this.totalGenerations
+          : 0,
       averageTokensPerSecond:
-        this.totalGenerations > 0 ? this.totalTokensPerSecond / this.totalGenerations : 0,
+        this.totalGenerations > 0
+          ? this.totalTokensPerSecond / this.totalGenerations
+          : 0,
       totalInputTokens: this.totalInputTokens,
       totalOutputTokens: this.totalOutputTokens,
     };
@@ -212,7 +219,8 @@ export class LLMAnalyticsService {
     tracker.firstTokenTime = new Date();
     this.activeGenerations.set(generationId, tracker);
 
-    const timeToFirstToken = tracker.firstTokenTime.getTime() - tracker.startTime.getTime();
+    const timeToFirstToken =
+      tracker.firstTokenTime.getTime() - tracker.startTime.getTime();
 
     const eventData: FirstTokenData = {
       generationId,
@@ -253,7 +261,8 @@ export class LLMAnalyticsService {
     const timeToFirstToken = tracker.firstTokenTime
       ? tracker.firstTokenTime.getTime() - tracker.startTime.getTime()
       : 0;
-    const tokensPerSecond = totalTime > 0 ? (outputTokens / totalTime) * 1000 : 0;
+    const tokensPerSecond =
+      totalTime > 0 ? (outputTokens / totalTime) * 1000 : 0;
 
     // Update metrics
     this.totalGenerations++;
@@ -360,7 +369,10 @@ export class LLMAnalyticsService {
   /**
    * Start a generation session
    */
-  public async startGenerationSession(modelId: string, type: string = 'text'): Promise<string> {
+  public async startGenerationSession(
+    modelId: string,
+    type: string = 'text'
+  ): Promise<string> {
     const metadata: SessionMetadata = {
       id: this.generateEventId(),
       modelId,
@@ -417,7 +429,10 @@ export class LLMAnalyticsService {
   /**
    * Track error
    */
-  public async trackError(error: Error, context: AnalyticsContext): Promise<void> {
+  public async trackError(
+    error: Error,
+    context: AnalyticsContext
+  ): Promise<void> {
     const eventData: ErrorEventData = {
       error: error.message,
       context: context.toString(),
@@ -440,7 +455,7 @@ export class LLMAnalyticsService {
   /**
    * Process event for custom analytics
    */
-  private async processEvent(event: GenerationEvent): Promise<void> {
+  private async processEvent(_event: GenerationEvent): Promise<void> {
     // Custom processing for generation events if needed
   }
 

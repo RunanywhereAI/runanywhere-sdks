@@ -7,6 +7,41 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/DependencyInjection/ServiceContainer.swift
  */
 
+// Stub interfaces for services not yet implemented
+// These will be replaced with real implementations when ready
+
+/** Placeholder interface for VoiceCapabilityService */
+interface VoiceCapabilityServiceStub {
+  initialize(): Promise<void>;
+}
+
+/** Placeholder interface for StorageAnalyzer */
+interface StorageAnalyzerStub {
+  analyze(): Promise<Record<string, unknown>>;
+}
+
+/** Placeholder interface for DatabaseManager */
+interface DatabaseManagerStub {
+  initialize(): Promise<void>;
+}
+
+/** Placeholder interface for TelemetryService */
+interface TelemetryServiceStub {
+  record(event: unknown): Promise<void>;
+}
+
+/** Placeholder interface for DeviceInfoService */
+interface DeviceInfoServiceStub {
+  loadCurrentDeviceInfo(): Promise<null>;
+  syncToCloud(): Promise<void>;
+  getDeviceInfoSummary(): Promise<string>;
+}
+
+/** Placeholder interface for Analytics services */
+interface AnalyticsServiceStub {
+  record(event: unknown): Promise<void>;
+}
+
 // Import actual services
 import { RegistryService } from '../../Capabilities/Registry/Services/RegistryService';
 import { ModelLoadingService } from '../../Capabilities/ModelLoading/Services/ModelLoadingService';
@@ -32,7 +67,11 @@ import type { ModelRegistry } from '../../Core/Protocols/Registry/ModelRegistry'
 import type { MemoryManager } from '../../Core/Protocols/Memory/MemoryManager';
 import type { DownloadService } from '../../Data/Network/Services/DownloadService';
 import { AdapterRegistry } from './AdapterRegistry';
-import { APIClient, type APIClientConfig, type AuthenticationProvider } from '../../Data/Network';
+import {
+  APIClient,
+  type APIClientConfig,
+  type AuthenticationProvider,
+} from '../../Data/Network';
 import type { SDKEnvironment } from '../../types';
 
 /**
@@ -98,7 +137,10 @@ export class ServiceContainer {
     if (!this._routingService) {
       const costCalculator = new CostCalculator();
       const resourceChecker = new ResourceChecker(this.hardwareManager);
-      this._routingService = new RoutingService(costCalculator, resourceChecker);
+      this._routingService = new RoutingService(
+        costCalculator,
+        resourceChecker
+      );
     }
     return this._routingService;
   }
@@ -134,8 +176,8 @@ export class ServiceContainer {
   /**
    * Voice capability service
    */
-  private _voiceCapabilityService?: any;
-  public get voiceCapabilityService(): any {
+  private _voiceCapabilityService?: VoiceCapabilityServiceStub;
+  public get voiceCapabilityService(): VoiceCapabilityServiceStub {
     if (!this._voiceCapabilityService) {
       // VoiceCapabilityService - to be implemented
       this._voiceCapabilityService = {
@@ -170,8 +212,8 @@ export class ServiceContainer {
   /**
    * Storage analyzer for storage operations
    */
-  private _storageAnalyzer?: any;
-  public get storageAnalyzer(): any {
+  private _storageAnalyzer?: StorageAnalyzerStub;
+  public get storageAnalyzer(): StorageAnalyzerStub {
     if (!this._storageAnalyzer) {
       // StorageAnalyzer - to be implemented
       this._storageAnalyzer = {
@@ -235,8 +277,8 @@ export class ServiceContainer {
   /**
    * Database manager
    */
-  private _databaseManager?: any;
-  private get databaseManager(): any {
+  private _databaseManager?: DatabaseManagerStub;
+  private get databaseManager(): DatabaseManagerStub {
     if (!this._databaseManager) {
       // DatabaseManager - to be implemented (would use SQLite or similar)
       this._databaseManager = {
@@ -248,8 +290,9 @@ export class ServiceContainer {
 
   /**
    * Network service (environment-based: mock or real)
+   * NOTE: Type will be refined when NetworkService is implemented
    */
-  public networkService?: any;
+  public networkService?: unknown;
 
   /**
    * Authentication service
@@ -308,12 +351,12 @@ export class ServiceContainer {
   /**
    * Telemetry service
    */
-  private _telemetryService?: any;
-  public async getTelemetryService(): Promise<any> {
+  private _telemetryService?: TelemetryServiceStub;
+  public async getTelemetryService(): Promise<TelemetryServiceStub> {
     if (!this._telemetryService) {
       // TelemetryService - to be implemented
       this._telemetryService = {
-        record: async (event: any) => {},
+        record: async (_event: unknown) => {},
       };
     }
     return this._telemetryService;
@@ -327,7 +370,10 @@ export class ServiceContainer {
     if (!this._modelInfoService) {
       const repository = new ModelInfoRepositoryImpl();
       const syncCoordinator = await this.getSyncCoordinator();
-      this._modelInfoService = new ModelInfoService(repository, syncCoordinator);
+      this._modelInfoService = new ModelInfoService(
+        repository,
+        syncCoordinator
+      );
     }
     return this._modelInfoService;
   }
@@ -335,8 +381,8 @@ export class ServiceContainer {
   /**
    * Device info service
    */
-  private _deviceInfoService?: any;
-  public async getDeviceInfoService(): Promise<any> {
+  private _deviceInfoService?: DeviceInfoServiceStub;
+  public async getDeviceInfoService(): Promise<DeviceInfoServiceStub> {
     if (!this._deviceInfoService) {
       // DeviceInfoService - to be implemented
       this._deviceInfoService = {
@@ -358,12 +404,12 @@ export class ServiceContainer {
   /**
    * Generation analytics service
    */
-  private _generationAnalytics?: any;
-  public async getGenerationAnalytics(): Promise<any> {
+  private _generationAnalytics?: AnalyticsServiceStub;
+  public async getGenerationAnalytics(): Promise<AnalyticsServiceStub> {
     if (!this._generationAnalytics) {
       // GenerationAnalyticsService - to be implemented
       this._generationAnalytics = {
-        record: async (event: any) => {},
+        record: async (_event: unknown) => {},
       };
     }
     return this._generationAnalytics;
@@ -372,12 +418,12 @@ export class ServiceContainer {
   /**
    * STT Analytics Service
    */
-  private _sttAnalytics?: any;
-  public async getSTTAnalytics(): Promise<any> {
+  private _sttAnalytics?: AnalyticsServiceStub;
+  public async getSTTAnalytics(): Promise<AnalyticsServiceStub> {
     if (!this._sttAnalytics) {
       // STTAnalyticsService - to be implemented
       this._sttAnalytics = {
-        record: async (event: any) => {},
+        record: async (_event: unknown) => {},
       };
     }
     return this._sttAnalytics;
@@ -386,12 +432,12 @@ export class ServiceContainer {
   /**
    * Voice Analytics Service
    */
-  private _voiceAnalytics?: any;
-  public async getVoiceAnalytics(): Promise<any> {
+  private _voiceAnalytics?: AnalyticsServiceStub;
+  public async getVoiceAnalytics(): Promise<AnalyticsServiceStub> {
     if (!this._voiceAnalytics) {
       // VoiceAnalyticsService - to be implemented
       this._voiceAnalytics = {
-        record: async (event: any) => {},
+        record: async (_event: unknown) => {},
       };
     }
     return this._voiceAnalytics;
@@ -400,12 +446,12 @@ export class ServiceContainer {
   /**
    * TTS Analytics Service
    */
-  private _ttsAnalytics?: any;
-  public async getTTSAnalytics(): Promise<any> {
+  private _ttsAnalytics?: AnalyticsServiceStub;
+  public async getTTSAnalytics(): Promise<AnalyticsServiceStub> {
     if (!this._ttsAnalytics) {
       // TTSAnalyticsService - to be implemented
       this._ttsAnalytics = {
-        record: async (event: any) => {},
+        record: async (_event: unknown) => {},
       };
     }
     return this._ttsAnalytics;

@@ -63,7 +63,9 @@ export class ThinkingParser {
 
     // Remove thinking section from content
     const beforeThinking = text.substring(0, openIndex);
-    const afterThinking = text.substring(closeIndex + pattern.closingTag.length);
+    const afterThinking = text.substring(
+      closeIndex + pattern.closingTag.length
+    );
     const content = (beforeThinking + afterThinking).trim();
 
     return {
@@ -92,7 +94,9 @@ export class ThinkingParser {
         const beforeThinking = state.buffer.substring(0, openIndex);
 
         // Update buffer to start after opening tag
-        state.buffer = state.buffer.substring(openIndex + pattern.openingTag.length);
+        state.buffer = state.buffer.substring(
+          openIndex + pattern.openingTag.length
+        );
         state.inThinkingSection = true;
 
         // Return any content before thinking as regular content
@@ -111,7 +115,9 @@ export class ThinkingParser {
         const thinkingContent = state.buffer.substring(0, closeIndex);
 
         // Update buffer to start after closing tag
-        state.buffer = state.buffer.substring(closeIndex + pattern.closingTag.length);
+        state.buffer = state.buffer.substring(
+          closeIndex + pattern.closingTag.length
+        );
         state.inThinkingSection = false;
 
         // Return the thinking content
@@ -137,6 +143,9 @@ export class ThinkingParser {
     // Regular content token
     const content = state.buffer;
     state.buffer = '';
-    return { tokenType: TokenType.Content, cleanToken: content.length > 0 ? content : null };
+    return {
+      tokenType: TokenType.Content,
+      cleanToken: content.length > 0 ? content : null,
+    };
   }
 }

@@ -22,35 +22,40 @@ export class SDKLogger {
   /**
    * Log a debug message
    */
-  public debug(message: string, metadata?: { [key: string]: any }): void {
+  public debug(message: string, metadata?: Record<string, unknown>): void {
     LoggingManager.shared.log(LogLevel.Debug, this.category, message, metadata);
   }
 
   /**
    * Log an info message
    */
-  public info(message: string, metadata?: { [key: string]: any }): void {
+  public info(message: string, metadata?: Record<string, unknown>): void {
     LoggingManager.shared.log(LogLevel.Info, this.category, message, metadata);
   }
 
   /**
    * Log a warning message
    */
-  public warning(message: string, metadata?: { [key: string]: any }): void {
-    LoggingManager.shared.log(LogLevel.Warning, this.category, message, metadata);
+  public warning(message: string, metadata?: Record<string, unknown>): void {
+    LoggingManager.shared.log(
+      LogLevel.Warning,
+      this.category,
+      message,
+      metadata
+    );
   }
 
   /**
    * Log an error message
    */
-  public error(message: string, metadata?: { [key: string]: any }): void {
+  public error(message: string, metadata?: Record<string, unknown>): void {
     LoggingManager.shared.log(LogLevel.Error, this.category, message, metadata);
   }
 
   /**
    * Log a fault message
    */
-  public fault(message: string, metadata?: { [key: string]: any }): void {
+  public fault(message: string, metadata?: Record<string, unknown>): void {
     LoggingManager.shared.log(LogLevel.Fault, this.category, message, metadata);
   }
 
@@ -60,7 +65,7 @@ export class SDKLogger {
   public log(
     level: LogLevel,
     message: string,
-    metadata?: { [key: string]: any }
+    metadata?: Record<string, unknown>
   ): void {
     LoggingManager.shared.log(level, this.category, message, metadata);
   }

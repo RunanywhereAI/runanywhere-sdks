@@ -9,8 +9,7 @@
 import { SDKComponent } from '../../Core/Models/Common/SDKComponent';
 import type { ComponentConfiguration } from '../../Core/Components/BaseComponent';
 import type { ComponentInitParameters } from '../../Core/Models/Common/ComponentInitParameters';
-import { QuantizationLevel } from '../../Core/Models/Common/QuantizationLevel';
-import { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
+import type { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
 import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 
 /**
@@ -29,7 +28,8 @@ export enum LLMQuantizationLevel {
 /**
  * Configuration for LLM component (conforms to ComponentConfiguration and ComponentInitParameters protocols)
  */
-export interface LLMConfiguration extends ComponentConfiguration, ComponentInitParameters {
+export interface LLMConfiguration
+  extends ComponentConfiguration, ComponentInitParameters {
   readonly componentType: SDKComponent;
   readonly modelId: string | null;
   readonly contextLength: number;
@@ -61,19 +61,21 @@ export class LLMConfigurationImpl implements LLMConfiguration {
   public readonly streamingEnabled: boolean;
   public readonly preferredFramework: LLMFramework | null;
 
-  constructor(options: {
-    modelId?: string | null;
-    contextLength?: number;
-    useGPUIfAvailable?: boolean;
-    quantizationLevel?: LLMQuantizationLevel | null;
-    cacheSize?: number;
-    preloadContext?: string | null;
-    temperature?: number;
-    maxTokens?: number;
-    systemPrompt?: string | null;
-    streamingEnabled?: boolean;
-    preferredFramework?: LLMFramework | null;
-  } = {}) {
+  constructor(
+    options: {
+      modelId?: string | null;
+      contextLength?: number;
+      useGPUIfAvailable?: boolean;
+      quantizationLevel?: LLMQuantizationLevel | null;
+      cacheSize?: number;
+      preloadContext?: string | null;
+      temperature?: number;
+      maxTokens?: number;
+      systemPrompt?: string | null;
+      streamingEnabled?: boolean;
+      preferredFramework?: LLMFramework | null;
+    } = {}
+  ) {
     this.modelId = options.modelId ?? null;
     this.contextLength = options.contextLength ?? 2048;
     this.useGPUIfAvailable = options.useGPUIfAvailable ?? true;

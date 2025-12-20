@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Models/Configuration/TTSConfiguration.swift
  */
 
-import { SDKComponent } from '../Common/SDKComponent';
+import type { SDKComponent } from '../Common/SDKComponent';
 
 export interface TTSConfiguration {
   componentType?: SDKComponent;

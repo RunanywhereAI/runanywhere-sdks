@@ -37,7 +37,10 @@ export {
 } from './CapabilityProtocols';
 
 // Resource Types
-export { CapabilityResourceType, getResourceTypeDisplayName } from './ResourceTypes';
+export {
+  CapabilityResourceType,
+  getResourceTypeDisplayName,
+} from './ResourceTypes';
 
 // Model Lifecycle Manager
 export {

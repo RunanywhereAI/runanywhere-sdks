@@ -6,9 +6,33 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/DependencyInjection/AdapterRegistry.swift
  */
 
-import { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
+import type { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
 import { FrameworkModality } from '../../Core/Models/Framework/FrameworkModality';
 import type { ModelInfo } from '../../Core/Models/Model/ModelInfo';
+import type { LLMService } from '../../Core/Protocols/LLM/LLMService';
+
+/**
+ * Service returned by adapter for a modality
+ */
+export type ModalityService = LLMService | unknown;
+
+/**
+ * Adapter configuration options
+ */
+export interface AdapterConfiguration {
+  maxBatchSize?: number;
+  enableCaching?: boolean;
+  [key: string]: unknown;
+}
+
+/**
+ * Download strategy interface
+ */
+export interface DownloadStrategy {
+  priority: number;
+  maxConcurrent: number;
+  chunkSize?: number;
+}
 
 /**
  * Unified framework adapter interface
@@ -18,12 +42,15 @@ export interface UnifiedFrameworkAdapter {
   readonly supportedModalities: FrameworkModality[];
   readonly supportedFormats: string[];
   canHandle(model: ModelInfo): boolean;
-  createService(modality: FrameworkModality): any | null;
-  loadModel(model: ModelInfo, modality: FrameworkModality): Promise<any>;
+  createService(modality: FrameworkModality): ModalityService | null;
+  loadModel(
+    model: ModelInfo,
+    modality: FrameworkModality
+  ): Promise<ModalityService>;
   estimateMemoryUsage(model: ModelInfo): number;
-  optimalConfiguration(model: ModelInfo): any;
+  optimalConfiguration(model: ModelInfo): AdapterConfiguration;
   getProvidedModels(): ModelInfo[];
-  getDownloadStrategy?(): any;
+  getDownloadStrategy?(): DownloadStrategy;
   onRegistration?(): void;
 }
 
@@ -36,7 +63,10 @@ export class AdapterRegistry {
   /**
    * Register a unified framework adapter with optional priority
    */
-  public register(adapter: UnifiedFrameworkAdapter, priority: number = 100): void {
+  public register(
+    adapter: UnifiedFrameworkAdapter,
+    _priority: number = 100
+  ): void {
     this.adapters.set(adapter.framework, adapter);
 
     // Call adapter's onRegistration if available
@@ -46,14 +76,14 @@ export class AdapterRegistry {
 
     // Register models provided by the adapter
     const models = adapter.getProvidedModels();
-    for (const model of models) {
+    for (const _model of models) {
       // Would register with ServiceContainer.shared.modelRegistry
       // For now, just store
     }
 
     // Register download strategy if provided
     if (adapter.getDownloadStrategy) {
-      const strategy = adapter.getDownloadStrategy();
+      const _strategy = adapter.getDownloadStrategy();
       // Would register with ServiceContainer.shared.downloadService
     }
   }
@@ -72,7 +102,7 @@ export class AdapterRegistry {
     model: ModelInfo,
     modality?: FrameworkModality
   ): Promise<UnifiedFrameworkAdapter | null> {
-    const targetModality = modality ?? this.determineModality(model);
+    const _targetModality = modality ?? this.determineModality(model);
 
     // First try preferred framework
     if (model.preferredFramework) {

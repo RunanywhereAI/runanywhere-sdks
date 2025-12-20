@@ -14,7 +14,6 @@ import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 import type { TTSConfiguration } from './TTSConfiguration';
 import type { TTSInput, TTSOutput, TTSOptions } from './TTSModels';
 import type { TTSService } from '../../Core/Protocols/Voice/TTSService';
-import type { TTSServiceProvider } from '../../Core/Protocols/Voice/TTSServiceProvider';
 import type { TTSResult } from '../../Core/Models/TTS/TTSResult';
 import type { TTSConfiguration as CoreTTSConfiguration } from '../../Core/Models/Configuration/TTSConfiguration';
 import { AnyServiceWrapper } from '../../Core/Components/BaseComponent';
@@ -61,7 +60,7 @@ export class TTSCapability extends BaseComponent<TTSServiceWrapper> {
     // Create managed lifecycle for TTS with load/unload functions
     this.managedLifecycle = ManagedLifecycle.forTTS<TTSService>(
       // Load resource function
-      async (resourceId: string, config: ComponentConfiguration | null) => {
+      async (resourceId: string, _config: ComponentConfiguration | null) => {
         return await this.loadTTSService(resourceId);
       },
       // Unload resource function
@@ -128,7 +127,8 @@ export class TTSCapability extends BaseComponent<TTSServiceWrapper> {
       return await provider.createTTSService(this.ttsConfiguration);
     } else {
       // Fallback to system TTS service
-      const { SystemTTSService } = await import('../../services/SystemTTSService');
+      const { SystemTTSService } =
+        await import('../../services/SystemTTSService');
       const ttsService = new SystemTTSService();
       await ttsService.initialize();
       return ttsService;
@@ -157,7 +157,10 @@ export class TTSCapability extends BaseComponent<TTSServiceWrapper> {
   /**
    * Synthesize text to audio
    */
-  public async synthesize(text: string, options?: Partial<TTSOptions>): Promise<TTSOutput> {
+  public async synthesize(
+    text: string,
+    options?: Partial<TTSOptions>
+  ): Promise<TTSOutput> {
     this.ensureReady();
 
     const input: TTSInput = {
@@ -168,7 +171,10 @@ export class TTSCapability extends BaseComponent<TTSServiceWrapper> {
       options: options as TTSOptions | null,
       validate: () => {
         if (!text || text.trim().length === 0) {
-          throw new SDKError(SDKErrorCode.ValidationFailed, 'TTSInput must contain text');
+          throw new SDKError(
+            SDKErrorCode.ValidationFailed,
+            'TTSInput must contain text'
+          );
         }
       },
       timestamp: new Date(),
@@ -227,7 +233,8 @@ export class TTSCapability extends BaseComponent<TTSServiceWrapper> {
 
     const processingTime = (Date.now() - startTime) / 1000; // seconds
     const characterCount = (input.ssml ?? input.text).length;
-    const charactersPerSecond = processingTime > 0 ? characterCount / processingTime : 0;
+    const charactersPerSecond =
+      processingTime > 0 ? characterCount / processingTime : 0;
 
     // Decode base64 audio data
     const audioData = Buffer.from(result.audio, 'base64');
@@ -326,7 +333,9 @@ export class TTSCapability extends BaseComponent<TTSServiceWrapper> {
    * Get detailed voice information
    * Returns structured voice metadata including language, gender, quality, etc.
    */
-  public async getVoiceInfo(): Promise<import('../../Core/Protocols/Voice/TTSService').VoiceInfo[]> {
+  public async getVoiceInfo(): Promise<
+    import('../../Core/Protocols/Voice/TTSService').VoiceInfo[]
+  > {
     this.ensureReady();
 
     // Use managedLifecycle.requireService() for iOS parity
@@ -347,12 +356,14 @@ export class TTSCapability extends BaseComponent<TTSServiceWrapper> {
     const allVoices = await this.getAvailableVoices();
 
     // Filter voices that match the language
-    return allVoices.filter(voice => {
+    return allVoices.filter((voice) => {
       if (!voice) return false;
       const voiceLower = voice.toLowerCase();
       const languageLower = language.toLowerCase();
       const langPrefix = language.split('-')[0]?.toLowerCase() || '';
-      return voiceLower.includes(languageLower) || voiceLower.startsWith(langPrefix);
+      return (
+        voiceLower.includes(languageLower) || voiceLower.startsWith(langPrefix)
+      );
     });
   }
 

@@ -22,7 +22,6 @@ import {
   createVoicePipelineCompletedEvent,
   createVoicePipelineFailedEvent,
   createSpeechDetectedEvent,
-  createSpeechEndedEvent,
 } from '../../Infrastructure/Events/CommonEvents';
 import type { VoiceAgentConfiguration } from './VoiceAgentConfiguration';
 import type {
@@ -33,9 +32,7 @@ import type {
 import {
   VoiceAgentError,
   notLoadedState,
-  loadingComponentState,
   loadedComponentState,
-  errorComponentState,
   isVoiceAgentFullyReady,
 } from './VoiceAgentModels';
 import { STTCapability } from '../STT/STTCapability';
@@ -207,12 +204,16 @@ export class VoiceAgentCapability implements CompositeCapability {
     llmModelId: string,
     ttsVoice = ''
   ): Promise<void> {
-    this.logger.info(`Initializing voice agent with models: STT=${sttModelId}, LLM=${llmModelId}, TTS=${ttsVoice || 'default'}`);
+    this.logger.info(
+      `Initializing voice agent with models: STT=${sttModelId}, LLM=${llmModelId}, TTS=${ttsVoice || 'default'}`
+    );
 
     try {
       // Create child capabilities if not already created
       if (!this.vadCapability) {
-        this.vadCapability = new VADCapability(this.configuration.vadConfig as VADConfiguration);
+        this.vadCapability = new VADCapability(
+          this.configuration.vadConfig as VADConfiguration
+        );
       }
       if (!this.sttCapability) {
         this.sttCapability = new STTCapability(this.configuration.sttConfig);
@@ -254,24 +255,40 @@ export class VoiceAgentCapability implements CompositeCapability {
   public async initializeWithLoadedModels(): Promise<void> {
     this.logger.info('Initializing voice agent with pre-loaded models...');
 
-    if (!this.sttCapability || !this.llmCapability || !this.ttsCapability || !this.vadCapability) {
+    if (
+      !this.sttCapability ||
+      !this.llmCapability ||
+      !this.ttsCapability ||
+      !this.vadCapability
+    ) {
       throw VoiceAgentError.notInitialized();
     }
 
     // Verify models are loaded
     if (!this.sttCapability.isModelLoaded) {
-      throw VoiceAgentError.componentFailed('STT', new Error('STT model not loaded'));
+      throw VoiceAgentError.componentFailed(
+        'STT',
+        new Error('STT model not loaded')
+      );
     }
     if (!this.llmCapability.isModelLoaded) {
-      throw VoiceAgentError.componentFailed('LLM', new Error('LLM model not loaded'));
+      throw VoiceAgentError.componentFailed(
+        'LLM',
+        new Error('LLM model not loaded')
+      );
     }
     if (!this.ttsCapability.isModelLoaded) {
-      throw VoiceAgentError.componentFailed('TTS', new Error('TTS model not loaded'));
+      throw VoiceAgentError.componentFailed(
+        'TTS',
+        new Error('TTS model not loaded')
+      );
     }
 
     this.verifyAllComponentsReady();
     this.isConfigured = true;
-    this.logger.info('Voice agent initialization with pre-loaded models complete');
+    this.logger.info(
+      'Voice agent initialization with pre-loaded models complete'
+    );
   }
 
   // ============================================================================
@@ -339,7 +356,7 @@ export class VoiceAgentCapability implements CompositeCapability {
   // Component Initialization Helpers
   // ============================================================================
 
-  private async initializeVAD(config: VADConfiguration): Promise<void> {
+  private async initializeVAD(_config: VADConfiguration): Promise<void> {
     if (!this.vadCapability) return;
     this.logger.debug('Initializing VAD...');
     await this.vadCapability.initialize();
@@ -440,7 +457,9 @@ export class VoiceAgentCapability implements CompositeCapability {
    *
    * Pipeline: Audio → VAD → STT → LLM → TTS
    */
-  public async processVoiceTurn(audioData: Buffer | Uint8Array): Promise<VoiceAgentResult> {
+  public async processVoiceTurn(
+    audioData: Buffer | Uint8Array
+  ): Promise<VoiceAgentResult> {
     if (!this.isConfigured) {
       throw VoiceAgentError.notInitialized();
     }
@@ -472,7 +491,9 @@ export class VoiceAgentCapability implements CompositeCapability {
         if (!vadOutput.isSpeech) {
           // Emit pipeline completed (short-circuit)
           const durationMs = Date.now() - startTime;
-          this.eventPublisher.track(createVoicePipelineCompletedEvent(durationMs));
+          this.eventPublisher.track(
+            createVoicePipelineCompletedEvent(durationMs)
+          );
           return result;
         }
       }
@@ -489,7 +510,9 @@ export class VoiceAgentCapability implements CompositeCapability {
 
       // LLM Processing
       if (this.llmCapability && result.transcription) {
-        const response = await this.llmCapability.generate(result.transcription);
+        const response = await this.llmCapability.generate(
+          result.transcription
+        );
         result.response = response.text;
       }
 
@@ -506,7 +529,8 @@ export class VoiceAgentCapability implements CompositeCapability {
       return result;
     } catch (error) {
       // Emit pipeline failed
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.eventPublisher.track(createVoicePipelineFailedEvent(errorMessage));
       throw error;
     } finally {
@@ -540,7 +564,10 @@ export class VoiceAgentCapability implements CompositeCapability {
           yield { type: 'audioSynthesized', data: result.synthesizedAudio };
         }
       } catch (error) {
-        yield { type: 'error', error: error instanceof Error ? error : new Error(String(error)) };
+        yield {
+          type: 'error',
+          error: error instanceof Error ? error : new Error(String(error)),
+        };
       }
     }
   }
@@ -569,7 +596,10 @@ export class VoiceAgentCapability implements CompositeCapability {
    */
   public async transcribe(audioData: Buffer | Uint8Array): Promise<string> {
     if (!this.sttCapability) {
-      throw VoiceAgentError.componentFailed('STT', new Error('STT not initialized'));
+      throw VoiceAgentError.componentFailed(
+        'STT',
+        new Error('STT not initialized')
+      );
     }
 
     const result = await this.sttCapability.transcribe(audioData);
@@ -582,7 +612,10 @@ export class VoiceAgentCapability implements CompositeCapability {
    */
   public async generateResponse(prompt: string): Promise<string> {
     if (!this.llmCapability) {
-      throw VoiceAgentError.componentFailed('LLM', new Error('LLM not initialized'));
+      throw VoiceAgentError.componentFailed(
+        'LLM',
+        new Error('LLM not initialized')
+      );
     }
 
     const result = await this.llmCapability.generate(prompt);
@@ -595,7 +628,10 @@ export class VoiceAgentCapability implements CompositeCapability {
    */
   public async synthesizeSpeech(text: string): Promise<Buffer | Uint8Array> {
     if (!this.ttsCapability) {
-      throw VoiceAgentError.componentFailed('TTS', new Error('TTS not initialized'));
+      throw VoiceAgentError.componentFailed(
+        'TTS',
+        new Error('TTS not initialized')
+      );
     }
 
     const result = await this.ttsCapability.synthesize(text);
@@ -628,6 +664,8 @@ export class VoiceAgentCapability implements CompositeCapability {
 /**
  * Create a VoiceAgentCapability with the given configuration.
  */
-export function createVoiceAgentCapability(configuration: VoiceAgentConfiguration): VoiceAgentCapability {
+export function createVoiceAgentCapability(
+  configuration: VoiceAgentConfiguration
+): VoiceAgentCapability {
   return new VoiceAgentCapability(configuration);
 }

@@ -7,8 +7,8 @@
  */
 
 import type { ModelInfo } from '../../Core/Models/Model/ModelInfo';
-import { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
-import { ModelCategory } from '../../Core/Models/Model/ModelCategory';
+import type { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
+import type { ModelCategory } from '../../Core/Models/Model/ModelCategory';
 
 /**
  * Repository protocol for model information
@@ -98,7 +98,9 @@ export class ModelInfoRepositoryImpl implements ModelInfoRepository {
   }
 
   public async fetchDownloaded(): Promise<ModelInfo[]> {
-    return Array.from(this.models.values()).filter((model) => model.isAvailable);
+    return Array.from(this.models.values()).filter(
+      (model) => model.isAvailable
+    );
   }
 
   public async updateDownloadStatus(

@@ -8,7 +8,12 @@
  */
 
 import { requireNativeModule } from '../native';
-import type { LLMFramework, ModelCategory, ModelFormat, ModelInfo } from '../types';
+import type {
+  LLMFramework,
+  ModelCategory,
+  ModelFormat,
+  ModelInfo,
+} from '../types';
 import { getAllCatalogModels } from '../Data/modelCatalog';
 
 /**
@@ -80,7 +85,9 @@ class ModelRegistryImpl {
     }
 
     this.initialized = true;
-    console.log(`[ModelRegistry] Registry initialized with ${catalogModels.length} catalog models`);
+    console.log(
+      `[ModelRegistry] Registry initialized with ${catalogModels.length} catalog models`
+    );
   }
 
   /**
@@ -164,16 +171,20 @@ class ModelRegistryImpl {
 
     // Apply filters
     if (criteria.framework) {
-      models = models.filter(m => m.compatibleFrameworks.includes(criteria.framework!));
+      models = models.filter((m) =>
+        m.compatibleFrameworks.includes(criteria.framework!)
+      );
     }
     if (criteria.category) {
-      models = models.filter(m => m.category === criteria.category);
+      models = models.filter((m) => m.category === criteria.category);
     }
     if (criteria.downloadedOnly) {
-      models = models.filter(m => m.localPath != null);
+      models = models.filter((m) => m.localPath != null);
     }
     if (criteria.availableOnly) {
-      models = models.filter(m => m.localPath != null || m.downloadURL != null);
+      models = models.filter(
+        (m) => m.localPath != null || m.downloadURL != null
+      );
     }
 
     return models;
@@ -211,7 +222,10 @@ class ModelRegistryImpl {
    */
   async addModelFromURL(options: AddModelFromURLOptions): Promise<ModelInfo> {
     const native = requireNativeModule();
-    const modelJson = await native.addModelFromURL(options.url, JSON.stringify(options));
+    const modelJson = await native.addModelFromURL(
+      options.url,
+      JSON.stringify(options)
+    );
     const model: ModelInfo = JSON.parse(modelJson);
     this.modelsCache.set(model.id, model);
     return model;

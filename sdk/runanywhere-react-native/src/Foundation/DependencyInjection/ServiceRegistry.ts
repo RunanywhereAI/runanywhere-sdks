@@ -50,17 +50,23 @@ interface PrioritizedProvider<T> {
 /**
  * Factory function for creating STT services
  */
-export type STTServiceFactory = (config: STTConfiguration) => Promise<STTService>;
+export type STTServiceFactory = (
+  config: STTConfiguration
+) => Promise<STTService>;
 
 /**
  * Factory function for creating LLM services
  */
-export type LLMServiceFactory = (config: LLMConfiguration) => Promise<LLMService>;
+export type LLMServiceFactory = (
+  config: LLMConfiguration
+) => Promise<LLMService>;
 
 /**
  * Factory function for creating TTS services
  */
-export type TTSServiceFactory = (config: TTSConfiguration) => Promise<TTSService>;
+export type TTSServiceFactory = (
+  config: TTSConfiguration
+) => Promise<TTSService>;
 
 /**
  * Factory function for creating VAD services
@@ -79,7 +85,9 @@ export interface VADService {
   cleanup(): Promise<void>;
 }
 
-export type VADServiceFactory = (config: VADConfiguration) => Promise<VADService>;
+export type VADServiceFactory = (
+  config: VADConfiguration
+) => Promise<VADService>;
 
 /**
  * Factory function for creating Speaker Diarization services
@@ -133,9 +141,13 @@ export function createServiceRegistration<Factory>(
  */
 export class ProviderNotFoundError extends SDKError {
   constructor(serviceType: string) {
-    super(ErrorCode.NotInitialized, `No ${serviceType} provider registered. Please register a provider first.`, {
-      category: ErrorCategory.Component,
-    });
+    super(
+      ErrorCode.NotInitialized,
+      `No ${serviceType} provider registered. Please register a provider first.`,
+      {
+        category: ErrorCategory.Component,
+      }
+    );
     this.name = 'ProviderNotFoundError';
   }
 }
@@ -179,7 +191,8 @@ export class ServiceRegistry {
   private llmRegistrations: ServiceRegistration<LLMServiceFactory>[] = [];
   private ttsRegistrations: ServiceRegistration<TTSServiceFactory>[] = [];
   private vadRegistrations: ServiceRegistration<VADServiceFactory>[] = [];
-  private speakerDiarizationRegistrations: ServiceRegistration<SpeakerDiarizationServiceFactory>[] = [];
+  private speakerDiarizationRegistrations: ServiceRegistration<SpeakerDiarizationServiceFactory>[] =
+    [];
 
   // MARK: - Provider Storage (provider object-based registration)
 
@@ -208,10 +221,17 @@ export class ServiceRegistry {
     canHandle: (modelId: string | null) => boolean,
     factory: STTServiceFactory
   ): void {
-    const registration = createServiceRegistration(name, priority, canHandle, factory);
+    const registration = createServiceRegistration(
+      name,
+      priority,
+      canHandle,
+      factory
+    );
     this.sttRegistrations.push(registration);
     this.sttRegistrations.sort((a, b) => b.priority - a.priority);
-    console.log(`[ServiceRegistry] Registered STT service: ${name} (priority: ${priority})`);
+    console.log(
+      `[ServiceRegistry] Registered STT service: ${name} (priority: ${priority})`
+    );
   }
 
   /**
@@ -222,13 +242,22 @@ export class ServiceRegistry {
    * @returns Promise resolving to the created service
    * @throws ProviderNotFoundError if no provider can handle the modelId
    */
-  public async createSTT(modelId: string | null, config: STTConfiguration): Promise<STTService> {
-    const registration = this.sttRegistrations.find((r) => r.canHandle(modelId));
+  public async createSTT(
+    modelId: string | null,
+    config: STTConfiguration
+  ): Promise<STTService> {
+    const registration = this.sttRegistrations.find((r) =>
+      r.canHandle(modelId)
+    );
     if (!registration) {
-      throw new ProviderNotFoundError(`STT service for model: ${modelId ?? 'default'}`);
+      throw new ProviderNotFoundError(
+        `STT service for model: ${modelId ?? 'default'}`
+      );
     }
 
-    console.log(`[ServiceRegistry] Creating STT service: ${registration.name} for model: ${modelId ?? 'default'}`);
+    console.log(
+      `[ServiceRegistry] Creating STT service: ${registration.name} for model: ${modelId ?? 'default'}`
+    );
     return registration.factory(config);
   }
 
@@ -257,10 +286,17 @@ export class ServiceRegistry {
     canHandle: (modelId: string | null) => boolean,
     factory: LLMServiceFactory
   ): void {
-    const registration = createServiceRegistration(name, priority, canHandle, factory);
+    const registration = createServiceRegistration(
+      name,
+      priority,
+      canHandle,
+      factory
+    );
     this.llmRegistrations.push(registration);
     this.llmRegistrations.sort((a, b) => b.priority - a.priority);
-    console.log(`[ServiceRegistry] Registered LLM service: ${name} (priority: ${priority})`);
+    console.log(
+      `[ServiceRegistry] Registered LLM service: ${name} (priority: ${priority})`
+    );
   }
 
   /**
@@ -271,13 +307,22 @@ export class ServiceRegistry {
    * @returns Promise resolving to the created service
    * @throws ProviderNotFoundError if no provider can handle the modelId
    */
-  public async createLLM(modelId: string | null, config: LLMConfiguration): Promise<LLMService> {
-    const registration = this.llmRegistrations.find((r) => r.canHandle(modelId));
+  public async createLLM(
+    modelId: string | null,
+    config: LLMConfiguration
+  ): Promise<LLMService> {
+    const registration = this.llmRegistrations.find((r) =>
+      r.canHandle(modelId)
+    );
     if (!registration) {
-      throw new ProviderNotFoundError(`LLM service for model: ${modelId ?? 'default'}`);
+      throw new ProviderNotFoundError(
+        `LLM service for model: ${modelId ?? 'default'}`
+      );
     }
 
-    console.log(`[ServiceRegistry] Creating LLM service: ${registration.name} for model: ${modelId ?? 'default'}`);
+    console.log(
+      `[ServiceRegistry] Creating LLM service: ${registration.name} for model: ${modelId ?? 'default'}`
+    );
     return registration.factory(config);
   }
 
@@ -306,10 +351,17 @@ export class ServiceRegistry {
     canHandle: (voiceId: string | null) => boolean,
     factory: TTSServiceFactory
   ): void {
-    const registration = createServiceRegistration(name, priority, canHandle, factory);
+    const registration = createServiceRegistration(
+      name,
+      priority,
+      canHandle,
+      factory
+    );
     this.ttsRegistrations.push(registration);
     this.ttsRegistrations.sort((a, b) => b.priority - a.priority);
-    console.log(`[ServiceRegistry] Registered TTS service: ${name} (priority: ${priority})`);
+    console.log(
+      `[ServiceRegistry] Registered TTS service: ${name} (priority: ${priority})`
+    );
   }
 
   /**
@@ -320,13 +372,22 @@ export class ServiceRegistry {
    * @returns Promise resolving to the created service
    * @throws ProviderNotFoundError if no provider can handle the voiceId
    */
-  public async createTTS(voiceId: string | null, config: TTSConfiguration): Promise<TTSService> {
-    const registration = this.ttsRegistrations.find((r) => r.canHandle(voiceId));
+  public async createTTS(
+    voiceId: string | null,
+    config: TTSConfiguration
+  ): Promise<TTSService> {
+    const registration = this.ttsRegistrations.find((r) =>
+      r.canHandle(voiceId)
+    );
     if (!registration) {
-      throw new ProviderNotFoundError(`TTS service for voice: ${voiceId ?? 'default'}`);
+      throw new ProviderNotFoundError(
+        `TTS service for voice: ${voiceId ?? 'default'}`
+      );
     }
 
-    console.log(`[ServiceRegistry] Creating TTS service: ${registration.name} for voice: ${voiceId ?? 'default'}`);
+    console.log(
+      `[ServiceRegistry] Creating TTS service: ${registration.name} for voice: ${voiceId ?? 'default'}`
+    );
     return registration.factory(config);
   }
 
@@ -362,7 +423,9 @@ export class ServiceRegistry {
     );
     this.vadRegistrations.push(registration);
     this.vadRegistrations.sort((a, b) => b.priority - a.priority);
-    console.log(`[ServiceRegistry] Registered VAD service: ${name} (priority: ${priority})`);
+    console.log(
+      `[ServiceRegistry] Registered VAD service: ${name} (priority: ${priority})`
+    );
   }
 
   /**
@@ -407,10 +470,19 @@ export class ServiceRegistry {
     canHandle: (modelId: string | null) => boolean = () => true,
     factory: SpeakerDiarizationServiceFactory
   ): void {
-    const registration = createServiceRegistration(name, priority, canHandle, factory);
+    const registration = createServiceRegistration(
+      name,
+      priority,
+      canHandle,
+      factory
+    );
     this.speakerDiarizationRegistrations.push(registration);
-    this.speakerDiarizationRegistrations.sort((a, b) => b.priority - a.priority);
-    console.log(`[ServiceRegistry] Registered Speaker Diarization service: ${name} (priority: ${priority})`);
+    this.speakerDiarizationRegistrations.sort(
+      (a, b) => b.priority - a.priority
+    );
+    console.log(
+      `[ServiceRegistry] Registered Speaker Diarization service: ${name} (priority: ${priority})`
+    );
   }
 
   /**
@@ -425,12 +497,16 @@ export class ServiceRegistry {
     modelId: string | null,
     config: SpeakerDiarizationConfiguration
   ): Promise<SpeakerDiarizationService> {
-    const registration = this.speakerDiarizationRegistrations.find((r) => r.canHandle(modelId));
+    const registration = this.speakerDiarizationRegistrations.find((r) =>
+      r.canHandle(modelId)
+    );
     if (!registration) {
       throw new ProviderNotFoundError('Speaker Diarization service');
     }
 
-    console.log(`[ServiceRegistry] Creating Speaker Diarization service: ${registration.name}`);
+    console.log(
+      `[ServiceRegistry] Creating Speaker Diarization service: ${registration.name}`
+    );
     return registration.factory(config);
   }
 
@@ -469,7 +545,10 @@ export class ServiceRegistry {
    * @param provider - STT service provider
    * @param priority - Priority (higher = preferred, default: 100)
    */
-  public registerSTTProvider(provider: STTServiceProvider, priority: number = 100): void {
+  public registerSTTProvider(
+    provider: STTServiceProvider,
+    priority: number = 100
+  ): void {
     const prioritizedProvider: PrioritizedProvider<STTServiceProvider> = {
       provider,
       priority,
@@ -482,9 +561,17 @@ export class ServiceRegistry {
     );
 
     // Call provider's onRegistration lifecycle hook (if implemented)
-    if ((provider as any).onRegistration && typeof (provider as any).onRegistration === 'function') {
-      console.log(`[ServiceRegistry] Calling onRegistration() for STT provider: ${provider.name}`);
-      (provider as any).onRegistration();
+    const providerWithHook = provider as STTServiceProvider & {
+      onRegistration?: () => void;
+    };
+    if (
+      providerWithHook.onRegistration &&
+      typeof providerWithHook.onRegistration === 'function'
+    ) {
+      console.log(
+        `[ServiceRegistry] Calling onRegistration() for STT provider: ${provider.name}`
+      );
+      providerWithHook.onRegistration();
     }
   }
 
@@ -495,7 +582,10 @@ export class ServiceRegistry {
    * @param provider - LLM service provider
    * @param priority - Priority (higher = preferred, default: 100)
    */
-  public registerLLMProvider(provider: LLMServiceProvider, priority: number = 100): void {
+  public registerLLMProvider(
+    provider: LLMServiceProvider,
+    priority: number = 100
+  ): void {
     const prioritizedProvider: PrioritizedProvider<LLMServiceProvider> = {
       provider,
       priority,
@@ -508,8 +598,13 @@ export class ServiceRegistry {
     );
 
     // Call provider's onRegistration lifecycle hook (if implemented)
-    if (provider.onRegistration && typeof provider.onRegistration === 'function') {
-      console.log(`[ServiceRegistry] Calling onRegistration() for provider: ${provider.name}`);
+    if (
+      provider.onRegistration &&
+      typeof provider.onRegistration === 'function'
+    ) {
+      console.log(
+        `[ServiceRegistry] Calling onRegistration() for provider: ${provider.name}`
+      );
       provider.onRegistration();
     }
   }
@@ -521,7 +616,10 @@ export class ServiceRegistry {
    * @param provider - TTS service provider
    * @param priority - Priority (higher = preferred, default: 100)
    */
-  public registerTTSProvider(provider: TTSServiceProvider, priority: number = 100): void {
+  public registerTTSProvider(
+    provider: TTSServiceProvider,
+    priority: number = 100
+  ): void {
     const prioritizedProvider: PrioritizedProvider<TTSServiceProvider> = {
       provider,
       priority,
@@ -534,9 +632,17 @@ export class ServiceRegistry {
     );
 
     // Call provider's onRegistration lifecycle hook (if implemented)
-    if ((provider as any).onRegistration && typeof (provider as any).onRegistration === 'function') {
-      console.log(`[ServiceRegistry] Calling onRegistration() for TTS provider: ${provider.name}`);
-      (provider as any).onRegistration();
+    const ttsProviderWithHook = provider as TTSServiceProvider & {
+      onRegistration?: () => void;
+    };
+    if (
+      ttsProviderWithHook.onRegistration &&
+      typeof ttsProviderWithHook.onRegistration === 'function'
+    ) {
+      console.log(
+        `[ServiceRegistry] Calling onRegistration() for TTS provider: ${provider.name}`
+      );
+      ttsProviderWithHook.onRegistration();
     }
   }
 
@@ -545,9 +651,13 @@ export class ServiceRegistry {
    *
    * @param provider - Speaker diarization service provider
    */
-  public registerSpeakerDiarizationProvider(provider: SpeakerDiarizationServiceProvider): void {
+  public registerSpeakerDiarizationProvider(
+    provider: SpeakerDiarizationServiceProvider
+  ): void {
     this.speakerDiarizationProviders.push(provider);
-    console.log(`[ServiceRegistry] Registered Speaker Diarization provider: ${provider.name}`);
+    console.log(
+      `[ServiceRegistry] Registered Speaker Diarization provider: ${provider.name}`
+    );
   }
 
   // ============================================================================
@@ -562,7 +672,9 @@ export class ServiceRegistry {
    */
   public sttProvider(modelId?: string | null): STTServiceProvider | null {
     if (modelId) {
-      const match = this.sttProviders.find((p) => p.provider.canHandle(modelId));
+      const match = this.sttProviders.find((p) =>
+        p.provider.canHandle(modelId)
+      );
       return match?.provider ?? null;
     }
     return this.sttProviders[0]?.provider ?? null;
@@ -591,7 +703,9 @@ export class ServiceRegistry {
    */
   public llmProvider(modelId?: string | null): LLMServiceProvider | null {
     if (modelId) {
-      const match = this.llmProviders.find((p) => p.provider.canHandle(modelId));
+      const match = this.llmProviders.find((p) =>
+        p.provider.canHandle(modelId)
+      );
       return match?.provider ?? null;
     }
     return this.llmProviders[0]?.provider ?? null;
@@ -620,7 +734,9 @@ export class ServiceRegistry {
    */
   public ttsProvider(modelId?: string | null): TTSServiceProvider | null {
     if (modelId) {
-      const match = this.ttsProviders.find((p) => p.provider.canHandle(modelId));
+      const match = this.ttsProviders.find((p) =>
+        p.provider.canHandle(modelId)
+      );
       return match?.provider ?? null;
     }
     return this.ttsProviders[0]?.provider ?? null;

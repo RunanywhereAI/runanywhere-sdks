@@ -48,7 +48,9 @@ export function getModelCategoryDisplayName(category: ModelCategory): string {
 /**
  * Maps to the corresponding FrameworkModality
  */
-export function getFrameworkModality(category: ModelCategory): FrameworkModality {
+export function getFrameworkModality(
+  category: ModelCategory
+): FrameworkModality {
   switch (category) {
     case ModelCategory.Language:
       return FrameworkModality.TextToText;
@@ -70,7 +72,9 @@ export function getFrameworkModality(category: ModelCategory): FrameworkModality
 /**
  * Initialize from a FrameworkModality
  */
-export function modelCategoryFromModality(modality: FrameworkModality): ModelCategory | null {
+export function modelCategoryFromModality(
+  modality: FrameworkModality
+): ModelCategory | null {
   switch (modality) {
     case FrameworkModality.TextToText:
       return ModelCategory.Language;
@@ -124,7 +128,9 @@ export function supportsThinking(category: ModelCategory): boolean {
 /**
  * Determine category from a FrameworkModality (non-failable)
  */
-export function modelCategoryFromModalityNonFailable(modality: FrameworkModality): ModelCategory {
+export function modelCategoryFromModalityNonFailable(
+  modality: FrameworkModality
+): ModelCategory {
   switch (modality) {
     case FrameworkModality.TextToText:
       return ModelCategory.Language;
@@ -144,7 +150,9 @@ export function modelCategoryFromModalityNonFailable(modality: FrameworkModality
 /**
  * Determine category from a framework
  */
-export function modelCategoryFromFramework(framework: LLMFramework): ModelCategory {
+export function modelCategoryFromFramework(
+  framework: LLMFramework
+): ModelCategory {
   switch (framework) {
     case LLMFramework.WhisperKit:
     case LLMFramework.OpenAIWhisper:

@@ -6,7 +6,6 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Components/STT/STTComponent.swift
  */
 
-import type { STTConfiguration } from '../../Models/Configuration/STTConfiguration';
 import type { STTTranscriptionResult } from '../../Models/STT/STTTranscriptionResult';
 
 /**

@@ -18,6 +18,21 @@ import { SDKError, SDKErrorCode } from '../Public/Errors/SDKError';
 import { Platform } from 'react-native';
 
 /**
+ * Native voice info from platform TTS
+ */
+interface NativeVoiceInfo {
+  id?: string;
+  identifier?: string;
+  language?: string;
+  name?: string;
+  displayName?: string;
+  gender?: 'male' | 'female' | 'neutral';
+  isNeural?: boolean;
+  quality?: 'low' | 'medium' | 'high' | 'enhanced';
+  sampleUrl?: string;
+}
+
+/**
  * System TTS Service implementation using native platform TTS
  *
  * iOS: Uses AVSpeechSynthesizer
@@ -45,7 +60,9 @@ export class SystemTTSService implements TTSService {
 
       // Extract voice IDs/languages from voice info
       if (Array.isArray(voices)) {
-        this._availableVoices = voices.map((v: any) => v.id || v.language || v.identifier);
+        this._availableVoices = (voices as NativeVoiceInfo[])
+          .map((v) => v.id || v.language || v.identifier || '')
+          .filter(Boolean);
       }
 
       this._isReady = true;
@@ -65,7 +82,10 @@ export class SystemTTSService implements TTSService {
    * @param configuration - TTS configuration with voice, rate, pitch, etc.
    * @returns TTSResult with base64-encoded audio data
    */
-  async synthesize(text: string, configuration?: TTSConfiguration): Promise<TTSResult> {
+  async synthesize(
+    text: string,
+    configuration?: TTSConfiguration
+  ): Promise<TTSResult> {
     if (!this._isReady) {
       throw new SDKError(
         SDKErrorCode.ComponentNotReady,
@@ -143,17 +163,19 @@ export class SystemTTSService implements TTSService {
       }
 
       // Map native voice info to VoiceInfo interface
-      return voices
-        .filter((v: any) => v.id || v.identifier || v.language)
-        .map((v: any): VoiceInfo => ({
-          id: v.id || v.identifier || v.language || 'unknown',
-          name: v.name || v.displayName || v.language || 'Unknown Voice',
-          language: v.language || 'en-US',
-          gender: v.gender as 'male' | 'female' | 'neutral' | undefined,
-          isNeural: v.isNeural || v.quality === 'enhanced',
-          quality: v.quality as 'low' | 'medium' | 'high' | 'enhanced' | undefined,
-          sampleUrl: v.sampleUrl,
-        }));
+      return (voices as NativeVoiceInfo[])
+        .filter((v) => v.id || v.identifier || v.language)
+        .map(
+          (v): VoiceInfo => ({
+            id: v.id || v.identifier || v.language || 'unknown',
+            name: v.name || v.displayName || v.language || 'Unknown Voice',
+            language: v.language || 'en-US',
+            gender: v.gender,
+            isNeural: v.isNeural || v.quality === 'enhanced',
+            quality: v.quality,
+            sampleUrl: v.sampleUrl,
+          })
+        );
     } catch (error) {
       console.warn('Failed to get detailed voice info:', error);
       return [];
@@ -242,20 +264,22 @@ export async function getVoicesByLanguage(): Promise<Map<string, VoiceInfo[]>> {
  * @param language - Language code (e.g., 'en-US', 'es-ES')
  * @returns Default voice ID for the language, or null if not found
  */
-export async function getDefaultVoice(language: string): Promise<string | null> {
+export async function getDefaultVoice(
+  language: string
+): Promise<string | null> {
   const service = new SystemTTSService();
   await service.initialize();
 
   const voices = await service.getVoiceInfo();
 
   // Try exact match first
-  let voice = voices.find(v => v.language === language);
+  let voice = voices.find((v) => v.language === language);
 
   // Try language prefix match (e.g., 'en' for 'en-US')
   if (!voice) {
     const langPrefix = language.split('-')[0];
     if (langPrefix) {
-      voice = voices.find(v => v.language.startsWith(langPrefix));
+      voice = voices.find((v) => v.language.startsWith(langPrefix));
     }
   }
 

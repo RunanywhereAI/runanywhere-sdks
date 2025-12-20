@@ -31,11 +31,7 @@ export class CacheEviction {
    */
   public selectModelsToEvict(targetMemory: number): string[] {
     const models = this.getCurrentModels();
-    return this.selectModelsUsingStrategy(
-      models,
-      targetMemory,
-      false
-    );
+    return this.selectModelsUsingStrategy(models, targetMemory, false);
   }
 
   /**
@@ -73,11 +69,7 @@ export class CacheEviction {
     aggressive: boolean
   ): string[] {
     // Default to least recently used strategy
-    return this.selectByLeastRecentlyUsed(
-      models,
-      targetMemory,
-      aggressive
-    );
+    return this.selectByLeastRecentlyUsed(models, targetMemory, aggressive);
   }
 
   /**
@@ -170,8 +162,7 @@ export class CacheEviction {
    * Calculate eviction score
    */
   private calculateEvictionScore(model: MemoryLoadedModelInfo): number {
-    const timeSinceUse =
-      (Date.now() - model.lastUsed.getTime()) / 1000; // seconds
+    const timeSinceUse = (Date.now() - model.lastUsed.getTime()) / 1000; // seconds
     const priorityWeight = model.priority * 1000; // Higher priority = higher score
     const recencyScore = timeSinceUse / 3600; // Hours since last use
 
@@ -222,24 +213,18 @@ export class CacheEviction {
     const avgLastUsed =
       models.length > 0
         ? new Date(
-            models.reduce(
-              (sum, m) => sum + m.lastUsed.getTime(),
-              0
-            ) / models.length
+            models.reduce((sum, m) => sum + m.lastUsed.getTime(), 0) /
+              models.length
           )
         : new Date();
 
     const oldestModel =
       models.length > 0
-        ? new Date(
-            Math.min(...models.map((m) => m.lastUsed.getTime()))
-          )
+        ? new Date(Math.min(...models.map((m) => m.lastUsed.getTime())))
         : new Date();
 
     const largestModel =
-      models.length > 0
-        ? Math.max(...models.map((m) => m.size))
-        : 0;
+      models.length > 0 ? Math.max(...models.map((m) => m.size)) : 0;
 
     return {
       totalModels: models.length,

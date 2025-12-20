@@ -7,12 +7,14 @@
  * Matches iOS: Core/Capabilities/ModelLifecycleManager.swift
  */
 
-import {
+import type {
   CapabilityLoadingState,
+  ComponentConfiguration,
+} from './CapabilityProtocols';
+import {
   idleState,
   loadingState,
   loadedState,
-  ComponentConfiguration,
   CapabilityError,
 } from './CapabilityProtocols';
 
@@ -204,7 +206,10 @@ export class ModelLifecycleManager<TService> {
     } catch (error) {
       this.inflightPromise = null;
       this.logError(`Failed to load resource: ${error}`);
-      throw CapabilityError.loadFailed(resourceId, error instanceof Error ? error : undefined);
+      throw CapabilityError.loadFailed(
+        resourceId,
+        error instanceof Error ? error : undefined
+      );
     }
   }
 

@@ -63,8 +63,13 @@ export class VADConfigurationImpl implements VADConfiguration {
   public enableAutoCalibration: boolean;
   public calibrationMultiplier: number;
 
-  constructor(options: Partial<Omit<VADConfiguration, 'validate' | 'componentType' | 'modelId'>> = {}) {
-    this.energyThreshold = options.energyThreshold ?? DEFAULT_VAD_CONFIG.energyThreshold;
+  constructor(
+    options: Partial<
+      Omit<VADConfiguration, 'validate' | 'componentType' | 'modelId'>
+    > = {}
+  ) {
+    this.energyThreshold =
+      options.energyThreshold ?? DEFAULT_VAD_CONFIG.energyThreshold;
     this.sampleRate = options.sampleRate ?? DEFAULT_VAD_CONFIG.sampleRate;
     this.frameLength = options.frameLength ?? DEFAULT_VAD_CONFIG.frameLength;
     this.enableAutoCalibration =
@@ -81,13 +86,22 @@ export class VADConfigurationImpl implements VADConfiguration {
       );
     }
     if (this.sampleRate <= 0) {
-      throw new SDKError(SDKErrorCode.ValidationFailed, 'Sample rate must be positive');
+      throw new SDKError(
+        SDKErrorCode.ValidationFailed,
+        'Sample rate must be positive'
+      );
     }
     if (this.frameLength <= 0) {
-      throw new SDKError(SDKErrorCode.ValidationFailed, 'Frame length must be positive');
+      throw new SDKError(
+        SDKErrorCode.ValidationFailed,
+        'Frame length must be positive'
+      );
     }
     if (this.calibrationMultiplier <= 0) {
-      throw new SDKError(SDKErrorCode.ValidationFailed, 'Calibration multiplier must be positive');
+      throw new SDKError(
+        SDKErrorCode.ValidationFailed,
+        'Calibration multiplier must be positive'
+      );
     }
   }
 }

@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Models/Common/ResourceAvailability.swift
  */
 
-import { HardwareAcceleration } from '../../../Capabilities/TextGeneration/Models/GenerationOptions';
+import type { HardwareAcceleration } from '../../../Capabilities/TextGeneration/Models/GenerationOptions';
 
 // Placeholder for ThermalState - React Native equivalent
 export enum ThermalState {
@@ -69,7 +69,9 @@ export function canLoadModel(
   const memoryNeeded = model.memoryRequired ?? 0;
   if (memoryNeeded > availability.memoryAvailable) {
     const neededMB = (memoryNeeded / (1024 * 1024)).toFixed(2);
-    const availableMB = (availability.memoryAvailable / (1024 * 1024)).toFixed(2);
+    const availableMB = (availability.memoryAvailable / (1024 * 1024)).toFixed(
+      2
+    );
     return {
       canLoad: false,
       reason: `Insufficient memory: need ${neededMB}MB, have ${availableMB}MB`,
@@ -77,9 +79,14 @@ export function canLoadModel(
   }
 
   // Check storage
-  if (model.downloadSize && model.downloadSize > availability.storageAvailable) {
+  if (
+    model.downloadSize &&
+    model.downloadSize > availability.storageAvailable
+  ) {
     const neededMB = (model.downloadSize / (1024 * 1024)).toFixed(2);
-    const availableMB = (availability.storageAvailable / (1024 * 1024)).toFixed(2);
+    const availableMB = (availability.storageAvailable / (1024 * 1024)).toFixed(
+      2
+    );
     return {
       canLoad: false,
       reason: `Insufficient storage: need ${neededMB}MB, have ${availableMB}MB`,

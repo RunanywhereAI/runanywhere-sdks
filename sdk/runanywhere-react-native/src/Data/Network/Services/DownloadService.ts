@@ -7,6 +7,7 @@
  */
 
 import type { ModelInfo } from '../../../Core/Models/Model/ModelInfo';
+import type { DownloadProgress } from '../../Models/Downloading/DownloadProgress';
 import type { DownloadTask } from '../../Models/Downloading/DownloadTask';
 
 /**
@@ -39,10 +40,7 @@ export class DownloadServiceImpl implements DownloadService {
     const taskId = `download-${Date.now()}`;
 
     // Create progress generator
-    const progressGenerator = this.createProgressGenerator(
-      model,
-      taskId
-    );
+    const progressGenerator = this.createProgressGenerator(model, taskId);
 
     // Create result promise
     const resultPromise = this.downloadFile(model, taskId);
@@ -77,8 +75,8 @@ export class DownloadServiceImpl implements DownloadService {
    */
   private async *createProgressGenerator(
     model: ModelInfo,
-    taskId: string
-  ): AsyncGenerator<any, void, unknown> {
+    _taskId: string
+  ): AsyncGenerator<DownloadProgress, void, unknown> {
     // Placeholder - would emit progress updates during download
     yield {
       bytesDownloaded: 0,
@@ -92,7 +90,10 @@ export class DownloadServiceImpl implements DownloadService {
   /**
    * Download file
    */
-  private async downloadFile(model: ModelInfo, taskId: string): Promise<string> {
+  private async downloadFile(
+    model: ModelInfo,
+    _taskId: string
+  ): Promise<string> {
     if (!model.downloadURL) {
       throw new Error('Model has no download URL');
     }

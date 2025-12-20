@@ -8,9 +8,8 @@
 
 import type { GenerationOptions } from '../Models/GenerationOptions';
 import type { GenerationResult } from '../Models/GenerationResult';
-import type { RoutingDecision } from '../../Routing/Models/RoutingDecision';
 import type { LoadedModel } from '../../ModelLoading/Models/LoadedModel';
-import { RoutingService } from '../../Routing/Services/RoutingService';
+import type { RoutingService } from '../../Routing/Services/RoutingService';
 import { GenerationOptionsResolver } from './GenerationOptionsResolver';
 import { StructuredOutputHandler } from '../../StructuredOutput/Services/StructuredOutputHandler';
 import { ThinkingParser } from './ThinkingParser';
@@ -19,7 +18,7 @@ import { ExecutionTarget } from '../Models/GenerationOptions';
 import { HardwareAcceleration } from '../Models/GenerationOptions';
 import type { PerformanceMetrics } from '../Models/PerformanceMetrics';
 import { PerformanceMetricsImpl } from '../Models/PerformanceMetrics';
-import { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
+import type { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
 
 /**
  * Main service for text generation
@@ -30,10 +29,7 @@ export class GenerationService {
   private optionsResolver: GenerationOptionsResolver;
   private currentLoadedModel: LoadedModel | null = null;
 
-  constructor(
-    routingService: RoutingService,
-    modelLoadingService?: any
-  ) {
+  constructor(routingService: RoutingService, modelLoadingService?: any) {
     this.routingService = routingService;
     this.modelLoadingService = modelLoadingService;
     this.optionsResolver = new GenerationOptionsResolver();
@@ -60,7 +56,7 @@ export class GenerationService {
     prompt: string,
     options: GenerationOptions
   ): Promise<GenerationResult> {
-    const startTime = Date.now();
+    const _startTime = Date.now();
 
     // Get remote configuration (placeholder - would come from ServiceContainer)
     const remoteConfig = null;
@@ -222,9 +218,9 @@ export class GenerationService {
    * Generate in cloud
    */
   private async generateInCloud(
-    prompt: string,
-    options: GenerationOptions,
-    provider: string | null
+    _prompt: string,
+    _options: GenerationOptions,
+    _provider: string | null
   ): Promise<GenerationResult> {
     // Placeholder implementation
     const latency = 50;
@@ -274,7 +270,10 @@ export class GenerationService {
     const loadedModel = this.currentLoadedModel;
 
     // For now, use on-device generation entirely
-    const generationResult = await loadedModel.service.generate(prompt, options);
+    const generationResult = await loadedModel.service.generate(
+      prompt,
+      options
+    );
     const generatedText = generationResult.text;
 
     // Calculate metrics

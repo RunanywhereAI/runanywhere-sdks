@@ -43,7 +43,8 @@ export function detectFormatFromURL(url: string): ModelFormat | null {
   if (path.includes('.safetensors')) return ModelFormat.SafeTensors;
   if (path.includes('.pte')) return ModelFormat.PTE;
   if (path.includes('.weights')) return ModelFormat.Weights;
-  if (path.includes('.checkpoint') || path.includes('.ckpt')) return ModelFormat.Checkpoint;
+  if (path.includes('.checkpoint') || path.includes('.ckpt'))
+    return ModelFormat.Checkpoint;
 
   // Check for common model hosting patterns
   if (url.includes('huggingface.co')) {

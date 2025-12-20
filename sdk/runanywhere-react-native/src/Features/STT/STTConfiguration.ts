@@ -15,7 +15,8 @@ import { SDKErrorCode } from '../../Public/Errors/SDKError';
 /**
  * Configuration for STT component (conforms to ComponentConfiguration and ComponentInitParameters protocols)
  */
-export interface STTConfiguration extends ComponentConfiguration, ComponentInitParameters {
+export interface STTConfiguration
+  extends ComponentConfiguration, ComponentInitParameters {
   readonly componentType: SDKComponent;
   readonly modelId: string | null;
   readonly language: string;
@@ -43,17 +44,19 @@ export class STTConfigurationImpl implements STTConfiguration {
   public readonly enableTimestamps: boolean;
   public readonly useGPUIfAvailable: boolean;
 
-  constructor(options: {
-    modelId?: string | null;
-    language?: string;
-    sampleRate?: number;
-    enablePunctuation?: boolean;
-    enableDiarization?: boolean;
-    vocabularyList?: string[];
-    maxAlternatives?: number;
-    enableTimestamps?: boolean;
-    useGPUIfAvailable?: boolean;
-  } = {}) {
+  constructor(
+    options: {
+      modelId?: string | null;
+      language?: string;
+      sampleRate?: number;
+      enablePunctuation?: boolean;
+      enableDiarization?: boolean;
+      vocabularyList?: string[];
+      maxAlternatives?: number;
+      enableTimestamps?: boolean;
+      useGPUIfAvailable?: boolean;
+    } = {}
+  ) {
     this.modelId = options.modelId ?? null;
     this.language = options.language ?? 'en-US';
     this.sampleRate = options.sampleRate ?? 16000;

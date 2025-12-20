@@ -8,14 +8,24 @@
  */
 
 import { EventBus } from './Events';
-import { requireNativeModule, isNativeModuleAvailable, NativeRunAnywhere, requireFileSystemModule } from '../native';
-import { SDKEnvironment, ExecutionTarget, HardwareAcceleration } from '../types';
+import {
+  requireNativeModule,
+  isNativeModuleAvailable,
+  requireFileSystemModule,
+} from '../native';
+import {
+  SDKEnvironment,
+  ExecutionTarget,
+  HardwareAcceleration,
+} from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
-import {
+import type {
   InitializationPhase,
   InitializationState,
   SDKInitParams,
+} from '../Foundation/Initialization';
+import {
   createInitialState,
   markCoreInitialized,
   markServicesInitializing,
@@ -273,7 +283,10 @@ export const RunAnywhere = {
         this._startPhase2InBackground();
         return;
       }
-      initState = markInitializationFailed(initState, new Error('Native module not available'));
+      initState = markInitializationFailed(
+        initState,
+        new Error('Native module not available')
+      );
       throw new Error('Native module not available');
     }
 
@@ -285,7 +298,9 @@ export const RunAnywhere = {
       const backendCreated = native.createBackend(backendName);
       if (!backendCreated) {
         if (__DEV__ || environment === SDKEnvironment.Development) {
-          console.warn('[RunAnywhere] Failed to create backend, running in limited mode');
+          console.warn(
+            '[RunAnywhere] Failed to create backend, running in limited mode'
+          );
           initState = markCoreInitialized(initState, initParams, null);
           state.initialized = true;
           state.environment = environment;
@@ -294,7 +309,10 @@ export const RunAnywhere = {
           this._startPhase2InBackground();
           return;
         }
-        initState = markInitializationFailed(initState, new Error('Failed to create backend'));
+        initState = markInitializationFailed(
+          initState,
+          new Error('Failed to create backend')
+        );
         throw new Error('Failed to create backend');
       }
       backendType = backendName;
@@ -324,7 +342,9 @@ export const RunAnywhere = {
       const result = native.initialize(configJson);
       if (!result) {
         if (__DEV__ || environment === SDKEnvironment.Development) {
-          console.warn('[RunAnywhere] Native initialize returned false, continuing in dev mode');
+          console.warn(
+            '[RunAnywhere] Native initialize returned false, continuing in dev mode'
+          );
           initState = markCoreInitialized(initState, initParams, backendType);
           state.initialized = true;
           state.environment = environment;
@@ -332,7 +352,10 @@ export const RunAnywhere = {
           this._startPhase2InBackground();
           return;
         }
-        initState = markInitializationFailed(initState, new Error('Failed to initialize SDK'));
+        initState = markInitializationFailed(
+          initState,
+          new Error('Failed to initialize SDK')
+        );
         throw new Error('Failed to initialize SDK');
       }
     } catch (error) {
@@ -435,7 +458,10 @@ export const RunAnywhere = {
         );
         console.log('[RunAnywhere] API client initialized');
       } catch (error) {
-        console.warn('[RunAnywhere] Failed to initialize API client (non-critical):', error);
+        console.warn(
+          '[RunAnywhere] Failed to initialize API client (non-critical):',
+          error
+        );
       }
     }
 
@@ -447,7 +473,10 @@ export const RunAnywhere = {
       LlamaCppProvider.register();
       console.log('[RunAnywhere] LlamaCPP provider registered');
     } catch (error) {
-      console.warn('[RunAnywhere] Failed to register LlamaCPP provider:', error);
+      console.warn(
+        '[RunAnywhere] Failed to register LlamaCPP provider:',
+        error
+      );
     }
 
     try {
@@ -464,7 +493,10 @@ export const RunAnywhere = {
       await ModelRegistry.initialize();
       console.log('[RunAnywhere] Model Registry initialized successfully');
     } catch (error) {
-      console.warn('[RunAnywhere] Model Registry initialization failed (non-critical):', error);
+      console.warn(
+        '[RunAnywhere] Model Registry initialization failed (non-critical):',
+        error
+      );
     }
 
     // Mark Phase 2 complete
@@ -554,13 +586,21 @@ export const RunAnywhere = {
    * @param modelPath - Path to the model file
    * @param config - Optional configuration
    */
-  async loadTextModel(modelPath: string, config?: Record<string, unknown>): Promise<boolean> {
+  async loadTextModel(
+    modelPath: string,
+    config?: Record<string, unknown>
+  ): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
-      console.warn('[RunAnywhere] Native module not available for loadTextModel');
+      console.warn(
+        '[RunAnywhere] Native module not available for loadTextModel'
+      );
       return false;
     }
     const native = requireNativeModule();
-    return native.loadTextModel(modelPath, config ? JSON.stringify(config) : undefined);
+    return native.loadTextModel(
+      modelPath,
+      config ? JSON.stringify(config) : undefined
+    );
   },
 
   /**
@@ -620,7 +660,10 @@ export const RunAnywhere = {
    * console.log('Text:', result.text);
    * ```
    */
-  async generate(prompt: string, options?: GenerationOptions): Promise<GenerationResult> {
+  async generate(
+    prompt: string,
+    options?: GenerationOptions
+  ): Promise<GenerationResult> {
     if (!isNativeModuleAvailable()) {
       throw new Error('Native module not available');
     }
@@ -651,7 +694,8 @@ export const RunAnywhere = {
         performanceMetrics: {
           timeToFirstTokenMs: result.performanceMetrics?.timeToFirstTokenMs,
           tokensPerSecond: result.performanceMetrics?.tokensPerSecond,
-          inferenceTimeMs: result.performanceMetrics?.inferenceTimeMs ?? result.latencyMs ?? 0,
+          inferenceTimeMs:
+            result.performanceMetrics?.inferenceTimeMs ?? result.latencyMs ?? 0,
         },
         thinkingTokens: result.thinkingTokens,
         responseTokens: result.responseTokens ?? result.tokensUsed ?? 0,
@@ -700,7 +744,10 @@ export const RunAnywhere = {
     onToken?: (token: string) => void
   ): void {
     if (!isNativeModuleAvailable()) {
-      EventBus.publish('Generation', { type: 'failed', error: 'Native module not available' });
+      EventBus.publish('Generation', {
+        type: 'failed',
+        error: 'Native module not available',
+      });
       return;
     }
     const native = requireNativeModule();
@@ -726,14 +773,18 @@ export const RunAnywhere = {
     }
 
     // Native generateStream takes (prompt, optionsJson, callback)
-    native.generateStream(prompt, optionsJson, (token: string, isComplete: boolean) => {
-      if (onToken && !isComplete) {
-        onToken(token);
+    native.generateStream(
+      prompt,
+      optionsJson,
+      (token: string, isComplete: boolean) => {
+        if (onToken && !isComplete) {
+          onToken(token);
+        }
+        if (isComplete) {
+          EventBus.publish('Generation', { type: 'completed' });
+        }
       }
-      if (isComplete) {
-        EventBus.publish('Generation', { type: 'completed' });
-      }
-    });
+    );
   },
 
   /**
@@ -764,11 +815,17 @@ export const RunAnywhere = {
     config?: Record<string, unknown>
   ): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
-      console.warn('[RunAnywhere] Native module not available for loadSTTModel');
+      console.warn(
+        '[RunAnywhere] Native module not available for loadSTTModel'
+      );
       return false;
     }
     const native = requireNativeModule();
-    return native.loadSTTModel(modelPath, modelType, config ? JSON.stringify(config) : undefined);
+    return native.loadSTTModel(
+      modelPath,
+      modelType,
+      config ? JSON.stringify(config) : undefined
+    );
   },
 
   /**
@@ -831,7 +888,11 @@ export const RunAnywhere = {
     const sampleRate = options?.sampleRate ?? 16000;
     const language = options?.language;
 
-    const resultJson = await native.transcribe(audioBase64, sampleRate, language);
+    const resultJson = await native.transcribe(
+      audioBase64,
+      sampleRate,
+      language
+    );
 
     try {
       const result = JSON.parse(resultJson);
@@ -881,7 +942,7 @@ export const RunAnywhere = {
     }
     const native = requireNativeModule();
 
-    const language = options?.language ?? 'en';  // Default to English
+    const language = options?.language ?? 'en'; // Default to English
     const resultJson = await native.transcribeFile(filePath, language);
 
     try {
@@ -897,7 +958,7 @@ export const RunAnywhere = {
         duration: result.duration ?? 0,
         alternatives: result.alternatives ?? [],
       };
-    } catch (e) {
+    } catch {
       if (resultJson.includes('error')) {
         const errorMatch = resultJson.match(/"error":\s*"([^"]+)"/);
         throw new Error(errorMatch ? errorMatch[1] : resultJson);
@@ -949,7 +1010,9 @@ export const RunAnywhere = {
     onError?: (error: string) => void
   ): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
-      console.warn('[RunAnywhere] Native module not available for startStreamingSTT');
+      console.warn(
+        '[RunAnywhere] Native module not available for startStreamingSTT'
+      );
       return false;
     }
     const native = requireNativeModule();
@@ -1018,11 +1081,17 @@ export const RunAnywhere = {
     config?: Record<string, unknown>
   ): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
-      console.warn('[RunAnywhere] Native module not available for loadTTSModel');
+      console.warn(
+        '[RunAnywhere] Native module not available for loadTTSModel'
+      );
       return false;
     }
     const native = requireNativeModule();
-    return native.loadTTSModel(modelPath, modelType, config ? JSON.stringify(config) : undefined);
+    return native.loadTTSModel(
+      modelPath,
+      modelType,
+      config ? JSON.stringify(config) : undefined
+    );
   },
 
   /**
@@ -1063,17 +1132,25 @@ export const RunAnywhere = {
    * // result.audio is base64 encoded audio
    * ```
    */
-  async synthesize(text: string, configuration?: TTSConfiguration): Promise<TTSResult> {
+  async synthesize(
+    text: string,
+    configuration?: TTSConfiguration
+  ): Promise<TTSResult> {
     if (!isNativeModuleAvailable()) {
       throw new Error('Native module not available');
     }
     const native = requireNativeModule();
 
-    const voiceId = configuration?.voice ?? '';  // Empty string, not null - native expects string
+    const voiceId = configuration?.voice ?? ''; // Empty string, not null - native expects string
     const speedRate = configuration?.rate ?? 1.0;
     const pitchShift = configuration?.pitch ?? 1.0;
 
-    const resultJson = await native.synthesize(text, voiceId, speedRate, pitchShift);
+    const resultJson = await native.synthesize(
+      text,
+      voiceId,
+      speedRate,
+      pitchShift
+    );
 
     try {
       const result = JSON.parse(resultJson);
@@ -1130,12 +1207,18 @@ export const RunAnywhere = {
   /**
    * Load a VAD model
    */
-  async loadVADModel(modelPath: string, config?: Record<string, unknown>): Promise<boolean> {
+  async loadVADModel(
+    modelPath: string,
+    config?: Record<string, unknown>
+  ): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
       return false;
     }
     const native = requireNativeModule();
-    return native.loadVADModel(modelPath, config ? JSON.stringify(config) : undefined);
+    return native.loadVADModel(
+      modelPath,
+      config ? JSON.stringify(config) : undefined
+    );
   },
 
   /**
@@ -1277,7 +1360,9 @@ export const RunAnywhere = {
    * ```
    */
   getAvailableFrameworks(): import('../types').LLMFramework[] {
-    const { ServiceRegistry } = require('../Foundation/DependencyInjection/ServiceRegistry');
+    const {
+      ServiceRegistry,
+    } = require('../Foundation/DependencyInjection/ServiceRegistry');
 
     // Get all registered LLM providers
     const llmProviders = ServiceRegistry.shared.allLLMProviders();
@@ -1317,11 +1402,14 @@ export const RunAnywhere = {
    * const llamaCppModels = RunAnywhere.getModelsForFramework(LLMFramework.LlamaCpp);
    * ```
    */
-  async getModelsForFramework(framework: import('../types').LLMFramework): Promise<ModelInfo[]> {
+  async getModelsForFramework(
+    framework: import('../types').LLMFramework
+  ): Promise<ModelInfo[]> {
     const allModels = await ModelRegistry.getAvailableModels();
-    return allModels.filter(model =>
-      model.compatibleFrameworks.includes(framework) ||
-      model.preferredFramework === framework
+    return allModels.filter(
+      (model) =>
+        model.compatibleFrameworks.includes(framework) ||
+        model.preferredFramework === framework
     );
   },
 
@@ -1463,7 +1551,9 @@ export const RunAnywhere = {
           if (onProgress) {
             onProgress({
               modelId,
-              bytesDownloaded: Math.round(progress * (modelInfo.downloadSize || 0)),
+              bytesDownloaded: Math.round(
+                progress * (modelInfo.downloadSize || 0)
+              ),
               totalBytes: modelInfo.downloadSize || 0,
               progress,
             });
@@ -1520,7 +1610,9 @@ export const RunAnywhere = {
 
       // Get model info to find the file name
       const modelInfo = await ModelRegistry.getModel(modelId);
-      const extension = modelInfo?.downloadURL?.includes('.gguf') ? '.gguf' : '';
+      const extension = modelInfo?.downloadURL?.includes('.gguf')
+        ? '.gguf'
+        : '';
       const fileName = `${modelId}${extension}`;
 
       // Check if model exists and delete via native module

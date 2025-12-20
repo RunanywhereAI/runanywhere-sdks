@@ -6,16 +6,16 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Analytics/TTS/TTSAnalyticsService.swift
  */
 
-import {
+import type {
   AnalyticsContext,
   AnalyticsEvent,
   ErrorEventData,
   SessionMetadata,
-  TTSEventType,
   TTSMetrics,
   TTSSynthesisCompletionData,
   TTSSynthesisStartData,
 } from '../../../types/analytics';
+import { TTSEventType } from '../../../types/analytics';
 import { AnalyticsQueueManager } from '../AnalyticsQueueManager';
 
 /**
@@ -92,12 +92,19 @@ export class TTSAnalyticsService {
     return {
       totalEvents: this.events.length,
       startTime: this.metricsStartTime,
-      lastEventTime: this.events.length > 0 ? this.events[this.events.length - 1].timestamp : undefined,
+      lastEventTime:
+        this.events.length > 0
+          ? this.events[this.events.length - 1].timestamp
+          : undefined,
       totalSyntheses: this.synthesisCount,
       averageCharactersPerSecond:
-        this.synthesisCount > 0 ? this.totalCharactersPerSecond / this.synthesisCount : 0,
+        this.synthesisCount > 0
+          ? this.totalCharactersPerSecond / this.synthesisCount
+          : 0,
       averageProcessingTimeMs:
-        this.synthesisCount > 0 ? this.totalProcessingTime / this.synthesisCount : 0,
+        this.synthesisCount > 0
+          ? this.totalProcessingTime / this.synthesisCount
+          : 0,
       totalCharactersProcessed: this.totalCharacters,
     };
   }
@@ -176,7 +183,8 @@ export class TTSAnalyticsService {
   ): Promise<void> {
     const charactersPerSecond =
       processingTimeMs > 0 ? (characterCount / processingTimeMs) * 1000 : 0;
-    const realTimeFactor = audioDurationMs > 0 ? processingTimeMs / audioDurationMs : 0;
+    const realTimeFactor =
+      audioDurationMs > 0 ? processingTimeMs / audioDurationMs : 0;
 
     const eventData: TTSSynthesisCompletionData = {
       characterCount,
@@ -230,7 +238,10 @@ export class TTSAnalyticsService {
   /**
    * Track error
    */
-  public async trackError(error: Error, context: AnalyticsContext): Promise<void> {
+  public async trackError(
+    error: Error,
+    context: AnalyticsContext
+  ): Promise<void> {
     const eventData: ErrorEventData = {
       error: error.message,
       context: context.toString(),
@@ -253,7 +264,7 @@ export class TTSAnalyticsService {
   /**
    * Process event for custom analytics
    */
-  private async processEvent(event: TTSEvent): Promise<void> {
+  private async processEvent(_event: TTSEvent): Promise<void> {
     // Custom processing for TTS events if needed
     // This is called after each event is tracked
   }

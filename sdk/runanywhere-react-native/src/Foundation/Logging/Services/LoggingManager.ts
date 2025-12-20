@@ -39,7 +39,7 @@ export class LoggingManager {
     level: LogLevel,
     category: string,
     message: string,
-    metadata?: { [key: string]: any }
+    metadata?: Record<string, unknown>
   ): void {
     if (level < this.logLevel) {
       return;

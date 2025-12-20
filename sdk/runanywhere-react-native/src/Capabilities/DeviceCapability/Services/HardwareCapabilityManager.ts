@@ -7,18 +7,28 @@
  */
 
 import type { DeviceCapabilities } from '../Models/DeviceCapabilities';
-import { DeviceCapabilitiesImpl } from '../Models/DeviceCapabilities';
+import {
+  DeviceCapabilitiesImpl,
+  ProcessorType,
+} from '../Models/DeviceCapabilities';
 import type { ModelInfo } from '../../../Core/Models/Model/ModelInfo';
 import type { ResourceAvailability } from '../../../Core/Models/Common/ResourceAvailability';
 import { ThermalState } from '../../../Core/Models/Common/ResourceAvailability';
 import { HardwareAcceleration } from '../../TextGeneration/Models/GenerationOptions';
 
 /**
+ * Capability analyzer interface for future extension
+ */
+interface CapabilityAnalyzer {
+  analyze(): unknown;
+}
+
+/**
  * Hardware capability manager
  */
 export class HardwareCapabilityManager {
   private static sharedInstance: HardwareCapabilityManager | null = null;
-  private capabilityAnalyzer: any; // CapabilityAnalyzer
+  private _capabilityAnalyzer: CapabilityAnalyzer | null = null;
   private cachedCapabilities: DeviceCapabilities | null = null;
   private cacheTimestamp: Date | null = null;
   private readonly cacheValidityDuration: number = 60 * 1000; // 1 minute in ms
@@ -28,7 +38,8 @@ export class HardwareCapabilityManager {
    */
   public static get shared(): HardwareCapabilityManager {
     if (!HardwareCapabilityManager.sharedInstance) {
-      HardwareCapabilityManager.sharedInstance = new HardwareCapabilityManager();
+      HardwareCapabilityManager.sharedInstance =
+        new HardwareCapabilityManager();
     }
     return HardwareCapabilityManager.sharedInstance;
   }
@@ -72,7 +83,7 @@ export class HardwareCapabilityManager {
   /**
    * Get optimal hardware configuration for a model
    */
-  public optimalConfiguration(model: ModelInfo): any {
+  public optimalConfiguration(_model: ModelInfo): unknown {
     // Placeholder - would use capabilityAnalyzer
     return {};
   }
@@ -86,7 +97,7 @@ export class HardwareCapabilityManager {
     // Placeholder values - would need native module support
     const storageAvailable = 0;
     const accelerators = capabilities.supportedAccelerators;
-    const thermalState = 'normal'; // Placeholder
+    const thermalState = ThermalState.Nominal;
     const batteryLevel = null;
     const isLowPowerMode = false;
 
@@ -94,7 +105,7 @@ export class HardwareCapabilityManager {
       memoryAvailable: capabilities.availableMemory,
       storageAvailable,
       acceleratorsAvailable: accelerators,
-      thermalState: thermalState as any,
+      thermalState,
       batteryLevel,
       isLowPowerMode,
       canLoadModel: (model: ModelInfo) => {
@@ -122,8 +133,11 @@ export class HardwareCapabilityManager {
       hasNeuralEngine: false, // Would detect via native module
       hasGPU: true, // Assume true for modern devices
       processorCount: 4, // Placeholder
-      processorType: 'unknown' as any,
-      supportedAccelerators: [HardwareAcceleration.CPU, HardwareAcceleration.GPU],
+      processorType: ProcessorType.Unknown,
+      supportedAccelerators: [
+        HardwareAcceleration.CPU,
+        HardwareAcceleration.GPU,
+      ],
       osVersion: {
         majorVersion: 0,
         minorVersion: 0,

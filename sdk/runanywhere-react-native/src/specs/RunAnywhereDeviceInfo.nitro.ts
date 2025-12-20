@@ -12,8 +12,10 @@ import type { HybridObject } from 'react-native-nitro-modules';
  * This is implemented natively in Kotlin/Swift to access
  * platform-specific device APIs.
  */
-export interface RunAnywhereDeviceInfo
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+export interface RunAnywhereDeviceInfo extends HybridObject<{
+  ios: 'swift';
+  android: 'kotlin';
+}> {
   /**
    * Get device model name (e.g., "iPhone 15 Pro", "Pixel 8")
    */

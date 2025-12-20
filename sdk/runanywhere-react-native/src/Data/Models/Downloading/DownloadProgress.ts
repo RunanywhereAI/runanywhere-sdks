@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Data/Models/Downloading/DownloadProgress.swift
  */
 
-import { DownloadState } from './DownloadState';
+import type { DownloadState } from './DownloadState';
 
 /**
  * Download progress information

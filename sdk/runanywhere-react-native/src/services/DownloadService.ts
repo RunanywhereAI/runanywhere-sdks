@@ -365,7 +365,10 @@ class DownloadServiceImpl {
    */
   isDownloading(modelId: string): boolean {
     for (const task of this.activeTasks.values()) {
-      if (task.modelId === modelId && task.state === DownloadState.Downloading) {
+      if (
+        task.modelId === modelId &&
+        task.state === DownloadState.Downloading
+      ) {
         return true;
       }
     }
@@ -383,7 +386,10 @@ class DownloadServiceImpl {
     const progressJson = await native.getDownloadProgress(modelId);
     try {
       const progressData = JSON.parse(progressJson);
-      const progress = typeof progressData === 'number' ? progressData : progressData?.progress;
+      const progress =
+        typeof progressData === 'number'
+          ? progressData
+          : progressData?.progress;
       return typeof progress === 'number' && progress >= 0 ? progress : null;
     } catch {
       return null;

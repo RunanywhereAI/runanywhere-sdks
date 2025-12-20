@@ -7,7 +7,6 @@
  * Pattern matches Swift SDK's AlamofireDownloadService.swift
  */
 
-import { Platform } from 'react-native';
 import { EventBus } from '../Public/Events';
 import { ModelRegistry } from './ModelRegistry';
 import type { ModelInfo } from '../types';
@@ -112,7 +111,9 @@ class JSDownloadServiceImpl {
     onProgress?: (progress: JSDownloadProgress) => void
   ): Promise<string> {
     if (!RNFetchBlob && !RNFS) {
-      throw new Error('No download library available. Please install rn-fetch-blob or react-native-fs.');
+      throw new Error(
+        'No download library available. Please install rn-fetch-blob or react-native-fs.'
+      );
     }
 
     // Check if already downloading
@@ -143,7 +144,8 @@ class JSDownloadServiceImpl {
     // Determine file extension from URL or format
     const urlPath = modelInfo.downloadURL.split('?')[0] || '';
     const urlExtension = urlPath.split('.').pop() || '';
-    const extension = urlExtension || (modelInfo.format === 'gguf' ? 'gguf' : 'bin');
+    const extension =
+      urlExtension || (modelInfo.format === 'gguf' ? 'gguf' : 'bin');
 
     // Create destination path
     const destPath = `${this.getModelsDirectory()}/${modelId}.${extension}`;
@@ -164,10 +166,22 @@ class JSDownloadServiceImpl {
 
     // Use rn-fetch-blob for download
     if (RNFetchBlob) {
-      return this.downloadWithRNFetchBlob(modelId, modelInfo, destPath, jobId, onProgress);
+      return this.downloadWithRNFetchBlob(
+        modelId,
+        modelInfo,
+        destPath,
+        jobId,
+        onProgress
+      );
     } else {
       // Fallback to fetch + RNFS (may have issues with large files)
-      return this.downloadWithFetch(modelId, modelInfo, destPath, jobId, onProgress);
+      return this.downloadWithFetch(
+        modelId,
+        modelInfo,
+        destPath,
+        jobId,
+        onProgress
+      );
     }
   }
 
@@ -245,7 +259,10 @@ class JSDownloadServiceImpl {
             try {
               await ModelRegistry.registerModel(updatedModel);
             } catch (e) {
-              console.warn('[JSDownloadService] Failed to update model in registry:', e);
+              console.warn(
+                '[JSDownloadService] Failed to update model in registry:',
+                e
+              );
             }
 
             EventBus.publish('Model', {
@@ -263,7 +280,7 @@ class JSDownloadServiceImpl {
             // Clean up partial file
             try {
               await RNFetchBlob.fs.unlink(destPath);
-            } catch (e) {
+            } catch {
               // Ignore
             }
 
@@ -283,7 +300,7 @@ class JSDownloadServiceImpl {
           // Clean up partial file
           try {
             await RNFetchBlob.fs.unlink(destPath);
-          } catch (e) {
+          } catch {
             // Ignore
           }
 
@@ -315,7 +332,10 @@ class JSDownloadServiceImpl {
 
     const downloadPromise = (async (): Promise<string> => {
       try {
-        console.log('[JSDownloadService] Fetching with fallback:', modelInfo.downloadURL);
+        console.log(
+          '[JSDownloadService] Fetching with fallback:',
+          modelInfo.downloadURL
+        );
 
         const response = await fetch(modelInfo.downloadURL!, {
           method: 'GET',
@@ -326,7 +346,10 @@ class JSDownloadServiceImpl {
           throw new Error(`Download failed with status: ${response.status}`);
         }
 
-        const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+        const contentLength = parseInt(
+          response.headers.get('content-length') || '0',
+          10
+        );
         console.log('[JSDownloadService] Content-Length:', contentLength);
 
         const blob = await response.blob();
@@ -366,7 +389,10 @@ class JSDownloadServiceImpl {
         try {
           await ModelRegistry.registerModel(updatedModel);
         } catch (e) {
-          console.warn('[JSDownloadService] Failed to update model in registry:', e);
+          console.warn(
+            '[JSDownloadService] Failed to update model in registry:',
+            e
+          );
         }
 
         EventBus.publish('Model', {
@@ -385,7 +411,7 @@ class JSDownloadServiceImpl {
           if (exists) {
             await RNFS!.unlink(destPath);
           }
-        } catch (e) {
+        } catch {
           // Ignore
         }
 
@@ -414,7 +440,9 @@ class JSDownloadServiceImpl {
   /**
    * Check if model is already downloaded
    */
-  private async checkExistingDownload(modelInfo: ModelInfo): Promise<string | null> {
+  private async checkExistingDownload(
+    modelInfo: ModelInfo
+  ): Promise<string | null> {
     if (!modelInfo.localPath) {
       return null;
     }
@@ -427,7 +455,10 @@ class JSDownloadServiceImpl {
     }
 
     if (exists) {
-      console.log('[JSDownloadService] Model already downloaded:', modelInfo.id);
+      console.log(
+        '[JSDownloadService] Model already downloaded:',
+        modelInfo.id
+      );
       return modelInfo.localPath;
     }
 

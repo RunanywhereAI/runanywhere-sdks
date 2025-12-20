@@ -33,10 +33,9 @@ export function getRunAnywhere(): RunAnywhere {
  */
 export function getFileSystem(): RunAnywhereFileSystem {
   if (!_fileSystem) {
-    _fileSystem =
-      NitroModules.createHybridObject<RunAnywhereFileSystem>(
-        'RunAnywhereFileSystem'
-      );
+    _fileSystem = NitroModules.createHybridObject<RunAnywhereFileSystem>(
+      'RunAnywhereFileSystem'
+    );
   }
   return _fileSystem;
 }
@@ -46,10 +45,9 @@ export function getFileSystem(): RunAnywhereFileSystem {
  */
 export function getDeviceInfo(): RunAnywhereDeviceInfo {
   if (!_deviceInfo) {
-    _deviceInfo =
-      NitroModules.createHybridObject<RunAnywhereDeviceInfo>(
-        'RunAnywhereDeviceInfo'
-      );
+    _deviceInfo = NitroModules.createHybridObject<RunAnywhereDeviceInfo>(
+      'RunAnywhereDeviceInfo'
+    );
   }
   return _deviceInfo;
 }

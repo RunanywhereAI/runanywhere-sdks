@@ -8,7 +8,7 @@
 
 import type { GenerationOptions } from '../Models/GenerationOptions';
 import type { GenerationResult } from '../Models/GenerationResult';
-import { GenerationService } from './GenerationService';
+import type { GenerationService } from './GenerationService';
 import { GenerationOptionsResolver } from './GenerationOptionsResolver';
 import { ThinkingParser } from './ThinkingParser';
 import { TokenCounter } from './TokenCounter';
@@ -16,6 +16,8 @@ import { ExecutionTarget } from '../Models/GenerationOptions';
 import { HardwareAcceleration } from '../Models/GenerationOptions';
 import type { PerformanceMetrics } from '../Models/PerformanceMetrics';
 import { PerformanceMetricsImpl } from '../Models/PerformanceMetrics';
+import type { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
+import type { ModelLoadingService } from '../../ModelLoading/Services/ModelLoadingService';
 
 /**
  * Streaming result with stream and final result task
@@ -33,12 +35,12 @@ export interface StreamingResult {
  */
 export class StreamingService {
   private generationService: GenerationService;
-  private modelLoadingService: any; // ModelLoadingService
+  private modelLoadingService?: ModelLoadingService;
   private optionsResolver: GenerationOptionsResolver;
 
   constructor(
     generationService: GenerationService,
-    modelLoadingService?: any
+    modelLoadingService?: ModelLoadingService
   ) {
     this.generationService = generationService;
     this.modelLoadingService = modelLoadingService;
@@ -55,7 +57,7 @@ export class StreamingService {
     // Shared state between stream and result promise
     let fullText = '';
     let thinkingContent: string | null = null;
-    let startTime = Date.now();
+    const startTime = Date.now();
     let firstTokenTime: number | null = null;
     let thinkingStartTime: number | null = null;
     let thinkingEndTime: number | null = null;
@@ -63,40 +65,36 @@ export class StreamingService {
     let error: Error | null = null;
     let isComplete = false;
     let modelName: string | null = null;
-    let framework: any = null;
+    let framework: LLMFramework | undefined;
 
     // Create stream
-    const stream = this.createStream(
-      prompt,
-      options,
-      {
-        onToken: (token: string, isThinking: boolean) => {
-          fullText += token;
-          tokenCount += 1;
+    const stream = this.createStream(prompt, options, {
+      onToken: (token: string, isThinking: boolean) => {
+        fullText += token;
+        tokenCount += 1;
 
-          // Only set firstTokenTime for non-empty tokens
-          if (firstTokenTime === null && token.length > 0) {
-            firstTokenTime = Date.now();
-          }
+        // Only set firstTokenTime for non-empty tokens
+        if (firstTokenTime === null && token.length > 0) {
+          firstTokenTime = Date.now();
+        }
 
-          if (isThinking && thinkingStartTime === null) {
-            thinkingStartTime = Date.now();
-          }
-        },
-        onThinkingEnd: (thinking: string) => {
-          thinkingContent = thinking;
-          thinkingEndTime = Date.now();
-        },
-        onComplete: (model: string, fw: any) => {
-          modelName = model;
-          framework = fw;
-          isComplete = true;
-        },
-        onError: (err: Error) => {
-          error = err;
-        },
-      }
-    );
+        if (isThinking && thinkingStartTime === null) {
+          thinkingStartTime = Date.now();
+        }
+      },
+      onThinkingEnd: (thinking: string) => {
+        thinkingContent = thinking;
+        thinkingEndTime = Date.now();
+      },
+      onComplete: (model: string, fw: LLMFramework | undefined) => {
+        modelName = model;
+        framework = fw;
+        isComplete = true;
+      },
+      onError: (err: Error) => {
+        error = err;
+      },
+    });
 
     // Create result promise
     const resultPromise = (async (): Promise<GenerationResult> => {
@@ -142,7 +140,7 @@ export class StreamingService {
     callbacks: {
       onToken: (token: string, isThinking: boolean) => void;
       onThinkingEnd: (thinking: string) => void;
-      onComplete: (model: string, framework: any) => void;
+      onComplete: (model: string, framework: LLMFramework | undefined) => void;
       onError: (error: Error) => void;
     }
   ): AsyncGenerator<string, void, unknown> {
@@ -151,7 +149,10 @@ export class StreamingService {
       const remoteConfig = null;
 
       // Apply remote constraints to options
-      const resolvedOptions = this.optionsResolver.resolve(options, remoteConfig);
+      const resolvedOptions = this.optionsResolver.resolve(
+        options,
+        remoteConfig
+      );
 
       // Prepare prompt
       const effectivePrompt = this.optionsResolver.preparePrompt(
@@ -181,8 +182,14 @@ export class StreamingService {
         tokens.push(token);
 
         // Check if this is a thinking token
-        if (currentModel.model.supportsThinking && currentModel.model.thinkingPattern) {
-          const state = { buffer: thinkingBuffer, inThinkingSection: isThinking };
+        if (
+          currentModel.model.supportsThinking &&
+          currentModel.model.thinkingPattern
+        ) {
+          const state = {
+            buffer: thinkingBuffer,
+            inThinkingSection: isThinking,
+          };
           const parseResult = ThinkingParser.parseStreamingToken(
             token,
             currentModel.model.thinkingPattern,
@@ -228,14 +235,14 @@ export class StreamingService {
    */
   private buildResult(
     modelUsed: string,
-    framework: any,
+    framework: LLMFramework | undefined,
     fullText: string,
     thinkingContent: string | null,
     startTime: number,
     firstTokenTime: number | null,
     thinkingStartTime: number | null,
     thinkingEndTime: number | null,
-    tokenCount: number
+    _tokenCount: number
   ): GenerationResult {
     const latency = Date.now() - startTime;
 
@@ -272,13 +279,15 @@ export class StreamingService {
       timeToFirstTokenMs: firstTokenTime ? firstTokenTime - startTime : null,
       thinkingTimeMs,
       responseTimeMs,
-      thinkingStartTimeMs: thinkingStartTime ? thinkingStartTime - startTime : null,
+      thinkingStartTimeMs: thinkingStartTime
+        ? thinkingStartTime - startTime
+        : null,
       thinkingEndTimeMs: thinkingEndTime ? thinkingEndTime - startTime : null,
       firstResponseTokenTimeMs: thinkingEndTime
         ? thinkingEndTime - startTime
         : firstTokenTime
-        ? firstTokenTime - startTime
-        : null,
+          ? firstTokenTime - startTime
+          : null,
     });
 
     return {

@@ -16,7 +16,7 @@
 
 import { NativeRunAnywhere } from '../../native/NativeRunAnywhere';
 import { EventBus } from '../../Public/Events/EventBus';
-import type { SDKGenerationEvent, SDKVoiceEvent } from '../../types';
+import type { SDKModelEvent, SDKVoiceEvent } from '../../types';
 
 export interface QueuedEvent {
   eventName: string;
@@ -84,7 +84,10 @@ export class EventPoller {
       const events: QueuedEvent[] = JSON.parse(eventsJsonString);
 
       if (!Array.isArray(events)) {
-        console.error('[RunAnywhere] pollEvents returned non-array:', eventsJsonString);
+        console.error(
+          '[RunAnywhere] pollEvents returned non-array:',
+          eventsJsonString
+        );
         return;
       }
 
@@ -93,7 +96,11 @@ export class EventPoller {
         this.handleQueuedEvent(event);
       }
     } catch (error) {
-      console.error('[RunAnywhere] Error parsing polled events:', error, eventsJsonString);
+      console.error(
+        '[RunAnywhere] Error parsing polled events:',
+        error,
+        eventsJsonString
+      );
     }
   }
 
@@ -105,9 +112,9 @@ export class EventPoller {
       const { eventName, eventData } = event;
 
       // Parse the event data JSON
-      let parsedData: any;
+      let parsedData: Record<string, unknown>;
       try {
-        parsedData = JSON.parse(eventData);
+        parsedData = JSON.parse(eventData) as Record<string, unknown>;
       } catch {
         parsedData = { raw: eventData };
       }
@@ -122,48 +129,106 @@ export class EventPoller {
   /**
    * Route event to the appropriate EventBus method
    */
-  private routeEvent(eventName: string, eventData: any): void {
-    // Generation events
-    if (eventName === 'onGenerationStart' || eventName === 'onGenerationToken' || eventName === 'onGenerationComplete') {
-      const genEvent: SDKGenerationEvent = {
-        type: eventName as any,
-        timestamp: Date.now(),
-        ...eventData,
+  private routeEvent(
+    eventName: string,
+    eventData: Record<string, unknown>
+  ): void {
+    // Model load events - use SDKModelEvent type
+    if (eventName === 'onGenerationStart') {
+      const modelEvent: SDKModelEvent = {
+        type: 'loadStarted',
+        modelId: String(eventData.modelId ?? eventData.prompt ?? ''),
       };
-      EventBus.emitModel(genEvent as any);
+      EventBus.emitModel(modelEvent);
+      return;
+    }
+    if (eventName === 'onGenerationToken') {
+      const modelEvent: SDKModelEvent = {
+        type: 'loadProgress',
+        modelId: String(eventData.modelId ?? ''),
+        progress: Number(eventData.progress ?? 0),
+      };
+      EventBus.emitModel(modelEvent);
+      return;
+    }
+    if (eventName === 'onGenerationComplete') {
+      const modelEvent: SDKModelEvent = {
+        type: 'loadCompleted',
+        modelId: String(eventData.modelId ?? ''),
+      };
+      EventBus.emitModel(modelEvent);
       return;
     }
 
     // TTS events
-    if (eventName === 'onTTSAudio' || eventName === 'onTTSComplete' || eventName === 'onTTSError') {
+    if (eventName === 'onTTSAudio') {
       const ttsEvent: SDKVoiceEvent = {
-        type: eventName as any,
-        timestamp: Date.now(),
-        ...eventData,
+        type: 'audioGenerated',
+        data: String(eventData.data ?? ''),
+      };
+      EventBus.emitVoice(ttsEvent);
+      return;
+    }
+    if (eventName === 'onTTSComplete') {
+      const ttsEvent: SDKVoiceEvent = { type: 'synthesisCompleted' };
+      EventBus.emitVoice(ttsEvent);
+      return;
+    }
+    if (eventName === 'onTTSError') {
+      const ttsEvent: SDKVoiceEvent = {
+        type: 'pipelineError',
+        error: String(eventData.error ?? 'Unknown TTS error'),
       };
       EventBus.emitVoice(ttsEvent);
       return;
     }
 
     // Voice events (STT, VAD)
-    if (eventName === 'onTranscriptionUpdate' || eventName === 'onTranscriptionComplete' || eventName === 'onVADStateChange') {
+    if (eventName === 'onTranscriptionUpdate') {
       const voiceEvent: SDKVoiceEvent = {
-        type: eventName as any,
-        timestamp: Date.now(),
-        ...eventData,
+        type: 'transcriptionPartial',
+        text: String(eventData.text ?? ''),
       };
+      EventBus.emitVoice(voiceEvent);
+      return;
+    }
+    if (eventName === 'onTranscriptionComplete') {
+      const voiceEvent: SDKVoiceEvent = {
+        type: 'transcriptionFinal',
+        text: String(eventData.text ?? ''),
+      };
+      EventBus.emitVoice(voiceEvent);
+      return;
+    }
+    if (eventName === 'onVADStateChange') {
+      // VAD state changes map to different event types
+      const vadState = String(eventData.state ?? 'unknown');
+      let voiceEvent: SDKVoiceEvent;
+      if (vadState === 'detected') {
+        voiceEvent = { type: 'vadDetected' };
+      } else if (vadState === 'ended') {
+        voiceEvent = { type: 'vadEnded' };
+      } else {
+        voiceEvent = { type: 'vadStarted' };
+      }
       EventBus.emitVoice(voiceEvent);
       return;
     }
 
     // Generic model events
-    if (eventName === 'onModelLoaded' || eventName === 'onModelUnloaded') {
-      const modelEvent: SDKGenerationEvent = {
-        type: eventName as any,
-        timestamp: Date.now(),
-        ...eventData,
+    if (eventName === 'onModelLoaded') {
+      const modelEvent: SDKModelEvent = {
+        type: 'loadCompleted',
+        modelId: String(eventData.modelId ?? ''),
       };
-      EventBus.emitModel(modelEvent as any);
+      EventBus.emitModel(modelEvent);
+      return;
+    }
+    if (eventName === 'onModelUnloaded') {
+      const modelEvent: SDKModelEvent = {
+        type: 'unloadCompleted',
+      };
+      EventBus.emitModel(modelEvent);
       return;
     }
 

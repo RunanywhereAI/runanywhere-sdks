@@ -39,7 +39,10 @@ export interface TTSService {
   /**
    * Synthesize text to speech
    */
-  synthesize(text: string, configuration?: TTSConfiguration): Promise<TTSResult>;
+  synthesize(
+    text: string,
+    configuration?: TTSConfiguration
+  ): Promise<TTSResult>;
 
   /**
    * Get available voices

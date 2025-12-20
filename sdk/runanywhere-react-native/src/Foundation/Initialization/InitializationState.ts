@@ -8,7 +8,7 @@
  */
 
 import { InitializationPhase } from './InitializationPhase';
-import { SDKEnvironment } from '../../types';
+import type { SDKEnvironment } from '../../types';
 
 /**
  * Parameters passed to SDK initialization

@@ -9,8 +9,8 @@
 import type { ModelInfo } from '../../Core/Models/Model/ModelInfo';
 import type { ModelInfoRepository } from '../../Data/Repositories/ModelInfoRepository';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
-import { ModelCategory } from '../../Core/Models/Model/ModelCategory';
+import type { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
+import type { ModelCategory } from '../../Core/Models/Model/ModelCategory';
 
 /**
  * Service for managing model information
@@ -61,12 +61,13 @@ export class ModelInfoService {
   /**
    * Load models for specific frameworks
    */
-  public async loadModelsForFrameworks(frameworks: LLMFramework[]): Promise<ModelInfo[]> {
+  public async loadModelsForFrameworks(
+    frameworks: LLMFramework[]
+  ): Promise<ModelInfo[]> {
     const models: ModelInfo[] = [];
     for (const framework of frameworks) {
-      const frameworkModels = await this.modelInfoRepository.fetchByFramework(
-        framework
-      );
+      const frameworkModels =
+        await this.modelInfoRepository.fetchByFramework(framework);
       models.push(...frameworkModels);
     }
     // Remove duplicates based on model ID
@@ -116,14 +117,18 @@ export class ModelInfoService {
   /**
    * Get models by framework
    */
-  public async getModelsByFramework(framework: LLMFramework): Promise<ModelInfo[]> {
+  public async getModelsByFramework(
+    framework: LLMFramework
+  ): Promise<ModelInfo[]> {
     return await this.modelInfoRepository.fetchByFramework(framework);
   }
 
   /**
    * Get models by category
    */
-  public async getModelsByCategory(category: ModelCategory): Promise<ModelInfo[]> {
+  public async getModelsByCategory(
+    category: ModelCategory
+  ): Promise<ModelInfo[]> {
     return await this.modelInfoRepository.fetchByCategory(category);
   }
 

@@ -10,7 +10,8 @@
  * - Conversation state
  */
 
-import { Message, MessageRole } from '../Features/LLM/LLMModels';
+import type { Message } from '../Features/LLM/LLMModels';
+import { MessageRole } from '../Features/LLM/LLMModels';
 
 /**
  * Configuration for conversation manager
@@ -152,7 +153,10 @@ export class ConversationManager {
     }
 
     // Trim by token count (rough estimate)
-    while (this.estimateTokenCount() > this.maxContextTokens && this.messages.length > 1) {
+    while (
+      this.estimateTokenCount() > this.maxContextTokens &&
+      this.messages.length > 1
+    ) {
       this.messages.shift();
     }
   }
@@ -171,7 +175,8 @@ export class ConversationManager {
 
     // Add conversation history
     for (const message of this.messages) {
-      const roleLabel = message.role === MessageRole.User ? 'User' : 'Assistant';
+      const roleLabel =
+        message.role === MessageRole.User ? 'User' : 'Assistant';
       prompt += `${roleLabel}: ${message.content}\n\n`;
     }
 
@@ -184,8 +189,12 @@ export class ConversationManager {
    * Get conversation statistics
    */
   public getStats(): ConversationStats {
-    const userMessages = this.messages.filter((m) => m.role === MessageRole.User).length;
-    const assistantMessages = this.messages.filter((m) => m.role === MessageRole.Assistant).length;
+    const userMessages = this.messages.filter(
+      (m) => m.role === MessageRole.User
+    ).length;
+    const assistantMessages = this.messages.filter(
+      (m) => m.role === MessageRole.Assistant
+    ).length;
 
     return {
       totalMessages: this.messages.length,

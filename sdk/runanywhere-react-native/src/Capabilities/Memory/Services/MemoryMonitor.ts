@@ -130,8 +130,8 @@ export class MemoryMonitor {
         memoryDelta > 0
           ? TrendDirection.Increasing
           : memoryDelta < 0
-          ? TrendDirection.Decreasing
-          : TrendDirection.Stable,
+            ? TrendDirection.Decreasing
+            : TrendDirection.Stable,
       rate,
       confidence: this.calculateTrendConfidence(recentHistory),
       rateString: this.formatBytes(rate) + '/s',
@@ -172,9 +172,7 @@ export class MemoryMonitor {
   /**
    * Calculate trend confidence
    */
-  private calculateTrendConfidence(
-    entries: MemoryMonitoringStats[]
-  ): number {
+  private calculateTrendConfidence(entries: MemoryMonitoringStats[]): number {
     if (entries.length < 3) {
       return 0.5;
     }

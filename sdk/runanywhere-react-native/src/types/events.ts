@@ -5,7 +5,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Events/SDKEvent.swift
  */
 
-import { LLMFramework, SDKComponent, SDKEventType } from './enums';
+import type { LLMFramework, SDKComponent, SDKEventType } from './enums';
 import type {
   DefaultGenerationSettings,
   DeviceInfoData,
@@ -76,7 +76,12 @@ export type SDKGenerationEvent =
   | { type: 'firstTokenGenerated'; token: string; latencyMs: number }
   | { type: 'tokenGenerated'; token: string }
   | { type: 'streamingUpdate'; text: string; tokensCount: number }
-  | { type: 'completed'; response: string; tokensUsed: number; latencyMs: number }
+  | {
+      type: 'completed';
+      response: string;
+      tokensUsed: number;
+      latencyMs: number;
+    }
   | { type: 'failed'; error: string }
   | { type: 'modelLoaded'; modelId: string }
   | { type: 'modelUnloaded'; modelId: string }
@@ -106,7 +111,12 @@ export type SDKModelEvent =
       downloadState?: string;
       error?: string;
     }
-  | { type: 'downloadCompleted'; modelId: string; taskId?: string; localPath?: string }
+  | {
+      type: 'downloadCompleted';
+      modelId: string;
+      taskId?: string;
+      localPath?: string;
+    }
   | { type: 'downloadFailed'; modelId: string; taskId?: string; error: string }
   | { type: 'listRequested' }
   | { type: 'listCompleted'; models: ModelInfo[] }
@@ -195,9 +205,17 @@ export type SDKFrameworkEvent =
   | { type: 'availabilityRequested' }
   | { type: 'availabilityRetrieved'; availability: FrameworkAvailability[] }
   | { type: 'modelsForFrameworkRequested'; framework: LLMFramework }
-  | { type: 'modelsForFrameworkRetrieved'; framework: LLMFramework; models: ModelInfo[] }
+  | {
+      type: 'modelsForFrameworkRetrieved';
+      framework: LLMFramework;
+      models: ModelInfo[];
+    }
   | { type: 'frameworksForModalityRequested'; modality: string }
-  | { type: 'frameworksForModalityRetrieved'; modality: string; frameworks: LLMFramework[] };
+  | {
+      type: 'frameworksForModalityRetrieved';
+      modality: string;
+      frameworks: LLMFramework[];
+    };
 
 // ============================================================================
 // Device Events
@@ -232,21 +250,33 @@ export type ComponentInitializationEvent =
       modelId: string;
       sizeBytes: number;
     }
-  | { type: 'componentDownloadStarted'; component: SDKComponent; modelId: string }
+  | {
+      type: 'componentDownloadStarted';
+      component: SDKComponent;
+      modelId: string;
+    }
   | {
       type: 'componentDownloadProgress';
       component: SDKComponent;
       modelId: string;
       progress: number;
     }
-  | { type: 'componentDownloadCompleted'; component: SDKComponent; modelId: string }
+  | {
+      type: 'componentDownloadCompleted';
+      component: SDKComponent;
+      modelId: string;
+    }
   | { type: 'componentInitializing'; component: SDKComponent; modelId?: string }
   | { type: 'componentReady'; component: SDKComponent; modelId?: string }
   | { type: 'componentFailed'; component: SDKComponent; error: string }
   | { type: 'parallelInitializationStarted'; components: SDKComponent[] }
   | { type: 'sequentialInitializationStarted'; components: SDKComponent[] }
   | { type: 'allComponentsReady' }
-  | { type: 'someComponentsReady'; ready: SDKComponent[]; pending: SDKComponent[] };
+  | {
+      type: 'someComponentsReady';
+      ready: SDKComponent[];
+      pending: SDKComponent[];
+    };
 
 // ============================================================================
 // Union Type for All Events

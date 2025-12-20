@@ -10,10 +10,9 @@
  * - Features/TTS/Analytics/TTSEvent.swift
  */
 
+import type { SDKEvent } from '../../Infrastructure/Events/SDKEvent';
 import {
-  SDKEvent,
   EventCategory,
-  EventDestination,
   createSDKEvent,
 } from '../../Infrastructure/Events/SDKEvent';
 
@@ -261,10 +260,16 @@ export type SpeakerDiarizationLifecycleEventType =
 /**
  * Create SpeakerDiarization model load started event.
  */
-export function createSpeakerDiarizationModelLoadStartedEvent(modelId: string): SDKEvent {
-  return createSDKEvent('speaker_diarization_model_load_started', EventCategory.Voice, {
-    model_id: modelId,
-  });
+export function createSpeakerDiarizationModelLoadStartedEvent(
+  modelId: string
+): SDKEvent {
+  return createSDKEvent(
+    'speaker_diarization_model_load_started',
+    EventCategory.Voice,
+    {
+      model_id: modelId,
+    }
+  );
 }
 
 /**
@@ -274,10 +279,14 @@ export function createSpeakerDiarizationModelLoadCompletedEvent(
   modelId: string,
   durationMs: number
 ): SDKEvent {
-  return createSDKEvent('speaker_diarization_model_load_completed', EventCategory.Voice, {
-    model_id: modelId,
-    duration_ms: durationMs.toFixed(1),
-  });
+  return createSDKEvent(
+    'speaker_diarization_model_load_completed',
+    EventCategory.Voice,
+    {
+      model_id: modelId,
+      duration_ms: durationMs.toFixed(1),
+    }
+  );
 }
 
 /**
@@ -287,19 +296,29 @@ export function createSpeakerDiarizationModelLoadFailedEvent(
   modelId: string,
   error: string
 ): SDKEvent {
-  return createSDKEvent('speaker_diarization_model_load_failed', EventCategory.Voice, {
-    model_id: modelId,
-    error,
-  });
+  return createSDKEvent(
+    'speaker_diarization_model_load_failed',
+    EventCategory.Voice,
+    {
+      model_id: modelId,
+      error,
+    }
+  );
 }
 
 /**
  * Create SpeakerDiarization model unloaded event.
  */
-export function createSpeakerDiarizationModelUnloadedEvent(modelId: string): SDKEvent {
-  return createSDKEvent('speaker_diarization_model_unloaded', EventCategory.Voice, {
-    model_id: modelId,
-  });
+export function createSpeakerDiarizationModelUnloadedEvent(
+  modelId: string
+): SDKEvent {
+  return createSDKEvent(
+    'speaker_diarization_model_unloaded',
+    EventCategory.Voice,
+    {
+      model_id: modelId,
+    }
+  );
 }
 
 // ============================================================================

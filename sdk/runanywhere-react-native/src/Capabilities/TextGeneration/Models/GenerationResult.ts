@@ -6,9 +6,9 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Models/GenerationResult.swift
  */
 
-import { ExecutionTarget } from './GenerationOptions';
-import { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
-import { HardwareAcceleration } from './GenerationOptions';
+import type { ExecutionTarget } from './GenerationOptions';
+import type { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
+import type { HardwareAcceleration } from './GenerationOptions';
 import type { PerformanceMetrics } from './PerformanceMetrics';
 import type { StructuredOutputValidation } from '../../StructuredOutput/Services/StructuredOutputHandler';
 

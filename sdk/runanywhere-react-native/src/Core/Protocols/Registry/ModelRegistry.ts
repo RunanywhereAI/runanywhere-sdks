@@ -7,9 +7,9 @@
  */
 
 import type { ModelInfo } from '../../Models/Model/ModelInfo';
-import { LLMFramework } from '../../Models/Framework/LLMFramework';
-import { ModelFormat } from '../../Models/Model/ModelFormat';
-import { ModelCategory } from '../../Models/Model/ModelCategory';
+import type { LLMFramework } from '../../Models/Framework/LLMFramework';
+import type { ModelFormat } from '../../Models/Model/ModelFormat';
+import type { ModelCategory } from '../../Models/Model/ModelCategory';
 
 /**
  * Model filter criteria

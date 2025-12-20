@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Analytics/Services/AnalyticsQueueManager.swift
  */
 
-import { AnalyticsEvent, TelemetryData } from '../../types/analytics';
+import type { AnalyticsEvent, TelemetryData } from '../../types/analytics';
 import type { APIClient } from '../../Data/Network/Services/APIClient';
 import { analyticsEndpointForEnvironment } from '../../Data/Network/APIEndpoint';
 import { SDKEnvironment } from '../../types';
@@ -200,7 +200,9 @@ export class AnalyticsQueueManager {
     }
 
     // Convert to telemetry events
-    const telemetryEvents = batch.map((event) => this.convertToTelemetryEvent(event));
+    const telemetryEvents = batch.map((event) =>
+      this.convertToTelemetryEvent(event)
+    );
 
     let success = false;
     let attempt = 0;
@@ -287,7 +289,9 @@ export class AnalyticsQueueManager {
    *
    * Matches iOS RemoteTelemetryDataSource.sendBatch() pattern.
    */
-  private async sendBatchViaAPIClient(telemetryEvents: TelemetryData[]): Promise<void> {
+  private async sendBatchViaAPIClient(
+    telemetryEvents: TelemetryData[]
+  ): Promise<void> {
     if (!this._apiClient) {
       throw new Error('API client not configured');
     }
@@ -317,11 +321,10 @@ export class AnalyticsQueueManager {
       errors?: string[];
     }
 
-    const response = await this._apiClient.post<typeof batchRequest, AnalyticsBatchResponse>(
-      endpoint,
-      batchRequest,
-      requiresAuth
-    );
+    const response = await this._apiClient.post<
+      typeof batchRequest,
+      AnalyticsBatchResponse
+    >(endpoint, batchRequest, requiresAuth);
 
     if (!response.success) {
       console.warn(

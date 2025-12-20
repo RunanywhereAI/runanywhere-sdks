@@ -67,7 +67,9 @@ export function getLLMFrameworkDisplayName(framework: LLMFramework): string {
 /**
  * The primary modality this framework supports
  */
-export function getLLMFrameworkPrimaryModality(framework: LLMFramework): FrameworkModality {
+export function getLLMFrameworkPrimaryModality(
+  framework: LLMFramework
+): FrameworkModality {
   switch (framework) {
     // Voice frameworks
     case LLMFramework.WhisperKit:
@@ -103,7 +105,9 @@ export function getLLMFrameworkPrimaryModality(framework: LLMFramework): Framewo
 /**
  * All modalities this framework can support
  */
-export function getLLMFrameworkSupportedModalities(framework: LLMFramework): Set<FrameworkModality> {
+export function getLLMFrameworkSupportedModalities(
+  framework: LLMFramework
+): Set<FrameworkModality> {
   switch (framework) {
     // Voice-only frameworks
     case LLMFramework.WhisperKit:
@@ -124,7 +128,10 @@ export function getLLMFrameworkSupportedModalities(framework: LLMFramework): Set
 
     // Swift Transformers could support various modalities
     case LLMFramework.SwiftTransformers:
-      return new Set([FrameworkModality.TextToText, FrameworkModality.ImageToText]);
+      return new Set([
+        FrameworkModality.TextToText,
+        FrameworkModality.ImageToText,
+      ]);
 
     // General frameworks can support multiple modalities
     case LLMFramework.CoreML:
@@ -172,7 +179,9 @@ export function isVoiceFramework(framework: LLMFramework): boolean {
  * Whether this framework is primarily for text generation
  */
 export function isTextGenerationFramework(framework: LLMFramework): boolean {
-  return getLLMFrameworkPrimaryModality(framework) === FrameworkModality.TextToText;
+  return (
+    getLLMFrameworkPrimaryModality(framework) === FrameworkModality.TextToText
+  );
 }
 
 /**

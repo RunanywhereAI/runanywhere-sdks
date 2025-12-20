@@ -3,14 +3,20 @@
  */
 
 // Import first for local usage
-import { TTSCapability as _TTSCapability, TTSServiceWrapper as _TTSServiceWrapper } from './TTSCapability';
-import { TTSConfigurationImpl as _TTSConfigurationImpl, type TTSConfiguration as _TTSConfiguration } from './TTSConfiguration';
+import { TTSCapability as _TTSCapability } from './TTSCapability';
+import {
+  TTSConfigurationImpl as _TTSConfigurationImpl,
+  type TTSConfiguration as _TTSConfiguration,
+} from './TTSConfiguration';
 
 // Export capability
 export { TTSCapability, TTSServiceWrapper } from './TTSCapability';
 
 // Export configuration
-export { TTSConfigurationImpl, type TTSConfiguration } from './TTSConfiguration';
+export {
+  TTSConfigurationImpl,
+  type TTSConfiguration,
+} from './TTSConfiguration';
 
 // Export models
 export {
@@ -22,7 +28,10 @@ export {
 } from './TTSModels';
 
 // Export service and types from Core protocols
-export type { TTSService, VoiceInfo } from '../../Core/Protocols/Voice/TTSService';
+export type {
+  TTSService,
+  VoiceInfo,
+} from '../../Core/Protocols/Voice/TTSService';
 
 /**
  * Default TTS configuration

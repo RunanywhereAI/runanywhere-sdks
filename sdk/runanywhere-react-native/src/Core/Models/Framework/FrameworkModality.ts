@@ -21,7 +21,9 @@ export enum FrameworkModality {
 /**
  * Human-readable display name for a modality
  */
-export function getFrameworkModalityDisplayName(modality: FrameworkModality): string {
+export function getFrameworkModalityDisplayName(
+  modality: FrameworkModality
+): string {
   switch (modality) {
     case FrameworkModality.TextToText:
       return 'Text Generation';
@@ -41,7 +43,9 @@ export function getFrameworkModalityDisplayName(modality: FrameworkModality): st
 /**
  * Icon name for UI display
  */
-export function getFrameworkModalityIconName(modality: FrameworkModality): string {
+export function getFrameworkModalityIconName(
+  modality: FrameworkModality
+): string {
   switch (modality) {
     case FrameworkModality.TextToText:
       return 'text.bubble';

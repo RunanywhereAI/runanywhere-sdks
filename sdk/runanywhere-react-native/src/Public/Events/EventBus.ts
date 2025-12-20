@@ -68,8 +68,10 @@ type NativeEventName = (typeof NativeEventNames)[keyof typeof NativeEventNames];
  */
 class EventBusImpl {
   private emitter: NativeEventEmitter | null = null;
-  private subscriptions: Map<string, Set<SDKEventListener<AnySDKEvent>>> = new Map();
-  private nativeSubscriptions: Map<NativeEventName, { remove: () => void }> = new Map();
+  private subscriptions: Map<string, Set<SDKEventListener<AnySDKEvent>>> =
+    new Map();
+  private nativeSubscriptions: Map<NativeEventName, { remove: () => void }> =
+    new Map();
   private isSetup = false;
 
   /**
@@ -112,9 +114,12 @@ class EventBusImpl {
   private setupNativeListener(eventName: NativeEventName): void {
     if (!this.emitter) return;
 
-    const subscription = this.emitter.addListener(eventName, (event: AnySDKEvent) => {
-      this.handleNativeEvent(eventName, event);
-    });
+    const subscription = this.emitter.addListener(
+      eventName,
+      (event: AnySDKEvent) => {
+        this.handleNativeEvent(eventName, event);
+      }
+    );
 
     this.nativeSubscriptions.set(eventName, subscription);
   }
@@ -122,7 +127,10 @@ class EventBusImpl {
   /**
    * Handle an event from native
    */
-  private handleNativeEvent(eventName: NativeEventName, event: AnySDKEvent): void {
+  private handleNativeEvent(
+    eventName: NativeEventName,
+    event: AnySDKEvent
+  ): void {
     // Get subscribers for this event type
     const typeSubscribers = this.subscriptions.get(eventName);
     if (typeSubscribers) {
@@ -136,7 +144,9 @@ class EventBusImpl {
     }
 
     // Also notify "all events" subscribers
-    const allSubscribers = this.subscriptions.get(NativeEventNames.SDK_ALL_EVENTS);
+    const allSubscribers = this.subscriptions.get(
+      NativeEventNames.SDK_ALL_EVENTS
+    );
     if (allSubscribers) {
       allSubscribers.forEach((listener) => {
         try {
@@ -202,7 +212,9 @@ class EventBusImpl {
   /**
    * Subscribe to generation events
    */
-  onGeneration(handler: SDKEventListener<SDKGenerationEvent>): UnsubscribeFunction {
+  onGeneration(
+    handler: SDKEventListener<SDKGenerationEvent>
+  ): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_GENERATION, handler);
   }
 
@@ -223,7 +235,9 @@ class EventBusImpl {
   /**
    * Subscribe to performance events
    */
-  onPerformance(handler: SDKEventListener<SDKPerformanceEvent>): UnsubscribeFunction {
+  onPerformance(
+    handler: SDKEventListener<SDKPerformanceEvent>
+  ): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_PERFORMANCE, handler);
   }
 
@@ -244,7 +258,9 @@ class EventBusImpl {
   /**
    * Subscribe to framework events
    */
-  onFramework(handler: SDKEventListener<SDKFrameworkEvent>): UnsubscribeFunction {
+  onFramework(
+    handler: SDKEventListener<SDKFrameworkEvent>
+  ): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_FRAMEWORK, handler);
   }
 

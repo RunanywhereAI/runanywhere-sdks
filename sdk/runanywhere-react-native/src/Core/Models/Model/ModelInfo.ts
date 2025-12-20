@@ -6,13 +6,17 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Models/Model/ModelInfo.swift
  */
 
-import { ModelCategory } from './ModelCategory';
-import { ModelFormat } from './ModelFormat';
-import { LLMFramework } from '../Framework/LLMFramework';
-import { ThinkingTagPattern, ThinkingTagPatternImpl } from '../../../Capabilities/TextGeneration/Models/ThinkingTagPattern';
-import { ModelInfoMetadata } from './ModelInfoMetadata';
+import type { ModelCategory } from './ModelCategory';
+import type { ModelFormat } from './ModelFormat';
+import type { LLMFramework } from '../Framework/LLMFramework';
+import type { ThinkingTagPattern } from '../../../Capabilities/TextGeneration/Models/ThinkingTagPattern';
+import { ThinkingTagPatternImpl } from '../../../Capabilities/TextGeneration/Models/ThinkingTagPattern';
+import type { ModelInfoMetadata } from './ModelInfoMetadata';
 import { ConfigurationSource } from '../Configuration/ConfigurationSource';
-import { requiresContextLength, supportsThinking as categorySupportsThinking } from './ModelCategory';
+import {
+  requiresContextLength,
+  supportsThinking as categorySupportsThinking,
+} from './ModelCategory';
 
 /**
  * Information about a model
@@ -120,7 +124,8 @@ export class ModelInfoImpl implements ModelInfo {
     this.downloadSize = options.downloadSize ?? null;
     this.memoryRequired = options.memoryRequired ?? null;
     this.compatibleFrameworks = options.compatibleFrameworks ?? [];
-    this.preferredFramework = options.preferredFramework ?? options.compatibleFrameworks?.[0] ?? null;
+    this.preferredFramework =
+      options.preferredFramework ?? options.compatibleFrameworks?.[0] ?? null;
     this.metadata = options.metadata ?? null;
     this.source = options.source ?? ConfigurationSource.Remote;
     this.createdAt = options.createdAt ?? new Date();
@@ -146,7 +151,8 @@ export class ModelInfoImpl implements ModelInfo {
 
     // Set thinking pattern based on supportsThinking
     if (this.supportsThinking) {
-      this.thinkingPattern = options.thinkingPattern ?? ThinkingTagPatternImpl.defaultPattern;
+      this.thinkingPattern =
+        options.thinkingPattern ?? ThinkingTagPatternImpl.defaultPattern;
     } else {
       this.thinkingPattern = null;
     }

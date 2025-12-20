@@ -9,12 +9,27 @@
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 /**
+ * Syncable item with required id field
+ */
+export interface SyncableItem {
+  id: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Remote data source interface for sync operations
+ */
+export interface RemoteDataSource {
+  syncBatch(items: SyncableItem[]): Promise<string[]>;
+}
+
+/**
  * Repository interface for sync
  */
 export interface Repository {
-  fetchPendingSync(): Promise<any[]>;
+  fetchPendingSync(): Promise<SyncableItem[]>;
   markSynced(ids: string[]): Promise<void>;
-  remoteDataSource?: any;
+  remoteDataSource?: RemoteDataSource;
 }
 
 /**
@@ -79,7 +94,7 @@ export class SyncCoordinator {
           }
 
           // Track any that didn't sync
-          const batchIds = new Set(batch.map((item: any) => item.id));
+          const batchIds = new Set(batch.map((item) => item.id));
           const syncedSet = new Set(syncedIds);
           const failedInBatch = Array.from(batchIds).filter(
             (id) => !syncedSet.has(id)
@@ -87,12 +102,14 @@ export class SyncCoordinator {
           failedIds.push(...failedInBatch);
         } catch (error) {
           this.logger.error(`Failed to sync batch: ${error}`);
-          failedIds.push(...batch.map((item: any) => item.id));
+          failedIds.push(...batch.map((item) => item.id));
         }
       }
 
       if (successCount > 0) {
-        this.logger.info(`Successfully synced ${successCount} ${typeName} items`);
+        this.logger.info(
+          `Successfully synced ${successCount} ${typeName} items`
+        );
       }
 
       if (failedIds.length > 0) {
@@ -109,10 +126,13 @@ export class SyncCoordinator {
    * Start auto sync
    */
   private startAutoSync(): void {
-    this.syncTimer = setInterval(() => {
-      this.logger.debug('Auto-sync timer triggered');
-      // Auto-sync would be triggered by services
-    }, 5 * 60 * 1000); // 5 minutes
+    this.syncTimer = setInterval(
+      () => {
+        this.logger.debug('Auto-sync timer triggered');
+        // Auto-sync would be triggered by services
+      },
+      5 * 60 * 1000
+    ); // 5 minutes
   }
 
   /**

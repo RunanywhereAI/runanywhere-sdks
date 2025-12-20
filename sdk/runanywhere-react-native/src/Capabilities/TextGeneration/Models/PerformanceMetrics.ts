@@ -66,20 +66,22 @@ export class PerformanceMetricsImpl implements PerformanceMetrics {
   public readonly thinkingEndTimeMs: number | null;
   public readonly firstResponseTokenTimeMs: number | null;
 
-  constructor(options: {
-    tokenizationTimeMs?: number;
-    inferenceTimeMs?: number;
-    postProcessingTimeMs?: number;
-    tokensPerSecond?: number;
-    peakMemoryUsage?: number;
-    queueWaitTimeMs?: number;
-    timeToFirstTokenMs?: number | null;
-    thinkingTimeMs?: number | null;
-    responseTimeMs?: number | null;
-    thinkingStartTimeMs?: number | null;
-    thinkingEndTimeMs?: number | null;
-    firstResponseTokenTimeMs?: number | null;
-  } = {}) {
+  constructor(
+    options: {
+      tokenizationTimeMs?: number;
+      inferenceTimeMs?: number;
+      postProcessingTimeMs?: number;
+      tokensPerSecond?: number;
+      peakMemoryUsage?: number;
+      queueWaitTimeMs?: number;
+      timeToFirstTokenMs?: number | null;
+      thinkingTimeMs?: number | null;
+      responseTimeMs?: number | null;
+      thinkingStartTimeMs?: number | null;
+      thinkingEndTimeMs?: number | null;
+      firstResponseTokenTimeMs?: number | null;
+    } = {}
+  ) {
     this.tokenizationTimeMs = options.tokenizationTimeMs ?? 0;
     this.inferenceTimeMs = options.inferenceTimeMs ?? 0;
     this.postProcessingTimeMs = options.postProcessingTimeMs ?? 0;

@@ -7,7 +7,10 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/SpeakerDiarization/SpeakerDiarizationCapability.swift
  */
 
-import { BaseComponent, AnyServiceWrapper, type ComponentConfiguration, type ComponentInput, type ComponentOutput } from '../../Core/Components/BaseComponent';
+import {
+  BaseComponent,
+  AnyServiceWrapper,
+} from '../../Core/Components/BaseComponent';
 import { ManagedLifecycle } from '../../Core/Capabilities/ManagedLifecycle';
 import type { ComponentConfiguration as CapabilityConfiguration } from '../../Core/Capabilities/CapabilityProtocols';
 import { SDKComponent } from '../../Core/Models/Common/SDKComponent';
@@ -40,9 +43,11 @@ class DefaultSpeakerDiarizationService implements SpeakerDiarizationService {
   }
 
   async processAudio(
-    audioData: string | ArrayBuffer,
-    sampleRate?: number
-  ): Promise<import('../../Core/Models/SpeakerDiarization/SpeakerDiarizationResult').SpeakerDiarizationResult> {
+    _audioData: string | ArrayBuffer,
+    _sampleRate?: number
+  ): Promise<
+    import('../../Core/Models/SpeakerDiarization/SpeakerDiarizationResult').SpeakerDiarizationResult
+  > {
     // Simple energy-based speaker detection
     // In real implementation, this would use ML models
     const speakerId = `speaker_${this.speakerCounter++}`;
@@ -139,16 +144,17 @@ export class SpeakerDiarizationCapability extends BaseComponent<SpeakerDiarizati
     this.diarizationConfiguration = configuration;
 
     // Create managed lifecycle for SpeakerDiarization with load/unload functions
-    this.managedLifecycle = ManagedLifecycle.forSpeakerDiarization<SpeakerDiarizationService>(
-      // Load resource function
-      async (resourceId: string, config: CapabilityConfiguration | null) => {
-        return await this.loadDiarizationService(resourceId);
-      },
-      // Unload resource function
-      async (service: SpeakerDiarizationService) => {
-        await service.cleanup();
-      }
-    );
+    this.managedLifecycle =
+      ManagedLifecycle.forSpeakerDiarization<SpeakerDiarizationService>(
+        // Load resource function
+        async (resourceId: string, _config: CapabilityConfiguration | null) => {
+          return await this.loadDiarizationService(resourceId);
+        },
+        // Unload resource function
+        async (service: SpeakerDiarizationService) => {
+          await service.cleanup();
+        }
+      );
 
     // Configure lifecycle with our configuration
     this.managedLifecycle.configure(configuration as CapabilityConfiguration);
@@ -203,20 +209,25 @@ export class SpeakerDiarizationCapability extends BaseComponent<SpeakerDiarizati
    * Load SpeakerDiarization service for a given model ID
    * Called by ManagedLifecycle during load()
    */
-  private async loadDiarizationService(modelId: string): Promise<SpeakerDiarizationService> {
+  private async loadDiarizationService(
+    modelId: string
+  ): Promise<SpeakerDiarizationService> {
     // Try to get a registered speaker diarization provider from central registry
     const provider = ServiceRegistry.shared.speakerDiarizationProvider();
 
     if (provider) {
       try {
-        const diarizationService = await provider.createSpeakerDiarizationService(
-          this.diarizationConfiguration
-        );
+        const diarizationService =
+          await provider.createSpeakerDiarizationService(
+            this.diarizationConfiguration
+          );
         await diarizationService.initialize(modelId);
         return diarizationService;
-      } catch (error) {
+      } catch {
         // Fall through to default
-        console.warn('[SpeakerDiarization] Provider service creation failed, falling back to default');
+        console.warn(
+          '[SpeakerDiarization] Provider service creation failed, falling back to default'
+        );
       }
     }
 
@@ -272,7 +283,10 @@ export class SpeakerDiarizationCapability extends BaseComponent<SpeakerDiarizati
       options: null,
       validate: () => {
         if (!audioData || audioData.length === 0) {
-          throw new SDKError(SDKErrorCode.ValidationFailed, 'Audio data cannot be empty');
+          throw new SDKError(
+            SDKErrorCode.ValidationFailed,
+            'Audio data cannot be empty'
+          );
         }
       },
       timestamp: new Date(),
@@ -299,7 +313,10 @@ export class SpeakerDiarizationCapability extends BaseComponent<SpeakerDiarizati
       options: null,
       validate: () => {
         if (!audioData || audioData.length === 0) {
-          throw new SDKError(SDKErrorCode.ValidationFailed, 'Audio data cannot be empty');
+          throw new SDKError(
+            SDKErrorCode.ValidationFailed,
+            'Audio data cannot be empty'
+          );
         }
       },
       timestamp: new Date(),
@@ -312,7 +329,9 @@ export class SpeakerDiarizationCapability extends BaseComponent<SpeakerDiarizati
    * Process diarization input
    * Reference: processAudio() in Swift SpeakerDiarizationCapability
    */
-  public async process(input: SpeakerDiarizationInput): Promise<SpeakerDiarizationOutput> {
+  public async process(
+    input: SpeakerDiarizationInput
+  ): Promise<SpeakerDiarizationOutput> {
     this.ensureReady();
 
     // Use managedLifecycle.requireService() for iOS parity
@@ -326,28 +345,38 @@ export class SpeakerDiarizationCapability extends BaseComponent<SpeakerDiarizati
 
     // Convert audio data to ArrayBuffer for service
     const audioBuffer: ArrayBuffer = Buffer.isBuffer(input.audioData)
-      ? (input.audioData.buffer.slice(input.audioData.byteOffset, input.audioData.byteOffset + input.audioData.byteLength) as ArrayBuffer)
+      ? (input.audioData.buffer.slice(
+          input.audioData.byteOffset,
+          input.audioData.byteOffset + input.audioData.byteLength
+        ) as ArrayBuffer)
       : input.audioData instanceof Uint8Array
-      ? (input.audioData.buffer.slice(input.audioData.byteOffset, input.audioData.byteOffset + input.audioData.byteLength) as ArrayBuffer)
-      : (Buffer.from(input.audioData).buffer as ArrayBuffer);
+        ? (input.audioData.buffer.slice(
+            input.audioData.byteOffset,
+            input.audioData.byteOffset + input.audioData.byteLength
+          ) as ArrayBuffer)
+        : (Buffer.from(input.audioData).buffer as ArrayBuffer);
 
     // Process audio to detect speakers
     const result = await diarizationService.processAudio(audioBuffer, 16000);
 
     // Build segments from result
-    const segments: SpeakerSegment[] = result.segments?.map((seg) => ({
-      speakerId: seg.speakerId ?? 'unknown',
-      startTime: seg.startTime ?? 0,
-      endTime: seg.endTime ?? 0,
-      confidence: seg.confidence ?? 0.8,
-    })) ?? [];
+    const segments: SpeakerSegment[] =
+      result.segments?.map((seg) => ({
+        speakerId: seg.speakerId ?? 'unknown',
+        startTime: seg.startTime ?? 0,
+        endTime: seg.endTime ?? 0,
+        confidence: seg.confidence ?? 0.8,
+      })) ?? [];
 
     // Build speaker profiles from result
     const allSpeakers = result.speakers ?? [];
     const profiles: SpeakerProfile[] = allSpeakers.map((speaker) => {
       const speakerId = speaker.id ?? 'unknown';
       const speakerSegments = segments.filter((s) => s.speakerId === speakerId);
-      const totalTime = speakerSegments.reduce((sum, seg) => sum + (seg.endTime - seg.startTime), 0);
+      const totalTime = speakerSegments.reduce(
+        (sum, seg) => sum + (seg.endTime - seg.startTime),
+        0
+      );
       return {
         id: speakerId,
         embedding: speaker.embedding ?? null,
@@ -374,9 +403,8 @@ export class SpeakerDiarizationCapability extends BaseComponent<SpeakerDiarizati
     const processingTime = (Date.now() - startTime) / 1000; // seconds
 
     // Calculate audio length from segments
-    const audioLength = segments.length > 0
-      ? Math.max(...segments.map((s) => s.endTime))
-      : 0;
+    const audioLength =
+      segments.length > 0 ? Math.max(...segments.map((s) => s.endTime)) : 0;
 
     const metadata = {
       processingTime,
@@ -439,7 +467,12 @@ export class SpeakerDiarizationCapability extends BaseComponent<SpeakerDiarizati
    * Create labeled transcription from word timestamps and segments
    */
   private createLabeledTranscription(
-    wordTimestamps: Array<{ word: string; startTime: number; endTime: number; confidence: number }>,
+    wordTimestamps: Array<{
+      word: string;
+      startTime: number;
+      endTime: number;
+      confidence: number;
+    }>,
     segments: SpeakerSegment[]
   ): LabeledTranscription {
     const labeledSegments = wordTimestamps.map((word) => {

@@ -18,7 +18,8 @@ import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 /**
  * Configuration for the Voice Agent composite component
  */
-export interface VoiceAgentConfiguration extends ComponentConfiguration, ComponentInitParameters {
+export interface VoiceAgentConfiguration
+  extends ComponentConfiguration, ComponentInitParameters {
   readonly componentType: SDKComponent;
   readonly modelId: string | null; // Voice agent doesn't have its own model
   readonly vadConfig: VADConfiguration;
@@ -38,12 +39,14 @@ export class VoiceAgentConfigurationImpl implements VoiceAgentConfiguration {
   public readonly llmConfig: LLMConfiguration;
   public readonly ttsConfig: TTSConfiguration;
 
-  constructor(options: {
-    vadConfig?: VADConfiguration;
-    sttConfig?: STTConfiguration;
-    llmConfig?: LLMConfiguration;
-    ttsConfig?: TTSConfiguration;
-  } = {}) {
+  constructor(
+    options: {
+      vadConfig?: VADConfiguration;
+      sttConfig?: STTConfiguration;
+      llmConfig?: LLMConfiguration;
+      ttsConfig?: TTSConfiguration;
+    } = {}
+  ) {
     // Use provided configs or create defaults
     // Note: These would need to import the actual configuration classes
     this.vadConfig = options.vadConfig ?? ({} as VADConfiguration);
