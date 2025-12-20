@@ -2,12 +2,8 @@ package com.runanywhere.sdk.utils
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
 import android.provider.Settings
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
-import com.runanywhere.sdk.storage.SecureStorage
 import java.util.*
 
 /**
@@ -108,61 +104,5 @@ actual object PlatformUtils {
         } catch (e: Exception) {
             null
         }
-    }
-}
-
-/**
- * Android implementation of secure storage using EncryptedSharedPreferences
- */
-actual class SecureStorageImpl : com.runanywhere.sdk.storage.SecureStorage {
-
-    private val encryptedPrefs: SharedPreferences by lazy {
-        createEncryptedSharedPreferences()
-    }
-
-    private fun createEncryptedSharedPreferences(): SharedPreferences {
-        val context = PlatformUtils.applicationContext
-
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                // Use Android's encrypted shared preferences
-                val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-
-                EncryptedSharedPreferences.create(
-                    "com.runanywhere.sdk.secure_prefs",
-                    masterKeyAlias,
-                    context,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                )
-            } catch (e: Exception) {
-                // Fallback to regular shared preferences if encryption fails
-                context.getSharedPreferences("com.runanywhere.sdk.secure_prefs", Context.MODE_PRIVATE)
-            }
-        } else {
-            // For older Android versions, use regular shared preferences
-            // In production, you might want to implement custom encryption
-            context.getSharedPreferences("com.runanywhere.sdk.secure_prefs", Context.MODE_PRIVATE)
-        }
-    }
-
-    override suspend fun setSecureString(key: String, value: String) {
-        encryptedPrefs.edit().putString(key, value).apply()
-    }
-
-    override suspend fun getSecureString(key: String): String? {
-        return encryptedPrefs.getString(key, null)
-    }
-
-    override suspend fun removeSecure(key: String) {
-        encryptedPrefs.edit().remove(key).apply()
-    }
-
-    override suspend fun clearSecure() {
-        encryptedPrefs.edit().clear().apply()
-    }
-
-    override suspend fun containsSecure(key: String): Boolean {
-        return encryptedPrefs.contains(key)
     }
 }

@@ -1,13 +1,13 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.capabilities.voiceagent.VoiceAgentCapability
-import com.runanywhere.sdk.capabilities.voiceagent.VoiceAgentComponentStates
-import com.runanywhere.sdk.capabilities.voiceagent.AudioPipelineState
-import com.runanywhere.sdk.components.voiceagent.VoiceAgentConfiguration
-import com.runanywhere.sdk.components.voiceagent.VoiceAgentResult
-import com.runanywhere.sdk.components.voiceagent.VoiceAgentEvent
-import com.runanywhere.sdk.components.voiceagent.VoiceAgentPipelineState
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentCapability
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentComponentStates
+import com.runanywhere.sdk.features.voiceagent.AudioPipelineState
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentConfiguration
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentResult
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentEvent
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentPipelineState
 import com.runanywhere.sdk.data.models.SDKError
 import kotlinx.coroutines.flow.Flow
 

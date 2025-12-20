@@ -1,9 +1,9 @@
 package com.runanywhere.sdk.voice.vad
 
-import com.runanywhere.sdk.components.vad.VADService
-import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.components.vad.VADResult
-import com.runanywhere.sdk.components.vad.SpeechActivityEvent
+import com.runanywhere.sdk.features.vad.VADService
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.features.vad.VADResult
+import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlin.math.sqrt
 

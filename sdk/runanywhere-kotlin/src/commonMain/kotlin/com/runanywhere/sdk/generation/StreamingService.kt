@@ -1,11 +1,11 @@
 package com.runanywhere.sdk.generation
 
-import com.runanywhere.sdk.components.llm.LLMService
+import com.runanywhere.sdk.features.llm.LLMService
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.LoadedModelWithService
-import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
+import com.runanywhere.sdk.models.LLMGenerationOptions
 import com.runanywhere.sdk.services.analytics.PerformanceMetrics
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -56,8 +56,8 @@ class StreamingService {
         val startTime = currentTimeMillis()
         var timeToFirstTokenMs: Double? = null
 
-        // Convert to RunAnywhereGenerationOptions
-        val llmOptions = RunAnywhereGenerationOptions(
+        // Convert to LLMGenerationOptions
+        val llmOptions = LLMGenerationOptions(
             temperature = options.temperature,
             maxTokens = options.maxTokens,
             streamingEnabled = true

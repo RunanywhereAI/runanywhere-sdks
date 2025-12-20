@@ -3,7 +3,7 @@ package com.runanywhere.sdk.public.models
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.ModelInfoMetadata
 import com.runanywhere.sdk.models.enums.FrameworkModality
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 
@@ -35,9 +35,9 @@ data class ModelRegistration(
 
     /**
      * The framework this model is compatible with.
-     * Strongly typed - uses LLMFramework enum.
+     * Strongly typed - uses InferenceFramework enum.
      */
-    val framework: LLMFramework,
+    val framework: InferenceFramework,
 
     /**
      * The modality/capability this model provides (STT, TTS, text-to-text, etc.)
@@ -103,7 +103,7 @@ data class ModelRegistration(
          */
         fun create(
             url: String,
-            framework: LLMFramework,
+            framework: InferenceFramework,
             modality: FrameworkModality,
             id: String? = null,
             name: String? = null,

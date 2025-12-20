@@ -4,9 +4,9 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.events.SDKGenerationEvent
 import com.runanywhere.sdk.models.LoadedModelWithService
-import com.runanywhere.sdk.components.llm.LLMComponent
-import com.runanywhere.sdk.components.llm.LLMConfiguration
-import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
+import com.runanywhere.sdk.features.llm.LLMComponent
+import com.runanywhere.sdk.features.llm.LLMConfiguration
+import com.runanywhere.sdk.models.LLMGenerationOptions
 import com.runanywhere.sdk.services.analytics.AnalyticsService
 import com.runanywhere.sdk.services.analytics.PerformanceMetrics
 import kotlinx.coroutines.CoroutineScope
@@ -46,11 +46,11 @@ class GenerationService(
     private var llmComponent: LLMComponent? = null
 
     /**
-     * Generate text with RunAnywhereGenerationOptions
+     * Generate text with LLMGenerationOptions
      */
     suspend fun generate(
         prompt: String,
-        options: RunAnywhereGenerationOptions
+        options: LLMGenerationOptions
     ): GenerationResult {
         val convertedOptions = GenerationOptions(
             temperature = options.temperature,
@@ -136,11 +136,11 @@ class GenerationService(
     }
 
     /**
-     * Stream text generation with RunAnywhereGenerationOptions
+     * Stream text generation with LLMGenerationOptions
      */
     fun streamGenerate(
         prompt: String,
-        options: RunAnywhereGenerationOptions
+        options: LLMGenerationOptions
     ): Flow<GenerationChunk> {
         val convertedOptions = GenerationOptions(
             temperature = options.temperature,
@@ -257,8 +257,8 @@ class GenerationService(
         // Use LLM component for actual generation
         val component = llmComponent ?: throw IllegalStateException("LLM component not initialized")
 
-        // Convert GenerationOptions to RunAnywhereGenerationOptions
-        val llmOptions = RunAnywhereGenerationOptions(
+        // Convert GenerationOptions to LLMGenerationOptions
+        val llmOptions = LLMGenerationOptions(
             maxTokens = options.maxTokens,
             temperature = options.temperature,
             streamingEnabled = options.streaming

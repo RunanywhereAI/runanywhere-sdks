@@ -2,7 +2,7 @@ package com.runanywhere.sdk.data.repositories
 
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.utils.SimpleInstant
 import kotlinx.coroutines.sync.Mutex
@@ -123,7 +123,7 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
         }
     }
 
-    override suspend fun fetchByFramework(framework: LLMFramework): List<ModelInfo> {
+    override suspend fun fetchByFramework(framework: InferenceFramework): List<ModelInfo> {
         return mutex.withLock {
             models.values.filter { model ->
                 model.compatibleFrameworks.contains(framework)

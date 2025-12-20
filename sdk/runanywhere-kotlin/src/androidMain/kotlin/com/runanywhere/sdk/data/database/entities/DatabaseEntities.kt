@@ -20,7 +20,7 @@ import com.runanywhere.sdk.data.models.StoredTokens
 import com.runanywhere.sdk.data.models.TelemetryData
 import com.runanywhere.sdk.data.models.TelemetryEventType
 import com.runanywhere.sdk.data.models.ThermalState
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 
@@ -105,7 +105,7 @@ data class ModelInfoEntity(
     val name: String,
     val category: ModelCategory,
     val format: ModelFormat,
-    val framework: LLMFramework,
+    val framework: InferenceFramework,
 
     @ColumnInfo(name = "download_url")
     val downloadURL: String,

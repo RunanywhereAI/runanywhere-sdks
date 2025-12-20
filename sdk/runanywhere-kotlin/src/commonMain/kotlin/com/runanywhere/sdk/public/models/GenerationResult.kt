@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.public.models
 
 import com.runanywhere.sdk.models.ExecutionTarget
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.services.analytics.PerformanceMetrics
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.Flow
@@ -64,7 +64,7 @@ data class GenerationResult(
     val savedAmount: Double = 0.0,
 
     /** Framework used for generation (if on-device) */
-    val framework: LLMFramework? = null,
+    val framework: InferenceFramework? = null,
 
     /** Hardware acceleration used */
     val hardwareUsed: HardwareAcceleration = HardwareAcceleration.CPU,

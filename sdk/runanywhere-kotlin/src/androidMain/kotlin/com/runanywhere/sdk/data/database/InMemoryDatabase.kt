@@ -3,7 +3,7 @@ package com.runanywhere.sdk.data.database
 import com.runanywhere.sdk.data.database.dao.*
 import com.runanywhere.sdk.data.database.entities.*
 import com.runanywhere.sdk.data.models.*
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -190,7 +190,7 @@ class InMemoryConfigurationDao : ConfigurationDao {
 class InMemoryModelInfoDao : ModelInfoDao {
     override suspend fun getModelById(modelId: String) = null
     override suspend fun getAllModels() = emptyList<ModelInfoEntity>()
-    override suspend fun getModelsByFrameworks(frameworks: List<LLMFramework>) = emptyList<ModelInfoEntity>()
+    override suspend fun getModelsByFrameworks(frameworks: List<InferenceFramework>) = emptyList<ModelInfoEntity>()
     override suspend fun getModelsByCategory(category: ModelCategory) = emptyList<ModelInfoEntity>()
     override suspend fun getDownloadedModels() = emptyList<ModelInfoEntity>()
     override suspend fun getBuiltInModels() = emptyList<ModelInfoEntity>()

@@ -4,7 +4,7 @@ import com.runanywhere.sdk.data.models.TelemetryData
 import com.runanywhere.sdk.data.models.TelemetryEventType
 import com.runanywhere.sdk.data.repositories.TelemetryRepository
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.PersistentDeviceIdentity
+import com.runanywhere.sdk.foundation.DeviceIdentity
 import com.runanywhere.sdk.foundation.device.DeviceInfoService
 import com.runanywhere.sdk.utils.SDKConstants
 import com.runanywhere.sdk.data.models.generateUUID
@@ -213,7 +213,7 @@ object AnalyticsQueueManager {
      */
     private fun getDeviceId(): String {
         return try {
-            PersistentDeviceIdentity.getPersistentDeviceUUID()
+            DeviceIdentity.persistentUUID
         } catch (e: Exception) {
             logger.error("Failed to get device ID: ${e.message}")
             "unknown-device" // Stable fallback

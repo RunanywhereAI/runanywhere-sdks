@@ -1,12 +1,12 @@
 package com.runanywhere.sdk.native.bridge.providers
 
-import com.runanywhere.sdk.components.stt.STTConfiguration
-import com.runanywhere.sdk.components.stt.STTOptions
-import com.runanywhere.sdk.components.stt.STTService
-import com.runanywhere.sdk.components.stt.STTTranscriptionResult
+import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.stt.STTOptions
+import com.runanywhere.sdk.features.stt.STTService
+import com.runanywhere.sdk.features.stt.STTTranscriptionResult
 import com.runanywhere.sdk.core.STTServiceProvider
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.native.bridge.NativeBridgeException
 import com.runanywhere.sdk.native.bridge.ONNXCoreService
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +32,7 @@ class ONNXSTTProvider : STTServiceProvider {
     private val logger = SDKLogger("ONNXSTTProvider")
 
     override val name: String = "ONNX STT"
-    override val framework: LLMFramework = LLMFramework.ONNX
+    override val framework: InferenceFramework = InferenceFramework.ONNX
 
     override fun canHandle(modelId: String?): Boolean {
         if (modelId == null) return true
@@ -164,7 +164,7 @@ class ONNXSTTService(
         }
     }
 
-    private fun audioDataToFloatArray(audioData: ByteArray, format: com.runanywhere.sdk.components.stt.AudioFormat): FloatArray {
+    private fun audioDataToFloatArray(audioData: ByteArray, format: com.runanywhere.sdk.core.AudioFormat): FloatArray {
         // Assume 16-bit PCM audio
         // Convert byte pairs to float samples in range [-1.0, 1.0]
         val sampleCount = audioData.size / 2

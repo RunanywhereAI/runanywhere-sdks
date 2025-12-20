@@ -13,7 +13,7 @@ import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.StorageConfiguration
 import com.runanywhere.sdk.data.models.TelemetryEventType
 import com.runanywhere.sdk.data.models.ThermalState
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import kotlinx.serialization.json.Json
@@ -57,10 +57,10 @@ class DatabaseConverters {
     fun toModelFormat(value: String): ModelFormat = ModelFormat.valueOf(value)
 
     @TypeConverter
-    fun fromLLMFramework(value: LLMFramework): String = value.name
+    fun fromInferenceFramework(value: InferenceFramework): String = value.name
 
     @TypeConverter
-    fun toLLMFramework(value: String): LLMFramework = LLMFramework.valueOf(value)
+    fun toInferenceFramework(value: String): InferenceFramework = InferenceFramework.valueOf(value)
 
     @TypeConverter
     fun fromGPUType(value: GPUType): String = value.name

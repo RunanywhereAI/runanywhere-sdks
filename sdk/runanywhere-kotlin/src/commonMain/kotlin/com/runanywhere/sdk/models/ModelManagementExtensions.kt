@@ -7,7 +7,7 @@ import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.uuid.ExperimentalUuidApi
@@ -185,8 +185,8 @@ object RunAnywhereModelManagement {
             localPath = null,
             downloadSize = null,
             memoryRequired = 1024L * 1024 * 1024, // Default 1GB
-            compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
-            preferredFramework = LLMFramework.LLAMA_CPP,
+            compatibleFrameworks = listOf(InferenceFramework.LLAMA_CPP),
+            preferredFramework = InferenceFramework.LLAMA_CPP,
             contextLength = 4096,
             supportsThinking = false,
             metadata = null

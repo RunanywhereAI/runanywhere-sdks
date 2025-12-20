@@ -1,9 +1,9 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.capabilities.stt.STTCapability
-import com.runanywhere.sdk.capabilities.stt.STTOptions
-import com.runanywhere.sdk.capabilities.stt.STTResult
+import com.runanywhere.sdk.features.stt.STTCapability
+import com.runanywhere.sdk.features.stt.STTOptions
+import com.runanywhere.sdk.features.stt.STTOutput
 import com.runanywhere.sdk.data.models.SDKError
 import kotlinx.coroutines.flow.Flow
 
@@ -80,12 +80,12 @@ suspend fun RunAnywhere.transcribe(audioData: ByteArray): String {
  *
  * @param audioData Raw audio data
  * @param options Transcription options
- * @return STTResult with transcribed text and metadata
+ * @return STTOutput with transcribed text and metadata
  */
 suspend fun RunAnywhere.transcribeWithOptions(
     audioData: ByteArray,
     options: STTOptions = STTOptions()
-): STTResult {
+): STTOutput {
     requireInitialized()
     ensureServicesReady()
 

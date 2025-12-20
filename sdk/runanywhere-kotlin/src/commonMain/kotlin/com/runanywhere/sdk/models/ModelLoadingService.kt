@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.models
 
-import com.runanywhere.sdk.components.llm.LLMService
+import com.runanywhere.sdk.features.llm.LLMService
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.LoadedModel
 import com.runanywhere.sdk.data.models.SDKError
@@ -80,7 +80,7 @@ class ModelLoadingService(
         logger.info("🚀 Using LLM provider: ${provider.name} for model: $modelId")
 
         // Create LLMConfiguration from ModelInfo
-        val configuration = com.runanywhere.sdk.components.llm.LLMConfiguration(
+        val configuration = com.runanywhere.sdk.features.llm.LLMConfiguration(
             modelId = modelInfo.localPath ?: modelInfo.id,
             contextLength = modelInfo.contextLength ?: 2048,
             useGPUIfAvailable = true,

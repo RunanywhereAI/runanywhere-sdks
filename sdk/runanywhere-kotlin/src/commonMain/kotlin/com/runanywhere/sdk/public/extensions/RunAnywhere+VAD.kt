@@ -1,10 +1,10 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.capabilities.vad.VADCapability
-import com.runanywhere.sdk.capabilities.vad.VADOutput
-import com.runanywhere.sdk.capabilities.vad.VADCapabilityConfiguration
-import com.runanywhere.sdk.components.vad.SpeechActivityEvent
+import com.runanywhere.sdk.features.vad.VADCapability
+import com.runanywhere.sdk.features.vad.VADOutput
+import com.runanywhere.sdk.features.vad.VADCapabilityConfiguration
+import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.data.models.SDKError
 import kotlinx.coroutines.flow.Flow
 
@@ -195,17 +195,3 @@ val RunAnywhere.isVADSpeechActive: Boolean
 suspend fun RunAnywhere.cleanupVAD() {
     vadCapability?.cleanup()
 }
-
-// ============================================================================
-// MARK: - Private Helpers
-// ============================================================================
-
-/**
- * Get VAD capability from RunAnywhere
- */
-private val RunAnywhere.vadCapability: VADCapability?
-    get() = try {
-        com.runanywhere.sdk.foundation.ServiceContainer.shared.vadCapability
-    } catch (e: Exception) {
-        null
-    }

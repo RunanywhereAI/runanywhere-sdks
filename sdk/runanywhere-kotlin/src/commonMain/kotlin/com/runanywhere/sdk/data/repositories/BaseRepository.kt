@@ -4,8 +4,6 @@ import com.runanywhere.sdk.data.config.RepositoryConfiguration
 import com.runanywhere.sdk.data.config.SyncStrategy
 import com.runanywhere.sdk.data.errors.RepositoryError
 import com.runanywhere.sdk.data.sources.*
-import com.runanywhere.sdk.data.sync.SyncCoordinator
-import com.runanywhere.sdk.data.sync.ConflictResolutionHandler
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -13,7 +11,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Abstract base repository providing common functionality for all repositories.
- * Integrates local caching, remote synchronization, and conflict resolution.
+ * Integrates local caching and remote synchronization.
  *
  * @param T The entity type managed by this repository
  */
@@ -21,16 +19,12 @@ abstract class BaseRepository<T : Any>(
     protected val repositoryId: String,
     protected val localDataSource: LocalDataSource<T>,
     protected val remoteDataSource: RemoteDataSource<T>? = null,
-    protected val syncCoordinator: SyncCoordinator? = null,
     protected val configuration: RepositoryConfiguration = RepositoryConfiguration.default,
     protected val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) {
 
     private val mutex = Mutex()
     private var isInitialized = false
-
-    // Conflict resolution handler for this repository
-    protected open val conflictResolutionHandler: ConflictResolutionHandler<T>? = null
 
     // Statistics tracking
     private var repositoryStats = RepositoryStatistics()
@@ -42,16 +36,6 @@ abstract class BaseRepository<T : Any>(
         return try {
             mutex.withLock {
                 if (isInitialized) return Result.success(Unit)
-
-                // Register with sync coordinator if available
-                if (syncCoordinator != null && remoteDataSource != null) {
-                    syncCoordinator.registerRepository(
-                        repositoryId = repositoryId,
-                        localDataSource = localDataSource,
-                        remoteDataSource = remoteDataSource,
-                        conflictHandler = conflictResolutionHandler
-                    )
-                }
 
                 // Perform initialization tasks
                 onInitialize()
@@ -235,12 +219,6 @@ abstract class BaseRepository<T : Any>(
                     configKey = "remoteDataSource",
                     issue = "Remote data source not configured"
                 ))
-            } else if (syncCoordinator != null) {
-                syncCoordinator.syncImmediate(
-                    repositoryId = repositoryId,
-                    localDataSource = localDataSource,
-                    remoteDataSource = remoteDataSource
-                )
             } else {
                 // Direct sync without coordinator
                 val localEntities = localDataSource.fetchAll().getOrThrow()
@@ -252,25 +230,14 @@ abstract class BaseRepository<T : Any>(
     }
 
     /**
-     * Get sync status if using sync coordinator
+     * Get sync status
      */
     open suspend fun getSyncStatus(): Result<Map<String, Any>> {
         return try {
-            if (syncCoordinator != null) {
-                val stats = syncCoordinator.getSyncStatistics()
-                val activeSyncs = syncCoordinator.getActiveSyncs()
-
-                Result.success(mapOf(
-                    "statistics" to stats,
-                    "activeSyncs" to activeSyncs,
-                    "repositoryId" to repositoryId
-                ))
-            } else {
-                Result.success(mapOf(
-                    "syncEnabled" to false,
-                    "repositoryId" to repositoryId
-                ))
-            }
+            Result.success(mapOf(
+                "syncEnabled" to configuration.sync.enabled,
+                "repositoryId" to repositoryId
+            ))
         } catch (e: Exception) {
             Result.failure(e.toRepositoryError())
         }
@@ -327,29 +294,17 @@ abstract class BaseRepository<T : Any>(
 
     private suspend fun syncWithRemote(entities: List<T>) {
         try {
-            if (syncCoordinator != null && remoteDataSource != null) {
-                syncCoordinator.queueSync(
-                    repositoryId = repositoryId,
-                    localDataSource = localDataSource,
-                    remoteDataSource = remoteDataSource,
-                    entities = entities
-                )
-            }
+            remoteDataSource?.sync(entities)
         } catch (e: Exception) {
             // Log but don't fail the operation
         }
     }
 
     private suspend fun queueForSync(entities: List<T>) {
+        // Queue entities for deferred sync - simplified implementation
+        // In production, this would use a background job queue
         try {
-            if (syncCoordinator != null && remoteDataSource != null) {
-                syncCoordinator.queueSync(
-                    repositoryId = repositoryId,
-                    localDataSource = localDataSource,
-                    remoteDataSource = remoteDataSource,
-                    entities = entities
-                )
-            }
+            remoteDataSource?.sync(entities)
         } catch (e: Exception) {
             // Log but don't fail the operation
         }
@@ -437,7 +392,6 @@ private fun Throwable.toRepositoryError(): RepositoryError {
 class RepositoryBuilder<T : Any>(private val repositoryId: String) {
     private var localDataSource: LocalDataSource<T>? = null
     private var remoteDataSource: RemoteDataSource<T>? = null
-    private var syncCoordinator: SyncCoordinator? = null
     private var configuration: RepositoryConfiguration = RepositoryConfiguration.default
     private var coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -447,10 +401,6 @@ class RepositoryBuilder<T : Any>(private val repositoryId: String) {
 
     fun withRemoteDataSource(dataSource: RemoteDataSource<T>) = apply {
         this.remoteDataSource = dataSource
-    }
-
-    fun withSyncCoordinator(coordinator: SyncCoordinator) = apply {
-        this.syncCoordinator = coordinator
     }
 
     fun withConfiguration(config: RepositoryConfiguration) = apply {
@@ -469,7 +419,6 @@ class RepositoryBuilder<T : Any>(private val repositoryId: String) {
             repositoryId = repositoryId,
             localDataSource = localDs,
             remoteDataSource = remoteDataSource,
-            syncCoordinator = syncCoordinator,
             configuration = configuration,
             coroutineScope = coroutineScope
         ) {}

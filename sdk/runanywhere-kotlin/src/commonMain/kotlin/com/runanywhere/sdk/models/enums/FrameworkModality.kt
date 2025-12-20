@@ -24,48 +24,57 @@ enum class FrameworkModality(val value: String, val displayName: String, val ico
 
 /**
  * Extension property to get primary modality for a framework
- * Matches iOS LLMFramework.primaryModality
+ * Matches iOS InferenceFramework.primaryModality
  */
-val LLMFramework.primaryModality: FrameworkModality
+val InferenceFramework.primaryModality: FrameworkModality
     get() = when (this) {
         // Voice frameworks
-        LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP, LLMFramework.OPEN_AI_WHISPER -> FrameworkModality.VOICE_TO_TEXT
+        InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP, InferenceFramework.OPEN_AI_WHISPER -> FrameworkModality.VOICE_TO_TEXT
 
         // Text generation frameworks
-        LLMFramework.LLAMA_CPP, LLMFramework.LLAMACPP, LLMFramework.MLX, LLMFramework.MLC,
-        LLMFramework.EXECU_TORCH, LLMFramework.PICO_LLM -> FrameworkModality.TEXT_TO_TEXT
+        InferenceFramework.LLAMA_CPP, InferenceFramework.LLAMACPP, InferenceFramework.MLX, InferenceFramework.MLC,
+        InferenceFramework.EXECU_TORCH, InferenceFramework.PICO_LLM -> FrameworkModality.TEXT_TO_TEXT
 
         // Text-focused frameworks
-        LLMFramework.SWIFT_TRANSFORMERS, LLMFramework.FOUNDATION_MODELS -> FrameworkModality.TEXT_TO_TEXT
+        InferenceFramework.SWIFT_TRANSFORMERS, InferenceFramework.FOUNDATION_MODELS -> FrameworkModality.TEXT_TO_TEXT
 
         // General ML frameworks that can support multiple modalities
-        LLMFramework.CORE_ML, LLMFramework.TENSOR_FLOW_LITE, LLMFramework.ONNX, LLMFramework.MEDIA_PIPE -> FrameworkModality.MULTIMODAL
+        InferenceFramework.CORE_ML, InferenceFramework.TENSOR_FLOW_LITE, InferenceFramework.ONNX, InferenceFramework.MEDIA_PIPE -> FrameworkModality.MULTIMODAL
 
         // System TTS
-        LLMFramework.SYSTEM_TTS -> FrameworkModality.TEXT_TO_VOICE
+        InferenceFramework.SYSTEM_TTS -> FrameworkModality.TEXT_TO_VOICE
+
+        // FluidAudio - speaker diarization
+        InferenceFramework.FLUID_AUDIO -> FrameworkModality.VOICE_TO_TEXT
+
+        // Built-in (e.g., energy-based VAD) - voice processing
+        InferenceFramework.BUILT_IN -> FrameworkModality.VOICE_TO_TEXT
+
+        // Unknown/None - default to multimodal
+        InferenceFramework.NONE, InferenceFramework.UNKNOWN -> FrameworkModality.MULTIMODAL
     }
 
 /**
  * Extension property to get all supported modalities for a framework
- * Matches iOS LLMFramework.supportedModalities
+ * Matches iOS InferenceFramework.supportedModalities
  */
-val LLMFramework.supportedModalities: Set<FrameworkModality>
+val InferenceFramework.supportedModalities: Set<FrameworkModality>
     get() = when (this) {
         // Voice-only frameworks
-        LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP, LLMFramework.OPEN_AI_WHISPER -> setOf(FrameworkModality.VOICE_TO_TEXT)
+        InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP, InferenceFramework.OPEN_AI_WHISPER -> setOf(FrameworkModality.VOICE_TO_TEXT)
 
         // Text-only frameworks
-        LLMFramework.LLAMA_CPP, LLMFramework.LLAMACPP, LLMFramework.MLX, LLMFramework.MLC,
-        LLMFramework.EXECU_TORCH, LLMFramework.PICO_LLM -> setOf(FrameworkModality.TEXT_TO_TEXT)
+        InferenceFramework.LLAMA_CPP, InferenceFramework.LLAMACPP, InferenceFramework.MLX, InferenceFramework.MLC,
+        InferenceFramework.EXECU_TORCH, InferenceFramework.PICO_LLM -> setOf(FrameworkModality.TEXT_TO_TEXT)
 
         // Foundation Models might support multimodal in future
-        LLMFramework.FOUNDATION_MODELS -> setOf(FrameworkModality.TEXT_TO_TEXT)
+        InferenceFramework.FOUNDATION_MODELS -> setOf(FrameworkModality.TEXT_TO_TEXT)
 
         // Swift Transformers could support various modalities
-        LLMFramework.SWIFT_TRANSFORMERS -> setOf(FrameworkModality.TEXT_TO_TEXT, FrameworkModality.IMAGE_TO_TEXT)
+        InferenceFramework.SWIFT_TRANSFORMERS -> setOf(FrameworkModality.TEXT_TO_TEXT, FrameworkModality.IMAGE_TO_TEXT)
 
         // General frameworks can support multiple modalities
-        LLMFramework.CORE_ML -> setOf(
+        InferenceFramework.CORE_ML -> setOf(
             FrameworkModality.TEXT_TO_TEXT,
             FrameworkModality.VOICE_TO_TEXT,
             FrameworkModality.TEXT_TO_VOICE,
@@ -73,45 +82,54 @@ val LLMFramework.supportedModalities: Set<FrameworkModality>
             FrameworkModality.TEXT_TO_IMAGE
         )
 
-        LLMFramework.TENSOR_FLOW_LITE -> setOf(
+        InferenceFramework.TENSOR_FLOW_LITE -> setOf(
             FrameworkModality.TEXT_TO_TEXT,
             FrameworkModality.VOICE_TO_TEXT,
             FrameworkModality.IMAGE_TO_TEXT
         )
 
         // ONNX supports STT (Sherpa Whisper) and TTS (Piper) models
-        LLMFramework.ONNX -> setOf(
+        InferenceFramework.ONNX -> setOf(
             FrameworkModality.TEXT_TO_TEXT,
             FrameworkModality.VOICE_TO_TEXT,
             FrameworkModality.TEXT_TO_VOICE,  // Piper TTS models
             FrameworkModality.IMAGE_TO_TEXT
         )
 
-        LLMFramework.MEDIA_PIPE -> setOf(
+        InferenceFramework.MEDIA_PIPE -> setOf(
             FrameworkModality.TEXT_TO_TEXT,
             FrameworkModality.VOICE_TO_TEXT,
             FrameworkModality.IMAGE_TO_TEXT
         )
 
         // System TTS - text-to-voice only
-        LLMFramework.SYSTEM_TTS -> setOf(FrameworkModality.TEXT_TO_VOICE)
+        InferenceFramework.SYSTEM_TTS -> setOf(FrameworkModality.TEXT_TO_VOICE)
+
+        // FluidAudio - speaker diarization
+        InferenceFramework.FLUID_AUDIO -> setOf(FrameworkModality.VOICE_TO_TEXT)
+
+        // Built-in (e.g., energy-based VAD) - voice activity detection
+        InferenceFramework.BUILT_IN -> setOf(FrameworkModality.VOICE_TO_TEXT)
+
+        // Unknown/None - empty set
+        InferenceFramework.NONE, InferenceFramework.UNKNOWN -> emptySet()
     }
 
 /**
  * Whether this framework is primarily for voice/audio processing
  */
-val LLMFramework.isVoiceFramework: Boolean
+val InferenceFramework.isVoiceFramework: Boolean
     get() = primaryModality == FrameworkModality.VOICE_TO_TEXT || primaryModality == FrameworkModality.TEXT_TO_VOICE
 
 /**
  * Whether this framework is primarily for text generation
  */
-val LLMFramework.isTextGenerationFramework: Boolean
+val InferenceFramework.isTextGenerationFramework: Boolean
     get() = primaryModality == FrameworkModality.TEXT_TO_TEXT
 
 /**
  * Whether this framework supports image processing
  */
-val LLMFramework.supportsImageProcessing: Boolean
+val InferenceFramework.supportsImageProcessing: Boolean
     get() = supportedModalities.contains(FrameworkModality.IMAGE_TO_TEXT) ||
             supportedModalities.contains(FrameworkModality.TEXT_TO_IMAGE)

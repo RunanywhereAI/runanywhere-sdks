@@ -4,10 +4,10 @@ import com.runanywhere.sdk.data.models.*
 import com.runanywhere.sdk.config.SDKConfig
 import com.runanywhere.sdk.data.network.NetworkService
 import com.runanywhere.sdk.data.network.models.APIEndpoint
-import com.runanywhere.sdk.foundation.PersistentDeviceIdentity
+import com.runanywhere.sdk.foundation.DeviceIdentity
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.storage.SecureStorage
-import com.runanywhere.sdk.storage.createSecureStorage
+import com.runanywhere.sdk.security.SecureStorage
+import com.runanywhere.sdk.security.SecureStorageFactory
 import com.runanywhere.sdk.utils.PlatformUtils
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -25,7 +25,7 @@ class DeviceRegistrationService(
     private val networkService: NetworkService
 ) {
     private val logger = SDKLogger("DeviceRegistrationService")
-    private val secureStorage: SecureStorage by lazy { createSecureStorage() }
+    private val secureStorage: SecureStorage by lazy { SecureStorageFactory.create() }
     private val registrationMutex = Mutex()
 
     companion object {
@@ -46,7 +46,7 @@ class DeviceRegistrationService(
         cachedRegistrationStatus?.let { return it }
 
         return try {
-            val isRegistered = secureStorage.containsSecure(DEVICE_REGISTRATION_KEY) &&
+            val isRegistered = secureStorage.containsKey(DEVICE_REGISTRATION_KEY) &&
                                secureStorage.getSecureString(DEVICE_REGISTRATION_KEY) == "true"
 
             cachedRegistrationStatus = isRegistered
@@ -84,7 +84,7 @@ class DeviceRegistrationService(
                 if (isDeviceRegistered()) {
                     logger.info("Device is already registered, skipping registration")
                     return Result.success(DeviceRegistrationResponse(
-                        deviceId = PersistentDeviceIdentity.getPersistentDeviceUUID(),
+                        deviceId = DeviceIdentity.persistentUUID,
                         registered = true,
                         message = "Device already registered"
                     ))
@@ -163,7 +163,7 @@ class DeviceRegistrationService(
             val updateRequest = DeviceInfoUpdateRequest(
                 deviceId = deviceInfo.deviceId,
                 deviceInfo = deviceInfo,
-                deviceFingerprint = PersistentDeviceIdentity.getDeviceFingerprint(),
+                deviceFingerprint = DeviceIdentity.getDeviceFingerprint(),
                 updateTimestamp = System.currentTimeMillis()
             )
 
@@ -206,7 +206,7 @@ class DeviceRegistrationService(
      * Collect comprehensive device information
      */
     private fun collectDeviceInfo(): DeviceInfoData {
-        val deviceId = PersistentDeviceIdentity.getPersistentDeviceUUID()
+        val deviceId = DeviceIdentity.persistentUUID
 
         // Get platform-specific device info
         val platformInfo = getPlatformSpecificDeviceInfo()

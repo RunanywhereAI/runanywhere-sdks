@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.core.onnx
 
-import com.runanywhere.sdk.components.llm.HardwareConfiguration
+import com.runanywhere.sdk.features.llm.HardwareConfiguration
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.core.frameworks.ComponentInitParameters
 import com.runanywhere.sdk.core.frameworks.DownloadStrategy
@@ -10,7 +10,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.FrameworkModality
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
 
 /**
@@ -38,7 +38,7 @@ class ONNXAdapter : UnifiedFrameworkAdapter {
 
     // MARK: - UnifiedFrameworkAdapter Properties
 
-    override val framework: LLMFramework = LLMFramework.ONNX
+    override val framework: InferenceFramework = InferenceFramework.ONNX
 
     override val supportedModalities: Set<FrameworkModality> = setOf(
         FrameworkModality.VOICE_TO_TEXT,
@@ -65,7 +65,7 @@ class ONNXAdapter : UnifiedFrameworkAdapter {
 
         // Check framework compatibility
         if (model.compatibleFrameworks.isNotEmpty()) {
-            return model.compatibleFrameworks.contains(LLMFramework.ONNX)
+            return model.compatibleFrameworks.contains(InferenceFramework.ONNX)
         }
 
         // Check by model ID patterns

@@ -1,16 +1,16 @@
 package com.runanywhere.sdk.core.onnx
 
-import com.runanywhere.sdk.components.TTSOptions
-import com.runanywhere.sdk.components.stt.STTConfiguration
-import com.runanywhere.sdk.components.stt.STTOptions
-import com.runanywhere.sdk.components.stt.STTService
-import com.runanywhere.sdk.components.stt.STTStreamEvent
-import com.runanywhere.sdk.components.stt.STTStreamingOptions
-import com.runanywhere.sdk.components.stt.STTTranscriptionResult
-import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.components.vad.VADResult
-import com.runanywhere.sdk.components.vad.VADService
-import com.runanywhere.sdk.components.vad.SpeechActivityEvent
+import com.runanywhere.sdk.features.tts.TTSOptions
+import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.stt.STTOptions
+import com.runanywhere.sdk.features.stt.STTService
+import com.runanywhere.sdk.features.stt.STTStreamEvent
+import com.runanywhere.sdk.features.stt.STTStreamingOptions
+import com.runanywhere.sdk.features.stt.STTTranscriptionResult
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.features.vad.VADResult
+import com.runanywhere.sdk.features.vad.VADService
+import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.utils.PlatformUtils

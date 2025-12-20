@@ -2,7 +2,7 @@ package com.runanywhere.sdk.data.database.dao
 
 import androidx.room.*
 import com.runanywhere.sdk.data.database.entities.ModelInfoEntity
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 
 /**
@@ -19,7 +19,7 @@ interface ModelInfoDao {
     suspend fun getAllModels(): List<ModelInfoEntity>
 
     @Query("SELECT * FROM model_info WHERE framework IN (:frameworks)")
-    suspend fun getModelsByFrameworks(frameworks: List<LLMFramework>): List<ModelInfoEntity>
+    suspend fun getModelsByFrameworks(frameworks: List<InferenceFramework>): List<ModelInfoEntity>
 
     @Query("SELECT * FROM model_info WHERE category = :category")
     suspend fun getModelsByCategory(category: ModelCategory): List<ModelInfoEntity>

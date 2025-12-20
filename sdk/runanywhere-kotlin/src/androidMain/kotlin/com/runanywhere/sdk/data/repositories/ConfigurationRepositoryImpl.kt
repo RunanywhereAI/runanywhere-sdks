@@ -7,15 +7,13 @@ import com.runanywhere.sdk.data.models.ConfigurationSource
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.repositories.ConfigurationRepository
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.network.NetworkService
 
 /**
  * Android implementation of ConfigurationRepository using Room database
  * Updated to match iOS ConfigurationRepositoryImpl interface patterns
  */
 class ConfigurationRepositoryImpl(
-    private val database: RunAnywhereDatabase,
-    private val networkService: NetworkService
+    private val database: RunAnywhereDatabase
 ) : ConfigurationRepository {
 
     private val logger = SDKLogger("ConfigurationRepository")

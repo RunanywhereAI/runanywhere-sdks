@@ -95,64 +95,6 @@ enum class FinishReason(val value: String) {
 }
 
 /**
- * Enhanced generation result with comprehensive metadata and token tracking
- * Combines aspects of both iOS LLMOutput and Kotlin GenerationResult
- */
-@Serializable
-data class LLMGenerationResult(
-    /** Generated text */
-    val text: String,
-
-    /** Token usage statistics */
-    val tokenUsage: TokenUsage,
-
-    /** Generation metadata */
-    val metadata: GenerationMetadata,
-
-    /** Finish reason */
-    val finishReason: FinishReason,
-
-    /** Timestamp when generation completed */
-    val timestamp: Long = getCurrentTimeMillis(),
-
-    /** Session ID for tracking */
-    val sessionId: String? = null,
-
-    /** Cost savings compared to cloud execution */
-    val savedAmount: Double = 0.0,
-
-    /** Execution target that was actually used */
-    val actualExecutionTarget: ExecutionTarget? = null
-) {
-    /**
-     * Validate the result
-     */
-    fun validate() {
-        require(text.isNotEmpty() || finishReason == FinishReason.ERROR) {
-            "Text must not be empty unless generation failed"
-        }
-        tokenUsage.validate()
-        metadata.validate()
-        require(timestamp > 0) { "Timestamp must be positive" }
-        require(savedAmount >= 0.0) { "Saved amount must be non-negative" }
-    }
-
-    /**
-     * Check if generation was successful
-     */
-    val isSuccessful: Boolean
-        get() = finishReason == FinishReason.COMPLETED || finishReason == FinishReason.MAX_TOKENS || finishReason == FinishReason.STOP_SEQUENCE
-
-    /**
-     * Get effective tokens per second
-     */
-    val effectiveTokensPerSecond: Double?
-        get() = metadata.tokensPerSecond ?: if (metadata.generationTime > 0) {
-            tokenUsage.completionTokens.toDouble() / (metadata.generationTime / 1000.0)
-        } else null
-}
-
-/**
  * Generation chunk for streaming - enhanced with metadata
  */
 @Serializable
@@ -249,7 +191,7 @@ data class MessageAnalytics(
     val conversationId: String,
     val modelId: String,
     val modelName: String,
-    val framework: com.runanywhere.sdk.models.enums.LLMFramework,
+    val framework: com.runanywhere.sdk.models.enums.InferenceFramework,
     val timestamp: Long,
 
     // Timing Metrics (in milliseconds)
@@ -305,7 +247,7 @@ data class MessageAnalytics(
 data class MessageModelInfo(
     val modelId: String,
     val modelName: String,
-    val framework: com.runanywhere.sdk.models.enums.LLMFramework
+    val framework: com.runanywhere.sdk.models.enums.InferenceFramework
 )
 
 /**

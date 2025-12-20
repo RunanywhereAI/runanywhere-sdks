@@ -4,7 +4,7 @@ import com.runanywhere.sdk.core.frameworks.DownloadStrategy
 import com.runanywhere.sdk.core.frameworks.ModelStorageStrategy
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
 
 /**
@@ -26,7 +26,7 @@ class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
      */
     override fun canHandle(model: ModelInfo): Boolean {
         // Must be ONNX compatible
-        if (!model.compatibleFrameworks.contains(LLMFramework.ONNX)) {
+        if (!model.compatibleFrameworks.contains(InferenceFramework.ONNX)) {
             return false
         }
 

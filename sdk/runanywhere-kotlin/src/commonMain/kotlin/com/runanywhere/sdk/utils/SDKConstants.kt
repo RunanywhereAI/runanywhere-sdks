@@ -38,6 +38,8 @@ object SDKConstants {
 
     // MARK: - SDK Information
     const val VERSION = "0.1.0"
+    /** Alias for VERSION to match core.SDKConstants naming */
+    const val SDK_VERSION = VERSION
     val USER_AGENT get() = "RunAnywhere-Kotlin-SDK/${VERSION}"
     const val SDK_NAME = "runanywhere-kotlin"
 

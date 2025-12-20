@@ -68,43 +68,7 @@ data class RoutingPolicy(
     val costOptimization: Boolean = true
 )
 
-// Voice-related types
-@Serializable
-data class STTOptions(
-    val language: String = "en",
-    val enableVAD: Boolean = true,
-    val enablePunctuation: Boolean = true,
-    val enableWordTimestamps: Boolean = false,
-    val enableSpeakerDiarization: Boolean = false,
-    val customVocabulary: List<String>? = null,
-    val audioFormat: String = "PCM_16BIT",
-    val sampleRate: Int = 16000
-)
-
-@Serializable
-data class STTResult(
-    val text: String,
-    val confidence: Float,
-    val language: String,
-    val duration: Double,
-    val wordTimestamps: List<WordTimestamp>? = null,
-    val speakerSegments: List<SpeakerSegment>? = null,
-    val processingTime: Double,
-    val modelUsed: String
-)
-
-@Serializable
-data class WordTimestamp(
-    val word: String,
-    val startTime: Double,
-    val endTime: Double,
-    val confidence: Float
-)
-
-@Serializable
-data class SpeakerSegment(
-    val speakerId: String,
-    val startTime: Double,
-    val endTime: Double,
-    val text: String
-)
+// Voice-related types are defined in their respective feature packages:
+// - STTOptions, STTResult, etc. -> features/stt/STTModels.kt
+// - SpeakerSegment -> features/speakerdiarization/SpeakerDiarizationModels.kt
+// - WordTimestamp -> features/stt/STTModels.kt
