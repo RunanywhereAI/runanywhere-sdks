@@ -13,7 +13,7 @@ import type { STTService } from './STTService';
  * Protocol for registering external STT implementations
  *
  * Providers implement this protocol to register their STT service
- * with the ModuleRegistry, enabling plugin-based architecture.
+ * with the ServiceRegistry, enabling plugin-based architecture.
  */
 export interface STTServiceProvider {
   /**

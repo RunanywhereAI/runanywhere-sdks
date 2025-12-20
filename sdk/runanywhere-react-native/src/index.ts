@@ -17,11 +17,68 @@ export * from './types';
 // Export commonly used enums for easy access
 export { LLMFramework, ModelCategory, ModelFormat } from './types/enums';
 
-// Errors
-export { SDKError, SDKErrorCode } from './Public/Errors/SDKError';
+// Errors (legacy - from Public/Errors)
+export { SDKError as LegacySDKError, SDKErrorCode } from './Public/Errors/SDKError';
+
+// Foundation (Core infrastructure matching iOS SDK)
+export {
+  // Initialization (matching iOS two-phase initialization pattern)
+  InitializationPhase,
+  type SDKInitParams,
+  type InitializationState,
+  isSDKUsable,
+  areServicesReady,
+  isInitializing,
+  createInitialState,
+  markCoreInitialized,
+  markServicesInitializing,
+  markServicesInitialized,
+  markInitializationFailed,
+  resetState,
+  // Error Types (matching iOS Foundation/ErrorTypes/)
+  ErrorCode,
+  getErrorCodeMessage,
+  ErrorCategory,
+  allErrorCategories,
+  getCategoryFromCode,
+  inferCategoryFromError,
+  type ErrorContext,
+  createErrorContext,
+  formatStackTrace,
+  formatLocation,
+  formatContext,
+  ContextualError,
+  withContext,
+  getErrorContext,
+  getUnderlyingError,
+  type SDKErrorProtocol,
+  SDKError,
+  asSDKError,
+  isSDKError,
+  captureAndThrow,
+  notInitializedError,
+  alreadyInitializedError,
+  invalidInputError,
+  modelNotFoundError,
+  modelLoadError,
+  networkError,
+  authenticationError,
+  generationError,
+  storageError,
+} from './Foundation';
 
 // Events
 export { EventBus, NativeEventNames } from './Public/Events';
+
+// Infrastructure (Event system with routing)
+export {
+  type SDKEvent,
+  EventDestination,
+  EventCategory,
+  createSDKEvent,
+  isSDKEvent,
+  EventPublisher,
+} from './Infrastructure';
 
 // Services
 export {
@@ -52,23 +109,23 @@ export {
 } from './native';
 export type { NativeRunAnywhereModule } from './native';
 
-// Components (following Swift SDK architecture)
+// Features (following Swift SDK architecture)
 export {
-  // STT Component
-  STTComponent,
+  // STT Capability
+  STTCapability,
   STTServiceWrapper,
   type STTConfiguration,
   type STTInput,
   type STTOutput,
-  // TTS Component
-  TTSComponent,
+  // TTS Capability
+  TTSCapability,
   TTSServiceWrapper,
   type TTSConfiguration as TTSConfig,
   type TTSInput,
   type TTSOutput,
   type TTSOptions,
-  // LLM Component
-  LLMComponent,
+  // LLM Capability
+  LLMCapability,
   LLMServiceWrapper,
   type LLMConfiguration,
   type LLMInput,
@@ -76,8 +133,68 @@ export {
   type Message,
   MessageRole,
   FinishReason,
-} from './components';
+} from './Features';
 
 // Core Registry & Providers
-export { ModuleRegistry } from './Core/ModuleRegistry';
+export { ServiceRegistry } from './Foundation/DependencyInjection/ServiceRegistry';
+export { ServiceContainer } from './Foundation/DependencyInjection/ServiceContainer';
 export { LlamaCppProvider } from './Providers';
+
+// Security (matching iOS Foundation/Security/)
+export {
+  SecureStorageKeys,
+  SecureStorageService,
+  type SecureStorageErrorCode,
+  SecureStorageError,
+  isSecureStorageError,
+  isItemNotFoundError,
+} from './Foundation/Security';
+
+// Data/Network (matching iOS Data/Network/)
+export {
+  // APIClient
+  APIClient,
+  APIClientError,
+  createAPIClient,
+  type APIClientConfig,
+  type AuthenticationProvider,
+  // Endpoints
+  type APIEndpointType,
+  type APIEndpointDefinition,
+  APIEndpoints,
+  deviceRegistrationEndpointForEnvironment,
+  analyticsEndpointForEnvironment,
+  // Auth Models
+  type AuthenticationRequest,
+  type RefreshTokenRequest,
+  type DeviceRegistrationRequest,
+  type DeviceRegistrationResponse,
+  type HealthCheckResponse,
+  toInternalAuthResponse,
+  createAuthRequest,
+  createRefreshRequest,
+} from './Data/Network';
+
+// Core/Capabilities (matching iOS Core/Capabilities/)
+export {
+  // Capability Protocols
+  type Capability,
+  type ModelLoadableCapability,
+  type ServiceBasedCapability,
+  type CompositeCapability,
+  type ComponentConfiguration,
+  // Loading State
+  type CapabilityLoadingState,
+  isIdle,
+  isLoading,
+  isLoaded,
+  isFailed,
+  // Resource Types
+  CapabilityResourceType,
+  // Managed Lifecycle
+  ManagedLifecycle,
+  ModelLifecycleManager,
+  // Errors
+  CapabilityError,
+  CapabilityErrorCode,
+} from './Core/Capabilities';

@@ -25,13 +25,15 @@ import { FileManager } from '../FileOperations/FileManager';
 import { DownloadServiceImpl } from '../../Data/Network/Services/DownloadService';
 import { SyncCoordinator } from '../../Data/Sync/SyncCoordinator';
 import { ConfigurationService } from '../Configuration/ConfigurationService';
-import { AnalyticsQueueManager } from '../Analytics/AnalyticsQueueManager';
+import { AnalyticsQueueManager } from '../../Infrastructure/Analytics/AnalyticsQueueManager';
 import { ModelInfoService } from '../../Data/Services/ModelInfoService';
 import { ModelInfoRepositoryImpl } from '../../Data/Repositories/ModelInfoRepository';
 import type { ModelRegistry } from '../../Core/Protocols/Registry/ModelRegistry';
 import type { MemoryManager } from '../../Core/Protocols/Memory/MemoryManager';
 import type { DownloadService } from '../../Data/Network/Services/DownloadService';
 import { AdapterRegistry } from './AdapterRegistry';
+import { APIClient, type APIClientConfig, type AuthenticationProvider } from '../../Data/Network';
+import type { SDKEnvironment } from '../../types';
 
 /**
  * Service container for dependency injection
@@ -251,13 +253,31 @@ export class ServiceContainer {
 
   /**
    * Authentication service
+   * Implements AuthenticationProvider interface for APIClient token injection
    */
-  public authenticationService?: any;
+  public authenticationService?: AuthenticationProvider;
 
   /**
    * API client for sync operations
+   *
+   * Main HTTP client for all SDK API calls.
+   * Initialized during SDK initialization with base URL and API key.
+   *
+   * Matches iOS: public var apiClient: APIClient?
    */
-  private apiClient?: any;
+  private _apiClient?: APIClient;
+
+  /**
+   * Get the API client
+   */
+  public get apiClient(): APIClient | undefined {
+    return this._apiClient;
+  }
+
+  /**
+   * Current SDK environment
+   */
+  private _environment?: SDKEnvironment;
 
   /**
    * Sync coordinator for centralized sync management
@@ -403,11 +423,64 @@ export class ServiceContainer {
   }
 
   /**
+   * Initialize the API client with SDK configuration
+   *
+   * This should be called during SDK initialization to set up the API client
+   * with the proper base URL and API key from the init options.
+   *
+   * Matches iOS: ServiceContainer setup during RunAnywhere.initialize()
+   *
+   * @param config - API client configuration (baseURL, apiKey)
+   * @param environment - SDK environment for endpoint selection
+   * @param authProvider - Optional authentication provider for token injection
+   */
+  public initializeAPIClient(
+    config: { baseURL: string; apiKey: string; timeout?: number },
+    environment: SDKEnvironment,
+    authProvider?: AuthenticationProvider
+  ): void {
+    this._environment = environment;
+
+    const apiClientConfig: APIClientConfig = {
+      baseURL: config.baseURL,
+      apiKey: config.apiKey,
+      timeout: config.timeout,
+      authProvider,
+    };
+
+    this._apiClient = new APIClient(apiClientConfig);
+
+    // If auth provider is provided, also store it for later use
+    if (authProvider) {
+      this.authenticationService = authProvider;
+    }
+
+    // Wire API client to analytics queue manager
+    this.analyticsQueueManager.setAPIClient(this._apiClient, environment);
+  }
+
+  /**
+   * Set the authentication provider on the API client
+   *
+   * Call this after authentication completes to enable authenticated requests.
+   * Matches iOS pattern of wiring AuthenticationService to APIClient.
+   *
+   * @param authProvider - Authentication provider implementing getAccessToken()
+   */
+  public setAuthenticationProvider(authProvider: AuthenticationProvider): void {
+    this.authenticationService = authProvider;
+    if (this._apiClient) {
+      this._apiClient.setAuthenticationProvider(authProvider);
+    }
+  }
+
+  /**
    * Reset service container state (for testing)
    */
   public reset(): void {
     this.authenticationService = undefined;
-    this.apiClient = undefined;
+    this._apiClient = undefined;
+    this._environment = undefined;
     this.networkService = undefined;
     this._syncCoordinator = undefined;
     this._configurationService = undefined;

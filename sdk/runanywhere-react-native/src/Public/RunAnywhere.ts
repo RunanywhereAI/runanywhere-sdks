@@ -11,6 +11,18 @@ import { EventBus } from './Events';
 import { requireNativeModule, isNativeModuleAvailable, NativeRunAnywhere, requireFileSystemModule } from '../native';
 import { SDKEnvironment, ExecutionTarget, HardwareAcceleration } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
+import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
+import {
+  InitializationPhase,
+  InitializationState,
+  SDKInitParams,
+  createInitialState,
+  markCoreInitialized,
+  markServicesInitializing,
+  markServicesInitialized,
+  markInitializationFailed,
+  resetState,
+} from '../Foundation/Initialization';
 import type {
   GenerationOptions,
   GenerationResult,
@@ -26,6 +38,20 @@ import type {
 // Internal State
 // ============================================================================
 
+/**
+ * SDK initialization state following iOS two-phase pattern.
+ *
+ * Phase 1 (Core): Sync, fast (~1-5ms)
+ *   - Validate config, setup logging, create backend
+ *   - isSDKInitialized = true after this
+ *
+ * Phase 2 (Services): Async (~100-500ms)
+ *   - Initialize ModelRegistry, register providers
+ *   - areServicesReady = true after this
+ */
+let initState: InitializationState = createInitialState();
+
+// Legacy state structure for backwards compatibility during migration
 interface SDKState {
   initialized: boolean;
   environment: SDKEnvironment | null;
@@ -120,54 +146,116 @@ export const RunAnywhere = {
   events: EventBus,
 
   // ============================================================================
-  // SDK State
+  // SDK State (Two-Phase Initialization)
   // ============================================================================
 
   /**
-   * Check if SDK is initialized
+   * Check if SDK is initialized (Phase 1 complete)
+   *
+   * After Phase 1, the SDK is usable for basic operations.
+   * Services may still be initializing in the background.
+   *
+   * Matches iOS: isSDKInitialized
    */
   get isSDKInitialized(): boolean {
-    return state.initialized;
+    return initState.isCoreInitialized;
+  },
+
+  /**
+   * Check if all services are ready (Phase 2 complete)
+   *
+   * When true, all async services (ModelRegistry, providers, etc.)
+   * have completed initialization.
+   *
+   * Matches iOS: areServicesReady
+   */
+  get areServicesReady(): boolean {
+    return initState.hasCompletedServicesInit;
+  },
+
+  /**
+   * Check if SDK is active and ready for use
+   *
+   * Matches iOS: isActive
+   */
+  get isActive(): boolean {
+    return initState.isCoreInitialized && initState.initParams !== null;
+  },
+
+  /**
+   * Get current initialization phase
+   */
+  get initializationPhase(): InitializationPhase {
+    return initState.phase;
   },
 
   /**
    * Get current environment
    */
   get currentEnvironment(): SDKEnvironment | null {
-    return state.environment;
+    return initState.environment;
   },
 
   // ============================================================================
-  // SDK Initialization
+  // SDK Initialization (Two-Phase Pattern)
   // ============================================================================
 
   /**
    * Initialize the RunAnywhere SDK
    *
-   * This method performs simple, fast initialization:
+   * Uses a two-phase initialization pattern matching iOS SDK:
    *
-   * 1. **Validation**: Validate API key and parameters
-   * 2. **Backend**: Create the native backend (ONNX by default)
-   * 3. **Configuration**: Pass configuration to native layer
-   * 4. **State**: Mark SDK as initialized
+   * **Phase 1 (Core)**: Synchronous, fast (~1-5ms)
+   *   - Validate configuration
+   *   - Create native backend
+   *   - Pass configuration to native layer
+   *   - SDK becomes usable immediately
+   *
+   * **Phase 2 (Services)**: Asynchronous, in background (~100-500ms)
+   *   - Register framework providers
+   *   - Initialize ModelRegistry
+   *   - Non-blocking, non-critical
+   *
+   * After this method returns, `isSDKInitialized` is true.
+   * Check `areServicesReady` to know when Phase 2 completes.
    *
    * @param options - SDK initialization options
-   * @throws Error if initialization fails
+   * @throws Error if Phase 1 initialization fails
    *
    * @example
    * ```typescript
+   * // Initialize (returns after Phase 1)
    * await RunAnywhere.initialize({
    *   apiKey: 'your-api-key',
-   *   baseURL: 'https://api.runanywhere.com',
    *   environment: SDKEnvironment.Production,
    * });
+   *
+   * // SDK is usable immediately
+   * console.log(RunAnywhere.isSDKInitialized); // true
+   *
+   * // Wait for services if needed
+   * await RunAnywhere.completeServicesInitialization();
+   * console.log(RunAnywhere.areServicesReady); // true
    * ```
    */
   async initialize(options: SDKInitOptions): Promise<void> {
     const environment = options.environment ?? SDKEnvironment.Production;
+    const initParams: SDKInitParams = {
+      apiKey: options.apiKey,
+      baseURL: options.baseURL,
+      environment,
+    };
 
     // Publish initialization started event
     EventBus.publish('Initialization', { type: 'started' });
+
+    // ========================================================================
+    // PHASE 1: Core Initialization (Sync, Fast)
+    // ========================================================================
+    console.log('[RunAnywhere] Phase 1: Core initialization starting...');
+    const phase1Start = Date.now();
+
+    let backendType: string | null = null;
 
     // Check if native module is available
     if (!isNativeModuleAvailable()) {
@@ -176,41 +264,52 @@ export const RunAnywhere = {
           '[RunAnywhere] Native module not available. ' +
             'Running in limited development mode.'
         );
+        initState = markCoreInitialized(initState, initParams, null);
         state.initialized = true;
         state.environment = environment;
         EventBus.publish('Initialization', { type: 'completed' });
+
+        // Start Phase 2 in background (non-blocking)
+        this._startPhase2InBackground();
         return;
       }
+      initState = markInitializationFailed(initState, new Error('Native module not available'));
       throw new Error('Native module not available');
     }
 
     const native = requireNativeModule();
 
     // Create the backend
-    // Use llamacpp for LLM text generation (GGUF models), which also supports other capabilities
     const backendName = 'llamacpp';
     try {
       const backendCreated = native.createBackend(backendName);
       if (!backendCreated) {
         if (__DEV__ || environment === SDKEnvironment.Development) {
           console.warn('[RunAnywhere] Failed to create backend, running in limited mode');
+          initState = markCoreInitialized(initState, initParams, null);
           state.initialized = true;
           state.environment = environment;
           state.backendType = null;
           EventBus.publish('Initialization', { type: 'completed' });
+          this._startPhase2InBackground();
           return;
         }
+        initState = markInitializationFailed(initState, new Error('Failed to create backend'));
         throw new Error('Failed to create backend');
       }
+      backendType = backendName;
       state.backendType = backendName;
     } catch (error) {
       if (__DEV__ || environment === SDKEnvironment.Development) {
         console.warn('[RunAnywhere] Backend creation error:', error);
+        initState = markCoreInitialized(initState, initParams, null);
         state.initialized = true;
         state.environment = environment;
         EventBus.publish('Initialization', { type: 'completed' });
+        this._startPhase2InBackground();
         return;
       }
+      initState = markInitializationFailed(initState, error as Error);
       throw error;
     }
 
@@ -226,26 +325,121 @@ export const RunAnywhere = {
       if (!result) {
         if (__DEV__ || environment === SDKEnvironment.Development) {
           console.warn('[RunAnywhere] Native initialize returned false, continuing in dev mode');
+          initState = markCoreInitialized(initState, initParams, backendType);
           state.initialized = true;
           state.environment = environment;
           EventBus.publish('Initialization', { type: 'completed' });
+          this._startPhase2InBackground();
           return;
         }
+        initState = markInitializationFailed(initState, new Error('Failed to initialize SDK'));
         throw new Error('Failed to initialize SDK');
       }
     } catch (error) {
       if (__DEV__ || environment === SDKEnvironment.Development) {
         console.warn('[RunAnywhere] Initialize error:', error);
+        initState = markCoreInitialized(initState, initParams, backendType);
         state.initialized = true;
         state.environment = environment;
         EventBus.publish('Initialization', { type: 'completed' });
+        this._startPhase2InBackground();
         return;
       }
+      initState = markInitializationFailed(initState, error as Error);
       throw error;
     }
 
-    // Register framework providers (same pattern as Swift SDK)
-    // This must happen BEFORE ModelRegistry.initialize() so models can be registered
+    // Phase 1 complete
+    const phase1Duration = Date.now() - phase1Start;
+    console.log(`[RunAnywhere] Phase 1 complete (${phase1Duration}ms)`);
+
+    initState = markCoreInitialized(initState, initParams, backendType);
+    state.initialized = true;
+    state.environment = environment;
+    EventBus.publish('Initialization', { type: 'completed' });
+
+    // ========================================================================
+    // PHASE 2: Services Initialization (Async, Background)
+    // ========================================================================
+    this._startPhase2InBackground();
+  },
+
+  /**
+   * Start Phase 2 initialization in background
+   * @internal
+   */
+  _startPhase2InBackground(): void {
+    console.log('[RunAnywhere] Starting Phase 2 (services) in background...');
+
+    // Run Phase 2 asynchronously without blocking
+    // Uses setTimeout to ensure it runs in the next event loop tick
+    setTimeout(async () => {
+      try {
+        await this.completeServicesInitialization();
+        console.log('[RunAnywhere] Phase 2 complete (background)');
+      } catch (error) {
+        // Phase 2 failure is non-critical
+        console.warn('[RunAnywhere] Phase 2 failed (non-critical):', error);
+      }
+    }, 0);
+  },
+
+  /**
+   * Complete services initialization (Phase 2)
+   *
+   * This method is idempotent - calling it multiple times is safe.
+   * If services are already initialized, this returns immediately.
+   *
+   * Matches iOS: completeServicesInitialization()
+   *
+   * @example
+   * ```typescript
+   * // Wait for all services to be ready
+   * await RunAnywhere.completeServicesInitialization();
+   * console.log(RunAnywhere.areServicesReady); // true
+   * ```
+   */
+  async completeServicesInitialization(): Promise<void> {
+    // Fast path: already completed
+    if (initState.hasCompletedServicesInit) {
+      return;
+    }
+
+    // Guard: must have completed Phase 1
+    if (!initState.isCoreInitialized) {
+      throw new Error('SDK not initialized. Call initialize() first.');
+    }
+
+    // Mark Phase 2 in progress
+    initState = markServicesInitializing(initState);
+    const phase2Start = Date.now();
+
+    // Step 1: Setup API client (matches iOS setupAPIClient pattern)
+    // The API client is used for analytics, model sync, and other network operations
+    if (initState.initParams) {
+      const params = initState.initParams;
+      const environment = initState.environment ?? SDKEnvironment.Production;
+
+      console.log('[RunAnywhere] Initializing API client...');
+      try {
+        // Initialize the API client in ServiceContainer
+        // This also wires the client to AnalyticsQueueManager
+        ServiceContainer.shared.initializeAPIClient(
+          {
+            baseURL: params.baseURL ?? '',
+            apiKey: params.apiKey,
+            timeout: 30000,
+          },
+          environment,
+          undefined // Auth provider will be set after authentication
+        );
+        console.log('[RunAnywhere] API client initialized');
+      } catch (error) {
+        console.warn('[RunAnywhere] Failed to initialize API client (non-critical):', error);
+      }
+    }
+
+    // Step 2: Register framework providers (same pattern as Swift SDK)
     console.log('[RunAnywhere] Registering framework providers...');
     try {
       // Register LlamaCPP provider for GGUF models
@@ -257,7 +451,7 @@ export const RunAnywhere = {
     }
 
     try {
-      // Register ONNX providers for STT/TTS models (mirrors Swift SDK's ONNXAdapter.register())
+      // Register ONNX providers for STT/TTS models
       const { registerONNXProviders } = require('../Providers/ONNXProvider');
       registerONNXProviders();
       console.log('[RunAnywhere] ONNX providers registered');
@@ -265,38 +459,70 @@ export const RunAnywhere = {
       console.warn('[RunAnywhere] Failed to register ONNX providers:', error);
     }
 
-    // Initialize the Model Registry (same pattern as Swift SDK)
-    // This loads the catalog models AND models provided by registered providers
+    // Step 3: Initialize the Model Registry
     try {
       await ModelRegistry.initialize();
       console.log('[RunAnywhere] Model Registry initialized successfully');
     } catch (error) {
       console.warn('[RunAnywhere] Model Registry initialization failed (non-critical):', error);
-      // Don't fail SDK initialization if model registry fails
-      // Models can still be added manually via addModelFromURL
     }
 
-    state.initialized = true;
-    state.environment = environment;
-    EventBus.publish('Initialization', { type: 'completed' });
+    // Mark Phase 2 complete
+    const phase2Duration = Date.now() - phase2Start;
+    console.log(`[RunAnywhere] Phase 2 complete (${phase2Duration}ms)`);
+    initState = markServicesInitialized(initState);
+  },
+
+  /**
+   * Ensure services are ready before proceeding
+   *
+   * This is a convenience method that guarantees Phase 2 is complete.
+   * O(1) performance on subsequent calls.
+   *
+   * Matches iOS: ensureServicesReady()
+   *
+   * @internal
+   */
+  async ensureServicesReady(): Promise<void> {
+    if (initState.hasCompletedServicesInit) {
+      return; // O(1) fast path
+    }
+    await this.completeServicesInitialization();
   },
 
   /**
    * Destroy SDK and release resources
+   *
+   * Resets all initialization state. After calling this,
+   * you must call initialize() again to use the SDK.
+   *
+   * Matches iOS: reset()
    */
   async destroy(): Promise<void> {
-    if (!isNativeModuleAvailable()) {
-      state.initialized = false;
-      state.environment = null;
-      state.backendType = null;
-      return;
+    if (isNativeModuleAvailable()) {
+      const native = requireNativeModule();
+      await native.destroy();
     }
 
-    const native = requireNativeModule();
-    await native.destroy();
+    // Reset ServiceContainer (clears API client, auth, analytics wiring)
+    ServiceContainer.shared.reset();
+
+    // Reset new initialization state
+    initState = resetState();
+
+    // Reset legacy state
     state.initialized = false;
     state.environment = null;
     state.backendType = null;
+  },
+
+  /**
+   * Reset SDK state (alias for destroy for iOS parity)
+   *
+   * Matches iOS: reset()
+   */
+  async reset(): Promise<void> {
+    await this.destroy();
   },
 
   /**
@@ -479,9 +705,12 @@ export const RunAnywhere = {
     }
     const native = requireNativeModule();
 
-    const maxTokens = options?.maxTokens ?? 256;
-    const temperature = options?.temperature ?? 0.7;
-    const systemPrompt = options?.systemPrompt ?? null;
+    // Build options JSON for native generateStream
+    const optionsJson = JSON.stringify({
+      max_tokens: options?.maxTokens ?? 256,
+      temperature: options?.temperature ?? 0.7,
+      system_prompt: options?.systemPrompt ?? null,
+    });
 
     // Subscribe to generation events if callback provided
     if (onToken) {
@@ -496,7 +725,15 @@ export const RunAnywhere = {
       });
     }
 
-    native.generateStream(prompt, systemPrompt, maxTokens, temperature);
+    // Native generateStream takes (prompt, optionsJson, callback)
+    native.generateStream(prompt, optionsJson, (token: string, isComplete: boolean) => {
+      if (onToken && !isComplete) {
+        onToken(token);
+      }
+      if (isComplete) {
+        EventBus.publish('Generation', { type: 'completed' });
+      }
+    });
   },
 
   /**
@@ -978,18 +1215,24 @@ export const RunAnywhere = {
   /**
    * Get supported capabilities
    */
-  async getCapabilities(): Promise<number[]> {
+  async getCapabilities(): Promise<string[]> {
     if (!isNativeModuleAvailable()) {
       return [];
     }
     const native = requireNativeModule();
-    return native.getCapabilities();
+    const capabilitiesJson = await native.getCapabilities();
+    try {
+      const parsed = JSON.parse(capabilitiesJson);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   },
 
   /**
    * Check if a capability is supported
    */
-  async supportsCapability(capability: number): Promise<boolean> {
+  async supportsCapability(capability: string): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
       return false;
     }
@@ -1034,10 +1277,10 @@ export const RunAnywhere = {
    * ```
    */
   getAvailableFrameworks(): import('../types').LLMFramework[] {
-    const { ModuleRegistry } = require('../Core/ModuleRegistry');
+    const { ServiceRegistry } = require('../Foundation/DependencyInjection/ServiceRegistry');
 
     // Get all registered LLM providers
-    const llmProviders = ModuleRegistry.shared.allLLMProviders();
+    const llmProviders = ServiceRegistry.shared.allLLMProviders();
 
     // Extract unique frameworks from models provided by each provider
     const frameworksSet = new Set<import('../types').LLMFramework>();

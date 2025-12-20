@@ -18,7 +18,7 @@ export enum SDKEnvironment {
  * Execution target for generation requests
  */
 export enum ExecutionTarget {
-  OnDevice = 'on-device',
+  OnDevice = 'onDevice',
   Cloud = 'cloud',
   Hybrid = 'hybrid',
 }
@@ -138,19 +138,17 @@ export enum ComponentState {
 
 /**
  * SDK component identifiers
- * Note: Values match iOS SDK rawValue (uppercase)
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Models/ComponentTypes.swift
+ * Note: Values match iOS SDK rawValue
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Types/ComponentTypes.swift
  */
 export enum SDKComponent {
-  LLM = 'LLM',
-  STT = 'STT',
-  TTS = 'TTS',
-  VAD = 'VAD',
-  VLM = 'VLM',
-  Embedding = 'Embedding',
-  SpeakerDiarization = 'SpeakerDiarization',
-  VoiceAgent = 'VoiceAgent',
-  WakeWord = 'wakeWord',
+  LLM = 'llm',
+  STT = 'stt',
+  TTS = 'tts',
+  VAD = 'vad',
+  Embedding = 'embedding',
+  SpeakerDiarization = 'speakerDiarization',
+  VoiceAgent = 'voice',
 }
 
 /**

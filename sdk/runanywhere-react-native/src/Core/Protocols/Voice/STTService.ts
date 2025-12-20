@@ -64,6 +64,12 @@ export interface STTService {
   readonly isReady: boolean;
 
   /**
+   * Whether this service supports streaming transcription
+   * Matches iOS: public var supportsStreaming: Bool
+   */
+  readonly supportsStreaming?: boolean;
+
+  /**
    * Current model identifier
    */
   readonly currentModel: string | null;

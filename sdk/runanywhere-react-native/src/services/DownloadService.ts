@@ -380,8 +380,14 @@ class DownloadServiceImpl {
    */
   async getDownloadProgress(modelId: string): Promise<number | null> {
     const native = requireNativeModule();
-    const progress = await native.getDownloadProgress(modelId);
-    return progress >= 0 ? progress : null;
+    const progressJson = await native.getDownloadProgress(modelId);
+    try {
+      const progressData = JSON.parse(progressJson);
+      const progress = typeof progressData === 'number' ? progressData : progressData?.progress;
+      return typeof progress === 'number' && progress >= 0 ? progress : null;
+    } catch {
+      return null;
+    }
   }
 
   /**

@@ -62,6 +62,392 @@ export interface NativeRunAnywhereModule {
   getTTSVoices(): Promise<string>;
 
   // ============================================================================
+  // STT Streaming
+  // ============================================================================
+
+  /**
+   * Start streaming STT transcription
+   * @param language - Optional language code
+   */
+  startStreamingSTT(language?: string): Promise<boolean>;
+
+  /**
+   * Stop streaming STT transcription
+   */
+  stopStreamingSTT(): Promise<boolean>;
+
+  /**
+   * Check if streaming STT is currently active
+   */
+  isStreamingSTT(): Promise<boolean>;
+
+  // ============================================================================
+  // TTS Additional
+  // ============================================================================
+
+  /**
+   * Check if TTS streaming is supported
+   */
+  supportsTTSStreaming(): Promise<boolean>;
+
+  /**
+   * Stream TTS synthesis
+   * @param text - Text to synthesize
+   * @param voiceId - Voice identifier
+   * @param speedRate - Speech rate
+   * @param pitchShift - Pitch adjustment
+   */
+  synthesizeStream(
+    text: string,
+    voiceId: string,
+    speedRate: number,
+    pitchShift: number
+  ): Promise<void>;
+
+  /**
+   * Cancel current TTS synthesis
+   */
+  cancelTTS(): Promise<boolean>;
+
+  // ============================================================================
+  // Voice Activity Detection (VAD)
+  // ============================================================================
+
+  /**
+   * Load a VAD model
+   * @param modelId - Model identifier
+   * @param configJson - JSON configuration
+   */
+  loadVADModel(modelId: string, configJson?: string): Promise<boolean>;
+
+  /**
+   * Check if VAD model is loaded
+   */
+  isVADModelLoaded(): Promise<boolean>;
+
+  /**
+   * Reset VAD state
+   */
+  resetVAD(): Promise<void>;
+
+  /**
+   * Process audio through VAD
+   * @param audioData - Base64 encoded audio data
+   * @param sampleRate - Audio sample rate
+   * @returns JSON result with isSpeech and probability
+   */
+  processVAD(audioData: string, sampleRate: number): Promise<string>;
+
+  /**
+   * Detect speech segments in audio
+   * @param audioData - Base64 encoded audio data
+   * @param sampleRate - Audio sample rate
+   * @returns JSON array of segments
+   */
+  detectVADSegments(audioData: string, sampleRate: number): Promise<string>;
+
+  // ============================================================================
+  // Secure Storage
+  // ============================================================================
+
+  /**
+   * Check if secure storage is available
+   */
+  secureStorageIsAvailable(): Promise<boolean>;
+
+  /**
+   * Store a value in secure storage
+   * @param key - Storage key
+   * @param value - Value to store
+   */
+  secureStorageStore(key: string, value: string): Promise<boolean>;
+
+  /**
+   * Retrieve a value from secure storage
+   * @param key - Storage key
+   * @returns Stored value or null
+   */
+  secureStorageRetrieve(key: string): Promise<string | null>;
+
+  /**
+   * Delete a value from secure storage
+   * @param key - Storage key
+   */
+  secureStorageDelete(key: string): Promise<boolean>;
+
+  /**
+   * Check if a key exists in secure storage
+   * @param key - Storage key
+   */
+  secureStorageExists(key: string): Promise<boolean>;
+
+  // ============================================================================
+  // Event Polling
+  // ============================================================================
+
+  /**
+   * Poll for queued native events
+   * @returns JSON array of events
+   */
+  pollEvents(): Promise<string>;
+
+  /**
+   * Clear the event queue
+   */
+  clearEventQueue(): Promise<void>;
+
+  // ============================================================================
+  // Capability & Model Info
+  // ============================================================================
+
+  /**
+   * Get device capabilities
+   * @returns JSON with capability information
+   */
+  getCapabilities(): Promise<string>;
+
+  /**
+   * Check if a specific capability is supported
+   * @param capability - Capability name
+   */
+  supportsCapability(capability: string): Promise<boolean>;
+
+  /**
+   * Get model information by ID
+   * @param modelId - Model identifier
+   * @returns JSON model info
+   */
+  getModelInfo(modelId: string): Promise<string>;
+
+  /**
+   * Get list of downloaded models
+   * @returns JSON array of model info
+   */
+  getDownloadedModels(): Promise<string>;
+
+  // ============================================================================
+  // Model Registry
+  // ============================================================================
+
+  /**
+   * Discover available models
+   * @returns JSON array of model info
+   */
+  discoverModels(): Promise<string>;
+
+  /**
+   * Get a specific model by ID
+   * @param modelId - Model ID
+   * @returns JSON model info
+   */
+  getModel(modelId: string): Promise<string>;
+
+  /**
+   * Update a model
+   * @param modelId - Model ID
+   * @param updateJson - JSON update data
+   */
+  updateModel(modelId: string, updateJson: string): Promise<void>;
+
+  /**
+   * Remove a model
+   * @param modelId - Model ID
+   */
+  removeModel(modelId: string): Promise<void>;
+
+  /**
+   * Add a model from URL
+   * @param modelId - Model ID
+   * @param url - Model URL
+   * @returns Task ID
+   */
+  addModelFromURL(modelId: string, url: string): Promise<string>;
+
+  /**
+   * Get available models
+   * @returns JSON array of available models
+   */
+  availableModels(): Promise<string>;
+
+  // ============================================================================
+  // Authentication
+  // ============================================================================
+
+  /**
+   * Authenticate with API key
+   * @param apiKey - API key for authentication
+   */
+  authenticate(apiKey: string): Promise<boolean>;
+
+  /**
+   * Get current user ID
+   */
+  getUserId(): Promise<string | null>;
+
+  /**
+   * Get current organization ID
+   */
+  getOrganizationId(): Promise<string | null>;
+
+  /**
+   * Get device ID
+   */
+  getDeviceId(): Promise<string | null>;
+
+  /**
+   * Get access token
+   */
+  getAccessToken(): Promise<string | null>;
+
+  /**
+   * Refresh access token
+   */
+  refreshAccessToken(): Promise<string>;
+
+  /**
+   * Check if authenticated
+   */
+  isAuthenticated(): Promise<boolean>;
+
+  /**
+   * Clear authentication
+   */
+  clearAuthentication(): Promise<void>;
+
+  /**
+   * Load stored tokens
+   */
+  loadStoredTokens(): Promise<boolean>;
+
+  /**
+   * Register device
+   */
+  registerDevice(): Promise<boolean>;
+
+  /**
+   * Health check
+   */
+  healthCheck(): Promise<boolean>;
+
+  // ============================================================================
+  // Configuration
+  // ============================================================================
+
+  /**
+   * Get current configuration
+   * @returns JSON configuration data
+   */
+  getConfiguration(): Promise<string>;
+
+  /**
+   * Load configuration on launch
+   * @returns JSON configuration data
+   */
+  loadConfigurationOnLaunch(): Promise<string>;
+
+  /**
+   * Set consumer configuration
+   * @param configJson - JSON configuration
+   */
+  setConsumerConfiguration(configJson: string): Promise<void>;
+
+  /**
+   * Update configuration
+   * @param configJson - JSON configuration updates
+   */
+  updateConfiguration(configJson: string): Promise<void>;
+
+  /**
+   * Sync configuration to cloud
+   */
+  syncConfigurationToCloud(): Promise<void>;
+
+  /**
+   * Clear configuration cache
+   */
+  clearConfigurationCache(): Promise<void>;
+
+  /**
+   * Get current environment
+   */
+  getCurrentEnvironment(): Promise<string>;
+
+  // ============================================================================
+  // Download Service
+  // ============================================================================
+
+  /**
+   * Start model download
+   * @param modelId - Model ID to download
+   * @returns Task ID
+   */
+  startModelDownload(modelId: string): Promise<string>;
+
+  /**
+   * Cancel download
+   * @param taskId - Task ID to cancel
+   */
+  cancelDownload(taskId: string): Promise<void>;
+
+  /**
+   * Pause download
+   * @param taskId - Task ID to pause
+   */
+  pauseDownload(taskId: string): Promise<void>;
+
+  /**
+   * Resume download
+   * @param taskId - Task ID to resume
+   */
+  resumeDownload(taskId: string): Promise<void>;
+
+  /**
+   * Pause all downloads
+   */
+  pauseAllDownloads(): Promise<void>;
+
+  /**
+   * Resume all downloads
+   */
+  resumeAllDownloads(): Promise<void>;
+
+  /**
+   * Cancel all downloads
+   */
+  cancelAllDownloads(): Promise<void>;
+
+  /**
+   * Get download progress
+   * @param taskId - Task ID
+   * @returns JSON progress info
+   */
+  getDownloadProgress(taskId: string): Promise<string>;
+
+  /**
+   * Configure download service
+   * @param configJson - JSON configuration
+   */
+  configureDownloadService(configJson: string): Promise<void>;
+
+  /**
+   * Check if download service is healthy
+   */
+  isDownloadServiceHealthy(): Promise<boolean>;
+
+  /**
+   * Get download resume data
+   * @param taskId - Task ID
+   */
+  getDownloadResumeData(taskId: string): Promise<string>;
+
+  /**
+   * Resume download with data
+   * @param taskId - Task ID
+   * @param resumeData - Resume data JSON
+   */
+  resumeDownloadWithData(taskId: string, resumeData: string): Promise<string>;
+
+  // ============================================================================
   // Utilities
   // ============================================================================
 
