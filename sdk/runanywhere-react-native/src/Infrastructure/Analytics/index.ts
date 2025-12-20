@@ -16,12 +16,3 @@ export {
   STTAnalyticsService,
   TTSAnalyticsService,
 } from './Services';
-
-// Storage adapters (examples)
-export {
-  AsyncStorageAdapter,
-  CustomStorageAdapter,
-  getPlatformStorage,
-  initializeAnalytics,
-  setupAnalyticsWithAsyncStorage,
-} from './AsyncStorageAdapter.example';

@@ -7,41 +7,6 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/DependencyInjection/ServiceContainer.swift
  */
 
-// Stub interfaces for services not yet implemented
-// These will be replaced with real implementations when ready
-
-/** Placeholder interface for VoiceCapabilityService */
-interface VoiceCapabilityServiceStub {
-  initialize(): Promise<void>;
-}
-
-/** Placeholder interface for StorageAnalyzer */
-interface StorageAnalyzerStub {
-  analyze(): Promise<Record<string, unknown>>;
-}
-
-/** Placeholder interface for DatabaseManager */
-interface DatabaseManagerStub {
-  initialize(): Promise<void>;
-}
-
-/** Placeholder interface for TelemetryService */
-interface TelemetryServiceStub {
-  record(event: unknown): Promise<void>;
-}
-
-/** Placeholder interface for DeviceInfoService */
-interface DeviceInfoServiceStub {
-  loadCurrentDeviceInfo(): Promise<null>;
-  syncToCloud(): Promise<void>;
-  getDeviceInfoSummary(): Promise<string>;
-}
-
-/** Placeholder interface for Analytics services */
-interface AnalyticsServiceStub {
-  record(event: unknown): Promise<void>;
-}
-
 // Import actual services
 import { RegistryService } from '../../Capabilities/Registry/Services/RegistryService';
 import { ModelLoadingService } from '../../Capabilities/ModelLoading/Services/ModelLoadingService';
@@ -51,10 +16,6 @@ import { RoutingService } from '../../Capabilities/Routing/Services/RoutingServi
 import { CostCalculator } from '../../Capabilities/Routing/Services/CostCalculator';
 import { ResourceChecker } from '../../Capabilities/Routing/Services/ResourceChecker';
 import { HardwareCapabilityManager } from '../../Capabilities/DeviceCapability/Services/HardwareCapabilityManager';
-import { MemoryService } from '../../Capabilities/Memory/Services/MemoryService';
-import { AllocationManager } from '../../Capabilities/Memory/Services/AllocationManager';
-import { PressureHandler } from '../../Capabilities/Memory/Services/PressureHandler';
-import { CacheEviction } from '../../Capabilities/Memory/Services/CacheEviction';
 import { SDKLogger } from '../Logging/Logger/SDKLogger';
 import { FileManager } from '../FileOperations/FileManager';
 import { DownloadServiceImpl } from '../../Data/Network/Services/DownloadService';
@@ -174,20 +135,6 @@ export class ServiceContainer {
   }
 
   /**
-   * Voice capability service
-   */
-  private _voiceCapabilityService?: VoiceCapabilityServiceStub;
-  public get voiceCapabilityService(): VoiceCapabilityServiceStub {
-    if (!this._voiceCapabilityService) {
-      // VoiceCapabilityService - to be implemented
-      this._voiceCapabilityService = {
-        initialize: async () => {},
-      };
-    }
-    return this._voiceCapabilityService;
-  }
-
-  /**
    * Download service
    */
   private _downloadService?: DownloadService;
@@ -209,20 +156,6 @@ export class ServiceContainer {
     return this._fileManager;
   }
 
-  /**
-   * Storage analyzer for storage operations
-   */
-  private _storageAnalyzer?: StorageAnalyzerStub;
-  public get storageAnalyzer(): StorageAnalyzerStub {
-    if (!this._storageAnalyzer) {
-      // StorageAnalyzer - to be implemented
-      this._storageAnalyzer = {
-        analyze: async () => ({}),
-      };
-    }
-    return this._storageAnalyzer;
-  }
-
   // ============================================================================
   // Infrastructure
   // ============================================================================
@@ -240,18 +173,25 @@ export class ServiceContainer {
 
   /**
    * Memory service (implements MemoryManager protocol)
+   * Stub implementation - native memory management is handled by the platform
    */
   private _memoryService?: MemoryManager;
   public get memoryService(): MemoryManager {
     if (!this._memoryService) {
-      const allocationManager = new AllocationManager();
-      const pressureHandler = new PressureHandler();
-      const cacheEviction = new CacheEviction();
-      this._memoryService = new MemoryService(
-        allocationManager,
-        pressureHandler,
-        cacheEviction
-      );
+      // Stub implementation - memory management is delegated to native layer
+      this._memoryService = {
+        registerLoadedModel: () => {},
+        unregisterModel: () => {},
+        getCurrentMemoryUsage: () => 0,
+        getAvailableMemory: () => 2_000_000_000, // 2GB default
+        hasAvailableMemory: () => true,
+        canAllocate: async () => true,
+        handleMemoryPressure: async () => {},
+        setMemoryThreshold: () => {},
+        getLoadedModels: () => [],
+        requestMemory: async () => true,
+        isHealthy: () => true,
+      };
     }
     return this._memoryService;
   }
@@ -272,20 +212,6 @@ export class ServiceContainer {
       this._logger = new SDKLogger();
     }
     return this._logger;
-  }
-
-  /**
-   * Database manager
-   */
-  private _databaseManager?: DatabaseManagerStub;
-  private get databaseManager(): DatabaseManagerStub {
-    if (!this._databaseManager) {
-      // DatabaseManager - to be implemented (would use SQLite or similar)
-      this._databaseManager = {
-        initialize: async () => {},
-      };
-    }
-    return this._databaseManager;
   }
 
   /**
@@ -349,20 +275,6 @@ export class ServiceContainer {
   }
 
   /**
-   * Telemetry service
-   */
-  private _telemetryService?: TelemetryServiceStub;
-  public async getTelemetryService(): Promise<TelemetryServiceStub> {
-    if (!this._telemetryService) {
-      // TelemetryService - to be implemented
-      this._telemetryService = {
-        record: async (_event: unknown) => {},
-      };
-    }
-    return this._telemetryService;
-  }
-
-  /**
    * Model info service
    */
   private _modelInfoService?: ModelInfoService;
@@ -379,82 +291,10 @@ export class ServiceContainer {
   }
 
   /**
-   * Device info service
-   */
-  private _deviceInfoService?: DeviceInfoServiceStub;
-  public async getDeviceInfoService(): Promise<DeviceInfoServiceStub> {
-    if (!this._deviceInfoService) {
-      // DeviceInfoService - to be implemented
-      this._deviceInfoService = {
-        loadCurrentDeviceInfo: async () => null,
-        syncToCloud: async () => {},
-        getDeviceInfoSummary: async () => '',
-      };
-    }
-    return this._deviceInfoService;
-  }
-
-  /**
    * Analytics queue manager - centralized queue for all analytics
    */
   public get analyticsQueueManager(): AnalyticsQueueManager {
     return AnalyticsQueueManager.shared;
-  }
-
-  /**
-   * Generation analytics service
-   */
-  private _generationAnalytics?: AnalyticsServiceStub;
-  public async getGenerationAnalytics(): Promise<AnalyticsServiceStub> {
-    if (!this._generationAnalytics) {
-      // GenerationAnalyticsService - to be implemented
-      this._generationAnalytics = {
-        record: async (_event: unknown) => {},
-      };
-    }
-    return this._generationAnalytics;
-  }
-
-  /**
-   * STT Analytics Service
-   */
-  private _sttAnalytics?: AnalyticsServiceStub;
-  public async getSTTAnalytics(): Promise<AnalyticsServiceStub> {
-    if (!this._sttAnalytics) {
-      // STTAnalyticsService - to be implemented
-      this._sttAnalytics = {
-        record: async (_event: unknown) => {},
-      };
-    }
-    return this._sttAnalytics;
-  }
-
-  /**
-   * Voice Analytics Service
-   */
-  private _voiceAnalytics?: AnalyticsServiceStub;
-  public async getVoiceAnalytics(): Promise<AnalyticsServiceStub> {
-    if (!this._voiceAnalytics) {
-      // VoiceAnalyticsService - to be implemented
-      this._voiceAnalytics = {
-        record: async (_event: unknown) => {},
-      };
-    }
-    return this._voiceAnalytics;
-  }
-
-  /**
-   * TTS Analytics Service
-   */
-  private _ttsAnalytics?: AnalyticsServiceStub;
-  public async getTTSAnalytics(): Promise<AnalyticsServiceStub> {
-    if (!this._ttsAnalytics) {
-      // TTSAnalyticsService - to be implemented
-      this._ttsAnalytics = {
-        record: async (_event: unknown) => {},
-      };
-    }
-    return this._ttsAnalytics;
   }
 
   // ============================================================================
@@ -530,13 +370,7 @@ export class ServiceContainer {
     this.networkService = undefined;
     this._syncCoordinator = undefined;
     this._configurationService = undefined;
-    this._telemetryService = undefined;
     this._modelInfoService = undefined;
-    this._deviceInfoService = undefined;
-    this._generationAnalytics = undefined;
-    this._sttAnalytics = undefined;
-    this._voiceAnalytics = undefined;
-    this._ttsAnalytics = undefined;
     // Reset core services
     this._modelRegistry = undefined;
     this._modelLoadingService = undefined;

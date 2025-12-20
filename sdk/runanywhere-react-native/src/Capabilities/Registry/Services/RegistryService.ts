@@ -3,12 +3,14 @@
  *
  * Implementation of model registry
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Registry/Services/RegistryService.swift
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/ModelManagement/Services/RegistryService.swift
  */
 
 import type { ModelInfo } from '../../../Core/Models/Model/ModelInfo';
 import type { ModelRegistry } from '../../../Core/Protocols/Registry/ModelRegistry';
 import type { ModelCriteria } from '../../../Core/Protocols/Registry/ModelRegistry';
+import { ServiceContainer } from '../../../Foundation/DependencyInjection/ServiceContainer';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 
 /**
  * Implementation of model registry
@@ -18,10 +20,10 @@ export class RegistryService implements ModelRegistry {
   private modelsByProvider: Map<string, ModelInfo[]> = new Map();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ModelDiscovery type not yet defined
   private modelDiscovery: any;
+  private readonly logger = new SDKLogger('RegistryService');
 
   constructor() {
-    // Initialize model discovery
-    // this.modelDiscovery = new ModelDiscovery();
+    this.logger.debug('Initializing RegistryService');
   }
 
   /**
@@ -154,11 +156,22 @@ export class RegistryService implements ModelRegistry {
   }
 
   /**
-   * Load preconfigured models
+   * Load preconfigured models from storage
+   * Matches iOS: RegistryService.loadPreconfiguredModels()
    */
   private async loadPreconfiguredModels(): Promise<void> {
-    // Load models from configuration (remote or cached)
-    // This would integrate with ConfigurationService
-    // For now, placeholder
+    try {
+      const modelInfoService =
+        await ServiceContainer.shared.getModelInfoService();
+      const storedModels = await modelInfoService.loadStoredModels();
+      this.logger.info(`Loading ${storedModels.length} stored models`);
+      for (const model of storedModels) {
+        this.registerModel(model);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to load stored models: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 }

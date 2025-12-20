@@ -262,14 +262,18 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
       text: result.transcript,
       confidence: result.confidence ?? 1.0,
       wordTimestamps:
-        result.segments?.map((t) => ({
-          word: t.text,
-          startTime: t.start,
-          endTime: t.end,
-          confidence: result.confidence,
+        result.timestamps?.map((t) => ({
+          word: t.word,
+          startTime: t.startTime,
+          endTime: t.endTime,
+          confidence: t.confidence ?? result.confidence ?? 1.0,
         })) ?? null,
       detectedLanguage: result.language ?? null,
-      alternatives: null, // STTTranscriptionResult doesn't have alternatives in the placeholder
+      alternatives:
+        result.alternatives?.map((a) => ({
+          text: a.transcript,
+          confidence: a.confidence,
+        })) ?? null,
       metadata: {
         modelId,
         processingTime,
@@ -482,14 +486,18 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
           text: result.transcript,
           confidence: result.confidence ?? 1.0,
           wordTimestamps:
-            result.segments?.map((t) => ({
-              word: t.text,
-              startTime: t.start,
-              endTime: t.end,
-              confidence: result.confidence,
+            result.timestamps?.map((t) => ({
+              word: t.word,
+              startTime: t.startTime,
+              endTime: t.endTime,
+              confidence: t.confidence ?? result.confidence ?? 1.0,
             })) ?? null,
           detectedLanguage: result.language ?? null,
-          alternatives: null,
+          alternatives:
+            result.alternatives?.map((a) => ({
+              text: a.transcript,
+              confidence: a.confidence,
+            })) ?? null,
           metadata: {
             modelId,
             processingTime,
@@ -548,14 +556,18 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
           text: result.transcript,
           confidence: result.confidence ?? 1.0,
           wordTimestamps:
-            result.segments?.map((t) => ({
-              word: t.text,
-              startTime: t.start,
-              endTime: t.end,
-              confidence: result.confidence,
+            result.timestamps?.map((t) => ({
+              word: t.word,
+              startTime: t.startTime,
+              endTime: t.endTime,
+              confidence: t.confidence ?? result.confidence ?? 1.0,
             })) ?? null,
           detectedLanguage: result.language ?? null,
-          alternatives: null,
+          alternatives:
+            result.alternatives?.map((a) => ({
+              text: a.transcript,
+              confidence: a.confidence,
+            })) ?? null,
           metadata: {
             modelId,
             processingTime,

@@ -90,22 +90,26 @@ export {
 
 // Services
 export {
-  ConfigurationService,
-  AuthenticationService,
   ModelRegistry,
   DownloadService,
   DownloadState,
-  type ConfigurationUpdateOptions,
-  type AuthenticationResponse,
-  type AuthenticationState,
-  type DeviceRegistrationInfo,
+  JSDownloadService,
+  SystemTTSService,
+  getVoicesByLanguage,
+  getDefaultVoice,
+  getPlatformDefaultVoice,
+  PlatformVoices,
   type ModelCriteria,
   type AddModelFromURLOptions,
   type DownloadProgress,
   type DownloadTask,
   type DownloadConfiguration,
   type ProgressCallback,
+  type JSDownloadProgress,
 } from './services';
+
+// Authentication types from Data/Network
+export { type AuthenticationResponse } from './Data/Network';
 
 // Native Module (for advanced use)
 export {

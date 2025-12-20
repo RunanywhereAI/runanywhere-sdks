@@ -242,8 +242,8 @@ export class TTSCapability extends BaseComponent<TTSServiceWrapper> {
     const charactersPerSecond =
       processingTime > 0 ? characterCount / processingTime : 0;
 
-    // Decode base64 audio data
-    const audioData = Buffer.from(result.audio, 'base64');
+    // Decode base64 audio data (result.audioData is already base64 from native)
+    const audioData = Buffer.from(result.audioData, 'base64');
 
     // Create output
     return {
