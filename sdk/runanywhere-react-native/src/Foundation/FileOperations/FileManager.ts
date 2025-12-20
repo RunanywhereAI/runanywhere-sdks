@@ -7,8 +7,7 @@
  */
 
 import { SDKLogger } from '../Logging/Logger/SDKLogger';
-import { ModelFormat } from '../../Core/Models/Model/ModelFormat';
-import { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
+import type { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
 
 /**
  * Simplified file manager using React Native file system
@@ -27,7 +26,10 @@ export class FileManager {
   /**
    * Find model file by searching all possible locations
    */
-  public findModelFile(modelId: string, expectedPath?: string | null): string | null {
+  public findModelFile(
+    modelId: string,
+    expectedPath?: string | null
+  ): string | null {
     // If expected path exists and is valid, return it
     if (expectedPath) {
       // In React Native, would check if file exists via native module
@@ -55,7 +57,7 @@ export class FileManager {
   /**
    * Get file size
    */
-  public async getFileSize(path: string): Promise<number | null> {
+  public async getFileSize(_path: string): Promise<number | null> {
     // In React Native, would use native module
     // For now, return null
     return null;
@@ -64,7 +66,7 @@ export class FileManager {
   /**
    * Check if file exists
    */
-  public async fileExists(path: string): Promise<boolean> {
+  public async fileExists(_path: string): Promise<boolean> {
     // In React Native, would use native module
     // For now, return false
     return false;

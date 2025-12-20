@@ -6,7 +6,10 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Components/SpeakerDiarization/SpeakerDiarizationComponent.swift
  */
 
-import type { ComponentInput, ComponentOutput } from '../../Core/Components/BaseComponent';
+import type {
+  ComponentInput,
+  ComponentOutput,
+} from '../../Core/Components/BaseComponent';
 import type { STTOutput } from '../STT/STTModels';
 
 /**

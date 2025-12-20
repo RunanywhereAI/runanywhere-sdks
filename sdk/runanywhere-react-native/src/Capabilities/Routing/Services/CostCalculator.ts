@@ -14,8 +14,8 @@ export class CostCalculator {
    * Calculate on-device cost
    */
   public async calculateOnDeviceCost(
-    tokenCount: number,
-    options: GenerationOptions
+    _tokenCount: number,
+    _options: GenerationOptions
   ): Promise<number> {
     // On-device is essentially free (just battery/processing)
     return 0.0;
@@ -26,7 +26,7 @@ export class CostCalculator {
    */
   public async calculateCloudCost(
     tokenCount: number,
-    options: GenerationOptions
+    _options: GenerationOptions
   ): Promise<number> {
     // Simple cost model: $0.001 per token
     return tokenCount * 0.001;

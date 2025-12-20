@@ -6,7 +6,8 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Protocols/Memory/MemoryManager.swift
  */
 
-import { LLMFramework } from '../../Models/Framework/LLMFramework';
+import type { LLMFramework } from '../../Models/Framework/LLMFramework';
+import type { LLMService } from '../LLM/LLMService';
 
 /**
  * Memory-tracked model information
@@ -38,7 +39,7 @@ export interface MemoryLoadedModelInfo {
   readonly model: MemoryLoadedModel;
   readonly size: number; // Int64
   lastUsed: Date;
-  readonly service: any | null; // LLMService (weak reference in Swift)
+  readonly service: LLMService | null; // LLMService (weak reference in Swift)
   readonly priority: MemoryPriority;
 }
 

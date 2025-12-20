@@ -23,7 +23,6 @@ import {
   type RunAnywhereGenerationOptions,
 } from './LLMModels';
 import type { LLMService } from '../../Core/Protocols/LLM/LLMService';
-import type { LLMServiceProvider } from '../../Core/Protocols/LLM/LLMServiceProvider';
 import type { GenerationOptions } from '../../Capabilities/TextGeneration/Models/GenerationOptions';
 import type { GenerationResult } from '../../Capabilities/TextGeneration/Models/GenerationResult';
 import { AnyServiceWrapper } from '../../Core/Components/BaseComponent';
@@ -53,7 +52,10 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
   public static override componentType: SDKComponent = SDKComponent.LLM;
 
   private readonly llmConfiguration: LLMConfiguration;
-  private conversationContext: { systemPrompt?: string | null; messages?: Message[] } | null = null;
+  private conversationContext: {
+    systemPrompt?: string | null;
+    messages?: Message[];
+  } | null = null;
 
   /**
    * Managed lifecycle with integrated event tracking
@@ -75,7 +77,7 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
     // Create managed lifecycle for LLM with load/unload functions
     this.managedLifecycle = ManagedLifecycle.forLLM<LLMService>(
       // Load resource function
-      async (resourceId: string, config: ComponentConfiguration | null) => {
+      async (resourceId: string, _config: ComponentConfiguration | null) => {
         return await this.loadLLMService(resourceId);
       },
       // Unload resource function
@@ -175,7 +177,10 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
   /**
    * Generate text from a simple prompt
    */
-  public async generate(prompt: string, systemPrompt?: string | null): Promise<LLMOutput> {
+  public async generate(
+    prompt: string,
+    systemPrompt?: string | null
+  ): Promise<LLMOutput> {
     this.ensureReady();
 
     const input: LLMInput = {
@@ -185,7 +190,10 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
       options: null,
       validate: () => {
         if (!prompt || prompt.trim().length === 0) {
-          throw new SDKError(SDKErrorCode.ValidationFailed, 'LLMInput must contain at least one message');
+          throw new SDKError(
+            SDKErrorCode.ValidationFailed,
+            'LLMInput must contain at least one message'
+          );
         }
       },
       timestamp: new Date(),
@@ -210,7 +218,10 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
       options: null,
       validate: () => {
         if (!messages || messages.length === 0) {
-          throw new SDKError(SDKErrorCode.ValidationFailed, 'LLMInput must contain at least one message');
+          throw new SDKError(
+            SDKErrorCode.ValidationFailed,
+            'LLMInput must contain at least one message'
+          );
         }
       },
       timestamp: new Date(),
@@ -240,10 +251,10 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
           systemPrompt: input.options.systemPrompt,
         }
       : {
-      maxTokens: this.llmConfiguration.maxTokens,
-      temperature: this.llmConfiguration.temperature,
+          maxTokens: this.llmConfiguration.maxTokens,
+          temperature: this.llmConfiguration.temperature,
           systemPrompt: this.llmConfiguration.systemPrompt,
-    };
+        };
 
     // Build prompt
     const prompt = this.buildPrompt(
@@ -261,7 +272,8 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
 
     // Extract token usage from result
     const promptTokens = Math.floor(prompt.length / 4); // Rough estimate
-    const completionTokens = result.tokensUsed ?? Math.floor(result.text.length / 4);
+    const completionTokens =
+      result.tokensUsed ?? Math.floor(result.text.length / 4);
     const tokensPerSecond = completionTokens / generationTime;
 
     // Create output
@@ -310,8 +322,8 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
     if (llmService.generateStream) {
       let accumulatedText = '';
       const result = await llmService.generateStream(
-      fullPrompt,
-      options,
+        fullPrompt,
+        options,
         (token: string) => {
           // Yield tokens as they come
           accumulatedText += token;
@@ -367,7 +379,7 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
 
     // Use managedLifecycle.requireService() for iOS parity
     const llmService = this.managedLifecycle.requireService();
-    const modelId = this.managedLifecycle.resourceIdOrUnknown();
+    const _modelId = this.managedLifecycle.resourceIdOrUnknown();
 
     // Shared state between stream and result
     const collector = {
@@ -383,7 +395,9 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
 
     // Token queue for async iteration
     const tokenQueue: LLMStreamToken[] = [];
-    let streamResolve: ((value: IteratorResult<LLMStreamToken>) => void) | null = null;
+    let streamResolve:
+      | ((value: IteratorResult<LLMStreamToken>) => void)
+      | null = null;
     let streamEnded = false;
 
     // Merge options with configuration defaults
@@ -394,8 +408,9 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
       topP: options?.topP,
       stopSequences: options?.stopSequences,
       streamingEnabled: true,
-      preferredExecutionTarget: options?.executionTarget ?
-        (options.executionTarget as any) : undefined,
+      preferredExecutionTarget: options?.executionTarget
+        ? (options.executionTarget as any)
+        : undefined,
       preferredFramework: options?.preferredFramework as any,
     };
 
@@ -481,7 +496,10 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
 
         // Signal result completion
         if (collector.resolveResult) {
-          const output = componentThis.buildOutputFromCollector(collector, generationOptions);
+          const output = componentThis.buildOutputFromCollector(
+            collector,
+            generationOptions
+          );
           collector.resolveResult(output);
         }
       } catch (error) {
@@ -494,7 +512,11 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
     })();
 
     // Create the async generator
-    const stream = (async function* (): AsyncGenerator<LLMStreamToken, void, unknown> {
+    const stream = (async function* (): AsyncGenerator<
+      LLMStreamToken,
+      void,
+      unknown
+    > {
       while (!streamEnded || tokenQueue.length > 0) {
         if (tokenQueue.length > 0) {
           const token = tokenQueue.shift()!;
@@ -537,7 +559,7 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
       fullText: string;
       startTime: number;
       firstTokenTime: number | null;
-      tokenCount: number
+      tokenCount: number;
     },
     options: GenerationOptions
   ): LLMOutput {
@@ -550,13 +572,14 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
       : null;
 
     // Calculate tokens per second
-    const tokensPerSecond = totalTimeSec > 0 ? collector.tokenCount / totalTimeSec : 0;
+    const tokensPerSecond =
+      totalTimeSec > 0 ? collector.tokenCount / totalTimeSec : 0;
 
     // Estimate prompt tokens (rough estimate: 1 token ≈ 4 characters)
     const promptTokens = Math.floor(collector.fullText.length / 4);
     const completionTokens = collector.tokenCount;
 
-    const performanceMetrics = new PerformanceMetricsImpl({
+    const _performanceMetrics = new PerformanceMetricsImpl({
       tokenizationTimeMs: 0,
       inferenceTimeMs: totalTimeMs,
       postProcessingTimeMs: 0,
@@ -589,7 +612,10 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
   /**
    * Build prompt from messages and system prompt
    */
-  private buildPrompt(messages: Message[], systemPrompt?: string | null): string {
+  private buildPrompt(
+    messages: Message[],
+    systemPrompt?: string | null
+  ): string {
     let prompt = '';
 
     if (systemPrompt) {
@@ -597,7 +623,8 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
     }
 
     for (const message of messages) {
-      const roleLabel = message.role === MessageRole.User ? 'User' : 'Assistant';
+      const roleLabel =
+        message.role === MessageRole.User ? 'User' : 'Assistant';
       prompt += `${roleLabel}: ${message.content}\n\n`;
     }
 

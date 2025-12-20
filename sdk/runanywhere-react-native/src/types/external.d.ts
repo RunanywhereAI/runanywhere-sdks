@@ -16,14 +16,25 @@ declare module 'react-native-fs' {
     DownloadDirectoryPath: string;
     PicturesDirectoryPath: string;
 
-    mkdir(filepath: string, options?: { NSURLIsExcludedFromBackupKey?: boolean }): Promise<void>;
+    mkdir(
+      filepath: string,
+      options?: { NSURLIsExcludedFromBackupKey?: boolean }
+    ): Promise<void>;
     moveFile(filepath: string, destPath: string): Promise<void>;
     copyFile(filepath: string, destPath: string): Promise<void>;
     unlink(filepath: string): Promise<void>;
     exists(filepath: string): Promise<boolean>;
     readFile(filepath: string, encoding?: string): Promise<string>;
-    writeFile(filepath: string, contents: string, encoding?: string): Promise<void>;
-    appendFile(filepath: string, contents: string, encoding?: string): Promise<void>;
+    writeFile(
+      filepath: string,
+      contents: string,
+      encoding?: string
+    ): Promise<void>;
+    appendFile(
+      filepath: string,
+      contents: string,
+      encoding?: string
+    ): Promise<void>;
     stat(filepath: string): Promise<{
       name: string;
       path: string;
@@ -35,15 +46,17 @@ declare module 'react-native-fs' {
       isFile: () => boolean;
       isDirectory: () => boolean;
     }>;
-    readDir(dirpath: string): Promise<Array<{
-      name: string;
-      path: string;
-      size: number;
-      ctime: Date;
-      mtime: Date;
-      isFile: () => boolean;
-      isDirectory: () => boolean;
-    }>>;
+    readDir(dirpath: string): Promise<
+      Array<{
+        name: string;
+        path: string;
+        size: number;
+        ctime: Date;
+        mtime: Date;
+        isFile: () => boolean;
+        isDirectory: () => boolean;
+      }>
+    >;
     hash(filepath: string, algorithm: string): Promise<string>;
     getFSInfo(): Promise<{
       totalSpace: number;
@@ -54,12 +67,24 @@ declare module 'react-native-fs' {
       toFile: string;
       headers?: Record<string, string>;
       background?: boolean;
-      begin?: (res: { jobId: number; contentLength: number; statusCode: number }) => void;
-      progress?: (res: { jobId: number; bytesWritten: number; contentLength: number }) => void;
+      begin?: (res: {
+        jobId: number;
+        contentLength: number;
+        statusCode: number;
+      }) => void;
+      progress?: (res: {
+        jobId: number;
+        bytesWritten: number;
+        contentLength: number;
+      }) => void;
       progressDivider?: number;
     }): {
       jobId: number;
-      promise: Promise<{ jobId: number; statusCode: number; bytesWritten: number }>;
+      promise: Promise<{
+        jobId: number;
+        statusCode: number;
+        bytesWritten: number;
+      }>;
     };
     stopDownload(jobId: number): void;
   };
@@ -79,7 +104,9 @@ declare module 'rn-fetch-blob' {
 
   interface StatefulPromise<T> extends Promise<T> {
     cancel(): void;
-    progress(callback: (received: number, total: number) => void): StatefulPromise<T>;
+    progress(
+      callback: (received: number, total: number) => void
+    ): StatefulPromise<T>;
   }
 
   interface RNFetchBlob {
@@ -99,7 +126,12 @@ declare module 'rn-fetch-blob' {
       appendExt?: string;
       timeout?: number;
     }): {
-      fetch(method: string, url: string, headers?: Record<string, string>, body?: any): StatefulPromise<FetchBlobResponse>;
+      fetch(
+        method: string,
+        url: string,
+        headers?: Record<string, string>,
+        body?: any
+      ): StatefulPromise<FetchBlobResponse>;
     };
   }
 

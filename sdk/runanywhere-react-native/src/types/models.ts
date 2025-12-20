@@ -5,7 +5,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/
  */
 
-import {
+import type {
   ConfigurationSource,
   ExecutionTarget,
   HardwareAcceleration,

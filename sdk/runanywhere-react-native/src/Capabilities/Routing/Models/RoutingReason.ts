@@ -6,8 +6,8 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Routing/Models/RoutingReason.swift
  */
 
-import { ExecutionTarget } from './ExecutionTarget';
-import { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
+import type { ExecutionTarget } from './ExecutionTarget';
+import type { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
 
 /**
  * Routing policy

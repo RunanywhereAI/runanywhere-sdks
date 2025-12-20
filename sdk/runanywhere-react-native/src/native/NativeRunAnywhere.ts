@@ -44,10 +44,18 @@ export interface NativeRunAnywhereModule {
   // Speech-to-Text (STT)
   // ============================================================================
 
-  loadSTTModel(path: string, modelType: string, configJson?: string): Promise<boolean>;
+  loadSTTModel(
+    path: string,
+    modelType: string,
+    configJson?: string
+  ): Promise<boolean>;
   isSTTModelLoaded(): Promise<boolean>;
   unloadSTTModel(): Promise<boolean>;
-  transcribe(audioBase64: string, sampleRate: number, language?: string): Promise<string>;
+  transcribe(
+    audioBase64: string,
+    sampleRate: number,
+    language?: string
+  ): Promise<string>;
   transcribeFile(filePath: string, language?: string): Promise<string>;
   supportsSTTStreaming(): Promise<boolean>;
 
@@ -55,10 +63,19 @@ export interface NativeRunAnywhereModule {
   // Text-to-Speech (TTS)
   // ============================================================================
 
-  loadTTSModel(path: string, modelType: string, configJson?: string): Promise<boolean>;
+  loadTTSModel(
+    path: string,
+    modelType: string,
+    configJson?: string
+  ): Promise<boolean>;
   isTTSModelLoaded(): Promise<boolean>;
   unloadTTSModel(): Promise<boolean>;
-  synthesize(text: string, voiceId: string, speedRate: number, pitchShift: number): Promise<string>;
+  synthesize(
+    text: string,
+    voiceId: string,
+    speedRate: number,
+    pitchShift: number
+  ): Promise<string>;
   getTTSVoices(): Promise<string>;
 
   // ============================================================================
@@ -468,14 +485,18 @@ function getRunAnywhere(): RunAnywhere {
  * Get the RunAnywhereFileSystem Nitrogen HybridObject
  */
 function getRunAnywhereFileSystem(): RunAnywhereFileSystem {
-  return NitroModules.createHybridObject<RunAnywhereFileSystem>('RunAnywhereFileSystem');
+  return NitroModules.createHybridObject<RunAnywhereFileSystem>(
+    'RunAnywhereFileSystem'
+  );
 }
 
 /**
  * Get the RunAnywhereDeviceInfo Nitrogen HybridObject
  */
 function getRunAnywhereDeviceInfo(): RunAnywhereDeviceInfo {
-  return NitroModules.createHybridObject<RunAnywhereDeviceInfo>('RunAnywhereDeviceInfo');
+  return NitroModules.createHybridObject<RunAnywhereDeviceInfo>(
+    'RunAnywhereDeviceInfo'
+  );
 }
 
 // Cached instances - lazily initialized to avoid accessing native modules
@@ -525,46 +546,61 @@ function getNativeDeviceInfo(): RunAnywhereDeviceInfo {
  * Defers HybridObject creation until first property access to avoid
  * accessing native modules before React Native is fully initialized
  */
-export const NativeRunAnywhere: NativeRunAnywhereModule = new Proxy({} as NativeRunAnywhereModule, {
-  get(_target, prop) {
-    const module = getNativeModule();
-    const value = (module as any)[prop];
-    if (typeof value === 'function') {
-      return value.bind(module);
-    }
-    return value;
-  },
-});
+export const NativeRunAnywhere: NativeRunAnywhereModule = new Proxy(
+  {} as NativeRunAnywhereModule,
+  {
+    get(_target, prop) {
+      const module = getNativeModule();
+      const value = (module as unknown as Record<string | symbol, unknown>)[
+        prop
+      ];
+      if (typeof value === 'function') {
+        return (value as (...args: unknown[]) => unknown).bind(module);
+      }
+      return value;
+    },
+  }
+);
 
 /**
  * Lazy proxy for NativeRunAnywhereFileSystem
  * Defers HybridObject creation until first property access
  */
-export const NativeRunAnywhereFileSystem: RunAnywhereFileSystem = new Proxy({} as RunAnywhereFileSystem, {
-  get(_target, prop) {
-    const module = getNativeFileSystem();
-    const value = (module as any)[prop];
-    if (typeof value === 'function') {
-      return value.bind(module);
-    }
-    return value;
-  },
-});
+export const NativeRunAnywhereFileSystem: RunAnywhereFileSystem = new Proxy(
+  {} as RunAnywhereFileSystem,
+  {
+    get(_target, prop) {
+      const module = getNativeFileSystem();
+      const value = (module as unknown as Record<string | symbol, unknown>)[
+        prop
+      ];
+      if (typeof value === 'function') {
+        return (value as (...args: unknown[]) => unknown).bind(module);
+      }
+      return value;
+    },
+  }
+);
 
 /**
  * Lazy proxy for NativeRunAnywhereDeviceInfo
  * Defers HybridObject creation until first property access
  */
-export const NativeRunAnywhereDeviceInfo: RunAnywhereDeviceInfo = new Proxy({} as RunAnywhereDeviceInfo, {
-  get(_target, prop) {
-    const module = getNativeDeviceInfo();
-    const value = (module as any)[prop];
-    if (typeof value === 'function') {
-      return value.bind(module);
-    }
-    return value;
-  },
-});
+export const NativeRunAnywhereDeviceInfo: RunAnywhereDeviceInfo = new Proxy(
+  {} as RunAnywhereDeviceInfo,
+  {
+    get(_target, prop) {
+      const module = getNativeDeviceInfo();
+      const value = (module as unknown as Record<string | symbol, unknown>)[
+        prop
+      ];
+      if (typeof value === 'function') {
+        return (value as (...args: unknown[]) => unknown).bind(module);
+      }
+      return value;
+    },
+  }
+);
 
 /**
  * Check if native module is available
@@ -609,8 +645,7 @@ export function requireFileSystemModule(): RunAnywhereFileSystem {
     return getNativeFileSystem();
   } catch (error) {
     throw new Error(
-      '[RunAnywhere] FileSystem module is not available. ' +
-        `Error: ${error}`
+      '[RunAnywhere] FileSystem module is not available. ' + `Error: ${error}`
     );
   }
 }
@@ -623,8 +658,7 @@ export function requireDeviceInfoModule(): RunAnywhereDeviceInfo {
     return getNativeDeviceInfo();
   } catch (error) {
     throw new Error(
-      '[RunAnywhere] DeviceInfo module is not available. ' +
-        `Error: ${error}`
+      '[RunAnywhere] DeviceInfo module is not available. ' + `Error: ${error}`
     );
   }
 }

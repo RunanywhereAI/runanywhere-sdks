@@ -17,7 +17,15 @@ import { LLMFramework as CatalogFramework } from '../types'; // For catalog look
 import { PerformanceMetricsImpl } from '../Capabilities/TextGeneration/Models/PerformanceMetrics';
 import { getCatalogModelsByFramework } from '../Data/modelCatalog';
 import { SDKError, SDKErrorCode } from '../Public/Errors/SDKError';
-import { requireNativeModule } from '../native';
+import { requireNativeModule, type NativeRunAnywhereModule } from '../native';
+
+/**
+ * LlamaCpp service configuration
+ */
+export interface LlamaCppConfiguration {
+  modelId?: string;
+  configJson?: string;
+}
 
 /**
  * LlamaCPP Service Provider
@@ -54,12 +62,16 @@ export class LlamaCppProvider implements LLMServiceProvider {
     console.log('[LlamaCppProvider] Registering LlamaCPP service provider');
 
     // Import ServiceRegistry dynamically to avoid circular dependency
-    const { ServiceRegistry } = require('../Foundation/DependencyInjection/ServiceRegistry');
+    const {
+      ServiceRegistry,
+    } = require('../Foundation/DependencyInjection/ServiceRegistry');
 
     // Register with priority 100 (default priority)
     ServiceRegistry.shared.registerLLMProvider(LlamaCppProvider.shared, 100);
 
-    console.log('[LlamaCppProvider] LlamaCPP service provider registered successfully');
+    console.log(
+      '[LlamaCppProvider] LlamaCPP service provider registered successfully'
+    );
   }
 
   /**
@@ -128,7 +140,9 @@ export class LlamaCppProvider implements LLMServiceProvider {
     // Get all GGUF models from catalog (use types/enums version for catalog lookup)
     const ggufModels = getCatalogModelsByFramework(CatalogFramework.LlamaCpp);
 
-    console.log(`[LlamaCppProvider] Providing ${ggufModels.length} GGUF models`);
+    console.log(
+      `[LlamaCppProvider] Providing ${ggufModels.length} GGUF models`
+    );
 
     return ggufModels;
   }
@@ -138,8 +152,12 @@ export class LlamaCppProvider implements LLMServiceProvider {
    *
    * This mirrors Swift SDK's createLLMService implementation.
    */
-  async createLLMService(configuration: any): Promise<LLMService> {
-    console.log(`[LlamaCppProvider] Creating LLM service for model: ${configuration?.modelId}`);
+  async createLLMService(
+    configuration: LlamaCppConfiguration
+  ): Promise<LLMService> {
+    console.log(
+      `[LlamaCppProvider] Creating LLM service for model: ${configuration?.modelId}`
+    );
 
     // Verify we can handle this model
     if (!this.canHandle(configuration?.modelId)) {
@@ -196,7 +214,9 @@ export class LlamaCppProvider implements LLMServiceProvider {
     // This ensures models are discoverable immediately
     const models = this.getProvidedModels();
 
-    console.log(`[LlamaCppProvider] Registered ${models.length} models through provider`);
+    console.log(
+      `[LlamaCppProvider] Registered ${models.length} models through provider`
+    );
   }
 }
 
@@ -206,14 +226,14 @@ export class LlamaCppProvider implements LLMServiceProvider {
  * Wraps the native LlamaCPP backend for text generation.
  */
 class LlamaCppService implements LLMService {
-  private configuration: any;
+  private configuration: LlamaCppConfiguration;
   private modelPath: string | null;
-  private native: any;
+  private native: NativeRunAnywhereModule;
 
   isReady: boolean = false;
   currentModel: string | null = null;
 
-  constructor(configuration: any, modelPath: string | null) {
+  constructor(configuration: LlamaCppConfiguration, modelPath: string | null) {
     this.configuration = configuration;
     this.modelPath = modelPath;
     this.native = requireNativeModule();
@@ -248,15 +268,20 @@ class LlamaCppService implements LLMService {
     console.log('[LlamaCppService] Model loaded successfully');
   }
 
-  async generate(prompt: string, options?: GenerationOptions): Promise<GenerationResult> {
+  async generate(
+    prompt: string,
+    options?: GenerationOptions
+  ): Promise<GenerationResult> {
     const startTime = Date.now();
 
-    const result = await this.native.generate(
-      prompt,
-      options?.systemPrompt || null,
-      options?.maxTokens || 512,
-      options?.temperature || 0.7
-    );
+    // Build options JSON for native module
+    const optionsJson = JSON.stringify({
+      systemPrompt: options?.systemPrompt || null,
+      maxTokens: options?.maxTokens || 512,
+      temperature: options?.temperature || 0.7,
+    });
+
+    const result = await this.native.generate(prompt, optionsJson);
 
     const latencyMs = Date.now() - startTime;
 
@@ -275,7 +300,9 @@ class LlamaCppService implements LLMService {
       framework: LLMFramework.LlamaCpp,
       hardwareUsed: HardwareAcceleration.CPU,
       memoryUsed: 0,
-      performanceMetrics: new PerformanceMetricsImpl({ inferenceTimeMs: latencyMs }),
+      performanceMetrics: new PerformanceMetricsImpl({
+        inferenceTimeMs: latencyMs,
+      }),
       structuredOutputValidation: null,
       thinkingTokens: null,
       responseTokens: 0,

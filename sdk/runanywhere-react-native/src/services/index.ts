@@ -5,7 +5,11 @@
  */
 
 // Model Registry - Manages model discovery and registration (JS-based)
-export { ModelRegistry, type ModelCriteria, type AddModelFromURLOptions } from './ModelRegistry';
+export {
+  ModelRegistry,
+  type ModelCriteria,
+  type AddModelFromURLOptions,
+} from './ModelRegistry';
 
 // JS Download Service - JavaScript-based download using react-native-fs
 export {
@@ -43,7 +47,12 @@ export {
 // Placeholder exports for type compatibility
 export type ConfigurationUpdateOptions = Record<string, unknown>;
 export type AuthenticationResponse = { success: boolean; token?: string };
-export type AuthenticationState = { isAuthenticated: boolean; userId?: string; organizationId?: string; deviceId?: string };
+export type AuthenticationState = {
+  isAuthenticated: boolean;
+  userId?: string;
+  organizationId?: string;
+  deviceId?: string;
+};
 export type DeviceRegistrationInfo = { deviceId: string; registered: boolean };
 
 // Placeholder service stubs

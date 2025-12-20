@@ -137,7 +137,9 @@ export interface ComponentConfiguration {
  * Base protocol for all capabilities.
  * Matches iOS Capability protocol.
  */
-export interface Capability<TConfiguration extends ComponentConfiguration = ComponentConfiguration> {
+export interface Capability<
+  TConfiguration extends ComponentConfiguration = ComponentConfiguration,
+> {
   /**
    * Configure the capability
    */
@@ -154,7 +156,7 @@ export interface Capability<TConfiguration extends ComponentConfiguration = Comp
  * Matches iOS ModelLoadableCapability protocol.
  */
 export interface ModelLoadableCapability<
-  TService,
+  _TService,
   TConfiguration extends ComponentConfiguration = ComponentConfiguration,
 > extends Capability<TConfiguration> {
   /**
@@ -185,7 +187,7 @@ export interface ModelLoadableCapability<
  * Matches iOS ServiceBasedCapability protocol.
  */
 export interface ServiceBasedCapability<
-  TService,
+  _TService,
   TConfiguration extends ComponentConfiguration = ComponentConfiguration,
 > extends Capability<TConfiguration> {
   /**
@@ -270,7 +272,10 @@ export class CapabilityError extends Error {
   }
 
   static notInitialized(capability: string): CapabilityError {
-    return new CapabilityError(`${capability} is not initialized`, CapabilityErrorCode.NotInitialized);
+    return new CapabilityError(
+      `${capability} is not initialized`,
+      CapabilityErrorCode.NotInitialized
+    );
   }
 
   static resourceNotLoaded(resource: string): CapabilityError {
@@ -280,14 +285,20 @@ export class CapabilityError extends Error {
     );
   }
 
-  static loadFailed(resource: string, underlyingError?: Error): CapabilityError {
+  static loadFailed(
+    resource: string,
+    underlyingError?: Error
+  ): CapabilityError {
     const message = underlyingError
       ? `Failed to load ${resource}: ${underlyingError.message}`
       : `Failed to load ${resource}: Unknown error`;
     return new CapabilityError(message, CapabilityErrorCode.LoadFailed);
   }
 
-  static operationFailed(operation: string, underlyingError?: Error): CapabilityError {
+  static operationFailed(
+    operation: string,
+    underlyingError?: Error
+  ): CapabilityError {
     const message = underlyingError
       ? `${operation} failed: ${underlyingError.message}`
       : `${operation} failed: Unknown error`;
@@ -301,11 +312,17 @@ export class CapabilityError extends Error {
     );
   }
 
-  static compositeComponentFailed(component: string, underlyingError?: Error): CapabilityError {
+  static compositeComponentFailed(
+    component: string,
+    underlyingError?: Error
+  ): CapabilityError {
     const message = underlyingError
       ? `${component} component failed: ${underlyingError.message}`
       : `${component} component failed: Unknown error`;
-    return new CapabilityError(message, CapabilityErrorCode.CompositeComponentFailed);
+    return new CapabilityError(
+      message,
+      CapabilityErrorCode.CompositeComponentFailed
+    );
   }
 }
 

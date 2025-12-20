@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Models/Model/ModelInfoMetadata.swift
  */
 
-import { QuantizationLevel } from '../Common/QuantizationLevel';
+import type { QuantizationLevel } from '../Common/QuantizationLevel';
 
 /**
  * Model information metadata
@@ -39,18 +39,20 @@ export class ModelInfoMetadataImpl implements ModelInfoMetadata {
   public readonly minOSVersion: string | null;
   public readonly minMemory: number | null;
 
-  constructor(options: {
-    author?: string | null;
-    license?: string | null;
-    tags?: string[];
-    description?: string | null;
-    trainingDataset?: string | null;
-    baseModel?: string | null;
-    quantizationLevel?: QuantizationLevel | null;
-    version?: string | null;
-    minOSVersion?: string | null;
-    minMemory?: number | null;
-  } = {}) {
+  constructor(
+    options: {
+      author?: string | null;
+      license?: string | null;
+      tags?: string[];
+      description?: string | null;
+      trainingDataset?: string | null;
+      baseModel?: string | null;
+      quantizationLevel?: QuantizationLevel | null;
+      version?: string | null;
+      minOSVersion?: string | null;
+      minMemory?: number | null;
+    } = {}
+  ) {
     this.author = options.author ?? null;
     this.license = options.license ?? null;
     this.tags = options.tags ?? [];

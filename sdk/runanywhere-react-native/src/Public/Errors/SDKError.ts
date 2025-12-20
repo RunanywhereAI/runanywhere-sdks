@@ -6,16 +6,18 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Errors/SDKError.swift
  */
 
-import { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
-
 /**
  * SDK-specific errors
  */
 export class SDKError extends Error {
   public readonly code: SDKErrorCode;
-  public readonly details?: any;
+  public readonly details?: Record<string, unknown>;
 
-  constructor(code: SDKErrorCode, message: string, details?: any) {
+  constructor(
+    code: SDKErrorCode,
+    message: string,
+    details?: Record<string, unknown>
+  ) {
     super(message);
     this.name = 'SDKError';
     this.code = code;
@@ -69,11 +71,9 @@ export class SDKError extends Error {
    * Create invalid state error
    */
   public static invalidState(reason: string): SDKError {
-    return new SDKError(
-      SDKErrorCode.InvalidState,
-      `Invalid state: ${reason}`,
-      { reason }
-    );
+    return new SDKError(SDKErrorCode.InvalidState, `Invalid state: ${reason}`, {
+      reason,
+    });
   }
 }
 

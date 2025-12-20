@@ -12,8 +12,10 @@ import type { HybridObject } from 'react-native-nitro-modules';
  * This is implemented natively in Kotlin/Swift for optimal performance
  * and access to platform-specific APIs (FileManager, java.io).
  */
-export interface RunAnywhereFileSystem
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+export interface RunAnywhereFileSystem extends HybridObject<{
+  ios: 'swift';
+  android: 'kotlin';
+}> {
   /**
    * Get the RunAnywhere data directory path
    */

@@ -120,7 +120,9 @@ export interface ServiceComponent<TService> extends Component {
  *
  * @template TService - The service type this component manages
  */
-export abstract class BaseComponent<TService> implements ServiceComponent<TService> {
+export abstract class BaseComponent<
+  TService,
+> implements ServiceComponent<TService> {
   // ============================================================================
   // Static Properties
   // ============================================================================

@@ -39,8 +39,7 @@ export class MemoryService implements MemoryManager {
     cacheEviction?: CacheEviction,
     memoryMonitor?: MemoryMonitor
   ) {
-    this.allocationManager =
-      allocationManager ?? new AllocationManager();
+    this.allocationManager = allocationManager ?? new AllocationManager();
     this.pressureHandler = pressureHandler ?? new PressureHandler();
     this.cacheEviction = cacheEviction ?? new CacheEviction();
     this.memoryMonitor = memoryMonitor ?? new MemoryMonitor();
@@ -84,8 +83,7 @@ export class MemoryService implements MemoryManager {
     level: MemoryPressureLevel = MemoryPressureLevel.Warning
   ): Promise<void> {
     const targetMemory = this.calculateTargetMemory(level);
-    const modelsToEvict =
-      this.cacheEviction.selectModelsToEvict(targetMemory);
+    const modelsToEvict = this.cacheEviction.selectModelsToEvict(targetMemory);
 
     await this.pressureHandler.handlePressure(level, modelsToEvict);
   }
@@ -115,8 +113,7 @@ export class MemoryService implements MemoryManager {
     size: number,
     service: LLMService
   ): void {
-    const framework =
-      model.model.preferredFramework ?? LLMFramework.CoreML;
+    const framework = model.model.preferredFramework ?? LLMFramework.CoreML;
     const memoryModel: MemoryLoadedModel = {
       id: model.model.id,
       name: model.model.name,

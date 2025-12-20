@@ -87,7 +87,7 @@ export class AllocationManager {
 
     // Try to free memory based on priority
     const needed = size - availableMemory;
-    const freed = await this.freeMemory(needed, priority);
+    const _freed = await this.freeMemory(needed, priority);
 
     const newAvailable = this.getCurrentAvailableMemory();
     return newAvailable >= size;
@@ -96,7 +96,7 @@ export class AllocationManager {
   /**
    * Release memory
    */
-  public async releaseMemory(size: number): Promise<void> {
+  public async releaseMemory(_size: number): Promise<void> {
     // Memory is automatically released when models are unloaded
     // This tracks explicit memory releases for accounting
   }
@@ -212,10 +212,7 @@ export class AllocationManager {
 
     for (const model of sortedModels) {
       // Don't evict models with higher or equal priority unless absolutely necessary
-      if (
-        model.priority >= requesterPriority &&
-        freedMemory > 0
-      ) {
+      if (model.priority >= requesterPriority && freedMemory > 0) {
         continue;
       }
 

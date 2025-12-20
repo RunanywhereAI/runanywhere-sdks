@@ -4,13 +4,15 @@
  * Resource checker for routing decisions
  */
 
+import type { HardwareCapabilityManager } from '../../DeviceCapability/Services/HardwareCapabilityManager';
+
 /**
  * Resource checker for routing decisions
  */
 export class ResourceChecker {
-  private hardwareManager: any; // HardwareCapabilityManager
+  private hardwareManager: HardwareCapabilityManager;
 
-  constructor(hardwareManager: any) {
+  constructor(hardwareManager: HardwareCapabilityManager) {
     this.hardwareManager = hardwareManager;
   }
 

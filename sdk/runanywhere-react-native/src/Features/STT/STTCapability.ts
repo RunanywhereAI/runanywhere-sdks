@@ -9,13 +9,11 @@
 
 import { BaseComponent } from '../../Core/Components/BaseComponent';
 import { SDKComponent } from '../../Core/Models/Common/SDKComponent';
-import { ComponentState } from '../../Core/Models/Common/ComponentState';
 import { ServiceRegistry } from '../../Foundation/DependencyInjection/ServiceRegistry';
 import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 import type { STTConfiguration } from './STTConfiguration';
 import type { STTInput, STTOutput, STTStreamResult } from './STTModels';
 import type { STTService } from '../../Core/Protocols/Voice/STTService';
-import type { STTServiceProvider } from '../../Core/Protocols/Voice/STTServiceProvider';
 import type { STTTranscriptionResult } from '../../Core/Models/STT/STTTranscriptionResult';
 import { AnyServiceWrapper } from '../../Core/Components/BaseComponent';
 import { ManagedLifecycle } from '../../Core/Capabilities/ManagedLifecycle';
@@ -59,7 +57,7 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
     // Create managed lifecycle for STT with load/unload functions
     this.managedLifecycle = ManagedLifecycle.forSTT<STTService>(
       // Load resource function
-      async (resourceId: string, config: ComponentConfiguration | null) => {
+      async (resourceId: string, _config: ComponentConfiguration | null) => {
         return await this.loadSTTService(resourceId);
       },
       // Unload resource function
@@ -167,7 +165,10 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
   /**
    * Transcribe audio data
    */
-  public async transcribe(audioData: Buffer | Uint8Array, options?: Partial<STTInput['options']>): Promise<STTOutput> {
+  public async transcribe(
+    audioData: Buffer | Uint8Array,
+    options?: Partial<STTInput['options']>
+  ): Promise<STTOutput> {
     this.ensureReady();
 
     const input: STTInput = {
@@ -177,7 +178,10 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
       options: options as STTInput['options'] | null,
       validate: () => {
         if (!audioData || audioData.length === 0) {
-          throw new SDKError(SDKErrorCode.ValidationFailed, 'STTInput must contain audioData');
+          throw new SDKError(
+            SDKErrorCode.ValidationFailed,
+            'STTInput must contain audioData'
+          );
         }
       },
       timestamp: new Date(),
@@ -244,7 +248,8 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
     );
 
     const processingTime = (Date.now() - startTime) / 1000; // seconds
-    const audioLength = input.audioData.length / (this.sttConfiguration.sampleRate * 2); // Rough estimate
+    const audioLength =
+      input.audioData.length / (this.sttConfiguration.sampleRate * 2); // Rough estimate
 
     // Create output
     return {
@@ -283,7 +288,7 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
     const sttService = this.managedLifecycle.requireService();
 
     // Build options
-    const sttOptions = options as STTInput['options'] | null ?? {
+    const sttOptions = (options as STTInput['options'] | null) ?? {
       language: this.sttConfiguration.language,
       detectLanguage: false,
       enablePunctuation: this.sttConfiguration.enablePunctuation,
@@ -296,30 +301,37 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
     };
 
     // Convert stream to ArrayBuffer format
-    const convertedStream: AsyncIterable<string | ArrayBuffer> = (async function* () {
-      for await (const chunk of audioStream) {
-        if (Buffer.isBuffer(chunk)) {
-          yield chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer;
-        } else if (chunk instanceof Uint8Array) {
-          yield chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer;
-        } else {
-          yield chunk as ArrayBuffer;
+    const convertedStream: AsyncIterable<string | ArrayBuffer> =
+      (async function* () {
+        for await (const chunk of audioStream) {
+          if (Buffer.isBuffer(chunk)) {
+            yield chunk.buffer.slice(
+              chunk.byteOffset,
+              chunk.byteOffset + chunk.byteLength
+            ) as ArrayBuffer;
+          } else if (chunk instanceof Uint8Array) {
+            yield chunk.buffer.slice(
+              chunk.byteOffset,
+              chunk.byteOffset + chunk.byteLength
+            ) as ArrayBuffer;
+          } else {
+            yield chunk as ArrayBuffer;
+          }
         }
-      }
-    })();
+      })();
 
     // Stream transcription (if supported)
     if (sttService.streamTranscribe) {
-      let partialText = '';
+      let _partialText = '';
       const result = await sttService.streamTranscribe(
         convertedStream,
         {
           sampleRate: sttOptions.sampleRate,
           language: sttOptions.language,
         },
-        (text: string, confidence: number) => {
+        (text: string, _confidence: number) => {
           // Yield partial results as they come
-          partialText = text;
+          _partialText = text;
         }
       );
       // Yield final result
@@ -328,10 +340,17 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
       // Fallback to batch mode - collect all chunks first
       const allChunks: ArrayBuffer[] = [];
       for await (const chunk of convertedStream) {
-        allChunks.push(chunk instanceof ArrayBuffer ? chunk : new TextEncoder().encode(chunk as string).buffer as ArrayBuffer);
+        allChunks.push(
+          chunk instanceof ArrayBuffer
+            ? chunk
+            : (new TextEncoder().encode(chunk as string).buffer as ArrayBuffer)
+        );
       }
       // Combine chunks
-      const totalLength = allChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+      const totalLength = allChunks.reduce(
+        (acc, chunk) => acc + chunk.byteLength,
+        0
+      );
       const combined = new Uint8Array(totalLength);
       let offset = 0;
       for (const chunk of allChunks) {
@@ -381,7 +400,7 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
     const modelId = this.managedLifecycle.resourceIdOrUnknown();
 
     // Build options
-    const sttOptions = options as STTInput['options'] | null ?? {
+    const sttOptions = (options as STTInput['options'] | null) ?? {
       language: this.sttConfiguration.language,
       detectLanguage: false,
       enablePunctuation: this.sttConfiguration.enablePunctuation,
@@ -394,17 +413,24 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
     };
 
     // Convert stream to ArrayBuffer format
-    const convertedStream: AsyncIterable<string | ArrayBuffer> = (async function* () {
-      for await (const chunk of audioStream) {
-        if (Buffer.isBuffer(chunk)) {
-          yield chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer;
-        } else if (chunk instanceof Uint8Array) {
-          yield chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer;
-        } else {
-          yield chunk as ArrayBuffer;
+    const convertedStream: AsyncIterable<string | ArrayBuffer> =
+      (async function* () {
+        for await (const chunk of audioStream) {
+          if (Buffer.isBuffer(chunk)) {
+            yield chunk.buffer.slice(
+              chunk.byteOffset,
+              chunk.byteOffset + chunk.byteLength
+            ) as ArrayBuffer;
+          } else if (chunk instanceof Uint8Array) {
+            yield chunk.buffer.slice(
+              chunk.byteOffset,
+              chunk.byteOffset + chunk.byteLength
+            ) as ArrayBuffer;
+          } else {
+            yield chunk as ArrayBuffer;
+          }
         }
-      }
-    })();
+      })();
 
     // Track processing time
     const startTime = Date.now();
@@ -449,19 +475,21 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
         const finalOutput: STTOutput = {
           text: result.transcript,
           confidence: result.confidence ?? 1.0,
-          wordTimestamps: result.segments?.map((t) => ({
-            word: t.text,
-            startTime: t.start,
-            endTime: t.end,
-            confidence: result.confidence,
-          })) ?? null,
+          wordTimestamps:
+            result.segments?.map((t) => ({
+              word: t.text,
+              startTime: t.start,
+              endTime: t.end,
+              confidence: result.confidence,
+            })) ?? null,
           detectedLanguage: result.language ?? null,
           alternatives: null,
           metadata: {
             modelId,
             processingTime,
             audioLength: totalAudioLength,
-            realTimeFactor: totalAudioLength > 0 ? processingTime / totalAudioLength : 0,
+            realTimeFactor:
+              totalAudioLength > 0 ? processingTime / totalAudioLength : 0,
           },
           timestamp: new Date(),
         };
@@ -479,15 +507,21 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
         // Fallback to batch mode - collect all chunks first
         const allChunks: ArrayBuffer[] = [];
         for await (const chunk of convertedStream) {
-          const arrayBuffer = chunk instanceof ArrayBuffer
-            ? chunk
-            : new TextEncoder().encode(chunk as string).buffer as ArrayBuffer;
+          const arrayBuffer =
+            chunk instanceof ArrayBuffer
+              ? chunk
+              : (new TextEncoder().encode(chunk as string)
+                  .buffer as ArrayBuffer);
           allChunks.push(arrayBuffer);
-          totalAudioLength += arrayBuffer.byteLength / (this.sttConfiguration.sampleRate * 2); // Rough estimate
+          totalAudioLength +=
+            arrayBuffer.byteLength / (this.sttConfiguration.sampleRate * 2); // Rough estimate
         }
 
         // Combine chunks
-        const totalLength = allChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+        const totalLength = allChunks.reduce(
+          (acc, chunk) => acc + chunk.byteLength,
+          0
+        );
         const combined = new Uint8Array(totalLength);
         let offset = 0;
         for (const chunk of allChunks) {
@@ -507,19 +541,21 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
         const finalOutput: STTOutput = {
           text: result.transcript,
           confidence: result.confidence ?? 1.0,
-          wordTimestamps: result.segments?.map((t) => ({
-            word: t.text,
-            startTime: t.start,
-            endTime: t.end,
-            confidence: result.confidence,
-          })) ?? null,
+          wordTimestamps:
+            result.segments?.map((t) => ({
+              word: t.text,
+              startTime: t.start,
+              endTime: t.end,
+              confidence: result.confidence,
+            })) ?? null,
           detectedLanguage: result.language ?? null,
           alternatives: null,
           metadata: {
             modelId,
             processingTime,
             audioLength: totalAudioLength,
-            realTimeFactor: totalAudioLength > 0 ? processingTime / totalAudioLength : 0,
+            realTimeFactor:
+              totalAudioLength > 0 ? processingTime / totalAudioLength : 0,
           },
           timestamp: new Date(),
         };

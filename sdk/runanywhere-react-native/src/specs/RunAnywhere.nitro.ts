@@ -13,8 +13,10 @@ import type { HybridObject } from 'react-native-nitro-modules';
  *
  * All methods here are implemented in C++ and call runanywhere-core APIs.
  */
-export interface RunAnywhere
-  extends HybridObject<{ ios: 'c++'; android: 'c++' }> {
+export interface RunAnywhere extends HybridObject<{
+  ios: 'c++';
+  android: 'c++';
+}> {
   // ============================================================================
   // Backend Lifecycle
   // ============================================================================

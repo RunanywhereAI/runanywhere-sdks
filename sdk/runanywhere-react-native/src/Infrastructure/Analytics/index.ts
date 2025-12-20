@@ -11,7 +11,11 @@
 export { AnalyticsQueueManager } from './AnalyticsQueueManager';
 
 // Component-specific analytics services
-export { LLMAnalyticsService, STTAnalyticsService, TTSAnalyticsService } from './Services';
+export {
+  LLMAnalyticsService,
+  STTAnalyticsService,
+  TTSAnalyticsService,
+} from './Services';
 
 // Storage adapters (examples)
 export {

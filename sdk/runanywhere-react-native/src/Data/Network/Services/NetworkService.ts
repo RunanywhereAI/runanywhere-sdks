@@ -79,8 +79,15 @@ export class NetworkServiceImpl implements NetworkService {
   ): Promise<R> {
     const data = JSON.stringify(payload);
     const encoded = new TextEncoder().encode(data);
-    const arrayBuffer = encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength) as ArrayBuffer;
-    const responseData = await this.postRaw(endpoint, arrayBuffer, requiresAuth);
+    const arrayBuffer = encoded.buffer.slice(
+      encoded.byteOffset,
+      encoded.byteOffset + encoded.byteLength
+    ) as ArrayBuffer;
+    const responseData = await this.postRaw(
+      endpoint,
+      arrayBuffer,
+      requiresAuth
+    );
     const text = new TextDecoder().decode(responseData);
     return JSON.parse(text) as R;
   }
@@ -105,7 +112,7 @@ export class NetworkServiceImpl implements NetworkService {
     };
 
     if (requiresAuth && this.apiKey) {
-      headers['Authorization'] = `Bearer ${this.apiKey}`;
+      headers.Authorization = `Bearer ${this.apiKey}`;
     }
 
     const response = await fetch(url, {
@@ -130,7 +137,7 @@ export class NetworkServiceImpl implements NetworkService {
     const headers: { [key: string]: string } = {};
 
     if (requiresAuth && this.apiKey) {
-      headers['Authorization'] = `Bearer ${this.apiKey}`;
+      headers.Authorization = `Bearer ${this.apiKey}`;
     }
 
     const response = await fetch(url, {

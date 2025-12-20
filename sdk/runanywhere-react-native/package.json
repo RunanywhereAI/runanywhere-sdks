@@ -38,7 +38,13 @@
     "example": "yarn workspace runanywhere-example",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "format": "prettier \"src/**/*.ts\" --check",
+    "format:fix": "prettier \"src/**/*.ts\" --write",
+    "unused": "knip",
+    "check:todos": "node scripts/check_todos.js",
+    "analyze": "node scripts/run_analysis.js",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib nitrogen/generated",
     "nitrogen": "nitrogen",
     "prepare": "nitrogen",
@@ -78,12 +84,18 @@
     "@types/jest": "^29.5.5",
     "@types/node": "^24.10.2",
     "@types/react": "^18.2.44",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
     "commitlint": "^17.0.2",
     "del-cli": "^5.1.0",
     "eslint": "^8.51.0",
     "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-jest": "^29.5.0",
     "eslint-plugin-prettier": "^5.0.1",
+    "eslint-plugin-unused-imports": "^4.3.0",
+    "glob": "^13.0.0",
     "jest": "^29.7.0",
+    "knip": "^5.76.0",
     "nitrogen": "^0.31.10",
     "prettier": "^3.0.3",
     "react": "18.2.0",
@@ -133,8 +145,19 @@
   },
   "eslintConfig": {
     "root": true,
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaVersion": 2020,
+      "sourceType": "module",
+      "project": "./tsconfig.json"
+    },
+    "plugins": [
+      "@typescript-eslint",
+      "unused-imports"
+    ],
     "extends": [
       "@react-native",
+      "plugin:@typescript-eslint/recommended",
       "prettier"
     ],
     "rules": {
@@ -147,12 +170,51 @@
           "trailingComma": "es5",
           "useTabs": false
         }
+      ],
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
+        "warn",
+        {
+          "vars": "all",
+          "varsIgnorePattern": "^_",
+          "args": "after-used",
+          "argsIgnorePattern": "^_"
+        }
+      ],
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/consistent-type-imports": [
+        "warn",
+        {
+          "prefer": "type-imports",
+          "disallowTypeAnnotations": false
+        }
+      ],
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-this-alias": "warn",
+      "@typescript-eslint/no-empty-object-type": "off",
+      "@typescript-eslint/no-non-null-assertion": "warn",
+      "no-console": [
+        "warn",
+        {
+          "allow": [
+            "warn",
+            "error"
+          ]
+        }
       ]
     }
   },
   "eslintIgnore": [
     "node_modules/",
-    "lib/"
+    "lib/",
+    "nitrogen/",
+    "android/",
+    "ios/",
+    "cpp/",
+    "example/",
+    "**/__tests__/**",
+    "**/*.test.ts"
   ],
   "prettier": {
     "quoteProps": "consistent",

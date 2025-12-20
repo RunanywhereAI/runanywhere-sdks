@@ -6,7 +6,10 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Components/TTS/TTSComponent.swift
  */
 
-import type { ComponentInput, ComponentOutput } from '../../Core/Components/BaseComponent';
+import type {
+  ComponentInput,
+  ComponentOutput,
+} from '../../Core/Components/BaseComponent';
 
 /**
  * Options for text-to-speech synthesis

@@ -8,7 +8,13 @@
  */
 
 import { NativeEventEmitter, NativeModules } from 'react-native';
-import { BaseComponent, AnyServiceWrapper, type ComponentConfiguration, type ComponentInput, type ComponentOutput } from '../../Core/Components/BaseComponent';
+import {
+  BaseComponent,
+  AnyServiceWrapper,
+  type ComponentConfiguration,
+  type ComponentInput,
+  type ComponentOutput,
+} from '../../Core/Components/BaseComponent';
 import { ManagedLifecycle } from '../../Core/Capabilities/ManagedLifecycle';
 import type { ComponentConfiguration as CapabilityConfiguration } from '../../Core/Capabilities/CapabilityProtocols';
 import { requireNativeModule } from '../../native/NativeRunAnywhere';
@@ -250,7 +256,7 @@ export class VADCapability extends BaseComponent<VADServiceWrapper> {
     // Create managed lifecycle for VAD with load/unload functions
     this.managedLifecycle = ManagedLifecycle.forVAD<VADService>(
       // Load resource function
-      async (resourceId: string, config: CapabilityConfiguration | null) => {
+      async (resourceId: string, _config: CapabilityConfiguration | null) => {
         return await this.loadVADService(resourceId);
       },
       // Unload resource function
@@ -328,7 +334,10 @@ export class VADCapability extends BaseComponent<VADServiceWrapper> {
         const success = await nativeModule.loadVADModel(modelId, configJson);
 
         if (!success) {
-          throw new SDKError(SDKErrorCode.ModelLoadFailed, 'Failed to load VAD model');
+          throw new SDKError(
+            SDKErrorCode.ModelLoadFailed,
+            'Failed to load VAD model'
+          );
         }
 
         // Setup event emitter for native events
@@ -348,7 +357,10 @@ export class VADCapability extends BaseComponent<VADServiceWrapper> {
         this.lastSpeechState = false;
       },
 
-      processAudioData: async (audioData: string, sampleRate?: number): Promise<boolean> => {
+      processAudioData: async (
+        audioData: string,
+        sampleRate?: number
+      ): Promise<boolean> => {
         if (this.isPaused) {
           return false;
         }
@@ -470,7 +482,10 @@ export class VADCapability extends BaseComponent<VADServiceWrapper> {
    * @param sampleRate - Optional sample rate override
    * @returns Array of speech segments
    */
-  async detectSegments(audioData: string, sampleRate?: number): Promise<VADSegment[]> {
+  async detectSegments(
+    audioData: string,
+    sampleRate?: number
+  ): Promise<VADSegment[]> {
     this.ensureReady();
 
     try {
@@ -516,7 +531,10 @@ export class VADCapability extends BaseComponent<VADServiceWrapper> {
         audioData: audioChunk,
         validate: () => {
           if (!audioChunk) {
-            throw new SDKError(SDKErrorCode.ValidationFailed, 'Audio data is required');
+            throw new SDKError(
+              SDKErrorCode.ValidationFailed,
+              'Audio data is required'
+            );
           }
         },
       };
@@ -586,7 +604,9 @@ export class VADCapability extends BaseComponent<VADServiceWrapper> {
    * Set speech activity callback
    * Reference: setSpeechActivityCallback() in Swift VADComponent
    */
-  setSpeechActivityCallback(callback: (event: SpeechActivityEvent) => void): void {
+  setSpeechActivityCallback(
+    callback: (event: SpeechActivityEvent) => void
+  ): void {
     this.onSpeechActivityCallback = callback;
   }
 
@@ -604,7 +624,9 @@ export class VADCapability extends BaseComponent<VADServiceWrapper> {
     // Calibration would be implemented here
     // This typically involves collecting ambient noise samples
     // and automatically adjusting the threshold
-    console.log('[VADComponent] Calibration started. Feed silent audio for best results.');
+    console.log(
+      '[VADComponent] Calibration started. Feed silent audio for best results.'
+    );
   }
 
   /**
@@ -694,9 +716,10 @@ export class VADCapability extends BaseComponent<VADServiceWrapper> {
           }
 
           // Emit to event bus - use appropriate VAD event type
-          const voiceEventType = activityEvent === SpeechActivityEvent.Started
-            ? 'vadDetected'
-            : 'vadEnded';
+          const voiceEventType =
+            activityEvent === SpeechActivityEvent.Started
+              ? 'vadDetected'
+              : 'vadEnded';
           EventBus.getInstance().emitVoice({
             type: voiceEventType,
           });
@@ -779,7 +802,10 @@ export function createVADConfiguration(
       }
 
       // Validate calibration multiplier
-      if (fullConfig.calibrationMultiplier < 1.5 || fullConfig.calibrationMultiplier > 5.0) {
+      if (
+        fullConfig.calibrationMultiplier < 1.5 ||
+        fullConfig.calibrationMultiplier > 5.0
+      ) {
         throw new SDKError(
           SDKErrorCode.InvalidConfiguration,
           'Calibration multiplier must be between 1.5 and 5.0'
@@ -809,10 +835,16 @@ export function createVADInput(
     energyThresholdOverride: options.energyThresholdOverride,
     validate: () => {
       if (!audioData) {
-        throw new SDKError(SDKErrorCode.ValidationFailed, 'Audio data is required');
+        throw new SDKError(
+          SDKErrorCode.ValidationFailed,
+          'Audio data is required'
+        );
       }
       if (options.energyThresholdOverride !== undefined) {
-        if (options.energyThresholdOverride < 0 || options.energyThresholdOverride > 1.0) {
+        if (
+          options.energyThresholdOverride < 0 ||
+          options.energyThresholdOverride > 1.0
+        ) {
           throw new SDKError(
             SDKErrorCode.ValidationFailed,
             'Energy threshold override must be between 0 and 1.0'

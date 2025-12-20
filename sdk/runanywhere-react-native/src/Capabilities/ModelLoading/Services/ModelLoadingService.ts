@@ -7,11 +7,24 @@
  */
 
 import type { LoadedModel } from '../Models/LoadedModel';
-import type { ModelInfo } from '../../../Core/Models/Model/ModelInfo';
 import type { MemoryManager } from '../../../Core/Protocols/Memory/MemoryManager';
 import type { ModelRegistry } from '../../../Core/Protocols/Registry/ModelRegistry';
+import type { AdapterRegistry } from '../../../Foundation/DependencyInjection/AdapterRegistry';
+import type { LLMService } from '../../../Core/Protocols/LLM/LLMService';
 import { FrameworkModality } from '../../../Core/Models/Framework/FrameworkModality';
 import { LLMFramework } from '../../../types';
+
+/**
+ * Type guard to check if a service is an LLMService
+ */
+function isLLMService(service: unknown): service is LLMService {
+  return (
+    service !== null &&
+    typeof service === 'object' &&
+    'generate' in service &&
+    typeof (service as LLMService).generate === 'function'
+  );
+}
 
 /**
  * Service for loading and unloading models
@@ -21,12 +34,12 @@ export class ModelLoadingService {
   private inflightLoads: Map<string, Promise<LoadedModel>> = new Map();
   private registry: ModelRegistry;
   private memoryService: MemoryManager;
-  private adapterRegistry: any; // AdapterRegistry
+  private adapterRegistry: AdapterRegistry | undefined;
 
   constructor(
     registry: ModelRegistry,
     memoryService: MemoryManager,
-    adapterRegistry?: any
+    adapterRegistry?: AdapterRegistry
   ) {
     this.registry = registry;
     this.memoryService = memoryService;
@@ -39,13 +52,15 @@ export class ModelLoadingService {
    */
   public async loadModel(modelId: string): Promise<LoadedModel> {
     // Check if already loaded
-    if (this.loadedModels.has(modelId)) {
-      return this.loadedModels.get(modelId)!;
+    const existingLoaded = this.loadedModels.get(modelId);
+    if (existingLoaded) {
+      return existingLoaded;
     }
 
     // Check if a load is already in progress
-    if (this.inflightLoads.has(modelId)) {
-      return await this.inflightLoads.get(modelId)!;
+    const existingLoad = this.inflightLoads.get(modelId);
+    if (existingLoad) {
+      return await existingLoad;
     }
 
     // Create a new loading task
@@ -68,8 +83,9 @@ export class ModelLoadingService {
    */
   private async performLoad(modelId: string): Promise<LoadedModel> {
     // Double-check if already loaded
-    if (this.loadedModels.has(modelId)) {
-      return this.loadedModels.get(modelId)!;
+    const existingLoaded = this.loadedModels.get(modelId);
+    if (existingLoaded) {
+      return existingLoaded;
     }
 
     // Get model info from registry
@@ -119,13 +135,13 @@ export class ModelLoadingService {
     let lastError: Error | null = null;
     for (let index = 0; index < adapters.length; index++) {
       const adapter = adapters[index];
-      const isPrimary = index === 0;
+      const _isPrimary = index === 0;
 
       try {
         const service = await adapter.loadModel(modelInfo, modality);
 
-        // Cast to LLMService (by construction: text-to-text modality)
-        if (!service || typeof service.generate !== 'function') {
+        // Validate it's an LLMService (by construction: text-to-text modality)
+        if (!isLLMService(service)) {
           throw new Error(
             `Adapter '${adapter.framework}' did not return an LLMService for text-to-text modality`
           );
@@ -134,7 +150,7 @@ export class ModelLoadingService {
         // Create loaded model
         const loaded: LoadedModel = {
           model: modelInfo,
-          service: service,
+          service,
         };
 
         // Register loaded model
@@ -154,7 +170,9 @@ export class ModelLoadingService {
     }
 
     // All adapters failed
-    throw lastError ?? new Error('Failed to load model with any available adapter');
+    throw (
+      lastError ?? new Error('Failed to load model with any available adapter')
+    );
   }
 
   /**

@@ -45,7 +45,10 @@ export const allErrorCategories: ErrorCategory[] = Object.values(ErrorCategory);
 export function getCategoryFromCode(code: ErrorCode): ErrorCategory {
   // General errors (1000-1099)
   if (code >= 1000 && code < 1100) {
-    if (code === ErrorCode.NotInitialized || code === ErrorCode.AlreadyInitialized) {
+    if (
+      code === ErrorCode.NotInitialized ||
+      code === ErrorCode.AlreadyInitialized
+    ) {
       return ErrorCategory.Initialization;
     }
     if (code === ErrorCode.InvalidInput) {

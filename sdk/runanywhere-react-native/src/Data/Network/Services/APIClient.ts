@@ -108,10 +108,7 @@ export class APIClientError extends Error {
  * 3. {"message": "Error message"}
  * 4. {"error": "Error message"}
  */
-function parseErrorMessage(
-  responseBody: string,
-  statusCode: number
-): string {
+function parseErrorMessage(responseBody: string, statusCode: number): string {
   const defaultMessage = `HTTP ${statusCode}`;
 
   if (!responseBody) {
@@ -220,7 +217,11 @@ export class APIClient implements NetworkService {
     const data = JSON.stringify(payload);
     const encoder = new TextEncoder();
     const arrayBuffer = encoder.encode(data).buffer as ArrayBuffer;
-    const responseData = await this.postRaw(endpoint, arrayBuffer, requiresAuth);
+    const responseData = await this.postRaw(
+      endpoint,
+      arrayBuffer,
+      requiresAuth
+    );
     const decoder = new TextDecoder();
     const text = decoder.decode(responseData);
     return JSON.parse(text) as R;
@@ -383,7 +384,7 @@ export class APIClient implements NetworkService {
     if (requiresAuth && this.authProvider) {
       try {
         token = await this.authProvider.getAccessToken();
-      } catch (error) {
+      } catch {
         this.logger.warning(
           'Failed to get access token, falling back to API key'
         );
@@ -394,7 +395,7 @@ export class APIClient implements NetworkService {
       token = this.apiKey;
     }
 
-    headers['Authorization'] = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
 
     return headers;
   }

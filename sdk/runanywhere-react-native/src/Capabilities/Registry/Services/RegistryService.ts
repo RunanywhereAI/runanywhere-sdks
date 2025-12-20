@@ -8,11 +8,7 @@
 
 import type { ModelInfo } from '../../../Core/Models/Model/ModelInfo';
 import type { ModelRegistry } from '../../../Core/Protocols/Registry/ModelRegistry';
-import type {
-  ModelCriteria,
-} from '../../../Core/Protocols/Registry/ModelRegistry';
-import { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
-import { ModelFormat } from '../../../Core/Models/Model/ModelFormat';
+import type { ModelCriteria } from '../../../Core/Protocols/Registry/ModelRegistry';
 
 /**
  * Implementation of model registry
@@ -30,12 +26,13 @@ export class RegistryService implements ModelRegistry {
   /**
    * Initialize registry with configuration
    */
-  public async initialize(apiKey: string): Promise<void> {
+  public async initialize(_apiKey: string): Promise<void> {
     // Load pre-configured models
     await this.loadPreconfiguredModels();
 
     // Discover local models that are already downloaded
-    const localModels = await this.modelDiscovery?.discoverLocalModels() ?? [];
+    const localModels =
+      (await this.modelDiscovery?.discoverLocalModels()) ?? [];
 
     // Update existing registered models with discovered local paths
     for (const discoveredModel of localModels) {

@@ -26,7 +26,9 @@ export enum CapabilityResourceType {
 /**
  * Get the display name for a resource type
  */
-export function getResourceTypeDisplayName(type: CapabilityResourceType): string {
+export function getResourceTypeDisplayName(
+  type: CapabilityResourceType
+): string {
   switch (type) {
     case CapabilityResourceType.LLMModel:
       return 'LLM Model';

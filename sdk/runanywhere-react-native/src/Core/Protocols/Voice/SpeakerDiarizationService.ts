@@ -18,7 +18,10 @@ export interface SpeakerDiarizationService {
   /**
    * Process audio for speaker diarization
    */
-  processAudio(audioData: string | ArrayBuffer, sampleRate?: number): Promise<SpeakerDiarizationResult>;
+  processAudio(
+    audioData: string | ArrayBuffer,
+    sampleRate?: number
+  ): Promise<SpeakerDiarizationResult>;
 
   /**
    * Check if service is ready

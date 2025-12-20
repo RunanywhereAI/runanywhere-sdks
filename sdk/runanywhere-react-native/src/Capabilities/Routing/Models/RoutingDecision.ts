@@ -7,7 +7,7 @@
  */
 
 import { ExecutionTarget } from './ExecutionTarget';
-import { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
+import type { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
 import type { RoutingReason } from './RoutingReason';
 
 /**

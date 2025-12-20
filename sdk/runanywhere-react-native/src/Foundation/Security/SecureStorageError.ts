@@ -115,7 +115,9 @@ export class SecureStorageError extends Error {
 /**
  * Type guard to check if an error is a SecureStorageError
  */
-export function isSecureStorageError(error: unknown): error is SecureStorageError {
+export function isSecureStorageError(
+  error: unknown
+): error is SecureStorageError {
   return error instanceof SecureStorageError;
 }
 

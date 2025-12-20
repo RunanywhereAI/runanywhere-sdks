@@ -12,7 +12,6 @@
  */
 
 import type { GenerationOptions } from '../Models/GenerationOptions';
-import type { StructuredOutputConfig } from '../../StructuredOutput/Services/StructuredOutputHandler';
 
 /**
  * Generation configuration from remote
@@ -88,7 +87,10 @@ export class GenerationOptionsResolver {
     // Apply token budget constraints (these are hard limits)
     if (remoteConfig.tokenBudget) {
       if (remoteConfig.tokenBudget.maxTokensPerRequest != null) {
-        maxTokens = Math.min(maxTokens, remoteConfig.tokenBudget.maxTokensPerRequest);
+        maxTokens = Math.min(
+          maxTokens,
+          remoteConfig.tokenBudget.maxTokensPerRequest
+        );
       }
     }
 
@@ -121,18 +123,19 @@ export class GenerationOptionsResolver {
   /**
    * Prepare prompt with system prompt and structured output formatting
    */
-  public preparePrompt(
-    prompt: string,
-    options: GenerationOptions
-  ): string {
+  public preparePrompt(prompt: string, options: GenerationOptions): string {
     let effectivePrompt = prompt;
 
     // Apply structured output formatting first if needed
     if (options.structuredOutput) {
       // Import StructuredOutputHandler dynamically to avoid circular dependency
-      const StructuredOutputHandler = require('../../StructuredOutput/Services/StructuredOutputHandler').StructuredOutputHandler;
+      const StructuredOutputHandler =
+        require('../../StructuredOutput/Services/StructuredOutputHandler').StructuredOutputHandler;
       const handler = new StructuredOutputHandler();
-      effectivePrompt = handler.preparePrompt(effectivePrompt, options.structuredOutput);
+      effectivePrompt = handler.preparePrompt(
+        effectivePrompt,
+        options.structuredOutput
+      );
     }
 
     // Then apply system prompt if provided
@@ -146,7 +149,10 @@ export class GenerationOptionsResolver {
   /**
    * Merge stop sequences from runtime and remote
    */
-  private mergeStopSequences(runtime: string[], remote: string[] | null): string[] {
+  private mergeStopSequences(
+    runtime: string[],
+    remote: string[] | null
+  ): string[] {
     const sequences = [...runtime];
     if (remote) {
       sequences.push(...remote);

@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Analytics/STT/STTAnalyticsService.swift
  */
 
-import {
+import type {
   AnalyticsContext,
   AnalyticsEvent,
   ErrorEventData,
@@ -16,11 +16,11 @@ import {
   SessionMetadata,
   SpeakerChangeData,
   SpeakerDetectionData,
-  STTEventType,
   STTMetrics,
   STTTranscriptionData,
   TranscriptionStartData,
 } from '../../../types/analytics';
+import { STTEventType } from '../../../types/analytics';
 import { AnalyticsQueueManager } from '../AnalyticsQueueManager';
 
 /**
@@ -95,12 +95,19 @@ export class STTAnalyticsService {
     return {
       totalEvents: this.events.length,
       startTime: this.metricsStartTime,
-      lastEventTime: this.events.length > 0 ? this.events[this.events.length - 1].timestamp : undefined,
+      lastEventTime:
+        this.events.length > 0
+          ? this.events[this.events.length - 1].timestamp
+          : undefined,
       totalTranscriptions: this.transcriptionCount,
       averageConfidence:
-        this.transcriptionCount > 0 ? this.totalConfidence / this.transcriptionCount : 0,
+        this.transcriptionCount > 0
+          ? this.totalConfidence / this.transcriptionCount
+          : 0,
       averageLatency:
-        this.transcriptionCount > 0 ? this.totalLatency / this.transcriptionCount : 0,
+        this.transcriptionCount > 0
+          ? this.totalLatency / this.transcriptionCount
+          : 0,
     };
   }
 
@@ -171,7 +178,9 @@ export class STTAnalyticsService {
     audioLength: number,
     speaker?: string
   ): Promise<void> {
-    const wordCount = text.split(/\s+/).filter((word) => word.length > 0).length;
+    const wordCount = text
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length;
 
     const eventData: STTTranscriptionData = {
       wordCount,
@@ -206,7 +215,9 @@ export class STTAnalyticsService {
     confidence: number,
     speaker?: string
   ): Promise<void> {
-    const wordCount = text.split(/\s+/).filter((word) => word.length > 0).length;
+    const wordCount = text
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length;
 
     const eventData: FinalTranscriptData = {
       textLength: text.length,
@@ -231,7 +242,9 @@ export class STTAnalyticsService {
    * Track partial transcript
    */
   public async trackPartialTranscript(text: string): Promise<void> {
-    const wordCount = text.split(/\s+/).filter((word) => word.length > 0).length;
+    const wordCount = text
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length;
 
     const eventData: PartialTranscriptData = {
       textLength: text.length,
@@ -252,7 +265,10 @@ export class STTAnalyticsService {
   /**
    * Track speaker detection
    */
-  public async trackSpeakerDetection(speaker: string, confidence: number): Promise<void> {
+  public async trackSpeakerDetection(
+    speaker: string,
+    confidence: number
+  ): Promise<void> {
     const eventData: SpeakerDetectionData = {
       speakerId: speaker,
       confidence,
@@ -273,7 +289,10 @@ export class STTAnalyticsService {
   /**
    * Track speaker change
    */
-  public async trackSpeakerChange(from: string | null, to: string): Promise<void> {
+  public async trackSpeakerChange(
+    from: string | null,
+    to: string
+  ): Promise<void> {
     const eventData: SpeakerChangeData = {
       fromSpeaker: from || 'none',
       toSpeaker: to,
@@ -294,7 +313,10 @@ export class STTAnalyticsService {
   /**
    * Track language detection
    */
-  public async trackLanguageDetection(language: string, confidence: number): Promise<void> {
+  public async trackLanguageDetection(
+    language: string,
+    confidence: number
+  ): Promise<void> {
     const eventData: LanguageDetectionData = {
       language,
       confidence,
@@ -314,7 +336,10 @@ export class STTAnalyticsService {
   /**
    * Track error
    */
-  public async trackError(error: Error, context: AnalyticsContext): Promise<void> {
+  public async trackError(
+    error: Error,
+    context: AnalyticsContext
+  ): Promise<void> {
     const eventData: ErrorEventData = {
       error: error.message,
       context: context.toString(),
@@ -337,7 +362,7 @@ export class STTAnalyticsService {
   /**
    * Process event for custom analytics
    */
-  private async processEvent(event: STTEvent): Promise<void> {
+  private async processEvent(_event: STTEvent): Promise<void> {
     // Custom processing for STT events if needed
     // This is called after each event is tracked
   }

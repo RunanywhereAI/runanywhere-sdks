@@ -6,7 +6,10 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Components/LLM/LLMComponent.swift
  */
 
-import type { ComponentInput, ComponentOutput } from '../../Core/Components/BaseComponent';
+import type {
+  ComponentInput,
+  ComponentOutput,
+} from '../../Core/Components/BaseComponent';
 
 /**
  * Message role

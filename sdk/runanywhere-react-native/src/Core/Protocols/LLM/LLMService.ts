@@ -19,7 +19,10 @@ export interface LLMService {
   /**
    * Generate text from prompt
    */
-  generate(prompt: string, options?: GenerationOptions): Promise<GenerationResult>;
+  generate(
+    prompt: string,
+    options?: GenerationOptions
+  ): Promise<GenerationResult>;
 
   /**
    * Stream generate text from prompt

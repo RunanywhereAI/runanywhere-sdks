@@ -6,12 +6,8 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Memory/Services/PressureHandler.swift
  */
 
-import {
-  MemoryPressureLevel,
-  type MemoryLoadedModelInfo,
-} from '../../../Core/Protocols/Memory/MemoryModels';
+import { MemoryPressureLevel } from '../../../Core/Protocols/Memory/MemoryModels';
 import type { CacheEviction } from './CacheEviction';
-import type { AllocationManager } from './AllocationManager';
 
 /**
  * Handles memory pressure situations and coordinates response actions
@@ -59,7 +55,7 @@ export class PressureHandler {
         break;
     }
 
-    const duration = (Date.now() - startTime) / 1000;
+    const _duration = (Date.now() - startTime) / 1000;
 
     return totalFreed;
   }
@@ -85,7 +81,9 @@ export class PressureHandler {
     }
 
     // If that's not enough, use eviction handler to find more candidates
-    if (totalFreed < this.calculateTargetFreedMemory(MemoryPressureLevel.Warning)) {
+    if (
+      totalFreed < this.calculateTargetFreedMemory(MemoryPressureLevel.Warning)
+    ) {
       if (!this.evictionHandler) {
         return totalFreed;
       }
@@ -116,8 +114,7 @@ export class PressureHandler {
 
     // Force additional cleanup if needed
     if (
-      totalFreed <
-      this.calculateTargetFreedMemory(MemoryPressureLevel.Critical)
+      totalFreed < this.calculateTargetFreedMemory(MemoryPressureLevel.Critical)
     ) {
       if (!this.evictionHandler) {
         return totalFreed;

@@ -120,7 +120,9 @@ export interface VoiceAgentComponentStates {
 /**
  * Check if all components are fully ready
  */
-export function isVoiceAgentFullyReady(states: VoiceAgentComponentStates): boolean {
+export function isVoiceAgentFullyReady(
+  states: VoiceAgentComponentStates
+): boolean {
   return (
     states.stt.type === 'loaded' &&
     states.llm.type === 'loaded' &&
@@ -132,7 +134,9 @@ export function isVoiceAgentFullyReady(states: VoiceAgentComponentStates): boole
 /**
  * Get list of missing/unloaded components
  */
-export function getMissingComponents(states: VoiceAgentComponentStates): string[] {
+export function getMissingComponents(
+  states: VoiceAgentComponentStates
+): string[] {
   const missing: string[] = [];
   if (states.stt.type !== 'loaded') missing.push('STT');
   if (states.llm.type !== 'loaded') missing.push('LLM');
@@ -172,7 +176,10 @@ export class VoiceAgentError extends Error {
    * Pipeline was interrupted (e.g., user cancelled, component failed mid-stream)
    */
   static pipelineInterrupted(reason: string): VoiceAgentError {
-    return new VoiceAgentError(`Pipeline was interrupted: ${reason}`, VoiceAgentErrorCode.PipelineInterrupted);
+    return new VoiceAgentError(
+      `Pipeline was interrupted: ${reason}`,
+      VoiceAgentErrorCode.PipelineInterrupted
+    );
   }
 
   /**
@@ -188,7 +195,10 @@ export class VoiceAgentError extends Error {
   /**
    * Component failed to initialize
    */
-  static componentFailed(component: string, underlying?: Error): VoiceAgentError {
+  static componentFailed(
+    component: string,
+    underlying?: Error
+  ): VoiceAgentError {
     const message = underlying
       ? `${component} component failed: ${underlying.message}`
       : `${component} component failed`;

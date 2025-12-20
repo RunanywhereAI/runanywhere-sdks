@@ -9,7 +9,12 @@
 
 // Main SDK
 import { RunAnywhere as _RunAnywhere } from './Public/RunAnywhere';
-export { RunAnywhere, Conversation, type ModelInfo, type DownloadProgress as ModelDownloadProgress } from './Public/RunAnywhere';
+export {
+  RunAnywhere,
+  Conversation,
+  type ModelInfo,
+  type DownloadProgress as ModelDownloadProgress,
+} from './Public/RunAnywhere';
 export default _RunAnywhere;
 
 // Types
@@ -18,7 +23,10 @@ export * from './types';
 export { LLMFramework, ModelCategory, ModelFormat } from './types/enums';
 
 // Errors (legacy - from Public/Errors)
-export { SDKError as LegacySDKError, SDKErrorCode } from './Public/Errors/SDKError';
+export {
+  SDKError as LegacySDKError,
+  SDKErrorCode,
+} from './Public/Errors/SDKError';
 
 // Foundation (Core infrastructure matching iOS SDK)
 export {

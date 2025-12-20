@@ -31,4 +31,5 @@ export const SecureStorageKeys = {
   organizationId: 'com.runanywhere.sdk.organizationId',
 } as const;
 
-export type SecureStorageKey = (typeof SecureStorageKeys)[keyof typeof SecureStorageKeys];
+export type SecureStorageKey =
+  (typeof SecureStorageKeys)[keyof typeof SecureStorageKeys];

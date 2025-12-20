@@ -29,10 +29,14 @@ export class TokenCounter {
     const wordCount = text.split(/\s+/).filter((w) => w.length > 0).length;
 
     // Count punctuation marks (often separate tokens)
-    const punctuationCount = text.split('').filter((c) => ".,!?;:()[]{}\"'".includes(c)).length;
+    const punctuationCount = text
+      .split('')
+      .filter((c) => '.,!?;:()[]{}"\''.includes(c)).length;
 
     // Count newlines and special whitespace (often separate tokens)
-    const newlineCount = text.split('').filter((c) => c === '\n' || c === '\r').length;
+    const newlineCount = text
+      .split('')
+      .filter((c) => c === '\n' || c === '\r').length;
 
     // Heuristic formula:
     // Base estimate: characters / 4 (GPT average)
@@ -44,7 +48,9 @@ export class TokenCounter {
     const punctuationTokens = punctuationCount * 0.7; // Most punctuation becomes tokens
     const newlineTokens = newlineCount;
 
-    const estimatedTokens = Math.ceil(baseEstimate + punctuationTokens + newlineTokens);
+    const estimatedTokens = Math.ceil(
+      baseEstimate + punctuationTokens + newlineTokens
+    );
 
     // Sanity check: token count should be between word count and character count
     return Math.max(wordCount, Math.min(estimatedTokens, characterCount));
@@ -53,7 +59,10 @@ export class TokenCounter {
   /**
    * Estimate tokens per second based on token count and elapsed time
    */
-  public static calculateTokensPerSecond(tokenCount: number, elapsedSeconds: number): number {
+  public static calculateTokensPerSecond(
+    tokenCount: number,
+    elapsedSeconds: number
+  ): number {
     if (elapsedSeconds <= 0) {
       return 0;
     }
@@ -79,7 +88,11 @@ export class TokenCounter {
       const totalTokens = thinkingTokens + responseTokens;
       return { thinkingTokens, responseTokens, totalTokens };
     } else {
-      return { thinkingTokens: null, responseTokens, totalTokens: responseTokens };
+      return {
+        thinkingTokens: null,
+        responseTokens,
+        totalTokens: responseTokens,
+      };
     }
   }
 }

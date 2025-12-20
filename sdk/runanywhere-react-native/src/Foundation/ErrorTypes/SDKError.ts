@@ -11,8 +11,8 @@ import {
   getCategoryFromCode,
   inferCategoryFromError,
 } from './ErrorCategory';
+import type { ErrorContext } from './ErrorContext';
 import {
-  ErrorContext,
   createErrorContext,
   formatContext,
   formatLocation,

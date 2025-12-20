@@ -3,14 +3,20 @@
  */
 
 // Import first for local usage
-import { STTCapability as _STTCapability, STTServiceWrapper as _STTServiceWrapper } from './STTCapability';
-import { STTConfigurationImpl as _STTConfigurationImpl, type STTConfiguration as _STTConfiguration } from './STTConfiguration';
+import { STTCapability as _STTCapability } from './STTCapability';
+import {
+  STTConfigurationImpl as _STTConfigurationImpl,
+  type STTConfiguration as _STTConfiguration,
+} from './STTConfiguration';
 
 // Export capability
 export { STTCapability, STTServiceWrapper } from './STTCapability';
 
 // Export configuration
-export { type STTConfiguration, STTConfigurationImpl } from './STTConfiguration';
+export {
+  type STTConfiguration,
+  STTConfigurationImpl,
+} from './STTConfiguration';
 
 // Export models
 export {

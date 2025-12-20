@@ -7,8 +7,12 @@
  * Matches iOS: Core/Capabilities/ManagedLifecycle.swift
  */
 
-import { ModelLifecycleManager, LoadResourceFn, UnloadResourceFn } from './ModelLifecycleManager';
-import { CapabilityLoadingState, ComponentConfiguration } from './CapabilityProtocols';
+import type { LoadResourceFn, UnloadResourceFn } from './ModelLifecycleManager';
+import { ModelLifecycleManager } from './ModelLifecycleManager';
+import type {
+  CapabilityLoadingState,
+  ComponentConfiguration,
+} from './CapabilityProtocols';
 import { CapabilityResourceType } from './ResourceTypes';
 import {
   createLLMModelLoadStartedEvent,
@@ -92,7 +96,11 @@ export interface ManagedLifecycleOptions<TService> {
 // Lifecycle Event Type (Internal)
 // ============================================================================
 
-type LifecycleEventType = 'loadStarted' | 'loadCompleted' | 'loadFailed' | 'unloaded';
+type LifecycleEventType =
+  | 'loadStarted'
+  | 'loadCompleted'
+  | 'loadFailed'
+  | 'unloaded';
 
 // ============================================================================
 // ManagedLifecycle Class
@@ -208,7 +216,12 @@ export class ManagedLifecycle<TService> {
       const loadTime = Date.now() - startTime;
 
       // Track load failed
-      this.trackEvent('loadFailed', resourceId, loadTime, error instanceof Error ? error : undefined);
+      this.trackEvent(
+        'loadFailed',
+        resourceId,
+        loadTime,
+        error instanceof Error ? error : undefined
+      );
 
       // Update metrics
       this.failedLoadCount += 1;
@@ -278,7 +291,8 @@ export class ManagedLifecycle<TService> {
       totalLoads: this.loadCount,
       successfulLoads: this.loadCount,
       failedLoads: this.failedLoadCount,
-      averageLoadTimeMs: this.loadCount > 0 ? this.totalLoadTime / this.loadCount : 0,
+      averageLoadTimeMs:
+        this.loadCount > 0 ? this.totalLoadTime / this.loadCount : 0,
       totalUnloads: 0,
       totalDownloads: 0,
       successfulDownloads: 0,
@@ -315,7 +329,12 @@ export class ManagedLifecycle<TService> {
       case CapabilityResourceType.VADModel:
         return this.createVADEvent(type, resourceId, durationMs, error);
       case CapabilityResourceType.DiarizationModel:
-        return this.createSpeakerDiarizationEvent(type, resourceId, durationMs, error);
+        return this.createSpeakerDiarizationEvent(
+          type,
+          resourceId,
+          durationMs,
+          error
+        );
       default:
         return this.createModelEvent(type, resourceId, durationMs, error);
     }
@@ -333,7 +352,10 @@ export class ManagedLifecycle<TService> {
       case 'loadCompleted':
         return createLLMModelLoadCompletedEvent(resourceId, durationMs ?? 0);
       case 'loadFailed':
-        return createLLMModelLoadFailedEvent(resourceId, error?.message ?? 'Unknown error');
+        return createLLMModelLoadFailedEvent(
+          resourceId,
+          error?.message ?? 'Unknown error'
+        );
       case 'unloaded':
         return createLLMModelUnloadedEvent(resourceId);
     }
@@ -351,7 +373,10 @@ export class ManagedLifecycle<TService> {
       case 'loadCompleted':
         return createSTTModelLoadCompletedEvent(resourceId, durationMs ?? 0);
       case 'loadFailed':
-        return createSTTModelLoadFailedEvent(resourceId, error?.message ?? 'Unknown error');
+        return createSTTModelLoadFailedEvent(
+          resourceId,
+          error?.message ?? 'Unknown error'
+        );
       case 'unloaded':
         return createSTTModelUnloadedEvent(resourceId);
     }
@@ -369,7 +394,10 @@ export class ManagedLifecycle<TService> {
       case 'loadCompleted':
         return createTTSModelLoadCompletedEvent(resourceId, durationMs ?? 0);
       case 'loadFailed':
-        return createTTSModelLoadFailedEvent(resourceId, error?.message ?? 'Unknown error');
+        return createTTSModelLoadFailedEvent(
+          resourceId,
+          error?.message ?? 'Unknown error'
+        );
       case 'unloaded':
         return createTTSModelUnloadedEvent(resourceId);
     }
@@ -387,7 +415,10 @@ export class ManagedLifecycle<TService> {
       case 'loadCompleted':
         return createVADModelLoadCompletedEvent(resourceId, durationMs ?? 0);
       case 'loadFailed':
-        return createVADModelLoadFailedEvent(resourceId, error?.message ?? 'Unknown error');
+        return createVADModelLoadFailedEvent(
+          resourceId,
+          error?.message ?? 'Unknown error'
+        );
       case 'unloaded':
         return createVADModelUnloadedEvent(resourceId);
     }
@@ -403,9 +434,15 @@ export class ManagedLifecycle<TService> {
       case 'loadStarted':
         return createSpeakerDiarizationModelLoadStartedEvent(resourceId);
       case 'loadCompleted':
-        return createSpeakerDiarizationModelLoadCompletedEvent(resourceId, durationMs ?? 0);
+        return createSpeakerDiarizationModelLoadCompletedEvent(
+          resourceId,
+          durationMs ?? 0
+        );
       case 'loadFailed':
-        return createSpeakerDiarizationModelLoadFailedEvent(resourceId, error?.message ?? 'Unknown error');
+        return createSpeakerDiarizationModelLoadFailedEvent(
+          resourceId,
+          error?.message ?? 'Unknown error'
+        );
       case 'unloaded':
         return createSpeakerDiarizationModelUnloadedEvent(resourceId);
     }
@@ -422,9 +459,16 @@ export class ManagedLifecycle<TService> {
       case 'loadStarted':
         return createModelDownloadStartedEvent(resourceId);
       case 'loadCompleted':
-        return createModelDownloadCompletedEvent(resourceId, durationMs ?? 0, 0);
+        return createModelDownloadCompletedEvent(
+          resourceId,
+          durationMs ?? 0,
+          0
+        );
       case 'loadFailed':
-        return createModelDownloadFailedEvent(resourceId, error?.message ?? 'Unknown error');
+        return createModelDownloadFailedEvent(
+          resourceId,
+          error?.message ?? 'Unknown error'
+        );
       case 'unloaded':
         return createModelDeletedEvent(resourceId);
     }

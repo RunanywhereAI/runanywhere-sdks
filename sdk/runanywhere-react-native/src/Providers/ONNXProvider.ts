@@ -10,7 +10,7 @@
 
 import type { ModelInfo } from '../types';
 import { LLMFramework, ModelCategory } from '../types';
-import { getCatalogModelsByFramework, getCatalogModelsByCategory } from '../Data/modelCatalog';
+import { getCatalogModelsByFramework } from '../Data/modelCatalog';
 
 /**
  * ONNX STT Service Provider
@@ -37,12 +37,16 @@ export class ONNXSTTProvider {
   static register(): void {
     console.log('[ONNXSTTProvider] Registering ONNX STT service provider');
 
-    const { ServiceRegistry } = require('../Foundation/DependencyInjection/ServiceRegistry');
+    const {
+      ServiceRegistry,
+    } = require('../Foundation/DependencyInjection/ServiceRegistry');
 
     // Register with priority 90 (slightly lower than LlamaCpp)
     ServiceRegistry.shared.registerSTTProvider(ONNXSTTProvider.shared, 90);
 
-    console.log('[ONNXSTTProvider] ONNX STT service provider registered successfully');
+    console.log(
+      '[ONNXSTTProvider] ONNX STT service provider registered successfully'
+    );
   }
 
   /**
@@ -61,15 +65,24 @@ export class ONNXSTTProvider {
     }
 
     // Sherpa-ONNX models
-    if (lowercased.includes('sherpa-onnx') || lowercased.includes('sherpa_onnx')) {
+    if (
+      lowercased.includes('sherpa-onnx') ||
+      lowercased.includes('sherpa_onnx')
+    ) {
       return true;
     }
 
     // ONNX format explicitly
     if (lowercased.includes('.onnx') || lowercased.includes('onnx')) {
       // Check if it's a speech recognition model
-      const speechKeywords = ['whisper', 'stt', 'asr', 'speech', 'transcription'];
-      if (speechKeywords.some(kw => lowercased.includes(kw))) {
+      const speechKeywords = [
+        'whisper',
+        'stt',
+        'asr',
+        'speech',
+        'transcription',
+      ];
+      if (speechKeywords.some((kw) => lowercased.includes(kw))) {
         return true;
       }
     }
@@ -83,21 +96,29 @@ export class ONNXSTTProvider {
   getProvidedModels(): ModelInfo[] {
     // Get STT models that use ONNX framework
     const onnxModels = getCatalogModelsByFramework(LLMFramework.ONNX);
-    const sttModels = onnxModels.filter(m => m.category === ModelCategory.SpeechRecognition);
+    const sttModels = onnxModels.filter(
+      (m) => m.category === ModelCategory.SpeechRecognition
+    );
 
     // Also get WhisperKit models (they can work with ONNX too in some cases)
-    const whisperKitModels = getCatalogModelsByFramework(LLMFramework.WhisperKit);
-    const sttWhisperKitModels = whisperKitModels.filter(m => m.category === ModelCategory.SpeechRecognition);
+    const whisperKitModels = getCatalogModelsByFramework(
+      LLMFramework.WhisperKit
+    );
+    const sttWhisperKitModels = whisperKitModels.filter(
+      (m) => m.category === ModelCategory.SpeechRecognition
+    );
 
     // Combine and dedupe
     const allSTTModels = [...sttModels];
     for (const model of sttWhisperKitModels) {
-      if (!allSTTModels.find(m => m.id === model.id)) {
+      if (!allSTTModels.find((m) => m.id === model.id)) {
         allSTTModels.push(model);
       }
     }
 
-    console.log(`[ONNXSTTProvider] Providing ${allSTTModels.length} STT models`);
+    console.log(
+      `[ONNXSTTProvider] Providing ${allSTTModels.length} STT models`
+    );
 
     return allSTTModels;
   }
@@ -108,7 +129,9 @@ export class ONNXSTTProvider {
   onRegistration(): void {
     console.log('[ONNXSTTProvider] onRegistration() called');
     const models = this.getProvidedModels();
-    console.log(`[ONNXSTTProvider] Registered ${models.length} STT models through provider`);
+    console.log(
+      `[ONNXSTTProvider] Registered ${models.length} STT models through provider`
+    );
   }
 }
 
@@ -137,12 +160,16 @@ export class ONNXTTSProvider {
   static register(): void {
     console.log('[ONNXTTSProvider] Registering ONNX TTS service provider');
 
-    const { ServiceRegistry } = require('../Foundation/DependencyInjection/ServiceRegistry');
+    const {
+      ServiceRegistry,
+    } = require('../Foundation/DependencyInjection/ServiceRegistry');
 
     // Register with priority 90 (slightly lower than system TTS)
     ServiceRegistry.shared.registerTTSProvider(ONNXTTSProvider.shared, 90);
 
-    console.log('[ONNXTTSProvider] ONNX TTS service provider registered successfully');
+    console.log(
+      '[ONNXTTSProvider] ONNX TTS service provider registered successfully'
+    );
   }
 
   /**
@@ -161,14 +188,17 @@ export class ONNXTTSProvider {
     }
 
     // Sherpa-ONNX TTS models
-    if (lowercased.includes('sherpa-onnx') || lowercased.includes('sherpa_onnx')) {
+    if (
+      lowercased.includes('sherpa-onnx') ||
+      lowercased.includes('sherpa_onnx')
+    ) {
       return true;
     }
 
     // ONNX format explicitly for TTS
     if (lowercased.includes('.onnx') || lowercased.includes('onnx')) {
       const ttsKeywords = ['tts', 'speech', 'synthesis', 'voice'];
-      if (ttsKeywords.some(kw => lowercased.includes(kw))) {
+      if (ttsKeywords.some((kw) => lowercased.includes(kw))) {
         return true;
       }
     }
@@ -182,29 +212,35 @@ export class ONNXTTSProvider {
   getProvidedModels(): ModelInfo[] {
     // Get TTS models that use ONNX framework
     const onnxModels = getCatalogModelsByFramework(LLMFramework.ONNX);
-    const ttsModels = onnxModels.filter(m => m.category === ModelCategory.SpeechSynthesis);
+    const ttsModels = onnxModels.filter(
+      (m) => m.category === ModelCategory.SpeechSynthesis
+    );
 
     // Also get SystemTTS (built-in)
     const systemTTSModels = getCatalogModelsByFramework(LLMFramework.SystemTTS);
 
     // Also get PiperTTS models
     const piperTTSModels = getCatalogModelsByFramework(LLMFramework.PiperTTS);
-    const piperTTSTTSModels = piperTTSModels.filter(m => m.category === ModelCategory.SpeechSynthesis);
+    const piperTTSTTSModels = piperTTSModels.filter(
+      (m) => m.category === ModelCategory.SpeechSynthesis
+    );
 
     // Combine and dedupe
     const allTTSModels = [...ttsModels];
     for (const model of systemTTSModels) {
-      if (!allTTSModels.find(m => m.id === model.id)) {
+      if (!allTTSModels.find((m) => m.id === model.id)) {
         allTTSModels.push(model);
       }
     }
     for (const model of piperTTSTTSModels) {
-      if (!allTTSModels.find(m => m.id === model.id)) {
+      if (!allTTSModels.find((m) => m.id === model.id)) {
         allTTSModels.push(model);
       }
     }
 
-    console.log(`[ONNXTTSProvider] Providing ${allTTSModels.length} TTS models`);
+    console.log(
+      `[ONNXTTSProvider] Providing ${allTTSModels.length} TTS models`
+    );
 
     return allTTSModels;
   }
@@ -215,7 +251,9 @@ export class ONNXTTSProvider {
   onRegistration(): void {
     console.log('[ONNXTTSProvider] onRegistration() called');
     const models = this.getProvidedModels();
-    console.log(`[ONNXTTSProvider] Registered ${models.length} TTS models through provider`);
+    console.log(
+      `[ONNXTTSProvider] Registered ${models.length} TTS models through provider`
+    );
   }
 }
 

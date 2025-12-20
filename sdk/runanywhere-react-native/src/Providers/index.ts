@@ -5,4 +5,8 @@
  */
 
 export { LlamaCppProvider } from './LlamaCppProvider';
-export { ONNXSTTProvider, ONNXTTSProvider, registerONNXProviders } from './ONNXProvider';
+export {
+  ONNXSTTProvider,
+  ONNXTTSProvider,
+  registerONNXProviders,
+} from './ONNXProvider';

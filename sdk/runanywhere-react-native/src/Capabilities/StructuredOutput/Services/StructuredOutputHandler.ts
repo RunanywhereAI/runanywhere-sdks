@@ -153,7 +153,9 @@ Remember: Output ONLY the JSON object, nothing else.`;
   /**
    * Find a complete JSON object or array in the text
    */
-  private findCompleteJSON(text: string): { start: number; end: number } | null {
+  private findCompleteJSON(
+    text: string
+  ): { start: number; end: number } | null {
     // Try to parse different segments of the text to find valid JSON
     for (const startChar of ['{', '[']) {
       const startIndex = text.indexOf(startChar);
@@ -286,7 +288,7 @@ Remember: Output ONLY the JSON object, nothing else.`;
    */
   public validateStructuredOutput(
     text: string,
-    config: StructuredOutputConfig
+    _config: StructuredOutputConfig
   ): StructuredOutputValidation {
     try {
       this.extractJSON(text);

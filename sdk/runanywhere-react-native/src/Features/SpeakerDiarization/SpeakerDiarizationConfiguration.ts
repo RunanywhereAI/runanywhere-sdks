@@ -14,7 +14,8 @@ import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 /**
  * Configuration for Speaker Diarization component
  */
-export interface SpeakerDiarizationConfiguration extends ComponentConfiguration, ComponentInitParameters {
+export interface SpeakerDiarizationConfiguration
+  extends ComponentConfiguration, ComponentInitParameters {
   readonly componentType: SDKComponent;
   readonly modelId: string | null;
   readonly maxSpeakers: number;
@@ -38,15 +39,17 @@ export class SpeakerDiarizationConfigurationImpl implements SpeakerDiarizationCo
   public readonly windowSize: number;
   public readonly stepSize: number;
 
-  constructor(options: {
-    modelId?: string | null;
-    maxSpeakers?: number;
-    minSpeechDuration?: number;
-    speakerChangeThreshold?: number;
-    enableVoiceIdentification?: boolean;
-    windowSize?: number;
-    stepSize?: number;
-  } = {}) {
+  constructor(
+    options: {
+      modelId?: string | null;
+      maxSpeakers?: number;
+      minSpeechDuration?: number;
+      speakerChangeThreshold?: number;
+      enableVoiceIdentification?: boolean;
+      windowSize?: number;
+      stepSize?: number;
+    } = {}
+  ) {
     this.modelId = options.modelId ?? null;
     this.maxSpeakers = options.maxSpeakers ?? 10;
     this.minSpeechDuration = options.minSpeechDuration ?? 0.5;

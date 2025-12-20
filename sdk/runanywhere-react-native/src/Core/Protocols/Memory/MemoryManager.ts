@@ -8,7 +8,8 @@
 
 import type { LoadedModel } from '../../../Capabilities/ModelLoading/Models/LoadedModel';
 import type { LLMService } from '../LLM/LLMService';
-import { MemoryPriority, type MemoryLoadedModel } from './MemoryModels';
+import type { MemoryPriority } from './MemoryModels';
+import { type MemoryLoadedModel } from './MemoryModels';
 
 // Re-export for convenience
 export { MemoryPriority, type MemoryLoadedModel } from './MemoryModels';
@@ -95,7 +96,11 @@ export interface MemoryManager {
    * @param size - Memory size in bytes
    * @param service - The LLM service managing the model
    */
-  registerLoadedModel(model: LoadedModel, size: number, service: LLMService): void;
+  registerLoadedModel(
+    model: LoadedModel,
+    size: number,
+    service: LLMService
+  ): void;
 
   /**
    * Unregister a model

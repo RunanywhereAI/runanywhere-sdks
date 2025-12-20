@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Models/GenerationOptions.swift
  */
 
-import { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
+import type { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
 import { ExecutionTarget, HardwareAcceleration } from '../../../types/enums';
 
 // Re-export for consumers who import from this module
@@ -71,18 +71,20 @@ export class GenerationOptionsImpl implements GenerationOptions {
   public readonly structuredOutput: StructuredOutputConfig | null;
   public readonly systemPrompt: string | null;
 
-  constructor(options: {
-    maxTokens?: number;
-    temperature?: number;
-    topP?: number;
-    enableRealTimeTracking?: boolean;
-    stopSequences?: string[];
-    streamingEnabled?: boolean;
-    preferredExecutionTarget?: ExecutionTarget | null;
-    preferredFramework?: LLMFramework | null;
-    structuredOutput?: StructuredOutputConfig | null;
-    systemPrompt?: string | null;
-  } = {}) {
+  constructor(
+    options: {
+      maxTokens?: number;
+      temperature?: number;
+      topP?: number;
+      enableRealTimeTracking?: boolean;
+      stopSequences?: string[];
+      streamingEnabled?: boolean;
+      preferredExecutionTarget?: ExecutionTarget | null;
+      preferredFramework?: LLMFramework | null;
+      structuredOutput?: StructuredOutputConfig | null;
+      systemPrompt?: string | null;
+    } = {}
+  ) {
     this.maxTokens = options.maxTokens ?? 100;
     this.temperature = options.temperature ?? 0.8;
     this.topP = options.topP ?? 1.0;

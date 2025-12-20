@@ -27,5 +27,5 @@
     "target": "ESNext",
     "verbatimModuleSyntax": false
   },
-  "exclude": ["lib", "node_modules", "example"]
+  "exclude": ["lib", "node_modules", "example", "src/__tests__", "**/*.test.ts"]
 }
