@@ -35,39 +35,3 @@ export {
   getPlatformDefaultVoice,
   PlatformVoices,
 } from './SystemTTSService';
-
-// Conversation Manager - For managing LLM conversation context
-export {
-  ConversationManager,
-  type ConversationConfig,
-  type ConversationStats,
-  type ConversationSnapshot,
-} from './ConversationManager';
-
-// Placeholder exports for type compatibility
-export type ConfigurationUpdateOptions = Record<string, unknown>;
-export type AuthenticationResponse = { success: boolean; token?: string };
-export type AuthenticationState = {
-  isAuthenticated: boolean;
-  userId?: string;
-  organizationId?: string;
-  deviceId?: string;
-};
-export type DeviceRegistrationInfo = { deviceId: string; registered: boolean };
-
-// Placeholder service stubs
-export const ConfigurationService = {
-  getInstance: () => ({
-    initialize: async () => {},
-    getConfiguration: async () => ({}),
-    updateConfiguration: async () => {},
-  }),
-};
-
-export const AuthenticationService = {
-  getInstance: () => ({
-    authenticate: async () => ({ success: false }),
-    isAuthenticated: async () => false,
-    logout: async () => {},
-  }),
-};

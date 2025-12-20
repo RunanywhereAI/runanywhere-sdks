@@ -16,6 +16,7 @@ import type { TTSConfiguration } from '../Core/Models/Configuration/TTSConfigura
 import type { TTSResult } from '../Core/Models/TTS/TTSResult';
 import { SDKError, SDKErrorCode } from '../Public/Errors/SDKError';
 import { Platform } from 'react-native';
+import { AudioFormat } from '../types/enums';
 
 /**
  * Native voice info from platform TTS
@@ -117,13 +118,22 @@ export class SystemTTSService implements TTSService {
       );
 
       const result = JSON.parse(resultJson);
+      const processingTime = 0; // Would be tracked with actual timing
+      const characterCount = text.length;
 
-      // Return TTSResult matching the expected interface
+      // Return TTSResult matching iOS TTSOutput structure
       return {
-        audio: result.audio, // base64 encoded audio
-        sampleRate: result.sampleRate || 22050,
-        numSamples: result.numSamples || 0,
+        audioData: result.audio, // base64 encoded audio from native
+        format: AudioFormat.WAV, // Default format from system TTS
         duration: result.duration || 0,
+        phonemeTimestamps: undefined, // Not typically available from system TTS
+        metadata: {
+          voice: configuration?.voice ?? 'default',
+          language: configuration?.language ?? 'en',
+          processingTime,
+          characterCount,
+        },
+        timestamp: new Date(),
       };
     } catch (error) {
       throw new SDKError(

@@ -11,6 +11,13 @@ import type {
   ComponentOutput,
 } from '../../Core/Components/BaseComponent';
 
+// Re-export canonical types from Core/Models
+export type {
+  STTTranscriptionResult,
+  TimestampInfo,
+  AlternativeTranscription,
+} from '../../Core/Models/STT/STTTranscriptionResult';
+
 /**
  * Options for speech-to-text transcription
  */
@@ -68,7 +75,7 @@ export interface STTOutput extends ComponentOutput {
 }
 
 /**
- * Word timestamp information
+ * Word timestamp information (for STTOutput)
  */
 export interface WordTimestamp {
   readonly word: string;
@@ -78,7 +85,7 @@ export interface WordTimestamp {
 }
 
 /**
- * Alternative transcription
+ * Alternative transcription (for STTOutput)
  */
 export interface TranscriptionAlternative {
   readonly text: string;
@@ -93,35 +100,6 @@ export interface TranscriptionMetadata {
   readonly processingTime: number; // seconds
   readonly audioLength: number; // seconds
   readonly realTimeFactor: number; // Processing time / audio length
-}
-
-/**
- * Transcription result from service
- */
-export interface STTTranscriptionResult {
-  readonly transcript: string;
-  readonly confidence: number | null;
-  readonly timestamps: TimestampInfo[] | null;
-  readonly language: string | null;
-  readonly alternatives: AlternativeTranscription[] | null;
-}
-
-/**
- * Timestamp information
- */
-export interface TimestampInfo {
-  readonly word: string;
-  readonly startTime: number; // seconds
-  readonly endTime: number; // seconds
-  readonly confidence: number | null;
-}
-
-/**
- * Alternative transcription result
- */
-export interface AlternativeTranscription {
-  readonly transcript: string;
-  readonly confidence: number;
 }
 
 /**

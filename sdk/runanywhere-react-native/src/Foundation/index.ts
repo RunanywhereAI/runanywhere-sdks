@@ -25,11 +25,18 @@ export * from './DependencyInjection';
 
 // File Operations
 export { FileManager } from './FileOperations/FileManager';
+export {
+  ArchiveManager,
+  extractArchive,
+  isArchive,
+  detectArchiveFormat,
+} from './FileOperations/ArchiveManager';
+export type {
+  ArchiveExtractionResult,
+  ArchiveFormat,
+} from './FileOperations/ArchiveManager';
 
 // Logging
 export { SDKLogger } from './Logging/Logger/SDKLogger';
 export { LogLevel } from './Logging/Models/LogLevel';
 export { LoggingManager } from './Logging/Services/LoggingManager';
-
-// Event Polling
-export { EventPoller } from './EventPolling/EventPoller';
