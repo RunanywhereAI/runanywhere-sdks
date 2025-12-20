@@ -1,7 +1,9 @@
 import 'framework_modality.dart';
 
 /// Supported LLM frameworks
-/// Matches iOS LLMFramework from Core/Models/Framework/LLMFramework.swift
+///
+/// Note: For iOS parity, use [InferenceFramework] from core/module/inference_framework.dart
+/// This enum provides backward compatibility but [InferenceFramework] is preferred.
 enum LLMFramework {
   coreML('CoreML', 'Core ML'),
   tensorFlowLite('TFLite', 'TensorFlow Lite'),

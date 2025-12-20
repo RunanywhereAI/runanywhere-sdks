@@ -1,12 +1,88 @@
 /// Main SDK error type
+/// Matches iOS RunAnywhereError from Foundation/Errors/RunAnywhereError.swift
+///
+/// Note: Also exported as [RunAnywhereError] for iOS parity
 class SDKError implements Exception {
   final String message;
   final SDKErrorType type;
 
-  SDKError(this.message, this.type);
+  /// The underlying error that caused this SDK error (if any)
+  /// Matches iOS RunAnywhereError.underlyingError
+  final Object? underlyingError;
+
+  SDKError(this.message, this.type, {this.underlyingError});
 
   @override
   String toString() => 'SDKError($type): $message';
+
+  /// Recovery suggestion for the error
+  /// Matches iOS RunAnywhereError.recoverySuggestion
+  String? get recoverySuggestion {
+    switch (type) {
+      case SDKErrorType.notInitialized:
+        return 'Call RunAnywhere.initialize() before using the SDK.';
+      case SDKErrorType.invalidAPIKey:
+        return 'Provide a valid API key in the configuration.';
+      case SDKErrorType.invalidConfiguration:
+        return 'Check your configuration settings and ensure all required fields are provided.';
+
+      case SDKErrorType.modelNotFound:
+        return 'Check the model identifier or download the model first.';
+      case SDKErrorType.modelLoadFailed:
+        return 'Ensure the model file is not corrupted and is compatible with your device.';
+      case SDKErrorType.modelValidationFailed:
+        return 'The model file may be corrupted or incompatible. Try re-downloading.';
+      case SDKErrorType.modelIncompatible:
+        return 'Use a different model that is compatible with your device.';
+      case SDKErrorType.frameworkNotAvailable:
+        return 'Use a different model or device that supports this feature.';
+
+      case SDKErrorType.generationFailed:
+        return 'Check your input and try again.';
+      case SDKErrorType.generationTimeout:
+        return 'Try with a shorter prompt or fewer tokens.';
+      case SDKErrorType.contextTooLong:
+        return 'Reduce the context size or use a model with larger context window.';
+      case SDKErrorType.tokenLimitExceeded:
+        return 'Reduce the number of tokens requested.';
+
+      case SDKErrorType.networkError:
+      case SDKErrorType.networkUnavailable:
+      case SDKErrorType.requestFailed:
+      case SDKErrorType.serverError:
+        return 'Check your internet connection and try again.';
+      case SDKErrorType.downloadFailed:
+        return 'Check your internet connection and available storage space.';
+      case SDKErrorType.timeout:
+        return 'The operation timed out. Try again or check your network connection.';
+
+      case SDKErrorType.storageError:
+      case SDKErrorType.insufficientStorage:
+        return 'Free up storage space on your device.';
+      case SDKErrorType.storageFull:
+        return 'Delete unnecessary files to free up space.';
+
+      case SDKErrorType.hardwareUnsupported:
+        return 'Use a different model or device that supports this feature.';
+      case SDKErrorType.memoryPressure:
+        return 'Close other apps to free up memory.';
+      case SDKErrorType.thermalStateExceeded:
+        return 'Wait for the device to cool down before trying again.';
+
+      case SDKErrorType.componentNotReady:
+      case SDKErrorType.componentNotInitialized:
+        return 'Ensure the component is properly initialized before use.';
+      case SDKErrorType.invalidState:
+        return 'Check the current state and ensure operations are called in the correct order.';
+
+      case SDKErrorType.validationFailed:
+        return 'Check your input parameters and ensure they are valid.';
+
+      case SDKErrorType.featureNotAvailable:
+      case SDKErrorType.notImplemented:
+        return 'This feature may be available in a future update.';
+    }
+  }
 
   // Factory constructors for common errors
   static SDKError notInitialized([String? message]) {
@@ -34,6 +110,7 @@ class SDKError implements Exception {
     return SDKError(
       'Model load failed: $modelId - $error',
       SDKErrorType.modelLoadFailed,
+      underlyingError: error,
     );
   }
 
@@ -158,3 +235,11 @@ enum SDKErrorType {
   timeout,
   serverError,
 }
+
+/// Type alias for iOS parity
+/// iOS uses RunAnywhereError; this alias provides compatibility
+typedef RunAnywhereError = SDKError;
+
+/// Type alias for iOS parity
+/// iOS uses ErrorCategory; this alias provides compatibility
+typedef ErrorCategory = SDKErrorType;

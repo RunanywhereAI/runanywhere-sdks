@@ -5,6 +5,8 @@ import 'module/module.dart';
 import '../features/vad/vad_service.dart' show VADService;
 // STT types are imported from centralized location to avoid duplication
 import '../features/stt/stt_types.dart';
+// SpeakerInfo types for diarization service return type
+import '../features/speaker_diarization/speaker_info.dart';
 // Export all VAD types for external consumers
 export '../features/vad/vad_service.dart'
     show VADService, VADResult, SpeechActivityEvent;
@@ -12,6 +14,8 @@ export '../features/vad/vad_service.dart'
 export '../features/stt/stt_types.dart';
 // Export module types for external consumers
 export 'module/module.dart';
+// Export speaker diarization types
+export '../features/speaker_diarization/speaker_info.dart';
 
 /// Central registry for external AI module implementations.
 ///
@@ -52,8 +56,6 @@ class ModuleRegistry {
   final List<_PrioritizedProvider<VADServiceProvider>> _vadProviders = [];
   final List<SpeakerDiarizationServiceProvider> _speakerDiarizationProviders =
       [];
-  final List<VLMServiceProvider> _vlmProviders = [];
-  final List<WakeWordServiceProvider> _wakeWordProviders = [];
 
   /// Register a Speech-to-Text provider with optional priority
   /// Higher priority providers are preferred (default: 100)
@@ -102,16 +104,6 @@ class ModuleRegistry {
   /// Register a Speaker Diarization provider
   void registerSpeakerDiarization(SpeakerDiarizationServiceProvider provider) {
     _speakerDiarizationProviders.add(provider);
-  }
-
-  /// Register a Vision Language Model provider
-  void registerVLM(VLMServiceProvider provider) {
-    _vlmProviders.add(provider);
-  }
-
-  /// Register a Wake Word Detection provider
-  void registerWakeWord(WakeWordServiceProvider provider) {
-    _wakeWordProviders.add(provider);
   }
 
   // ============================================================================
@@ -225,8 +217,6 @@ class ModuleRegistry {
     _ttsProviders.clear();
     _vadProviders.clear();
     _speakerDiarizationProviders.clear();
-    _vlmProviders.clear();
-    _wakeWordProviders.clear();
   }
 
   // ============================================================================
@@ -338,34 +328,6 @@ class ModuleRegistry {
         : null;
   }
 
-  /// Get a VLM provider for the specified model
-  VLMServiceProvider? vlmProvider({String? modelId}) {
-    if (modelId != null) {
-      try {
-        return _vlmProviders.firstWhere(
-          (p) => p.canHandle(modelId: modelId),
-        );
-      } catch (e) {
-        return _vlmProviders.isNotEmpty ? _vlmProviders.first : null;
-      }
-    }
-    return _vlmProviders.isNotEmpty ? _vlmProviders.first : null;
-  }
-
-  /// Get a Wake Word provider
-  WakeWordServiceProvider? wakeWordProvider({String? modelId}) {
-    if (modelId != null) {
-      try {
-        return _wakeWordProviders.firstWhere(
-          (p) => p.canHandle(modelId: modelId),
-        );
-      } catch (e) {
-        return _wakeWordProviders.isNotEmpty ? _wakeWordProviders.first : null;
-      }
-    }
-    return _wakeWordProviders.isNotEmpty ? _wakeWordProviders.first : null;
-  }
-
   /// Check if STT is available
   bool get hasSTT => _sttProviders.isNotEmpty;
 
@@ -381,12 +343,6 @@ class ModuleRegistry {
   /// Check if Speaker Diarization is available
   bool get hasSpeakerDiarization => _speakerDiarizationProviders.isNotEmpty;
 
-  /// Check if VLM is available
-  bool get hasVLM => _vlmProviders.isNotEmpty;
-
-  /// Check if Wake Word Detection is available
-  bool get hasWakeWord => _wakeWordProviders.isNotEmpty;
-
   /// Get list of all registered modules
   List<String> get registeredModules {
     final modules = <String>[];
@@ -395,8 +351,6 @@ class ModuleRegistry {
     if (hasTTS) modules.add('TTS');
     if (hasVAD) modules.add('VAD');
     if (hasSpeakerDiarization) modules.add('SpeakerDiarization');
-    if (hasVLM) modules.add('VLM');
-    if (hasWakeWord) modules.add('WakeWord');
     return modules;
   }
 }
@@ -445,18 +399,6 @@ abstract class SpeakerDiarizationServiceProvider {
   Future<SpeakerDiarizationService> createSpeakerDiarizationService(
     dynamic configuration,
   );
-}
-
-abstract class VLMServiceProvider {
-  String get name;
-  bool canHandle({String? modelId});
-  Future<VLMService> createVLMService(dynamic configuration);
-}
-
-abstract class WakeWordServiceProvider {
-  String get name;
-  bool canHandle({String? modelId});
-  Future<WakeWordService> createWakeWordService(dynamic configuration);
 }
 
 // Service interfaces (to be implemented by providers)
@@ -509,23 +451,18 @@ abstract class TTSService {
 abstract class SpeakerDiarizationService {
   Future<void> initialize({String? modelPath});
   Future<SpeakerDiarizationResult> process(List<int> audioData);
-  bool get isReady;
-  Future<void> cleanup();
-}
 
-abstract class VLMService {
-  Future<void> initialize({String? modelPath});
-  Future<VLMResult> process({
-    required String prompt,
-    required List<int> imageData,
-  });
-  bool get isReady;
-  Future<void> cleanup();
-}
+  /// Get all identified speakers
+  Future<List<SpeakerDiarizationSpeakerInfo>> getAllSpeakers();
 
-abstract class WakeWordService {
-  Future<void> initialize({String? modelPath});
-  Future<bool> detect(List<int> audioData);
+  /// Update a speaker's display name
+  /// [speakerId] - The speaker ID to update
+  /// [name] - The new display name
+  void updateSpeakerName({required String speakerId, required String name});
+
+  /// Reset speaker diarization state (clears all speaker data)
+  Future<void> reset();
+
   bool get isReady;
   Future<void> cleanup();
 }
@@ -586,5 +523,3 @@ class TTSOptions {
 // VADResult is exported from features/vad/vad_service.dart (see top of file)
 
 class SpeakerDiarizationResult {}
-
-class VLMResult {}

@@ -333,3 +333,79 @@ class VoiceAgentError extends VoiceAgentEvent {
   final Object error;
   VoiceAgentError(this.error);
 }
+
+// MARK: - Component Load State
+
+/// State of a voice agent component
+/// Matches iOS ComponentLoadState from RunAnywhere+VoiceAgent.swift
+sealed class ComponentLoadState {
+  const ComponentLoadState();
+
+  /// Component is not loaded
+  static const ComponentLoadState notLoaded = NotLoadedState();
+
+  /// Component is currently loading
+  static const ComponentLoadState loading = LoadingState();
+
+  /// Component is loaded with a specific model/voice
+  const factory ComponentLoadState.loaded({required String modelId}) =
+      LoadedState;
+
+  /// Component failed to load
+  const factory ComponentLoadState.failed({required Object error}) =
+      FailedState;
+}
+
+class NotLoadedState extends ComponentLoadState {
+  const NotLoadedState();
+}
+
+class LoadingState extends ComponentLoadState {
+  const LoadingState();
+}
+
+class LoadedState extends ComponentLoadState {
+  final String modelId;
+  const LoadedState({required this.modelId});
+}
+
+class FailedState extends ComponentLoadState {
+  final Object error;
+  const FailedState({required this.error});
+}
+
+/// State of all voice agent components
+/// Matches iOS VoiceAgentComponentStates from RunAnywhere+VoiceAgent.swift
+class VoiceAgentComponentStates {
+  /// STT component state
+  final ComponentLoadState stt;
+
+  /// LLM component state
+  final ComponentLoadState llm;
+
+  /// TTS component state
+  final ComponentLoadState tts;
+
+  VoiceAgentComponentStates({
+    this.stt = ComponentLoadState.notLoaded,
+    this.llm = ComponentLoadState.notLoaded,
+    this.tts = ComponentLoadState.notLoaded,
+  });
+
+  /// Check if all components are loaded
+  bool get isFullyReady =>
+      stt is LoadedState && llm is LoadedState && tts is LoadedState;
+
+  /// Check if any component is loading
+  bool get isLoading =>
+      stt is LoadingState || llm is LoadingState || tts is LoadingState;
+
+  /// Get list of components that are not ready
+  List<String> get notReadyComponents {
+    final notReady = <String>[];
+    if (stt is! LoadedState) notReady.add('STT');
+    if (llm is! LoadedState) notReady.add('LLM');
+    if (tts is! LoadedState) notReady.add('TTS');
+    return notReady;
+  }
+}
