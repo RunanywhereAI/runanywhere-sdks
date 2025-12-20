@@ -50,7 +50,8 @@ class LoggingConfiguration {
       enableRemoteLogging: enableRemoteLogging ?? this.enableRemoteLogging,
       remoteEndpoint: remoteEndpoint ?? this.remoteEndpoint,
       minLogLevel: minLogLevel ?? this.minLogLevel,
-      includeDeviceMetadata: includeDeviceMetadata ?? this.includeDeviceMetadata,
+      includeDeviceMetadata:
+          includeDeviceMetadata ?? this.includeDeviceMetadata,
       batchSize: batchSize ?? this.batchSize,
       batchInterval: batchInterval ?? this.batchInterval,
     );

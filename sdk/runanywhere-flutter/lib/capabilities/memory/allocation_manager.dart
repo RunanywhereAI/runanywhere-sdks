@@ -68,17 +68,20 @@ class AllocationManager {
       return true;
     }
 
-    _logger.info('Insufficient memory, attempting to free space for ${_formatBytes(size)}');
+    _logger.info(
+        'Insufficient memory, attempting to free space for ${_formatBytes(size)}');
 
     // Try to free memory based on priority
     final needed = size - availableMemory;
-    final freed = await _freeMemory(needed: needed, requesterPriority: priority);
+    final freed =
+        await _freeMemory(needed: needed, requesterPriority: priority);
 
     final newAvailable = _getCurrentAvailableMemory();
     final success = newAvailable >= size;
 
     if (success) {
-      _logger.info('Memory request successful after freeing ${_formatBytes(freed)}');
+      _logger.info(
+          'Memory request successful after freeing ${_formatBytes(freed)}');
     } else {
       _logger.warning('Memory request failed, insufficient memory available');
     }
@@ -141,7 +144,8 @@ class AllocationManager {
 
     final size = modelInfo.size;
     final sizeString = _formatBytes(size);
-    _logger.info("Unloading model '${modelInfo.model.name}' to free $sizeString");
+    _logger
+        .info("Unloading model '${modelInfo.model.name}' to free $sizeString");
 
     // Notify service to cleanup
     try {

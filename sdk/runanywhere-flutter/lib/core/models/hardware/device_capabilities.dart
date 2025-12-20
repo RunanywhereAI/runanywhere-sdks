@@ -191,8 +191,8 @@ class DeviceCapabilities {
       hasNeuralEngine: json['hasNeuralEngine'] as bool? ?? false,
       hasGPU: json['hasGPU'] as bool? ?? false,
       processorCount: (json['processorCount'] as num?)?.toInt() ?? 0,
-      processorType:
-          ProcessorType.fromRawValue(json['processorType'] as String? ?? 'unknown'),
+      processorType: ProcessorType.fromRawValue(
+          json['processorType'] as String? ?? 'unknown'),
       supportedAccelerators: (json['supportedAccelerators'] as List<dynamic>?)
               ?.map((e) => HardwareAcceleration.fromRawValue(e as String))
               .whereType<HardwareAcceleration>()

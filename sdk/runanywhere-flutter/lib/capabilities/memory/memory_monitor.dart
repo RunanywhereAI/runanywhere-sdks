@@ -15,7 +15,8 @@ class MemoryMonitor {
 
   MemoryMonitor();
 
-  void configure({required int memoryThreshold, required int criticalThreshold}) {
+  void configure(
+      {required int memoryThreshold, required int criticalThreshold}) {
     _memoryThreshold = memoryThreshold;
     _criticalThreshold = criticalThreshold;
   }
@@ -83,9 +84,8 @@ class MemoryMonitor {
   /// Get memory trend over the specified duration
   MemoryUsageTrend? getMemoryTrend(Duration duration) {
     final cutoffTime = DateTime.now().subtract(duration);
-    final recentHistory = _memoryHistory
-        .where((s) => s.timestamp.isAfter(cutoffTime))
-        .toList();
+    final recentHistory =
+        _memoryHistory.where((s) => s.timestamp.isAfter(cutoffTime)).toList();
 
     if (recentHistory.length < 2) return null;
 
@@ -93,14 +93,17 @@ class MemoryMonitor {
     final lastEntry = recentHistory.last;
 
     final memoryDelta = lastEntry.availableMemory - firstEntry.availableMemory;
-    final timeDelta = lastEntry.timestamp.difference(firstEntry.timestamp).inSeconds;
+    final timeDelta =
+        lastEntry.timestamp.difference(firstEntry.timestamp).inSeconds;
 
     if (timeDelta <= 0) return null;
 
     final rate = memoryDelta / timeDelta; // bytes per second
 
     return MemoryUsageTrend(
-      direction: memoryDelta > 0 ? TrendDirection.increasing : TrendDirection.decreasing,
+      direction: memoryDelta > 0
+          ? TrendDirection.increasing
+          : TrendDirection.decreasing,
       rate: rate.abs(),
       confidence: _calculateTrendConfidence(recentHistory),
     );
@@ -109,13 +112,13 @@ class MemoryMonitor {
   /// Get average memory usage over duration
   double? getAverageMemoryUsage(Duration duration) {
     final cutoffTime = DateTime.now().subtract(duration);
-    final recentHistory = _memoryHistory
-        .where((s) => s.timestamp.isAfter(cutoffTime))
-        .toList();
+    final recentHistory =
+        _memoryHistory.where((s) => s.timestamp.isAfter(cutoffTime)).toList();
 
     if (recentHistory.isEmpty) return null;
 
-    final totalUsage = recentHistory.map((s) => s.usedMemory).reduce((a, b) => a + b);
+    final totalUsage =
+        recentHistory.map((s) => s.usedMemory).reduce((a, b) => a + b);
     return totalUsage / recentHistory.length;
   }
 
@@ -139,9 +142,12 @@ class MemoryMonitor {
     final usedString = _formatBytes(stats.usedMemory);
     final usagePercent = stats.usedMemoryPercentage.toStringAsFixed(1);
 
-    final pressureInfo = stats.pressureLevel != null ? ' [PRESSURE: ${stats.pressureLevel}]' : '';
+    final pressureInfo = stats.pressureLevel != null
+        ? ' [PRESSURE: ${stats.pressureLevel}]'
+        : '';
 
-    _logger.debug('Memory: $usedString used, $availableString available ($usagePercent%)$pressureInfo');
+    _logger.debug(
+        'Memory: $usedString used, $availableString available ($usagePercent%)$pressureInfo');
 
     if (stats.pressureLevel != null) {
       _logger.warning('Memory pressure detected: ${stats.pressureLevel}');
@@ -161,7 +167,8 @@ class MemoryMonitor {
           ? entries[i - 1].availableMemory - entries[i - 2].availableMemory
           : delta;
 
-      if ((delta > 0 && previousDelta > 0) || (delta < 0 && previousDelta < 0)) {
+      if ((delta > 0 && previousDelta > 0) ||
+          (delta < 0 && previousDelta < 0)) {
         consistent++;
       }
       total++;

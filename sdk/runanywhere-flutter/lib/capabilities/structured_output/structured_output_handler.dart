@@ -99,7 +99,8 @@ Remember: Output ONLY the JSON object, nothing else.
       if (e is StructuredOutputError) {
         rethrow;
       }
-      throw StructuredOutputError.invalidJSON('Failed to parse structured output: $e');
+      throw StructuredOutputError.invalidJSON(
+          'Failed to parse structured output: $e');
     }
   }
 
@@ -135,7 +136,8 @@ Remember: Output ONLY the JSON object, nothing else.
     if (arrayStartIndex != -1 &&
         arrayEndIndex != -1 &&
         arrayStartIndex < arrayEndIndex) {
-      final jsonSubstring = trimmed.substring(arrayStartIndex, arrayEndIndex + 1);
+      final jsonSubstring =
+          trimmed.substring(arrayStartIndex, arrayEndIndex + 1);
       try {
         jsonDecode(jsonSubstring);
         return jsonSubstring;
@@ -155,8 +157,10 @@ Remember: Output ONLY the JSON object, nothing else.
     }
 
     // Log the text that couldn't be parsed
-    logger.error('Failed to extract JSON from text: ${trimmed.length > 200 ? trimmed.substring(0, 200) : trimmed}...');
-    throw StructuredOutputError.extractionFailed('No valid JSON found in the response');
+    logger.error(
+        'Failed to extract JSON from text: ${trimmed.length > 200 ? trimmed.substring(0, 200) : trimmed}...');
+    throw StructuredOutputError.extractionFailed(
+        'No valid JSON found in the response');
   }
 
   /// Find a complete JSON object or array in the text
@@ -282,11 +286,13 @@ class StructuredOutputError implements Exception {
   }
 
   factory StructuredOutputError.extractionFailed(String detail) {
-    return StructuredOutputError('Failed to extract structured output: $detail');
+    return StructuredOutputError(
+        'Failed to extract structured output: $detail');
   }
 
   factory StructuredOutputError.unsupportedType(String type) {
-    return StructuredOutputError('Unsupported type for structured output: $type');
+    return StructuredOutputError(
+        'Unsupported type for structured output: $type');
   }
 
   @override

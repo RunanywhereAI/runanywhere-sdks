@@ -157,7 +157,9 @@ class ModelRegistration {
     if (urlLower.endsWith('.mlx')) return ModelFormat.mlx;
     if (urlLower.endsWith('.pte')) return ModelFormat.pte;
     if (urlLower.endsWith('.bin')) return ModelFormat.bin;
-    if (urlLower.endsWith('.tar.bz2')) return ModelFormat.onnx; // Sherpa ONNX archives
+    if (urlLower.endsWith('.tar.bz2')) {
+      return ModelFormat.onnx; // Sherpa ONNX archives
+    }
     if (urlLower.endsWith('.tar.gz')) return ModelFormat.onnx;
 
     return ModelFormat.unknown;

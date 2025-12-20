@@ -16,6 +16,10 @@ import '../../public/configuration/sdk_environment.dart';
 import '../../core/service_registry/unified_service_registry.dart';
 import '../../core/protocols/frameworks/unified_framework_adapter.dart';
 import '../../core/models/model/model_registration.dart';
+import '../../infrastructure/analytics/sdk_analytics_initializer.dart';
+import '../../data/network/api_client.dart';
+import '../../data/network/network_service.dart';
+import '../../data/network/services/authentication_service.dart';
 
 /// Service container for dependency injection
 /// Matches iOS ServiceContainer from Foundation/DependencyInjection/ServiceContainer.swift
@@ -37,6 +41,14 @@ class ServiceContainer {
   AnalyticsService? _analyticsService;
   HardwareCapabilityManager? _hardwareManager;
   SDKLogger? _logger;
+
+  // Analytics pipeline
+  SDKAnalyticsInitializer? _analyticsInitializer;
+
+  // Network services
+  APIClient? _apiClient;
+  NetworkService? _networkService;
+  AuthenticationService? _authenticationService;
 
   /// Single adapter registry for all frameworks (text and voice)
   /// Matches iOS adapterRegistry pattern
@@ -124,6 +136,52 @@ class ServiceContainer {
     return _logger ??= SDKLogger();
   }
 
+  /// Analytics initializer
+  SDKAnalyticsInitializer get analyticsInitializer {
+    return _analyticsInitializer ??= SDKAnalyticsInitializer();
+  }
+
+  /// API client
+  APIClient? get apiClient => _apiClient;
+
+  /// Network service for HTTP operations
+  NetworkService? get networkService => _networkService;
+
+  /// Set network service (called during Phase 2 initialization)
+  void setNetworkService(NetworkService service) {
+    _networkService = service;
+  }
+
+  /// Authentication service for token management
+  AuthenticationService? get authenticationService => _authenticationService;
+
+  /// Create an API client with the given configuration
+  APIClient createAPIClient({
+    required Uri baseURL,
+    required String apiKey,
+  }) {
+    final client = APIClient(baseURL: baseURL, apiKey: apiKey);
+    _apiClient = client;
+    _networkService = client;
+    return client;
+  }
+
+  /// Create and configure an authentication service
+  Future<AuthenticationService> createAuthenticationService({
+    required Uri baseURL,
+    required String apiKey,
+  }) async {
+    // Create API client first if needed
+    final client =
+        _apiClient ?? createAPIClient(baseURL: baseURL, apiKey: apiKey);
+
+    // Create authentication service
+    final authService = AuthenticationService(apiClient: client);
+    _authenticationService = authService;
+
+    return authService;
+  }
+
   /// Setup local services (no network calls)
   Future<void> setupLocalServices({
     required String apiKey,
@@ -140,6 +198,19 @@ class ServiceContainer {
     // Initialize local services only
     // Network services are initialized lazily on first API call
     await modelRegistry.initialize(apiKey: apiKey);
+
+    // Create API client for network services
+    _apiClient = APIClient(
+      baseURL: baseURL,
+      apiKey: apiKey,
+    );
+
+    // Initialize analytics pipeline
+    // This wires EventPublisher -> AnalyticsQueueManager -> TelemetryRepository
+    await analyticsInitializer.initialize(
+      apiClient: _apiClient,
+      environment: environment,
+    );
   }
 
   /// Initialize network services
@@ -200,6 +271,11 @@ class ServiceContainer {
 
   /// Reset all services (for testing)
   void reset() {
+    // Stop analytics pipeline
+    _analyticsInitializer?.dispose();
+    _analyticsInitializer = null;
+
+    // Reset core services
     _modelRegistry = null;
     _modelLoadingService = null;
     _generationService = null;
@@ -210,6 +286,11 @@ class ServiceContainer {
     _hardwareManager = null;
     _logger = null;
     _initParams = null;
+
+    // Reset network services
+    _apiClient = null;
+    _networkService = null;
+    _authenticationService = null;
   }
 }
 

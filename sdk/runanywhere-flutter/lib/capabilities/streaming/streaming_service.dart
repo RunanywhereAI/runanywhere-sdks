@@ -3,7 +3,8 @@ import '../model_loading/model_loading_service.dart';
 import '../text_generation/generation_service.dart';
 import '../../../foundation/logging/sdk_logger.dart';
 import '../../../foundation/error_types/sdk_error.dart';
-import '../../../public/runanywhere.dart' show unawaited, RunAnywhereGenerationOptions;
+import '../../../public/runanywhere.dart'
+    show unawaited, RunAnywhereGenerationOptions;
 import '../../../core/module_registry.dart' show LLMGenerationOptions;
 
 /// Service for streaming text generation
@@ -31,7 +32,8 @@ class StreamingService {
       try {
         final loadedModel = generationService.getCurrentModel();
         if (loadedModel == null) {
-          controller.addError(SDKError.modelNotFound('No model is currently loaded'));
+          controller
+              .addError(SDKError.modelNotFound('No model is currently loaded'));
           await controller.close();
           return;
         }

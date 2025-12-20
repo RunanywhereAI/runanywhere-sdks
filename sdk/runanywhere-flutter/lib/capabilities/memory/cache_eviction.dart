@@ -37,7 +37,8 @@ class CacheEviction {
   /// Select a specific count of models to evict
   List<String> selectModelsToEvictByCount({required int count}) {
     final models = _getCurrentModels();
-    final sortedModels = _sortModelsByEvictionPriority(models, aggressive: false);
+    final sortedModels =
+        _sortModelsByEvictionPriority(models, aggressive: false);
     return sortedModels.take(count).map((m) => m.model.id).toList();
   }
 
@@ -139,7 +140,9 @@ class CacheEviction {
 
     for (final model in sortedModels) {
       // In non-aggressive mode, skip critical priority models unless absolutely necessary
-      if (!aggressive && model.priority == MemoryPriority.critical && freedMemory > 0) {
+      if (!aggressive &&
+          model.priority == MemoryPriority.critical &&
+          freedMemory > 0) {
         continue;
       }
 
@@ -147,7 +150,8 @@ class CacheEviction {
       freedMemory += model.size;
 
       final sizeString = _formatBytes(model.size);
-      _logger.debug("Selected model '${model.model.name}' for eviction (size: $sizeString)");
+      _logger.debug(
+          "Selected model '${model.model.name}' for eviction (size: $sizeString)");
 
       if (freedMemory >= targetMemory) {
         break;
@@ -155,7 +159,8 @@ class CacheEviction {
     }
 
     final targetMemoryString = _formatBytes(targetMemory);
-    _logger.info('Selected ${modelsToEvict.length} models for eviction, target memory: $targetMemoryString');
+    _logger.info(
+        'Selected ${modelsToEvict.length} models for eviction, target memory: $targetMemoryString');
 
     return modelsToEvict;
   }
@@ -179,11 +184,13 @@ class CacheEviction {
         final aScore = _calculateEvictionScore(a);
         final bScore = _calculateEvictionScore(b);
 
-        return aScore.compareTo(bScore); // Lower score = higher eviction priority
+        return aScore
+            .compareTo(bScore); // Lower score = higher eviction priority
       });
   }
 
-  List<MemoryLoadedModelInfo> _sortModelsByImportance(List<MemoryLoadedModelInfo> models) {
+  List<MemoryLoadedModelInfo> _sortModelsByImportance(
+      List<MemoryLoadedModelInfo> models) {
     return models.toList()
       ..sort((a, b) {
         // Higher priority = more important (lower eviction priority)
@@ -198,7 +205,8 @@ class CacheEviction {
 
   double _calculateEvictionScore(MemoryLoadedModelInfo model) {
     final timeSinceUse = DateTime.now().difference(model.lastUsed).inSeconds;
-    final priorityWeight = model.priority.value * 1000; // Higher priority = higher score
+    final priorityWeight =
+        model.priority.value * 1000; // Higher priority = higher score
     final recencyScore = timeSinceUse / 3600; // Hours since last use
 
     // Lower score = higher eviction priority
@@ -220,7 +228,8 @@ class CacheEviction {
   }
 
   /// Get models older than interval
-  List<MemoryLoadedModelInfo> getModelsByUsageAge({required Duration olderThan}) {
+  List<MemoryLoadedModelInfo> getModelsByUsageAge(
+      {required Duration olderThan}) {
     final models = _getCurrentModels();
     final cutoffDate = DateTime.now().subtract(olderThan);
     return models.where((m) => m.lastUsed.isBefore(cutoffDate)).toList();
@@ -235,20 +244,25 @@ class CacheEviction {
     final totalMemory = models.fold<int>(0, (sum, m) => sum + m.size);
     final modelsByPriority = <MemoryPriority, int>{};
     for (final model in models) {
-      modelsByPriority[model.priority] = (modelsByPriority[model.priority] ?? 0) + 1;
+      modelsByPriority[model.priority] =
+          (modelsByPriority[model.priority] ?? 0) + 1;
     }
 
     final avgLastUsed = models.isEmpty
         ? DateTime.now()
         : DateTime.fromMillisecondsSinceEpoch(
-            (models.map((m) => m.lastUsed.millisecondsSinceEpoch).reduce((a, b) => a + b) /
+            (models
+                        .map((m) => m.lastUsed.millisecondsSinceEpoch)
+                        .reduce((a, b) => a + b) /
                     models.length)
                 .round(),
           );
 
     final oldestModel = models.isEmpty
         ? DateTime.now()
-        : models.reduce((a, b) => a.lastUsed.isBefore(b.lastUsed) ? a : b).lastUsed;
+        : models
+            .reduce((a, b) => a.lastUsed.isBefore(b.lastUsed) ? a : b)
+            .lastUsed;
 
     final largestModel = models.isEmpty
         ? 0

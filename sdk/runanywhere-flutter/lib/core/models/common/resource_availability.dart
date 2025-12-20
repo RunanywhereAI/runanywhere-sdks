@@ -105,8 +105,8 @@ class ResourceAvailability {
               ?.map((a) => HardwareAcceleration.fromRawValue(a as String))
               .toList() ??
           [],
-      thermalState:
-          ThermalState.fromRawValue(json['thermalState'] as String? ?? 'nominal'),
+      thermalState: ThermalState.fromRawValue(
+          json['thermalState'] as String? ?? 'nominal'),
       batteryLevel: json['batteryLevel'] as double?,
       isLowPowerMode: json['isLowPowerMode'] as bool? ?? false,
     );

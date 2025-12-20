@@ -39,7 +39,8 @@ abstract class MemoryManager {
   List<dynamic> getLoadedModels();
 
   /// Request memory for a model
-  Future<bool> requestMemory({required int size, required MemoryPriority priority});
+  Future<bool> requestMemory(
+      {required int size, required MemoryPriority priority});
 
   /// Check if the memory manager is healthy and operational
   bool isHealthy();

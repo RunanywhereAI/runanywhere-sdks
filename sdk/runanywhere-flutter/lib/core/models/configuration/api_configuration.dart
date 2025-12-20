@@ -18,7 +18,8 @@ class APIConfiguration {
   /// Create from JSON map
   factory APIConfiguration.fromJson(Map<String, dynamic> json) {
     return APIConfiguration(
-      baseURL: json['baseURL'] != null ? Uri.parse(json['baseURL'] as String) : null,
+      baseURL:
+          json['baseURL'] != null ? Uri.parse(json['baseURL'] as String) : null,
       timeout: Duration(
         seconds: (json['timeoutInterval'] as num?)?.toInt() ?? 30,
       ),

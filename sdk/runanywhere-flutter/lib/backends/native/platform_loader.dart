@@ -66,19 +66,40 @@ class PlatformLoader {
 
   /// Load on Android from jniLibs
   static DynamicLibrary _loadAndroid() {
-    // First load dependencies in correct order for symbol visibility
-    // These may already be loaded or bundled differently
-    _tryLoadDependency('onnxruntime');
-    _tryLoadDependency('sherpa-onnx-c-api');
+    // Load dependencies in correct order for Android symbol visibility
+    // Order matters: base libs first, then backends, then bridge
 
+    // 1. Load C++ standard library (required by all native libs)
+    _tryLoadDependency('c++_shared');
+
+    // 2. Load OpenMP (required by LlamaCpp and some ONNX operations)
+    _tryLoadDependency('omp');
+
+    // 3. Load ONNX Runtime (required by ONNX backend and Sherpa-ONNX)
+    _tryLoadDependency('onnxruntime');
+
+    // 4. Load Sherpa-ONNX libraries (for STT/TTS/VAD)
+    _tryLoadDependency('sherpa-onnx-cxx-api');
+    _tryLoadDependency('sherpa-onnx-c-api');
+    _tryLoadDependency('sherpa-onnx-jni');
+
+    // 5. Load backend-specific libraries
+    _tryLoadDependency('runanywhere_onnx');
+    _tryLoadDependency('runanywhere_llamacpp');
+
+    // 6. Load the RunAnywhere loader (provides global symbol loading)
+    _tryLoadDependency('runanywhere_loader');
+
+    // 7. Finally load the main bridge library
     return DynamicLibrary.open('lib$_libraryName.so');
   }
 
-  /// Load on iOS using process() for statically linked XCFramework
+  /// Load on iOS using executable() for statically linked XCFramework
   static DynamicLibrary _loadIOS() {
     // iOS uses static linking via XCFramework in podspec
-    // Symbols are already in the process
-    return DynamicLibrary.process();
+    // Symbols are linked into the executable, use DynamicLibrary.executable()
+    // which looks up symbols in the main executable where static libraries are linked
+    return DynamicLibrary.executable();
   }
 
   /// Load on macOS for development/testing

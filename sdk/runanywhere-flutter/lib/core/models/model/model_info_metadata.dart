@@ -98,5 +98,8 @@ class ModelInfoMetadata {
 
   @override
   int get hashCode =>
-      author.hashCode ^ license.hashCode ^ description.hashCode ^ version.hashCode;
+      author.hashCode ^
+      license.hashCode ^
+      description.hashCode ^
+      version.hashCode;
 }

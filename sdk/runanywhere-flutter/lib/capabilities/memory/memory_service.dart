@@ -115,11 +115,13 @@ class MemoryService {
   // MARK: - Memory Pressure Management
 
   /// Handle memory pressure at a given level
-  Future<void> handleMemoryPressure({MemoryPressureLevel level = MemoryPressureLevel.warning}) async {
+  Future<void> handleMemoryPressure(
+      {MemoryPressureLevel level = MemoryPressureLevel.warning}) async {
     _logger.info('Handling memory pressure at level: $level');
 
     final targetMemory = _calculateTargetMemory(level);
-    final modelsToEvict = cacheEviction.selectModelsToEvict(targetMemory: targetMemory);
+    final modelsToEvict =
+        cacheEviction.selectModelsToEvict(targetMemory: targetMemory);
 
     await pressureHandler.handlePressure(
       level: level,
@@ -132,7 +134,8 @@ class MemoryService {
     required int size,
     MemoryPriority priority = MemoryPriority.normal,
   }) async {
-    return await allocationManager.requestMemory(size: size, priority: priority);
+    return await allocationManager.requestMemory(
+        size: size, priority: priority);
   }
 
   /// Release memory

@@ -28,8 +28,8 @@ class DownloadProgress {
     this.estimatedTimeRemaining,
     this.speed,
     double? percentage,
-  }) : percentage = percentage ??
-            (totalBytes > 0 ? bytesDownloaded / totalBytes : 0.0);
+  }) : percentage =
+            percentage ?? (totalBytes > 0 ? bytesDownloaded / totalBytes : 0.0);
 
   /// Create progress for downloading state
   factory DownloadProgress.downloading({
@@ -67,7 +67,8 @@ class DownloadProgress {
   }
 
   /// Create progress for failed state
-  factory DownloadProgress.failed(Object error, {int bytesDownloaded = 0, int totalBytes = 0}) {
+  factory DownloadProgress.failed(Object error,
+      {int bytesDownloaded = 0, int totalBytes = 0}) {
     return DownloadProgress(
       bytesDownloaded: bytesDownloaded,
       totalBytes: totalBytes,

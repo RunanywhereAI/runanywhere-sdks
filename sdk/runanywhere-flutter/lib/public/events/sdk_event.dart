@@ -1,35 +1,119 @@
-/// Base protocol for all SDK events
+import 'package:uuid/uuid.dart';
+
+import '../../infrastructure/events/event_category.dart';
+import '../../infrastructure/events/event_destination.dart';
+
+export '../../infrastructure/events/event_category.dart';
+export '../../infrastructure/events/event_destination.dart';
+
+/// Base protocol for all SDK events.
+///
+/// Mirrors iOS `SDKEvent` protocol from RunAnywhere SDK.
+/// Every event in the SDK should extend this class. The [destination] property
+/// tells the router where to send the event:
+/// - [EventDestination.all] (default) → EventBus + Analytics
+/// - [EventDestination.publicOnly] → EventBus only
+/// - [EventDestination.analyticsOnly] → Analytics only
+///
+/// Usage:
+/// ```dart
+/// EventPublisher.shared.track(LLMEvent.generationCompleted(...));
+/// ```
 abstract class SDKEvent {
-  /// Timestamp when the event occurred
-  DateTime get timestamp => DateTime.now();
+  /// Unique identifier for this event instance
+  String get id;
+
+  /// Event type string (used for analytics categorization)
+  String get type;
+
+  /// Category for filtering/routing
+  EventCategory get category;
+
+  /// When the event occurred
+  DateTime get timestamp;
+
+  /// Optional session ID for grouping related events
+  String? get sessionId => null;
+
+  /// Where to route this event
+  EventDestination get destination => EventDestination.all;
+
+  /// Event properties as key-value pairs (for analytics serialization)
+  Map<String, String> get properties => {};
 }
+
+/// Mixin providing default implementations for SDKEvent fields.
+/// Similar to Swift protocol extensions.
+mixin SDKEventDefaults implements SDKEvent {
+  static const _uuid = Uuid();
+
+  @override
+  String get id => _uuid.v4();
+
+  @override
+  DateTime get timestamp => DateTime.now();
+
+  @override
+  String? get sessionId => null;
+
+  @override
+  EventDestination get destination => EventDestination.all;
+
+  @override
+  Map<String, String> get properties => {};
+}
+
+// ============================================================================
+// SDK Initialization Events
+// ============================================================================
 
 /// SDK initialization events
-abstract class SDKInitializationEvent implements SDKEvent {}
-
-class SDKInitializationStarted implements SDKInitializationEvent {
+abstract class SDKInitializationEvent with SDKEventDefaults {
   @override
-  final DateTime timestamp = DateTime.now();
+  EventCategory get category => EventCategory.sdk;
 }
 
-class SDKInitializationCompleted implements SDKInitializationEvent {
+class SDKInitializationStarted extends SDKInitializationEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'sdk.initialization.started';
 }
 
-class SDKInitializationFailed implements SDKInitializationEvent {
+class SDKInitializationCompleted extends SDKInitializationEvent {
+  @override
+  String get type => 'sdk.initialization.completed';
+}
+
+class SDKInitializationFailed extends SDKInitializationEvent {
   final Object error;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKInitializationFailed(this.error);
+
+  @override
+  String get type => 'sdk.initialization.failed';
+
+  @override
+  Map<String, String> get properties => {'error': error.toString()};
 }
 
+// ============================================================================
+// SDK Configuration Events
+// ============================================================================
+
 /// SDK configuration events
-abstract class SDKConfigurationEvent implements SDKEvent {}
+abstract class SDKConfigurationEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.sdk;
+}
+
+// ============================================================================
+// SDK Generation Events (LLM)
+// ============================================================================
 
 /// SDK generation events
-abstract class SDKGenerationEvent implements SDKEvent {
+abstract class SDKGenerationEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.llm;
+
   static SDKGenerationStarted started({required String prompt}) {
     return SDKGenerationStarted(prompt: prompt);
   }
@@ -61,50 +145,80 @@ abstract class SDKGenerationEvent implements SDKEvent {
   }
 }
 
-class SDKGenerationStarted implements SDKGenerationEvent {
+class SDKGenerationStarted extends SDKGenerationEvent {
   final String prompt;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKGenerationStarted({required this.prompt});
+
+  @override
+  String get type => 'llm.generation.started';
+
+  @override
+  Map<String, String> get properties => {'prompt_length': '${prompt.length}'};
 }
 
-class SDKGenerationCompleted implements SDKGenerationEvent {
+class SDKGenerationCompleted extends SDKGenerationEvent {
   final String response;
   final int tokensUsed;
   final int latencyMs;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKGenerationCompleted({
     required this.response,
     required this.tokensUsed,
     required this.latencyMs,
   });
+
+  @override
+  String get type => 'llm.generation.completed';
+
+  @override
+  Map<String, String> get properties => {
+        'response_length': '${response.length}',
+        'tokens_used': '$tokensUsed',
+        'latency_ms': '$latencyMs',
+      };
 }
 
-class SDKGenerationFailed implements SDKGenerationEvent {
+class SDKGenerationFailed extends SDKGenerationEvent {
   final Object error;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKGenerationFailed(this.error);
+
+  @override
+  String get type => 'llm.generation.failed';
+
+  @override
+  Map<String, String> get properties => {'error': error.toString()};
 }
 
-class SDKGenerationCostCalculated implements SDKGenerationEvent {
+class SDKGenerationCostCalculated extends SDKGenerationEvent {
   final double amount;
   final double savedAmount;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKGenerationCostCalculated({
     required this.amount,
     required this.savedAmount,
   });
+
+  @override
+  String get type => 'llm.generation.cost_calculated';
+
+  @override
+  Map<String, String> get properties => {
+        'amount': amount.toStringAsFixed(6),
+        'saved_amount': savedAmount.toStringAsFixed(6),
+      };
 }
 
+// ============================================================================
+// SDK Model Events
+// ============================================================================
+
 /// SDK model events
-abstract class SDKModelEvent implements SDKEvent {
+abstract class SDKModelEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.model;
+
   static SDKModelLoadStarted loadStarted({required String modelId}) {
     return SDKModelLoadStarted(modelId: modelId);
   }
@@ -129,49 +243,79 @@ abstract class SDKModelEvent implements SDKEvent {
   }
 }
 
-class SDKModelLoadStarted implements SDKModelEvent {
+class SDKModelLoadStarted extends SDKModelEvent {
   final String modelId;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKModelLoadStarted({required this.modelId});
+
+  @override
+  String get type => 'model.load.started';
+
+  @override
+  Map<String, String> get properties => {'model_id': modelId};
 }
 
-class SDKModelLoadCompleted implements SDKModelEvent {
+class SDKModelLoadCompleted extends SDKModelEvent {
   final String modelId;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKModelLoadCompleted({required this.modelId});
+
+  @override
+  String get type => 'model.load.completed';
+
+  @override
+  Map<String, String> get properties => {'model_id': modelId};
 }
 
-class SDKModelLoadFailed implements SDKModelEvent {
+class SDKModelLoadFailed extends SDKModelEvent {
   final String modelId;
   final Object error;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKModelLoadFailed({required this.modelId, required this.error});
+
+  @override
+  String get type => 'model.load.failed';
+
+  @override
+  Map<String, String> get properties => {
+        'model_id': modelId,
+        'error': error.toString(),
+      };
 }
 
-class SDKModelUnloadStarted implements SDKModelEvent {
+class SDKModelUnloadStarted extends SDKModelEvent {
   final String modelId;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKModelUnloadStarted({required this.modelId});
+
+  @override
+  String get type => 'model.unload.started';
+
+  @override
+  Map<String, String> get properties => {'model_id': modelId};
 }
 
-class SDKModelUnloadCompleted implements SDKModelEvent {
+class SDKModelUnloadCompleted extends SDKModelEvent {
   final String modelId;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKModelUnloadCompleted({required this.modelId});
+
+  @override
+  String get type => 'model.unload.completed';
+
+  @override
+  Map<String, String> get properties => {'model_id': modelId};
 }
 
+// ============================================================================
+// SDK Voice Events
+// ============================================================================
+
 /// SDK voice events
-abstract class SDKVoiceEvent implements SDKEvent {
+abstract class SDKVoiceEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.voice;
+
   static SDKVoiceListeningStarted listeningStarted() {
     return SDKVoiceListeningStarted();
   }
@@ -250,124 +394,248 @@ abstract class SDKVoiceEvent implements SDKEvent {
   }
 }
 
-class SDKVoiceListeningStarted implements SDKVoiceEvent {
+class SDKVoiceListeningStarted extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.listening.started';
 }
 
-class SDKVoiceListeningEnded implements SDKVoiceEvent {
+class SDKVoiceListeningEnded extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.listening.ended';
 }
 
-class SDKVoiceSpeechDetected implements SDKVoiceEvent {
+class SDKVoiceSpeechDetected extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.speech.detected';
 }
 
-class SDKVoiceTranscriptionStarted implements SDKVoiceEvent {
+class SDKVoiceTranscriptionStarted extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.transcription.started';
+
+  @override
+  EventCategory get category => EventCategory.stt;
 }
 
-class SDKVoiceTranscriptionPartial implements SDKVoiceEvent {
+class SDKVoiceTranscriptionPartial extends SDKVoiceEvent {
   final String text;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKVoiceTranscriptionPartial({required this.text});
+
+  @override
+  String get type => 'voice.transcription.partial';
+
+  @override
+  EventCategory get category => EventCategory.stt;
+
+  @override
+  Map<String, String> get properties => {'text': text};
 }
 
-class SDKVoiceTranscriptionFinal implements SDKVoiceEvent {
+class SDKVoiceTranscriptionFinal extends SDKVoiceEvent {
   final String text;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKVoiceTranscriptionFinal({required this.text});
+
+  @override
+  String get type => 'voice.transcription.final';
+
+  @override
+  EventCategory get category => EventCategory.stt;
+
+  @override
+  Map<String, String> get properties => {'text': text};
 }
 
-class SDKVoiceResponseGenerated implements SDKVoiceEvent {
+class SDKVoiceResponseGenerated extends SDKVoiceEvent {
   final String text;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKVoiceResponseGenerated({required this.text});
-}
 
-class SDKVoiceSynthesisStarted implements SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.response.generated';
+
+  @override
+  Map<String, String> get properties => {'text_length': '${text.length}'};
 }
 
-class SDKVoiceAudioGenerated implements SDKVoiceEvent {
+class SDKVoiceSynthesisStarted extends SDKVoiceEvent {
+  @override
+  String get type => 'voice.synthesis.started';
+
+  @override
+  EventCategory get category => EventCategory.tts;
+}
+
+class SDKVoiceAudioGenerated extends SDKVoiceEvent {
   final dynamic data;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKVoiceAudioGenerated({required this.data});
-}
 
-class SDKVoiceSynthesisCompleted implements SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.audio.generated';
+
+  @override
+  EventCategory get category => EventCategory.tts;
 }
 
-class SDKVoicePipelineError implements SDKVoiceEvent {
+class SDKVoiceSynthesisCompleted extends SDKVoiceEvent {
+  @override
+  String get type => 'voice.synthesis.completed';
+
+  @override
+  EventCategory get category => EventCategory.tts;
+}
+
+class SDKVoicePipelineError extends SDKVoiceEvent {
   final Object error;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   SDKVoicePipelineError({required this.error});
+
+  @override
+  String get type => 'voice.pipeline.error';
+
+  @override
+  EventCategory get category => EventCategory.error;
+
+  @override
+  Map<String, String> get properties => {'error': error.toString()};
 }
 
-class SDKVoicePipelineStarted implements SDKVoiceEvent {
+class SDKVoicePipelineStarted extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.pipeline.started';
 }
 
-class SDKVoicePipelineCompleted implements SDKVoiceEvent {
+class SDKVoicePipelineCompleted extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.pipeline.completed';
 }
 
-class SDKVoiceVADStarted implements SDKVoiceEvent {
+class SDKVoiceVADStarted extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.vad.started';
 }
 
-class SDKVoiceVADDetected implements SDKVoiceEvent {
+class SDKVoiceVADDetected extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.vad.detected';
 }
 
-class SDKVoiceVADEnded implements SDKVoiceEvent {
+class SDKVoiceVADEnded extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.vad.ended';
 }
 
-class SDKVoiceSTTProcessing implements SDKVoiceEvent {
+class SDKVoiceSTTProcessing extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.stt.processing';
+
+  @override
+  EventCategory get category => EventCategory.stt;
 }
 
-class SDKVoiceLLMProcessing implements SDKVoiceEvent {
+class SDKVoiceLLMProcessing extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.llm.processing';
+
+  @override
+  EventCategory get category => EventCategory.llm;
 }
 
-class SDKVoiceTTSProcessing implements SDKVoiceEvent {
+class SDKVoiceTTSProcessing extends SDKVoiceEvent {
   @override
-  final DateTime timestamp = DateTime.now();
+  String get type => 'voice.tts.processing';
+
+  @override
+  EventCategory get category => EventCategory.tts;
 }
+
+// ============================================================================
+// SDK Device Events
+// ============================================================================
+
+/// SDK device events.
+///
+/// Mirrors iOS `DeviceEvent` from RunAnywhere SDK.
+abstract class SDKDeviceEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.device;
+
+  /// Factory method: device registered successfully
+  static DeviceRegistered registered({required String deviceId}) {
+    return DeviceRegistered(deviceId: deviceId);
+  }
+
+  /// Factory method: device registration failed
+  static DeviceRegistrationFailed registrationFailed({required String error}) {
+    return DeviceRegistrationFailed(error: error);
+  }
+}
+
+class DeviceRegistered extends SDKDeviceEvent {
+  final String deviceId;
+
+  DeviceRegistered({required this.deviceId});
+
+  @override
+  String get type => 'device.registered';
+
+  @override
+  Map<String, String> get properties => {
+        'device_id':
+            deviceId.length > 8 ? '${deviceId.substring(0, 8)}...' : deviceId
+      };
+}
+
+class DeviceRegistrationFailed extends SDKDeviceEvent {
+  final String error;
+
+  DeviceRegistrationFailed({required this.error});
+
+  @override
+  String get type => 'device.registration.failed';
+
+  @override
+  Map<String, String> get properties => {'error': error};
+}
+
+// ============================================================================
+// SDK Performance Events
+// ============================================================================
 
 /// SDK performance events
-abstract class SDKPerformanceEvent implements SDKEvent {}
+abstract class SDKPerformanceEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.sdk;
+}
+
+// ============================================================================
+// SDK Network Events
+// ============================================================================
 
 /// SDK network events
-abstract class SDKNetworkEvent implements SDKEvent {}
+abstract class SDKNetworkEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.network;
+}
+
+// ============================================================================
+// SDK Storage Events
+// ============================================================================
 
 /// SDK storage events
-abstract class SDKStorageEvent implements SDKEvent {}
+abstract class SDKStorageEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.storage;
+}
+
+// ============================================================================
+// SDK Framework Events
+// ============================================================================
 
 /// SDK framework events
-abstract class SDKFrameworkEvent implements SDKEvent {}
+abstract class SDKFrameworkEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.sdk;
+}

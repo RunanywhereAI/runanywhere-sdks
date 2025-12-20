@@ -3,7 +3,7 @@
 /// Matches iOS VoiceSession.swift from Capabilities/Voice/Models/
 library voice_session;
 
-import '../../../components/stt/stt_component.dart' show STTOutput;
+import '../../../features/stt/stt_capability.dart' show STTOutput;
 
 /// Configuration for a voice session
 /// Matches iOS VoiceSessionConfig from VoiceSession.swift

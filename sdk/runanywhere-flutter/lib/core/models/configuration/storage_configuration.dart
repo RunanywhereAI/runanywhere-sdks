@@ -38,15 +38,16 @@ class StorageConfiguration {
   factory StorageConfiguration.fromJson(Map<String, dynamic> json) {
     return StorageConfiguration(
       maxCacheSize: (json['maxCacheSize'] as num?)?.toInt() ?? 1073741824,
-      evictionPolicy:
-          CacheEvictionPolicy.fromRawValue(json['evictionPolicy'] as String? ?? 'lru') ??
-              CacheEvictionPolicy.leastRecentlyUsed,
+      evictionPolicy: CacheEvictionPolicy.fromRawValue(
+              json['evictionPolicy'] as String? ?? 'lru') ??
+          CacheEvictionPolicy.leastRecentlyUsed,
       directoryName: json['directoryName'] as String? ?? 'RunAnywhere',
       enableAutoCleanup: json['enableAutoCleanup'] as bool? ?? true,
       autoCleanupInterval: Duration(
         seconds: (json['autoCleanupInterval'] as num?)?.toInt() ?? 86400,
       ),
-      minimumFreeSpace: (json['minimumFreeSpace'] as num?)?.toInt() ?? 500000000,
+      minimumFreeSpace:
+          (json['minimumFreeSpace'] as num?)?.toInt() ?? 500000000,
       enableCompression: json['enableCompression'] as bool? ?? false,
     );
   }

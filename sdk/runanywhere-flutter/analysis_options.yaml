@@ -2,22 +2,60 @@ include: package:flutter_lints/flutter.yaml
 
 linter:
   rules:
+    # === Strong Typing ===
     - always_declare_return_types
-    - avoid_print
-    - avoid_relative_lib_imports
     - avoid_types_as_parameter_names
+    - type_annotate_public_apis
+    - avoid_dynamic_calls          # Catch dynamic calls
+    - strict_raw_type              # Enforce type parameters
+
+    # === Reliability ===
+    - avoid_print
     - cancel_subscriptions
     - close_sinks
+    - unawaited_futures
+    - discarded_futures            # Don't discard futures
+
+    # === API Hygiene ===
+    - avoid_relative_lib_imports
     - prefer_const_constructors
     - prefer_const_literals_to_create_immutables
+    - prefer_const_declarations
     - prefer_final_fields
+    - prefer_final_locals
     - prefer_single_quotes
-    - unawaited_futures
     - use_key_in_widget_constructors
+    - curly_braces_in_flow_control_structures  # Consistent braces
+
+    # === Safety ===
+    - avoid_returning_null_for_void
+    - avoid_void_async
+    - no_duplicate_case_values
+    - prefer_void_to_null
+    - avoid_catching_errors        # Prefer catching Exception
+    - throw_in_finally             # Avoid throwing in finally
 
 analyzer:
   exclude:
     - '**/*.g.dart'
     - '**/*.freezed.dart'
   errors:
+    # Treat unused code as errors (high priority for quality)
+    dead_code: error
+    unused_import: error
+    unused_local_variable: error
+    unused_element: error
+    unused_field: error
+
+    # Strong typing (warning to avoid breaking build)
+    avoid_dynamic_calls: warning
+    strict_raw_type: warning
+
+    # Keep these as info level (not blockers)
+    avoid_print: info
+    prefer_const_constructors: info
+    prefer_const_declarations: info
+    prefer_final_locals: info
+
+    # Ignore generated code issues
     invalid_annotation_target: ignore

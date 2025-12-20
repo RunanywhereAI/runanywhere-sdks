@@ -67,7 +67,8 @@ class LogEntry {
     required this.message,
     Map<String, dynamic>? metadata,
     this.deviceInfo,
-  }) : metadata = metadata?.map((key, value) => MapEntry(key, value.toString()));
+  }) : metadata =
+            metadata?.map((key, value) => MapEntry(key, value.toString()));
 
   /// Convert to JSON map
   Map<String, dynamic> toJson() {
@@ -91,7 +92,8 @@ class LogEntry {
       ),
       category: json['category'] as String,
       message: json['message'] as String,
-      metadata: (json['metadata'] as Map<String, dynamic>?)?.cast<String, String>(),
+      metadata:
+          (json['metadata'] as Map<String, dynamic>?)?.cast<String, String>(),
       deviceInfo: json['deviceInfo'] != null
           ? DeviceInfo.fromJson(json['deviceInfo'] as Map<String, dynamic>)
           : null,

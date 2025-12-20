@@ -45,7 +45,8 @@ class SessionMetadata {
   }
 
   @override
-  String toString() => 'SessionMetadata(id: $id, modelId: $modelId, type: $type)';
+  String toString() =>
+      'SessionMetadata(id: $id, modelId: $modelId, type: $type)';
 
   @override
   bool operator ==(Object other) =>
