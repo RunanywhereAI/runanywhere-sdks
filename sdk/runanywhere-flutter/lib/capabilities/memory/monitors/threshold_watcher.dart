@@ -40,7 +40,8 @@ class ThresholdWatcher {
     }
   }
 
-  void configure({required int memoryThreshold, required int criticalThreshold}) {
+  void configure(
+      {required int memoryThreshold, required int criticalThreshold}) {
     _memoryThreshold = memoryThreshold;
     _criticalThreshold = criticalThreshold;
   }
@@ -73,7 +74,8 @@ class ThresholdWatcher {
     _logger.info('Stopped threshold watching');
   }
 
-  void setThresholdCallback(MemoryThreshold threshold, void Function() callback) {
+  void setThresholdCallback(
+      MemoryThreshold threshold, void Function() callback) {
     _thresholdCallbacks[threshold] = callback;
     _logger.debug('Set callback for threshold: $threshold');
   }
@@ -112,7 +114,8 @@ class ThresholdWatcher {
     final bool isAboveThreshold;
     if (currentState) {
       // If already crossed, use hysteresis buffer to prevent flapping
-      isAboveThreshold = stats.availableMemory < (thresholdValue + hysteresisBuffer);
+      isAboveThreshold =
+          stats.availableMemory < (thresholdValue + hysteresisBuffer);
     } else {
       // If not crossed, check against raw threshold
       isAboveThreshold = stats.availableMemory < thresholdValue;
@@ -160,7 +163,8 @@ class ThresholdWatcher {
     _thresholdCallbacks[threshold]?.call();
 
     // Post notification
-    _postThresholdNotification(threshold: threshold, crossed: true, stats: stats);
+    _postThresholdNotification(
+        threshold: threshold, crossed: true, stats: stats);
   }
 
   void _handleThresholdUncrossed(
@@ -188,7 +192,8 @@ class ThresholdWatcher {
     );
 
     // Post notification
-    _postThresholdNotification(threshold: threshold, crossed: false, stats: stats);
+    _postThresholdNotification(
+        threshold: threshold, crossed: false, stats: stats);
   }
 
   // MARK: - Threshold State
@@ -251,7 +256,10 @@ class ThresholdWatcher {
     }
 
     if (since != null) {
-      filtered = filtered.where((e) => e.timestamp.isAfter(since) || e.timestamp.isAtSameMomentAs(since)).toList();
+      filtered = filtered
+          .where((e) =>
+              e.timestamp.isAfter(since) || e.timestamp.isAtSameMomentAs(since))
+          .toList();
     }
 
     return filtered;

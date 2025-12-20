@@ -15,7 +15,8 @@ class EventBus {
       StreamController<SDKInitializationEvent>.broadcast();
   final _configurationController =
       StreamController<SDKConfigurationEvent>.broadcast();
-  final _generationController = StreamController<SDKGenerationEvent>.broadcast();
+  final _generationController =
+      StreamController<SDKGenerationEvent>.broadcast();
   final _modelController = StreamController<SDKModelEvent>.broadcast();
   final _voiceController = StreamController<SDKVoiceEvent>.broadcast();
   final _performanceController =
@@ -48,8 +49,7 @@ class EventBus {
 
   Stream<SDKStorageEvent> get storageEvents => _storageController.stream;
 
-  Stream<SDKFrameworkEvent> get frameworkEvents =>
-      _frameworkController.stream;
+  Stream<SDKFrameworkEvent> get frameworkEvents => _frameworkController.stream;
 
   Stream<ComponentInitializationEvent> get componentEvents =>
       _componentController.stream;

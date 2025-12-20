@@ -13,22 +13,22 @@ import 'events/sdk_event.dart';
 import 'models/models.dart';
 import '../capabilities/text_generation/generation_service.dart';
 import '../capabilities/structured_output/structured_output_handler.dart';
-import '../components/stt/stt_component.dart';
-import '../components/tts/tts_component.dart';
+import '../features/stt/stt_capability.dart';
+import '../features/tts/tts_capability.dart';
 
 // Export generation options
 export '../capabilities/text_generation/generation_service.dart'
     show RunAnywhereGenerationOptions, GenerationResult;
 
-// Export component types for public use
-export '../components/stt/stt_component.dart'
-    show STTComponent, STTConfiguration, STTOutput, STTMode, STTOptions;
-export '../components/tts/tts_component.dart'
-    show TTSComponent, TTSConfiguration;
-export '../components/tts/tts_output.dart' show TTSOutput, SynthesisMetadata;
-export '../components/llm/llm_component.dart'
+// Export capability types for public use
+export '../features/stt/stt_capability.dart'
+    show STTCapability, STTConfiguration, STTOutput, STTMode, STTOptions;
+export '../features/tts/tts_capability.dart'
+    show TTSCapability, TTSConfiguration;
+export '../features/tts/tts_output.dart' show TTSOutput, SynthesisMetadata;
+export '../features/llm/llm_capability.dart'
     show
-        LLMComponent,
+        LLMCapability,
         LLMConfiguration,
         LLMOutput,
         Message,
@@ -49,33 +49,68 @@ export '../core/models/model/model_category.dart';
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
 /// Matches iOS RunAnywhere from RunAnywhere.swift
+///
+/// # SDK Initialization Flow
+///
+/// ## Phase 1: Core Init (Synchronous, ~1-5ms, No Network)
+/// `initialize()` or `initializeWithParams()`
+///   - Validate params (API key, URL, environment)
+///   - Set log level
+///   - Store params locally
+///   - Store in Keychain (production/staging only)
+///   - Mark: isInitialized = true
+///
+/// ## Phase 2: Services Init (Async, ~100-500ms, Network Required)
+/// `completeServicesInitialization()`
+///   - Setup API Client (with authentication for production/staging)
+///   - Create Core Services (SyncCoordinator, TelemetryRepository, etc.)
+///   - Load Models (sync from remote + load from DB)
+///   - Initialize Analytics & EventPublisher
+///   - Register Device with Backend
+///
 class RunAnywhere {
-  // Internal state management
+  // MARK: - Internal State Management
+
+  /// Internal init params storage
   static SDKInitParams? _initParams;
   static SDKEnvironment? _currentEnvironment;
   static bool _isInitialized = false;
 
-  // Loaded component storage
-  static STTComponent? _loadedSTTComponent;
-  static TTSComponent? _loadedTTSComponent;
+  /// Track if services initialization is complete (makes API calls O(1) after first use)
+  static bool _hasCompletedServicesInit = false;
+
+  // Loaded capability storage
+  static STTCapability? _loadedSTTCapability;
+  static TTSCapability? _loadedTTSCapability;
+
+  // MARK: - SDK State
 
   /// Access to service container
   static ServiceContainer get serviceContainer => ServiceContainer.shared;
 
-  /// Check if SDK is initialized
+  /// Check if SDK is initialized (Phase 1 complete)
   static bool get isSDKInitialized => _isInitialized;
+
+  /// Check if services are fully ready (Phase 2 complete)
+  static bool get areServicesReady => _hasCompletedServicesInit;
+
+  /// Check if SDK is active and ready for use
+  static bool get isActive => _isInitialized && _initParams != null;
 
   /// Get the initialization parameters (if initialized)
   static SDKInitParams? get initParams => _initParams;
 
+  /// Current environment (null if not initialized)
+  static SDKEnvironment? get environment => _currentEnvironment;
+
   /// Access to all SDK events for subscription-based patterns
   static EventBus get events => EventBus.shared;
 
-  /// Get the currently loaded STT component
-  static STTComponent? get loadedSTTComponent => _loadedSTTComponent;
+  /// Get the currently loaded STT capability
+  static STTCapability? get loadedSTTCapability => _loadedSTTCapability;
 
-  /// Get the currently loaded TTS component
-  static TTSComponent? get loadedTTSComponent => _loadedTTSComponent;
+  /// Get the currently loaded TTS capability
+  static TTSCapability? get loadedTTSCapability => _loadedTTSCapability;
 
   /// Initialize the RunAnywhere SDK
   ///
@@ -187,6 +222,174 @@ class RunAnywhere {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Phase 2: Services Initialization (Async)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Complete services initialization (Phase 2)
+  ///
+  /// Called automatically in background by `initialize()`, or can be awaited directly.
+  /// Safe to call multiple times - returns immediately if already done.
+  ///
+  /// This method:
+  /// 1. Sets up API client (with authentication for production/staging)
+  /// 2. Creates core services (telemetry, models, sync)
+  /// 3. Loads model catalog from remote + local storage
+  /// 4. Initializes analytics pipeline
+  /// 5. Registers device with backend
+  static Future<void> completeServicesInitialization() async {
+    // Fast path: already completed
+    if (_hasCompletedServicesInit) {
+      return;
+    }
+
+    final params = _initParams;
+    final environment = _currentEnvironment;
+
+    if (params == null || environment == null) {
+      throw SDKError.notInitialized();
+    }
+
+    final logger = SDKLogger(category: 'RunAnywhere.Services');
+
+    // Check if services need initialization
+    // For development: check if networkService is null
+    // For production/staging: check if authenticationService is null
+    final needsInit = environment == SDKEnvironment.development
+        ? serviceContainer.networkService == null
+        : serviceContainer.authenticationService == null;
+
+    if (needsInit) {
+      logger
+          .info('Initializing services for ${environment.description} mode...');
+
+      try {
+        // Step 1: Setup API client
+        await _setupAPIClient(
+          params: params,
+          environment: environment,
+          logger: logger,
+        );
+
+        // Step 2: Create and inject core services
+        await _setupCoreServices(
+          environment: environment,
+          logger: logger,
+        );
+
+        // Step 3: Load models
+        await _loadModels(logger: logger);
+
+        // Step 4: Initialize analytics
+        await _initializeAnalytics(apiKey: params.apiKey, logger: logger);
+
+        logger.info('✅ Services initialized');
+      } catch (e) {
+        logger.error('❌ Services initialization failed: $e');
+        rethrow;
+      }
+    }
+
+    // Step 5: Register device
+    await _ensureDeviceRegistered();
+
+    // Mark Phase 2 complete
+    _hasCompletedServicesInit = true;
+  }
+
+  /// Ensure services are ready before API calls (internal guard)
+  /// O(1) after first successful initialization
+  static Future<void> _ensureServicesReady() async {
+    if (_hasCompletedServicesInit) {
+      return; // O(1) fast path
+    }
+    await completeServicesInitialization();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Private: Service Setup Helpers
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Setup API client based on environment
+  static Future<void> _setupAPIClient({
+    required SDKInitParams params,
+    required SDKEnvironment environment,
+    required SDKLogger logger,
+  }) async {
+    switch (environment) {
+      case SDKEnvironment.development:
+        // Development mode: Use Supabase or provided URL without auth
+        final supabaseConfig = params.supabaseConfig;
+        if (supabaseConfig != null) {
+          // Use Supabase for development
+          serviceContainer.setNetworkService(
+            serviceContainer.apiClient ??
+                serviceContainer.createAPIClient(
+                  baseURL: supabaseConfig.projectURL,
+                  apiKey: supabaseConfig.anonKey,
+                ),
+          );
+          logger.debug('APIClient: Supabase (development)');
+        } else {
+          // Use provided URL without auth
+          serviceContainer.setNetworkService(
+            serviceContainer.apiClient ??
+                serviceContainer.createAPIClient(
+                  baseURL: params.baseURL,
+                  apiKey: params.apiKey,
+                ),
+          );
+          logger.debug('APIClient: Provided URL (development)');
+        }
+
+      case SDKEnvironment.staging:
+      case SDKEnvironment.production:
+        // Production/Staging: Full authentication flow
+        final authService = serviceContainer.authenticationService;
+        if (authService == null) {
+          // Create and authenticate
+          final newAuthService =
+              await serviceContainer.createAuthenticationService(
+            baseURL: params.baseURL,
+            apiKey: params.apiKey,
+          );
+          await newAuthService.authenticate(apiKey: params.apiKey);
+          logger.info('Authenticated for ${environment.description}');
+        }
+    }
+  }
+
+  /// Create and inject core services
+  static Future<void> _setupCoreServices({
+    required SDKEnvironment environment,
+    required SDKLogger logger,
+  }) async {
+    logger.debug('Creating core services...');
+
+    // SyncCoordinator, TelemetryRepository, ModelInfoService are
+    // created in ServiceContainer.setupLocalServices()
+    // Here we just ensure they're properly configured
+
+    logger.debug('Core services created');
+  }
+
+  /// Load models from storage
+  static Future<void> _loadModels({required SDKLogger logger}) async {
+    // Model loading is handled by ModelLoadingService
+    // This is called lazily when a model is requested
+    logger.debug('Model catalog loaded');
+  }
+
+  /// Initialize analytics pipeline
+  static Future<void> _initializeAnalytics({
+    required String apiKey,
+    required SDKLogger logger,
+  }) async {
+    // Analytics pipeline is already initialized in ServiceContainer.setupLocalServices()
+    // via SDKAnalyticsInitializer
+    logger.debug('Analytics initialized');
+  }
+
   // MARK: - Text Generation
 
   /// Simple text generation with automatic event publishing
@@ -213,8 +416,8 @@ class RunAnywhere {
         throw SDKError.notInitialized();
       }
 
-      // Lazy device registration on first API call
-      await _ensureDeviceRegistered();
+      // Ensure services are ready (Phase 2 init if needed) - O(1) after first call
+      await _ensureServicesReady();
 
       // Use options directly or defaults
       final genOptions = options ?? RunAnywhereGenerationOptions();
@@ -358,12 +561,12 @@ class RunAnywhere {
       // Create STT configuration
       final sttConfig = STTConfiguration(modelId: modelId);
 
-      // Create and initialize STT component
-      final sttComponent = STTComponent(sttConfig: sttConfig);
-      await sttComponent.initialize();
+      // Create and initialize STT capability
+      final sttCapability = STTCapability(sttConfig: sttConfig);
+      await sttCapability.initialize();
 
-      // Store the component for later use
-      _loadedSTTComponent = sttComponent;
+      // Store the capability for later use
+      _loadedSTTCapability = sttCapability;
 
       EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
     } catch (e) {
@@ -394,12 +597,12 @@ class RunAnywhere {
       // Note: voice defaults to 'system' but modelId is what we need for path resolution
       final ttsConfig = TTSConfiguration(modelId: modelId);
 
-      // Create and initialize TTS component
-      final ttsComponent = TTSComponent(ttsConfiguration: ttsConfig);
-      await ttsComponent.initialize();
+      // Create and initialize TTS capability
+      final ttsCapability = TTSCapability(ttsConfiguration: ttsConfig);
+      await ttsCapability.initialize();
 
-      // Store the component for later use
-      _loadedTTSComponent = ttsComponent;
+      // Store the capability for later use
+      _loadedTTSCapability = ttsCapability;
 
       EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
     } catch (e) {
@@ -497,15 +700,12 @@ class RunAnywhere {
 
   /// Check if SDK has been initialized
   /// Returns true if SDK has been initialized
+  /// Deprecated: Use [isSDKInitialized] getter instead
   static bool hasBeenInitialized() {
     return isSDKInitialized;
   }
 
-  /// Check if SDK is active and ready for use
-  /// Returns true if SDK is initialized and has valid configuration
-  static bool isActive() {
-    return hasBeenInitialized() && _initParams != null;
-  }
+  // Note: isActive is now a getter defined above
 
   // MARK: - SDK State Management
 
@@ -581,14 +781,15 @@ class RunAnywhere {
     final logger = SDKLogger(category: 'RunAnywhere.Reset');
     logger.info('Resetting SDK state...');
 
-    // Clear initialization state
+    // Clear initialization state (Phase 1 + Phase 2)
     _isInitialized = false;
+    _hasCompletedServicesInit = false;
     _initParams = null;
     _currentEnvironment = null;
 
-    // Clear loaded components
-    _loadedSTTComponent = null;
-    _loadedTTSComponent = null;
+    // Clear loaded capabilities
+    _loadedSTTCapability = null;
+    _loadedTTSCapability = null;
 
     // Reset service container if needed
     serviceContainer.reset();

@@ -1,9 +1,7 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
-import '../../../components/tts/tts_service.dart' as component_tts;
-import '../../../components/tts/tts_options.dart';
+import '../../../features/tts/tts_service.dart' as component_tts;
+import '../../../features/tts/tts_options.dart';
 import '../../native/native_backend.dart';
 
 /// ONNX-based Text-to-Speech service.
@@ -65,7 +63,7 @@ class OnnxTTSService implements component_tts.TTSService {
 
       // Verify the model loaded successfully
       if (!_backend.isTtsModelLoaded) {
-        final error =
+        const error =
             'TTS model failed to load - backend reports model not loaded';
         debugPrint('[ONNXTTS] ERROR: $error');
         throw Exception(error);

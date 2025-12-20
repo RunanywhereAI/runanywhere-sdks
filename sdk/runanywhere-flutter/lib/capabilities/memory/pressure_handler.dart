@@ -14,7 +14,8 @@ class PressureHandler {
   int _memoryThreshold = 500 * 1024 * 1024; // 500MB
 
   // Stream controller for pressure notifications
-  final StreamController<MemoryPressureNotificationInfo> _pressureNotifications =
+  final StreamController<MemoryPressureNotificationInfo>
+      _pressureNotifications =
       StreamController<MemoryPressureNotificationInfo>.broadcast();
 
   /// Stream of pressure handling notifications
@@ -56,17 +57,20 @@ class PressureHandler {
         break;
       case MemoryPressureLevel.high:
         // Light cleanup for high pressure
-        final result = await _handleWarningPressure(modelsToEvict: modelsToEvict);
+        final result =
+            await _handleWarningPressure(modelsToEvict: modelsToEvict);
         totalFreed = result.$1;
         evictedModels.addAll(result.$2);
         break;
       case MemoryPressureLevel.warning:
-        final result = await _handleWarningPressure(modelsToEvict: modelsToEvict);
+        final result =
+            await _handleWarningPressure(modelsToEvict: modelsToEvict);
         totalFreed = result.$1;
         evictedModels.addAll(result.$2);
         break;
       case MemoryPressureLevel.critical:
-        final result = await _handleCriticalPressure(modelsToEvict: modelsToEvict);
+        final result =
+            await _handleCriticalPressure(modelsToEvict: modelsToEvict);
         totalFreed = result.$1;
         evictedModels.addAll(result.$2);
         break;
@@ -75,7 +79,8 @@ class PressureHandler {
     final duration = DateTime.now().difference(startTime);
     final freedString = _formatBytes(totalFreed);
 
-    _logger.info('Memory pressure handling completed in ${duration.inMilliseconds}ms, freed $freedString');
+    _logger.info(
+        'Memory pressure handling completed in ${duration.inMilliseconds}ms, freed $freedString');
 
     // Post pressure handling notification
     _postPressureHandlingNotification(
@@ -122,8 +127,10 @@ class PressureHandler {
         return (totalFreed, evictedModels);
       }
 
-      final additionalTarget = _calculateTargetFreedMemory(MemoryPressureLevel.warning) - totalFreed;
-      final additionalModels = evictionHandler.selectModelsToEvict(targetMemory: additionalTarget);
+      final additionalTarget =
+          _calculateTargetFreedMemory(MemoryPressureLevel.warning) - totalFreed;
+      final additionalModels =
+          evictionHandler.selectModelsToEvict(targetMemory: additionalTarget);
       final result = await _evictModels(additionalModels);
       totalFreed += result.$1;
       evictedModels.addAll(result.$2);
@@ -146,7 +153,8 @@ class PressureHandler {
     }
 
     // Force additional cleanup if needed
-    if (totalFreed < _calculateTargetFreedMemory(MemoryPressureLevel.critical)) {
+    if (totalFreed <
+        _calculateTargetFreedMemory(MemoryPressureLevel.critical)) {
       final evictionHandler = _evictionHandler;
       if (evictionHandler == null) {
         _logger.error('No eviction handler available for critical cleanup');
@@ -154,8 +162,11 @@ class PressureHandler {
       }
 
       // Use more aggressive eviction strategy
-      final additionalTarget = _calculateTargetFreedMemory(MemoryPressureLevel.critical) - totalFreed;
-      final additionalModels = evictionHandler.selectModelsForCriticalEviction(targetMemory: additionalTarget);
+      final additionalTarget =
+          _calculateTargetFreedMemory(MemoryPressureLevel.critical) -
+              totalFreed;
+      final additionalModels = evictionHandler.selectModelsForCriticalEviction(
+          targetMemory: additionalTarget);
       final result = await _evictModels(additionalModels);
       totalFreed += result.$1;
       evictedModels.addAll(result.$2);

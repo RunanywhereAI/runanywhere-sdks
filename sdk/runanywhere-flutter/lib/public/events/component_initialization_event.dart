@@ -3,7 +3,10 @@ import '../../core/types/component_state.dart';
 import 'sdk_event.dart';
 
 /// Component initialization events
-abstract class ComponentInitializationEvent implements SDKEvent {
+abstract class ComponentInitializationEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.sdk;
+
   static ComponentInitializationEvent componentChecking({
     required SDKComponent component,
     String? modelId,
@@ -84,100 +87,136 @@ abstract class ComponentInitializationEvent implements SDKEvent {
   }
 }
 
-class ComponentChecking implements ComponentInitializationEvent {
+class ComponentChecking extends ComponentInitializationEvent {
   final SDKComponent component;
   final String? modelId;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   ComponentChecking({required this.component, this.modelId});
+
+  @override
+  String get type => 'component.checking';
 }
 
-class ComponentInitializing implements ComponentInitializationEvent {
+class ComponentInitializing extends ComponentInitializationEvent {
   final SDKComponent component;
   final String? modelId;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   ComponentInitializing({required this.component, this.modelId});
+
+  @override
+  String get type => 'component.initializing';
 }
 
-class ComponentReady implements ComponentInitializationEvent {
+class ComponentReady extends ComponentInitializationEvent {
   final SDKComponent component;
   final String? modelId;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   ComponentReady({required this.component, this.modelId});
+
+  @override
+  String get type => 'component.ready';
 }
 
-class ComponentFailed implements ComponentInitializationEvent {
+class ComponentFailed extends ComponentInitializationEvent {
   final SDKComponent component;
   final Object error;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   ComponentFailed({required this.component, required this.error});
+
+  @override
+  String get type => 'component.failed';
+
+  @override
+  Map<String, String> get properties => {'error': error.toString()};
 }
 
-class ComponentStateChanged implements ComponentInitializationEvent {
+class ComponentStateChanged extends ComponentInitializationEvent {
   final SDKComponent component;
   final ComponentState oldState;
   final ComponentState newState;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   ComponentStateChanged({
     required this.component,
     required this.oldState,
     required this.newState,
   });
+
+  @override
+  String get type => 'component.state_changed';
+
+  @override
+  Map<String, String> get properties => {
+        'old_state': oldState.name,
+        'new_state': newState.name,
+      };
 }
 
 // Download event classes - matching iOS SDK patterns
 
-class ComponentDownloadRequired implements ComponentInitializationEvent {
+class ComponentDownloadRequired extends ComponentInitializationEvent {
   final SDKComponent component;
   final String modelId;
   final int sizeBytes;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   ComponentDownloadRequired({
     required this.component,
     required this.modelId,
     required this.sizeBytes,
   });
+
+  @override
+  String get type => 'component.download.required';
+
+  @override
+  Map<String, String> get properties => {
+        'model_id': modelId,
+        'size_bytes': sizeBytes.toString(),
+      };
 }
 
-class ComponentDownloadStarted implements ComponentInitializationEvent {
+class ComponentDownloadStarted extends ComponentInitializationEvent {
   final SDKComponent component;
   final String modelId;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   ComponentDownloadStarted({required this.component, required this.modelId});
+
+  @override
+  String get type => 'component.download.started';
+
+  @override
+  Map<String, String> get properties => {'model_id': modelId};
 }
 
-class ComponentDownloadProgress implements ComponentInitializationEvent {
+class ComponentDownloadProgress extends ComponentInitializationEvent {
   final SDKComponent component;
   final String modelId;
   final double progress;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   ComponentDownloadProgress({
     required this.component,
     required this.modelId,
     required this.progress,
   });
+
+  @override
+  String get type => 'component.download.progress';
+
+  @override
+  Map<String, String> get properties => {
+        'model_id': modelId,
+        'progress': progress.toStringAsFixed(2),
+      };
 }
 
-class ComponentDownloadCompleted implements ComponentInitializationEvent {
+class ComponentDownloadCompleted extends ComponentInitializationEvent {
   final SDKComponent component;
   final String modelId;
-  @override
-  final DateTime timestamp = DateTime.now();
 
   ComponentDownloadCompleted({required this.component, required this.modelId});
+
+  @override
+  String get type => 'component.download.completed';
+
+  @override
+  Map<String, String> get properties => {'model_id': modelId};
 }

@@ -61,7 +61,8 @@ class GenerationService {
         ),
       );
 
-      logger.info('✅ Got response from service: ${generatedText.text.substring(0, generatedText.text.length > 100 ? 100 : generatedText.text.length)}...');
+      logger.info(
+          '✅ Got response from service: ${generatedText.text.substring(0, generatedText.text.length > 100 ? 100 : generatedText.text.length)}...');
 
       // Calculate metrics
       final latency = DateTime.now().difference(startTime).inMilliseconds;
@@ -84,7 +85,8 @@ class GenerationService {
       );
 
       // Submit analytics (non-blocking)
-      unawaited(ServiceContainer.shared.analyticsService.submitGenerationAnalytics(
+      unawaited(
+          ServiceContainer.shared.analyticsService.submitGenerationAnalytics(
         generationId: DateTime.now().millisecondsSinceEpoch.toString(),
         modelId: loadedModel.model.id,
         performanceMetrics: result.performanceMetrics,

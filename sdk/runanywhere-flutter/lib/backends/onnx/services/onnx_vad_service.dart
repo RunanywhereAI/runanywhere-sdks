@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import '../../../components/vad/vad_service.dart';
+import '../../../features/vad/vad_service.dart';
 import '../../native/native_backend.dart';
 
 /// ONNX-based Voice Activity Detection service.

@@ -14,11 +14,11 @@ export 'public/configuration/configuration.dart';
 export 'core/types/component_state.dart';
 export 'core/types/sdk_component.dart';
 export 'core/module_registry.dart' hide LLMGenerationOptions;
-export 'components/stt/stt_component.dart';
-export 'components/llm/llm_component.dart';
-export 'components/tts/tts_component.dart';
-export 'components/vad/vad_component.dart';
-export 'components/voice_agent/voice_agent_component.dart';
+export 'features/stt/stt_capability.dart';
+export 'features/llm/llm_capability.dart';
+export 'features/tts/tts_capability.dart';
+export 'features/vad/vad_capability.dart';
+export 'features/voice_agent/voice_agent_capability.dart';
 export 'capabilities/download/download_service.dart';
 export 'capabilities/text_generation/generation_service.dart';
 export 'capabilities/analytics/analytics_service.dart';
@@ -29,12 +29,10 @@ export 'core/protocols/downloading/download_progress.dart';
 export 'core/protocols/downloading/download_state.dart';
 
 // Native FFI bindings for on-device AI capabilities
-// Use: import 'package:runanywhere/native/native.dart';
-// Or access via: NativeBackend, PlatformLoader, NativeProviderRegistration
-export 'native/platform_loader.dart' show PlatformLoader;
-export 'native/native_backend.dart' show NativeBackend, NativeBackendException;
-export 'native/native_provider_registration.dart'
-    show NativeProviderRegistration;
+// Access via: NativeBackend, PlatformLoader
+export 'backends/native/platform_loader.dart' show PlatformLoader;
+export 'backends/native/native_backend.dart'
+    show NativeBackend, NativeBackendException;
 
 // Backend modules (modular architecture - import specific backends as needed)
 // Use: import 'package:runanywhere/backends/onnx/onnx.dart';

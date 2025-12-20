@@ -126,7 +126,8 @@ class MockWakeWordDetector implements WakeWordDetector {
   }
 
   @override
-  void Function(WakeWordDetection)? get onWakeWordDetected => _onWakeWordDetected;
+  void Function(WakeWordDetection)? get onWakeWordDetected =>
+      _onWakeWordDetected;
 
   @override
   set onWakeWordDetected(void Function(WakeWordDetection)? callback) {

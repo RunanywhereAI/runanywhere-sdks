@@ -77,8 +77,7 @@ class ModelInfo {
         contextLength = category.requiresContextLength
             ? (contextLength ?? 2048)
             : contextLength,
-        supportsThinking =
-            category.supportsThinking ? supportsThinking : false,
+        supportsThinking = category.supportsThinking ? supportsThinking : false,
         thinkingPattern = (category.supportsThinking && supportsThinking)
             ? (thinkingPattern ?? ThinkingTagPattern.defaultPattern)
             : null,
@@ -133,7 +132,8 @@ class ModelInfo {
           'preferredFramework': preferredFramework!.rawValue,
         if (contextLength != null) 'contextLength': contextLength,
         'supportsThinking': supportsThinking,
-        if (thinkingPattern != null) 'thinkingPattern': thinkingPattern!.toJson(),
+        if (thinkingPattern != null)
+          'thinkingPattern': thinkingPattern!.toJson(),
         if (metadata != null) 'metadata': metadata!.toJson(),
         'source': source.rawValue,
         'createdAt': createdAt.toIso8601String(),

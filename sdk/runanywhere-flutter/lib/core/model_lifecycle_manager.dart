@@ -30,7 +30,8 @@ class ModelLoadStateWithProgress {
     this.errorMessage,
   });
 
-  factory ModelLoadStateWithProgress.notLoaded() => const ModelLoadStateWithProgress(
+  factory ModelLoadStateWithProgress.notLoaded() =>
+      const ModelLoadStateWithProgress(
         state: ModelLoadState.notLoaded,
       );
 
@@ -40,15 +41,18 @@ class ModelLoadStateWithProgress {
         progress: progress,
       );
 
-  factory ModelLoadStateWithProgress.loaded() => const ModelLoadStateWithProgress(
+  factory ModelLoadStateWithProgress.loaded() =>
+      const ModelLoadStateWithProgress(
         state: ModelLoadState.loaded,
       );
 
-  factory ModelLoadStateWithProgress.unloading() => const ModelLoadStateWithProgress(
+  factory ModelLoadStateWithProgress.unloading() =>
+      const ModelLoadStateWithProgress(
         state: ModelLoadState.unloading,
       );
 
-  factory ModelLoadStateWithProgress.error(String message) => ModelLoadStateWithProgress(
+  factory ModelLoadStateWithProgress.error(String message) =>
+      ModelLoadStateWithProgress(
         state: ModelLoadState.error,
         errorMessage: message,
       );
@@ -209,7 +213,8 @@ class ModelLifecycleTracker extends ChangeNotifier {
       StreamController<ModelLifecycleEvent>.broadcast();
 
   /// Stream of lifecycle events
-  Stream<ModelLifecycleEvent> get lifecycleEvents => _lifecycleEventsController.stream;
+  Stream<ModelLifecycleEvent> get lifecycleEvents =>
+      _lifecycleEventsController.stream;
 
   /// Get current state of all models
   Map<Modality, LoadedModelState> get modelsByModality =>
@@ -257,7 +262,8 @@ class ModelLifecycleTracker extends ChangeNotifier {
     );
 
     _modelsByModality[modality] = state;
-    _lifecycleEventsController.add(ModelWillLoad(modelId: modelId, modality: modality));
+    _lifecycleEventsController
+        .add(ModelWillLoad(modelId: modelId, modality: modality));
     notifyListeners();
   }
 
@@ -293,7 +299,8 @@ class ModelLifecycleTracker extends ChangeNotifier {
     dynamic sttService,
     dynamic ttsService,
   }) {
-    _logger.info('Model loaded: $modelName [${modality.rawValue}] with ${framework.rawValue}');
+    _logger.info(
+        'Model loaded: $modelName [${modality.rawValue}] with ${framework.rawValue}');
 
     final state = LoadedModelState(
       modelId: modelId,
@@ -359,7 +366,8 @@ class ModelLifecycleTracker extends ChangeNotifier {
     required Modality modality,
     required String error,
   }) {
-    _logger.error('Model load failed: $modelId [${modality.rawValue}] - $error');
+    _logger
+        .error('Model load failed: $modelId [${modality.rawValue}] - $error');
 
     final currentState = _modelsByModality[modality];
     if (currentState != null) {
@@ -387,7 +395,8 @@ class ModelLifecycleTracker extends ChangeNotifier {
       );
     }
 
-    _lifecycleEventsController.add(ModelWillUnload(modelId: modelId, modality: modality));
+    _lifecycleEventsController
+        .add(ModelWillUnload(modelId: modelId, modality: modality));
     notifyListeners();
   }
 
@@ -396,7 +405,8 @@ class ModelLifecycleTracker extends ChangeNotifier {
     _logger.info('Model unloaded: $modelId [${modality.rawValue}]');
 
     _modelsByModality.remove(modality);
-    _lifecycleEventsController.add(ModelDidUnload(modelId: modelId, modality: modality));
+    _lifecycleEventsController
+        .add(ModelDidUnload(modelId: modelId, modality: modality));
     notifyListeners();
   }
 

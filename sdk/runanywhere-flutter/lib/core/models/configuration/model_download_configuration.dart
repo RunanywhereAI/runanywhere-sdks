@@ -29,13 +29,15 @@ class ModelDownloadConfiguration {
   /// Create from JSON map
   factory ModelDownloadConfiguration.fromJson(Map<String, dynamic> json) {
     return ModelDownloadConfiguration(
-      policy:
-          DownloadPolicy.fromRawValue(json['policy'] as String? ?? 'automatic') ??
-              DownloadPolicy.automatic,
-      maxConcurrentDownloads: (json['maxConcurrentDownloads'] as num?)?.toInt() ?? 3,
+      policy: DownloadPolicy.fromRawValue(
+              json['policy'] as String? ?? 'automatic') ??
+          DownloadPolicy.automatic,
+      maxConcurrentDownloads:
+          (json['maxConcurrentDownloads'] as num?)?.toInt() ?? 3,
       retryCount: (json['retryCount'] as num?)?.toInt() ?? 3,
       timeout: Duration(seconds: (json['timeout'] as num?)?.toInt() ?? 300),
-      enableBackgroundDownloads: json['enableBackgroundDownloads'] as bool? ?? false,
+      enableBackgroundDownloads:
+          json['enableBackgroundDownloads'] as bool? ?? false,
     );
   }
 
@@ -60,10 +62,12 @@ class ModelDownloadConfiguration {
   }) {
     return ModelDownloadConfiguration(
       policy: policy ?? this.policy,
-      maxConcurrentDownloads: maxConcurrentDownloads ?? this.maxConcurrentDownloads,
+      maxConcurrentDownloads:
+          maxConcurrentDownloads ?? this.maxConcurrentDownloads,
       retryCount: retryCount ?? this.retryCount,
       timeout: timeout ?? this.timeout,
-      enableBackgroundDownloads: enableBackgroundDownloads ?? this.enableBackgroundDownloads,
+      enableBackgroundDownloads:
+          enableBackgroundDownloads ?? this.enableBackgroundDownloads,
     );
   }
 

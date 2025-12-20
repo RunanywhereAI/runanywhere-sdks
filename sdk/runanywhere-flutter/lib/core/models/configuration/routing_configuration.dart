@@ -34,12 +34,16 @@ class RoutingConfiguration {
   /// Create from JSON map
   factory RoutingConfiguration.fromJson(Map<String, dynamic> json) {
     return RoutingConfiguration(
-      policy: RoutingPolicy.fromRawValue(json['policy'] as String? ?? 'device_only') ??
+      policy: RoutingPolicy.fromRawValue(
+              json['policy'] as String? ?? 'device_only') ??
           RoutingPolicy.deviceOnly,
       cloudEnabled: json['cloudEnabled'] as bool? ?? false,
-      privacyMode: PrivacyMode.fromRawValue(json['privacyMode'] as String? ?? 'standard') ??
+      privacyMode: PrivacyMode.fromRawValue(
+              json['privacyMode'] as String? ?? 'standard') ??
           PrivacyMode.standard,
-      customRules: (json['customRules'] as Map<String, dynamic>?)?.cast<String, String>() ?? {},
+      customRules: (json['customRules'] as Map<String, dynamic>?)
+              ?.cast<String, String>() ??
+          {},
       maxLatencyThreshold: json['maxLatencyThreshold'] as int?,
       minConfidenceScore: (json['minConfidenceScore'] as num?)?.toDouble(),
     );
@@ -52,7 +56,8 @@ class RoutingConfiguration {
       'cloudEnabled': cloudEnabled,
       'privacyMode': privacyMode.rawValue,
       'customRules': customRules,
-      if (maxLatencyThreshold != null) 'maxLatencyThreshold': maxLatencyThreshold,
+      if (maxLatencyThreshold != null)
+        'maxLatencyThreshold': maxLatencyThreshold,
       if (minConfidenceScore != null) 'minConfidenceScore': minConfidenceScore,
     };
   }

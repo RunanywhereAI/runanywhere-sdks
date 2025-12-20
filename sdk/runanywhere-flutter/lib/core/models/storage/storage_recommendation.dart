@@ -36,7 +36,8 @@ class StorageRecommendation {
   /// Create from JSON map
   factory StorageRecommendation.fromJson(Map<String, dynamic> json) {
     return StorageRecommendation(
-      type: RecommendationType.fromRawValue(json['type'] as String? ?? 'suggestion') ??
+      type: RecommendationType.fromRawValue(
+              json['type'] as String? ?? 'suggestion') ??
           RecommendationType.suggestion,
       message: json['message'] as String? ?? '',
       action: json['action'] as String? ?? '',

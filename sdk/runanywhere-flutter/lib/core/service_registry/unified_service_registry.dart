@@ -36,7 +36,7 @@ class UnifiedServiceRegistry {
 
     // Store by modality with priority
     for (final modality in adapter.supportedModalities) {
-      var adapters = _adaptersByModality[modality] ?? [];
+      final adapters = _adaptersByModality[modality] ?? [];
 
       // Remove existing adapter with same framework to avoid duplicates
       adapters.removeWhere((a) => a.adapter.framework == adapter.framework);

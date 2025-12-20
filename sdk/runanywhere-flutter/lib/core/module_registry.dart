@@ -1,31 +1,57 @@
 import 'dart:async';
 import 'models/framework/llm_framework.dart';
+import 'module/module.dart';
 // VADService is imported for use in VADServiceProvider return type
-import '../components/vad/vad_service.dart' show VADService;
+import '../features/vad/vad_service.dart' show VADService;
 // STT types are imported from centralized location to avoid duplication
-import '../components/stt/stt_types.dart';
+import '../features/stt/stt_types.dart';
 // Export all VAD types for external consumers
-export '../components/vad/vad_service.dart'
+export '../features/vad/vad_service.dart'
     show VADService, VADResult, SpeechActivityEvent;
 // Export STT types for external consumers
-export '../components/stt/stt_types.dart';
+export '../features/stt/stt_types.dart';
+// Export module types for external consumers
+export 'module/module.dart';
 
-/// Central registry for external AI module implementations
+/// Central registry for external AI module implementations.
 ///
 /// This allows optional dependencies to register their implementations
 /// at runtime, enabling a plugin-based architecture where modules like
 /// WhisperKit, llama.cpp, and FluidAudioDiarization can be added as needed.
+///
+/// ## Module Registration (iOS Parity)
+///
+/// Modules can be registered using the formal [RunAnywhereModule] protocol:
+///
+/// ```dart
+/// ModuleRegistry.shared.registerModule(ONNXModule());
+/// ```
+///
+/// ## Provider Registration (Legacy)
+///
+/// Individual service providers can also be registered directly:
+///
+/// ```dart
+/// ModuleRegistry.shared.registerSTT(mySTTProvider, priority: 150);
+/// ```
 class ModuleRegistry {
   /// Singleton instance
   static final ModuleRegistry shared = ModuleRegistry._();
 
   ModuleRegistry._();
 
+  // Module-level tracking (iOS parity)
+  final Map<String, ModuleMetadata> _registeredModules = {};
+  final Map<InferenceFramework, ModelStorageStrategy> _storageStrategies = {};
+  final Map<InferenceFramework, DownloadStrategy> _downloadStrategies = {};
+
+  // Provider-level tracking (existing functionality)
   final List<_PrioritizedProvider<STTServiceProvider>> _sttProviders = [];
   final List<_PrioritizedProvider<LLMServiceProvider>> _llmProviders = [];
   final List<_PrioritizedProvider<TTSServiceProvider>> _ttsProviders = [];
   final List<_PrioritizedProvider<VADServiceProvider>> _vadProviders = [];
-  final List<SpeakerDiarizationServiceProvider> _speakerDiarizationProviders = [];
+  final List<SpeakerDiarizationServiceProvider> _speakerDiarizationProviders =
+      [];
   final List<VLMServiceProvider> _vlmProviders = [];
   final List<WakeWordServiceProvider> _wakeWordProviders = [];
 
@@ -87,6 +113,125 @@ class ModuleRegistry {
   void registerWakeWord(WakeWordServiceProvider provider) {
     _wakeWordProviders.add(provider);
   }
+
+  // ============================================================================
+  // Module Registration (iOS Parity)
+  // ============================================================================
+
+  /// Register a module with the SDK.
+  ///
+  /// [module] - The module to register.
+  /// [priority] - Override the default priority (optional).
+  ///
+  /// The module's [RunAnywhereModule.register] method will be called to register
+  /// its service providers with the registry.
+  void registerModule(RunAnywhereModule module, {int? priority}) {
+    final effectivePriority = priority ?? module.defaultPriority;
+
+    // Check for duplicate registration
+    if (_registeredModules.containsKey(module.moduleId)) {
+      // Already registered, skip
+      return;
+    }
+
+    // Call the module's register method to register its services
+    module.register(priority: effectivePriority);
+
+    // Store metadata
+    final metadata = ModuleMetadata(
+      moduleId: module.moduleId,
+      moduleName: module.moduleName,
+      inferenceFramework: module.inferenceFramework,
+      capabilities: module.capabilities,
+      priority: effectivePriority,
+      registeredAt: DateTime.now(),
+    );
+    _registeredModules[module.moduleId] = metadata;
+
+    // Store storage strategy if provided
+    final storageStrategy = module.storageStrategy;
+    if (storageStrategy != null) {
+      _storageStrategies[module.inferenceFramework] = storageStrategy;
+    }
+
+    // Store download strategy if provided
+    final downloadStrategy = module.downloadStrategy;
+    if (downloadStrategy != null) {
+      _downloadStrategies[module.inferenceFramework] = downloadStrategy;
+    }
+  }
+
+  /// Check if a module is registered.
+  bool isModuleRegistered(String moduleId) {
+    return _registeredModules.containsKey(moduleId);
+  }
+
+  /// Get metadata for a registered module.
+  ModuleMetadata? moduleMetadata(String moduleId) {
+    return _registeredModules[moduleId];
+  }
+
+  /// Get all registered module IDs.
+  List<String> get moduleIds => _registeredModules.keys.toList()..sort();
+
+  /// Get all registered module metadata.
+  List<ModuleMetadata> get allModules {
+    final modules = _registeredModules.values.toList();
+    modules.sort((a, b) => a.moduleId.compareTo(b.moduleId));
+    return modules;
+  }
+
+  /// Get modules that provide a specific capability.
+  List<ModuleMetadata> modulesForCapability(CapabilityType capability) {
+    return _registeredModules.values
+        .where((m) => m.capabilities.contains(capability))
+        .toList()
+      ..sort((a, b) => b.priority.compareTo(a.priority));
+  }
+
+  /// Check if any module provides a specific capability.
+  bool hasCapabilityFromModule(CapabilityType capability) {
+    return _registeredModules.values
+        .any((m) => m.capabilities.contains(capability));
+  }
+
+  /// Get the storage strategy for a framework.
+  ModelStorageStrategy? storageStrategy(InferenceFramework framework) {
+    return _storageStrategies[framework];
+  }
+
+  /// Check if a storage strategy is registered for a framework.
+  bool hasStorageStrategy(InferenceFramework framework) {
+    return _storageStrategies.containsKey(framework);
+  }
+
+  /// Get the download strategy for a framework.
+  DownloadStrategy? downloadStrategyForFramework(InferenceFramework framework) {
+    return _downloadStrategies[framework];
+  }
+
+  /// Check if a download strategy is registered for a framework.
+  bool hasDownloadStrategy(InferenceFramework framework) {
+    return _downloadStrategies.containsKey(framework);
+  }
+
+  /// Reset all module registrations (useful for testing).
+  void reset() {
+    _registeredModules.clear();
+    _storageStrategies.clear();
+    _downloadStrategies.clear();
+    _sttProviders.clear();
+    _llmProviders.clear();
+    _ttsProviders.clear();
+    _vadProviders.clear();
+    _speakerDiarizationProviders.clear();
+    _vlmProviders.clear();
+    _wakeWordProviders.clear();
+  }
+
+  // ============================================================================
+  // Provider Queries (existing functionality)
+  // ============================================================================
 
   /// Get an STT provider for the specified model (returns highest priority match)
   STTServiceProvider? sttProvider({String? modelId}) {
@@ -175,7 +320,8 @@ class ModuleRegistry {
   }
 
   /// Get a Speaker Diarization provider
-  SpeakerDiarizationServiceProvider? speakerDiarizationProvider({String? modelId}) {
+  SpeakerDiarizationServiceProvider? speakerDiarizationProvider(
+      {String? modelId}) {
     if (modelId != null) {
       try {
         return _speakerDiarizationProviders.firstWhere(
@@ -277,8 +423,8 @@ abstract class LLMServiceProvider {
 }
 
 /// Provider for Text-to-Speech services
-/// Note: Returns dynamic to avoid circular dependency with components/tts/tts_service.dart
-/// Actual return type should be TTSService from components/tts/tts_service.dart
+/// Note: Returns dynamic to avoid circular dependency with features/tts/tts_service.dart
+/// Actual return type should be TTSService from features/tts/tts_service.dart
 abstract class TTSServiceProvider {
   String get name;
   String get version;
@@ -358,7 +504,7 @@ abstract class TTSService {
   Future<void> cleanup();
 }
 
-// VADService is exported from components/vad/vad_service.dart (see top of file)
+// VADService is exported from features/vad/vad_service.dart (see top of file)
 
 abstract class SpeakerDiarizationService {
   Future<void> initialize({String? modelPath});
@@ -385,7 +531,7 @@ abstract class WakeWordService {
 }
 
 // STTOptions, STTTranscriptionResult, TimestampInfo, and AlternativeTranscription
-// are imported from ../components/stt/stt_types.dart (see imports above)
+// are imported from ../features/stt/stt_types.dart (see imports above)
 
 /// LLM Generation Options
 /// Matches iOS RunAnywhereGenerationOptions from GenerationOptions.swift
@@ -437,7 +583,8 @@ class TTSOptions {
   });
 }
 
-// VADResult is exported from components/vad/vad_service.dart (see top of file)
+// VADResult is exported from features/vad/vad_service.dart (see top of file)
 
 class SpeakerDiarizationResult {}
+
 class VLMResult {}

@@ -78,6 +78,6 @@ class WakeWordDetection {
           isConfirmed == other.isConfirmed;
 
   @override
-  int get hashCode =>
-      Object.hash(wakeWord, confidence, timestamp, startTime, endTime, isConfirmed);
+  int get hashCode => Object.hash(
+      wakeWord, confidence, timestamp, startTime, endTime, isConfirmed);
 }

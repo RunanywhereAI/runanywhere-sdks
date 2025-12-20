@@ -9,12 +9,12 @@ import 'dart:typed_data';
 
 import '../../core/module_registry.dart'
     show ModuleRegistry, STTService, LLMService;
-import '../../components/tts/tts_service.dart' show TTSService;
-import '../../components/stt/stt_component.dart' show STTConfiguration;
-import '../../components/llm/llm_component.dart' show LLMConfiguration;
-import '../../components/tts/tts_component.dart' show TTSConfiguration;
-import '../../components/vad/vad_configuration.dart' show VADConfiguration;
-import '../../components/voice_agent/voice_agent_component.dart';
+import '../../features/tts/tts_service.dart' show TTSService;
+import '../../features/stt/stt_capability.dart' show STTConfiguration;
+import '../../features/llm/llm_capability.dart' show LLMConfiguration;
+import '../../features/tts/tts_capability.dart' show TTSConfiguration;
+import '../../features/vad/vad_configuration.dart' show VADConfiguration;
+import '../../features/voice_agent/voice_agent_capability.dart';
 import '../../foundation/logging/sdk_logger.dart';
 import '../../foundation/dependency_injection/service_container.dart';
 import 'services/voice_session_manager.dart';
@@ -39,7 +39,7 @@ class VoiceCapabilityService {
   bool _isInitialized = false;
 
   // Active voice agents
-  final Map<String, VoiceAgentComponent> _activeAgents = {};
+  final Map<String, VoiceAgentCapability> _activeAgents = {};
 
   VoiceCapabilityService() : _sessionManager = VoiceSessionManager();
 
@@ -60,7 +60,7 @@ class VoiceCapabilityService {
   }
 
   /// Create a voice agent with the given parameters
-  Future<VoiceAgentComponent> createVoiceAgent({
+  Future<VoiceAgentCapability> createVoiceAgent({
     VADConfiguration? vadParams,
     STTConfiguration? sttParams,
     LLMConfiguration? llmParams,
@@ -77,7 +77,7 @@ class VoiceCapabilityService {
     );
 
     // Create and initialize agent
-    final agent = VoiceAgentComponent(
+    final agent = VoiceAgentCapability(
       configuration: agentConfig,
       serviceContainer: ServiceContainer.shared,
     );
@@ -92,7 +92,7 @@ class VoiceCapabilityService {
   }
 
   /// Create a full voice pipeline with all components
-  Future<VoiceAgentComponent> createFullPipeline({
+  Future<VoiceAgentCapability> createFullPipeline({
     String? sttModelId,
     String? llmModelId,
   }) async {
@@ -137,7 +137,7 @@ class VoiceCapabilityService {
   Future<STTService?> findVoiceService({String? modelId}) async {
     // Check if any active agent has STT with the specified model
     for (final agent in _activeAgents.values) {
-      final stt = agent.sttComponent?.getService();
+      final stt = agent.sttCapability?.getService();
       if (stt != null) {
         return stt;
       }
@@ -168,7 +168,7 @@ class VoiceCapabilityService {
   Future<LLMService?> findLLMService({String? modelId}) async {
     // Check if any active agent has LLM with the specified model
     for (final agent in _activeAgents.values) {
-      final llm = agent.llmComponent?.getService();
+      final llm = agent.llmCapability?.getService();
       if (llm != null) {
         return llm;
       }
@@ -180,7 +180,7 @@ class VoiceCapabilityService {
   Future<TTSService?> findTTSService() async {
     // Check if any active agent has TTS
     for (final agent in _activeAgents.values) {
-      final tts = agent.ttsComponent?.getService();
+      final tts = agent.ttsCapability?.getService();
       if (tts != null) {
         return tts;
       }
@@ -205,7 +205,7 @@ class VoiceCapabilityService {
 
 extension VoiceCapabilityServiceBackwardCompat on VoiceCapabilityService {
   /// Create a voice pipeline using the new architecture
-  Future<VoiceAgentComponent> createPipeline({
+  Future<VoiceAgentCapability> createPipeline({
     VADConfiguration? vadParams,
     STTConfiguration? sttParams,
     LLMConfiguration? llmParams,

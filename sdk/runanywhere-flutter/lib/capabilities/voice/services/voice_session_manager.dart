@@ -4,7 +4,7 @@
 library voice_session_manager;
 
 import '../../../foundation/logging/sdk_logger.dart';
-import '../../../components/stt/stt_component.dart' show STTOutput;
+import '../../../features/stt/stt_capability.dart' show STTOutput;
 import '../models/voice_session.dart';
 
 /// Manages voice session lifecycle

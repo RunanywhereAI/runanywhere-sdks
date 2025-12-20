@@ -20,7 +20,8 @@ enum MemoryThreshold {
   low,
   veryLow;
 
-  int threshold({required int memoryThreshold, required int criticalThreshold}) {
+  int threshold(
+      {required int memoryThreshold, required int criticalThreshold}) {
     switch (this) {
       case MemoryThreshold.warning:
         return memoryThreshold;

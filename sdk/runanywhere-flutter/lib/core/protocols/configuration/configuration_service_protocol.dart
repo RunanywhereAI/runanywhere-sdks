@@ -29,7 +29,8 @@ abstract interface class ConfigurationServiceProtocol {
   Future<void> setConsumerConfiguration(ConfigurationData config);
 
   /// Load configuration with fallback to defaults
-  Future<ConfigurationData> loadConfigurationWithFallback({required String apiKey});
+  Future<ConfigurationData> loadConfigurationWithFallback(
+      {required String apiKey});
 
   /// Clear cached configuration
   Future<void> clearCache();
@@ -69,7 +70,8 @@ class InvalidConfigurationError extends ConfigurationServiceError {
   final String message;
   final List<String> validationErrors;
 
-  const InvalidConfigurationError(this.message, [this.validationErrors = const []]);
+  const InvalidConfigurationError(this.message,
+      [this.validationErrors = const []]);
 
   @override
   String toString() => 'InvalidConfigurationError: $message';

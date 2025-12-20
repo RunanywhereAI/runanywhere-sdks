@@ -38,7 +38,8 @@ class DefaultGenerationSettings {
       topP: (json['topP'] as num?)?.toDouble() ?? 0.9,
       topK: (json['topK'] as num?)?.toInt(),
       repetitionPenalty: (json['repetitionPenalty'] as num?)?.toDouble(),
-      stopSequences: (json['stopSequences'] as List<dynamic>?)?.cast<String>() ?? [],
+      stopSequences:
+          (json['stopSequences'] as List<dynamic>?)?.cast<String>() ?? [],
     );
   }
 
@@ -109,7 +110,8 @@ class TokenBudgetConfiguration {
   /// Convert to JSON map
   Map<String, dynamic> toJson() {
     return {
-      if (maxTokensPerRequest != null) 'maxTokensPerRequest': maxTokensPerRequest,
+      if (maxTokensPerRequest != null)
+        'maxTokensPerRequest': maxTokensPerRequest,
       if (maxTokensPerDay != null) 'maxTokensPerDay': maxTokensPerDay,
       if (maxTokensPerMonth != null) 'maxTokensPerMonth': maxTokensPerMonth,
       'enforceStrictly': enforceStrictly,
@@ -166,10 +168,12 @@ class GenerationConfiguration {
   factory GenerationConfiguration.fromJson(Map<String, dynamic> json) {
     return GenerationConfiguration(
       defaults: json['defaults'] != null
-          ? DefaultGenerationSettings.fromJson(json['defaults'] as Map<String, dynamic>)
+          ? DefaultGenerationSettings.fromJson(
+              json['defaults'] as Map<String, dynamic>)
           : const DefaultGenerationSettings(),
       tokenBudget: json['tokenBudget'] != null
-          ? TokenBudgetConfiguration.fromJson(json['tokenBudget'] as Map<String, dynamic>)
+          ? TokenBudgetConfiguration.fromJson(
+              json['tokenBudget'] as Map<String, dynamic>)
           : null,
       frameworkPreferences: (json['frameworkPreferences'] as List<dynamic>?)
               ?.map((e) => LLMFramework.fromRawValue(e as String))
@@ -177,7 +181,8 @@ class GenerationConfiguration {
               .toList() ??
           [],
       maxContextLength: (json['maxContextLength'] as num?)?.toInt() ?? 4096,
-      enableThinkingExtraction: json['enableThinkingExtraction'] as bool? ?? false,
+      enableThinkingExtraction:
+          json['enableThinkingExtraction'] as bool? ?? false,
       thinkingPattern: json['thinkingPattern'] as String?,
     );
   }
@@ -187,7 +192,8 @@ class GenerationConfiguration {
     return {
       'defaults': defaults.toJson(),
       if (tokenBudget != null) 'tokenBudget': tokenBudget!.toJson(),
-      'frameworkPreferences': frameworkPreferences.map((f) => f.rawValue).toList(),
+      'frameworkPreferences':
+          frameworkPreferences.map((f) => f.rawValue).toList(),
       'maxContextLength': maxContextLength,
       'enableThinkingExtraction': enableThinkingExtraction,
       if (thinkingPattern != null) 'thinkingPattern': thinkingPattern,
@@ -208,7 +214,8 @@ class GenerationConfiguration {
       tokenBudget: tokenBudget ?? this.tokenBudget,
       frameworkPreferences: frameworkPreferences ?? this.frameworkPreferences,
       maxContextLength: maxContextLength ?? this.maxContextLength,
-      enableThinkingExtraction: enableThinkingExtraction ?? this.enableThinkingExtraction,
+      enableThinkingExtraction:
+          enableThinkingExtraction ?? this.enableThinkingExtraction,
       thinkingPattern: thinkingPattern ?? this.thinkingPattern,
     );
   }

@@ -43,7 +43,8 @@ class SDKLogger {
   }
 
   /// Log an error message
-  void error(String message, {Object? error, StackTrace? stackTrace, Map<String, dynamic>? metadata}) {
+  void error(String message,
+      {Object? error, StackTrace? stackTrace, Map<String, dynamic>? metadata}) {
     final enrichedMetadata = metadata ?? <String, dynamic>{};
     if (error != null) {
       enrichedMetadata['error'] = error.toString();
@@ -61,7 +62,8 @@ class SDKLogger {
   }
 
   /// Log a fault message (highest severity)
-  void fault(String message, {Object? error, StackTrace? stackTrace, Map<String, dynamic>? metadata}) {
+  void fault(String message,
+      {Object? error, StackTrace? stackTrace, Map<String, dynamic>? metadata}) {
     final enrichedMetadata = metadata ?? <String, dynamic>{};
     if (error != null) {
       enrichedMetadata['error'] = error.toString();
@@ -154,8 +156,10 @@ class SDKLogger {
     Map<String, dynamic>? metadata,
   }) {
     final enrichedMetadata = metadata ?? <String, dynamic>{};
-    enrichedMetadata[LogMetadataKeys.sensitiveDataCategory] = sensitiveCategory.name;
-    enrichedMetadata[LogMetadataKeys.sensitiveDataPolicy] = sensitiveCategory.defaultPolicy.name;
+    enrichedMetadata[LogMetadataKeys.sensitiveDataCategory] =
+        sensitiveCategory.name;
+    enrichedMetadata[LogMetadataKeys.sensitiveDataPolicy] =
+        sensitiveCategory.defaultPolicy.name;
 
     // Sanitize message based on policy
     final sanitizedMessage = _sanitizeMessage(message, sensitiveCategory);
@@ -171,7 +175,8 @@ class SDKLogger {
   // MARK: - Performance Logging
 
   /// Log performance metrics
-  void performance(String metric, double value, {Map<String, dynamic>? metadata}) {
+  void performance(String metric, double value,
+      {Map<String, dynamic>? metadata}) {
     final enrichedMetadata = metadata ?? <String, dynamic>{};
     enrichedMetadata['metric'] = metric;
     enrichedMetadata['value'] = value;
@@ -187,7 +192,8 @@ class SDKLogger {
 
   // MARK: - Private Methods
 
-  String _sanitizeMessage(String message, SensitiveDataCategory sensitiveCategory) {
+  String _sanitizeMessage(
+      String message, SensitiveDataCategory sensitiveCategory) {
     final policy = sensitiveCategory.defaultPolicy;
 
     switch (policy) {

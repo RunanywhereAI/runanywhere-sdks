@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../../../core/module_registry.dart';
+import '../../../foundation/logging/sdk_logger.dart';
 import '../../native/native_backend.dart';
 import '../llamacpp_error.dart';
 import '../llamacpp_template_resolver.dart';
@@ -27,6 +28,7 @@ import '../llamacpp_template_resolver.dart';
 /// ```
 class LlamaCppLLMService implements LLMService {
   final NativeBackend _backend;
+  final SDKLogger _logger = SDKLogger(category: 'LlamaCppLLMService');
   String? _modelPath;
   bool _isInitialized = false;
   LLMTemplate? _currentTemplate;
@@ -56,9 +58,8 @@ class LlamaCppLLMService implements LLMService {
     // Determine template from model path
     _currentTemplate = LlamaCppTemplateResolver.determineTemplate(modelPath);
 
-    print('🔧 [LlamaCppLLMService] Loading model from path: $modelPath');
-    print(
-        '🔧 [LlamaCppLLMService] Template: ${_currentTemplate?.name ?? 'chatML'}');
+    _logger.debug('Loading model from path: $modelPath');
+    _logger.debug('Template: ${_currentTemplate?.name ?? 'chatML'}');
 
     // Load the model through native backend
     try {
@@ -76,10 +77,10 @@ class LlamaCppLLMService implements LLMService {
             'Model failed to load - native backend reports not loaded');
       }
 
-      print('✅ [LlamaCppLLMService] Model loaded successfully');
+      _logger.info('Model loaded successfully');
       _isInitialized = true;
     } catch (e) {
-      print('❌ [LlamaCppLLMService] Failed to load model: $e');
+      _logger.error('Failed to load model: $e');
       _isInitialized = false;
       rethrow;
     }

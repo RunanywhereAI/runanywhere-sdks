@@ -90,27 +90,33 @@ class ConfigurationData {
     return ConfigurationData(
       id: json['id'] as String?,
       routing: json['routing'] != null
-          ? RoutingConfiguration.fromJson(json['routing'] as Map<String, dynamic>)
+          ? RoutingConfiguration.fromJson(
+              json['routing'] as Map<String, dynamic>)
           : const RoutingConfiguration(),
       generation: json['generation'] != null
-          ? GenerationConfiguration.fromJson(json['generation'] as Map<String, dynamic>)
+          ? GenerationConfiguration.fromJson(
+              json['generation'] as Map<String, dynamic>)
           : const GenerationConfiguration(),
       storage: json['storage'] != null
-          ? StorageConfiguration.fromJson(json['storage'] as Map<String, dynamic>)
+          ? StorageConfiguration.fromJson(
+              json['storage'] as Map<String, dynamic>)
           : const StorageConfiguration(),
       api: json['api'] != null
           ? APIConfiguration.fromJson(json['api'] as Map<String, dynamic>)
           : APIConfiguration(),
       download: json['download'] != null
-          ? ModelDownloadConfiguration.fromJson(json['download'] as Map<String, dynamic>)
+          ? ModelDownloadConfiguration.fromJson(
+              json['download'] as Map<String, dynamic>)
           : const ModelDownloadConfiguration(),
       hardware: json['hardware'] != null
-          ? HardwareConfiguration.fromJson(json['hardware'] as Map<String, dynamic>)
+          ? HardwareConfiguration.fromJson(
+              json['hardware'] as Map<String, dynamic>)
           : null,
       debugMode: json['debugMode'] as bool? ?? false,
       apiKey: json['apiKey'] as String?,
       allowUserOverride: json['allowUserOverride'] as bool? ?? true,
-      source: ConfigurationSource.fromRawValue(json['source'] as String? ?? 'defaults'),
+      source: ConfigurationSource.fromRawValue(
+          json['source'] as String? ?? 'defaults'),
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : null,
@@ -177,7 +183,8 @@ class ConfigurationData {
   }
 
   /// Update and mark as pending sync
-  ConfigurationData update(ConfigurationData Function(ConfigurationData) updater) {
+  ConfigurationData update(
+      ConfigurationData Function(ConfigurationData) updater) {
     final updated = updater(this);
     return updated.copyWith(
       updatedAt: DateTime.now(),

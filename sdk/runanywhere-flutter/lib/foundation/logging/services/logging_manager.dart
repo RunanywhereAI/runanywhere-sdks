@@ -79,7 +79,8 @@ class LoggingManager {
       category: category,
       message: message,
       metadata: metadata,
-      deviceInfo: configuration.includeDeviceMetadata ? _getCurrentDeviceInfo() : null,
+      deviceInfo:
+          configuration.includeDeviceMetadata ? _getCurrentDeviceInfo() : null,
     );
 
     // Local logging
@@ -105,7 +106,8 @@ class LoggingManager {
     final sensitiveMarker = isSensitive ? ' [SENSITIVE]' : '';
     final metadataStr = _formatMetadata(entry.metadata);
 
-    final logMessage = '$levelEmoji [${entry.category}]$sensitiveMarker ${entry.message}$metadataStr';
+    final logMessage =
+        '$levelEmoji [${entry.category}]$sensitiveMarker ${entry.message}$metadataStr';
 
     // Use dart:developer log for structured output
     developer.log(
@@ -214,7 +216,8 @@ class LoggingManager {
         timestamp: DateTime.now(),
         level: LogLevel.info,
         category: 'LoggingManager',
-        message: 'Running in ${_environment.name} environment - Remote: ${configuration.enableRemoteLogging}, MinLevel: ${configuration.minLogLevel}',
+        message:
+            'Running in ${_environment.name} environment - Remote: ${configuration.enableRemoteLogging}, MinLevel: ${configuration.minLogLevel}',
       );
       _logToConsole(entry, isSensitive: false);
     }
