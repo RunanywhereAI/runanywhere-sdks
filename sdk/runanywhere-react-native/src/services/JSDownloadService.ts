@@ -10,13 +10,17 @@
 import { EventBus } from '../Public/Events';
 import { ModelRegistry } from './ModelRegistry';
 import type { ModelInfo } from '../types';
+import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+
+const logger = new SDKLogger('JSDownloadService');
 
 // Dynamic import of rn-fetch-blob
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let RNFetchBlob: any = null;
 try {
   RNFetchBlob = require('rn-fetch-blob').default;
 } catch {
-  console.warn('[JSDownloadService] rn-fetch-blob not available.');
+  logger.warning('rn-fetch-blob not available.');
 }
 
 // Fallback to RNFS for file operations
@@ -24,7 +28,7 @@ let RNFS: typeof import('react-native-fs') | null = null;
 try {
   RNFS = require('react-native-fs');
 } catch {
-  console.warn('[JSDownloadService] react-native-fs not available.');
+  logger.warning('react-native-fs not available.');
 }
 
 /**
@@ -45,6 +49,7 @@ interface ActiveDownload {
   modelId: string;
   promise: Promise<string>;
   cancel: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RNFetchBlob task type from external package
   task?: any;
 }
 
@@ -88,13 +93,13 @@ class JSDownloadServiceImpl {
       const exists = await RNFetchBlob.fs.isDir(dir);
       if (!exists) {
         await RNFetchBlob.fs.mkdir(dir);
-        console.log('[JSDownloadService] Created models directory:', dir);
+        logger.debug(`Created models directory: ${dir}`);
       }
     } else if (RNFS) {
       const exists = await RNFS.exists(dir);
       if (!exists) {
         await RNFS.mkdir(dir);
-        console.log('[JSDownloadService] Created models directory:', dir);
+        logger.debug(`Created models directory: ${dir}`);
       }
     }
   }
@@ -117,9 +122,10 @@ class JSDownloadServiceImpl {
     }
 
     // Check if already downloading
-    if (this.activeDownloads.has(modelId)) {
-      console.log('[JSDownloadService] Model already downloading:', modelId);
-      return this.activeDownloads.get(modelId)!.promise;
+    const existingDownload = this.activeDownloads.get(modelId);
+    if (existingDownload) {
+      logger.debug(`Model already downloading: ${modelId}`);
+      return existingDownload.promise;
     }
 
     // Get model info from registry
@@ -150,7 +156,7 @@ class JSDownloadServiceImpl {
     // Create destination path
     const destPath = `${this.getModelsDirectory()}/${modelId}.${extension}`;
 
-    console.log('[JSDownloadService] Starting download:', {
+    logger.debug(' Starting download:', {
       modelId,
       url: modelInfo.downloadURL,
       destPath,
@@ -195,6 +201,11 @@ class JSDownloadServiceImpl {
     jobId: number,
     onProgress?: (progress: JSDownloadProgress) => void
   ): Promise<string> {
+    const downloadURL = modelInfo.downloadURL;
+    if (!downloadURL) {
+      throw new Error(`Model has no download URL: ${modelId}`);
+    }
+
     let lastProgressPercent = 0;
 
     const downloadPromise = new Promise<string>((resolve, reject) => {
@@ -202,7 +213,7 @@ class JSDownloadServiceImpl {
         path: destPath,
         fileCache: false,
       })
-        .fetch('GET', modelInfo.downloadURL!, {
+        .fetch('GET', downloadURL, {
           // Add headers if needed
         })
         .progress({ interval: 100 }, (received: number, total: number) => {
@@ -211,7 +222,7 @@ class JSDownloadServiceImpl {
 
           if (progressPercent > lastProgressPercent) {
             lastProgressPercent = progressPercent;
-            console.log(`---Progress callback EMIT--- ${progressPercent}`);
+            logger.debug(`Progress callback EMIT: ${progressPercent}%`);
 
             if (onProgress) {
               onProgress({
@@ -243,11 +254,12 @@ class JSDownloadServiceImpl {
       this.activeDownloads.set(modelId, activeDownload);
 
       task
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RNFetchBlob response type
         .then(async (res: any) => {
           const status = res.info().status;
 
           if (status === 200) {
-            console.log('[JSDownloadService] Download completed:', destPath);
+            logger.debug(`Download completed: ${destPath}`);
 
             // Update model info with local path
             const updatedModel: ModelInfo = {
@@ -259,10 +271,9 @@ class JSDownloadServiceImpl {
             try {
               await ModelRegistry.registerModel(updatedModel);
             } catch (e) {
-              console.warn(
-                '[JSDownloadService] Failed to update model in registry:',
-                e
-              );
+              logger.warning('Failed to update model in registry:', {
+                error: e,
+              });
             }
 
             EventBus.publish('Model', {
@@ -275,7 +286,7 @@ class JSDownloadServiceImpl {
             resolve(destPath);
           } else {
             const error = new Error(`Download failed with status: ${status}`);
-            console.error('[JSDownloadService] Download failed:', error);
+            logger.error(`Download failed: ${error.message}`);
 
             // Clean up partial file
             try {
@@ -294,8 +305,9 @@ class JSDownloadServiceImpl {
             reject(error);
           }
         })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .catch(async (error: any) => {
-          console.error('[JSDownloadService] Download error:', error);
+          logger.error(`Download error: ${error?.message || String(error)}`);
 
           // Clean up partial file
           try {
@@ -328,16 +340,23 @@ class JSDownloadServiceImpl {
     jobId: number,
     onProgress?: (progress: JSDownloadProgress) => void
   ): Promise<string> {
+    const downloadURL = modelInfo.downloadURL;
+    if (!downloadURL) {
+      throw new Error(`Model has no download URL: ${modelId}`);
+    }
+    if (!RNFS) {
+      throw new Error('RNFS is not available');
+    }
+    // Capture RNFS in a const so TypeScript knows it's non-null in the async block
+    const rnfs = RNFS;
+
     const abortController = new AbortController();
 
     const downloadPromise = (async (): Promise<string> => {
       try {
-        console.log(
-          '[JSDownloadService] Fetching with fallback:',
-          modelInfo.downloadURL
-        );
+        logger.debug(`Fetching with fallback: ${downloadURL}`);
 
-        const response = await fetch(modelInfo.downloadURL!, {
+        const response = await fetch(downloadURL, {
           method: 'GET',
           signal: abortController.signal,
         });
@@ -350,7 +369,7 @@ class JSDownloadServiceImpl {
           response.headers.get('content-length') || '0',
           10
         );
-        console.log('[JSDownloadService] Content-Length:', contentLength);
+        logger.debug(`Content-Length: ${contentLength}`);
 
         const blob = await response.blob();
 
@@ -366,8 +385,8 @@ class JSDownloadServiceImpl {
           reader.readAsDataURL(blob);
         });
 
-        console.log('[JSDownloadService] Writing file...');
-        await RNFS!.writeFile(destPath, base64Data, 'base64');
+        logger.debug(' Writing file...');
+        await rnfs.writeFile(destPath, base64Data, 'base64');
 
         // Emit 100% progress
         if (onProgress) {
@@ -389,10 +408,7 @@ class JSDownloadServiceImpl {
         try {
           await ModelRegistry.registerModel(updatedModel);
         } catch (e) {
-          console.warn(
-            '[JSDownloadService] Failed to update model in registry:',
-            e
-          );
+          logger.warning('Failed to update model in registry:', { error: e });
         }
 
         EventBus.publish('Model', {
@@ -403,13 +419,14 @@ class JSDownloadServiceImpl {
 
         this.activeDownloads.delete(modelId);
         return destPath;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
-        console.error('[JSDownloadService] Download error:', error);
+        logger.error(`Download error: ${error?.message || String(error)}`);
 
         try {
-          const exists = await RNFS!.exists(destPath);
+          const exists = await rnfs.exists(destPath);
           if (exists) {
-            await RNFS!.unlink(destPath);
+            await rnfs.unlink(destPath);
           }
         } catch {
           // Ignore
@@ -455,10 +472,7 @@ class JSDownloadServiceImpl {
     }
 
     if (exists) {
-      console.log(
-        '[JSDownloadService] Model already downloaded:',
-        modelInfo.id
-      );
+      logger.debug(`Model already downloaded: ${modelInfo.id}`);
       return modelInfo.localPath;
     }
 
@@ -515,7 +529,7 @@ class JSDownloadServiceImpl {
       }
 
       if (exists) {
-        console.log('[JSDownloadService] Deleted model:', modelId);
+        logger.debug(`Deleted model: ${modelId}`);
 
         const updatedModel: ModelInfo = {
           ...modelInfo,
@@ -527,7 +541,9 @@ class JSDownloadServiceImpl {
         return true;
       }
     } catch (error) {
-      console.error('[JSDownloadService] Error deleting model:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(`Error deleting model: ${errorMessage}`);
     }
 
     return false;

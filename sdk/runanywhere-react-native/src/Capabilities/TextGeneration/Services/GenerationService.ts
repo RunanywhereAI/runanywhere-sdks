@@ -25,10 +25,12 @@ import type { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
  */
 export class GenerationService {
   private routingService: RoutingService;
-  private modelLoadingService: any; // ModelLoadingService
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ModelLoadingService type not yet defined
+  private modelLoadingService: any;
   private optionsResolver: GenerationOptionsResolver;
   private currentLoadedModel: LoadedModel | null = null;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ModelLoadingService type not yet defined
   constructor(routingService: RoutingService, modelLoadingService?: any) {
     this.routingService = routingService;
     this.modelLoadingService = modelLoadingService;

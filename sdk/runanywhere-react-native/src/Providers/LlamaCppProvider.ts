@@ -18,6 +18,7 @@ import { PerformanceMetricsImpl } from '../Capabilities/TextGeneration/Models/Pe
 import { getCatalogModelsByFramework } from '../Data/modelCatalog';
 import { SDKError, SDKErrorCode } from '../Public/Errors/SDKError';
 import { requireNativeModule, type NativeRunAnywhereModule } from '../native';
+import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 
 /**
  * LlamaCpp service configuration
@@ -38,6 +39,8 @@ export interface LlamaCppConfiguration {
  * 2. Framework name matching (llamacpp, llama-cpp)
  * 3. Model family + quantization pattern matching
  */
+const logger = new SDKLogger('LlamaCppProvider');
+
 export class LlamaCppProvider implements LLMServiceProvider {
   readonly name = 'LlamaCpp';
 
@@ -59,7 +62,7 @@ export class LlamaCppProvider implements LLMServiceProvider {
    * This is called during SDK initialization (like Swift SDK's onRegistration)
    */
   static register(): void {
-    console.log('[LlamaCppProvider] Registering LlamaCPP service provider');
+    logger.info('Registering LlamaCPP service provider');
 
     // Import ServiceRegistry dynamically to avoid circular dependency
     const {
@@ -69,9 +72,7 @@ export class LlamaCppProvider implements LLMServiceProvider {
     // Register with priority 100 (default priority)
     ServiceRegistry.shared.registerLLMProvider(LlamaCppProvider.shared, 100);
 
-    console.log(
-      '[LlamaCppProvider] LlamaCPP service provider registered successfully'
-    );
+    logger.info('LlamaCPP service provider registered successfully');
   }
 
   /**
@@ -140,9 +141,7 @@ export class LlamaCppProvider implements LLMServiceProvider {
     // Get all GGUF models from catalog (use types/enums version for catalog lookup)
     const ggufModels = getCatalogModelsByFramework(CatalogFramework.LlamaCpp);
 
-    console.log(
-      `[LlamaCppProvider] Providing ${ggufModels.length} GGUF models`
-    );
+    logger.debug(`Providing ${ggufModels.length} GGUF models`);
 
     return ggufModels;
   }
@@ -155,9 +154,7 @@ export class LlamaCppProvider implements LLMServiceProvider {
   async createLLMService(
     configuration: LlamaCppConfiguration
   ): Promise<LLMService> {
-    console.log(
-      `[LlamaCppProvider] Creating LLM service for model: ${configuration?.modelId}`
-    );
+    logger.info(`Creating LLM service for model: ${configuration?.modelId}`);
 
     // Verify we can handle this model
     if (!this.canHandle(configuration?.modelId)) {
@@ -196,7 +193,7 @@ export class LlamaCppProvider implements LLMServiceProvider {
     // Create native LLM service wrapper
     const service = new LlamaCppService(configuration, modelPath);
 
-    console.log('[LlamaCppProvider] LLM service created successfully');
+    logger.info('LLM service created successfully');
 
     return service;
   }
@@ -208,17 +205,17 @@ export class LlamaCppProvider implements LLMServiceProvider {
    * Called automatically by ServiceRegistry during registration.
    */
   onRegistration(): void {
-    console.log('[LlamaCppProvider] onRegistration() called');
+    logger.debug('onRegistration() called');
 
     // Register models with ModelRegistry (in-memory cache)
     // This ensures models are discoverable immediately
     const models = this.getProvidedModels();
 
-    console.log(
-      `[LlamaCppProvider] Registered ${models.length} models through provider`
-    );
+    logger.info(`Registered ${models.length} models through provider`);
   }
 }
+
+const serviceLogger = new SDKLogger('LlamaCppService');
 
 /**
  * LlamaCPP Service Implementation
@@ -249,7 +246,7 @@ class LlamaCppService implements LLMService {
       );
     }
 
-    console.log(`[LlamaCppService] Initializing with model: ${pathToLoad}`);
+    serviceLogger.info(`Initializing with model: ${pathToLoad}`);
 
     // Load model via native module
     const config = this.configuration?.configJson || null;
@@ -265,7 +262,7 @@ class LlamaCppService implements LLMService {
 
     this.isReady = true;
     this.currentModel = pathToLoad;
-    console.log('[LlamaCppService] Model loaded successfully');
+    serviceLogger.info('Model loaded successfully');
   }
 
   async generate(
@@ -310,7 +307,7 @@ class LlamaCppService implements LLMService {
   }
 
   async cleanup(): Promise<void> {
-    console.log('[LlamaCppService] Cleaning up service');
+    serviceLogger.debug('Cleaning up service');
     await this.native.unloadTextModel();
     this.isReady = false;
     this.currentModel = null;

@@ -31,6 +31,7 @@ interface Storage {
  * Adapter for @react-native-async-storage/async-storage
  */
 export class AsyncStorageAdapter implements Storage {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AsyncStorage type from external package
   constructor(private asyncStorage: any) {}
 
   async getItem(key: string): Promise<string | null> {
@@ -69,6 +70,7 @@ export class CustomStorageAdapter implements Storage {
   private cache = new Map<string, string>();
 
   constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- localStorage type varies by platform
     private localStorage?: any,
     private useCache: boolean = true
   ) {}

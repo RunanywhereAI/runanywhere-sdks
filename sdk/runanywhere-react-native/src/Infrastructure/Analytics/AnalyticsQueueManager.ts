@@ -10,6 +10,9 @@ import type { AnalyticsEvent, TelemetryData } from '../../types/analytics';
 import type { APIClient } from '../../Data/Network/Services/APIClient';
 import { analyticsEndpointForEnvironment } from '../../Data/Network/APIEndpoint';
 import { SDKEnvironment } from '../../types';
+import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+
+const logger = new SDKLogger('AnalyticsQueueManager');
 
 const STORAGE_KEY = '@runanywhere:analytics_queue';
 
@@ -49,6 +52,7 @@ export class AnalyticsQueueManager {
   private eventQueue: AnalyticsEvent[] = [];
   private readonly batchSize: number = 50;
   private readonly flushInterval: number = 30 * 1000; // 30 seconds in ms
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TelemetryRepository type not yet defined
   private telemetryRepository: any | null = null;
   private flushTimer: NodeJS.Timeout | null = null;
   private readonly maxRetries: number = 3;
@@ -84,6 +88,7 @@ export class AnalyticsQueueManager {
   /**
    * Initialize with telemetry repository and optional storage
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TelemetryRepository type not yet defined
   public initialize(telemetryRepository: any, storage?: Storage): void {
     this.telemetryRepository = telemetryRepository;
     if (storage) {
@@ -358,18 +363,20 @@ export class AnalyticsQueueManager {
     try {
       const stored = await this.storage.getItem(STORAGE_KEY);
       if (stored) {
-        const serializedEvents = JSON.parse(stored);
-        this.eventQueue = serializedEvents.map((event: any) => ({
+        const serializedEvents = JSON.parse(stored) as Array<
+          Omit<AnalyticsEvent, 'timestamp'> & { timestamp: string }
+        >;
+        this.eventQueue = serializedEvents.map((event) => ({
           ...event,
           timestamp: new Date(event.timestamp),
         }));
 
-        console.log(
-          `[AnalyticsQueue] Loaded ${this.eventQueue.length} persisted events`
-        );
+        logger.debug(`Loaded ${this.eventQueue.length} persisted events`);
       }
     } catch (error) {
-      console.warn('[AnalyticsQueue] Failed to load persisted events:', error);
+      logger.warning(
+        `Failed to load persisted events: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 

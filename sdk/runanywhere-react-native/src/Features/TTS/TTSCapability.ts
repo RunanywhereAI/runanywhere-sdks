@@ -141,7 +141,13 @@ export class TTSCapability extends BaseComponent<TTSServiceWrapper> {
     // If voice is provided in config, load through managed lifecycle
     if (this.ttsConfiguration.voice) {
       await this.loadModel(this.ttsConfiguration.voice);
-      return this.service!;
+      if (!this.service) {
+        throw new SDKError(
+          SDKErrorCode.InvalidState,
+          'Service was not created after loading model'
+        );
+      }
+      return this.service;
     }
 
     // Fallback: create service without loading model (caller will load model separately)

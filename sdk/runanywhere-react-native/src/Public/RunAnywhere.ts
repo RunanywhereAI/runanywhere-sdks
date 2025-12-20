@@ -20,6 +20,10 @@ import {
 } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
+import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+import { DeviceIdentityService } from '../Foundation/DeviceIdentity/DeviceIdentityService';
+
+const logger = new SDKLogger('RunAnywhere');
 import type {
   InitializationPhase,
   InitializationState,
@@ -43,6 +47,8 @@ import type {
   TTSResult,
   ModelInfo,
 } from '../types';
+import { StructuredOutputHandler } from '../Capabilities/StructuredOutput/Services/StructuredOutputHandler';
+import type { GeneratableType } from '../Capabilities/StructuredOutput/Services/StructuredOutputHandler';
 
 // ============================================================================
 // Internal State
@@ -206,6 +212,30 @@ export const RunAnywhere = {
     return initState.environment;
   },
 
+  /**
+   * Get the persistent device identifier
+   *
+   * Returns the cached device UUID if available, null otherwise.
+   * For guaranteed access, use `getDeviceId()` which is async.
+   *
+   * Matches iOS: `static var deviceId: String`
+   */
+  get deviceId(): string | null {
+    return DeviceIdentityService.getCachedDeviceUUID();
+  },
+
+  /**
+   * Get the persistent device identifier (async version)
+   *
+   * Returns the device UUID, loading from secure storage if needed.
+   * This UUID survives app reinstalls.
+   *
+   * @returns Promise resolving to the persistent device UUID
+   */
+  async getDeviceId(): Promise<string> {
+    return DeviceIdentityService.getPersistentDeviceUUID();
+  },
+
   // ============================================================================
   // SDK Initialization (Two-Phase Pattern)
   // ============================================================================
@@ -262,7 +292,7 @@ export const RunAnywhere = {
     // ========================================================================
     // PHASE 1: Core Initialization (Sync, Fast)
     // ========================================================================
-    console.log('[RunAnywhere] Phase 1: Core initialization starting...');
+    logger.info(' Phase 1: Core initialization starting...');
     const phase1Start = Date.now();
 
     let backendType: string | null = null;
@@ -270,9 +300,8 @@ export const RunAnywhere = {
     // Check if native module is available
     if (!isNativeModuleAvailable()) {
       if (__DEV__ || environment === SDKEnvironment.Development) {
-        console.warn(
-          '[RunAnywhere] Native module not available. ' +
-            'Running in limited development mode.'
+        logger.warning(
+          'Native module not available. Running in limited development mode.'
         );
         initState = markCoreInitialized(initState, initParams, null);
         state.initialized = true;
@@ -298,9 +327,7 @@ export const RunAnywhere = {
       const backendCreated = native.createBackend(backendName);
       if (!backendCreated) {
         if (__DEV__ || environment === SDKEnvironment.Development) {
-          console.warn(
-            '[RunAnywhere] Failed to create backend, running in limited mode'
-          );
+          logger.warning('Failed to create backend, running in limited mode');
           initState = markCoreInitialized(initState, initParams, null);
           state.initialized = true;
           state.environment = environment;
@@ -319,7 +346,9 @@ export const RunAnywhere = {
       state.backendType = backendName;
     } catch (error) {
       if (__DEV__ || environment === SDKEnvironment.Development) {
-        console.warn('[RunAnywhere] Backend creation error:', error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.warning(`Backend creation error: ${errorMessage}`);
         initState = markCoreInitialized(initState, initParams, null);
         state.initialized = true;
         state.environment = environment;
@@ -342,8 +371,8 @@ export const RunAnywhere = {
       const result = native.initialize(configJson);
       if (!result) {
         if (__DEV__ || environment === SDKEnvironment.Development) {
-          console.warn(
-            '[RunAnywhere] Native initialize returned false, continuing in dev mode'
+          logger.warning(
+            'Native initialize returned false, continuing in dev mode'
           );
           initState = markCoreInitialized(initState, initParams, backendType);
           state.initialized = true;
@@ -360,7 +389,9 @@ export const RunAnywhere = {
       }
     } catch (error) {
       if (__DEV__ || environment === SDKEnvironment.Development) {
-        console.warn('[RunAnywhere] Initialize error:', error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.warning(`Initialize error: ${errorMessage}`);
         initState = markCoreInitialized(initState, initParams, backendType);
         state.initialized = true;
         state.environment = environment;
@@ -374,7 +405,7 @@ export const RunAnywhere = {
 
     // Phase 1 complete
     const phase1Duration = Date.now() - phase1Start;
-    console.log(`[RunAnywhere] Phase 1 complete (${phase1Duration}ms)`);
+    logger.info(`Phase 1 complete (${phase1Duration}ms)`);
 
     initState = markCoreInitialized(initState, initParams, backendType);
     state.initialized = true;
@@ -392,17 +423,19 @@ export const RunAnywhere = {
    * @internal
    */
   _startPhase2InBackground(): void {
-    console.log('[RunAnywhere] Starting Phase 2 (services) in background...');
+    logger.info(' Starting Phase 2 (services) in background...');
 
     // Run Phase 2 asynchronously without blocking
     // Uses setTimeout to ensure it runs in the next event loop tick
     setTimeout(async () => {
       try {
         await this.completeServicesInitialization();
-        console.log('[RunAnywhere] Phase 2 complete (background)');
+        logger.info('Phase 2 complete (background)');
       } catch (error) {
         // Phase 2 failure is non-critical
-        console.warn('[RunAnywhere] Phase 2 failed (non-critical):', error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.warning(`Phase 2 failed (non-critical): ${errorMessage}`);
       }
     }, 0);
   },
@@ -443,7 +476,7 @@ export const RunAnywhere = {
       const params = initState.initParams;
       const environment = initState.environment ?? SDKEnvironment.Production;
 
-      console.log('[RunAnywhere] Initializing API client...');
+      logger.info(' Initializing API client...');
       try {
         // Initialize the API client in ServiceContainer
         // This also wires the client to AnalyticsQueueManager
@@ -456,52 +489,47 @@ export const RunAnywhere = {
           environment,
           undefined // Auth provider will be set after authentication
         );
-        console.log('[RunAnywhere] API client initialized');
+        logger.info(' API client initialized');
       } catch (error) {
-        console.warn(
-          '[RunAnywhere] Failed to initialize API client (non-critical):',
-          error
-        );
+        logger.warning('Failed to initialize API client (non-critical):', {
+          error,
+        });
       }
     }
 
     // Step 2: Register framework providers (same pattern as Swift SDK)
-    console.log('[RunAnywhere] Registering framework providers...');
+    logger.info('Registering framework providers...');
     try {
       // Register LlamaCPP provider for GGUF models
       const { LlamaCppProvider } = require('../Providers/LlamaCppProvider');
       LlamaCppProvider.register();
-      console.log('[RunAnywhere] LlamaCPP provider registered');
+      logger.info('LlamaCPP provider registered');
     } catch (error) {
-      console.warn(
-        '[RunAnywhere] Failed to register LlamaCPP provider:',
-        error
-      );
+      logger.warning('Failed to register LlamaCPP provider:', { error });
     }
 
     try {
       // Register ONNX providers for STT/TTS models
       const { registerONNXProviders } = require('../Providers/ONNXProvider');
       registerONNXProviders();
-      console.log('[RunAnywhere] ONNX providers registered');
+      logger.info('ONNX providers registered');
     } catch (error) {
-      console.warn('[RunAnywhere] Failed to register ONNX providers:', error);
+      logger.warning('Failed to register ONNX providers:', { error });
     }
 
     // Step 3: Initialize the Model Registry
     try {
       await ModelRegistry.initialize();
-      console.log('[RunAnywhere] Model Registry initialized successfully');
+      logger.info('Model Registry initialized successfully');
     } catch (error) {
-      console.warn(
-        '[RunAnywhere] Model Registry initialization failed (non-critical):',
-        error
-      );
+      logger.warning('Model Registry initialization failed (non-critical):', {
+        error,
+      });
     }
 
     // Mark Phase 2 complete
     const phase2Duration = Date.now() - phase2Start;
-    console.log(`[RunAnywhere] Phase 2 complete (${phase2Duration}ms)`);
+    logger.info(`Phase 2 complete (${phase2Duration}ms)`);
     initState = markServicesInitialized(initState);
   },
 
@@ -581,8 +609,40 @@ export const RunAnywhere = {
   // ============================================================================
 
   /**
+   * Load an LLM model by ID or path
+   *
+   * Matches iOS: `RunAnywhere.loadModel(_:)`
+   *
+   * @param modelPathOrId - Path to the model file or model ID
+   * @param config - Optional configuration
+   * @returns true if model loaded successfully
+   *
+   * @example
+   * ```typescript
+   * await RunAnywhere.loadModel('/path/to/model.gguf');
+   * // or with model ID
+   * await RunAnywhere.loadModel('llama-3.2-1b-q4');
+   * ```
+   */
+  async loadModel(
+    modelPathOrId: string,
+    config?: Record<string, unknown>
+  ): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      logger.warning('Native module not available for loadModel');
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.loadTextModel(
+      modelPathOrId,
+      config ? JSON.stringify(config) : undefined
+    );
+  },
+
+  /**
    * Load a text generation model
    *
+   * @deprecated Use `loadModel()` instead for iOS API parity
    * @param modelPath - Path to the model file
    * @param config - Optional configuration
    */
@@ -590,23 +650,15 @@ export const RunAnywhere = {
     modelPath: string,
     config?: Record<string, unknown>
   ): Promise<boolean> {
-    if (!isNativeModuleAvailable()) {
-      console.warn(
-        '[RunAnywhere] Native module not available for loadTextModel'
-      );
-      return false;
-    }
-    const native = requireNativeModule();
-    return native.loadTextModel(
-      modelPath,
-      config ? JSON.stringify(config) : undefined
-    );
+    return this.loadModel(modelPath, config);
   },
 
   /**
-   * Check if a text model is loaded
+   * Check if an LLM model is loaded
+   *
+   * Matches iOS: `RunAnywhere.isModelLoaded`
    */
-  async isTextModelLoaded(): Promise<boolean> {
+  async isModelLoaded(): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
       return false;
     }
@@ -615,14 +667,34 @@ export const RunAnywhere = {
   },
 
   /**
-   * Unload the current text model
+   * Check if a text model is loaded
+   *
+   * @deprecated Use `isModelLoaded()` instead for iOS API parity
    */
-  async unloadTextModel(): Promise<boolean> {
+  async isTextModelLoaded(): Promise<boolean> {
+    return this.isModelLoaded();
+  },
+
+  /**
+   * Unload the currently loaded LLM model
+   *
+   * Matches iOS: `RunAnywhere.unloadModel()`
+   */
+  async unloadModel(): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
       return false;
     }
     const native = requireNativeModule();
     return native.unloadTextModel();
+  },
+
+  /**
+   * Unload the current text model
+   *
+   * @deprecated Use `unloadModel()` instead for iOS API parity
+   */
+  async unloadTextModel(): Promise<boolean> {
+    return this.unloadModel();
   },
 
   /**
@@ -799,6 +871,196 @@ export const RunAnywhere = {
   },
 
   // ============================================================================
+  // Structured Output Generation
+  // ============================================================================
+
+  /**
+   * Generate structured output that conforms to a type schema
+   *
+   * Matches iOS: `RunAnywhere.generateStructured(_:prompt:options:)`
+   *
+   * @param schema - Object with a `jsonSchema` property defining the expected output structure
+   * @param prompt - The prompt to generate from
+   * @param options - Optional generation options
+   * @returns The generated object parsed from JSON
+   * @throws Error if generation fails or output is not valid JSON
+   *
+   * @example
+   * ```typescript
+   * // Define your schema
+   * const QuizQuestionSchema = {
+   *   jsonSchema: JSON.stringify({
+   *     type: 'object',
+   *     properties: {
+   *       question: { type: 'string' },
+   *       options: { type: 'array', items: { type: 'string' } },
+   *       correctAnswer: { type: 'integer' }
+   *     },
+   *     required: ['question', 'options', 'correctAnswer']
+   *   })
+   * };
+   *
+   * // Generate structured output
+   * const quiz = await RunAnywhere.generateStructured(
+   *   QuizQuestionSchema,
+   *   'Create a quiz question about Swift programming'
+   * );
+   * console.log(quiz.question);
+   * ```
+   */
+  async generateStructured<T>(
+    schema: GeneratableType,
+    prompt: string,
+    options?: GenerationOptions
+  ): Promise<T> {
+    const handler = new StructuredOutputHandler();
+
+    // Get the system prompt from the handler
+    const systemPrompt = handler.getSystemPrompt(schema);
+
+    // Build the user prompt
+    const userPrompt = handler.buildUserPrompt(schema, prompt);
+
+    // Create effective options with structured output system prompt
+    const effectiveOptions: GenerationOptions = {
+      ...options,
+      maxTokens: options?.maxTokens ?? 1500,
+      temperature: options?.temperature ?? 0.7,
+      systemPrompt: systemPrompt,
+    };
+
+    // Generate using the standard generate method
+    const result = await this.generate(userPrompt, effectiveOptions);
+
+    // Extract and parse JSON from the response
+    const extractedJson = this._extractJSON(result.text);
+    try {
+      return JSON.parse(extractedJson) as T;
+    } catch {
+      throw new Error(
+        `Failed to parse structured output as JSON: ${result.text.substring(0, 200)}`
+      );
+    }
+  },
+
+  /**
+   * Extract JSON from potentially mixed text
+   * @internal
+   */
+  _extractJSON(text: string): string {
+    const trimmed = text.trim();
+
+    // Try to find JSON object boundaries
+    const startIndex = trimmed.indexOf('{');
+    if (startIndex !== -1) {
+      const endIndex = this._findMatchingBrace(trimmed, startIndex);
+      if (endIndex !== null) {
+        return trimmed.substring(startIndex, endIndex + 1);
+      }
+    }
+
+    // Try to find JSON array boundaries
+    const arrayStartIndex = trimmed.indexOf('[');
+    if (arrayStartIndex !== -1) {
+      const arrayEndIndex = this._findMatchingBracket(trimmed, arrayStartIndex);
+      if (arrayEndIndex !== null) {
+        return trimmed.substring(arrayStartIndex, arrayEndIndex + 1);
+      }
+    }
+
+    // If no clear JSON boundaries, check if the entire text might be JSON
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      return trimmed;
+    }
+
+    throw new Error('No valid JSON found in the response');
+  },
+
+  /**
+   * Find matching closing brace
+   * @internal
+   */
+  _findMatchingBrace(text: string, startIndex: number): number | null {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = startIndex; i < text.length; i++) {
+      const char = text[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === '{') {
+        depth++;
+      } else if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          return i;
+        }
+      }
+    }
+
+    return null;
+  },
+
+  /**
+   * Find matching closing bracket
+   * @internal
+   */
+  _findMatchingBracket(text: string, startIndex: number): number | null {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = startIndex; i < text.length; i++) {
+      const char = text[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === '[') {
+        depth++;
+      } else if (char === ']') {
+        depth--;
+        if (depth === 0) {
+          return i;
+        }
+      }
+    }
+
+    return null;
+  },
+
+  // ============================================================================
   // Speech-to-Text (STT)
   // ============================================================================
 
@@ -815,9 +1077,7 @@ export const RunAnywhere = {
     config?: Record<string, unknown>
   ): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
-      console.warn(
-        '[RunAnywhere] Native module not available for loadSTTModel'
-      );
+      logger.warning('Native module not available for loadSTTModel');
       return false;
     }
     const native = requireNativeModule();
@@ -880,7 +1140,10 @@ export const RunAnywhere = {
       const bytes = new Uint8Array(audioData);
       let binary = '';
       for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]!);
+        const byte = bytes[i];
+        if (byte !== undefined) {
+          binary += String.fromCharCode(byte);
+        }
       }
       audioBase64 = btoa(binary);
     }
@@ -1010,9 +1273,7 @@ export const RunAnywhere = {
     onError?: (error: string) => void
   ): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
-      console.warn(
-        '[RunAnywhere] Native module not available for startStreamingSTT'
-      );
+      logger.warning('Native module not available for startStreamingSTT');
       return false;
     }
     const native = requireNativeModule();
@@ -1081,9 +1342,7 @@ export const RunAnywhere = {
     config?: Record<string, unknown>
   ): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
-      console.warn(
-        '[RunAnywhere] Native module not available for loadTTSModel'
-      );
+      logger.warning('Native module not available for loadTTSModel');
       return false;
     }
     const native = requireNativeModule();
@@ -1251,7 +1510,10 @@ export const RunAnywhere = {
       const bytes = new Uint8Array(audioData);
       let binary = '';
       for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]!);
+        const byte = bytes[i];
+        if (byte !== undefined) {
+          binary += String.fromCharCode(byte);
+        }
       }
       audioBase64 = btoa(binary);
     }
@@ -1524,7 +1786,7 @@ export const RunAnywhere = {
     }
     const fileName = `${modelId}${extension}`;
 
-    console.log('[RunAnywhere] Starting native download (OkHttp/URLSession):', {
+    logger.info(' Starting native download (OkHttp/URLSession):', {
       modelId,
       url: modelInfo.downloadURL,
     });
@@ -1544,7 +1806,7 @@ export const RunAnywhere = {
           // Only log every 10% to reduce noise
           const progressPct = Math.round(progress * 100);
           if (progressPct - lastLoggedProgress >= 10) {
-            console.log(`[RunAnywhere] Download progress: ${progressPct}%`);
+            logger.debug(`Download progress: ${progressPct}%`);
             lastLoggedProgress = progressPct;
           }
 
@@ -1564,7 +1826,7 @@ export const RunAnywhere = {
       // Get the actual path where model was downloaded
       const destPath = await fs.getModelPath(fileName);
 
-      console.log('[RunAnywhere] Download completed:', {
+      logger.info(' Download completed:', {
         modelId,
         destPath,
       });
@@ -1593,7 +1855,7 @@ export const RunAnywhere = {
     // Note: Native cancellation requires additional implementation
     if (activeDownloads.has(modelId)) {
       activeDownloads.delete(modelId);
-      console.log('[RunAnywhere] Marked download as cancelled:', modelId);
+      logger.info(`Marked download as cancelled: ${modelId}`);
       return true;
     }
     return false;
@@ -1619,7 +1881,7 @@ export const RunAnywhere = {
       const exists = await fs.modelExists(fileName);
       if (exists) {
         await fs.deleteModel(fileName);
-        console.log('[RunAnywhere] Deleted model:', modelId);
+        logger.info(`Deleted model: ${modelId}`);
       }
 
       // Also try without extension
@@ -1640,7 +1902,7 @@ export const RunAnywhere = {
 
       return true;
     } catch (error) {
-      console.error('[RunAnywhere] Delete model error:', error);
+      logger.error('Delete model error:', { error });
       return false;
     }
   },

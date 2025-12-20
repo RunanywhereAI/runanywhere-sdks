@@ -17,6 +17,7 @@ import {
   loadedState,
   CapabilityError,
 } from './CapabilityProtocols';
+import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 // ============================================================================
 // Types
@@ -257,10 +258,12 @@ export class ModelLifecycleManager<TService> {
   // MARK: - Private Helpers
 
   private log(message: string): void {
-    console.log(`[${this.category}] ${message}`);
+    const logger = new SDKLogger(this.category);
+    logger.debug(message);
   }
 
   private logError(message: string): void {
-    console.error(`[${this.category}] ${message}`);
+    const logger = new SDKLogger(this.category);
+    logger.error(message);
   }
 }

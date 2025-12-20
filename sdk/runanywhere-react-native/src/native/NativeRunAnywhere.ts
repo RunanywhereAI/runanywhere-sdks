@@ -9,6 +9,9 @@ import { NitroModules } from 'react-native-nitro-modules';
 import type { RunAnywhere } from '../specs/RunAnywhere.nitro';
 import type { RunAnywhereFileSystem } from '../specs/RunAnywhereFileSystem.nitro';
 import type { RunAnywhereDeviceInfo } from '../specs/RunAnywhereDeviceInfo.nitro';
+import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+
+const logger = new SDKLogger('NativeRunAnywhere');
 
 /**
  * Native module interface
@@ -512,7 +515,7 @@ let _cachedDeviceInfo: RunAnywhereDeviceInfo | null = null;
 function getNativeModule(): NativeRunAnywhereModule {
   if (!_cachedModule) {
     _cachedModule = getRunAnywhere();
-    console.log('[NativeRunAnywhere] Created Nitrogen HybridObject');
+    logger.debug('Created Nitrogen HybridObject');
   }
   return _cachedModule as unknown as NativeRunAnywhereModule;
 }
@@ -524,7 +527,7 @@ function getNativeModule(): NativeRunAnywhereModule {
 function getNativeFileSystem(): RunAnywhereFileSystem {
   if (!_cachedFileSystem) {
     _cachedFileSystem = getRunAnywhereFileSystem();
-    console.log('[NativeRunAnywhereFileSystem] Created Nitrogen HybridObject');
+    logger.debug('Created FileSystem Nitrogen HybridObject');
   }
   return _cachedFileSystem;
 }
@@ -536,7 +539,7 @@ function getNativeFileSystem(): RunAnywhereFileSystem {
 function getNativeDeviceInfo(): RunAnywhereDeviceInfo {
   if (!_cachedDeviceInfo) {
     _cachedDeviceInfo = getRunAnywhereDeviceInfo();
-    console.log('[NativeRunAnywhereDeviceInfo] Created Nitrogen HybridObject');
+    logger.debug('Created DeviceInfo Nitrogen HybridObject');
   }
   return _cachedDeviceInfo;
 }

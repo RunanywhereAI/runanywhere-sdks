@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Components/STT/STTComponent.swift
  */
 
-import type { STTConfiguration } from '../../Models/Configuration/STTConfiguration';
+import type { STTConfiguration } from '../../../Features/STT/STTConfiguration';
 import type { STTService } from './STTService';
 
 /**

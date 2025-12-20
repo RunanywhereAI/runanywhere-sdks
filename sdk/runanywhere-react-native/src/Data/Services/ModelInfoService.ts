@@ -18,6 +18,7 @@ import type { ModelCategory } from '../../Core/Models/Model/ModelCategory';
 export class ModelInfoService {
   private logger: SDKLogger;
   private modelInfoRepository: ModelInfoRepository;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SyncCoordinator type not yet defined
   private syncCoordinator: any | null;
 
   /**
@@ -29,6 +30,7 @@ export class ModelInfoService {
 
   constructor(
     modelInfoRepository: ModelInfoRepository,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SyncCoordinator type not yet defined
     syncCoordinator?: any | null
   ) {
     this.logger = new SDKLogger('ModelInfoService');

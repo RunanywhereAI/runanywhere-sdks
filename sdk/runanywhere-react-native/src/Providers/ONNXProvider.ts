@@ -11,6 +11,11 @@
 import type { ModelInfo } from '../types';
 import { LLMFramework, ModelCategory } from '../types';
 import { getCatalogModelsByFramework } from '../Data/modelCatalog';
+import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+
+const sttLogger = new SDKLogger('ONNXSTTProvider');
+const ttsLogger = new SDKLogger('ONNXTTSProvider');
+const providerLogger = new SDKLogger('ONNXProvider');
 
 /**
  * ONNX STT Service Provider
@@ -35,7 +40,7 @@ export class ONNXSTTProvider {
    * Register the ONNX STT provider with ServiceRegistry
    */
   static register(): void {
-    console.log('[ONNXSTTProvider] Registering ONNX STT service provider');
+    sttLogger.info('Registering ONNX STT service provider');
 
     const {
       ServiceRegistry,
@@ -44,9 +49,7 @@ export class ONNXSTTProvider {
     // Register with priority 90 (slightly lower than LlamaCpp)
     ServiceRegistry.shared.registerSTTProvider(ONNXSTTProvider.shared, 90);
 
-    console.log(
-      '[ONNXSTTProvider] ONNX STT service provider registered successfully'
-    );
+    sttLogger.info('ONNX STT service provider registered successfully');
   }
 
   /**
@@ -116,9 +119,7 @@ export class ONNXSTTProvider {
       }
     }
 
-    console.log(
-      `[ONNXSTTProvider] Providing ${allSTTModels.length} STT models`
-    );
+    sttLogger.debug(`Providing ${allSTTModels.length} STT models`);
 
     return allSTTModels;
   }
@@ -127,11 +128,9 @@ export class ONNXSTTProvider {
    * Lifecycle hook called when provider is registered
    */
   onRegistration(): void {
-    console.log('[ONNXSTTProvider] onRegistration() called');
+    sttLogger.debug('onRegistration() called');
     const models = this.getProvidedModels();
-    console.log(
-      `[ONNXSTTProvider] Registered ${models.length} STT models through provider`
-    );
+    sttLogger.info(`Registered ${models.length} STT models through provider`);
   }
 }
 
@@ -158,7 +157,7 @@ export class ONNXTTSProvider {
    * Register the ONNX TTS provider with ServiceRegistry
    */
   static register(): void {
-    console.log('[ONNXTTSProvider] Registering ONNX TTS service provider');
+    ttsLogger.info('Registering ONNX TTS service provider');
 
     const {
       ServiceRegistry,
@@ -167,9 +166,7 @@ export class ONNXTTSProvider {
     // Register with priority 90 (slightly lower than system TTS)
     ServiceRegistry.shared.registerTTSProvider(ONNXTTSProvider.shared, 90);
 
-    console.log(
-      '[ONNXTTSProvider] ONNX TTS service provider registered successfully'
-    );
+    ttsLogger.info('ONNX TTS service provider registered successfully');
   }
 
   /**
@@ -238,9 +235,7 @@ export class ONNXTTSProvider {
       }
     }
 
-    console.log(
-      `[ONNXTTSProvider] Providing ${allTTSModels.length} TTS models`
-    );
+    ttsLogger.debug(`Providing ${allTTSModels.length} TTS models`);
 
     return allTTSModels;
   }
@@ -249,11 +244,9 @@ export class ONNXTTSProvider {
    * Lifecycle hook called when provider is registered
    */
   onRegistration(): void {
-    console.log('[ONNXTTSProvider] onRegistration() called');
+    ttsLogger.debug('onRegistration() called');
     const models = this.getProvidedModels();
-    console.log(
-      `[ONNXTTSProvider] Registered ${models.length} TTS models through provider`
-    );
+    ttsLogger.info(`Registered ${models.length} TTS models through provider`);
   }
 }
 
@@ -264,8 +257,8 @@ export class ONNXTTSProvider {
  * Mirrors Swift SDK's ONNXAdapter.register() pattern.
  */
 export function registerONNXProviders(): void {
-  console.log('[ONNXProvider] Registering all ONNX providers...');
+  providerLogger.info('Registering all ONNX providers...');
   ONNXSTTProvider.register();
   ONNXTTSProvider.register();
-  console.log('[ONNXProvider] All ONNX providers registered');
+  providerLogger.info('All ONNX providers registered');
 }

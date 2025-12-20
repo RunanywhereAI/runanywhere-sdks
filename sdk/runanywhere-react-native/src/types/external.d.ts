@@ -95,6 +95,7 @@ declare module 'react-native-fs' {
 declare module 'rn-fetch-blob' {
   interface FetchBlobResponse {
     path(): string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- External library JSON type
     json(): any;
     text(): string;
     data: string;
@@ -130,6 +131,7 @@ declare module 'rn-fetch-blob' {
         method: string,
         url: string,
         headers?: Record<string, string>,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- External library body type
         body?: any
       ): StatefulPromise<FetchBlobResponse>;
     };

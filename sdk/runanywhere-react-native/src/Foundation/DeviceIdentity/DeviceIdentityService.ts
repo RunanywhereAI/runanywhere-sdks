@@ -123,12 +123,14 @@ export class DeviceIdentityService {
    * @returns New UUID string
    */
   private static generateUUID(): string {
+    /* eslint-disable no-bitwise -- Bitwise ops required for UUID generation per RFC 4122 */
     // RFC 4122 compliant UUID v4
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = (Math.random() * 16) | 0;
       const v = c === 'x' ? r : (r & 0x3) | 0x8;
       return v.toString(16);
     });
+    /* eslint-enable no-bitwise */
   }
 
   /**

@@ -149,7 +149,13 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
     // If modelId is provided in config, load through managed lifecycle
     if (this.sttConfiguration.modelId) {
       await this.loadModel(this.sttConfiguration.modelId);
-      return this.service!;
+      if (!this.service) {
+        throw new SDKError(
+          SDKErrorCode.InvalidState,
+          'Service was not created after loading model'
+        );
+      }
+      return this.service;
     }
 
     // Fallback: create service without loading model (caller will load model separately)
@@ -435,7 +441,7 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
     // Track processing time
     const startTime = Date.now();
     let totalAudioLength = 0;
-    let partialResultCount = 0;
+    let _partialResultCount = 0;
 
     try {
       // Stream transcription (if supported)
@@ -450,7 +456,7 @@ export class STTCapability extends BaseComponent<STTServiceWrapper> {
             timestamp: new Date(),
           };
           partialResults.push(partialResult);
-          partialResultCount++;
+          _partialResultCount++;
         };
 
         // Call streaming service

@@ -15,6 +15,9 @@ import type {
   ModelInfo,
 } from '../types';
 import { getAllCatalogModels } from '../Data/modelCatalog';
+import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+
+const logger = new SDKLogger('ModelRegistry');
 
 /**
  * Criteria for filtering models
@@ -74,7 +77,7 @@ class ModelRegistryImpl {
    * This ensures users see available models before downloading.
    */
   async initialize(): Promise<void> {
-    console.log('[ModelRegistry] Initializing registry...');
+    logger.debug('Initializing registry...');
 
     // Load pre-configured models from catalog
     const catalogModels = getAllCatalogModels();
@@ -85,8 +88,8 @@ class ModelRegistryImpl {
     }
 
     this.initialized = true;
-    console.log(
-      `[ModelRegistry] Registry initialized with ${catalogModels.length} catalog models`
+    logger.info(
+      `Registry initialized with ${catalogModels.length} catalog models`
     );
   }
 
@@ -118,7 +121,7 @@ class ModelRegistryImpl {
    */
   async registerModel(model: ModelInfo): Promise<void> {
     this.modelsCache.set(model.id, model);
-    console.log(`[ModelRegistry] Registered/updated model: ${model.id}`);
+    logger.debug(`Registered/updated model: ${model.id}`);
   }
 
   /**
@@ -130,7 +133,7 @@ class ModelRegistryImpl {
     // For now, just update the cache
     // TODO: Persist to AsyncStorage for cross-session persistence
     this.modelsCache.set(model.id, model);
-    console.log(`[ModelRegistry] Registered model persistently: ${model.id}`);
+    logger.debug(`Registered model persistently: ${model.id}`);
   }
 
   /**
@@ -171,9 +174,8 @@ class ModelRegistryImpl {
 
     // Apply filters
     if (criteria.framework) {
-      models = models.filter((m) =>
-        m.compatibleFrameworks.includes(criteria.framework!)
-      );
+      const framework = criteria.framework;
+      models = models.filter((m) => m.compatibleFrameworks.includes(framework));
     }
     if (criteria.category) {
       models = models.filter((m) => m.category === criteria.category);

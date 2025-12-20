@@ -50,8 +50,10 @@ export class LoggingManager {
     const logMessage = `[${timestamp}] [${levelStr}] [${category}] ${message}`;
 
     if (metadata) {
+      // eslint-disable-next-line no-console
       console.log(logMessage, metadata);
     } else {
+      // eslint-disable-next-line no-console
       console.log(logMessage);
     }
   }

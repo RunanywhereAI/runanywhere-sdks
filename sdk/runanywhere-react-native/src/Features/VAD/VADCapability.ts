@@ -7,7 +7,11 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/VAD/VADCapability.swift
  */
 
-import { NativeEventEmitter, NativeModules } from 'react-native';
+import {
+  NativeEventEmitter,
+  NativeModules,
+  type EmitterSubscription,
+} from 'react-native';
 import {
   BaseComponent,
   AnyServiceWrapper,
@@ -21,6 +25,9 @@ import { requireNativeModule } from '../../native/NativeRunAnywhere';
 import { EventBus } from '../../Public/Events';
 import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 import { SDKComponent } from '../../types/enums';
+import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+
+const logger = new SDKLogger('VADCapability');
 
 // ============================================================================
 // VAD Configuration
@@ -234,7 +241,7 @@ export class VADCapability extends BaseComponent<VADServiceWrapper> {
   private lastSpeechState: boolean = false;
   private isPaused: boolean = false;
   private eventEmitter?: NativeEventEmitter;
-  private eventSubscriptions: Map<string, any> = new Map();
+  private eventSubscriptions: Map<string, EmitterSubscription> = new Map();
 
   // Callbacks
   private onSpeechActivityCallback?: (event: SpeechActivityEvent) => void;
@@ -624,9 +631,7 @@ export class VADCapability extends BaseComponent<VADServiceWrapper> {
     // Calibration would be implemented here
     // This typically involves collecting ambient noise samples
     // and automatically adjusting the threshold
-    console.log(
-      '[VADComponent] Calibration started. Feed silent audio for best results.'
-    );
+    logger.info('Calibration started. Feed silent audio for best results.');
   }
 
   /**

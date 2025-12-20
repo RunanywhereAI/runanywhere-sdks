@@ -13,6 +13,9 @@ import { EventDestination, type SDKEvent } from './SDKEvent';
 import { EventBus } from '../../Public/Events/EventBus';
 import type { AnalyticsQueueManager } from '../Analytics/AnalyticsQueueManager';
 import type { AnalyticsEvent } from '../../types/analytics';
+import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+
+const logger = new SDKLogger('EventPublisher');
 
 // ============================================================================
 // EventPublisher Class
@@ -146,9 +149,8 @@ class EventPublisherImpl {
     if (!this.analyticsQueue) {
       // Analytics not initialized - log warning but don't block
       if (process.env.NODE_ENV !== 'production') {
-        console.debug(
-          '[EventPublisher] Analytics queue not initialized, event not tracked:',
-          event.type
+        logger.debug(
+          `Analytics queue not initialized, event not tracked: ${event.type}`
         );
       }
       return;
@@ -157,7 +159,7 @@ class EventPublisherImpl {
     const analyticsEvent = this.convertToAnalyticsEvent(event);
     // Fire and forget - don't await
     this.analyticsQueue.enqueue(analyticsEvent).catch((error) => {
-      console.warn('[EventPublisher] Failed to enqueue event:', error);
+      logger.warning('Failed to enqueue event:', { error });
     });
   }
 
@@ -167,9 +169,8 @@ class EventPublisherImpl {
   private async enqueueForAnalyticsAsync(event: SDKEvent): Promise<void> {
     if (!this.analyticsQueue) {
       if (process.env.NODE_ENV !== 'production') {
-        console.debug(
-          '[EventPublisher] Analytics queue not initialized, event not tracked:',
-          event.type
+        logger.debug(
+          `Analytics queue not initialized, event not tracked: ${event.type}`
         );
       }
       return;

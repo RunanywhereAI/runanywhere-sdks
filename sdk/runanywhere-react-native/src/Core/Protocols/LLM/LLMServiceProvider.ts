@@ -6,7 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Components/LLM/LLMComponent.swift
  */
 
-import type { LLMConfiguration } from '../../Models/Configuration/LLMConfiguration';
+import type { LLMConfiguration } from '../../../Features/LLM/LLMConfiguration';
 import type { LLMService } from './LLMService';
 import type { ModelInfo } from '../../../types';
 

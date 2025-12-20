@@ -45,6 +45,7 @@ import {
 } from '../../Infrastructure/Events/CommonEvents';
 import { EventPublisher } from '../../Infrastructure/Events/EventPublisher';
 import type { SDKEvent } from '../../Infrastructure/Events/SDKEvent';
+import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 // ============================================================================
 // Lifecycle Metrics
@@ -477,11 +478,13 @@ export class ManagedLifecycle<TService> {
   // MARK: - Private Helpers
 
   private log(message: string): void {
-    console.log(`[${this.loggerCategory}] ${message}`);
+    const logger = new SDKLogger(this.loggerCategory);
+    logger.debug(message);
   }
 
   private logError(message: string): void {
-    console.error(`[${this.loggerCategory}] ${message}`);
+    const logger = new SDKLogger(this.loggerCategory);
+    logger.error(message);
   }
 
   // ============================================================================

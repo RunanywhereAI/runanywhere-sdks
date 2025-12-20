@@ -33,7 +33,7 @@ export class RoutingService {
    */
   public async determineRouting(
     prompt: string,
-    context: any | null,
+    _context: unknown,
     options: GenerationOptions
   ): Promise<RoutingDecision> {
     // FORCE ON-DEVICE ONLY - ignore all other logic
