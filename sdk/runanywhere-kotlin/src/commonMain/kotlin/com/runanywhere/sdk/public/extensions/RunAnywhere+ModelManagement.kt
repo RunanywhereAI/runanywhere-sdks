@@ -19,6 +19,7 @@ private val logger = SDKLogger("ModelManagement")
 
 /**
  * Load a model by identifier and return model info
+ * Matches iOS RunAnywhere.loadModel() pattern via LLMCapability
  * @param modelIdentifier The model to load
  * @return Information about the loaded model
  */
@@ -27,14 +28,20 @@ suspend fun loadModelWithInfo(modelIdentifier: String): ModelInfo =
         EventPublisher.track(SDKModelEvent.LoadStarted(modelIdentifier))
 
         try {
-            // Use existing service logic directly
-            val loadedModel = ServiceContainer.shared.modelLoadingService.loadModel(modelIdentifier)
+            // iOS pattern: loadModel() goes through llmCapability which handles lifecycle
+            val llmCapability =
+                ServiceContainer.shared.llmCapability
+                    ?: throw SDKError.ComponentNotInitialized("LLM capability not available")
 
-            // IMPORTANT: Set the loaded model in the generation service
-            ServiceContainer.shared.generationService.setCurrentModel(loadedModel)
+            llmCapability.loadModel(modelIdentifier)
+
+            // Get model info from model info service after loading
+            val modelInfo =
+                ServiceContainer.shared.modelInfoService.getModel(modelIdentifier)
+                    ?: throw SDKError.ModelNotFound(modelIdentifier)
 
             EventPublisher.track(SDKModelEvent.LoadCompleted(modelIdentifier))
-            return@withContext loadedModel.model
+            return@withContext modelInfo
         } catch (error: Throwable) {
             EventPublisher.track(SDKModelEvent.LoadFailed(modelIdentifier, error))
             throw error
@@ -43,23 +50,15 @@ suspend fun loadModelWithInfo(modelIdentifier: String): ModelInfo =
 
 /**
  * Unload the currently loaded model
+ * Matches iOS RunAnywhere.unloadModel() pattern via LLMCapability
  */
 suspend fun unloadModel() =
     withContext(Dispatchers.IO) {
         EventPublisher.track(SDKModelEvent.UnloadStarted)
 
         try {
-            // Get the current model ID from generation service
-            val currentModel = ServiceContainer.shared.generationService.getCurrentModel()
-            if (currentModel != null) {
-                val modelId = currentModel.model.id
-
-                // Unload through model loading service
-                ServiceContainer.shared.modelLoadingService.unloadModel(modelId)
-
-                // Clear from generation service
-                ServiceContainer.shared.generationService.setCurrentModel(null)
-            }
+            // iOS pattern: unloadModel() goes through llmCapability which handles lifecycle
+            ServiceContainer.shared.llmCapability?.unload()
 
             EventPublisher.track(SDKModelEvent.UnloadCompleted)
         } catch (error: Throwable) {
@@ -242,17 +241,16 @@ suspend fun registerBuiltInModel(model: ModelInfo) =
     }
 
 /**
- * Get currently loaded model from generation service
+ * Get currently loaded model ID
+ * Returns the currently loaded model ID from LLMCapability (iOS pattern)
  */
-fun getCurrentModel(): ModelInfo? =
-    ServiceContainer.shared.generationService
-        .getCurrentModel()
-        ?.model
+fun getCurrentModelId(): String? = ServiceContainer.shared.llmCapability?.currentModelId
 
 /**
  * Check if a model is currently loaded
+ * Uses LLMCapability.isModelLoaded (iOS pattern)
  */
-fun isModelLoaded(modelId: String): Boolean = ServiceContainer.shared.modelLoadingService.isModelLoaded(modelId)
+fun isModelLoaded(): Boolean = ServiceContainer.shared.llmCapability?.isModelLoaded == true
 
 /**
  * Get total storage used by all models

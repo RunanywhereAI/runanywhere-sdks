@@ -86,61 +86,6 @@ interface SDKEvent {
     val properties: Map<String, String>
 }
 
-// Legacy compatibility
-@Deprecated("Use EventCategory instead", ReplaceWith("EventCategory"))
-enum class SDKEventType {
-    INITIALIZATION,
-    CONFIGURATION,
-    GENERATION,
-    MODEL,
-    VOICE,
-    STORAGE,
-    FRAMEWORK,
-    DEVICE,
-    ERROR,
-    PERFORMANCE,
-    NETWORK,
-    LOGGING,
-    ;
-
-    fun toCategory(): EventCategory =
-        when (this) {
-            INITIALIZATION -> EventCategory.SDK
-            CONFIGURATION -> EventCategory.CONFIGURATION
-            GENERATION -> EventCategory.LLM
-            MODEL -> EventCategory.MODEL
-            VOICE -> EventCategory.VOICE
-            STORAGE -> EventCategory.STORAGE
-            FRAMEWORK -> EventCategory.FRAMEWORK
-            DEVICE -> EventCategory.DEVICE
-            ERROR -> EventCategory.ERROR
-            PERFORMANCE -> EventCategory.PERFORMANCE
-            NETWORK -> EventCategory.NETWORK
-            LOGGING -> EventCategory.LOGGING
-        }
-}
-
-// Legacy compat property
-@Suppress("DEPRECATION")
-val SDKEvent.eventType: SDKEventType
-    get() =
-        when (category) {
-            EventCategory.SDK -> SDKEventType.INITIALIZATION
-            EventCategory.CONFIGURATION -> SDKEventType.CONFIGURATION
-            EventCategory.LLM -> SDKEventType.GENERATION
-            EventCategory.MODEL -> SDKEventType.MODEL
-            EventCategory.VOICE -> SDKEventType.VOICE
-            EventCategory.STORAGE -> SDKEventType.STORAGE
-            EventCategory.FRAMEWORK -> SDKEventType.FRAMEWORK
-            EventCategory.DEVICE -> SDKEventType.DEVICE
-            EventCategory.ERROR -> SDKEventType.ERROR
-            EventCategory.PERFORMANCE -> SDKEventType.PERFORMANCE
-            EventCategory.NETWORK -> SDKEventType.NETWORK
-            EventCategory.LOGGING -> SDKEventType.LOGGING
-            EventCategory.STT -> SDKEventType.VOICE
-            EventCategory.TTS -> SDKEventType.VOICE
-        }
-
 /**
  * Helper to generate unique event IDs
  */

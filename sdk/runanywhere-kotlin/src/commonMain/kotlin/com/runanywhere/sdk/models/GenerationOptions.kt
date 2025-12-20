@@ -77,20 +77,6 @@ data class LLMGenerationOptions(
      */
     fun withStructuredOutput(config: StructuredOutputConfig?): LLMGenerationOptions = copy(structuredOutput = config)
 
-    /**
-     * Convert to GenerationOptions for GenerationService
-     */
-    fun toGenerationOptions(): com.runanywhere.sdk.generation.GenerationOptions =
-        com.runanywhere.sdk.generation.GenerationOptions(
-            temperature = temperature,
-            maxTokens = maxTokens,
-            topP = topP,
-            topK = topK ?: 40,
-            stopSequences = stopSequences,
-            streaming = streamingEnabled,
-            seed = seed,
-        )
-
     companion object {
         /**
          * Default options for quick text generation

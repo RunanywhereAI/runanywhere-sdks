@@ -190,12 +190,6 @@ object DeviceIdentity {
 }
 
 /**
- * Type alias for backward compatibility during migration
- */
-@Deprecated("Use DeviceIdentity instead", ReplaceWith("com.runanywhere.sdk.infrastructure.device.services.DeviceIdentity"))
-typealias PersistentDeviceIdentity = DeviceIdentity
-
-/**
  * Platform-specific device information for fingerprinting
  */
 data class PlatformDeviceInfo(

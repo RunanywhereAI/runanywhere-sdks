@@ -1,4 +1,4 @@
-package com.runanywhere.sdk.services.telemetry
+package com.runanywhere.sdk.infrastructure.analytics
 
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.models.SessionTelemetryData
@@ -8,8 +8,8 @@ import com.runanywhere.sdk.data.models.TelemetryEventData
 import com.runanywhere.sdk.data.models.TelemetryEventType
 import com.runanywhere.sdk.data.models.generateUUID
 import com.runanywhere.sdk.data.repositories.TelemetryRepository
+import com.runanywhere.sdk.data.sync.SyncCoordinator
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.services.sync.SyncCoordinator
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

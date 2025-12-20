@@ -1,4 +1,4 @@
-package com.runanywhere.sdk.services.sync
+package com.runanywhere.sdk.data.sync
 
 import com.runanywhere.sdk.data.models.ConfigurationData
 import com.runanywhere.sdk.data.models.DeviceInfoData

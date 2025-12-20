@@ -4,6 +4,7 @@ import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.TelemetryData
 import com.runanywhere.sdk.data.network.models.DevAnalyticsSubmissionRequest
 import com.runanywhere.sdk.data.repositories.TelemetryRepository
+import com.runanywhere.sdk.data.sync.SyncCoordinator
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.constants.BuildToken
 import com.runanywhere.sdk.foundation.currentTimeISO8601
@@ -13,7 +14,6 @@ import com.runanywhere.sdk.foundation.supabase.SupabaseConfig
 import com.runanywhere.sdk.infrastructure.events.ComponentInitializationEvent
 import com.runanywhere.sdk.infrastructure.events.EventBus
 import com.runanywhere.sdk.infrastructure.events.SDKInitializationEvent
-import com.runanywhere.sdk.services.sync.SyncCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

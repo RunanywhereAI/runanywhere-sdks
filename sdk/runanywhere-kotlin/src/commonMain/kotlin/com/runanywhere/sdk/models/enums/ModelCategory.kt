@@ -79,7 +79,7 @@ enum class ModelCategory(
             when (framework) {
                 InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP, InferenceFramework.OPEN_AI_WHISPER -> SPEECH_RECOGNITION
                 InferenceFramework.SYSTEM_TTS -> SPEECH_SYNTHESIS
-                InferenceFramework.LLAMA_CPP, InferenceFramework.LLAMACPP, InferenceFramework.MLX, InferenceFramework.MLC,
+                InferenceFramework.LLAMA_CPP, InferenceFramework.MLX, InferenceFramework.MLC,
                 InferenceFramework.EXECU_TORCH, InferenceFramework.PICO_LLM,
                 InferenceFramework.FOUNDATION_MODELS, InferenceFramework.SWIFT_TRANSFORMERS,
                 -> LANGUAGE
