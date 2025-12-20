@@ -16,7 +16,8 @@ import type { ModelCriteria } from '../../../Core/Protocols/Registry/ModelRegist
 export class RegistryService implements ModelRegistry {
   private models: Map<string, ModelInfo> = new Map();
   private modelsByProvider: Map<string, ModelInfo[]> = new Map();
-  private modelDiscovery: any; // ModelDiscovery
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ModelDiscovery type not yet defined
+  private modelDiscovery: any;
 
   constructor() {
     // Initialize model discovery

@@ -7,10 +7,17 @@
  */
 
 /**
+ * Type that can generate JSON schema for structured output
+ */
+export interface GeneratableType {
+  readonly jsonSchema: string;
+}
+
+/**
  * Structured output configuration
  */
 export interface StructuredOutputConfig {
-  readonly type: any; // Generatable type
+  readonly type: GeneratableType;
   readonly includeSchemaInPrompt: boolean;
 }
 

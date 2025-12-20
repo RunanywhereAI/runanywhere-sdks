@@ -9,7 +9,9 @@
 
 import { BaseComponent } from '../../Core/Components/BaseComponent';
 import { SDKComponent } from '../../Core/Models/Common/SDKComponent';
+import type { LLMFramework } from '../../Core/Models/Framework/LLMFramework';
 import { ServiceRegistry } from '../../Foundation/DependencyInjection/ServiceRegistry';
+import type { ExecutionTarget } from '../../types/enums';
 import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 import type { LLMConfiguration } from './LLMConfiguration';
 import {
@@ -160,7 +162,13 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
     // If modelId is provided in config, load through managed lifecycle
     if (this.llmConfiguration.modelId) {
       await this.loadModel(this.llmConfiguration.modelId);
-      return this.service!;
+      if (!this.service) {
+        throw new SDKError(
+          SDKErrorCode.InvalidState,
+          'Service was not created after loading model'
+        );
+      }
+      return this.service;
     }
 
     // Fallback: create service without loading model (caller will load model separately)
@@ -401,6 +409,7 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
     let streamEnded = false;
 
     // Merge options with configuration defaults
+
     const generationOptions: GenerationOptions = {
       maxTokens: options?.maxTokens ?? this.llmConfiguration.maxTokens,
       temperature: options?.temperature ?? this.llmConfiguration.temperature,
@@ -409,9 +418,11 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
       stopSequences: options?.stopSequences,
       streamingEnabled: true,
       preferredExecutionTarget: options?.executionTarget
-        ? (options.executionTarget as any)
+        ? (options.executionTarget as ExecutionTarget)
         : undefined,
-      preferredFramework: options?.preferredFramework as any,
+      preferredFramework: options?.preferredFramework as
+        | LLMFramework
+        | undefined,
     };
 
     const fullPrompt = this.buildPrompt(
@@ -439,8 +450,6 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
     };
 
     // Start the streaming generation in the background
-    const componentThis = this;
-
     (async () => {
       try {
         if (!llmService?.generateStream) {
@@ -496,7 +505,7 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
 
         // Signal result completion
         if (collector.resolveResult) {
-          const output = componentThis.buildOutputFromCollector(
+          const output = this.buildOutputFromCollector(
             collector,
             generationOptions
           );
@@ -519,7 +528,8 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
     > {
       while (!streamEnded || tokenQueue.length > 0) {
         if (tokenQueue.length > 0) {
-          const token = tokenQueue.shift()!;
+          const token = tokenQueue.shift();
+          if (!token) continue;
           yield token;
           if (token.isLast) {
             break;

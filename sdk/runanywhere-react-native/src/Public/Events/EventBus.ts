@@ -171,7 +171,11 @@ class EventBusImpl {
       this.subscriptions.set(eventName, new Set());
     }
 
-    const subscribers = this.subscriptions.get(eventName)!;
+    const subscribers = this.subscriptions.get(eventName);
+    if (!subscribers) {
+      // Should never happen since we just set it above
+      return () => {};
+    }
     subscribers.add(listener as SDKEventListener<AnySDKEvent>);
 
     // Return unsubscribe function

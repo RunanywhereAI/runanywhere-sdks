@@ -4,7 +4,7 @@
  * Protocol for registering external Speaker Diarization implementations
  */
 
-import type { SpeakerDiarizationConfiguration } from '../../Models/Configuration/SpeakerDiarizationConfiguration';
+import type { SpeakerDiarizationConfiguration } from '../../../Features/SpeakerDiarization/SpeakerDiarizationConfiguration';
 import type { SpeakerDiarizationService } from './SpeakerDiarizationService';
 
 /**

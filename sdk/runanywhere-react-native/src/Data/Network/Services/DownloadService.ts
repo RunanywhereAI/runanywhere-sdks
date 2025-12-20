@@ -8,6 +8,7 @@
 
 import type { ModelInfo } from '../../../Core/Models/Model/ModelInfo';
 import type { DownloadProgress } from '../../Models/Downloading/DownloadProgress';
+import { DownloadState } from '../../Models/Downloading/DownloadState';
 import type { DownloadTask } from '../../Models/Downloading/DownloadTask';
 
 /**
@@ -81,7 +82,7 @@ export class DownloadServiceImpl implements DownloadService {
     yield {
       bytesDownloaded: 0,
       totalBytes: model.downloadSize ?? 0,
-      state: 'downloading' as any,
+      state: DownloadState.Downloading,
       speed: null,
       estimatedTimeRemaining: null,
     };

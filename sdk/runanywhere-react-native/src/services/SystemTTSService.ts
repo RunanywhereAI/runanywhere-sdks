@@ -252,7 +252,10 @@ export async function getVoicesByLanguage(): Promise<Map<string, VoiceInfo[]>> {
     if (!voiceMap.has(lang)) {
       voiceMap.set(lang, []);
     }
-    voiceMap.get(lang)!.push(voice);
+    const voicesForLang = voiceMap.get(lang);
+    if (voicesForLang) {
+      voicesForLang.push(voice);
+    }
   }
 
   return voiceMap;

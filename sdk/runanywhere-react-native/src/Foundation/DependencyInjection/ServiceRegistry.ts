@@ -30,6 +30,9 @@ import type { SpeakerDiarizationServiceProvider } from '../../Core/Protocols/Voi
 import { SDKError } from '../ErrorTypes/SDKError';
 import { ErrorCode } from '../ErrorTypes/ErrorCodes';
 import { ErrorCategory } from '../ErrorTypes/ErrorCategory';
+import { SDKLogger } from '../Logging/Logger/SDKLogger';
+
+const logger = new SDKLogger('ServiceRegistry');
 
 // ============================================================================
 // Provider Registration (for provider objects)
@@ -229,7 +232,7 @@ export class ServiceRegistry {
     );
     this.sttRegistrations.push(registration);
     this.sttRegistrations.sort((a, b) => b.priority - a.priority);
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Registered STT service: ${name} (priority: ${priority})`
     );
   }
@@ -255,7 +258,7 @@ export class ServiceRegistry {
       );
     }
 
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Creating STT service: ${registration.name} for model: ${modelId ?? 'default'}`
     );
     return registration.factory(config);
@@ -294,7 +297,7 @@ export class ServiceRegistry {
     );
     this.llmRegistrations.push(registration);
     this.llmRegistrations.sort((a, b) => b.priority - a.priority);
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Registered LLM service: ${name} (priority: ${priority})`
     );
   }
@@ -320,7 +323,7 @@ export class ServiceRegistry {
       );
     }
 
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Creating LLM service: ${registration.name} for model: ${modelId ?? 'default'}`
     );
     return registration.factory(config);
@@ -359,7 +362,7 @@ export class ServiceRegistry {
     );
     this.ttsRegistrations.push(registration);
     this.ttsRegistrations.sort((a, b) => b.priority - a.priority);
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Registered TTS service: ${name} (priority: ${priority})`
     );
   }
@@ -385,7 +388,7 @@ export class ServiceRegistry {
       );
     }
 
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Creating TTS service: ${registration.name} for voice: ${voiceId ?? 'default'}`
     );
     return registration.factory(config);
@@ -423,7 +426,7 @@ export class ServiceRegistry {
     );
     this.vadRegistrations.push(registration);
     this.vadRegistrations.sort((a, b) => b.priority - a.priority);
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Registered VAD service: ${name} (priority: ${priority})`
     );
   }
@@ -441,7 +444,9 @@ export class ServiceRegistry {
       throw new ProviderNotFoundError('VAD service');
     }
 
-    console.log(`[ServiceRegistry] Creating VAD service: ${registration.name}`);
+    logger.debug(
+      `[ServiceRegistry] Creating VAD service: ${registration.name}`
+    );
     return registration.factory(config);
   }
 
@@ -480,7 +485,7 @@ export class ServiceRegistry {
     this.speakerDiarizationRegistrations.sort(
       (a, b) => b.priority - a.priority
     );
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Registered Speaker Diarization service: ${name} (priority: ${priority})`
     );
   }
@@ -504,7 +509,7 @@ export class ServiceRegistry {
       throw new ProviderNotFoundError('Speaker Diarization service');
     }
 
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Creating Speaker Diarization service: ${registration.name}`
     );
     return registration.factory(config);
@@ -556,7 +561,7 @@ export class ServiceRegistry {
     this.sttProviders.push(prioritizedProvider);
     // Sort by priority (higher first)
     this.sttProviders.sort((a, b) => b.priority - a.priority);
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Registered STT provider: ${provider.name} with priority: ${priority}`
     );
 
@@ -568,7 +573,7 @@ export class ServiceRegistry {
       providerWithHook.onRegistration &&
       typeof providerWithHook.onRegistration === 'function'
     ) {
-      console.log(
+      logger.debug(
         `[ServiceRegistry] Calling onRegistration() for STT provider: ${provider.name}`
       );
       providerWithHook.onRegistration();
@@ -593,7 +598,7 @@ export class ServiceRegistry {
     this.llmProviders.push(prioritizedProvider);
     // Sort by priority (higher first)
     this.llmProviders.sort((a, b) => b.priority - a.priority);
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Registered LLM provider: ${provider.name} with priority: ${priority}`
     );
 
@@ -602,7 +607,7 @@ export class ServiceRegistry {
       provider.onRegistration &&
       typeof provider.onRegistration === 'function'
     ) {
-      console.log(
+      logger.debug(
         `[ServiceRegistry] Calling onRegistration() for provider: ${provider.name}`
       );
       provider.onRegistration();
@@ -627,7 +632,7 @@ export class ServiceRegistry {
     this.ttsProviders.push(prioritizedProvider);
     // Sort by priority (higher first)
     this.ttsProviders.sort((a, b) => b.priority - a.priority);
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Registered TTS provider: ${provider.name} with priority: ${priority}`
     );
 
@@ -639,7 +644,7 @@ export class ServiceRegistry {
       ttsProviderWithHook.onRegistration &&
       typeof ttsProviderWithHook.onRegistration === 'function'
     ) {
-      console.log(
+      logger.debug(
         `[ServiceRegistry] Calling onRegistration() for TTS provider: ${provider.name}`
       );
       ttsProviderWithHook.onRegistration();
@@ -655,7 +660,7 @@ export class ServiceRegistry {
     provider: SpeakerDiarizationServiceProvider
   ): void {
     this.speakerDiarizationProviders.push(provider);
-    console.log(
+    logger.debug(
       `[ServiceRegistry] Registered Speaker Diarization provider: ${provider.name}`
     );
   }
@@ -794,7 +799,7 @@ export class ServiceRegistry {
     this.llmProviders = [];
     this.ttsProviders = [];
     this.speakerDiarizationProviders = [];
-    console.log('[ServiceRegistry] Service registry reset');
+    logger.debug(' Service registry reset');
   }
 
   /**

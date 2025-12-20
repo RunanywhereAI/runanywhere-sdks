@@ -241,6 +241,12 @@ export interface GenerationOptions {
   systemPrompt?: string;
 }
 
+/**
+ * Alias for GenerationOptions to match iOS SDK naming convention.
+ * @see GenerationOptions
+ */
+export type LLMGenerationOptions = GenerationOptions;
+
 // ============================================================================
 // Voice Types
 // ============================================================================

@@ -112,8 +112,11 @@ export class MemoryMonitor {
       return null;
     }
 
-    const firstEntry = recentHistory[0]!;
-    const lastEntry = recentHistory[recentHistory.length - 1]!;
+    const firstEntry = recentHistory[0];
+    const lastEntry = recentHistory[recentHistory.length - 1];
+    if (!firstEntry || !lastEntry) {
+      return null;
+    }
 
     const memoryDelta = lastEntry.availableMemory - firstEntry.availableMemory;
     const timeDelta =
@@ -182,13 +185,14 @@ export class MemoryMonitor {
     let total = 0;
 
     for (let i = 1; i < entries.length; i++) {
-      const currentEntry = entries[i]!;
-      const prevEntry = entries[i - 1]!;
+      const currentEntry = entries[i];
+      const prevEntry = entries[i - 1];
+      if (!currentEntry || !prevEntry) continue;
       const delta = currentEntry.availableMemory - prevEntry.availableMemory;
-      const previousDelta =
-        i > 1
-          ? prevEntry.availableMemory - entries[i - 2]!.availableMemory
-          : delta;
+      const prevPrevEntry = i > 1 ? entries[i - 2] : null;
+      const previousDelta = prevPrevEntry
+        ? prevEntry.availableMemory - prevPrevEntry.availableMemory
+        : delta;
 
       if (
         (delta > 0 && previousDelta > 0) ||
