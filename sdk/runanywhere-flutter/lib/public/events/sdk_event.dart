@@ -241,6 +241,10 @@ abstract class SDKModelEvent with SDKEventDefaults {
   static SDKModelUnloadCompleted unloadCompleted({required String modelId}) {
     return SDKModelUnloadCompleted(modelId: modelId);
   }
+
+  static SDKModelDeleted deleted({required String modelId}) {
+    return SDKModelDeleted(modelId: modelId);
+  }
 }
 
 class SDKModelLoadStarted extends SDKModelEvent {
@@ -302,6 +306,18 @@ class SDKModelUnloadCompleted extends SDKModelEvent {
 
   @override
   String get type => 'model.unload.completed';
+
+  @override
+  Map<String, String> get properties => {'model_id': modelId};
+}
+
+class SDKModelDeleted extends SDKModelEvent {
+  final String modelId;
+
+  SDKModelDeleted({required this.modelId});
+
+  @override
+  String get type => 'model.deleted';
 
   @override
   Map<String, String> get properties => {'model_id': modelId};
@@ -628,6 +644,26 @@ abstract class SDKNetworkEvent with SDKEventDefaults {
 abstract class SDKStorageEvent with SDKEventDefaults {
   @override
   EventCategory get category => EventCategory.storage;
+
+  /// Factory method: cache cleared
+  static SDKStorageCacheCleared cacheCleared() {
+    return SDKStorageCacheCleared();
+  }
+
+  /// Factory method: temp files cleaned
+  static SDKStorageTempFilesCleaned tempFilesCleaned() {
+    return SDKStorageTempFilesCleaned();
+  }
+}
+
+class SDKStorageCacheCleared extends SDKStorageEvent {
+  @override
+  String get type => 'storage.cache.cleared';
+}
+
+class SDKStorageTempFilesCleaned extends SDKStorageEvent {
+  @override
+  String get type => 'storage.temp_files.cleaned';
 }
 
 // ============================================================================

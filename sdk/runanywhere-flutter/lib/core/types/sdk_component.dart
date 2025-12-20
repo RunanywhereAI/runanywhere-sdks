@@ -15,9 +15,6 @@ enum SDKComponent {
   /// Voice Agent component
   voiceAgent,
 
-  /// Wake Word Detection component
-  wakeWord,
-
   /// Speaker Diarization component
   speakerDiarization,
 
@@ -39,8 +36,6 @@ extension SDKComponentExtension on SDKComponent {
         return 'vad';
       case SDKComponent.voiceAgent:
         return 'voice_agent';
-      case SDKComponent.wakeWord:
-        return 'wake_word';
       case SDKComponent.speakerDiarization:
         return 'speaker_diarization';
       case SDKComponent.vlm:

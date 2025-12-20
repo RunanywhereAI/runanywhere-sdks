@@ -36,4 +36,14 @@ enum ModelFormat {
       orElse: () => ModelFormat.unknown,
     );
   }
+
+  /// Get format from filename
+  static ModelFormat fromFilename(String filename) {
+    final dotIndex = filename.lastIndexOf('.');
+    if (dotIndex > 0) {
+      final extension = filename.substring(dotIndex + 1);
+      return fromExtension(extension);
+    }
+    return ModelFormat.unknown;
+  }
 }

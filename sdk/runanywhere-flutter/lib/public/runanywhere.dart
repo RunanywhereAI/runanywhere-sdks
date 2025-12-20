@@ -1,12 +1,20 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import '../foundation/dependency_injection/service_container.dart';
 import '../foundation/error_types/sdk_error.dart';
 import '../foundation/logging/sdk_logger.dart';
+import '../foundation/logging/models/log_level.dart';
+import '../foundation/logging/services/logging_manager.dart';
+import '../infrastructure/analytics/analytics_queue_manager.dart';
 import '../foundation/security/keychain_manager.dart';
 import '../foundation/device_identity/device_manager.dart';
 import '../foundation/configuration/sdk_constants.dart';
+import '../foundation/file_operations/model_path_utils.dart';
 import '../core/protocols/frameworks/unified_framework_adapter.dart';
 import '../core/models/model/model_registration.dart';
+import '../core/models/storage/storage_info.dart';
+import '../core/protocols/downloading/download_progress.dart';
 import 'configuration/sdk_environment.dart';
 import 'events/event_bus.dart';
 import 'events/sdk_event.dart';
@@ -20,6 +28,7 @@ import '../features/tts/tts_output.dart';
 import '../features/vad/vad_capability.dart';
 import '../features/vad/vad_configuration.dart';
 import '../features/voice_agent/voice_agent_capability.dart';
+import '../features/llm/llm_capability.dart' show LLMConfiguration;
 import '../core/module_registry.dart' hide TTSOptions, TTSService;
 
 // Export generation options
@@ -56,6 +65,9 @@ export '../core/models/model/model_category.dart';
 // Export speaker diarization types
 export '../features/speaker_diarization/speaker_info.dart';
 
+// Export capability type for framework queries
+export '../core/module/capability_type.dart';
+
 // Export VAD types for top-level access
 export '../features/vad/vad_capability.dart' show VADCapability;
 export '../features/vad/vad_service.dart'
@@ -74,6 +86,20 @@ export '../features/voice_agent/voice_agent_capability.dart'
         VoiceAgentEvent,
         ComponentLoadState,
         VoiceAgentComponentStates;
+
+// Export storage types for public use
+export '../core/models/storage/storage_info.dart';
+export '../core/models/storage/app_storage_info.dart';
+export '../core/models/storage/device_storage_info.dart';
+export '../core/models/storage/model_storage_info.dart';
+export '../core/models/storage/stored_model.dart';
+
+// Export download progress types
+export '../core/protocols/downloading/download_progress.dart';
+export '../core/protocols/downloading/download_state.dart';
+
+// Export logging types for configuration
+export '../foundation/logging/models/log_level.dart';
 
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
@@ -974,6 +1000,131 @@ class RunAnywhere {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - STT API (Additional methods for iOS parity)
+  // Matches iOS RunAnywhere+STT.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Check if an STT model is loaded
+  /// Matches iOS RunAnywhere.isSTTModelLoaded
+  static bool get isSTTModelLoaded =>
+      _loadedSTTCapability?.isModelLoaded ?? false;
+
+  /// Transcribe audio with options
+  /// Matches iOS RunAnywhere.transcribeWithOptions(_:options:)
+  static Future<STTOutput> transcribeWithOptions(
+    List<int> audioData, {
+    required STTOptions options,
+  }) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final capability = _loadedSTTCapability;
+    if (capability == null || !capability.isReady) {
+      throw SDKError.componentNotReady('STT');
+    }
+
+    return await capability.transcribe(audioData, options: options);
+  }
+
+  /// Stream transcription for real-time processing
+  /// Matches iOS RunAnywhere.transcribeStream(_:options:)
+  /// Returns a stream of transcription text
+  static Stream<String> transcribeStream(
+    Stream<List<int>> audioStream, {
+    STTOptions? options,
+  }) {
+    if (!_isInitialized) {
+      return Stream.error(SDKError.notInitialized());
+    }
+
+    final capability = _loadedSTTCapability;
+    if (capability == null || !capability.isReady) {
+      return Stream.error(SDKError.componentNotReady('STT'));
+    }
+
+    return capability.streamTranscribe(
+      audioStream,
+      language: options?.language,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - TTS API (Additional methods for iOS parity)
+  // Matches iOS RunAnywhere+TTS.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Check if a TTS voice is loaded
+  /// Matches iOS RunAnywhere.isTTSVoiceLoaded
+  static bool get isTTSVoiceLoaded =>
+      _loadedTTSCapability?.isReady ?? false;
+
+  /// Get available TTS voices
+  /// Matches iOS RunAnywhere.availableTTSVoices
+  static List<String> get availableTTSVoices =>
+      _loadedTTSCapability?.getAvailableVoices() ?? [];
+
+  /// Stream synthesis for long text
+  /// Matches iOS RunAnywhere.synthesizeStream(_:options:)
+  /// Returns a stream of audio data chunks
+  static Stream<Uint8List> synthesizeStream(
+    String text, {
+    TTSOptions? options,
+  }) {
+    if (!_isInitialized) {
+      return Stream.error(SDKError.notInitialized());
+    }
+
+    final capability = _loadedTTSCapability;
+    if (capability == null || !capability.isReady) {
+      return Stream.error(SDKError.componentNotReady('TTS'));
+    }
+
+    return capability.streamSynthesize(
+      text,
+      voice: options?.voice,
+      language: options?.language,
+    );
+  }
+
+  /// Stop current TTS synthesis
+  /// Matches iOS RunAnywhere.stopSynthesis()
+  static void stopSynthesis() {
+    final capability = _loadedTTSCapability;
+    if (capability != null && capability.isReady) {
+      capability.stopSynthesis();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - VAD API (Additional methods for iOS parity)
+  // Matches iOS RunAnywhere+VAD.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Detect speech in audio samples and return full VAD output
+  /// Matches iOS RunAnywhere.detectSpeech(in:) returning VADOutput
+  /// [audioData] Audio data (16-bit PCM samples)
+  /// Returns VADResult with detection result and metadata
+  static Future<VADResult> detectSpeechWithResult(List<int> audioData) async {
+    final capability = _loadedVADCapability;
+    if (capability == null || !capability.isReady) {
+      throw SDKError.componentNotReady('VAD');
+    }
+
+    return await capability.detectSpeech(buffer: audioData);
+  }
+
+  /// Cleanup VAD resources
+  /// Matches iOS RunAnywhere.cleanupVAD()
+  static Future<void> cleanupVAD() async {
+    final capability = _loadedVADCapability;
+    if (capability != null) {
+      await capability.cleanup();
+      _loadedVADCapability = null;
+    }
+  }
+
   /// Get available models
   /// Returns Array of available models
   static Future<List<ModelInfo>> availableModels() async {
@@ -1153,6 +1304,10 @@ class RunAnywhere {
     _loadedTTSCapability = null;
     _loadedVADCapability = null;
 
+    // Clear voice agent and speaker diarization
+    _voiceAgentCapability = null;
+    _speakerDiarizationService = null;
+
     // Reset service container if needed
     serviceContainer.reset();
 
@@ -1164,6 +1319,714 @@ class RunAnywhere {
   /// Create a new conversation
   static Conversation conversation() {
     return Conversation();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Storage & Download API
+  // Matches iOS RunAnywhere+Storage.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Download a model by ID with progress tracking
+  /// Returns a stream of download progress updates
+  /// Matches iOS RunAnywhere.downloadModel(_:)
+  ///
+  /// Example:
+  /// ```dart
+  /// await for (final progress in RunAnywhere.downloadModel('my-model-id')) {
+  ///   print('Progress: ${(progress.percentage * 100).toStringAsFixed(1)}%');
+  /// }
+  /// ```
+  static Stream<DownloadProgress> downloadModel(String modelId) async* {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final models = await availableModels();
+    final model = models.cast<ModelInfo?>().firstWhere(
+          (m) => m?.id == modelId,
+          orElse: () => null,
+        );
+
+    if (model == null) {
+      throw SDKError.modelNotFound('Model not found: $modelId');
+    }
+
+    final task = await serviceContainer.downloadService.downloadModel(model);
+    yield* task.progress;
+  }
+
+  /// Get storage information
+  /// Matches iOS RunAnywhere.getStorageInfo()
+  static Future<StorageInfo> getStorageInfo() async {
+    // Use the storage analyzer from service container
+    final storageAnalyzer = serviceContainer.storageAnalyzer;
+    return await storageAnalyzer.analyzeStorage();
+  }
+
+  /// Clear cache
+  /// Matches iOS RunAnywhere.clearCache()
+  static Future<void> clearCache() async {
+    final cacheDir = await ModelPathUtils.getCacheDirectory();
+    if (await cacheDir.exists()) {
+      await cacheDir.delete(recursive: true);
+      await cacheDir.create(recursive: true);
+    }
+    EventBus.shared.publish(SDKStorageEvent.cacheCleared());
+  }
+
+  /// Clean temporary files
+  /// Matches iOS RunAnywhere.cleanTempFiles()
+  static Future<void> cleanTempFiles() async {
+    final tempDir = await ModelPathUtils.getTempDirectory();
+    if (await tempDir.exists()) {
+      await tempDir.delete(recursive: true);
+      await tempDir.create(recursive: true);
+    }
+    EventBus.shared.publish(SDKStorageEvent.tempFilesCleaned());
+  }
+
+  /// Delete a stored model
+  /// Matches iOS RunAnywhere.deleteStoredModel(_:, framework:)
+  static Future<void> deleteStoredModel(
+    String modelId,
+    LLMFramework framework,
+  ) async {
+    final modelFolder = await ModelPathUtils.getModelFolder(
+      modelId: modelId,
+      framework: framework,
+    );
+    if (await modelFolder.exists()) {
+      await modelFolder.delete(recursive: true);
+    }
+    EventBus.shared.publish(SDKModelEvent.deleted(modelId: modelId));
+  }
+
+  /// Get base directory path
+  /// Matches iOS RunAnywhere.getBaseDirectoryURL()
+  static Future<String> getBaseDirectoryPath() async {
+    final baseDir = await ModelPathUtils.getBaseDirectory();
+    return baseDir.path;
+  }
+
+  /// Get all downloaded models grouped by framework
+  /// Matches iOS RunAnywhere.getDownloadedModels()
+  static Future<Map<LLMFramework, List<String>>> getDownloadedModels() async {
+    final result = <LLMFramework, List<String>>{};
+    final modelsDir = await ModelPathUtils.getModelsDirectory();
+
+    if (!await modelsDir.exists()) {
+      return result;
+    }
+
+    // Iterate through framework directories
+    await for (final frameworkDir in modelsDir.list()) {
+      if (frameworkDir is! Directory) continue;
+
+      final frameworkName = frameworkDir.path.split('/').last;
+      final framework = LLMFramework.values.cast<LLMFramework?>().firstWhere(
+            (f) => f?.rawValue == frameworkName,
+            orElse: () => null,
+          );
+
+      if (framework == null) continue;
+
+      final modelIds = <String>[];
+      await for (final modelDir in frameworkDir.list()) {
+        if (modelDir is Directory) {
+          modelIds.add(modelDir.path.split('/').last);
+        }
+      }
+
+      if (modelIds.isNotEmpty) {
+        result[framework] = modelIds;
+      }
+    }
+
+    return result;
+  }
+
+  /// Check if a model is downloaded
+  /// Matches iOS RunAnywhere.isModelDownloaded(_:, framework:)
+  static Future<bool> isModelDownloaded(
+    String modelId,
+    LLMFramework framework,
+  ) async {
+    final modelFolder = await ModelPathUtils.getModelFolder(
+      modelId: modelId,
+      framework: framework,
+    );
+    return modelFolder.exists();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Model Registration API
+  // Matches iOS RunAnywhere+ModelAssignments.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Register a model from a download URL
+  /// Matches iOS RunAnywhere.registerModel(id:name:url:framework:...)
+  ///
+  /// Example:
+  /// ```dart
+  /// final model = RunAnywhere.registerModel(
+  ///   name: 'My Model',
+  ///   url: Uri.parse('https://example.com/model.gguf'),
+  ///   framework: InferenceFramework.llamaCpp,
+  /// );
+  /// ```
+  static ModelInfo registerModelWithURL({
+    String? id,
+    required String name,
+    required Uri url,
+    required LLMFramework framework,
+    ModelCategory modality = ModelCategory.language,
+    ModelArtifactType? artifactType,
+    int? memoryRequirement,
+    bool supportsThinking = false,
+  }) {
+    return serviceContainer.modelRegistry.addModelFromURL(
+      id: id,
+      name: name,
+      url: url,
+      framework: framework,
+      category: modality,
+      artifactType: artifactType,
+      estimatedSize: memoryRequirement,
+      supportsThinking: supportsThinking,
+    );
+  }
+
+  /// Register a model from a URL string
+  /// Returns null if URL is invalid
+  /// Matches iOS RunAnywhere.registerModel(id:name:urlString:framework:...)
+  static ModelInfo? registerModelFromString({
+    String? id,
+    required String name,
+    required String urlString,
+    required LLMFramework framework,
+    ModelCategory modality = ModelCategory.language,
+    ModelArtifactType? artifactType,
+    int? memoryRequirement,
+    bool supportsThinking = false,
+  }) {
+    final url = Uri.tryParse(urlString);
+    if (url == null) {
+      SDKLogger(category: 'RunAnywhere.Models')
+          .error('Invalid URL: $urlString');
+      return null;
+    }
+    return registerModelWithURL(
+      id: id,
+      name: name,
+      url: url,
+      framework: framework,
+      modality: modality,
+      artifactType: artifactType,
+      memoryRequirement: memoryRequirement,
+      supportsThinking: supportsThinking,
+    );
+  }
+
+  /// Fetch model assignments for the current device from the backend
+  /// Matches iOS RunAnywhere.fetchModelAssignments(forceRefresh:)
+  static Future<List<ModelInfo>> fetchModelAssignments({
+    bool forceRefresh = false,
+  }) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    // For now, return all registered models
+    // A full implementation would fetch from backend API
+    return serviceContainer.modelRegistry.discoverModels();
+  }
+
+  /// Get available models for a specific framework
+  /// Matches iOS RunAnywhere.getModelsForFramework(_:)
+  static Future<List<ModelInfo>> getModelsForFramework(
+    LLMFramework framework,
+  ) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    return serviceContainer.modelRegistry.getModelsForFramework(framework);
+  }
+
+  /// Get available models for a specific category
+  /// Matches iOS RunAnywhere.getModelsForCategory(_:)
+  static Future<List<ModelInfo>> getModelsForCategory(
+    ModelCategory category,
+  ) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    return serviceContainer.modelRegistry.getModelsForCategory(category);
+  }
+
+  /// Clear cached model assignments
+  /// Matches iOS RunAnywhere.clearModelAssignmentsCache()
+  static Future<void> clearModelAssignmentsCache() async {
+    if (!_isInitialized) {
+      return;
+    }
+
+    serviceContainer.modelRegistry.clearCache();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Logging Configuration API
+  // Matches iOS RunAnywhere+Logging.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Enable or disable local logging
+  /// Matches iOS RunAnywhere.configureLocalLogging(enabled:)
+  static void configureLocalLogging({required bool enabled}) {
+    final config = LoggingManager.shared.configuration.copyWith(
+      enableLocalLogging: enabled,
+    );
+    LoggingManager.shared.configure(config);
+  }
+
+  /// Set minimum log level for SDK logging
+  /// Matches iOS RunAnywhere.setLogLevel(_:)
+  static void setLogLevel(LogLevel level) {
+    final config = LoggingManager.shared.configuration.copyWith(
+      minLogLevel: level,
+    );
+    LoggingManager.shared.configure(config);
+  }
+
+  /// Enable verbose debugging mode
+  /// Matches iOS RunAnywhere.setDebugMode(_:)
+  static void setDebugMode({required bool enabled}) {
+    // Update log level based on debug mode
+    setLogLevel(enabled ? LogLevel.debug : LogLevel.info);
+
+    // Update local logging
+    configureLocalLogging(enabled: enabled);
+  }
+
+  /// Force flush all pending logs and analytics
+  /// Matches iOS RunAnywhere.flushAll()
+  static Future<void> flushAll() async {
+    // Flush SDK logs
+    LoggingManager.shared.flush();
+
+    // Flush analytics events
+    await AnalyticsQueueManager.shared.flush();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Framework Discovery API
+  // Matches iOS RunAnywhere+Frameworks.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Get all registered frameworks derived from available models
+  /// Returns array of available inference frameworks that have models registered
+  /// Matches iOS RunAnywhere.getRegisteredFrameworks()
+  static Future<List<LLMFramework>> getRegisteredFrameworks() async {
+    if (!_isInitialized) {
+      return [];
+    }
+
+    // Derive frameworks from registered models - this is the source of truth
+    final allModels =
+        serviceContainer.modelRegistry.filterModels(const ModelCriteria());
+    final frameworks = <LLMFramework>{};
+
+    for (final model in allModels) {
+      // Add preferred framework
+      if (model.preferredFramework != null) {
+        frameworks.add(model.preferredFramework!);
+      }
+      // Add all compatible frameworks
+      for (final framework in model.compatibleFrameworks) {
+        frameworks.add(framework);
+      }
+    }
+
+    final result = frameworks.toList();
+    result.sort((a, b) => a.displayName.compareTo(b.displayName));
+    return result;
+  }
+
+  /// Get all registered frameworks for a specific capability
+  /// Matches iOS RunAnywhere.getFrameworks(for:)
+  /// [capability] The capability type to filter by
+  /// Returns array of frameworks that provide the specified capability
+  static Future<List<LLMFramework>> getFrameworksForCapability(
+    CapabilityType capability,
+  ) async {
+    if (!_isInitialized) {
+      return [];
+    }
+
+    final allModels =
+        serviceContainer.modelRegistry.filterModels(const ModelCriteria());
+    final frameworks = <LLMFramework>{};
+
+    // Map capability to model categories
+    final Set<ModelCategory> relevantCategories;
+    switch (capability) {
+      case CapabilityType.llm:
+        relevantCategories = {ModelCategory.language, ModelCategory.multimodal};
+      case CapabilityType.stt:
+        relevantCategories = {ModelCategory.speechRecognition};
+      case CapabilityType.tts:
+        relevantCategories = {ModelCategory.speechSynthesis};
+      case CapabilityType.vad:
+        relevantCategories = {ModelCategory.audio};
+      case CapabilityType.speakerDiarization:
+        relevantCategories = {ModelCategory.audio};
+    }
+
+    for (final model in allModels) {
+      if (relevantCategories.contains(model.category)) {
+        if (model.preferredFramework != null) {
+          frameworks.add(model.preferredFramework!);
+        }
+        for (final framework in model.compatibleFrameworks) {
+          frameworks.add(framework);
+        }
+      }
+    }
+
+    final result = frameworks.toList();
+    result.sort((a, b) => a.displayName.compareTo(b.displayName));
+    return result;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Speaker Diarization API
+  // Matches iOS RunAnywhere+SpeakerDiarization.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Speaker diarization capability instance
+  static SpeakerDiarizationService? _speakerDiarizationService;
+
+  /// Initialize speaker diarization with default configuration
+  /// Matches iOS RunAnywhere.initializeSpeakerDiarization()
+  static Future<void> initializeSpeakerDiarization() async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final provider = ModuleRegistry.shared.speakerDiarizationProvider();
+    if (provider == null) {
+      throw SDKError.featureNotAvailable(
+        'No speaker diarization service available. Register a SpeakerDiarizationServiceProvider first.',
+      );
+    }
+
+    _speakerDiarizationService =
+        await provider.createSpeakerDiarizationService(null);
+    await _speakerDiarizationService!.initialize();
+  }
+
+  /// Initialize speaker diarization with configuration
+  /// Matches iOS RunAnywhere.initializeSpeakerDiarization(_:)
+  /// [config] Speaker diarization configuration (dynamic for flexibility)
+  static Future<void> initializeSpeakerDiarizationWithConfig(
+    dynamic config,
+  ) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final provider = ModuleRegistry.shared.speakerDiarizationProvider();
+    if (provider == null) {
+      throw SDKError.featureNotAvailable(
+        'No speaker diarization service available. Register a SpeakerDiarizationServiceProvider first.',
+      );
+    }
+
+    _speakerDiarizationService =
+        await provider.createSpeakerDiarizationService(config);
+    await _speakerDiarizationService!.initialize();
+  }
+
+  /// Check if speaker diarization is ready
+  /// Matches iOS RunAnywhere.isSpeakerDiarizationReady
+  static bool get isSpeakerDiarizationReady =>
+      _speakerDiarizationService?.isReady ?? false;
+
+  /// Process audio and identify speaker
+  /// Matches iOS RunAnywhere.identifySpeaker(_:)
+  /// [samples] Audio samples to analyze (Float32 PCM samples)
+  /// Returns information about the detected speaker
+  static Future<SpeakerInfo> identifySpeaker(List<double> samples) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final service = _speakerDiarizationService;
+    if (service == null || !service.isReady) {
+      throw SDKError.componentNotReady('SpeakerDiarization');
+    }
+
+    // Convert double samples to int for process() method
+    // This assumes 16-bit PCM - multiply by 32767 to convert from float
+    final intSamples =
+        samples.map((s) => (s * 32767).round().clamp(-32768, 32767)).toList();
+
+    // Process audio to identify speaker (result not needed, just triggers identification)
+    await service.process(intSamples);
+
+    // Get the most recently identified speaker
+    final speakers = await service.getAllSpeakers();
+    if (speakers.isEmpty) {
+      return SpeakerInfo(id: 'unknown', confidence: 0.0);
+    }
+    return speakers.last;
+  }
+
+  /// Get all identified speakers
+  /// Matches iOS RunAnywhere.getAllSpeakers()
+  /// Returns array of all speakers detected so far
+  static Future<List<SpeakerInfo>> getAllSpeakers() async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final service = _speakerDiarizationService;
+    if (service == null || !service.isReady) {
+      throw SDKError.componentNotReady('SpeakerDiarization');
+    }
+
+    return service.getAllSpeakers();
+  }
+
+  /// Cleanup speaker diarization resources
+  /// Matches iOS RunAnywhere.cleanupSpeakerDiarization()
+  static Future<void> cleanupSpeakerDiarization() async {
+    final service = _speakerDiarizationService;
+    if (service != null) {
+      await service.cleanup();
+      _speakerDiarizationService = null;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Voice Agent API
+  // Matches iOS RunAnywhere+VoiceAgent.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Voice agent capability instance
+  static VoiceAgentCapability? _voiceAgentCapability;
+
+  /// Initialize the voice agent with configuration
+  /// Matches iOS RunAnywhere.initializeVoiceAgent(_:)
+  static Future<void> initializeVoiceAgent(
+    VoiceAgentConfiguration config,
+  ) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    await _ensureServicesReady();
+
+    EventBus.shared.publish(SDKVoiceEvent.pipelineStarted());
+
+    try {
+      _voiceAgentCapability = VoiceAgentCapability(
+        configuration: config,
+        serviceContainer: serviceContainer,
+      );
+      await _voiceAgentCapability!.initialize();
+      EventBus.shared.publish(SDKVoiceEvent.pipelineCompleted());
+    } catch (e) {
+      EventBus.shared.publish(SDKVoicePipelineError(error: e));
+      rethrow;
+    }
+  }
+
+  /// Initialize voice agent with individual model IDs
+  /// Pass empty strings to reuse already-loaded models for that component
+  /// Matches iOS RunAnywhere.initializeVoiceAgent(sttModelId:llmModelId:ttsVoice:)
+  static Future<void> initializeVoiceAgentWithModels({
+    String sttModelId = '',
+    String llmModelId = '',
+    String ttsVoice = '',
+  }) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    await _ensureServicesReady();
+
+    EventBus.shared.publish(SDKVoiceEvent.pipelineStarted());
+
+    try {
+      // Build config from model IDs
+      final config = VoiceAgentConfiguration(
+        sttConfig: sttModelId.isNotEmpty
+            ? STTConfiguration(modelId: sttModelId)
+            : STTConfiguration(),
+        llmConfig: llmModelId.isNotEmpty
+            ? LLMConfiguration(modelId: llmModelId)
+            : LLMConfiguration(),
+        ttsConfig: ttsVoice.isNotEmpty
+            ? TTSConfiguration(modelId: ttsVoice)
+            : TTSConfiguration(),
+      );
+
+      _voiceAgentCapability = VoiceAgentCapability(
+        configuration: config,
+        serviceContainer: serviceContainer,
+      );
+      await _voiceAgentCapability!.initialize();
+      EventBus.shared.publish(SDKVoiceEvent.pipelineCompleted());
+    } catch (e) {
+      EventBus.shared.publish(SDKVoicePipelineError(error: e));
+      rethrow;
+    }
+  }
+
+  /// Initialize voice agent using already-loaded models
+  /// Use this when you've already loaded STT, LLM, and TTS models via individual APIs
+  /// Matches iOS RunAnywhere.initializeVoiceAgentWithLoadedModels()
+  static Future<void> initializeVoiceAgentWithLoadedModels() async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    await _ensureServicesReady();
+
+    // Verify all components are loaded
+    final states = await getVoiceAgentComponentStates();
+    if (!states.isFullyReady) {
+      final missing = states.notReadyComponents.join(', ');
+      throw SDKError.componentNotReady(
+        'Not all voice components are loaded. Missing: $missing',
+      );
+    }
+
+    EventBus.shared.publish(SDKVoiceEvent.pipelineStarted());
+
+    try {
+      // Create config using existing loaded models
+      final sttModelId = _loadedSTTCapability?.sttConfig.modelId ?? '';
+      final llmModelId = currentModel?.id ?? '';
+      final ttsVoice = _loadedTTSCapability?.currentVoice ?? '';
+
+      final config = VoiceAgentConfiguration(
+        sttConfig: STTConfiguration(modelId: sttModelId),
+        llmConfig: LLMConfiguration(modelId: llmModelId),
+        ttsConfig: TTSConfiguration(modelId: ttsVoice),
+      );
+
+      _voiceAgentCapability = VoiceAgentCapability(
+        configuration: config,
+        serviceContainer: serviceContainer,
+      );
+      await _voiceAgentCapability!.initialize();
+      EventBus.shared.publish(SDKVoiceEvent.pipelineCompleted());
+    } catch (e) {
+      EventBus.shared.publish(SDKVoicePipelineError(error: e));
+      rethrow;
+    }
+  }
+
+  /// Check if voice agent is ready (all components initialized)
+  /// Matches iOS RunAnywhere.isVoiceAgentReady
+  static bool get isVoiceAgentReady =>
+      _voiceAgentCapability?.isReady ?? false;
+
+  /// Process a complete voice turn: audio → transcription → LLM response → synthesized speech
+  /// Matches iOS RunAnywhere.processVoiceTurn(_:)
+  static Future<VoiceAgentResult> processVoiceTurn(Uint8List audioData) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final capability = _voiceAgentCapability;
+    if (capability == null || !capability.isReady) {
+      throw SDKError.componentNotReady('VoiceAgent');
+    }
+
+    try {
+      return await capability.processAudio(audioData);
+    } catch (e) {
+      EventBus.shared.publish(SDKVoicePipelineError(error: e));
+      rethrow;
+    }
+  }
+
+  /// Process audio stream for continuous conversation
+  /// Matches iOS RunAnywhere.processVoiceStream(_:)
+  static Stream<VoiceAgentEvent> processVoiceStream(
+    Stream<Uint8List> audioStream,
+  ) {
+    if (!_isInitialized) {
+      return Stream.error(SDKError.notInitialized());
+    }
+
+    final capability = _voiceAgentCapability;
+    if (capability == null || !capability.isReady) {
+      return Stream.error(SDKError.componentNotReady('VoiceAgent'));
+    }
+
+    return capability.processStream(audioStream);
+  }
+
+  /// Transcribe audio (voice agent must be initialized)
+  /// Matches iOS RunAnywhere.voiceAgentTranscribe(_:)
+  static Future<String> voiceAgentTranscribe(Uint8List audioData) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final capability = _voiceAgentCapability;
+    if (capability == null || !capability.isReady) {
+      throw SDKError.componentNotReady('VoiceAgent');
+    }
+
+    final result = await capability.transcribe(audioData);
+    return result ?? '';
+  }
+
+  /// Generate LLM response (voice agent must be initialized)
+  /// Matches iOS RunAnywhere.voiceAgentGenerateResponse(_:)
+  static Future<String> voiceAgentGenerateResponse(String prompt) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final capability = _voiceAgentCapability;
+    if (capability == null || !capability.isReady) {
+      throw SDKError.componentNotReady('VoiceAgent');
+    }
+
+    final result = await capability.generateResponse(prompt);
+    return result ?? '';
+  }
+
+  /// Synthesize speech (voice agent must be initialized)
+  /// Matches iOS RunAnywhere.voiceAgentSynthesizeSpeech(_:)
+  static Future<Uint8List> voiceAgentSynthesizeSpeech(String text) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final capability = _voiceAgentCapability;
+    if (capability == null || !capability.isReady) {
+      throw SDKError.componentNotReady('VoiceAgent');
+    }
+
+    final result = await capability.synthesizeSpeech(text);
+    return result ?? Uint8List(0);
+  }
+
+  /// Cleanup voice agent resources
+  /// Matches iOS RunAnywhere.cleanupVoiceAgent()
+  static Future<void> cleanupVoiceAgent() async {
+    final capability = _voiceAgentCapability;
+    if (capability != null) {
+      await capability.cleanup();
+      _voiceAgentCapability = null;
+    }
   }
 }
 

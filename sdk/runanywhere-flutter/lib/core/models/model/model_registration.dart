@@ -185,8 +185,6 @@ class ModelRegistration {
         return ModelCategory.speechRecognition;
       case FrameworkModality.speakerDiarization:
         return ModelCategory.speechRecognition;
-      case FrameworkModality.wakeWord:
-        return ModelCategory.speechRecognition;
       case FrameworkModality.textEmbedding:
         return ModelCategory.embedding;
     }

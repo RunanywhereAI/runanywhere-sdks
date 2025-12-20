@@ -29,9 +29,6 @@ enum FrameworkModality {
   /// Speaker diarization - identify who is speaking
   speakerDiarization('speaker_diarization'),
 
-  /// Wake word detection
-  wakeWord('wake_word'),
-
   /// Text embeddings
   textEmbedding('text_embedding');
 
