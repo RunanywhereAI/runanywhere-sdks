@@ -11,9 +11,8 @@ import com.runanywhere.sdk.network.CircuitBreaker
  */
 class CircuitBreakerNetworkService(
     private val delegate: NetworkService,
-    private val circuitBreaker: CircuitBreaker
+    private val circuitBreaker: CircuitBreaker,
 ) : NetworkService {
-
     private val logger = SDKLogger("CircuitBreakerNetworkService")
 
     /**
@@ -22,24 +21,22 @@ class CircuitBreakerNetworkService(
     override suspend fun <T : Any, R : Any> post(
         endpoint: APIEndpoint,
         payload: T,
-        requiresAuth: Boolean
-    ): R {
-        return circuitBreaker.execute {
+        requiresAuth: Boolean,
+    ): R =
+        circuitBreaker.execute {
             delegate.post(endpoint, payload, requiresAuth)
         }
-    }
 
     /**
      * GET request with typed response - with circuit breaker protection
      */
     override suspend fun <R : Any> get(
         endpoint: APIEndpoint,
-        requiresAuth: Boolean
-    ): R {
-        return circuitBreaker.execute {
+        requiresAuth: Boolean,
+    ): R =
+        circuitBreaker.execute {
             delegate.get(endpoint, requiresAuth)
         }
-    }
 
     /**
      * POST request with raw data payload - with circuit breaker protection
@@ -47,26 +44,24 @@ class CircuitBreakerNetworkService(
     override suspend fun postRaw(
         endpoint: APIEndpoint,
         payload: ByteArray,
-        requiresAuth: Boolean
-    ): ByteArray {
-        return circuitBreaker.execute {
+        requiresAuth: Boolean,
+    ): ByteArray =
+        circuitBreaker.execute {
             logger.debug("Circuit breaker executing POST to: ${endpoint.url}")
             delegate.postRaw(endpoint, payload, requiresAuth)
         }
-    }
 
     /**
      * GET request with raw data response - with circuit breaker protection
      */
     override suspend fun getRaw(
         endpoint: APIEndpoint,
-        requiresAuth: Boolean
-    ): ByteArray {
-        return circuitBreaker.execute {
+        requiresAuth: Boolean,
+    ): ByteArray =
+        circuitBreaker.execute {
             logger.debug("Circuit breaker executing GET to: ${endpoint.url}")
             delegate.getRaw(endpoint, requiresAuth)
         }
-    }
 
     /**
      * Get circuit breaker status for monitoring
@@ -96,7 +91,7 @@ class CircuitBreakerNetworkService(
 suspend inline fun <reified T : Any, reified R : Any> CircuitBreakerNetworkService.postTyped(
     endpoint: APIEndpoint,
     payload: T,
-    requiresAuth: Boolean = true
+    requiresAuth: Boolean = true,
 ): R {
     // The circuit breaker protection is already applied in the base method
     return this.post(endpoint, payload, requiresAuth)
@@ -104,7 +99,7 @@ suspend inline fun <reified T : Any, reified R : Any> CircuitBreakerNetworkServi
 
 suspend inline fun <reified R : Any> CircuitBreakerNetworkService.getTyped(
     endpoint: APIEndpoint,
-    requiresAuth: Boolean = true
+    requiresAuth: Boolean = true,
 ): R {
     // The circuit breaker protection is already applied in the base method
     return this.get(endpoint, requiresAuth)

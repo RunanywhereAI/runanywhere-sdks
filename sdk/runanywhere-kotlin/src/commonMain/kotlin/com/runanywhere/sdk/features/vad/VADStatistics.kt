@@ -17,32 +17,32 @@ data class VADStatistics(
     /** Recent average energy level */
     val recentAvg: Float,
     /** Recent maximum energy level */
-    val recentMax: Float
+    val recentMax: Float,
 ) {
     /**
      * Formatted debug description matching iOS CustomStringConvertible
      */
-    override fun toString(): String {
-        return """
-            VADStatistics:
-              Current: ${String.format("%.6f", current)}
-              Threshold: ${String.format("%.6f", threshold)}
-              Ambient: ${String.format("%.6f", ambient)}
-              Recent Avg: ${String.format("%.6f", recentAvg)}
-              Recent Max: ${String.format("%.6f", recentMax)}
+    override fun toString(): String =
+        """
+        VADStatistics:
+          Current: ${String.format("%.6f", current)}
+          Threshold: ${String.format("%.6f", threshold)}
+          Ambient: ${String.format("%.6f", ambient)}
+          Recent Avg: ${String.format("%.6f", recentAvg)}
+          Recent Max: ${String.format("%.6f", recentMax)}
         """.trimIndent()
-    }
 
     companion object {
         /**
          * Create empty/default statistics
          */
-        fun empty(): VADStatistics = VADStatistics(
-            current = 0f,
-            threshold = 0f,
-            ambient = 0f,
-            recentAvg = 0f,
-            recentMax = 0f
-        )
+        fun empty(): VADStatistics =
+            VADStatistics(
+                current = 0f,
+                threshold = 0f,
+                ambient = 0f,
+                recentAvg = 0f,
+                recentMax = 0f,
+            )
     }
 }

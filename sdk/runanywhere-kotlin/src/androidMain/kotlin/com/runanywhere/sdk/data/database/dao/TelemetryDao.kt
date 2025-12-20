@@ -1,6 +1,11 @@
 package com.runanywhere.sdk.data.database.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import com.runanywhere.sdk.data.database.entities.TelemetryEventEntity
 import com.runanywhere.sdk.data.models.TelemetryEventType
 
@@ -10,7 +15,6 @@ import com.runanywhere.sdk.data.models.TelemetryEventType
  */
 @Dao
 interface TelemetryDao {
-
     @Query("SELECT * FROM telemetry_events WHERE id = :eventId")
     suspend fun getEventById(eventId: String): TelemetryEventEntity?
 
@@ -33,7 +37,10 @@ interface TelemetryDao {
     suspend fun getFailedEvents(): List<TelemetryEventEntity>
 
     @Query("SELECT * FROM telemetry_events WHERE timestamp BETWEEN :startTime AND :endTime ORDER BY timestamp DESC")
-    suspend fun getEventsByTimeRange(startTime: Long, endTime: Long): List<TelemetryEventEntity>
+    suspend fun getEventsByTimeRange(
+        startTime: Long,
+        endTime: Long,
+    ): List<TelemetryEventEntity>
 
     @Query("SELECT * FROM telemetry_events WHERE device_id = :deviceId ORDER BY timestamp DESC")
     suspend fun getEventsByDevice(deviceId: String): List<TelemetryEventEntity>
@@ -50,18 +57,25 @@ interface TelemetryDao {
     @Update
     suspend fun updateEvent(event: TelemetryEventEntity)
 
-    @Query("""
+    @Query(
+        """
         UPDATE telemetry_events
         SET is_sent = 1, sent_at = :sentAt
         WHERE id IN (:eventIds)
-    """)
-    suspend fun markEventsSent(eventIds: List<String>, sentAt: Long)
+    """,
+    )
+    suspend fun markEventsSent(
+        eventIds: List<String>,
+        sentAt: Long,
+    )
 
-    @Query("""
+    @Query(
+        """
         UPDATE telemetry_events
         SET retry_count = retry_count + 1
         WHERE id IN (:eventIds)
-    """)
+    """,
+    )
     suspend fun incrementRetryCount(eventIds: List<String>)
 
     @Delete

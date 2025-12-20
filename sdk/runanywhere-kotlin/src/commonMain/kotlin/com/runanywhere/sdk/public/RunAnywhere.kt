@@ -1,19 +1,19 @@
 package com.runanywhere.sdk.public
 
 import com.runanywhere.sdk.data.models.SDKEnvironment
-import com.runanywhere.sdk.data.models.SDKInitParams
 import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.data.models.SDKInitParams
 import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.events.SDKInitializationEvent
-import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.features.llm.LLMCapability
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationCapability
 import com.runanywhere.sdk.features.stt.STTCapability
 import com.runanywhere.sdk.features.tts.TTSCapability
-import com.runanywhere.sdk.features.llm.LLMCapability
 import com.runanywhere.sdk.features.vad.VADCapability
-import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationCapability
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentCapability
+import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.utils.SDKConstants
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -74,7 +74,6 @@ import kotlinx.coroutines.sync.withLock
  * - LLM: RunAnywhere.chat(), RunAnywhere.generate(), RunAnywhere.generateStream()
  */
 object RunAnywhere {
-
     // ═══════════════════════════════════════════════════════════════════════════
     // MARK: - Internal State Management
     // ═══════════════════════════════════════════════════════════════════════════
@@ -231,17 +230,18 @@ object RunAnywhere {
     fun initialize(
         apiKey: String? = null,
         baseURL: String? = null,
-        environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT
+        environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT,
     ) {
         val params: SDKInitParams
 
         if (environment == SDKEnvironment.DEVELOPMENT) {
             // Development mode - no auth needed
-            params = SDKInitParams(
-                apiKey = apiKey ?: "",
-                baseURL = baseURL,
-                environment = environment
-            )
+            params =
+                SDKInitParams(
+                    apiKey = apiKey ?: "",
+                    baseURL = baseURL,
+                    environment = environment,
+                )
         } else {
             // Production/Staging mode - require API key and URL
             if (apiKey.isNullOrEmpty()) {
@@ -283,11 +283,12 @@ object RunAnywhere {
 
         try {
             // Step 1: Initialize logging system
-            val logLevel = when (params.environment) {
-                SDKEnvironment.DEVELOPMENT -> SDKLogger.Companion.LogLevel.DEBUG
-                SDKEnvironment.STAGING -> SDKLogger.Companion.LogLevel.INFO
-                SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.WARNING
-            }
+            val logLevel =
+                when (params.environment) {
+                    SDKEnvironment.DEVELOPMENT -> SDKLogger.Companion.LogLevel.DEBUG
+                    SDKEnvironment.STAGING -> SDKLogger.Companion.LogLevel.INFO
+                    SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.WARNING
+                }
             SDKLogger.setLogLevel(logLevel)
 
             // Step 2: Store parameters
@@ -307,7 +308,6 @@ object RunAnywhere {
             logger.info("✅ Phase 1 complete in ${initDurationMs}ms (${params.environment.name})")
 
             EventPublisher.track(SDKInitializationEvent.Completed)
-
         } catch (error: Exception) {
             logger.error("❌ Initialization failed: ${error.message}")
             initParams = null
@@ -362,7 +362,6 @@ object RunAnywhere {
                 // Mark Phase 2 complete
                 _hasCompletedServicesInit = true
                 logger.info("✅ Services initialized")
-
             } catch (e: Exception) {
                 logger.error("Services initialization failed: ${e.message}")
                 throw e

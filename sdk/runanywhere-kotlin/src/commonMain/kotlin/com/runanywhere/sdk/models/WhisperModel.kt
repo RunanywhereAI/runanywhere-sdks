@@ -4,19 +4,21 @@ package com.runanywhere.sdk.models
  * Represents a Whisper model configuration
  */
 class WhisperModel(
-    val type: ModelType
+    val type: ModelType,
 ) {
     enum class ModelType(
         val fileName: String,
         val downloadUrl: String,
-        val sizeInMB: Int
+        val sizeInMB: Int,
     ) {
         BASE(
             "ggml-base.en.bin",
             "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
-            141
-        );
+            141,
+        ),
+        ;
 
+        @Suppress("FunctionOnlyReturningConstant") // Model-specific constant
         fun isMultilingual(): Boolean {
             return false // English-only model
         }
@@ -37,21 +39,15 @@ class WhisperModel(
     /**
      * Check if the model is already downloaded
      */
-    fun isDownloaded(): Boolean {
-        return createPlatformFile(getLocalPath()).exists()
-    }
+    fun isDownloaded(): Boolean = createPlatformFile(getLocalPath()).exists()
 
     /**
      * Get the download URL for the model
      */
-    fun getDownloadUrl(): String {
-        return type.downloadUrl
-    }
+    fun getDownloadUrl(): String = type.downloadUrl
 
     /**
      * Get the model size in MB
      */
-    fun getSizeInMB(): Int {
-        return type.sizeInMB
-    }
+    fun getSizeInMB(): Int = type.sizeInMB
 }

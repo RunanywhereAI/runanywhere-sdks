@@ -18,7 +18,6 @@ import kotlin.uuid.Uuid
  * Actual sample rates may vary depending on the TTS model/voice configuration.
  */
 class TTSAnalyticsService {
-
     private val logger = SDKLogger("TTSAnalytics")
 
     // Active synthesis operations
@@ -40,7 +39,7 @@ class TTSAnalyticsService {
         val startTime: Long,
         val voiceId: String,
         val characterCount: Int,
-        val framework: InferenceFramework
+        val framework: InferenceFramework,
     )
 
     // MARK: - Synthesis Tracking
@@ -56,18 +55,19 @@ class TTSAnalyticsService {
     fun startSynthesis(
         text: String,
         voice: String,
-        framework: InferenceFramework = InferenceFramework.SYSTEM_TTS
+        framework: InferenceFramework = InferenceFramework.SYSTEM_TTS,
     ): String {
         val id = Uuid.random().toString()
         val characterCount = text.length
 
         synchronized(activeSyntheses) {
-            activeSyntheses[id] = SynthesisTracker(
-                startTime = currentTimeMillis(),
-                voiceId = voice,
-                characterCount = characterCount,
-                framework = framework
-            )
+            activeSyntheses[id] =
+                SynthesisTracker(
+                    startTime = currentTimeMillis(),
+                    voiceId = voice,
+                    characterCount = characterCount,
+                    framework = framework,
+                )
         }
 
         EventPublisher.track(
@@ -75,8 +75,8 @@ class TTSAnalyticsService {
                 synthesisId = id,
                 voiceId = voice,
                 characterCount = characterCount,
-                framework = framework
-            )
+                framework = framework,
+            ),
         )
 
         logger.debug("Synthesis started: $id, $characterCount characters")
@@ -86,12 +86,15 @@ class TTSAnalyticsService {
     /**
      * Track synthesis chunk (analytics only, for streaming synthesis).
      */
-    fun trackSynthesisChunk(synthesisId: String, chunkSize: Int) {
+    fun trackSynthesisChunk(
+        synthesisId: String,
+        chunkSize: Int,
+    ) {
         EventPublisher.track(
             TTSEvent.SynthesisChunk(
                 synthesisId = synthesisId,
-                chunkSize = chunkSize
-            )
+                chunkSize = chunkSize,
+            ),
         )
     }
 
@@ -104,22 +107,24 @@ class TTSAnalyticsService {
     fun completeSynthesis(
         synthesisId: String,
         audioDurationMs: Double,
-        audioSizeBytes: Int
+        audioSizeBytes: Int,
     ) {
-        val tracker = synchronized(activeSyntheses) {
-            activeSyntheses.remove(synthesisId)
-        } ?: return
+        val tracker =
+            synchronized(activeSyntheses) {
+                activeSyntheses.remove(synthesisId)
+            } ?: return
 
         val endTime = currentTimeMillis()
         val processingTimeMs = (endTime - tracker.startTime).toDouble()
         val characterCount = tracker.characterCount
 
         // Calculate characters per second (synthesis speed)
-        val charsPerSecond = if (processingTimeMs > 0) {
-            characterCount.toDouble() / (processingTimeMs / 1000.0)
-        } else {
-            0.0
-        }
+        val charsPerSecond =
+            if (processingTimeMs > 0) {
+                characterCount.toDouble() / (processingTimeMs / 1000.0)
+            } else {
+                0.0
+            }
 
         // Update metrics
         synchronized(this) {
@@ -141,8 +146,8 @@ class TTSAnalyticsService {
                 audioSizeBytes = audioSizeBytes,
                 processingDurationMs = processingTimeMs,
                 charactersPerSecond = charsPerSecond,
-                framework = tracker.framework
-            )
+                framework = tracker.framework,
+            ),
         )
 
         logger.debug("Synthesis completed: $synthesisId, audio: ${String.format("%.1f", audioDurationMs)}ms, $audioSizeBytes bytes")
@@ -153,7 +158,7 @@ class TTSAnalyticsService {
      */
     fun trackSynthesisFailed(
         synthesisId: String,
-        errorMessage: String
+        errorMessage: String,
     ) {
         synchronized(activeSyntheses) {
             activeSyntheses.remove(synthesisId)
@@ -163,15 +168,18 @@ class TTSAnalyticsService {
         EventPublisher.track(
             TTSEvent.SynthesisFailed(
                 synthesisId = synthesisId,
-                error = errorMessage
-            )
+                error = errorMessage,
+            ),
         )
     }
 
     /**
      * Track an error during operations.
      */
-    fun trackError(error: Throwable, operation: String) {
+    fun trackError(
+        error: Throwable,
+        operation: String,
+    ) {
         lastEventTime = currentTimeMillis()
         logger.error("TTS error during $operation: ${error.message}")
         // Error events can be added via a generic ErrorEvent if needed
@@ -182,33 +190,35 @@ class TTSAnalyticsService {
     /**
      * Get current TTS metrics.
      */
-    fun getMetrics(): TTSMetrics {
-        return synchronized(this) {
+    fun getMetrics(): TTSMetrics =
+        synchronized(this) {
             TTSMetrics(
                 totalEvents = synthesisCount,
                 startTime = startTime,
                 lastEventTime = lastEventTime,
                 totalSyntheses = synthesisCount,
-                averageCharactersPerSecond = if (synthesisCount > 0) {
-                    totalCharactersPerSecond / synthesisCount
-                } else {
-                    0.0
-                },
-                averageProcessingTimeMs = if (synthesisCount > 0) {
-                    totalProcessingTimeMs / synthesisCount
-                } else {
-                    0.0
-                },
-                averageAudioDurationMs = if (synthesisCount > 0) {
-                    totalAudioDurationMs / synthesisCount
-                } else {
-                    0.0
-                },
+                averageCharactersPerSecond =
+                    if (synthesisCount > 0) {
+                        totalCharactersPerSecond / synthesisCount
+                    } else {
+                        0.0
+                    },
+                averageProcessingTimeMs =
+                    if (synthesisCount > 0) {
+                        totalProcessingTimeMs / synthesisCount
+                    } else {
+                        0.0
+                    },
+                averageAudioDurationMs =
+                    if (synthesisCount > 0) {
+                        totalAudioDurationMs / synthesisCount
+                    } else {
+                        0.0
+                    },
                 totalCharactersProcessed = totalCharacters,
-                totalAudioSizeBytes = totalAudioSizeBytes
+                totalAudioSizeBytes = totalAudioSizeBytes,
             )
         }
-    }
 }
 
 // MARK: - TTS Metrics
@@ -235,5 +245,5 @@ data class TTSMetrics(
     /** Total characters processed across all syntheses */
     val totalCharactersProcessed: Int = 0,
     /** Total audio size generated in bytes */
-    val totalAudioSizeBytes: Long = 0
+    val totalAudioSizeBytes: Long = 0,
 )

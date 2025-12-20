@@ -1,10 +1,9 @@
 package com.runanywhere.sdk.features.vad
 
-import com.runanywhere.sdk.core.capabilities.*
 import com.runanywhere.sdk.core.ModuleRegistry
+import com.runanywhere.sdk.core.capabilities.*
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.models.enums.InferenceFramework
-import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,9 +18,8 @@ import kotlinx.coroutines.launch
  */
 class VADComponent(
     configuration: VADConfiguration,
-    private val analyticsService: VADAnalyticsService = VADAnalyticsService()
+    private val analyticsService: VADAnalyticsService = VADAnalyticsService(),
 ) : BaseComponent<VADServiceWrapper>(configuration) {
-
     // MARK: - Properties
 
     override val componentType: SDKComponent = SDKComponent.VAD
@@ -35,16 +33,17 @@ class VADComponent(
 
     override suspend fun createService(): VADServiceWrapper {
         // Try to get a registered VAD provider from central registry
-        val provider = ModuleRegistry.vadProvider(vadConfiguration.modelId)
-            ?: run {
-                analyticsService.trackInitializationFailed(
-                    error = "No VAD service provider registered",
-                    framework = InferenceFramework.BUILT_IN
-                )
-                throw SDKError.ComponentNotInitialized(
-                    "No VAD service provider registered. Please register WebRTCVADServiceProvider.register()"
-                )
-            }
+        val provider =
+            ModuleRegistry.vadProvider(vadConfiguration.modelId)
+                ?: run {
+                    analyticsService.trackInitializationFailed(
+                        error = "No VAD service provider registered",
+                        framework = InferenceFramework.BUILT_IN,
+                    )
+                    throw SDKError.ComponentNotInitialized(
+                        "No VAD service provider registered. Please register WebRTCVADServiceProvider.register()",
+                    )
+                }
 
         try {
             // Create service through provider
@@ -58,7 +57,7 @@ class VADComponent(
         } catch (e: Exception) {
             analyticsService.trackInitializationFailed(
                 error = e.message ?: "Unknown error",
-                framework = InferenceFramework.BUILT_IN
+                framework = InferenceFramework.BUILT_IN,
             )
             throw e
         }
@@ -82,18 +81,17 @@ class VADComponent(
     fun processAudioChunk(audioSamples: FloatArray): VADOutput {
         ensureReady()
 
-        val input = VADInput(
-            audioSamples = audioSamples
-        )
+        val input =
+            VADInput(
+                audioSamples = audioSamples,
+            )
         return process(input)
     }
 
     /**
      * Detect speech in audio samples - iOS-style method name
      */
-    fun detectSpeech(audioSamples: FloatArray): VADOutput {
-        return processAudioChunk(audioSamples)
-    }
+    fun detectSpeech(audioSamples: FloatArray): VADOutput = processAudioChunk(audioSamples)
 
     /**
      * Process VAD input - supporting threshold override like iOS
@@ -113,13 +111,8 @@ class VADComponent(
         }
 
         try {
-            // Track processing time
-            val startTime = getCurrentTimeMillis()
-
             // Process audio chunk
             val result = service.processAudioChunk(input.audioSamples)
-
-            val processingTime = (getCurrentTimeMillis() - startTime) / 1000.0
 
             // Calculate energy level (simple RMS)
             val energyLevel = calculateEnergyLevel(input.audioSamples)
@@ -127,7 +120,7 @@ class VADComponent(
             return VADOutput(
                 isSpeechDetected = result.isSpeechDetected,
                 energyLevel = energyLevel,
-                confidence = result.confidence
+                confidence = result.confidence,
             )
         } finally {
             // Restore original threshold if it was overridden
@@ -140,16 +133,17 @@ class VADComponent(
     /**
      * Stream VAD processing
      */
-    fun streamProcess(audioStream: Flow<FloatArray>): Flow<VADOutput> = flow {
-        ensureReady()
+    fun streamProcess(audioStream: Flow<FloatArray>): Flow<VADOutput> =
+        flow {
+            ensureReady()
 
-        audioStream.collect { audioSamples ->
-            val output = processAudioChunk(audioSamples)
-            emit(output)
+            audioStream.collect { audioSamples ->
+                val output = processAudioChunk(audioSamples)
+                emit(output)
+            }
+        }.catch { error ->
+            throw VADError.ProcessingFailed(error)
         }
-    }.catch { error ->
-        throw VADError.ProcessingFailed(error)
-    }
 
     /**
      * Process with speech segments detection.
@@ -158,45 +152,46 @@ class VADComponent(
     fun detectSpeechSegments(
         audioStream: Flow<FloatArray>,
         onSpeechStart: () -> Unit = {},
-        onSpeechEnd: () -> Unit = {}
-    ): Flow<VADOutput> = flow {
-        ensureReady()
+        onSpeechEnd: () -> Unit = {},
+    ): Flow<VADOutput> =
+        flow {
+            ensureReady()
 
-        var isInSpeech = false
-        var silenceFrames = 0
-        // Use iOS-style hysteresis - 10 frames of silence to end speech
-        val silenceFramesThreshold = 10
+            var isInSpeech = false
+            var silenceFrames = 0
+            // Use iOS-style hysteresis - 10 frames of silence to end speech
+            val silenceFramesThreshold = 10
 
-        audioStream.collect { audioSamples ->
-            val output = processAudioChunk(audioSamples)
+            audioStream.collect { audioSamples ->
+                val output = processAudioChunk(audioSamples)
 
-            when {
-                output.isSpeechDetected && !isInSpeech -> {
-                    isInSpeech = true
-                    silenceFrames = 0
-                    // Track speech start for analytics
-                    analyticsScope.launch { analyticsService.trackSpeechStart() }
-                    onSpeechStart()
-                }
+                when {
+                    output.isSpeechDetected && !isInSpeech -> {
+                        isInSpeech = true
+                        silenceFrames = 0
+                        // Track speech start for analytics
+                        analyticsScope.launch { analyticsService.trackSpeechStart() }
+                        onSpeechStart()
+                    }
 
-                !output.isSpeechDetected && isInSpeech -> {
-                    silenceFrames++
-                    if (silenceFrames >= silenceFramesThreshold) {
-                        isInSpeech = false
-                        // Track speech end for analytics
-                        analyticsScope.launch { analyticsService.trackSpeechEnd() }
-                        onSpeechEnd()
+                    !output.isSpeechDetected && isInSpeech -> {
+                        silenceFrames++
+                        if (silenceFrames >= silenceFramesThreshold) {
+                            isInSpeech = false
+                            // Track speech end for analytics
+                            analyticsScope.launch { analyticsService.trackSpeechEnd() }
+                            onSpeechEnd()
+                        }
+                    }
+
+                    output.isSpeechDetected && isInSpeech -> {
+                        silenceFrames = 0
                     }
                 }
 
-                output.isSpeechDetected && isInSpeech -> {
-                    silenceFrames = 0
-                }
+                emit(output)
             }
-
-            emit(output)
         }
-    }
 
     /**
      * Reset VAD state
@@ -222,16 +217,12 @@ class VADComponent(
     /**
      * Get service for compatibility
      */
-    fun getService(): VADService? {
-        return vadService
-    }
+    fun getService(): VADService? = vadService
 
     /**
      * Check if VAD is enabled
      */
-    fun isEnabled(): Boolean {
-        return state == ComponentState.READY
-    }
+    fun isEnabled(): Boolean = state == ComponentState.READY
 
     /**
      * Start VAD processing - matching iOS method.
@@ -302,9 +293,7 @@ class VADComponent(
      * Get current VAD analytics metrics.
      * Matches iOS getAnalyticsMetrics() pattern.
      */
-    suspend fun getAnalyticsMetrics(): VADMetrics {
-        return analyticsService.getMetrics()
-    }
+    suspend fun getAnalyticsMetrics(): VADMetrics = analyticsService.getMetrics()
 
     // MARK: - Private Helpers
 

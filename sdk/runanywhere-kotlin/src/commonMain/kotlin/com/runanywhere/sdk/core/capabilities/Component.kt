@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.core.capabilities
 
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.ComponentInitializationEvent
+import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
@@ -55,7 +55,7 @@ enum class ComponentState {
     INITIALIZING,
     READY,
     PROCESSING,
-    FAILED
+    FAILED,
 }
 
 // MARK: - SDK Component Types
@@ -68,14 +68,14 @@ enum class SDKComponent {
     VLM,
     WAKEWORD,
     SPEAKER_DIARIZATION,
-    VOICE_AGENT
+    VOICE_AGENT,
 }
 
 // MARK: - Component Health and Status
 
 data class ComponentHealth(
     val isHealthy: Boolean,
-    val details: String
+    val details: String,
 )
 
 /**
@@ -87,7 +87,7 @@ data class ComponentStatus(
     val error: Throwable? = null,
     val timestamp: Long = getCurrentTimeMillis(),
     val currentStage: String? = null,
-    val metadata: Map<String, Any>? = null
+    val metadata: Map<String, Any>? = null,
 ) {
     val isHealthy: Boolean
         get() = state != ComponentState.FAILED && error == null
@@ -100,8 +100,11 @@ interface Component {
     val parameters: ComponentInitParameters
 
     suspend fun initialize(parameters: ComponentInitParameters)
+
     suspend fun cleanup()
+
     suspend fun healthCheck(): ComponentHealth
+
     suspend fun transitionTo(state: ComponentState)
 }
 
@@ -132,9 +135,8 @@ class AnyServiceWrapper<T : Any> : ServiceWrapper<T> {
  */
 abstract class BaseComponent<TService : Any>(
     protected val configuration: ComponentConfiguration,
-    serviceContainer: ServiceContainer? = null
+    serviceContainer: ServiceContainer? = null,
 ) : Component {
-
     // MARK: - Core Properties
 
     /**
@@ -213,18 +215,22 @@ abstract class BaseComponent<TService : Any>(
         try {
             // Stage: Validation
             currentStage = "validation"
-            eventBus.publish(ComponentInitializationEvent.ComponentChecking(
-                component = componentType.name,
-                modelId = parameters.modelId
-            ))
+            eventBus.publish(
+                ComponentInitializationEvent.ComponentChecking(
+                    component = componentType.name,
+                    modelId = parameters.modelId,
+                ),
+            )
             configuration.validate()
 
             // Stage: Service Creation
             currentStage = "service_creation"
-            eventBus.publish(ComponentInitializationEvent.ComponentInitializing(
-                component = componentType.name,
-                modelId = parameters.modelId
-            ))
+            eventBus.publish(
+                ComponentInitializationEvent.ComponentInitializing(
+                    component = componentType.name,
+                    modelId = parameters.modelId,
+                ),
+            )
             service = createService()
 
             // Stage: Service Initialization
@@ -234,23 +240,28 @@ abstract class BaseComponent<TService : Any>(
             // Component ready
             currentStage = null
             updateState(ComponentState.READY)
-            eventBus.publish(ComponentInitializationEvent.ComponentReady(
-                component = componentType.name,
-                modelId = parameters.modelId
-            ))
+            eventBus.publish(
+                ComponentInitializationEvent.ComponentReady(
+                    component = componentType.name,
+                    modelId = parameters.modelId,
+                ),
+            )
         } catch (e: Exception) {
             // Update status with error information
-            _status = ComponentStatus(
-                state = ComponentState.FAILED,
-                error = e,
-                currentStage = currentStage,
-                timestamp = getCurrentTimeMillis()
-            )
+            _status =
+                ComponentStatus(
+                    state = ComponentState.FAILED,
+                    error = e,
+                    currentStage = currentStage,
+                    timestamp = getCurrentTimeMillis(),
+                )
             updateState(ComponentState.FAILED)
-            eventBus.publish(ComponentInitializationEvent.ComponentFailed(
-                component = componentType.name,
-                error = e
-            ))
+            eventBus.publish(
+                ComponentInitializationEvent.ComponentFailed(
+                    component = componentType.name,
+                    error = e,
+                ),
+            )
             throw e
         }
     }
@@ -323,17 +334,20 @@ abstract class BaseComponent<TService : Any>(
         state = newState
 
         // Update component status with metadata
-        _status = ComponentStatus(
-            state = newState,
-            currentStage = currentStage,
-            timestamp = getCurrentTimeMillis()
-        )
+        _status =
+            ComponentStatus(
+                state = newState,
+                currentStage = currentStage,
+                timestamp = getCurrentTimeMillis(),
+            )
 
-        eventBus.publish(ComponentInitializationEvent.ComponentStateChanged(
-            component = componentType.name,
-            oldState = oldState.name,
-            newState = newState.name
-        ))
+        eventBus.publish(
+            ComponentInitializationEvent.ComponentStateChanged(
+                component = componentType.name,
+                oldState = oldState.name,
+                newState = newState.name,
+            ),
+        )
     }
 
     // MARK: - Component Protocol Requirements
@@ -341,21 +355,21 @@ abstract class BaseComponent<TService : Any>(
     /**
      * Health check implementation - Enhanced with comprehensive status
      */
-    override suspend fun healthCheck(): ComponentHealth {
-        return ComponentHealth(
+    override suspend fun healthCheck(): ComponentHealth =
+        ComponentHealth(
             isHealthy = status.isHealthy,
-            details = buildString {
-                append("Component: $componentType, ")
-                append("State: ${state.name}")
-                if (currentStage != null) {
-                    append(", Stage: $currentStage")
-                }
-                if (status.error != null) {
-                    append(", Error: ${status.error?.message}")
-                }
-            }
+            details =
+                buildString {
+                    append("Component: $componentType, ")
+                    append("State: ${state.name}")
+                    if (currentStage != null) {
+                        append(", Stage: $currentStage")
+                    }
+                    if (status.error != null) {
+                        append(", Error: ${status.error?.message}")
+                    }
+                },
         )
-    }
 
     /**
      * Get detailed component status
@@ -383,6 +397,7 @@ abstract class BaseComponent<TService : Any>(
 private class EmptyComponentParameters : ComponentInitParameters {
     override val componentType: SDKComponent = SDKComponent.VAD // Default, not used
     override val modelId: String? = null
+
     override fun validate() {}
 }
 

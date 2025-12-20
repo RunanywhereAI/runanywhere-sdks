@@ -1,16 +1,16 @@
 package com.runanywhere.sdk.features.llm
 
+import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.core.capabilities.BaseComponent
 import com.runanywhere.sdk.core.capabilities.SDKComponent
 import com.runanywhere.sdk.core.capabilities.ServiceWrapper
-import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.events.ComponentInitializationEvent
 import com.runanywhere.sdk.events.EventPublisher
-import com.runanywhere.sdk.models.*
-import com.runanywhere.sdk.foundation.currentTimeMillis
-import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.foundation.currentTimeMillis
+import com.runanywhere.sdk.models.*
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.flow
  * Exact match with iOS LLMServiceWrapper
  */
 class LLMServiceWrapper(
-    override var wrappedService: LLMService? = null
+    override var wrappedService: LLMService? = null,
 ) : ServiceWrapper<LLMService>
 
 /**
@@ -32,9 +32,8 @@ class LLMServiceWrapper(
  */
 class LLMComponent(
     private val llmConfiguration: LLMConfiguration,
-    private val analyticsService: GenerationAnalyticsService = GenerationAnalyticsService()
+    private val analyticsService: GenerationAnalyticsService = GenerationAnalyticsService(),
 ) : BaseComponent<LLMServiceWrapper>(llmConfiguration) {
-
     companion object {
         val componentType: SDKComponent = SDKComponent.LLM
     }
@@ -71,10 +70,11 @@ class LLMComponent(
         ensureModelAvailable()
 
         // 2. Get provider from registry (iOS pattern)
-        val provider = ModuleRegistry.llmProvider(llmConfiguration.modelId)
-            ?: throw SDKError.ComponentNotInitialized(
-                "No LLM service provider registered. Please add llama.cpp or another LLM implementation as a dependency and register it with ModuleRegistry.registerLLM(provider)."
-            )
+        val provider =
+            ModuleRegistry.llmProvider(llmConfiguration.modelId)
+                ?: throw SDKError.ComponentNotInitialized(
+                    "No LLM service provider registered. Please add llama.cpp or another LLM implementation as a dependency and register it with ModuleRegistry.registerLLM(provider).",
+                )
 
         // 3. Create service via provider (iOS pattern)
         val llmService = provider.createLLMService(llmConfiguration)
@@ -106,11 +106,13 @@ class LLMComponent(
 
             if (needsDownload) {
                 // Emit download required event
-                EventPublisher.track(ComponentInitializationEvent.ComponentDownloadRequired(
-                    component = componentType.name,
-                    modelId = modelId,
-                    sizeBytes = modelInfo.downloadSize ?: 1_000_000_000L
-                ))
+                EventPublisher.track(
+                    ComponentInitializationEvent.ComponentDownloadRequired(
+                        component = componentType.name,
+                        modelId = modelId,
+                        sizeBytes = modelInfo.downloadSize ?: 1_000_000_000L,
+                    ),
+                )
 
                 // Download model
                 logger.info("⬇️  Downloading model: $modelId")
@@ -141,10 +143,12 @@ class LLMComponent(
 
     private suspend fun downloadModel(modelId: String) {
         // Emit download started event
-        EventPublisher.track(ComponentInitializationEvent.ComponentDownloadStarted(
-            component = componentType.name,
-            modelId = modelId
-        ))
+        EventPublisher.track(
+            ComponentInitializationEvent.ComponentDownloadStarted(
+                component = componentType.name,
+                modelId = modelId,
+            ),
+        )
 
         try {
             // First try to get model info from registry
@@ -159,54 +163,60 @@ class LLMComponent(
                 val updatedModelInfo = modelInfo.copy(localPath = downloadedPath)
                 serviceContainer?.modelRegistry?.updateModel(updatedModelInfo)
                 logger.info("Model $modelId downloaded successfully to: $downloadedPath")
-
             } else {
                 // Try to get the LLM provider to handle the download (legacy support)
                 val provider = ModuleRegistry.llmProvider(modelId)
                 if (provider != null) {
                     // Use provider to download the model
-                    val downloadedModel = provider.downloadModel(modelId) { progress ->
-                        modelLoadProgress = progress.toDouble()
-                        EventPublisher.track(ComponentInitializationEvent.ComponentDownloadProgress(
-                            component = componentType.name,
-                            modelId = modelId,
-                            progress = progress.toDouble()
-                        ))
-                    }
+                    val downloadedModel =
+                        provider.downloadModel(modelId) { progress ->
+                            modelLoadProgress = progress.toDouble()
+                            EventPublisher.track(
+                                ComponentInitializationEvent.ComponentDownloadProgress(
+                                    component = componentType.name,
+                                    modelId = modelId,
+                                    progress = progress.toDouble(),
+                                ),
+                            )
+                        }
 
                     // Update model registry with downloaded model info
                     serviceContainer?.modelRegistry?.registerModel(downloadedModel)
                     logger.info("Model $modelId downloaded successfully via provider")
-
                 } else {
                     // Fallback: simulate download with progress for development
                     logger.warn("No provider found for model $modelId, simulating download")
                     for (i in 0..10) {
                         val progress = i / 10.0
                         modelLoadProgress = progress
-                        EventPublisher.track(ComponentInitializationEvent.ComponentDownloadProgress(
-                            component = componentType.name,
-                            modelId = modelId,
-                            progress = progress
-                        ))
+                        EventPublisher.track(
+                            ComponentInitializationEvent.ComponentDownloadProgress(
+                                component = componentType.name,
+                                modelId = modelId,
+                                progress = progress,
+                            ),
+                        )
                         kotlinx.coroutines.delay(100) // 0.1 second
                     }
                 }
             }
 
             // Emit download completed event
-            EventPublisher.track(ComponentInitializationEvent.ComponentDownloadCompleted(
-                component = componentType.name,
-                modelId = modelId
-            ))
-
+            EventPublisher.track(
+                ComponentInitializationEvent.ComponentDownloadCompleted(
+                    component = componentType.name,
+                    modelId = modelId,
+                ),
+            )
         } catch (e: Exception) {
             logger.error("Failed to download model $modelId: ${e.message}")
-            EventPublisher.track(ComponentInitializationEvent.ComponentDownloadFailed(
-                component = componentType.name,
-                modelId = modelId,
-                error = e.message ?: "Unknown error"
-            ))
+            EventPublisher.track(
+                ComponentInitializationEvent.ComponentDownloadFailed(
+                    component = componentType.name,
+                    modelId = modelId,
+                    error = e.message ?: "Unknown error",
+                ),
+            )
             throw e
         }
     }
@@ -236,11 +246,13 @@ class LLMComponent(
             modelPath = null
 
             // Publish event
-            EventPublisher.track(ComponentInitializationEvent.ComponentUnloaded(
-                component = componentType.name,
-                modelId = modelId,
-                timestamp = currentTimeMillis()
-            ))
+            EventPublisher.track(
+                ComponentInitializationEvent.ComponentUnloaded(
+                    component = componentType.name,
+                    modelId = modelId,
+                    timestamp = currentTimeMillis(),
+                ),
+            )
 
             logger.info("✅ Model unloaded successfully: $modelId")
         } catch (e: Exception) {
@@ -265,27 +277,32 @@ class LLMComponent(
     /**
      * Generate text from a simple prompt
      */
-    suspend fun generate(prompt: String, systemPrompt: String? = null): LLMOutput {
+    suspend fun generate(
+        prompt: String,
+        systemPrompt: String? = null,
+    ): LLMOutput {
         ensureReady()
 
-        val input = LLMInput(
-            messages = listOf(Message(role = MessageRole.USER, content = prompt)),
-            systemPrompt = systemPrompt
-        )
+        val input =
+            LLMInput(
+                messages = listOf(Message(role = MessageRole.USER, content = prompt)),
+                systemPrompt = systemPrompt,
+            )
         return process(input)
     }
 
     /**
      * Generate text from prompt (overload for compatibility)
      */
-    suspend fun generate(prompt: String): LLMOutput {
-        return generate(prompt, systemPrompt = null)
-    }
+    suspend fun generate(prompt: String): LLMOutput = generate(prompt, systemPrompt = null)
 
     /**
      * Generate with conversation history
      */
-    suspend fun generateWithHistory(messages: List<Message>, systemPrompt: String? = null): LLMOutput {
+    suspend fun generateWithHistory(
+        messages: List<Message>,
+        systemPrompt: String? = null,
+    ): LLMOutput {
         ensureReady()
 
         val input = LLMInput(messages = messages, systemPrompt = systemPrompt)
@@ -304,11 +321,12 @@ class LLMComponent(
         input.validate()
 
         // Use provided options or create from configuration
-        val options = input.options ?: LLMGenerationOptions(
-            maxTokens = llmConfiguration.maxTokens,
-            temperature = llmConfiguration.temperature.toFloat(),
-            streamingEnabled = llmConfiguration.streamingEnabled
-        )
+        val options =
+            input.options ?: LLMGenerationOptions(
+                maxTokens = llmConfiguration.maxTokens,
+                temperature = llmConfiguration.temperature.toFloat(),
+                streamingEnabled = llmConfiguration.streamingEnabled,
+            )
 
         // Build prompt
         val prompt = buildPrompt(input.messages, input.systemPrompt ?: llmConfiguration.effectiveSystemPrompt)
@@ -342,33 +360,38 @@ class LLMComponent(
 
             // Calculate completion tokens using same rough estimation (~4 chars per token)
             val completionTokens = response.length / 4
-            val tokensPerSecond = if (generationTime > 0) {
-                (completionTokens.toDouble() * 1000.0) / generationTime
-            } else null
+            val tokensPerSecond =
+                if (generationTime > 0) {
+                    (completionTokens.toDouble() * 1000.0) / generationTime
+                } else {
+                    null
+                }
 
             // Complete analytics tracking
             analyticsService.completeGeneration(
                 generationId = generationId,
                 inputTokens = promptTokens,
                 outputTokens = completionTokens,
-                modelId = modelId
+                modelId = modelId,
             )
 
             // Create output
             return LLMOutput(
                 text = response,
-                tokenUsage = TokenUsage(
-                    promptTokens = promptTokens,
-                    completionTokens = completionTokens
-                ),
-                metadata = GenerationMetadata(
-                    modelId = service.currentModel ?: "unknown",
-                    temperature = options.temperature,
-                    generationTime = generationTime,
-                    tokensPerSecond = tokensPerSecond
-                ),
+                tokenUsage =
+                    TokenUsage(
+                        promptTokens = promptTokens,
+                        completionTokens = completionTokens,
+                    ),
+                metadata =
+                    GenerationMetadata(
+                        modelId = service.currentModel ?: "unknown",
+                        temperature = options.temperature,
+                        generationTime = generationTime,
+                        tokensPerSecond = tokensPerSecond,
+                    ),
                 finishReason = FinishReason.COMPLETED,
-                timestamp = currentTimeMillis()
+                timestamp = currentTimeMillis(),
             )
         } catch (e: Exception) {
             // Track generation failed
@@ -382,163 +405,170 @@ class LLMComponent(
      */
     fun streamGenerate(
         prompt: String,
-        systemPrompt: String? = null
-    ): Flow<String> = flow {
-        ensureReady()
+        systemPrompt: String? = null,
+    ): Flow<String> =
+        flow {
+            ensureReady()
 
-        val service = llmService ?: throw SDKError.ComponentNotReady("LLM service not available")
+            val service = llmService ?: throw SDKError.ComponentNotReady("LLM service not available")
 
-        val options = LLMGenerationOptions(
-            maxTokens = llmConfiguration.maxTokens,
-            temperature = llmConfiguration.temperature.toFloat(),
-            streamingEnabled = true
-        )
+            val options =
+                LLMGenerationOptions(
+                    maxTokens = llmConfiguration.maxTokens,
+                    temperature = llmConfiguration.temperature.toFloat(),
+                    streamingEnabled = true,
+                )
 
-        val fullPrompt = buildPrompt(
-            listOf(Message(role = MessageRole.USER, content = prompt)),
-            systemPrompt ?: llmConfiguration.effectiveSystemPrompt
-        )
+            val fullPrompt =
+                buildPrompt(
+                    listOf(Message(role = MessageRole.USER, content = prompt)),
+                    systemPrompt ?: llmConfiguration.effectiveSystemPrompt,
+                )
 
-        val modelId = llmConfiguration.modelId ?: service.currentModel ?: "unknown"
-        val framework = llmConfiguration.framework ?: InferenceFramework.LLAMA_CPP
-        val promptTokens = fullPrompt.length / 4
+            val modelId = llmConfiguration.modelId ?: service.currentModel ?: "unknown"
+            val framework = llmConfiguration.framework ?: InferenceFramework.LLAMA_CPP
+            val promptTokens = fullPrompt.length / 4
 
-        // Start analytics tracking (streaming)
-        val generationId = analyticsService.startStreamingGeneration(modelId, framework)
+            // Start analytics tracking (streaming)
+            val generationId = analyticsService.startStreamingGeneration(modelId, framework)
 
-        // Stream generation using callback that emits to Flow
-        val tokens = mutableListOf<String>()
-        var firstTokenTracked = false
+            // Stream generation using callback that emits to Flow
+            val tokens = mutableListOf<String>()
+            var firstTokenTracked = false
 
-        try {
-            service.streamGenerate(fullPrompt, options) { token ->
-                // Track first token
-                if (!firstTokenTracked) {
-                    analyticsService.trackFirstToken(generationId)
-                    firstTokenTracked = true
+            try {
+                service.streamGenerate(fullPrompt, options) { token ->
+                    // Track first token
+                    if (!firstTokenTracked) {
+                        analyticsService.trackFirstToken(generationId)
+                        firstTokenTracked = true
+                    }
+                    tokens.add(token)
                 }
-                tokens.add(token)
-            }
 
-            // Emit collected tokens
-            for ((index, token) in tokens.withIndex()) {
-                emit(token)
-                // Track streaming update periodically (every 10 tokens to avoid chatty events)
-                if ((index + 1) % 10 == 0) {
-                    analyticsService.trackStreamingUpdate(generationId, index + 1)
+                // Emit collected tokens
+                for ((index, token) in tokens.withIndex()) {
+                    emit(token)
+                    // Track streaming update periodically (every 10 tokens to avoid chatty events)
+                    if ((index + 1) % 10 == 0) {
+                        analyticsService.trackStreamingUpdate(generationId, index + 1)
+                    }
                 }
-            }
 
-            // Complete analytics tracking
-            val outputTokens = tokens.size
-            analyticsService.completeGeneration(
-                generationId = generationId,
-                inputTokens = promptTokens,
-                outputTokens = outputTokens,
-                modelId = modelId
-            )
-        } catch (e: Exception) {
-            analyticsService.trackGenerationFailed(generationId, e)
-            throw e
+                // Complete analytics tracking
+                val outputTokens = tokens.size
+                analyticsService.completeGeneration(
+                    generationId = generationId,
+                    inputTokens = promptTokens,
+                    outputTokens = outputTokens,
+                    modelId = modelId,
+                )
+            } catch (e: Exception) {
+                analyticsService.trackGenerationFailed(generationId, e)
+                throw e
+            }
         }
-    }
 
     /**
      * Stream generation with structured input/output
      * Component-level method that builds the prompt and delegates to streamGenerate
      */
-    fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
-        ensureReady()
+    fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> =
+        flow {
+            ensureReady()
 
-        val service = llmService ?: throw SDKError.ComponentNotReady("LLM service not available")
+            val service = llmService ?: throw SDKError.ComponentNotReady("LLM service not available")
 
-        // Validate input
-        input.validate()
+            // Validate input
+            input.validate()
 
-        // Use provided options or create from configuration
-        val options = input.options ?: LLMGenerationOptions(
-            maxTokens = llmConfiguration.maxTokens,
-            temperature = llmConfiguration.temperature.toFloat(),
-            streamingEnabled = true
-        )
+            // Use provided options or create from configuration
+            val options =
+                input.options ?: LLMGenerationOptions(
+                    maxTokens = llmConfiguration.maxTokens,
+                    temperature = llmConfiguration.temperature.toFloat(),
+                    streamingEnabled = true,
+                )
 
-        // Build prompt from messages
-        val prompt = buildPrompt(input.messages, input.systemPrompt ?: llmConfiguration.effectiveSystemPrompt)
+            // Build prompt from messages
+            val prompt = buildPrompt(input.messages, input.systemPrompt ?: llmConfiguration.effectiveSystemPrompt)
 
-        val modelId = llmConfiguration.modelId ?: service.currentModel ?: "unknown"
-        val framework = llmConfiguration.framework ?: InferenceFramework.LLAMA_CPP
-        val promptTokens = prompt.length / 4
+            val modelId = llmConfiguration.modelId ?: service.currentModel ?: "unknown"
+            val framework = llmConfiguration.framework ?: InferenceFramework.LLAMA_CPP
+            val promptTokens = prompt.length / 4
 
-        // Start analytics tracking (streaming)
-        val generationId = analyticsService.startStreamingGeneration(modelId, framework)
+            // Start analytics tracking (streaming)
+            val generationId = analyticsService.startStreamingGeneration(modelId, framework)
 
-        // Track chunks for structured output
-        var chunkIndex = 0
-        val sessionId = generationId  // Use generation ID as session ID for correlation
+            // Track chunks for structured output
+            var chunkIndex = 0
+            val sessionId = generationId // Use generation ID as session ID for correlation
 
-        // Collect tokens from streaming service
-        val tokens = mutableListOf<String>()
-        var firstTokenTracked = false
+            // Collect tokens from streaming service
+            val tokens = mutableListOf<String>()
+            var firstTokenTracked = false
 
-        try {
-            service.streamGenerate(prompt, options) { token ->
-                // Track first token
-                if (!firstTokenTracked) {
-                    analyticsService.trackFirstToken(generationId)
-                    firstTokenTracked = true
+            try {
+                service.streamGenerate(prompt, options) { token ->
+                    // Track first token
+                    if (!firstTokenTracked) {
+                        analyticsService.trackFirstToken(generationId)
+                        firstTokenTracked = true
+                    }
+                    tokens.add(token)
                 }
-                tokens.add(token)
-            }
 
-            // Emit collected tokens as chunks
-            for ((index, token) in tokens.withIndex()) {
-                emit(LLMGenerationChunk(
-                    text = token,
-                    isComplete = false,
-                    tokenCount = 1,
-                    timestamp = currentTimeMillis(),
-                    chunkIndex = chunkIndex++,
-                    sessionId = sessionId,
-                    finishReason = null
-                ))
+                // Emit collected tokens as chunks
+                for ((index, token) in tokens.withIndex()) {
+                    emit(
+                        LLMGenerationChunk(
+                            text = token,
+                            isComplete = false,
+                            tokenCount = 1,
+                            timestamp = currentTimeMillis(),
+                            chunkIndex = chunkIndex++,
+                            sessionId = sessionId,
+                            finishReason = null,
+                        ),
+                    )
 
-                // Track streaming update periodically (every 10 tokens)
-                if ((index + 1) % 10 == 0) {
-                    analyticsService.trackStreamingUpdate(generationId, index + 1)
+                    // Track streaming update periodically (every 10 tokens)
+                    if ((index + 1) % 10 == 0) {
+                        analyticsService.trackStreamingUpdate(generationId, index + 1)
+                    }
                 }
+
+                // Complete analytics tracking
+                val outputTokens = tokens.size
+                analyticsService.completeGeneration(
+                    generationId = generationId,
+                    inputTokens = promptTokens,
+                    outputTokens = outputTokens,
+                    modelId = modelId,
+                )
+
+                // Emit final chunk
+                emit(
+                    LLMGenerationChunk(
+                        text = "",
+                        isComplete = true,
+                        tokenCount = 0,
+                        timestamp = currentTimeMillis(),
+                        chunkIndex = chunkIndex,
+                        sessionId = sessionId,
+                        finishReason = FinishReason.COMPLETED,
+                    ),
+                )
+            } catch (e: Exception) {
+                analyticsService.trackGenerationFailed(generationId, e)
+                throw e
             }
-
-            // Complete analytics tracking
-            val outputTokens = tokens.size
-            analyticsService.completeGeneration(
-                generationId = generationId,
-                inputTokens = promptTokens,
-                outputTokens = outputTokens,
-                modelId = modelId
-            )
-
-            // Emit final chunk
-            emit(LLMGenerationChunk(
-                text = "",
-                isComplete = true,
-                tokenCount = 0,
-                timestamp = currentTimeMillis(),
-                chunkIndex = chunkIndex,
-                sessionId = sessionId,
-                finishReason = FinishReason.COMPLETED
-            ))
-        } catch (e: Exception) {
-            analyticsService.trackGenerationFailed(generationId, e)
-            throw e
         }
-    }
 
     /**
      * Get service for compatibility
      */
-    fun getService(): LLMService? {
-        return llmService
-    }
+    fun getService(): LLMService? = llmService
 
     /**
      * Load a specific model
@@ -587,7 +617,10 @@ class LLMComponent(
      * Check if prompt fits within context window
      * Note: This is a component-level utility not part of iOS LLMService protocol.
      */
-    fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
+    fun fitsInContext(
+        prompt: String,
+        maxTokens: Int,
+    ): Boolean {
         val promptTokens = getTokenCount(prompt)
         val totalTokens = promptTokens + maxTokens
         return totalTokens <= llmConfiguration.contextLength
@@ -608,9 +641,7 @@ class LLMComponent(
     /**
      * Get conversation context
      */
-    fun getConversationContext(): Context? {
-        return conversationContext
-    }
+    fun getConversationContext(): Context? = conversationContext
 
     /**
      * Set conversation context
@@ -636,7 +667,10 @@ class LLMComponent(
      *
      * Source: iOS LLMComponent.swift lines 520-536
      */
-    private fun buildPrompt(messages: List<Message>, systemPrompt: String?): String {
+    private fun buildPrompt(
+        messages: List<Message>,
+        systemPrompt: String?,
+    ): String {
         var prompt = ""
 
         // Add system prompt first if available

@@ -25,7 +25,6 @@ import kotlin.concurrent.Volatile
  * - Operations are dispatched to IO dispatcher for JNI calls
  */
 class LlamaCppCoreService : NativeCoreService {
-
     private val logger = SDKLogger("LlamaCppCoreService")
 
     @Volatile
@@ -70,39 +69,40 @@ class LlamaCppCoreService : NativeCoreService {
     // Lifecycle
     // =============================================================================
 
-    override suspend fun initialize(configJson: String?) = withContext(Dispatchers.IO) {
-        synchronized(lock) {
-            if (_isInitialized) {
-                logger.debug("Already initialized")
-                return@synchronized
+    override suspend fun initialize(configJson: String?) =
+        withContext(Dispatchers.IO) {
+            synchronized(lock) {
+                if (_isInitialized) {
+                    logger.debug("Already initialized")
+                    return@synchronized
+                }
+
+                // Ensure library is loaded
+                RunAnywhereBridge.loadLibrary()
+
+                logger.info("Creating LlamaCPP backend...")
+                backendHandle = RunAnywhereBridge.nativeCreateBackend("llamacpp")
+
+                if (backendHandle == 0L) {
+                    throw NativeBridgeException(
+                        NativeResultCode.ERROR_INIT_FAILED,
+                        "Failed to create LlamaCPP backend",
+                    )
+                }
+
+                val resultCode = RunAnywhereBridge.nativeInitialize(backendHandle, configJson)
+                val result = NativeResultCode.fromValue(resultCode)
+
+                if (!result.isSuccess) {
+                    RunAnywhereBridge.nativeDestroy(backendHandle)
+                    backendHandle = 0
+                    throw NativeBridgeException(result, "Failed to initialize LlamaCPP backend")
+                }
+
+                _isInitialized = true
+                logger.info("✅ LlamaCPP backend initialized")
             }
-
-            // Ensure library is loaded
-            RunAnywhereBridge.loadLibrary()
-
-            logger.info("Creating LlamaCPP backend...")
-            backendHandle = RunAnywhereBridge.nativeCreateBackend("llamacpp")
-
-            if (backendHandle == 0L) {
-                throw NativeBridgeException(
-                    NativeResultCode.ERROR_INIT_FAILED,
-                    "Failed to create LlamaCPP backend"
-                )
-            }
-
-            val resultCode = RunAnywhereBridge.nativeInitialize(backendHandle, configJson)
-            val result = NativeResultCode.fromValue(resultCode)
-
-            if (!result.isSuccess) {
-                RunAnywhereBridge.nativeDestroy(backendHandle)
-                backendHandle = 0
-                throw NativeBridgeException(result, "Failed to initialize LlamaCPP backend")
-            }
-
-            _isInitialized = true
-            logger.info("✅ LlamaCPP backend initialized")
         }
-    }
 
     override fun destroy() {
         synchronized(lock) {
@@ -135,16 +135,17 @@ class LlamaCppCoreService : NativeCoreService {
      */
     suspend fun loadTextModel(
         modelPath: String,
-        configJson: String? = null
+        configJson: String? = null,
     ) = withContext(Dispatchers.IO) {
         ensureInitialized()
 
         logger.info("Loading text model: $modelPath")
-        val resultCode = RunAnywhereBridge.nativeTextLoadModel(
-            backendHandle,
-            modelPath,
-            configJson
-        )
+        val resultCode =
+            RunAnywhereBridge.nativeTextLoadModel(
+                backendHandle,
+                modelPath,
+                configJson,
+            )
         val result = NativeResultCode.fromValue(resultCode)
 
         if (!result.isSuccess) {
@@ -158,19 +159,20 @@ class LlamaCppCoreService : NativeCoreService {
     /**
      * Unload the current text generation model
      */
-    suspend fun unloadTextModel() = withContext(Dispatchers.IO) {
-        ensureInitialized()
+    suspend fun unloadTextModel() =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
 
-        val resultCode = RunAnywhereBridge.nativeTextUnloadModel(backendHandle)
-        val result = NativeResultCode.fromValue(resultCode)
+            val resultCode = RunAnywhereBridge.nativeTextUnloadModel(backendHandle)
+            val result = NativeResultCode.fromValue(resultCode)
 
-        if (!result.isSuccess) {
-            throw NativeBridgeException(result, "Failed to unload text model")
+            if (!result.isSuccess) {
+                throw NativeBridgeException(result, "Failed to unload text model")
+            }
+
+            _isTextModelLoaded = false
+            logger.debug("Text model unloaded")
         }
-
-        _isTextModelLoaded = false
-        logger.debug("Text model unloaded")
-    }
 
     /**
      * Generate text from a prompt (synchronous/batch mode)
@@ -185,24 +187,26 @@ class LlamaCppCoreService : NativeCoreService {
         prompt: String,
         systemPrompt: String? = null,
         maxTokens: Int = 256,
-        temperature: Float = 0.7f
-    ): String = withContext(Dispatchers.IO) {
-        ensureInitialized()
-        ensureTextModelLoaded()
+        temperature: Float = 0.7f,
+    ): String =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
+            ensureTextModelLoaded()
 
-        val result = RunAnywhereBridge.nativeTextGenerate(
-            backendHandle,
-            prompt,
-            systemPrompt,
-            maxTokens,
-            temperature
-        )
+            val result =
+                RunAnywhereBridge.nativeTextGenerate(
+                    backendHandle,
+                    prompt,
+                    systemPrompt,
+                    maxTokens,
+                    temperature,
+                )
 
-        result ?: throw NativeBridgeException(
-            NativeResultCode.ERROR_INFERENCE_FAILED,
-            "Text generation failed: ${RunAnywhereBridge.nativeGetLastError()}"
-        )
-    }
+            result ?: throw NativeBridgeException(
+                NativeResultCode.ERROR_INFERENCE_FAILED,
+                "Text generation failed: ${RunAnywhereBridge.nativeGetLastError()}",
+            )
+        }
 
     /**
      * Cancel an ongoing text generation
@@ -228,10 +232,14 @@ class LlamaCppCoreService : NativeCoreService {
     override val isSTTModelLoaded: Boolean = false
     override val supportsSTTStreaming: Boolean = false
 
-    override suspend fun loadSTTModel(modelPath: String, modelType: String, configJson: String?) {
+    override suspend fun loadSTTModel(
+        modelPath: String,
+        modelType: String,
+        configJson: String?,
+    ) {
         throw NativeBridgeException(
             NativeResultCode.ERROR_NOT_IMPLEMENTED,
-            "STT not supported by LlamaCPP backend. Use ONNX backend for STT."
+            "STT not supported by LlamaCPP backend. Use ONNX backend for STT.",
         )
     }
 
@@ -239,12 +247,15 @@ class LlamaCppCoreService : NativeCoreService {
         // No-op
     }
 
-    override suspend fun transcribe(audioSamples: FloatArray, sampleRate: Int, language: String?): String {
+    override suspend fun transcribe(
+        audioSamples: FloatArray,
+        sampleRate: Int,
+        language: String?,
+    ): String =
         throw NativeBridgeException(
             NativeResultCode.ERROR_NOT_IMPLEMENTED,
-            "STT not supported by LlamaCPP backend. Use ONNX backend for STT."
+            "STT not supported by LlamaCPP backend. Use ONNX backend for STT.",
         )
-    }
 
     // =============================================================================
     // TTS Operations (Not supported by LlamaCPP - delegate to stub)
@@ -252,10 +263,14 @@ class LlamaCppCoreService : NativeCoreService {
 
     override val isTTSModelLoaded: Boolean = false
 
-    override suspend fun loadTTSModel(modelPath: String, modelType: String, configJson: String?) {
+    override suspend fun loadTTSModel(
+        modelPath: String,
+        modelType: String,
+        configJson: String?,
+    ) {
         throw NativeBridgeException(
             NativeResultCode.ERROR_NOT_IMPLEMENTED,
-            "TTS not supported by LlamaCPP backend. Use ONNX backend for TTS."
+            "TTS not supported by LlamaCPP backend. Use ONNX backend for TTS.",
         )
     }
 
@@ -267,13 +282,12 @@ class LlamaCppCoreService : NativeCoreService {
         text: String,
         voiceId: String?,
         speedRate: Float,
-        pitchShift: Float
-    ): NativeTTSSynthesisResult {
+        pitchShift: Float,
+    ): NativeTTSSynthesisResult =
         throw NativeBridgeException(
             NativeResultCode.ERROR_NOT_IMPLEMENTED,
-            "TTS not supported by LlamaCPP backend. Use ONNX backend for TTS."
+            "TTS not supported by LlamaCPP backend. Use ONNX backend for TTS.",
         )
-    }
 
     override suspend fun getVoices(): String = "[]"
 
@@ -283,10 +297,13 @@ class LlamaCppCoreService : NativeCoreService {
 
     override val isVADModelLoaded: Boolean = false
 
-    override suspend fun loadVADModel(modelPath: String?, configJson: String?) {
+    override suspend fun loadVADModel(
+        modelPath: String?,
+        configJson: String?,
+    ) {
         throw NativeBridgeException(
             NativeResultCode.ERROR_NOT_IMPLEMENTED,
-            "VAD not supported by LlamaCPP backend. Use ONNX backend for VAD."
+            "VAD not supported by LlamaCPP backend. Use ONNX backend for VAD.",
         )
     }
 
@@ -294,19 +311,23 @@ class LlamaCppCoreService : NativeCoreService {
         // No-op
     }
 
-    override suspend fun processVAD(audioSamples: FloatArray, sampleRate: Int): NativeVADResult {
+    override suspend fun processVAD(
+        audioSamples: FloatArray,
+        sampleRate: Int,
+    ): NativeVADResult =
         throw NativeBridgeException(
             NativeResultCode.ERROR_NOT_IMPLEMENTED,
-            "VAD not supported by LlamaCPP backend. Use ONNX backend for VAD."
+            "VAD not supported by LlamaCPP backend. Use ONNX backend for VAD.",
         )
-    }
 
-    override suspend fun detectVADSegments(audioSamples: FloatArray, sampleRate: Int): String {
+    override suspend fun detectVADSegments(
+        audioSamples: FloatArray,
+        sampleRate: Int,
+    ): String =
         throw NativeBridgeException(
             NativeResultCode.ERROR_NOT_IMPLEMENTED,
-            "VAD not supported by LlamaCPP backend. Use ONNX backend for VAD."
+            "VAD not supported by LlamaCPP backend. Use ONNX backend for VAD.",
         )
-    }
 
     // =============================================================================
     // Embedding Operations (LlamaCPP can do embeddings with embedding models)
@@ -321,53 +342,58 @@ class LlamaCppCoreService : NativeCoreService {
             return RunAnywhereBridge.nativeEmbedGetDimensions(backendHandle)
         }
 
-    override suspend fun loadEmbeddingModel(modelPath: String, configJson: String?) =
-        withContext(Dispatchers.IO) {
-            ensureInitialized()
-
-            logger.info("Loading embedding model: $modelPath")
-            val resultCode = RunAnywhereBridge.nativeEmbedLoadModel(
-                backendHandle,
-                modelPath,
-                configJson
-            )
-            val result = NativeResultCode.fromValue(resultCode)
-
-            if (!result.isSuccess) {
-                throw NativeBridgeException(result, "Failed to load embedding model: $modelPath")
-            }
-            logger.info("✅ Embedding model loaded")
-        }
-
-    override suspend fun unloadEmbeddingModel() = withContext(Dispatchers.IO) {
+    override suspend fun loadEmbeddingModel(
+        modelPath: String,
+        configJson: String?,
+    ) = withContext(Dispatchers.IO) {
         ensureInitialized()
 
-        val resultCode = RunAnywhereBridge.nativeEmbedUnloadModel(backendHandle)
+        logger.info("Loading embedding model: $modelPath")
+        val resultCode =
+            RunAnywhereBridge.nativeEmbedLoadModel(
+                backendHandle,
+                modelPath,
+                configJson,
+            )
         val result = NativeResultCode.fromValue(resultCode)
 
         if (!result.isSuccess) {
-            throw NativeBridgeException(result, "Failed to unload embedding model")
+            throw NativeBridgeException(result, "Failed to load embedding model: $modelPath")
         }
-        logger.debug("Embedding model unloaded")
+        logger.info("✅ Embedding model loaded")
     }
 
-    override suspend fun embed(text: String): FloatArray = withContext(Dispatchers.IO) {
-        ensureInitialized()
+    override suspend fun unloadEmbeddingModel() =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
 
-        if (!isEmbeddingModelLoaded) {
-            throw NativeBridgeException(
-                NativeResultCode.ERROR_MODEL_LOAD_FAILED,
-                "Embedding model not loaded. Call loadEmbeddingModel() first."
+            val resultCode = RunAnywhereBridge.nativeEmbedUnloadModel(backendHandle)
+            val result = NativeResultCode.fromValue(resultCode)
+
+            if (!result.isSuccess) {
+                throw NativeBridgeException(result, "Failed to unload embedding model")
+            }
+            logger.debug("Embedding model unloaded")
+        }
+
+    override suspend fun embed(text: String): FloatArray =
+        withContext(Dispatchers.IO) {
+            ensureInitialized()
+
+            if (!isEmbeddingModelLoaded) {
+                throw NativeBridgeException(
+                    NativeResultCode.ERROR_MODEL_LOAD_FAILED,
+                    "Embedding model not loaded. Call loadEmbeddingModel() first.",
+                )
+            }
+
+            val result = RunAnywhereBridge.nativeEmbedText(backendHandle, text)
+
+            result ?: throw NativeBridgeException(
+                NativeResultCode.ERROR_INFERENCE_FAILED,
+                "Embedding failed: ${RunAnywhereBridge.nativeGetLastError()}",
             )
         }
-
-        val result = RunAnywhereBridge.nativeEmbedText(backendHandle, text)
-
-        result ?: throw NativeBridgeException(
-            NativeResultCode.ERROR_INFERENCE_FAILED,
-            "Embedding failed: ${RunAnywhereBridge.nativeGetLastError()}"
-        )
-    }
 
     // =============================================================================
     // Private Helpers
@@ -377,7 +403,7 @@ class LlamaCppCoreService : NativeCoreService {
         if (!_isInitialized || backendHandle == 0L) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_INVALID_HANDLE,
-                "LlamaCPP backend not initialized. Call initialize() first."
+                "LlamaCPP backend not initialized. Call initialize() first.",
             )
         }
     }
@@ -386,7 +412,7 @@ class LlamaCppCoreService : NativeCoreService {
         if (!isTextModelLoaded) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_MODEL_LOAD_FAILED,
-                "Text model not loaded. Call loadTextModel() first."
+                "Text model not loaded. Call loadTextModel() first.",
             )
         }
     }

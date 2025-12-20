@@ -12,9 +12,8 @@ import kotlin.math.*
 class DefaultSpeakerDiarizationService(
     private var config: SpeakerDiarizationConfiguration,
     private val database: SpeakerDatabase,
-    private val audioProcessor: PlatformAudioProcessor
+    private val audioProcessor: PlatformAudioProcessor,
 ) : SpeakerDiarizationService {
-
     // MARK: - Properties
 
     override var isReady: Boolean = false
@@ -76,8 +75,9 @@ class DefaultSpeakerDiarizationService(
             throw SpeakerDiarizationError.NotInitialized
         }
 
-        val speakerManager = this.speakerManager
-            ?: throw SpeakerDiarizationError.NotInitialized
+        val speakerManager =
+            this.speakerManager
+                ?: throw SpeakerDiarizationError.NotInitialized
 
         try {
             // Add samples to accumulator for better analysis
@@ -99,20 +99,22 @@ class DefaultSpeakerDiarizationService(
 
             // Create embedding and detect speaker
             val embedding = createSimpleEmbedding(processingSamples)
-            val detectedSpeaker = findMatchingSpeaker(embedding)
-                ?: createNewSpeaker(embedding)
+            val detectedSpeaker =
+                findMatchingSpeaker(embedding)
+                    ?: createNewSpeaker(embedding)
 
             // Check for speaker change
             if (currentSpeaker?.id != detectedSpeaker.id) {
                 // Finalize previous segment
                 currentSpeaker?.let { prevSpeaker ->
                     if (prevSpeaker.id != "SILENCE") {
-                        val segment = SpeakerSegment(
-                            speakerId = prevSpeaker.id,
-                            startTime = segmentStartTime,
-                            endTime = startTime,
-                            confidence = prevSpeaker.confidence ?: 0.8f
-                        )
+                        val segment =
+                            SpeakerSegment(
+                                speakerId = prevSpeaker.id,
+                                startTime = segmentStartTime,
+                                endTime = startTime,
+                                confidence = prevSpeaker.confidence ?: 0.8f,
+                            )
                         speakerSegments.add(segment)
                     }
                 }
@@ -127,7 +129,6 @@ class DefaultSpeakerDiarizationService(
             currentChunkStartTime = currentTime
 
             return detectedSpeaker
-
         } catch (e: Exception) {
             throw SpeakerDiarizationError.ProcessingFailed(e.message ?: "Audio processing error")
         }
@@ -135,7 +136,7 @@ class DefaultSpeakerDiarizationService(
 
     override suspend fun performDetailedDiarization(
         audioBuffer: FloatArray,
-        sampleRate: Int
+        sampleRate: Int,
     ): SpeakerDiarizationResult? {
         if (!isReady) {
             throw SpeakerDiarizationError.NotInitialized
@@ -148,12 +149,13 @@ class DefaultSpeakerDiarizationService(
             val speakers = mutableSetOf<SpeakerInfo>()
 
             // Segment audio into overlapping chunks
-            val chunks = audioProcessor.segmentAudio(
-                audioBuffer,
-                sampleRate,
-                config.windowSize,
-                config.stepSize
-            )
+            val chunks =
+                audioProcessor.segmentAudio(
+                    audioBuffer,
+                    sampleRate,
+                    config.windowSize,
+                    config.stepSize,
+                )
 
             var currentSpeaker: SpeakerInfo? = null
             var segmentStart = 0.0
@@ -161,8 +163,9 @@ class DefaultSpeakerDiarizationService(
             for (chunk in chunks) {
                 // Process each chunk
                 val embedding = createSimpleEmbedding(chunk.samples)
-                val detectedSpeaker = findMatchingSpeaker(embedding)
-                    ?: createNewSpeaker(embedding)
+                val detectedSpeaker =
+                    findMatchingSpeaker(embedding)
+                        ?: createNewSpeaker(embedding)
 
                 speakers.add(detectedSpeaker)
 
@@ -171,13 +174,14 @@ class DefaultSpeakerDiarizationService(
                     // Finalize previous segment
                     currentSpeaker?.let { prevSpeaker ->
                         if (prevSpeaker.id != "SILENCE") {
-                            val segment = SpeakerSegment(
-                                speakerId = prevSpeaker.id,
-                                startTime = segmentStart,
-                                endTime = chunk.startTime,
-                                confidence = prevSpeaker.confidence ?: 0.8f,
-                                energy = audioProcessor.calculateRMSEnergy(chunk.samples)
-                            )
+                            val segment =
+                                SpeakerSegment(
+                                    speakerId = prevSpeaker.id,
+                                    startTime = segmentStart,
+                                    endTime = chunk.startTime,
+                                    confidence = prevSpeaker.confidence ?: 0.8f,
+                                    energy = audioProcessor.calculateRMSEnergy(chunk.samples),
+                                )
                             segments.add(segment)
                         }
                     }
@@ -192,13 +196,14 @@ class DefaultSpeakerDiarizationService(
             currentSpeaker?.let { speaker ->
                 if (speaker.id != "SILENCE" && chunks.isNotEmpty()) {
                     val lastChunk = chunks.last()
-                    val segment = SpeakerSegment(
-                        speakerId = speaker.id,
-                        startTime = segmentStart,
-                        endTime = lastChunk.endTime,
-                        confidence = speaker.confidence ?: 0.8f,
-                        energy = audioProcessor.calculateRMSEnergy(lastChunk.samples)
-                    )
+                    val segment =
+                        SpeakerSegment(
+                            speakerId = speaker.id,
+                            startTime = segmentStart,
+                            endTime = lastChunk.endTime,
+                            confidence = speaker.confidence ?: 0.8f,
+                            energy = audioProcessor.calculateRMSEnergy(lastChunk.samples),
+                        )
                     segments.add(segment)
                 }
             }
@@ -209,9 +214,8 @@ class DefaultSpeakerDiarizationService(
                 speakers = speakers.toList(),
                 segments = segments,
                 processingTime = processingTime,
-                confidence = speakers.mapNotNull { it.confidence }.average().toFloat()
+                confidence = speakers.mapNotNull { it.confidence }.average().toFloat(),
             )
-
         } catch (e: Exception) {
             throw SpeakerDiarizationError.ProcessingFailed(e.message ?: "Detailed diarization error")
         }
@@ -219,9 +223,7 @@ class DefaultSpeakerDiarizationService(
 
     // MARK: - Speaker Management
 
-    override fun getAllSpeakers(): List<SpeakerInfo> {
-        return speakerManager?.getActiveSpeakers() ?: emptyList()
-    }
+    override fun getAllSpeakers(): List<SpeakerInfo> = speakerManager?.getActiveSpeakers() ?: emptyList()
 
     override fun getSpeakerProfile(id: String): SpeakerProfile? {
         // This would need to be suspended, but interface doesn't allow it
@@ -229,7 +231,10 @@ class DefaultSpeakerDiarizationService(
         return null // TODO: Implement with cached profiles
     }
 
-    override fun updateSpeakerName(speakerId: String, name: String) {
+    override fun updateSpeakerName(
+        speakerId: String,
+        name: String,
+    ) {
         // Update would need to be suspended for database access
         // For now, update in-memory only
         speakerManager?.let { manager ->
@@ -292,7 +297,10 @@ class DefaultSpeakerDiarizationService(
      * Calculate cosine similarity between two embeddings
      * Uses the same algorithm as iOS implementation
      */
-    private fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
+    private fun cosineSimilarity(
+        a: FloatArray,
+        b: FloatArray,
+    ): Float {
         if (a.size != b.size) return 0.0f
 
         return audioProcessor.cosineSimilarity(a, b)
@@ -341,22 +349,21 @@ class DefaultSpeakerDiarizationService(
             name = null, // Will be assigned later
             confidence = 0.8f, // Default confidence for new speakers
             embedding = embedding,
-            createdAt = getCurrentTimeMillis()
+            createdAt = getCurrentTimeMillis(),
         )
     }
 
     /**
      * Create silence/no speaker indicator
      */
-    private fun createSilenceSpeaker(): SpeakerInfo {
-        return SpeakerInfo(
+    private fun createSilenceSpeaker(): SpeakerInfo =
+        SpeakerInfo(
             id = "SILENCE",
             name = "Silence",
             confidence = 1.0f,
             embedding = null,
-            createdAt = getCurrentTimeMillis()
+            createdAt = getCurrentTimeMillis(),
         )
-    }
 
     // MARK: - Audio Analysis Utilities
 
@@ -369,28 +376,6 @@ class DefaultSpeakerDiarizationService(
 
         val sumSquares = samples.map { it * it }.sum()
         return sqrt(sumSquares / samples.size)
-    }
-
-    /**
-     * Check if audio contains speech based on energy threshold
-     */
-    private fun containsSpeech(samples: FloatArray): Boolean {
-        val energy = calculateRMSEnergy(samples)
-        return energy > config.energyThreshold
-    }
-
-    /**
-     * Detect speaker change based on embedding similarity
-     */
-    private fun detectSpeakerChange(
-        currentEmbedding: FloatArray?,
-        newEmbedding: FloatArray
-    ): Boolean {
-        currentEmbedding?.let { current ->
-            val similarity = cosineSimilarity(current, newEmbedding)
-            return similarity < config.speakerChangeThreshold
-        }
-        return true // First speaker or no previous embedding
     }
 }
 
@@ -409,17 +394,15 @@ class InMemorySpeakerDatabase : SpeakerDatabase {
         }
     }
 
-    override suspend fun getSpeaker(id: String): SpeakerProfile? {
-        return mutex.withLock {
+    override suspend fun getSpeaker(id: String): SpeakerProfile? =
+        mutex.withLock {
             speakers[id]
         }
-    }
 
-    override suspend fun getAllSpeakers(): List<SpeakerProfile> {
-        return mutex.withLock {
+    override suspend fun getAllSpeakers(): List<SpeakerProfile> =
+        mutex.withLock {
             speakers.values.toList()
         }
-    }
 
     override suspend fun updateSpeaker(profile: SpeakerProfile) {
         mutex.withLock {
@@ -441,18 +424,20 @@ class InMemorySpeakerDatabase : SpeakerDatabase {
 
     override suspend fun findSimilarSpeakers(
         embedding: FloatArray,
-        threshold: Float
-    ): List<Pair<SpeakerProfile, Float>> {
-        return mutex.withLock {
+        threshold: Float,
+    ): List<Pair<SpeakerProfile, Float>> =
+        mutex.withLock {
             val processor = PlatformAudioProcessor() // Platform-specific instance
-            speakers.values.mapNotNull { profile ->
-                profile.embedding?.let { profileEmbedding ->
-                    val similarity = processor.cosineSimilarity(embedding, profileEmbedding)
-                    if (similarity > threshold) {
-                        profile to similarity
-                    } else null
-                }
-            }.sortedByDescending { it.second }
+            speakers.values
+                .mapNotNull { profile ->
+                    profile.embedding?.let { profileEmbedding ->
+                        val similarity = processor.cosineSimilarity(embedding, profileEmbedding)
+                        if (similarity > threshold) {
+                            profile to similarity
+                        } else {
+                            null
+                        }
+                    }
+                }.sortedByDescending { it.second }
         }
-    }
 }

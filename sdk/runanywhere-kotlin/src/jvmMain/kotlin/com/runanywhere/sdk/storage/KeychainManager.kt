@@ -1,12 +1,12 @@
 package com.runanywhere.sdk.storage
 
+import com.runanywhere.sdk.foundation.SDKLogger
+import java.util.Base64
 import java.util.prefs.Preferences
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
-import java.util.Base64
-import com.runanywhere.sdk.foundation.SDKLogger
 
 /**
  * JVM implementation of secure credential storage
@@ -39,8 +39,8 @@ object KeychainManager {
     /**
      * Retrieve API key
      */
-    fun getAPIKey(): String? {
-        return try {
+    fun getAPIKey(): String? =
+        try {
             val stored = prefs.get(API_KEY_PREF, null)
             if (stored != null) {
                 decrypt(stored)
@@ -52,7 +52,6 @@ object KeychainManager {
             // Try as plain text
             prefs.get(API_KEY_PREF, null)
         }
-    }
 
     /**
      * Clear stored credentials

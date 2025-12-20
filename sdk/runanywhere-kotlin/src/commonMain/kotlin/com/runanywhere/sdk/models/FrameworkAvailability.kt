@@ -17,7 +17,7 @@ data class FrameworkAvailability(
     val unavailabilityReason: String? = null,
     val recommendedFor: List<String> = emptyList(),
     val supportedFormats: List<ModelFormat> = emptyList(),
-    val supportedModalities: Set<FrameworkModality> = emptySet()
+    val supportedModalities: Set<FrameworkModality> = emptySet(),
 ) {
     companion object {
         /**
@@ -26,22 +26,25 @@ data class FrameworkAvailability(
         fun forFramework(
             framework: InferenceFramework,
             isAvailable: Boolean,
-            unavailabilityReason: String? = null
-        ): FrameworkAvailability {
-            return FrameworkAvailability(
+            unavailabilityReason: String? = null,
+        ): FrameworkAvailability =
+            FrameworkAvailability(
                 framework = framework,
                 isAvailable = isAvailable,
                 unavailabilityReason = unavailabilityReason,
                 recommendedFor = getRecommendedFor(framework),
                 supportedFormats = getSupportedFormats(framework),
-                supportedModalities = framework.supportedModalities
+                supportedModalities = framework.supportedModalities,
             )
-        }
 
-        private fun getRecommendedFor(framework: InferenceFramework): List<String> {
-            return when (framework) {
+        private fun getRecommendedFor(framework: InferenceFramework): List<String> =
+            when (framework) {
                 InferenceFramework.LLAMA_CPP, InferenceFramework.LLAMACPP -> listOf("GGUF models", "Text generation", "Chat")
-                InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP, InferenceFramework.OPEN_AI_WHISPER -> listOf("Speech recognition", "Transcription")
+                InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP, InferenceFramework.OPEN_AI_WHISPER ->
+                    listOf(
+                        "Speech recognition",
+                        "Transcription",
+                    )
                 InferenceFramework.TENSOR_FLOW_LITE -> listOf("TFLite models", "Edge inference")
                 InferenceFramework.ONNX -> listOf("ONNX models", "Cross-platform inference")
                 InferenceFramework.CORE_ML -> listOf("Apple Neural Engine", "iOS/macOS optimization")
@@ -57,10 +60,9 @@ data class FrameworkAvailability(
                 InferenceFramework.BUILT_IN -> listOf("Built-in algorithms", "Energy-based VAD")
                 InferenceFramework.NONE, InferenceFramework.UNKNOWN -> emptyList()
             }
-        }
 
-        private fun getSupportedFormats(framework: InferenceFramework): List<ModelFormat> {
-            return when (framework) {
+        private fun getSupportedFormats(framework: InferenceFramework): List<ModelFormat> =
+            when (framework) {
                 InferenceFramework.LLAMA_CPP, InferenceFramework.LLAMACPP -> listOf(ModelFormat.GGUF, ModelFormat.GGML)
                 InferenceFramework.WHISPER_KIT -> listOf(ModelFormat.MLMODEL, ModelFormat.MLPACKAGE)
                 InferenceFramework.WHISPER_CPP -> listOf(ModelFormat.GGML, ModelFormat.BIN)
@@ -80,6 +82,5 @@ data class FrameworkAvailability(
                 InferenceFramework.BUILT_IN -> emptyList() // Built-in algorithms, no model files
                 InferenceFramework.NONE, InferenceFramework.UNKNOWN -> emptyList()
             }
-        }
     }
 }

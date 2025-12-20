@@ -1,14 +1,12 @@
 package com.runanywhere.sdk.storage
 
 import com.runanywhere.sdk.models.ModelInfo
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Download strategy interface matching iOS DownloadStrategy protocol
  * Base interface for all download operations, extended by ModelStorageStrategy
  */
 interface DownloadStrategy {
-
     /**
      * Download a model with progress tracking
      * @param model The model to download
@@ -19,7 +17,7 @@ interface DownloadStrategy {
     suspend fun download(
         model: ModelInfo,
         destinationFolder: String,
-        progressHandler: ((DownloadProgress) -> Unit)? = null
+        progressHandler: ((DownloadProgress) -> Unit)? = null,
     ): String
 
     /**
@@ -49,27 +47,29 @@ data class DownloadProgress(
     val estimatedTimeRemaining: Double? = null,
     val currentFile: String? = null,
     val filesDownloaded: Int = 0,
-    val totalFiles: Int = 1
+    val totalFiles: Int = 1,
 ) {
     /**
      * Progress percentage (0.0 to 1.0)
      */
     val percentage: Double
-        get() = if (totalBytes > 0) {
-            bytesDownloaded.toDouble() / totalBytes.toDouble()
-        } else {
-            0.0
-        }
+        get() =
+            if (totalBytes > 0) {
+                bytesDownloaded.toDouble() / totalBytes.toDouble()
+            } else {
+                0.0
+            }
 
     /**
      * File-based progress percentage (for multi-file downloads)
      */
     val fileProgress: Double
-        get() = if (totalFiles > 0) {
-            filesDownloaded.toDouble() / totalFiles.toDouble()
-        } else {
-            0.0
-        }
+        get() =
+            if (totalFiles > 0) {
+                filesDownloaded.toDouble() / totalFiles.toDouble()
+            } else {
+                0.0
+            }
 
     /**
      * Whether download is complete
@@ -93,7 +93,7 @@ enum class DownloadState {
     COMPLETED,
     FAILED,
     CANCELLED,
-    PAUSED
+    PAUSED,
 }
 
 /**
@@ -101,18 +101,23 @@ enum class DownloadState {
  * Provides comprehensive error categorization with detailed information
  */
 sealed class DownloadError : Exception() {
-
     // URL and request errors
-    data class InvalidURL(val url: String) : DownloadError() {
+    data class InvalidURL(
+        val url: String,
+    ) : DownloadError() {
         override val message = "Invalid URL: $url"
     }
 
     // Network-related errors
-    data class NetworkError(override val cause: Throwable?) : DownloadError() {
+    data class NetworkError(
+        override val cause: Throwable?,
+    ) : DownloadError() {
         override val message = "Network error: ${cause?.message ?: "Unknown network issue"}"
     }
 
-    data class Timeout(val timeoutSeconds: Int) : DownloadError() {
+    data class Timeout(
+        val timeoutSeconds: Int,
+    ) : DownloadError() {
         override val message = "Download timed out after $timeoutSeconds seconds"
     }
 
@@ -121,34 +126,52 @@ sealed class DownloadError : Exception() {
     }
 
     // HTTP-specific errors
-    data class HttpError(val statusCode: Int, val statusMessage: String? = null) : DownloadError() {
+    data class HttpError(
+        val statusCode: Int,
+        val statusMessage: String? = null,
+    ) : DownloadError() {
         override val message = "HTTP error $statusCode${statusMessage?.let { ": $it" } ?: ""}"
     }
 
     // File and storage errors
-    data class InsufficientSpace(val required: Long, val available: Long) : DownloadError() {
+    data class InsufficientSpace(
+        val required: Long,
+        val available: Long,
+    ) : DownloadError() {
         override val message = "Insufficient storage space. Required: ${required / 1024 / 1024}MB, Available: ${available / 1024 / 1024}MB"
     }
 
-    data class PartialDownload(val expected: Long, val actual: Long) : DownloadError() {
+    data class PartialDownload(
+        val expected: Long,
+        val actual: Long,
+    ) : DownloadError() {
         override val message = "Partial download: expected $expected bytes, got $actual bytes"
     }
 
-    data class ChecksumMismatch(val expected: String, val actual: String) : DownloadError() {
+    data class ChecksumMismatch(
+        val expected: String,
+        val actual: String,
+    ) : DownloadError() {
         override val message = "Checksum mismatch: expected $expected, got $actual"
     }
 
     // Archive and extraction errors
-    data class ExtractionFailed(val reason: String) : DownloadError() {
+    data class ExtractionFailed(
+        val reason: String,
+    ) : DownloadError() {
         override val message = "Failed to extract archive: $reason"
     }
 
-    data class UnsupportedArchive(val format: String) : DownloadError() {
+    data class UnsupportedArchive(
+        val format: String,
+    ) : DownloadError() {
         override val message = "Unsupported archive format: $format"
     }
 
     // Model-specific errors
-    data class ModelNotFound(val modelId: String) : DownloadError() {
+    data class ModelNotFound(
+        val modelId: String,
+    ) : DownloadError() {
         override val message = "Model not found: $modelId"
     }
 
@@ -158,5 +181,8 @@ sealed class DownloadError : Exception() {
     }
 
     // Generic errors
-    data class UnknownError(override val message: String, override val cause: Throwable? = null) : DownloadError()
+    data class UnknownError(
+        override val message: String,
+        override val cause: Throwable? = null,
+    ) : DownloadError()
 }

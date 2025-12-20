@@ -13,24 +13,18 @@ import kotlinx.serialization.Serializable
 data class Message(
     /** The role of the message sender */
     val role: MessageRole,
-
     /** The content of the message */
     val content: String,
-
     /** Optional thinking content (for thinking mode models) */
     val thinkingContent: String? = null,
-
     /** Optional metadata */
     val metadata: Map<String, String>? = null,
-
     /** Timestamp when the message was created */
     val timestamp: Long = getCurrentTimeMillis(),
-
     /** Optional analytics data for this message */
     val analytics: MessageAnalytics? = null,
-
     /** Optional model information for this message */
-    val modelInfo: MessageModelInfo? = null
+    val modelInfo: MessageModelInfo? = null,
 ) {
     /** Helper to check if message is from user */
     val isFromUser: Boolean get() = role == MessageRole.USER
@@ -42,15 +36,16 @@ data class Message(
  * Role of the message sender - exact match with iOS MessageRole
  */
 @Serializable
-enum class MessageRole(val value: String) {
+enum class MessageRole(
+    val value: String,
+) {
     SYSTEM("system"),
     USER("user"),
-    ASSISTANT("assistant");
+    ASSISTANT("assistant"),
+    ;
 
     companion object {
-        fun fromValue(value: String): MessageRole? {
-            return values().find { it.value == value }
-        }
+        fun fromValue(value: String): MessageRole? = values().find { it.value == value }
     }
 }
 
@@ -63,15 +58,12 @@ enum class MessageRole(val value: String) {
 data class Context(
     /** System prompt for the conversation */
     val systemPrompt: String? = null,
-
     /** Previous messages in the conversation */
     val messages: List<Message> = emptyList(),
-
     /** Maximum number of messages to keep in context */
     val maxMessages: Int = 100,
-
     /** Additional context metadata */
-    val metadata: Map<String, String> = emptyMap()
+    val metadata: Map<String, String> = emptyMap(),
 ) {
     /**
      * Add a message to the context
@@ -81,11 +73,12 @@ data class Context(
         newMessages.add(message)
 
         // Trim if exceeds max
-        val trimmedMessages = if (newMessages.size > maxMessages) {
-            newMessages.takeLast(maxMessages)
-        } else {
-            newMessages
-        }
+        val trimmedMessages =
+            if (newMessages.size > maxMessages) {
+                newMessages.takeLast(maxMessages)
+            } else {
+                newMessages
+            }
 
         return copy(messages = trimmedMessages)
     }
@@ -93,12 +86,11 @@ data class Context(
     /**
      * Clear all messages but keep system prompt
      */
-    fun cleared(): Context {
-        return copy(
+    fun cleared(): Context =
+        copy(
             messages = emptyList(),
-            metadata = metadata
+            metadata = metadata,
         )
-    }
 
     /**
      * Get total message count
@@ -143,5 +135,5 @@ data class Conversation(
     val updatedAt: Long = getCurrentTimeMillis(),
     val modelName: String? = null,
     val analytics: ConversationAnalytics? = null,
-    val performanceSummary: PerformanceSummary? = null
+    val performanceSummary: PerformanceSummary? = null,
 )

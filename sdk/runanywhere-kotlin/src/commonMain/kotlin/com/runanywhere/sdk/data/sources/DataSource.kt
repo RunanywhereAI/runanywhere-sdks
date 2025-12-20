@@ -151,7 +151,7 @@ data class DataSourceConfiguration(
     val type: DataSourceType,
     val version: String,
     val capabilities: Set<DataSourceCapability>,
-    val metadata: Map<String, Any> = emptyMap()
+    val metadata: Map<String, Any> = emptyMap(),
 )
 
 /**
@@ -161,7 +161,7 @@ enum class DataSourceType {
     CACHE,
     LOCAL_STORAGE,
     NETWORK,
-    HYBRID
+    HYBRID,
 }
 
 /**
@@ -175,7 +175,7 @@ enum class DataSourceCapability {
     SYNC,
     SEARCH,
     INDEXING,
-    TRANSACTIONS
+    TRANSACTIONS,
 }
 
 /**
@@ -186,7 +186,7 @@ data class DataSourceHealth(
     val status: HealthStatus,
     val lastCheckTime: Long,
     val errors: List<String> = emptyList(),
-    val metrics: Map<String, Any> = emptyMap()
+    val metrics: Map<String, Any> = emptyMap(),
 )
 
 /**
@@ -196,7 +196,7 @@ enum class HealthStatus {
     HEALTHY,
     DEGRADED,
     UNHEALTHY,
-    UNKNOWN
+    UNKNOWN,
 }
 
 /**
@@ -208,7 +208,7 @@ data class StorageInfo(
     val availableSize: Long,
     val entityCount: Int,
     val lastModified: Long,
-    val metadata: Map<String, Any> = emptyMap()
+    val metadata: Map<String, Any> = emptyMap(),
 )
 
 /**
@@ -218,7 +218,7 @@ data class NetworkStatus(
     val isConnected: Boolean,
     val connectionType: ConnectionType,
     val latency: Long = -1,
-    val bandwidth: Long = -1
+    val bandwidth: Long = -1,
 )
 
 /**
@@ -229,7 +229,7 @@ enum class ConnectionType {
     CELLULAR,
     ETHERNET,
     UNKNOWN,
-    NONE
+    NONE,
 }
 
 /**
@@ -239,7 +239,7 @@ data class SyncResult<T>(
     val synced: List<T>,
     val conflicts: List<SyncConflict<T>>,
     val errors: List<RepositoryError>,
-    val statistics: SyncStatistics
+    val statistics: SyncStatistics,
 )
 
 /**
@@ -249,7 +249,7 @@ data class SyncConflict<T>(
     val localEntity: T,
     val remoteEntity: T,
     val conflictType: ConflictType,
-    val field: String? = null
+    val field: String? = null,
 )
 
 /**
@@ -259,7 +259,7 @@ enum class ConflictType {
     MODIFICATION_CONFLICT,
     DELETION_CONFLICT,
     CREATION_CONFLICT,
-    VERSION_CONFLICT
+    VERSION_CONFLICT,
 }
 
 /**
@@ -271,5 +271,5 @@ data class SyncStatistics(
     val failed: Int,
     val conflicts: Int,
     val duration: Long,
-    val timestamp: Long
+    val timestamp: Long,
 )

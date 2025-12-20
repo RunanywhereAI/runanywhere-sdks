@@ -1,10 +1,9 @@
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.features.tts.TTSCapability
+import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.features.tts.TTSOptions
 import com.runanywhere.sdk.features.tts.TTSResult
-import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -26,8 +25,9 @@ suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
     requireInitialized()
     ensureServicesReady()
 
-    val capability = ttsCapability
-        ?: throw SDKError.ComponentNotInitialized("TTS capability not available")
+    val capability =
+        ttsCapability
+            ?: throw SDKError.ComponentNotInitialized("TTS capability not available")
 
     capability.loadVoice(voiceId)
 }
@@ -73,13 +73,14 @@ val RunAnywhere.availableTTSVoices: List<String>
  */
 suspend fun RunAnywhere.synthesize(
     text: String,
-    options: TTSOptions = TTSOptions()
+    options: TTSOptions = TTSOptions(),
 ): TTSResult {
     requireInitialized()
     ensureServicesReady()
 
-    val capability = ttsCapability
-        ?: throw SDKError.ComponentNotReady("TTS capability not available. Call loadTTSVoice() first.")
+    val capability =
+        ttsCapability
+            ?: throw SDKError.ComponentNotReady("TTS capability not available. Call loadTTSVoice() first.")
 
     return capability.synthesize(text, options)
 }
@@ -93,12 +94,13 @@ suspend fun RunAnywhere.synthesize(
  */
 fun RunAnywhere.synthesizeStream(
     text: String,
-    options: TTSOptions = TTSOptions()
+    options: TTSOptions = TTSOptions(),
 ): Flow<ByteArray> {
     requireInitialized()
 
-    val capability = ttsCapability
-        ?: throw SDKError.ComponentNotReady("TTS capability not available. Call loadTTSVoice() first.")
+    val capability =
+        ttsCapability
+            ?: throw SDKError.ComponentNotReady("TTS capability not available. Call loadTTSVoice() first.")
 
     return capability.synthesizeStream(text, options)
 }

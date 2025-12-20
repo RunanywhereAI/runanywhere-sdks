@@ -64,6 +64,7 @@ navigationCompose = "2.8.5"
 # Code Quality
 # ============================================================================
 detekt = "1.23.7"
+ktlint = "12.1.2"
 
 # ============================================================================
 # IDE Plugin Development
@@ -337,6 +338,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 # Code Quality
 # ----------------------------------------------------------------------------
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 
 # ----------------------------------------------------------------------------
 # IDE Plugin Development

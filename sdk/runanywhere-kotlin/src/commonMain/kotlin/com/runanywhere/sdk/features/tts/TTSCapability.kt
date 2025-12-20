@@ -1,7 +1,6 @@
 package com.runanywhere.sdk.features.tts
 
 import com.runanywhere.sdk.core.AudioFormat
-import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +19,7 @@ import kotlinx.coroutines.flow.map
  * the public RunAnywhere+TTS.kt extension functions.
  */
 class TTSCapability internal constructor(
-    private val getComponent: () -> TTSComponent
+    private val getComponent: () -> TTSComponent,
 ) {
     private val logger = SDKLogger("TTSCapability")
 
@@ -49,11 +48,12 @@ class TTSCapability internal constructor(
      * Get available TTS voices
      */
     val availableVoices: List<String>
-        get() = try {
-            getComponent().getAllVoices().map { it.id }
-        } catch (e: Exception) {
-            emptyList()
-        }
+        get() =
+            try {
+                getComponent().getAllVoices().map { it.id }
+            } catch (e: Exception) {
+                emptyList()
+            }
 
     // ============================================================================
     // MARK: - Voice Lifecycle (iOS ModelLoadableCapability pattern)
@@ -117,21 +117,25 @@ class TTSCapability internal constructor(
      * @param options Synthesis options
      * @return TTSResult with audio data
      */
-    suspend fun synthesize(text: String, options: TTSOptions): TTSResult {
+    suspend fun synthesize(
+        text: String,
+        options: TTSOptions,
+    ): TTSResult {
         ensureVoiceLoaded()
 
         val component = getComponent()
 
-        val output = component.synthesize(
-            text = text,
-            voice = options.voice,
-            language = options.language
-        )
+        val output =
+            component.synthesize(
+                text = text,
+                voice = options.voice,
+                language = options.language,
+            )
 
         return TTSResult(
             audioData = output.audioData,
             format = output.format,
-            duration = output.duration
+            duration = output.duration,
         )
     }
 
@@ -142,7 +146,10 @@ class TTSCapability internal constructor(
      * @param options Synthesis options
      * @return Flow of audio data chunks
      */
-    fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> {
+    fun synthesizeStream(
+        text: String,
+        options: TTSOptions,
+    ): Flow<ByteArray> {
         ensureVoiceLoaded()
 
         val component = getComponent()
@@ -186,7 +193,7 @@ data class TTSResult(
     /** Audio format (from core package) */
     val format: AudioFormat,
     /** Duration in seconds */
-    val duration: Double
+    val duration: Double,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

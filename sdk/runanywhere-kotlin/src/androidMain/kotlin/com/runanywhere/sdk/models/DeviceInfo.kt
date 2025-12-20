@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.models
 
-import android.os.Build
 import android.app.ActivityManager
 import android.content.Context
+import android.os.Build
 import com.runanywhere.sdk.storage.AndroidPlatformContext
 
 /**
@@ -15,20 +15,22 @@ actual fun collectDeviceInfo(): DeviceInfo {
     // Get memory info
     val memoryInfo = ActivityManager.MemoryInfo()
     activityManager?.getMemoryInfo(memoryInfo)
-    val totalMemoryMB = if (memoryInfo.totalMem > 0) {
-        memoryInfo.totalMem / (1024 * 1024)
-    } else {
-        // Fallback for older Android versions
-        Runtime.getRuntime().maxMemory() / (1024 * 1024)
-    }
+    val totalMemoryMB =
+        if (memoryInfo.totalMem > 0) {
+            memoryInfo.totalMem / (1024 * 1024)
+        } else {
+            // Fallback for older Android versions
+            Runtime.getRuntime().maxMemory() / (1024 * 1024)
+        }
 
     // Get app info
     val packageManager = context.packageManager
-    val packageInfo = try {
-        packageManager.getPackageInfo(context.packageName, 0)
-    } catch (e: Exception) {
-        null
-    }
+    val packageInfo =
+        try {
+            packageManager.getPackageInfo(context.packageName, 0)
+        } catch (e: Exception) {
+            null
+        }
 
     return DeviceInfo.create(
         platformName = "Android",
@@ -39,11 +41,12 @@ actual fun collectDeviceInfo(): DeviceInfo {
         cpuCores = Runtime.getRuntime().availableProcessors(),
         totalMemoryMB = totalMemoryMB,
         appBundleId = context.packageName,
-        appVersion = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            packageInfo?.versionName
-        } else {
-            @Suppress("DEPRECATION")
-            packageInfo?.versionName
-        }
+        appVersion =
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                packageInfo?.versionName
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo?.versionName
+            },
     )
 }

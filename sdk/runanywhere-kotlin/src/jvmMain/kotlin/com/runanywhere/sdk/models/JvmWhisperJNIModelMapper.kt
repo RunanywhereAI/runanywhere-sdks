@@ -7,39 +7,35 @@ package com.runanywhere.sdk.models
  * This follows the exact iOS implementation pattern for consistency.
  */
 object JvmWhisperJNIModelMapper {
-
     /**
      * Standard model mappings from common model names to whisper.cpp model filenames
      * These correspond to the standard whisper.cpp model distribution
      */
-    private val modelMappings = mapOf(
-        // Tiny model (39 MB) - fastest, lowest accuracy
-        "whisper-tiny" to "ggml-tiny.bin",
-        "tiny" to "ggml-tiny.bin",
-        "openai_whisper-tiny" to "ggml-tiny.bin",
-
-        // Base model (142 MB) - good balance
-        "whisper-base" to "ggml-base.bin",
-        "base" to "ggml-base.bin",
-        "openai_whisper-base" to "ggml-base.bin",
-
-        // Small model (244 MB) - better accuracy
-        "whisper-small" to "ggml-small.bin",
-        "small" to "ggml-small.bin",
-        "openai_whisper-small" to "ggml-small.bin",
-
-        // Medium model (769 MB) - high accuracy
-        "whisper-medium" to "ggml-medium.bin",
-        "medium" to "ggml-medium.bin",
-        "openai_whisper-medium" to "ggml-medium.bin",
-
-        // Large model (1550 MB) - highest accuracy
-        "whisper-large" to "ggml-large-v3.bin",
-        "large" to "ggml-large-v3.bin",
-        "whisper-large-v3" to "ggml-large-v3.bin",
-        "openai_whisper-large" to "ggml-large-v3.bin",
-        "openai_whisper-large-v3" to "ggml-large-v3.bin"
-    )
+    private val modelMappings =
+        mapOf(
+            // Tiny model (39 MB) - fastest, lowest accuracy
+            "whisper-tiny" to "ggml-tiny.bin",
+            "tiny" to "ggml-tiny.bin",
+            "openai_whisper-tiny" to "ggml-tiny.bin",
+            // Base model (142 MB) - good balance
+            "whisper-base" to "ggml-base.bin",
+            "base" to "ggml-base.bin",
+            "openai_whisper-base" to "ggml-base.bin",
+            // Small model (244 MB) - better accuracy
+            "whisper-small" to "ggml-small.bin",
+            "small" to "ggml-small.bin",
+            "openai_whisper-small" to "ggml-small.bin",
+            // Medium model (769 MB) - high accuracy
+            "whisper-medium" to "ggml-medium.bin",
+            "medium" to "ggml-medium.bin",
+            "openai_whisper-medium" to "ggml-medium.bin",
+            // Large model (1550 MB) - highest accuracy
+            "whisper-large" to "ggml-large-v3.bin",
+            "large" to "ggml-large-v3.bin",
+            "whisper-large-v3" to "ggml-large-v3.bin",
+            "openai_whisper-large" to "ggml-large-v3.bin",
+            "openai_whisper-large-v3" to "ggml-large-v3.bin",
+        )
 
     /**
      * Default model used when no specific model is requested
@@ -52,13 +48,12 @@ object JvmWhisperJNIModelMapper {
      * @param modelId The model identifier (e.g., "whisper-base", "tiny", "openai_whisper-small")
      * @return The corresponding model filename (e.g., "ggml-base.bin")
      */
-    fun mapModelIdToFileName(modelId: String?): String {
-        return if (modelId == null) {
+    fun mapModelIdToFileName(modelId: String?): String =
+        if (modelId == null) {
             DEFAULT_MODEL
         } else {
             modelMappings[modelId.lowercase()] ?: DEFAULT_MODEL
         }
-    }
 
     /**
      * Map a model ID to a full model path within the models directory
@@ -67,7 +62,10 @@ object JvmWhisperJNIModelMapper {
      * @param modelsDir The base directory where models are stored (default: "models/")
      * @return The full relative path to the model file
      */
-    fun mapModelIdToPath(modelId: String?, modelsDir: String = "models/"): String {
+    fun mapModelIdToPath(
+        modelId: String?,
+        modelsDir: String = "models/",
+    ): String {
         val fileName = mapModelIdToFileName(modelId)
         return if (modelsDir.endsWith("/")) {
             "$modelsDir$fileName"
@@ -82,18 +80,14 @@ object JvmWhisperJNIModelMapper {
      * @param modelId The model identifier to check
      * @return True if the model is supported, false otherwise
      */
-    fun isModelSupported(modelId: String?): Boolean {
-        return modelId == null || modelMappings.containsKey(modelId.lowercase())
-    }
+    fun isModelSupported(modelId: String?): Boolean = modelId == null || modelMappings.containsKey(modelId.lowercase())
 
     /**
      * Get all supported model IDs
      *
      * @return Set of all supported model identifiers
      */
-    fun getSupportedModelIds(): Set<String> {
-        return modelMappings.keys.toSet()
-    }
+    fun getSupportedModelIds(): Set<String> = modelMappings.keys.toSet()
 
     /**
      * Get model size information in MB

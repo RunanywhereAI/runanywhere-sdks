@@ -1,9 +1,9 @@
 package com.runanywhere.sdk.data.models
 
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Telemetry data models
@@ -52,7 +52,7 @@ enum class TelemetryEventType {
     STT_STREAMING_UPDATE,
     STT_VAD_DETECTED,
     STT_AUDIO_PROCESSED,
-    STT_EVENT,  // Generic STT event
+    STT_EVENT, // Generic STT event
 
     // TTS events
     TTS_MODEL_LOADED,
@@ -72,7 +72,7 @@ enum class TelemetryEventType {
     FEATURE_USAGE,
 
     // Custom events
-    CUSTOM_EVENT
+    CUSTOM_EVENT,
 }
 
 /**
@@ -88,7 +88,7 @@ data class TelemetryEventData(
     val timestamp: Long = getCurrentTimeMillis(),
     val eventData: Map<String, @Contextual Any?> = emptyMap(),
     val success: Boolean = true,
-    val duration: Long? = null
+    val duration: Long? = null,
 )
 
 /**
@@ -102,7 +102,6 @@ data class TelemetryData(
     val name: String,
     val properties: Map<String, String> = emptyMap(),
     val metrics: Map<String, Double> = emptyMap(),
-
     // Session information
     @SerialName("session_id")
     val sessionId: String,
@@ -110,7 +109,6 @@ data class TelemetryData(
     val userId: String? = null,
     @SerialName("device_id")
     val deviceId: String,
-
     // Context information
     @SerialName("app_version")
     val appVersion: String? = null,
@@ -119,41 +117,38 @@ data class TelemetryData(
     val platform: String = "android",
     @SerialName("os_version")
     val osVersion: String,
-
     // Timing information
     val timestamp: Long = getCurrentTimeMillis(),
     val duration: Long? = null, // milliseconds
-
     // Status information
     val success: Boolean = true,
     @SerialName("error_code")
     val errorCode: String? = null,
     @SerialName("error_message")
     val errorMessage: String? = null,
-
     // Synchronization status
     @SerialName("is_sent")
     val isSent: Boolean = false,
     @SerialName("sent_at")
     val sentAt: Long? = null,
     @SerialName("retry_count")
-    val retryCount: Int = 0
+    val retryCount: Int = 0,
 ) {
-
     /**
      * Get human-readable event description
      * Equivalent to iOS computed property
      */
     val eventDescription: String
-        get() = buildString {
-            append(name)
-            if (properties.isNotEmpty()) {
-                append(" (")
-                append(properties.entries.joinToString(", ") { "${it.key}=${it.value}" })
-                append(")")
+        get() =
+            buildString {
+                append(name)
+                if (properties.isNotEmpty()) {
+                    append(" (")
+                    append(properties.entries.joinToString(", ") { "${it.key}=${it.value}" })
+                    append(")")
+                }
+                duration?.let { append(" [${it}ms]") }
             }
-            duration?.let { append(" [${it}ms]") }
-        }
 
     /**
      * Check if event needs retry
@@ -170,7 +165,6 @@ data class TelemetryData(
 @Serializable
 data class STTTelemetryData(
     val baseEvent: TelemetryData,
-
     // Audio characteristics
     @SerialName("audio_duration_ms")
     val audioDurationMs: Long? = null,
@@ -182,7 +176,6 @@ data class STTTelemetryData(
     val audioFormat: String? = null,
     @SerialName("audio_size_bytes")
     val audioSizeBytes: Long? = null,
-
     // Model information
     @SerialName("model_id")
     val modelId: String? = null,
@@ -190,7 +183,6 @@ data class STTTelemetryData(
     val modelSizeMB: Long? = null,
     @SerialName("model_type")
     val modelType: String? = null,
-
     // Processing metrics
     @SerialName("processing_time_ms")
     val processingTimeMs: Long? = null,
@@ -198,7 +190,6 @@ data class STTTelemetryData(
     val firstTokenLatencyMs: Long? = null,
     @SerialName("tokens_per_second")
     val tokensPerSecond: Float? = null,
-
     // Quality metrics
     @SerialName("confidence_score")
     val confidenceScore: Float? = null,
@@ -206,7 +197,6 @@ data class STTTelemetryData(
     val wordCount: Int? = null,
     @SerialName("character_count")
     val characterCount: Int? = null,
-
     // VAD information
     @SerialName("vad_detected")
     val vadDetected: Boolean? = null,
@@ -216,14 +206,12 @@ data class STTTelemetryData(
     val vadEndTimeMs: Long? = null,
     @SerialName("silence_duration_ms")
     val silenceDurationMs: Long? = null,
-
     // Language information
     val language: String? = null,
     @SerialName("detected_language")
     val detectedLanguage: String? = null,
     @SerialName("language_confidence")
     val languageConfidence: Float? = null,
-
     // Resource usage
     @SerialName("memory_usage_mb")
     val memoryUsageMB: Long? = null,
@@ -232,7 +220,7 @@ data class STTTelemetryData(
     @SerialName("gpu_usage_percent")
     val gpuUsagePercent: Float? = null,
     @SerialName("battery_drain_mah")
-    val batteryDrainMAH: Float? = null
+    val batteryDrainMAH: Float? = null,
 )
 
 /**
@@ -242,7 +230,6 @@ data class STTTelemetryData(
 @Serializable
 data class PerformanceTelemetryData(
     val baseEvent: TelemetryData,
-
     // System performance
     @SerialName("cpu_cores")
     val cpuCores: Int,
@@ -252,7 +239,6 @@ data class PerformanceTelemetryData(
     val availableMemoryMB: Long,
     @SerialName("gpu_type")
     val gpuType: String? = null,
-
     // Benchmark scores
     @SerialName("single_core_score")
     val singleCoreScore: Int? = null,
@@ -262,14 +248,13 @@ data class PerformanceTelemetryData(
     val gpuScore: Int? = null,
     @SerialName("memory_bandwidth")
     val memoryBandwidth: Float? = null,
-
     // Thermal information
     @SerialName("thermal_state")
     val thermalState: String? = null,
     @SerialName("cpu_temperature")
     val cpuTemperature: Float? = null,
     @SerialName("battery_temperature")
-    val batteryTemperature: Float? = null
+    val batteryTemperature: Float? = null,
 )
 
 /**
@@ -279,7 +264,6 @@ data class PerformanceTelemetryData(
 @Serializable
 data class ErrorTelemetryData(
     val baseEvent: TelemetryData,
-
     // Error classification
     @SerialName("error_category")
     val errorCategory: String,
@@ -287,7 +271,6 @@ data class ErrorTelemetryData(
     val errorSeverity: String, // low, medium, high, critical
     @SerialName("error_type")
     val errorType: String,
-
     // Context information
     @SerialName("component_name")
     val componentName: String? = null,
@@ -295,7 +278,6 @@ data class ErrorTelemetryData(
     val methodName: String? = null,
     @SerialName("stack_trace")
     val stackTrace: String? = null,
-
     // Recovery information
     @SerialName("recovery_attempted")
     val recoveryAttempted: Boolean = false,
@@ -303,14 +285,13 @@ data class ErrorTelemetryData(
     val recoverySuccessful: Boolean? = null,
     @SerialName("recovery_strategy")
     val recoveryStrategy: String? = null,
-
     // Impact assessment
     @SerialName("user_facing")
     val userFacing: Boolean = true,
     @SerialName("blocking")
     val blocking: Boolean = false,
     @SerialName("data_loss")
-    val dataLoss: Boolean = false
+    val dataLoss: Boolean = false,
 )
 
 /**
@@ -326,7 +307,6 @@ data class SessionTelemetryData(
     @SerialName("end_time")
     val endTime: Long? = null,
     val duration: Long? = null,
-
     // Session statistics
     @SerialName("events_count")
     val eventsCount: Int = 0,
@@ -336,7 +316,6 @@ data class SessionTelemetryData(
     val generationsCount: Int = 0,
     @SerialName("transcriptions_count")
     val transcriptionsCount: Int = 0,
-
     // Resource usage during session
     @SerialName("peak_memory_usage_mb")
     val peakMemoryUsageMB: Long? = null,
@@ -344,13 +323,11 @@ data class SessionTelemetryData(
     val averageCpuUsage: Float? = null,
     @SerialName("battery_drain_mah")
     val batteryDrainMAH: Float? = null,
-
     // Quality metrics
     @SerialName("average_confidence")
     val averageConfidence: Float? = null,
     @SerialName("success_rate")
     val successRate: Float? = null,
-
     // Context
     @SerialName("app_version")
     val appVersion: String? = null,
@@ -359,7 +336,7 @@ data class SessionTelemetryData(
     @SerialName("device_id")
     val deviceId: String,
     @SerialName("created_at")
-    val createdAt: Long = getCurrentTimeMillis()
+    val createdAt: Long = getCurrentTimeMillis(),
 )
 
 /**
@@ -380,9 +357,8 @@ data class TelemetryBatch(
     @SerialName("app_version")
     val appVersion: String? = null,
     @SerialName("sdk_version")
-    val sdkVersion: String
+    val sdkVersion: String,
 ) {
-
     val size: Int
         get() = events.size
 
@@ -404,19 +380,16 @@ data class TelemetryEventPayload(
     val timestamp: Long,
     @SerialName("created_at")
     val createdAt: Long,
-
     // MARK: - Session Tracking
     @SerialName("session_id")
     val sessionId: String? = null,
-
     // MARK: - Model Info
     @SerialName("model_id")
     val modelId: String? = null,
     @SerialName("model_name")
     val modelName: String? = null,
     val framework: String? = null,
-    val modality: String? = null,  // "stt", "tts", "llm", etc.
-
+    val modality: String? = null, // "stt", "tts", "llm", etc.
     // MARK: - Device Info
     val device: String? = null,
     @SerialName("os_version")
@@ -424,7 +397,6 @@ data class TelemetryEventPayload(
     val platform: String? = null,
     @SerialName("sdk_version")
     val sdkVersion: String? = null,
-
     // MARK: - Common Performance Metrics
     @SerialName("processing_time_ms")
     val processingTimeMs: Double? = null,
@@ -433,7 +405,6 @@ data class TelemetryEventPayload(
     val errorMessage: String? = null,
     @SerialName("error_code")
     val errorCode: String? = null,
-
     // MARK: - LLM-specific Fields
     @SerialName("input_tokens")
     val inputTokens: Int? = null,
@@ -454,7 +425,6 @@ data class TelemetryEventPayload(
     val temperature: Double? = null,
     @SerialName("max_tokens")
     val maxTokens: Int? = null,
-
     // MARK: - STT-specific Fields
     @SerialName("audio_duration_ms")
     val audioDurationMs: Double? = null,
@@ -468,7 +438,6 @@ data class TelemetryEventPayload(
     val isStreaming: Boolean? = null,
     @SerialName("segment_index")
     val segmentIndex: Int? = null,
-
     // MARK: - TTS-specific Fields
     @SerialName("character_count")
     val characterCount: Int? = null,
@@ -480,7 +449,7 @@ data class TelemetryEventPayload(
     val sampleRate: Int? = null,
     val voice: String? = null,
     @SerialName("output_duration_ms")
-    val outputDurationMs: Double? = null
+    val outputDurationMs: Double? = null,
 )
 
 /**
@@ -491,7 +460,7 @@ data class TelemetryBatchRequest(
     val events: List<TelemetryEventPayload>,
     @SerialName("device_id")
     val deviceId: String,
-    val timestamp: Long = getCurrentTimeMillis()
+    val timestamp: Long = getCurrentTimeMillis(),
 )
 
 /**
@@ -504,5 +473,5 @@ data class TelemetryBatchResponse(
     val eventsReceived: Int,
     @SerialName("events_stored")
     val eventsStored: Int,
-    val errors: List<String>? = null
+    val errors: List<String>? = null,
 )

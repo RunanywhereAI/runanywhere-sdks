@@ -1,11 +1,11 @@
 package com.runanywhere.sdk.models.structuredoutput
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.datetime.Instant
 
 /**
  * Token emitted during streaming
@@ -17,17 +17,19 @@ import kotlinx.coroutines.CompletableDeferred
 data class StreamToken(
     val text: String,
     val timestamp: Instant,
-    val tokenIndex: Int
+    val tokenIndex: Int,
 ) {
     companion object {
         @Suppress("DEPRECATION")
-        fun create(text: String, tokenIndex: Int): StreamToken {
-            return StreamToken(
+        fun create(
+            text: String,
+            tokenIndex: Int,
+        ): StreamToken =
+            StreamToken(
                 text = text,
                 timestamp = Instant.fromEpochMilliseconds(System.currentTimeMillis()),
-                tokenIndex = tokenIndex
+                tokenIndex = tokenIndex,
             )
-        }
     }
 }
 
@@ -42,11 +44,10 @@ data class StructuredOutputStreamResult<T>(
      * Stream of tokens as they're generated
      */
     val tokenStream: Flow<StreamToken>,
-
     /**
      * Final parsed result (available after stream completes)
      */
-    val result: Deferred<T>
+    val result: Deferred<T>,
 )
 
 /**
@@ -67,11 +68,10 @@ class StreamAccumulator {
         }
     }
 
-    suspend fun getFullText(): String {
-        return mutex.withLock {
+    suspend fun getFullText(): String =
+        mutex.withLock {
             textBuilder.toString()
         }
-    }
 
     suspend fun markComplete() {
         mutex.withLock {

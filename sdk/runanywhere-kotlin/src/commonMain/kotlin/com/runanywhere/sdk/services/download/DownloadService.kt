@@ -6,16 +6,16 @@ import com.runanywhere.sdk.foundation.utils.ModelPathUtils
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.storage.FileSystem
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.utils.io.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -27,7 +27,7 @@ data class DownloadProgress(
     val totalBytes: Long,
     val state: DownloadState,
     val estimatedTimeRemaining: Double? = null, // TimeInterval in seconds
-    val speed: Double? = null // bytes per second
+    val speed: Double? = null, // bytes per second
 ) {
     val percentage: Double
         get() = if (totalBytes > 0) bytesDownloaded.toDouble() / totalBytes else 0.0
@@ -38,11 +38,21 @@ data class DownloadProgress(
  */
 sealed class DownloadState {
     object Pending : DownloadState()
+
     object Downloading : DownloadState()
+
     object Extracting : DownloadState()
-    data class Retrying(val attempt: Int) : DownloadState()
+
+    data class Retrying(
+        val attempt: Int,
+    ) : DownloadState()
+
     object Completed : DownloadState()
-    data class Failed(val error: Throwable) : DownloadState()
+
+    data class Failed(
+        val error: Throwable,
+    ) : DownloadState()
+
     object Cancelled : DownloadState()
 }
 
@@ -55,47 +65,53 @@ sealed class DownloadState {
 enum class DownloadStage {
     /** Downloading file - 0-80% of overall progress */
     DOWNLOADING,
+
     /** Extracting archive - 80-95% of overall progress */
     EXTRACTING,
+
     /** Validating downloaded content - 95-100% of overall progress */
     VALIDATING,
+
     /** Download complete - 100% */
-    COMPLETED;
+    COMPLETED,
+
+    ;
 
     /**
      * Weight for this stage in overall progress calculation.
      * Matches iOS stageWeight computed property.
      */
     val weight: Double
-        get() = when (this) {
-            DOWNLOADING -> 0.8  // 80% of overall progress
-            EXTRACTING -> 0.15  // 15% of overall progress
-            VALIDATING -> 0.05  // 5% of overall progress
-            COMPLETED -> 0.0    // No weight, already complete
-        }
+        get() =
+            when (this) {
+                DOWNLOADING -> 0.8 // 80% of overall progress
+                EXTRACTING -> 0.15 // 15% of overall progress
+                VALIDATING -> 0.05 // 5% of overall progress
+                COMPLETED -> 0.0 // No weight, already complete
+            }
 
     /**
      * Starting progress for this stage.
      * Matches iOS stageStartProgress computed property.
      */
     val startProgress: Double
-        get() = when (this) {
-            DOWNLOADING -> 0.0
-            EXTRACTING -> 0.8
-            VALIDATING -> 0.95
-            COMPLETED -> 1.0
-        }
+        get() =
+            when (this) {
+                DOWNLOADING -> 0.0
+                EXTRACTING -> 0.8
+                VALIDATING -> 0.95
+                COMPLETED -> 1.0
+            }
 
     /**
      * Calculate overall progress given stage-specific progress (0.0 to 1.0)
      * Matches iOS calculateOverallProgress method.
      */
-    fun calculateOverallProgress(stageProgress: Double): Double {
-        return when (this) {
+    fun calculateOverallProgress(stageProgress: Double): Double =
+        when (this) {
             COMPLETED -> 1.0
             else -> startProgress + (stageProgress * weight)
         }
-    }
 }
 
 /**
@@ -106,7 +122,7 @@ data class DownloadTask(
     val id: String,
     val modelId: String,
     val progress: Flow<DownloadProgress>,
-    val result: Deferred<String> // URL as String in Kotlin
+    val result: Deferred<String>, // URL as String in Kotlin
 )
 
 /**
@@ -114,37 +130,59 @@ data class DownloadTask(
  */
 sealed class DownloadError : Exception() {
     object InvalidURL : DownloadError()
-    data class NetworkError(override val cause: Throwable?) : DownloadError()
+
+    data class NetworkError(
+        override val cause: Throwable?,
+    ) : DownloadError()
+
     object Timeout : DownloadError()
+
     object PartialDownload : DownloadError()
+
     object ChecksumMismatch : DownloadError()
-    data class ExtractionFailed(val reason: String) : DownloadError()
-    data class UnsupportedArchive(val format: String) : DownloadError()
+
+    data class ExtractionFailed(
+        val reason: String,
+    ) : DownloadError()
+
+    data class UnsupportedArchive(
+        val format: String,
+    ) : DownloadError()
+
     object Unknown : DownloadError()
+
     object InvalidResponse : DownloadError()
-    data class HttpError(val code: Int) : DownloadError()
+
+    data class HttpError(
+        val code: Int,
+    ) : DownloadError()
+
     object Cancelled : DownloadError()
+
     object InsufficientSpace : DownloadError()
+
     object ModelNotFound : DownloadError()
+
     object ConnectionLost : DownloadError()
 
     override val message: String
-        get() = when (this) {
-            is InvalidURL -> "Invalid download URL"
-            is NetworkError -> "Network error: ${cause?.message}"
-            is Timeout -> "Download timeout"
-            is PartialDownload -> "Partial download - file incomplete"
-            is ChecksumMismatch -> "Downloaded file checksum doesn't match expected"
-            is ExtractionFailed -> "Archive extraction failed: $reason"
-            is UnsupportedArchive -> "Unsupported archive format: $format"
-            is Unknown -> "Unknown download error"
-            is InvalidResponse -> "Invalid server response"
-            is HttpError -> "HTTP error: $code"
-            is Cancelled -> "Download was cancelled"
-            is InsufficientSpace -> "Insufficient storage space"
-            is ModelNotFound -> "Model not found"
-            is ConnectionLost -> "Network connection lost"
-        }
+        get() =
+            when (this) {
+                is InvalidURL -> "Invalid download URL"
+                is NetworkError -> "Network error: ${cause?.message}"
+                is Timeout -> "Download timeout"
+                is PartialDownload -> "Partial download - file incomplete"
+                is ChecksumMismatch -> "Downloaded file checksum doesn't match expected"
+                is ExtractionFailed -> "Archive extraction failed: $reason"
+                is UnsupportedArchive -> "Unsupported archive format: $format"
+                is Unknown -> "Unknown download error"
+                is InvalidResponse -> "Invalid server response"
+                is HttpError -> "HTTP error: $code"
+                is Cancelled -> "Download was cancelled"
+                is InsufficientSpace -> "Insufficient storage space"
+                is ModelNotFound -> "Model not found"
+                is ConnectionLost -> "Network connection lost"
+            }
 }
 
 /**
@@ -157,7 +195,7 @@ data class DownloadConfiguration(
     val timeout: Double = 300.0, // TimeInterval equivalent
     val chunkSize: Int = 1024 * 1024, // 1MB chunks
     val resumeOnFailure: Boolean = true,
-    val verifyChecksum: Boolean = true
+    val verifyChecksum: Boolean = true,
 )
 
 /**
@@ -165,10 +203,11 @@ data class DownloadConfiguration(
  */
 interface DownloadStrategy {
     fun canHandle(model: ModelInfo): Boolean
+
     suspend fun download(
         model: ModelInfo,
         to: String, // URL -> String in Kotlin
-        progressHandler: ((Double) -> Unit)? = null
+        progressHandler: ((Double) -> Unit)? = null,
     ): String
 }
 
@@ -177,7 +216,9 @@ interface DownloadStrategy {
  */
 interface DownloadManager {
     suspend fun downloadModel(model: ModelInfo): DownloadTask
+
     fun cancelDownload(taskId: String)
+
     fun activeDownloads(): List<DownloadTask>
 }
 
@@ -190,7 +231,7 @@ internal expect suspend fun downloadWithPlatformImplementation(
     destinationPath: String,
     modelId: String,
     expectedSize: Long,
-    progressChannel: Channel<DownloadProgress>
+    progressChannel: Channel<DownloadProgress>,
 )
 
 /**
@@ -200,21 +241,20 @@ internal expect suspend fun downloadWithPlatformImplementation(
 @OptIn(ExperimentalUuidApi::class)
 class KtorDownloadService(
     internal val configuration: DownloadConfiguration = DownloadConfiguration(),
-    internal val fileSystem: FileSystem
+    internal val fileSystem: FileSystem,
 ) : DownloadManager {
-
     // MARK: - Properties (EXACT copy of iOS)
 
     internal val httpClient: HttpClient
     private val activeDownloadRequests: MutableMap<String, Job> = mutableMapOf()
-    private val downloadQueue: MutableList<suspend () -> Unit> = mutableListOf()
     private val activeDownloadTasks: MutableMap<String, DownloadTask> = mutableMapOf()
     private val downloadSemaphore = kotlinx.coroutines.sync.Semaphore(configuration.maxConcurrentDownloads)
     private val logger = SDKLogger("KtorDownloadService")
+    internal val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // MARK: - Custom Download Strategies (EXACT copy of iOS)
 
-    /// Storage for custom download strategies provided by host app
+    // / Storage for custom download strategies provided by host app
     private val customStrategies: MutableList<DownloadStrategy> = mutableListOf()
 
     // MARK: - Initialization (EXACT copy of iOS)
@@ -222,17 +262,18 @@ class KtorDownloadService(
     init {
         // SIMPLIFIED HTTP CLIENT - NO buffering, NO retries, NO plugins
         // This prevents Ktor from buffering the entire response in memory
-        httpClient = HttpClient {
-            // ONLY timeout - nothing else that could buffer
-            install(HttpTimeout) {
-                requestTimeoutMillis = (configuration.timeout * 1000).toLong()
-                connectTimeoutMillis = (configuration.timeout * 1000).toLong()
-                socketTimeoutMillis = (configuration.timeout * 2 * 1000).toLong()
-            }
+        httpClient =
+            HttpClient {
+                // ONLY timeout - nothing else that could buffer
+                install(HttpTimeout) {
+                    requestTimeoutMillis = (configuration.timeout * 1000).toLong()
+                    connectTimeoutMillis = (configuration.timeout * 1000).toLong()
+                    socketTimeoutMillis = (configuration.timeout * 2 * 1000).toLong()
+                }
 
-            // Disable ALL automatic response handling to prevent buffering
-            expectSuccess = false
-        }
+                // Disable ALL automatic response handling to prevent buffering
+                expectSuccess = false
+            }
 
         // Auto-discover and register download strategies from adapters
         autoRegisterStrategies()
@@ -255,106 +296,117 @@ class KtorDownloadService(
         }
 
         // No custom strategy found, use default download
-        val downloadURL = model.downloadURL
-            ?: throw DownloadError.InvalidURL
+        val downloadURL =
+            model.downloadURL
+                ?: throw DownloadError.InvalidURL
 
         val taskId = Uuid.random().toString()
         val progressChannel = Channel<DownloadProgress>(Channel.UNLIMITED)
 
         // Create download task with semaphore for concurrency control
-        val result = GlobalScope.async {
-            downloadSemaphore.acquire() // Limit concurrent downloads
-            try {
-                // Use framework-specific folder if available (matching iOS logic)
-                val modelFolder = if (model.preferredFramework != null || model.compatibleFrameworks.isNotEmpty()) {
-                    val framework = model.preferredFramework ?: model.compatibleFrameworks.first()
-                    getModelFolder(model.id, framework)
-                } else {
-                    getModelFolder(model.id)
-                }
-
-                val destinationPath = "$modelFolder/${model.id}.${model.format.name.lowercase()}"
-
-                // Log download start (matching iOS)
-                logger.info(
-                    "Starting download - modelId: ${model.id}, url: $downloadURL, expectedSize: ${model.downloadSize ?: 0}, destination: $destinationPath"
-                )
-
-                // Ensure directory exists
-                fileSystem.createDirectory(modelFolder)
-
-                // Use platform-specific download implementation
-                downloadWithPlatformImplementation(
-                    downloadURL = downloadURL,
-                    destinationPath = destinationPath,
-                    modelId = model.id,
-                    expectedSize = model.downloadSize ?: 0L,
-                    progressChannel = progressChannel
-                )
-
-                // Update model with local path in BOTH registry AND repository
-                val updatedModel = model.copy(localPath = destinationPath, updatedAt = com.runanywhere.sdk.utils.SimpleInstant.now())
-
-                // 1. Update in-memory registry
-                ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
-
-                // 2. Save to persistent repository (database)
+        val result =
+            serviceScope.async {
+                downloadSemaphore.acquire() // Limit concurrent downloads
                 try {
-                    ServiceContainer.shared.modelInfoService.saveModel(updatedModel)
+                    // Use framework-specific folder if available (matching iOS logic)
+                    val modelFolder =
+                        if (model.preferredFramework != null || model.compatibleFrameworks.isNotEmpty()) {
+                            val framework = model.preferredFramework ?: model.compatibleFrameworks.first()
+                            getModelFolder(model.id, framework)
+                        } else {
+                            getModelFolder(model.id)
+                        }
+
+                    val destinationPath = "$modelFolder/${model.id}.${model.format.name.lowercase()}"
+
+                    // Log download start (matching iOS)
                     logger.info(
-                        "Model saved to repository - modelId: ${model.id}, localPath: $destinationPath, isDownloaded: ${updatedModel.isDownloaded}"
+                        "Starting download - modelId: ${model.id}, url: $downloadURL, expectedSize: ${model.downloadSize ?: 0}, destination: $destinationPath",
                     )
+
+                    // Ensure directory exists
+                    fileSystem.createDirectory(modelFolder)
+
+                    // Use platform-specific download implementation
+                    downloadWithPlatformImplementation(
+                        downloadURL = downloadURL,
+                        destinationPath = destinationPath,
+                        modelId = model.id,
+                        expectedSize = model.downloadSize ?: 0L,
+                        progressChannel = progressChannel,
+                    )
+
+                    // Update model with local path in BOTH registry AND repository
+                    val updatedModel =
+                        model.copy(
+                            localPath = destinationPath,
+                            updatedAt =
+                                com.runanywhere.sdk.utils.SimpleInstant
+                                    .now(),
+                        )
+
+                    // 1. Update in-memory registry
+                    ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                    // 2. Save to persistent repository (database)
+                    try {
+                        ServiceContainer.shared.modelInfoService.saveModel(updatedModel)
+                        logger.info(
+                            "Model saved to repository - modelId: ${model.id}, localPath: $destinationPath, isDownloaded: ${updatedModel.isDownloaded}",
+                        )
+                    } catch (e: Exception) {
+                        logger.error("Failed to save model to repository: ${e.message}", e)
+                    }
+
+                    logger.info(
+                        "Model updated in registry - modelId: ${model.id}, localPath: $destinationPath, isDownloaded: ${updatedModel.isDownloaded}",
+                    )
+
+                    destinationPath
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    progressChannel.trySend(
+                        DownloadProgress(
+                            bytesDownloaded = 0,
+                            totalBytes = model.downloadSize ?: 0,
+                            state = DownloadState.Failed(DownloadError.Cancelled),
+                        ),
+                    )
+                    throw DownloadError.Cancelled
                 } catch (e: Exception) {
-                    logger.error("Failed to save model to repository: ${e.message}", e)
+                    val downloadError = mapKtorError(e)
+                    progressChannel.trySend(
+                        DownloadProgress(
+                            bytesDownloaded = 0,
+                            totalBytes = model.downloadSize ?: 0,
+                            state = DownloadState.Failed(downloadError),
+                        ),
+                    )
+
+                    logger.error(
+                        "Download failed - modelId: ${model.id}, url: $downloadURL, error: ${e.message}, errorType: ${e::class.simpleName}",
+                        e,
+                    )
+                    throw downloadError
+                } finally {
+                    progressChannel.close()
+                    downloadSemaphore.release() // Release semaphore for other downloads
                 }
-
-                logger.info(
-                    "Model updated in registry - modelId: ${model.id}, localPath: $destinationPath, isDownloaded: ${updatedModel.isDownloaded}"
-                )
-
-                destinationPath
-
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                progressChannel.trySend(
-                    DownloadProgress(
-                        bytesDownloaded = 0,
-                        totalBytes = model.downloadSize ?: 0,
-                        state = DownloadState.Failed(DownloadError.Cancelled)
-                    )
-                )
-                throw DownloadError.Cancelled
-            } catch (e: Exception) {
-                val downloadError = mapKtorError(e)
-                progressChannel.trySend(
-                    DownloadProgress(
-                        bytesDownloaded = 0,
-                        totalBytes = model.downloadSize ?: 0,
-                        state = DownloadState.Failed(downloadError)
-                    )
-                )
-
-                logger.error(
-                    "Download failed - modelId: ${model.id}, url: $downloadURL, error: ${e.message}, errorType: ${e::class.simpleName}", e
-                )
-                throw downloadError
-            } finally {
-                progressChannel.close()
-                downloadSemaphore.release() // Release semaphore for other downloads
             }
-        }
 
-        val progressFlow = flow {
-            for (progress in progressChannel) {
-                emit(progress)
+        val progressFlow =
+            flow {
+                for (progress in progressChannel) {
+                    emit(progress)
+                }
             }
-        }
 
-        val task = DownloadTask(
-            id = taskId,
-            modelId = model.id,
-            progress = progressFlow,
-            result = result
-        )
+        val task =
+            DownloadTask(
+                id = taskId,
+                modelId = model.id,
+                progress = progressFlow,
+                result = result,
+            )
 
         // Store the task for tracking
         activeDownloadTasks[taskId] = task
@@ -375,13 +427,11 @@ class KtorDownloadService(
         }
     }
 
-    override fun activeDownloads(): List<DownloadTask> {
-        return activeDownloadTasks.values.toList()
-    }
+    override fun activeDownloads(): List<DownloadTask> = activeDownloadTasks.values.toList()
 
     // MARK: - Custom Strategy Support (EXACT copy of iOS)
 
-    /// Register a custom download strategy from host app
+    // / Register a custom download strategy from host app
     fun registerStrategy(strategy: DownloadStrategy) {
         customStrategies.add(0, strategy) // Custom strategies have priority
         logger.info("Registered custom download strategy")
@@ -390,7 +440,7 @@ class KtorDownloadService(
     // Track which frameworks have had their strategies registered to avoid duplicates
     private val registeredFrameworks = mutableSetOf<com.runanywhere.sdk.models.enums.InferenceFramework>()
 
-    /// Auto-discover and register strategies from framework adapters
+    // / Auto-discover and register strategies from framework adapters
     private fun autoRegisterStrategies() {
         // Query ModuleRegistry for registered framework adapters and get their download strategies
         var registeredCount = 0
@@ -405,19 +455,16 @@ class KtorDownloadService(
 
                 adapter.getDownloadStrategy()?.let { frameworkStrategy ->
                     // Wrap framework strategy to match local DownloadStrategy interface
-                    val wrappedStrategy = object : DownloadStrategy {
-                        override fun canHandle(model: ModelInfo): Boolean {
-                            return frameworkStrategy.canHandle(model)
-                        }
+                    val wrappedStrategy =
+                        object : DownloadStrategy {
+                            override fun canHandle(model: ModelInfo): Boolean = frameworkStrategy.canHandle(model)
 
-                        override suspend fun download(
-                            model: ModelInfo,
-                            to: String,
-                            progressHandler: ((Double) -> Unit)?
-                        ): String {
-                            return frameworkStrategy.download(model, to, progressHandler)
+                            override suspend fun download(
+                                model: ModelInfo,
+                                to: String,
+                                progressHandler: ((Double) -> Unit)?,
+                            ): String = frameworkStrategy.download(model, to, progressHandler)
                         }
-                    }
 
                     customStrategies.add(wrappedStrategy)
                     registeredFrameworks.add(adapter.framework)
@@ -446,94 +493,107 @@ class KtorDownloadService(
         }
     }
 
-    /// Helper to download using a custom strategy (EXACT copy of iOS)
-    private suspend fun downloadModelWithCustomStrategy(model: ModelInfo, strategy: DownloadStrategy): DownloadTask {
+    // / Helper to download using a custom strategy (EXACT copy of iOS)
+    private suspend fun downloadModelWithCustomStrategy(
+        model: ModelInfo,
+        strategy: DownloadStrategy,
+    ): DownloadTask {
         logger.info("Using custom strategy for model: ${model.id}")
 
         val taskId = Uuid.random().toString()
         val progressChannel = Channel<DownloadProgress>(Channel.UNLIMITED)
 
         // Create download task with semaphore for concurrency control
-        val result = GlobalScope.async {
-            downloadSemaphore.acquire() // Limit concurrent downloads
-            try {
-                val destinationFolder = getDestinationFolder(model.id, model.preferredFramework)
-
-                val resultPath = strategy.download(
-                    model = model,
-                    to = destinationFolder,
-                    progressHandler = { progress ->
-                        progressChannel.trySend(
-                            DownloadProgress(
-                                bytesDownloaded = (progress * (model.downloadSize ?: 100)).toLong(),
-                                totalBytes = model.downloadSize ?: 100,
-                                state = DownloadState.Downloading
-                            )
-                        )
-                    }
-                )
-
-                // Update progress to completed
-                progressChannel.trySend(
-                    DownloadProgress(
-                        bytesDownloaded = model.downloadSize ?: 100,
-                        totalBytes = model.downloadSize ?: 100,
-                        state = DownloadState.Completed
-                    )
-                )
-
-                logger.info(
-                    "Custom strategy download completed - modelId: ${model.id}, localPath: $resultPath"
-                )
-
-                // Update model with local path in BOTH registry AND repository
-                val updatedModel = model.copy(localPath = resultPath, updatedAt = com.runanywhere.sdk.utils.SimpleInstant.now())
-
-                // 1. Update in-memory registry
-                ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
-
-                // 2. Save to persistent repository (database)
+        val result =
+            serviceScope.async {
+                downloadSemaphore.acquire() // Limit concurrent downloads
                 try {
-                    ServiceContainer.shared.modelInfoService.saveModel(updatedModel)
+                    val destinationFolder = getDestinationFolder(model.id, model.preferredFramework)
+
+                    val resultPath =
+                        strategy.download(
+                            model = model,
+                            to = destinationFolder,
+                            progressHandler = { progress ->
+                                progressChannel.trySend(
+                                    DownloadProgress(
+                                        bytesDownloaded = (progress * (model.downloadSize ?: 100)).toLong(),
+                                        totalBytes = model.downloadSize ?: 100,
+                                        state = DownloadState.Downloading,
+                                    ),
+                                )
+                            },
+                        )
+
+                    // Update progress to completed
+                    progressChannel.trySend(
+                        DownloadProgress(
+                            bytesDownloaded = model.downloadSize ?: 100,
+                            totalBytes = model.downloadSize ?: 100,
+                            state = DownloadState.Completed,
+                        ),
+                    )
+
                     logger.info(
-                        "Model saved to repository - modelId: ${model.id}, localPath: $resultPath, isDownloaded: ${updatedModel.isDownloaded}"
+                        "Custom strategy download completed - modelId: ${model.id}, localPath: $resultPath",
                     )
+
+                    // Update model with local path in BOTH registry AND repository
+                    val updatedModel =
+                        model.copy(
+                            localPath = resultPath,
+                            updatedAt =
+                                com.runanywhere.sdk.utils.SimpleInstant
+                                    .now(),
+                        )
+
+                    // 1. Update in-memory registry
+                    ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                    // 2. Save to persistent repository (database)
+                    try {
+                        ServiceContainer.shared.modelInfoService.saveModel(updatedModel)
+                        logger.info(
+                            "Model saved to repository - modelId: ${model.id}, localPath: $resultPath, isDownloaded: ${updatedModel.isDownloaded}",
+                        )
+                    } catch (e: Exception) {
+                        logger.error("Failed to save model to repository: ${e.message}", e)
+                    }
+
+                    logger.info(
+                        "Model updated in registry - modelId: ${model.id}, localPath: $resultPath, isDownloaded: ${updatedModel.isDownloaded}",
+                    )
+
+                    resultPath
                 } catch (e: Exception) {
-                    logger.error("Failed to save model to repository: ${e.message}", e)
-                }
-
-                logger.info(
-                    "Model updated in registry - modelId: ${model.id}, localPath: $resultPath, isDownloaded: ${updatedModel.isDownloaded}"
-                )
-
-                resultPath
-            } catch (e: Exception) {
-                progressChannel.trySend(
-                    DownloadProgress(
-                        bytesDownloaded = 0,
-                        totalBytes = model.downloadSize ?: 0,
-                        state = DownloadState.Failed(e)
+                    progressChannel.trySend(
+                        DownloadProgress(
+                            bytesDownloaded = 0,
+                            totalBytes = model.downloadSize ?: 0,
+                            state = DownloadState.Failed(e),
+                        ),
                     )
-                )
-                throw e
-            } finally {
-                progressChannel.close()
-                downloadSemaphore.release() // Release semaphore for other downloads
+                    throw e
+                } finally {
+                    progressChannel.close()
+                    downloadSemaphore.release() // Release semaphore for other downloads
+                }
             }
-        }
 
-        val progressFlow = flow {
-            for (progress in progressChannel) {
-                emit(progress)
+        val progressFlow =
+            flow {
+                for (progress in progressChannel) {
+                    emit(progress)
+                }
             }
-        }
 
-        val task = DownloadTask(
-            id = taskId,
-            modelId = model.id,
-            progress = progressFlow,
-            result = result
-        )
+        val task =
+            DownloadTask(
+                id = taskId,
+                modelId = model.id,
+                progress = progressFlow,
+                result = result,
+            )
 
         // Store the task for tracking
         activeDownloadTasks[taskId] = task
@@ -546,94 +606,61 @@ class KtorDownloadService(
         return task
     }
 
-    /// Helper to get destination folder for a model (EXACT copy of iOS)
-    private fun getDestinationFolder(modelId: String, framework: InferenceFramework? = null): String {
-        return if (framework != null) {
+    // / Helper to get destination folder for a model (EXACT copy of iOS)
+    private fun getDestinationFolder(
+        modelId: String,
+        framework: InferenceFramework? = null,
+    ): String =
+        if (framework != null) {
             getModelFolder(modelId, framework)
         } else {
             getModelFolder(modelId)
         }
-    }
 
     // Model folder helpers - Use centralized ModelPathUtils
-    private fun getModelFolder(modelId: String, framework: InferenceFramework): String {
-        return ModelPathUtils.getModelFolder(modelId, framework)
-    }
+    private fun getModelFolder(
+        modelId: String,
+        framework: InferenceFramework,
+    ): String = ModelPathUtils.getModelFolder(modelId, framework)
 
-    private fun getModelFolder(modelId: String): String {
-        return ModelPathUtils.getModelFolder(modelId)
-    }
+    private fun getModelFolder(modelId: String): String = ModelPathUtils.getModelFolder(modelId)
 
-    // MARK: - Helper Methods (EXACT copy of iOS)
+    // MARK: - Helper Methods
 
-    private fun calculateDownloadSpeed(bytesDownloaded: Long, timeElapsed: Long): String {
-        if (timeElapsed <= 0) return "0 B/s"
-
-        val bytesPerSecond = (bytesDownloaded.toDouble() / timeElapsed) * 1000 // Convert ms to seconds
-
-        return when {
-            bytesPerSecond < 1024 -> String.format("%.0f B/s", bytesPerSecond)
-            bytesPerSecond < 1024 * 1024 -> String.format("%.1f KB/s", bytesPerSecond / 1024)
-            else -> String.format("%.1f MB/s", bytesPerSecond / (1024 * 1024))
-        }
-    }
-
-    private fun formatSpeed(speed: Double?): String {
-        if (speed == null) return "N/A"
-        return when {
-            speed < 1024 -> String.format("%.0f B/s", speed)
-            speed < 1024 * 1024 -> String.format("%.1f KB/s", speed / 1024)
-            else -> String.format("%.1f MB/s", speed / (1024 * 1024))
-        }
-    }
-
-    private fun formatETA(eta: Double?): String {
-        if (eta == null) return "N/A"
-        val seconds = eta.toInt()
-        return when {
-            seconds < 60 -> "${seconds}s"
-            seconds < 3600 -> "${seconds / 60}m ${seconds % 60}s"
-            else -> "${seconds / 3600}h ${(seconds % 3600) / 60}m"
-        }
-    }
-
-    private fun mapKtorError(error: Throwable): DownloadError {
-        return when (error) {
+    private fun mapKtorError(error: Throwable): DownloadError =
+        when (error) {
             is HttpRequestTimeoutException -> DownloadError.Timeout
             is kotlinx.io.IOException -> DownloadError.NetworkError(error)
             is kotlinx.coroutines.CancellationException -> DownloadError.Cancelled
             else -> DownloadError.Unknown
         }
-    }
 
-    private fun mapHttpError(statusCode: Int): DownloadError {
-        return when (statusCode) {
+    private fun mapHttpError(statusCode: Int): DownloadError =
+        when (statusCode) {
             in 400..499 -> DownloadError.HttpError(statusCode)
             in 500..599 -> DownloadError.HttpError(statusCode)
             else -> DownloadError.InvalidResponse
         }
-    }
 
     // MARK: - Public Methods (EXACT copy of iOS)
 
-    /// Pause all active downloads
+    // / Pause all active downloads
     fun pauseAll() {
         // Note: Ktor doesn't have direct pause/resume like Alamofire
         // This would need platform-specific implementation
         logger.info("Paused all downloads")
     }
 
-    /// Resume all paused downloads
+    // / Resume all paused downloads
     fun resumeAll() {
         // Note: Ktor doesn't have direct pause/resume like Alamofire
         // This would need platform-specific implementation
         logger.info("Resumed all downloads")
     }
 
-    /// Check if service is healthy
-    fun isHealthy(): Boolean {
-        return true
-    }
+    // / Check if service is healthy
+    @Suppress("FunctionOnlyReturningConstant") // TODO: Implement proper health check
+    fun isHealthy(): Boolean = true
 
     fun cleanup() {
         activeDownloadRequests.values.forEach { it.cancel() }
@@ -648,154 +675,163 @@ class KtorDownloadService(
  * Extension for resume functionality - EXACT copy of iOS extension
  */
 @OptIn(ExperimentalUuidApi::class)
-suspend fun KtorDownloadService.downloadModelWithResume(model: ModelInfo, resumeData: ByteArray? = null): DownloadTask {
-    val downloadURL = model.downloadURL
-        ?: throw DownloadError.InvalidURL
+suspend fun KtorDownloadService.downloadModelWithResume(
+    model: ModelInfo,
+    resumeData: ByteArray? = null,
+): DownloadTask {
+    val downloadURL =
+        model.downloadURL
+            ?: throw DownloadError.InvalidURL
 
     val taskId = Uuid.random().toString()
     val progressChannel = Channel<DownloadProgress>(Channel.UNLIMITED)
 
-    // Create download task
-    val result = GlobalScope.async {
-        try {
-            // Use framework-specific folder if available (matching iOS logic)
-            val modelFolder = if (model.preferredFramework != null || model.compatibleFrameworks.isNotEmpty()) {
-                val framework = model.preferredFramework ?: model.compatibleFrameworks.first()
-                getModelFolder(model.id, framework)
-            } else {
-                getModelFolder(model.id)
-            }
+    // Create download task using service scope
+    val result =
+        serviceScope.async {
+            try {
+                // Use framework-specific folder if available (matching iOS logic)
+                val modelFolder =
+                    if (model.preferredFramework != null || model.compatibleFrameworks.isNotEmpty()) {
+                        val framework = model.preferredFramework ?: model.compatibleFrameworks.first()
+                        getModelFolder(model.id, framework)
+                    } else {
+                        getModelFolder(model.id)
+                    }
 
-            val destinationPath = "$modelFolder/${model.id}.${model.format.name.lowercase()}"
+                val destinationPath = "$modelFolder/${model.id}.${model.format.name.lowercase()}"
 
-            // Check for partial file and resume data
-            var startByte = 0L
-            if (resumeData != null && fileSystem.exists(destinationPath)) {
-                startByte = fileSystem.fileSize(destinationPath)
-            }
-
-            // Create HTTP request with Range header for resume
-            val response = httpClient.prepareGet(downloadURL) {
-                if (startByte > 0) {
-                    header(HttpHeaders.Range, "bytes=$startByte-")
+                // Check for partial file and resume data
+                var startByte = 0L
+                if (resumeData != null && fileSystem.exists(destinationPath)) {
+                    startByte = fileSystem.fileSize(destinationPath)
                 }
-            }.execute()
 
-            if (!response.status.isSuccess() && response.status.value != 206) {
-                // Save resume data if available
+                // Create HTTP request with Range header for resume
+                val response =
+                    httpClient
+                        .prepareGet(downloadURL) {
+                            if (startByte > 0) {
+                                header(HttpHeaders.Range, "bytes=$startByte-")
+                            }
+                        }.execute()
+
+                if (!response.status.isSuccess() && response.status.value != 206) {
+                    // Save resume data if available
+                    saveResumeData(ByteArray(0), model.id) // Placeholder for resume data
+                    throw mapHttpError(response.status.value)
+                }
+
+                val contentLength = response.contentLength() ?: model.downloadSize ?: 0L
+                val totalLength = contentLength + startByte
+                val channel = response.bodyAsChannel()
+
+                // Use temp file for new data
+                val tempPath = "$destinationPath.tmp"
+
+                var bytesDownloaded = startByte
+                val buffer = ByteArray(configuration.chunkSize)
+
+                // If resuming, copy existing file to temp
+                if (startByte > 0 && fileSystem.exists(destinationPath)) {
+                    fileSystem.copy(destinationPath, tempPath)
+                } else {
+                    fileSystem.writeBytes(tempPath, ByteArray(0))
+                }
+
+                while (!channel.isClosedForRead) {
+                    val bytesRead = channel.readAvailable(buffer, 0, buffer.size)
+                    if (bytesRead <= 0) break
+
+                    // Append chunk directly to temp file
+                    val chunkData = ByteArray(bytesRead)
+                    buffer.copyInto(chunkData, 0, 0, bytesRead)
+                    fileSystem.appendBytes(tempPath, chunkData)
+                    bytesDownloaded += bytesRead
+
+                    // Report progress
+                    val progress =
+                        DownloadProgress(
+                            bytesDownloaded = bytesDownloaded,
+                            totalBytes = totalLength,
+                            state = DownloadState.Downloading,
+                        )
+                    progressChannel.trySend(progress)
+                }
+
+                // Move temp file to final destination
+                fileSystem.move(tempPath, destinationPath)
+
+                // Final progress update
+                progressChannel.trySend(
+                    DownloadProgress(
+                        bytesDownloaded = totalLength,
+                        totalBytes = totalLength,
+                        state = DownloadState.Completed,
+                    ),
+                )
+
+                destinationPath
+            } catch (e: Exception) {
+                // Save resume data if download failed
                 saveResumeData(ByteArray(0), model.id) // Placeholder for resume data
-                throw mapHttpError(response.status.value)
-            }
 
-            val contentLength = response.contentLength() ?: model.downloadSize ?: 0L
-            val totalLength = contentLength + startByte
-            val channel = response.bodyAsChannel()
-
-            // Use temp file for new data
-            val tempPath = "$destinationPath.tmp"
-
-            var bytesDownloaded = startByte
-            val buffer = ByteArray(configuration.chunkSize)
-
-            // If resuming, copy existing file to temp
-            if (startByte > 0 && fileSystem.exists(destinationPath)) {
-                fileSystem.copy(destinationPath, tempPath)
-            } else {
-                fileSystem.writeBytes(tempPath, ByteArray(0))
-            }
-
-            while (!channel.isClosedForRead) {
-                val bytesRead = channel.readAvailable(buffer, 0, buffer.size)
-                if (bytesRead <= 0) break
-
-                // Append chunk directly to temp file
-                val chunkData = ByteArray(bytesRead)
-                buffer.copyInto(chunkData, 0, 0, bytesRead)
-                fileSystem.appendBytes(tempPath, chunkData)
-                bytesDownloaded += bytesRead
-
-                // Report progress
-                val progress = DownloadProgress(
-                    bytesDownloaded = bytesDownloaded,
-                    totalBytes = totalLength,
-                    state = DownloadState.Downloading
+                val downloadError = mapKtorError(e)
+                progressChannel.trySend(
+                    DownloadProgress(
+                        bytesDownloaded = 0,
+                        totalBytes = model.downloadSize ?: 0,
+                        state = DownloadState.Failed(downloadError),
+                    ),
                 )
-                progressChannel.trySend(progress)
+                throw downloadError
+            } finally {
+                progressChannel.close()
             }
-
-            // Move temp file to final destination
-            fileSystem.move(tempPath, destinationPath)
-
-            // Final progress update
-            progressChannel.trySend(
-                DownloadProgress(
-                    bytesDownloaded = totalLength,
-                    totalBytes = totalLength,
-                    state = DownloadState.Completed
-                )
-            )
-
-            destinationPath
-
-        } catch (e: Exception) {
-            // Save resume data if download failed
-            saveResumeData(ByteArray(0), model.id) // Placeholder for resume data
-
-            val downloadError = mapKtorError(e)
-            progressChannel.trySend(
-                DownloadProgress(
-                    bytesDownloaded = 0,
-                    totalBytes = model.downloadSize ?: 0,
-                    state = DownloadState.Failed(downloadError)
-                )
-            )
-            throw downloadError
-        } finally {
-            progressChannel.close()
         }
-    }
 
-    val progressFlow = flow {
-        for (progress in progressChannel) {
-            emit(progress)
+    val progressFlow =
+        flow {
+            for (progress in progressChannel) {
+                emit(progress)
+            }
         }
-    }
 
     return DownloadTask(
         id = taskId,
         modelId = model.id,
         progress = progressFlow,
-        result = result
+        result = result,
     )
 }
 
 // Extension functions using centralized ModelPathUtils
-private fun KtorDownloadService.getModelFolder(modelId: String, framework: InferenceFramework): String {
-    return ModelPathUtils.getModelFolder(modelId, framework)
-}
+private fun KtorDownloadService.getModelFolder(
+    modelId: String,
+    framework: InferenceFramework,
+): String = ModelPathUtils.getModelFolder(modelId, framework)
 
-private fun KtorDownloadService.getModelFolder(modelId: String): String {
-    return ModelPathUtils.getModelFolder(modelId)
-}
+private fun KtorDownloadService.getModelFolder(modelId: String): String = ModelPathUtils.getModelFolder(modelId)
 
-private fun mapKtorError(error: Throwable): DownloadError {
-    return when (error) {
+private fun mapKtorError(error: Throwable): DownloadError =
+    when (error) {
         is HttpRequestTimeoutException -> DownloadError.Timeout
         is kotlinx.io.IOException -> DownloadError.NetworkError(error)
         is kotlinx.coroutines.CancellationException -> DownloadError.Cancelled
         else -> DownloadError.Unknown
     }
-}
 
-private fun mapHttpError(statusCode: Int): DownloadError {
-    return when (statusCode) {
+private fun mapHttpError(statusCode: Int): DownloadError =
+    when (statusCode) {
         in 400..499 -> DownloadError.HttpError(statusCode)
         in 500..599 -> DownloadError.HttpError(statusCode)
         else -> DownloadError.InvalidResponse
     }
-}
 
-private suspend fun saveResumeData(data: ByteArray, modelId: String) {
+private suspend fun saveResumeData(
+    data: ByteArray,
+    modelId: String,
+) {
     try {
         val fileSystem = ServiceContainer.shared.fileSystem
         val resumePath = "${fileSystem.getTempDirectory()}/resume_$modelId"
@@ -806,8 +842,8 @@ private suspend fun saveResumeData(data: ByteArray, modelId: String) {
     }
 }
 
-suspend fun getResumeData(modelId: String): ByteArray? {
-    return try {
+suspend fun getResumeData(modelId: String): ByteArray? =
+    try {
         val fileSystem = ServiceContainer.shared.fileSystem
         val resumePath = "${fileSystem.getTempDirectory()}/resume_$modelId"
         if (fileSystem.exists(resumePath)) {
@@ -820,7 +856,6 @@ suspend fun getResumeData(modelId: String): ByteArray? {
         logger.error("Failed to load resume data for $modelId", e)
         null
     }
-}
 
 // MARK: - Interface compatibility with existing DownloadService
 
@@ -830,13 +865,17 @@ suspend fun getResumeData(modelId: String): ByteArray? {
 interface DownloadService {
     suspend fun downloadModel(
         model: ModelInfo,
-        progressHandler: ((DownloadProgress) -> Unit)? = null
+        progressHandler: ((DownloadProgress) -> Unit)? = null,
     ): String
 
     fun downloadModelStream(model: ModelInfo): Flow<DownloadProgress>
+
     fun cancelDownload(modelId: String)
+
     fun getActiveDownloads(): List<DownloadTask>
+
     fun isDownloading(modelId: String): Boolean
+
     suspend fun resumeDownload(modelId: String): String?
 }
 
@@ -844,21 +883,21 @@ interface DownloadService {
  * Adapter to make KtorDownloadService work with existing DownloadService interface
  */
 class KtorDownloadServiceAdapter(
-    private val ktorService: KtorDownloadService
+    private val ktorService: KtorDownloadService,
 ) : DownloadService {
-
     private val activeTasks = mutableMapOf<String, DownloadTask>()
+    private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override suspend fun downloadModel(
         model: ModelInfo,
-        progressHandler: ((DownloadProgress) -> Unit)?
+        progressHandler: ((DownloadProgress) -> Unit)?,
     ): String {
         val task = ktorService.downloadModel(model)
         activeTasks[model.id] = task
 
         // Start progress monitoring if handler provided
         progressHandler?.let { handler ->
-            GlobalScope.launch {
+            adapterScope.launch {
                 task.progress.collect { progress ->
                     handler(progress)
                 }
@@ -872,20 +911,22 @@ class KtorDownloadServiceAdapter(
         }
     }
 
-    override fun downloadModelStream(model: ModelInfo): Flow<DownloadProgress> = flow {
-        val task = ktorService.downloadModel(model)
-        activeTasks[model.id] = task
+    override fun downloadModelStream(model: ModelInfo): Flow<DownloadProgress> =
+        flow {
+            val task = ktorService.downloadModel(model)
+            activeTasks[model.id] = task
 
-        task.progress.collect { progress ->
-            emit(progress)
-            // Clean up when download is complete or failed
-            if (progress.state is DownloadState.Completed ||
-                progress.state is DownloadState.Failed ||
-                progress.state is DownloadState.Cancelled) {
-                activeTasks.remove(model.id)
+            task.progress.collect { progress ->
+                emit(progress)
+                // Clean up when download is complete or failed
+                if (progress.state is DownloadState.Completed ||
+                    progress.state is DownloadState.Failed ||
+                    progress.state is DownloadState.Cancelled
+                ) {
+                    activeTasks.remove(model.id)
+                }
             }
         }
-    }
 
     override fun cancelDownload(modelId: String) {
         activeTasks[modelId]?.let { task ->
@@ -894,13 +935,9 @@ class KtorDownloadServiceAdapter(
         }
     }
 
-    override fun getActiveDownloads(): List<DownloadTask> {
-        return activeTasks.values.toList()
-    }
+    override fun getActiveDownloads(): List<DownloadTask> = activeTasks.values.toList()
 
-    override fun isDownloading(modelId: String): Boolean {
-        return activeTasks.containsKey(modelId)
-    }
+    override fun isDownloading(modelId: String): Boolean = activeTasks.containsKey(modelId)
 
     override suspend fun resumeDownload(modelId: String): String? {
         // Not implemented yet - would need to store resume data

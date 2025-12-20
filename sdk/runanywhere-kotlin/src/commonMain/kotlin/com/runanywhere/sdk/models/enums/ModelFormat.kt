@@ -6,7 +6,9 @@ import kotlinx.serialization.Serializable
  * Model formats supported - exact match with iOS
  */
 @Serializable
-enum class ModelFormat(val value: String) {
+enum class ModelFormat(
+    val value: String,
+) {
     MLMODEL("mlmodel"),
     MLPACKAGE("mlpackage"),
     TFLITE("tflite"),
@@ -20,12 +22,11 @@ enum class ModelFormat(val value: String) {
     BIN("bin"),
     WEIGHTS("weights"),
     CHECKPOINT("checkpoint"),
-    UNKNOWN("unknown");
+    UNKNOWN("unknown"),
+    ;
 
     companion object {
-        fun fromValue(value: String): ModelFormat {
-            return entries.find { it.value == value } ?: UNKNOWN
-        }
+        fun fromValue(value: String): ModelFormat = entries.find { it.value == value } ?: UNKNOWN
 
         /**
          * Auto-detect model format from URL
@@ -49,11 +50,12 @@ enum class ModelFormat(val value: String) {
                 path.contains(".weights") -> WEIGHTS
                 path.contains(".checkpoint") || path.contains(".ckpt") -> CHECKPOINT
                 // Check for common model hosting patterns
-                url.contains("huggingface.co") -> when {
-                    path.contains("gguf") -> GGUF
-                    path.contains("onnx") -> ONNX
-                    else -> UNKNOWN
-                }
+                url.contains("huggingface.co") ->
+                    when {
+                        path.contains("gguf") -> GGUF
+                        path.contains("onnx") -> ONNX
+                        else -> UNKNOWN
+                    }
                 else -> UNKNOWN
             }
         }

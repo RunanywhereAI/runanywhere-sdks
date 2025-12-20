@@ -34,32 +34,27 @@ import com.runanywhere.sdk.models.enums.ModelFormat
 data class ConfigurationEntity(
     @PrimaryKey
     val id: String,
-
     @ColumnInfo(name = "api_key")
     val apiKey: String,
-
     @ColumnInfo(name = "base_url")
     val baseURL: String,
-
     val environment: SDKEnvironment,
     val source: ConfigurationSource,
-
     @ColumnInfo(name = "last_updated")
     val lastUpdated: Long,
-
     // Nested configurations stored as JSON strings (converted by TypeConverters)
     val routing: RoutingConfiguration,
     val generation: GenerationConfiguration,
     val storage: StorageConfiguration,
     val api: APIConfiguration,
     val download: ModelDownloadConfiguration,
-    val hardware: HardwareConfiguration?
+    val hardware: HardwareConfiguration?,
 ) {
     /**
      * Convert to domain model
      */
-    fun toConfigurationData(): ConfigurationData {
-        return ConfigurationData(
+    fun toConfigurationData(): ConfigurationData =
+        ConfigurationData(
             id = id,
             routing = routing,
             generation = generation,
@@ -70,16 +65,15 @@ data class ConfigurationEntity(
             apiKey = apiKey,
             source = source,
             createdAt = lastUpdated,
-            updatedAt = lastUpdated
+            updatedAt = lastUpdated,
         )
-    }
 
     companion object {
         /**
          * Convert from domain model
          */
-        fun fromConfigurationData(config: ConfigurationData): ConfigurationEntity {
-            return ConfigurationEntity(
+        fun fromConfigurationData(config: ConfigurationData): ConfigurationEntity =
+            ConfigurationEntity(
                 id = config.id,
                 apiKey = config.apiKey ?: "",
                 baseURL = config.api.baseURL,
@@ -91,9 +85,8 @@ data class ConfigurationEntity(
                 storage = config.storage,
                 api = config.api,
                 download = config.download,
-                hardware = config.hardware
+                hardware = config.hardware,
             )
-        }
     }
 }
 
@@ -101,58 +94,43 @@ data class ConfigurationEntity(
 data class ModelInfoEntity(
     @PrimaryKey
     val id: String,
-
     val name: String,
     val category: ModelCategory,
     val format: ModelFormat,
     val framework: InferenceFramework,
-
     @ColumnInfo(name = "download_url")
     val downloadURL: String,
-
     @ColumnInfo(name = "local_path")
     val localPath: String?,
-
     @ColumnInfo(name = "download_size")
     val downloadSize: Long,
-
     @ColumnInfo(name = "memory_required")
     val memoryRequired: Long,
-
     @ColumnInfo(name = "compatible_frameworks")
     val compatibleFrameworks: List<String>,
-
     val version: String,
     val description: String,
-
     @ColumnInfo(name = "is_built_in")
     val isBuiltIn: Boolean,
-
     @ColumnInfo(name = "is_downloaded")
     val isDownloaded: Boolean,
-
     @ColumnInfo(name = "download_progress")
     val downloadProgress: Float,
-
     @ColumnInfo(name = "last_used")
     val lastUsed: Long?,
-
     @ColumnInfo(name = "checksum_sha256")
     val checksumSHA256: String?,
-
     val metadata: Map<String, String>,
-
     @ColumnInfo(name = "created_at")
     val createdAt: Long,
-
     @ColumnInfo(name = "updated_at")
-    val updatedAt: Long
+    val updatedAt: Long,
 ) {
     /**
      * Convert to domain model
      */
-    fun toModelInfo(): ModelInfo {
-        return ModelInfo(
+    fun toModelInfo(): ModelInfo =
+        ModelInfo(
             id = id,
             name = name,
             category = category,
@@ -172,16 +150,15 @@ data class ModelInfoEntity(
             checksumSHA256 = checksumSHA256,
             metadata = metadata,
             createdAt = createdAt,
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
         )
-    }
 
     companion object {
         /**
          * Convert from domain model
          */
-        fun fromModelInfo(modelInfo: ModelInfo): ModelInfoEntity {
-            return ModelInfoEntity(
+        fun fromModelInfo(modelInfo: ModelInfo): ModelInfoEntity =
+            ModelInfoEntity(
                 id = modelInfo.id,
                 name = modelInfo.name,
                 category = modelInfo.category,
@@ -201,9 +178,8 @@ data class ModelInfoEntity(
                 checksumSHA256 = modelInfo.checksumSHA256,
                 metadata = modelInfo.metadata,
                 createdAt = modelInfo.createdAt,
-                updatedAt = modelInfo.updatedAt
+                updatedAt = modelInfo.updatedAt,
             )
-        }
     }
 }
 
@@ -212,114 +188,80 @@ data class DeviceInfoEntity(
     @PrimaryKey
     @ColumnInfo(name = "device_id")
     val deviceId: String,
-
     @ColumnInfo(name = "device_name")
     val deviceName: String,
-
     @ColumnInfo(name = "system_name")
     val systemName: String,
-
     @ColumnInfo(name = "system_version")
     val systemVersion: String,
-
     @ColumnInfo(name = "model_name")
     val modelName: String,
-
     @ColumnInfo(name = "model_identifier")
     val modelIdentifier: String,
-
     @ColumnInfo(name = "cpu_type")
     val cpuType: String,
-
     @ColumnInfo(name = "cpu_architecture")
     val cpuArchitecture: String,
-
     @ColumnInfo(name = "cpu_core_count")
     val cpuCoreCount: Int,
-
     @ColumnInfo(name = "cpu_frequency_mhz")
     val cpuFrequencyMHz: Int?,
-
     @ColumnInfo(name = "total_memory_mb")
     val totalMemoryMB: Long,
-
     @ColumnInfo(name = "available_memory_mb")
     val availableMemoryMB: Long,
-
     @ColumnInfo(name = "total_storage_mb")
     val totalStorageMB: Long,
-
     @ColumnInfo(name = "available_storage_mb")
     val availableStorageMB: Long,
-
     @ColumnInfo(name = "gpu_type")
     val gpuType: GPUType,
-
     @ColumnInfo(name = "gpu_name")
     val gpuName: String?,
-
     @ColumnInfo(name = "gpu_vendor")
     val gpuVendor: String?,
-
     @ColumnInfo(name = "supports_metal")
     val supportsMetal: Boolean,
-
     @ColumnInfo(name = "supports_vulkan")
     val supportsVulkan: Boolean,
-
     @ColumnInfo(name = "supports_opencl")
     val supportsOpenCL: Boolean,
-
     @ColumnInfo(name = "battery_level")
     val batteryLevel: Float?,
-
     @ColumnInfo(name = "battery_state")
     val batteryState: BatteryState,
-
     @ColumnInfo(name = "thermal_state")
     val thermalState: ThermalState,
-
     @ColumnInfo(name = "is_low_power_mode")
     val isLowPowerMode: Boolean,
-
     @ColumnInfo(name = "has_cellular")
     val hasCellular: Boolean,
-
     @ColumnInfo(name = "has_wifi")
     val hasWifi: Boolean,
-
     @ColumnInfo(name = "has_bluetooth")
     val hasBluetooth: Boolean,
-
     @ColumnInfo(name = "has_camera")
     val hasCamera: Boolean,
-
     @ColumnInfo(name = "has_microphone")
     val hasMicrophone: Boolean,
-
     @ColumnInfo(name = "has_speakers")
     val hasSpeakers: Boolean,
-
     @ColumnInfo(name = "has_biometric")
     val hasBiometric: Boolean,
-
     @ColumnInfo(name = "benchmark_score")
     val benchmarkScore: Int?,
-
     @ColumnInfo(name = "memory_pressure")
     val memoryPressure: Float,
-
     @ColumnInfo(name = "created_at")
     val createdAt: Long,
-
     @ColumnInfo(name = "updated_at")
-    val updatedAt: Long
+    val updatedAt: Long,
 ) {
     /**
      * Convert to domain model
      */
-    fun toDeviceInfoData(): DeviceInfoData {
-        return DeviceInfoData(
+    fun toDeviceInfoData(): DeviceInfoData =
+        DeviceInfoData(
             deviceId = deviceId,
             deviceName = deviceName,
             systemName = systemName,
@@ -354,16 +296,15 @@ data class DeviceInfoEntity(
             benchmarkScore = benchmarkScore,
             memoryPressure = memoryPressure,
             createdAt = createdAt,
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
         )
-    }
 
     companion object {
         /**
          * Convert from domain model
          */
-        fun fromDeviceInfoData(deviceInfo: DeviceInfoData): DeviceInfoEntity {
-            return DeviceInfoEntity(
+        fun fromDeviceInfoData(deviceInfo: DeviceInfoData): DeviceInfoEntity =
+            DeviceInfoEntity(
                 deviceId = deviceInfo.deviceId,
                 deviceName = deviceInfo.deviceName,
                 systemName = deviceInfo.systemName,
@@ -398,9 +339,8 @@ data class DeviceInfoEntity(
                 benchmarkScore = deviceInfo.benchmarkScore,
                 memoryPressure = deviceInfo.memoryPressure,
                 createdAt = deviceInfo.createdAt,
-                updatedAt = deviceInfo.updatedAt
+                updatedAt = deviceInfo.updatedAt,
             )
-        }
     }
 }
 
@@ -408,56 +348,42 @@ data class DeviceInfoEntity(
 data class TelemetryEventEntity(
     @PrimaryKey
     val id: String,
-
     val type: TelemetryEventType,
     val name: String,
     val properties: Map<String, String>,
     val metrics: Map<String, Double>,
-
     @ColumnInfo(name = "session_id")
     val sessionId: String,
-
     @ColumnInfo(name = "user_id")
     val userId: String?,
-
     @ColumnInfo(name = "device_id")
     val deviceId: String,
-
     @ColumnInfo(name = "app_version")
     val appVersion: String?,
-
     @ColumnInfo(name = "sdk_version")
     val sdkVersion: String,
-
     val platform: String,
-
     @ColumnInfo(name = "os_version")
     val osVersion: String,
-
     val timestamp: Long,
     val duration: Long?,
     val success: Boolean,
-
     @ColumnInfo(name = "error_code")
     val errorCode: String?,
-
     @ColumnInfo(name = "error_message")
     val errorMessage: String?,
-
     @ColumnInfo(name = "is_sent")
     val isSent: Boolean,
-
     @ColumnInfo(name = "sent_at")
     val sentAt: Long?,
-
     @ColumnInfo(name = "retry_count")
-    val retryCount: Int
+    val retryCount: Int,
 ) {
     /**
      * Convert to domain model
      */
-    fun toTelemetryData(): TelemetryData {
-        return TelemetryData(
+    fun toTelemetryData(): TelemetryData =
+        TelemetryData(
             id = id,
             type = type,
             name = name,
@@ -477,16 +403,15 @@ data class TelemetryEventEntity(
             errorMessage = errorMessage,
             isSent = isSent,
             sentAt = sentAt,
-            retryCount = retryCount
+            retryCount = retryCount,
         )
-    }
 
     companion object {
         /**
          * Convert from domain model
          */
-        fun fromTelemetryData(telemetry: TelemetryData): TelemetryEventEntity {
-            return TelemetryEventEntity(
+        fun fromTelemetryData(telemetry: TelemetryData): TelemetryEventEntity =
+            TelemetryEventEntity(
                 id = telemetry.id,
                 type = telemetry.type,
                 name = telemetry.name,
@@ -506,9 +431,8 @@ data class TelemetryEventEntity(
                 errorMessage = telemetry.errorMessage,
                 isSent = telemetry.isSent,
                 sentAt = telemetry.sentAt,
-                retryCount = telemetry.retryCount
+                retryCount = telemetry.retryCount,
             )
-        }
     }
 }
 
@@ -516,44 +440,40 @@ data class TelemetryEventEntity(
 data class AuthTokenEntity(
     @PrimaryKey
     val id: String = "current_token",
-
     @ColumnInfo(name = "access_token")
     val accessToken: String,
-
     @ColumnInfo(name = "refresh_token")
     val refreshToken: String,
-
     @ColumnInfo(name = "expires_at")
     val expiresAt: Long,
-
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
-
     @ColumnInfo(name = "updated_at")
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
 ) {
     /**
      * Convert to domain model
      */
-    fun toStoredTokens(): StoredTokens {
-        return StoredTokens(
+    fun toStoredTokens(): StoredTokens =
+        StoredTokens(
             accessToken = accessToken,
             refreshToken = refreshToken,
-            expiresAt = expiresAt
+            expiresAt = expiresAt,
         )
-    }
 
     companion object {
         /**
          * Convert from domain model
          */
-        fun fromStoredTokens(tokens: StoredTokens, id: String = "current_token"): AuthTokenEntity {
-            return AuthTokenEntity(
+        fun fromStoredTokens(
+            tokens: StoredTokens,
+            id: String = "current_token",
+        ): AuthTokenEntity =
+            AuthTokenEntity(
                 id = id,
                 accessToken = tokens.accessToken,
                 refreshToken = tokens.refreshToken,
-                expiresAt = tokens.expiresAt
+                expiresAt = tokens.expiresAt,
             )
-        }
     }
 }

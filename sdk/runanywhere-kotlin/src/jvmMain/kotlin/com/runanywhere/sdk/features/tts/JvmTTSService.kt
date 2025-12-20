@@ -21,7 +21,7 @@ data class JvmAudioFormatConfig(
     val sampleSizeInBits: Int,
     val channels: Int,
     val signed: Boolean,
-    val bigEndian: Boolean
+    val bigEndian: Boolean,
 )
 
 /**
@@ -30,35 +30,34 @@ data class JvmAudioFormatConfig(
  * Aligned with iOS TTSService protocol patterns
  */
 class JvmTTSService : TTSService {
-
     private val logger = SDKLogger("JvmTTSService")
     private var _isSynthesizing = false
     private var _isInitialized = false
     private var availableTTSVoices = mutableListOf<TTSVoice>()
 
-    // Audio format configuration
-    private val jvmAudioFormat = JvmAudioFormatConfig(16000f, 16, 1, true, false) // 16kHz, 16-bit mono
-
     companion object {
         private val logger = SDKLogger("JvmTTSService")
 
         // Default voices for different platforms
-        private val WINDOWS_VOICES = listOf(
-            TTSVoice("david", "Microsoft David", "en-US", TTSGender.MALE),
-            TTSVoice("zira", "Microsoft Zira", "en-US", TTSGender.FEMALE),
-            TTSVoice("mark", "Microsoft Mark", "en-US", TTSGender.MALE)
-        )
+        private val WINDOWS_VOICES =
+            listOf(
+                TTSVoice("david", "Microsoft David", "en-US", TTSGender.MALE),
+                TTSVoice("zira", "Microsoft Zira", "en-US", TTSGender.FEMALE),
+                TTSVoice("mark", "Microsoft Mark", "en-US", TTSGender.MALE),
+            )
 
-        private val MACOS_VOICES = listOf(
-            TTSVoice("alex", "Alex", "en-US", TTSGender.MALE),
-            TTSVoice("samantha", "Samantha", "en-US", TTSGender.FEMALE),
-            TTSVoice("victoria", "Victoria", "en-US", TTSGender.FEMALE)
-        )
+        private val MACOS_VOICES =
+            listOf(
+                TTSVoice("alex", "Alex", "en-US", TTSGender.MALE),
+                TTSVoice("samantha", "Samantha", "en-US", TTSGender.FEMALE),
+                TTSVoice("victoria", "Victoria", "en-US", TTSGender.FEMALE),
+            )
 
-        private val LINUX_VOICES = listOf(
-            TTSVoice("espeak-default", "eSpeak Default", "en-US", TTSGender.NEUTRAL),
-            TTSVoice("festival-male", "Festival Male", "en-US", TTSGender.MALE)
-        )
+        private val LINUX_VOICES =
+            listOf(
+                TTSVoice("espeak-default", "eSpeak Default", "en-US", TTSGender.NEUTRAL),
+                TTSVoice("festival-male", "Festival Male", "en-US", TTSGender.MALE),
+            )
     }
 
     override suspend fun initialize() {
@@ -71,7 +70,6 @@ class JvmTTSService : TTSService {
 
                 _isInitialized = true
                 logger.info("JVM TTS service initialized with ${availableTTSVoices.size} voices")
-
             } catch (e: Exception) {
                 logger.error("Failed to initialize JVM TTS service", e)
                 throw SDKError.ComponentFailure("TTS initialization failed: ${e.message}")
@@ -80,7 +78,10 @@ class JvmTTSService : TTSService {
     }
 
     // iOS-style synthesize method
-    override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
+    override suspend fun synthesize(
+        text: String,
+        options: TTSOptions,
+    ): ByteArray {
         if (!_isInitialized) {
             throw SDKError.ComponentNotReady("TTS service not initialized")
         }
@@ -89,9 +90,10 @@ class JvmTTSService : TTSService {
         return try {
             withContext(Dispatchers.IO) {
                 // Find voice by ID or use default
-                val voice = options.voice?.let { voiceId ->
-                    availableTTSVoices.find { it.id == voiceId }
-                } ?: availableTTSVoices.firstOrNull() ?: TTSVoice.DEFAULT
+                val voice =
+                    options.voice?.let { voiceId ->
+                        availableTTSVoices.find { it.id == voiceId }
+                    } ?: availableTTSVoices.firstOrNull() ?: TTSVoice.DEFAULT
                 logger.debug("Synthesizing text: '${text.take(50)}...' with voice: ${voice.name}")
 
                 when {
@@ -107,45 +109,47 @@ class JvmTTSService : TTSService {
     }
 
     // KMP Flow-based streaming
-    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> = flow {
-        if (!_isInitialized) {
-            throw SDKError.ComponentNotReady("TTS service not initialized")
-        }
-
-        _isSynthesizing = true
-        try {
-            logger.debug("Starting streaming synthesis")
-
-            // For streaming, we'll split text into sentences and synthesize each
-            val sentences = text.split(Regex("[.!?]+")).filter { it.trim().isNotEmpty() }
-
-            for (sentence in sentences) {
-                val audioData = synthesize(sentence.trim(), options)
-                if (audioData.isNotEmpty()) {
-                    emit(audioData)
-                }
-                // Small delay between sentences to allow for natural speech rhythm
-                delay(100)
+    override fun synthesizeStream(
+        text: String,
+        options: TTSOptions,
+    ): Flow<ByteArray> =
+        flow {
+            if (!_isInitialized) {
+                throw SDKError.ComponentNotReady("TTS service not initialized")
             }
-        } finally {
-            _isSynthesizing = false
+
+            _isSynthesizing = true
+            try {
+                logger.debug("Starting streaming synthesis")
+
+                // For streaming, we'll split text into sentences and synthesize each
+                val sentences = text.split(Regex("[.!?]+")).filter { it.trim().isNotEmpty() }
+
+                for (sentence in sentences) {
+                    val audioData = synthesize(sentence.trim(), options)
+                    if (audioData.isNotEmpty()) {
+                        emit(audioData)
+                    }
+                    // Small delay between sentences to allow for natural speech rhythm
+                    delay(100)
+                }
+            } finally {
+                _isSynthesizing = false
+            }
         }
-    }
 
     // iOS-style callback streaming
     override suspend fun synthesizeStream(
         text: String,
         options: TTSOptions,
-        onChunk: suspend (ByteArray) -> Unit
+        onChunk: suspend (ByteArray) -> Unit,
     ) {
         synthesizeStream(text, options).collect { chunk ->
             onChunk(chunk)
         }
     }
 
-    override fun getAllVoices(): List<TTSVoice> {
-        return availableTTSVoices.toList()
-    }
+    override fun getAllVoices(): List<TTSVoice> = availableTTSVoices.toList()
 
     override val availableVoices: List<String>
         get() = availableTTSVoices.map { it.id }
@@ -174,17 +178,11 @@ class JvmTTSService : TTSService {
 
     // MARK: - Platform Detection
 
-    private fun isMacOS(): Boolean {
-        return System.getProperty("os.name").lowercase().contains("mac")
-    }
+    private fun isMacOS(): Boolean = System.getProperty("os.name").lowercase().contains("mac")
 
-    private fun isWindows(): Boolean {
-        return System.getProperty("os.name").lowercase().contains("windows")
-    }
+    private fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("windows")
 
-    private fun isLinux(): Boolean {
-        return System.getProperty("os.name").lowercase().contains("linux")
-    }
+    private fun isLinux(): Boolean = System.getProperty("os.name").lowercase().contains("linux")
 
     // MARK: - Voice Detection
 
@@ -223,8 +221,8 @@ class JvmTTSService : TTSService {
         }
     }
 
-    private fun detectMacOSVoices(): List<TTSVoice> {
-        return try {
+    private fun detectMacOSVoices(): List<TTSVoice> =
+        try {
             val process = ProcessBuilder("say", "-v", "?").start()
             val output = process.inputStream.bufferedReader().readText()
             process.waitFor()
@@ -245,8 +243,8 @@ class JvmTTSService : TTSService {
                                 id = voiceName.lowercase(),
                                 name = voiceName,
                                 language = language,
-                                gender = gender
-                            )
+                                gender = gender,
+                            ),
                         )
                     }
                 }
@@ -257,7 +255,6 @@ class JvmTTSService : TTSService {
             logger.warn("Failed to detect macOS voices, using defaults")
             MACOS_VOICES
         }
-    }
 
     private fun guessGenderFromName(name: String): TTSGender {
         val femaleName = listOf("samantha", "victoria", "allison", "susan", "zira", "hazel")
@@ -270,39 +267,40 @@ class JvmTTSService : TTSService {
         }
     }
 
-    private fun checkCommandAvailable(command: String): Boolean {
-        return try {
+    private fun checkCommandAvailable(command: String): Boolean =
+        try {
             val process = ProcessBuilder("which", command).start()
             process.waitFor() == 0
         } catch (e: Exception) {
             false
         }
-    }
 
     // MARK: - Platform-Specific Synthesis
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun synthesizeWithMacOSSay(
         text: String,
         voice: TTSVoice,
         rate: Float,
         pitch: Float,
-        volume: Float
-    ): ByteArray {
-        return withContext(Dispatchers.IO) {
+        volume: Float,
+    ): ByteArray =
+        withContext(Dispatchers.IO) {
             try {
                 val outputFile = createTempFile("tts_output", ".wav")
 
                 // Build 'say' command with parameters
-                val command = buildList {
-                    add("say")
-                    add("-v")
-                    add(voice.name)
-                    add("-r")
-                    add((rate * 200).toInt().toString()) // say uses words per minute
-                    add("-o")
-                    add(outputFile.absolutePath)
-                    add(text)
-                }
+                val command =
+                    buildList {
+                        add("say")
+                        add("-v")
+                        add(voice.name)
+                        add("-r")
+                        add((rate * 200).toInt().toString()) // say uses words per minute
+                        add("-o")
+                        add(outputFile.absolutePath)
+                        add(text)
+                    }
 
                 logger.debug("Executing: ${command.joinToString(" ")}")
 
@@ -322,14 +320,14 @@ class JvmTTSService : TTSService {
                 generateSilentAudio(text.length)
             }
         }
-    }
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun synthesizeWithWindowsSAPI(
         text: String,
         voice: TTSVoice,
         rate: Float,
         pitch: Float,
-        volume: Float
+        volume: Float,
     ): ByteArray {
         // For now, return silent audio as Windows SAPI integration requires COM interop
         // In a full implementation, you would use JNI or COM4J to access Windows SAPI
@@ -337,14 +335,15 @@ class JvmTTSService : TTSService {
         return generateSilentAudio(text.length)
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun synthesizeWithLinuxTTS(
         text: String,
         voice: TTSVoice,
         rate: Float,
         pitch: Float,
-        volume: Float
-    ): ByteArray {
-        return withContext(Dispatchers.IO) {
+        volume: Float,
+    ): ByteArray =
+        withContext(Dispatchers.IO) {
             try {
                 when {
                     voice.id.startsWith("espeak") -> synthesizeWithEspeak(text, rate, pitch)
@@ -356,19 +355,26 @@ class JvmTTSService : TTSService {
                 generateSilentAudio(text.length)
             }
         }
-    }
 
-    private fun synthesizeWithEspeak(text: String, rate: Float, pitch: Float): ByteArray {
-        return try {
+    private fun synthesizeWithEspeak(
+        text: String,
+        rate: Float,
+        pitch: Float,
+    ): ByteArray =
+        try {
             val outputFile = createTempFile("espeak_output", ".wav")
 
-            val command = listOf(
-                "espeak",
-                "-s", (rate * 175).toInt().toString(), // Speed in words per minute
-                "-p", (pitch * 50).toInt().toString(), // Pitch 0-99
-                "-w", outputFile.absolutePath,
-                text
-            )
+            val command =
+                listOf(
+                    "espeak",
+                    "-s",
+                    (rate * 175).toInt().toString(), // Speed in words per minute
+                    "-p",
+                    (pitch * 50).toInt().toString(), // Pitch 0-99
+                    "-w",
+                    outputFile.absolutePath,
+                    text,
+                )
 
             val process = ProcessBuilder(command).start()
             val exitCode = process.waitFor()
@@ -384,18 +390,19 @@ class JvmTTSService : TTSService {
             logger.error("Error with espeak synthesis", e)
             generateSilentAudio(text.length)
         }
-    }
 
-    private fun synthesizeWithFestival(text: String): ByteArray {
-        return try {
+    private fun synthesizeWithFestival(text: String): ByteArray =
+        try {
             val outputFile = createTempFile("festival_output", ".wav")
 
             // Create festival script
             val scriptFile = createTempFile("festival_script", ".scm")
-            scriptFile.writeText("""
+            scriptFile.writeText(
+                """
                 (voice_kal_diphone)
                 (utt.save.wave (SayText "$text") "${outputFile.absolutePath}" 'riff)
-            """.trimIndent())
+                """.trimIndent(),
+            )
 
             val command = listOf("festival", "-b", scriptFile.absolutePath)
             val process = ProcessBuilder(command).start()
@@ -414,7 +421,6 @@ class JvmTTSService : TTSService {
             logger.error("Error with Festival synthesis", e)
             generateSilentAudio(text.length)
         }
-    }
 
     // MARK: - Utility Methods
 
@@ -445,24 +451,32 @@ class JvmTTSService : TTSService {
     /**
      * Create temporary file with automatic cleanup
      */
-    private fun createTempFile(prefix: String, suffix: String): java.io.File {
-        return kotlin.io.path.createTempFile(prefix, suffix).toFile().apply {
+    private fun createTempFile(
+        prefix: String,
+        suffix: String,
+    ): java.io.File =
+        kotlin.io.path.createTempFile(prefix, suffix).toFile().apply {
             deleteOnExit()
         }
-    }
 }
 
 /**
  * JVM TTS Service Provider for integration with ModuleRegistry
  */
 class JvmTTSServiceProvider : com.runanywhere.sdk.core.TTSServiceProvider {
-    override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
+    override suspend fun synthesize(
+        text: String,
+        options: TTSOptions,
+    ): ByteArray {
         val service = JvmTTSService()
         service.initialize()
         return service.synthesize(text = text, options = options)
     }
 
-    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> {
+    override fun synthesizeStream(
+        text: String,
+        options: TTSOptions,
+    ): Flow<ByteArray> {
         val service = JvmTTSService()
         return flow {
             service.initialize()

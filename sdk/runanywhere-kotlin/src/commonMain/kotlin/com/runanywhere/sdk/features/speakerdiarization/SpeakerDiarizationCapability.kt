@@ -4,7 +4,6 @@ import com.runanywhere.sdk.core.capabilities.ComponentState
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
 // All types (SpeakerDiarizationOutput, SpeakerSegment, SpeakerProfile, etc.) are imported from
 // the same package (SpeakerDiarizationModels.kt) - no need for explicit imports
@@ -24,7 +23,7 @@ import kotlinx.coroutines.flow.map
  * it initializes a service rather than loading a specific model.
  */
 class SpeakerDiarizationCapability internal constructor(
-    private val getComponent: () -> SpeakerDiarizationComponent
+    private val getComponent: () -> SpeakerDiarizationComponent,
 ) {
     private val logger = SDKLogger("SpeakerDiarizationCapability")
 
@@ -57,7 +56,9 @@ class SpeakerDiarizationCapability internal constructor(
      * @param config Speaker Diarization configuration
      * @throws SDKError if initialization fails
      */
-    suspend fun initialize(config: SpeakerDiarizationConfiguration) {
+    suspend fun initialize(
+        @Suppress("UNUSED_PARAMETER") config: SpeakerDiarizationConfiguration,
+    ) {
         logger.info("Initializing Speaker Diarization")
 
         try {
@@ -101,10 +102,11 @@ class SpeakerDiarizationCapability internal constructor(
         ensureReady()
 
         val component = getComponent()
-        val input = SpeakerDiarizationInput(
-            audioBuffer = samples,
-            sampleRate = 16000
-        )
+        val input =
+            SpeakerDiarizationInput(
+                audioBuffer = samples,
+                sampleRate = 16000,
+            )
 
         val output = component.processAudio(input)
 
@@ -114,13 +116,13 @@ class SpeakerDiarizationCapability internal constructor(
                 id = profile.id,
                 name = profile.name,
                 confidence = profile.averageConfidence,
-                embedding = profile.embedding
+                embedding = profile.embedding,
             )
         } ?: SpeakerInfo(
             id = "SILENCE",
             name = null,
             confidence = 0.0f,
-            embedding = null
+            embedding = null,
         )
     }
 
@@ -144,14 +146,18 @@ class SpeakerDiarizationCapability internal constructor(
      * @param sampleRate Sample rate of audio
      * @return Full diarization output with segments and speakers
      */
-    suspend fun diarize(samples: FloatArray, sampleRate: Int = 16000): SpeakerDiarizationOutput {
+    suspend fun diarize(
+        samples: FloatArray,
+        sampleRate: Int = 16000,
+    ): SpeakerDiarizationOutput {
         ensureReady()
 
         val component = getComponent()
-        val input = SpeakerDiarizationInput(
-            audioBuffer = samples,
-            sampleRate = sampleRate
-        )
+        val input =
+            SpeakerDiarizationInput(
+                audioBuffer = samples,
+                sampleRate = sampleRate,
+            )
 
         return component.processAudio(input)
     }
@@ -189,7 +195,10 @@ class SpeakerDiarizationCapability internal constructor(
      * @param name The new name for the speaker
      * @throws SDKError if not ready
      */
-    suspend fun updateSpeakerName(speakerId: String, name: String) {
+    suspend fun updateSpeakerName(
+        speakerId: String,
+        name: String,
+    ) {
         ensureReady()
 
         logger.info("Updating speaker name: $speakerId -> $name")

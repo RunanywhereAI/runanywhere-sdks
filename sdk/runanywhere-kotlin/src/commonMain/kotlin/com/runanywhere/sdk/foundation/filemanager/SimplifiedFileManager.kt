@@ -4,8 +4,8 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.platform.getPlatformBaseDirectory
-import com.runanywhere.sdk.platform.getPlatformTempDirectory
 import com.runanywhere.sdk.platform.getPlatformStorageInfo
+import com.runanywhere.sdk.platform.getPlatformTempDirectory
 import kotlinx.coroutines.runBlocking
 import okio.FileSystem
 import okio.Path
@@ -92,15 +92,16 @@ class SimplifiedFileManager {
      */
     fun setupDirectories() {
         // Matches iOS directory structure: Models, Cache, Temp, Downloads
-        val directories = listOf(
-            baseDirectory,
-            modelsDirectory,
-            cacheDirectory,
-            databaseDirectory,
-            logsDirectory,
-            temporaryDirectory,
-            downloadsDirectory
-        )
+        val directories =
+            listOf(
+                baseDirectory,
+                modelsDirectory,
+                cacheDirectory,
+                databaseDirectory,
+                logsDirectory,
+                temporaryDirectory,
+                downloadsDirectory,
+            )
 
         directories.forEach { dir ->
             try {
@@ -118,43 +119,39 @@ class SimplifiedFileManager {
      * Check if file exists
      * Matches iOS fileExists(at:) method
      */
-    fun fileExists(path: String): Boolean {
-        return fileSystem.exists(path.toPath())
-    }
+    fun fileExists(path: String): Boolean = fileSystem.exists(path.toPath())
 
     /**
      * Check if path is a directory
      * Matches iOS isDirectory(at:) method
      */
-    fun isDirectory(path: String): Boolean {
-        return try {
+    fun isDirectory(path: String): Boolean =
+        try {
             val metadata = fileSystem.metadata(path.toPath())
             metadata.isDirectory
         } catch (e: Exception) {
             false
         }
-    }
 
     /**
      * Get file size
      * Matches iOS fileSize(at:) method
      */
-    fun fileSize(path: String): Long? {
-        return try {
+    fun fileSize(path: String): Long? =
+        try {
             val metadata = fileSystem.metadata(path.toPath())
             metadata.size
         } catch (e: Exception) {
             logger.error("Failed to get file size: $path", e)
             null
         }
-    }
 
     /**
      * Delete file
      * Matches iOS deleteFile(at:) method
      */
-    fun deleteFile(path: String): Boolean {
-        return try {
+    fun deleteFile(path: String): Boolean =
+        try {
             val filePath = path.toPath()
             if (fileSystem.exists(filePath)) {
                 fileSystem.delete(filePath)
@@ -168,14 +165,13 @@ class SimplifiedFileManager {
             logger.error("Failed to delete file: $path", e)
             false
         }
-    }
 
     /**
      * Delete directory recursively
      * Matches iOS deleteDirectory(at:) method
      */
-    fun deleteDirectory(path: String): Boolean {
-        return try {
+    fun deleteDirectory(path: String): Boolean =
+        try {
             val dirPath = path.toPath()
             if (fileSystem.exists(dirPath)) {
                 fileSystem.deleteRecursively(dirPath)
@@ -189,7 +185,6 @@ class SimplifiedFileManager {
             logger.error("Failed to delete directory: $path", e)
             false
         }
-    }
 
     /**
      * Calculate directory size
@@ -217,8 +212,8 @@ class SimplifiedFileManager {
      * List files in directory (non-recursive)
      * Matches iOS listFiles(at:) method
      */
-    fun listFiles(path: String): List<String> {
-        return try {
+    fun listFiles(path: String): List<String> =
+        try {
             val dirPath = path.toPath()
             if (fileSystem.exists(dirPath)) {
                 fileSystem.list(dirPath).map { it.toString() }
@@ -229,7 +224,6 @@ class SimplifiedFileManager {
             logger.error("Failed to list files: $path", e)
             emptyList()
         }
-    }
 
     /**
      * List files recursively
@@ -263,8 +257,8 @@ class SimplifiedFileManager {
      * Create directory
      * Matches iOS createDirectory(at:) method
      */
-    fun createDirectory(path: String): Boolean {
-        return try {
+    fun createDirectory(path: String): Boolean =
+        try {
             val dirPath = path.toPath()
             if (!fileSystem.exists(dirPath)) {
                 fileSystem.createDirectories(dirPath)
@@ -275,14 +269,16 @@ class SimplifiedFileManager {
             logger.error("Failed to create directory: $path", e)
             false
         }
-    }
 
     /**
      * Move file
      * Matches iOS moveFile(from:to:) method
      */
-    fun moveFile(from: String, to: String): Boolean {
-        return try {
+    fun moveFile(
+        from: String,
+        to: String,
+    ): Boolean =
+        try {
             val fromPath = from.toPath()
             val toPath = to.toPath()
             fileSystem.atomicMove(fromPath, toPath)
@@ -292,14 +288,16 @@ class SimplifiedFileManager {
             logger.error("Failed to move file: $from -> $to", e)
             false
         }
-    }
 
     /**
      * Copy file
      * Matches iOS copyFile(from:to:) method
      */
-    fun copyFile(from: String, to: String): Boolean {
-        return try {
+    fun copyFile(
+        from: String,
+        to: String,
+    ): Boolean =
+        try {
             val fromPath = from.toPath()
             val toPath = to.toPath()
             fileSystem.copy(fromPath, toPath)
@@ -309,7 +307,6 @@ class SimplifiedFileManager {
             logger.error("Failed to copy file: $from -> $to", e)
             false
         }
-    }
 
     // MARK: - Storage Information
     // Matches iOS SimplifiedFileManager storage methods exactly
@@ -320,21 +317,18 @@ class SimplifiedFileManager {
      *
      * Calculates size recursively for all files in base folder
      */
-    fun getTotalStorageSize(): Long {
-        return directorySize(baseDirectory.toString())
-    }
+    fun getTotalStorageSize(): Long = directorySize(baseDirectory.toString())
 
     /**
      * Get model storage size
      * Matches iOS getModelStorageSize() method exactly
      */
-    fun getModelStorageSize(): Long {
-        return if (fileSystem.exists(modelsDirectory)) {
+    fun getModelStorageSize(): Long =
+        if (fileSystem.exists(modelsDirectory)) {
             directorySize(modelsDirectory.toString())
         } else {
             0L
         }
-    }
 
     /**
      * Calculate the total size of a directory including all subdirectories and files
@@ -351,9 +345,7 @@ class SimplifiedFileManager {
      * }
      * ```
      */
-    fun calculateDirectorySize(path: String): Long {
-        return directorySize(path)
-    }
+    fun calculateDirectorySize(path: String): Long = directorySize(path)
 
     /**
      * Get available space
@@ -365,8 +357,8 @@ class SimplifiedFileManager {
      * return values.volumeAvailableCapacityForImportantUsage ?? 0
      * ```
      */
-    fun getAvailableSpace(): Long {
-        return runBlocking {
+    fun getAvailableSpace(): Long =
+        runBlocking {
             try {
                 val storageInfo = getPlatformStorageInfo(baseDirectory.toString())
                 storageInfo.availableSpace
@@ -375,7 +367,6 @@ class SimplifiedFileManager {
                 0L
             }
         }
-    }
 
     /**
      * Get device storage information (total, free, used space)
@@ -390,21 +381,20 @@ class SimplifiedFileManager {
      * return (totalSpace: totalSpace, freeSpace: freeSpace, usedSpace: usedSpace)
      * ```
      */
-    fun getDeviceStorageInfo(): DeviceStorageData {
-        return runBlocking {
+    fun getDeviceStorageInfo(): DeviceStorageData =
+        runBlocking {
             try {
                 val storageInfo = getPlatformStorageInfo(baseDirectory.toString())
                 DeviceStorageData(
                     totalSpace = storageInfo.totalSpace,
                     freeSpace = storageInfo.availableSpace,
-                    usedSpace = storageInfo.usedSpace
+                    usedSpace = storageInfo.usedSpace,
                 )
             } catch (e: Exception) {
                 logger.error("Failed to get device storage info", e)
                 DeviceStorageData(0L, 0L, 0L)
             }
         }
-    }
 
     /**
      * Get all stored models
@@ -431,10 +421,11 @@ class SimplifiedFileManager {
                 val entryName = entryPath.substringAfterLast("/")
 
                 // Check if this is a framework folder
-                val framework = InferenceFramework.values().firstOrNull {
-                    it.value.equals(entryName, ignoreCase = true) ||
-                    it.displayName.equals(entryName, ignoreCase = true)
-                }
+                val framework =
+                    InferenceFramework.values().firstOrNull {
+                        it.value.equals(entryName, ignoreCase = true) ||
+                            it.displayName.equals(entryName, ignoreCase = true)
+                    }
 
                 if (framework != null) {
                     // Scan framework-specific folder
@@ -449,8 +440,8 @@ class SimplifiedFileManager {
                                 modelId = entryName,
                                 format = modelInfo.format,
                                 size = modelInfo.size,
-                                framework = null
-                            )
+                                framework = null,
+                            ),
                         )
                     }
                 }
@@ -466,7 +457,10 @@ class SimplifiedFileManager {
      * Scan framework-specific folder for models
      * Matches iOS getAllStoredModels() framework scanning logic
      */
-    private fun scanFrameworkFolder(frameworkPath: String, framework: InferenceFramework): List<StoredModelData> {
+    private fun scanFrameworkFolder(
+        frameworkPath: String,
+        framework: InferenceFramework,
+    ): List<StoredModelData> {
         val models = mutableListOf<StoredModelData>()
 
         try {
@@ -480,14 +474,14 @@ class SimplifiedFileManager {
 
                 if (modelInfo != null) {
                     models.add(
-                            StoredModelData(
-                                modelId = modelId,
-                                format = modelInfo.format,
-                                size = modelInfo.size,
-                                framework = framework
-                            )
-                        )
-                        logger.debug("Detected ${framework.value} model $modelId: ${modelInfo.size} bytes")
+                        StoredModelData(
+                            modelId = modelId,
+                            format = modelInfo.format,
+                            size = modelInfo.size,
+                            framework = framework,
+                        ),
+                    )
+                    logger.debug("Detected ${framework.value} model $modelId: ${modelInfo.size} bytes")
                 }
             }
         } catch (e: Exception) {
@@ -532,15 +526,16 @@ class SimplifiedFileManager {
                 val fileName = filePath.substringAfterLast("/")
                 val extension = fileName.substringAfterLast(".", "").lowercase()
 
-                val format = when (extension) {
-                    "gguf" -> ModelFormat.GGUF
-                    "onnx" -> ModelFormat.ONNX
-                    "mlmodel", "mlmodelc" -> ModelFormat.MLMODEL
-                    "mlpackage" -> ModelFormat.MLPACKAGE
-                    "tflite" -> ModelFormat.TFLITE
-                    "safetensors" -> ModelFormat.MLX
-                    else -> null
-                }
+                val format =
+                    when (extension) {
+                        "gguf" -> ModelFormat.GGUF
+                        "onnx" -> ModelFormat.ONNX
+                        "mlmodel", "mlmodelc" -> ModelFormat.MLMODEL
+                        "mlpackage" -> ModelFormat.MLPACKAGE
+                        "tflite" -> ModelFormat.TFLITE
+                        "safetensors" -> ModelFormat.MLX
+                        else -> null
+                    }
 
                 if (format != null) {
                     val fileSize = fileSize(filePath) ?: 0L
@@ -551,7 +546,6 @@ class SimplifiedFileManager {
             // Check for ONNX directory structure (sherpa-onnx models)
             // These have multiple .onnx files (encoder, decoder) and tokens.txt
             val hasOnnxFiles = files.any { !isDirectory(it) && it.endsWith(".onnx", ignoreCase = true) }
-            val hasTokens = files.any { !isDirectory(it) && it.contains("tokens", ignoreCase = true) }
 
             if (hasOnnxFiles) {
                 val totalSize = directorySize(folderPath)
@@ -576,7 +570,6 @@ class SimplifiedFileManager {
             if (totalSize > 0) {
                 return ModelDetection(ModelFormat.ONNX, totalSize)
             }
-
         } catch (e: Exception) {
             logger.error("Failed to detect model in folder: $folderPath", e)
         }
@@ -627,7 +620,10 @@ class SimplifiedFileManager {
      * Find model file by searching all possible locations
      * Matches iOS findModelFile(modelId:expectedPath:) method exactly
      */
-    fun findModelFile(modelId: String, expectedPath: String? = null): String? {
+    fun findModelFile(
+        modelId: String,
+        expectedPath: String? = null,
+    ): String? {
         // If expected path exists and is valid, return it
         if (expectedPath != null && fileExists(expectedPath)) {
             return expectedPath
@@ -692,8 +688,8 @@ class SimplifiedFileManager {
      * Clear all cache
      * Matches iOS clearCache() method exactly
      */
-    fun clearCache(): Boolean {
-        return try {
+    fun clearCache(): Boolean =
+        try {
             if (fileSystem.exists(cacheDirectory)) {
                 val files = listFiles(cacheDirectory.toString())
                 files.forEach { deleteFile(it) }
@@ -704,14 +700,13 @@ class SimplifiedFileManager {
             logger.error("Failed to clear cache", e)
             false
         }
-    }
 
     /**
      * Clean temporary files
      * Matches iOS cleanTempFiles() method exactly
      */
-    fun cleanTempFiles(): Boolean {
-        return try {
+    fun cleanTempFiles(): Boolean =
+        try {
             if (fileSystem.exists(temporaryDirectory)) {
                 val files = listFiles(temporaryDirectory.toString())
                 files.forEach { filePath ->
@@ -728,15 +723,12 @@ class SimplifiedFileManager {
             logger.error("Failed to clean temp files", e)
             false
         }
-    }
 
     /**
      * Get base directory URL (as string path)
      * Matches iOS getBaseDirectoryURL() method
      */
-    fun getBaseDirectoryURL(): String {
-        return baseDirectory.toString()
-    }
+    fun getBaseDirectoryURL(): String = baseDirectory.toString()
 }
 
 /**
@@ -746,7 +738,7 @@ class SimplifiedFileManager {
 data class DeviceStorageData(
     val totalSpace: Long,
     val freeSpace: Long,
-    val usedSpace: Long
+    val usedSpace: Long,
 )
 
 /**
@@ -757,7 +749,7 @@ data class StoredModelData(
     val modelId: String,
     val format: ModelFormat,
     val size: Long,
-    val framework: InferenceFramework?
+    val framework: InferenceFramework?,
 )
 
 /**
@@ -766,5 +758,5 @@ data class StoredModelData(
  */
 data class ModelDetection(
     val format: ModelFormat,
-    val size: Long
+    val size: Long,
 )

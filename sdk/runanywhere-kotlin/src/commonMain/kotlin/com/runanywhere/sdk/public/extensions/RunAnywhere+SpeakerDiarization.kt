@@ -1,12 +1,11 @@
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationCapability
+import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationOutput
 import com.runanywhere.sdk.features.speakerdiarization.SpeakerInfo
 import com.runanywhere.sdk.features.speakerdiarization.SpeakerProfile
-import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationOutput
-import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration
-import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -28,8 +27,9 @@ import kotlinx.coroutines.flow.Flow
 suspend fun RunAnywhere.initializeSpeakerDiarization() {
     requireInitialized()
 
-    val capability = speakerDiarizationCapability
-        ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
+    val capability =
+        speakerDiarizationCapability
+            ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
 
     capability.initialize()
 }
@@ -43,8 +43,9 @@ suspend fun RunAnywhere.initializeSpeakerDiarization() {
 suspend fun RunAnywhere.initializeSpeakerDiarization(config: SpeakerDiarizationConfiguration) {
     requireInitialized()
 
-    val capability = speakerDiarizationCapability
-        ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
+    val capability =
+        speakerDiarizationCapability
+            ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
 
     capability.initialize(config)
 }
@@ -69,8 +70,9 @@ val RunAnywhere.isSpeakerDiarizationReady: Boolean
 suspend fun RunAnywhere.identifySpeaker(samples: FloatArray): SpeakerInfo {
     requireInitialized()
 
-    val capability = speakerDiarizationCapability
-        ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
+    val capability =
+        speakerDiarizationCapability
+            ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
 
     return capability.processAudio(samples)
 }
@@ -84,8 +86,9 @@ suspend fun RunAnywhere.identifySpeaker(samples: FloatArray): SpeakerInfo {
 fun RunAnywhere.identifySpeakerStream(audioStream: Flow<ByteArray>): Flow<SpeakerInfo> {
     requireInitialized()
 
-    val capability = speakerDiarizationCapability
-        ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
+    val capability =
+        speakerDiarizationCapability
+            ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
 
     return capability.processAudioStream(audioStream)
 }
@@ -97,11 +100,15 @@ fun RunAnywhere.identifySpeakerStream(audioStream: Flow<ByteArray>): Flow<Speake
  * @param sampleRate Sample rate of audio (default: 16000)
  * @return Full diarization output with segments and speakers
  */
-suspend fun RunAnywhere.diarize(samples: FloatArray, sampleRate: Int = 16000): SpeakerDiarizationOutput {
+suspend fun RunAnywhere.diarize(
+    samples: FloatArray,
+    sampleRate: Int = 16000,
+): SpeakerDiarizationOutput {
     requireInitialized()
 
-    val capability = speakerDiarizationCapability
-        ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
+    val capability =
+        speakerDiarizationCapability
+            ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
 
     return capability.diarize(samples, sampleRate)
 }
@@ -115,8 +122,9 @@ suspend fun RunAnywhere.diarize(samples: FloatArray, sampleRate: Int = 16000): S
 fun RunAnywhere.getAllSpeakers(): List<SpeakerInfo> {
     requireInitialized()
 
-    val capability = speakerDiarizationCapability
-        ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
+    val capability =
+        speakerDiarizationCapability
+            ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
 
     return capability.getAllSpeakers()
 }
@@ -141,11 +149,15 @@ suspend fun RunAnywhere.getSpeakerProfile(speakerId: String): SpeakerProfile? {
  * @param name The new name for the speaker
  * @throws SDKError if SDK is not initialized
  */
-suspend fun RunAnywhere.updateSpeakerName(speakerId: String, name: String) {
+suspend fun RunAnywhere.updateSpeakerName(
+    speakerId: String,
+    name: String,
+) {
     requireInitialized()
 
-    val capability = speakerDiarizationCapability
-        ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
+    val capability =
+        speakerDiarizationCapability
+            ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
 
     capability.updateSpeakerName(speakerId, name)
 }
@@ -158,8 +170,9 @@ suspend fun RunAnywhere.updateSpeakerName(speakerId: String, name: String) {
 suspend fun RunAnywhere.resetSpeakerDiarization() {
     requireInitialized()
 
-    val capability = speakerDiarizationCapability
-        ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
+    val capability =
+        speakerDiarizationCapability
+            ?: throw SDKError.ComponentNotInitialized("Speaker Diarization capability not available")
 
     capability.reset()
 }

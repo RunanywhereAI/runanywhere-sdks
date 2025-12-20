@@ -15,20 +15,21 @@ import java.util.Date
  * One-to-one translation from iOS KeychainManager to Android EncryptedSharedPreferences
  * Equivalent to iOS KeychainManager.shared
  */
-class KeychainManager private constructor(private val context: Context) {
-
+class KeychainManager private constructor(
+    private val context: Context,
+) {
     companion object {
         @Volatile
-        private var INSTANCE: KeychainManager? = null
+        private var instance: KeychainManager? = null
 
         val shared: KeychainManager
-            get() = INSTANCE ?: throw IllegalStateException("KeychainManager not initialized. Call initialize(context) first.")
+            get() = instance ?: throw IllegalStateException("KeychainManager not initialized. Call initialize(context) first.")
 
         fun initialize(context: Context) {
-            if (INSTANCE == null) {
+            if (instance == null) {
                 synchronized(this) {
-                    if (INSTANCE == null) {
-                        INSTANCE = KeychainManager(context.applicationContext)
+                    if (instance == null) {
+                        instance = KeychainManager(context.applicationContext)
                     }
                 }
             }
@@ -44,7 +45,8 @@ class KeychainManager private constructor(private val context: Context) {
     private val mutex = Mutex()
 
     private val masterKey: MasterKey by lazy {
-        MasterKey.Builder(context)
+        MasterKey
+            .Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
     }
@@ -55,16 +57,19 @@ class KeychainManager private constructor(private val context: Context) {
             "runanywhere_secure_prefs",
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
     }
-
 
     /**
      * Save authentication tokens securely
      * Equivalent to iOS KeychainManager keychain operations
      */
-    suspend fun saveTokens(accessToken: String, refreshToken: String, expiresAt: Date) = mutex.withLock {
+    suspend fun saveTokens(
+        accessToken: String,
+        refreshToken: String,
+        expiresAt: Date,
+    ) = mutex.withLock {
         logger.debug("Saving tokens to keychain")
 
         try {
@@ -86,87 +91,92 @@ class KeychainManager private constructor(private val context: Context) {
      * Retrieve stored authentication tokens
      * Equivalent to iOS KeychainManager keychain queries
      */
-    suspend fun getTokens(): StoredTokens? = mutex.withLock {
-        logger.debug("Retrieving tokens from keychain")
+    suspend fun getTokens(): StoredTokens? =
+        mutex.withLock {
+            logger.debug("Retrieving tokens from keychain")
 
-        try {
-            val accessToken = encryptedPrefs.getString(ACCESS_TOKEN_KEY, null)
-            val refreshToken = encryptedPrefs.getString(REFRESH_TOKEN_KEY, null)
-            val expiresAtMillis = encryptedPrefs.getLong(EXPIRES_AT_KEY, -1L)
+            try {
+                val accessToken = encryptedPrefs.getString(ACCESS_TOKEN_KEY, null)
+                val refreshToken = encryptedPrefs.getString(REFRESH_TOKEN_KEY, null)
+                val expiresAtMillis = encryptedPrefs.getLong(EXPIRES_AT_KEY, -1L)
 
-            if (accessToken != null && refreshToken != null && expiresAtMillis != -1L) {
-                val storedTokens = StoredTokens(
-                    accessToken = accessToken,
-                    refreshToken = refreshToken,
-                    expiresAt = expiresAtMillis
-                )
+                if (accessToken != null && refreshToken != null && expiresAtMillis != -1L) {
+                    val storedTokens =
+                        StoredTokens(
+                            accessToken = accessToken,
+                            refreshToken = refreshToken,
+                            expiresAt = expiresAtMillis,
+                        )
 
-                logger.debug("Tokens retrieved successfully")
-                return storedTokens
-            } else {
-                logger.debug("No valid tokens found")
+                    logger.debug("Tokens retrieved successfully")
+                    return storedTokens
+                } else {
+                    logger.debug("No valid tokens found")
+                    return null
+                }
+            } catch (e: Exception) {
+                logger.error("Failed to retrieve tokens", e)
                 return null
             }
-        } catch (e: Exception) {
-            logger.error("Failed to retrieve tokens", e)
-            return null
         }
-    }
 
     /**
      * Delete all stored tokens
      * Equivalent to iOS KeychainManager deletion operations
      */
-    suspend fun deleteTokens() = mutex.withLock {
-        logger.debug("Deleting tokens from keychain")
+    suspend fun deleteTokens() =
+        mutex.withLock {
+            logger.debug("Deleting tokens from keychain")
 
-        try {
-            with(encryptedPrefs.edit()) {
-                remove(ACCESS_TOKEN_KEY)
-                remove(REFRESH_TOKEN_KEY)
-                remove(EXPIRES_AT_KEY)
-                apply()
+            try {
+                with(encryptedPrefs.edit()) {
+                    remove(ACCESS_TOKEN_KEY)
+                    remove(REFRESH_TOKEN_KEY)
+                    remove(EXPIRES_AT_KEY)
+                    apply()
+                }
+
+                logger.debug("Tokens deleted successfully")
+            } catch (e: Exception) {
+                logger.error("Failed to delete tokens", e)
+                throw e
             }
-
-            logger.debug("Tokens deleted successfully")
-        } catch (e: Exception) {
-            logger.error("Failed to delete tokens", e)
-            throw e
         }
-    }
 
     /**
      * Check if tokens exist in keychain
      * Equivalent to iOS KeychainManager queries
      */
-    suspend fun hasStoredTokens(): Boolean = mutex.withLock {
-        try {
-            val accessToken = encryptedPrefs.getString(ACCESS_TOKEN_KEY, null)
-            val refreshToken = encryptedPrefs.getString(REFRESH_TOKEN_KEY, null)
-            return accessToken != null && refreshToken != null
-        } catch (e: Exception) {
-            logger.error("Failed to check stored tokens", e)
-            return false
+    suspend fun hasStoredTokens(): Boolean =
+        mutex.withLock {
+            try {
+                val accessToken = encryptedPrefs.getString(ACCESS_TOKEN_KEY, null)
+                val refreshToken = encryptedPrefs.getString(REFRESH_TOKEN_KEY, null)
+                return accessToken != null && refreshToken != null
+            } catch (e: Exception) {
+                logger.error("Failed to check stored tokens", e)
+                return false
+            }
         }
-    }
 
     /**
      * Clear all keychain data
      * Equivalent to iOS KeychainManager clear operations
      */
-    suspend fun clearAll() = mutex.withLock {
-        logger.debug("Clearing all keychain data")
+    suspend fun clearAll() =
+        mutex.withLock {
+            logger.debug("Clearing all keychain data")
 
-        try {
-            with(encryptedPrefs.edit()) {
-                clear()
-                apply()
+            try {
+                with(encryptedPrefs.edit()) {
+                    clear()
+                    apply()
+                }
+
+                logger.info("All keychain data cleared")
+            } catch (e: Exception) {
+                logger.error("Failed to clear keychain data", e)
+                throw e
             }
-
-            logger.info("All keychain data cleared")
-        } catch (e: Exception) {
-            logger.error("Failed to clear keychain data", e)
-            throw e
         }
-    }
 }

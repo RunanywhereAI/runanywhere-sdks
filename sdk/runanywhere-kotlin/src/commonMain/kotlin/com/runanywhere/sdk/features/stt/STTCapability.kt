@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.Flow
  * the public RunAnywhere+STT.kt extension functions.
  */
 class STTCapability internal constructor(
-    private val getComponent: () -> STTComponent
+    private val getComponent: () -> STTComponent,
 ) {
     private val logger = SDKLogger("STTCapability")
 
@@ -54,7 +54,7 @@ class STTCapability internal constructor(
         // Check if provider is available
         if (!ModuleRegistry.hasSTT) {
             throw SDKError.ComponentNotInitialized(
-                "No STT service provider registered. Add WhisperKit or another STT module as a dependency."
+                "No STT service provider registered. Add WhisperKit or another STT module as a dependency.",
             )
         }
 
@@ -116,18 +116,22 @@ class STTCapability internal constructor(
      * @param options Transcription options (STTOptions from STTModels.kt)
      * @return STTOutput with transcribed text and metadata
      */
-    suspend fun transcribe(audioData: ByteArray, options: STTOptions): STTOutput {
+    suspend fun transcribe(
+        audioData: ByteArray,
+        options: STTOptions,
+    ): STTOutput {
         ensureModelLoaded()
 
         val component = getComponent()
 
         // Use process method with full options
-        val input = STTInput(
-            audioData = audioData,
-            format = options.audioFormat,
-            language = options.language,
-            options = options
-        )
+        val input =
+            STTInput(
+                audioData = audioData,
+                format = options.audioFormat,
+                language = options.language,
+                options = options,
+            )
 
         return component.process(input)
     }
@@ -139,7 +143,10 @@ class STTCapability internal constructor(
      * @param options Transcription options
      * @return Flow of transcription text
      */
-    fun streamTranscribe(audioStream: Flow<ByteArray>, options: STTOptions): Flow<String> {
+    fun streamTranscribe(
+        audioStream: Flow<ByteArray>,
+        options: STTOptions,
+    ): Flow<String> {
         ensureModelLoaded()
 
         val component = getComponent()

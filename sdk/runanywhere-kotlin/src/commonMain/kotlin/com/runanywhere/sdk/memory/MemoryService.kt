@@ -12,9 +12,8 @@ class MemoryService(
     private val allocationManager: AllocationManager = AllocationManager(),
     private val pressureHandler: PressureHandler = PressureHandler(),
     private val cacheEviction: CacheEviction = CacheEviction(),
-    private val memoryMonitor: MemoryMonitor = MemoryMonitor()
+    private val memoryMonitor: MemoryMonitor = MemoryMonitor(),
 ) : MemoryManager {
-
     private val logger = SDKLogger("MemoryService")
     private val mutex = Mutex()
 
@@ -37,7 +36,7 @@ class MemoryService(
         model: MemoryLoadedModel,
         size: Long,
         service: Any, // TODO: Replace with LLMService when available
-        priority: MemoryPriority = MemoryPriority.NORMAL
+        priority: MemoryPriority = MemoryPriority.NORMAL,
     ) {
         mutex.withLock {
             allocationManager.registerModel(model, size, service, priority)
@@ -68,9 +67,10 @@ class MemoryService(
         pressureHandler.handlePressure(level, modelsToEvict)
     }
 
-    suspend fun requestMemory(size: Long, priority: MemoryPriority = MemoryPriority.NORMAL): Boolean {
-        return allocationManager.requestMemory(size, priority)
-    }
+    suspend fun requestMemory(
+        size: Long,
+        priority: MemoryPriority = MemoryPriority.NORMAL,
+    ): Boolean = allocationManager.requestMemory(size, priority)
 
     suspend fun releaseMemory(size: Long) {
         allocationManager.releaseMemory(size)
@@ -78,21 +78,13 @@ class MemoryService(
 
     // MARK: - MemoryManager Protocol Implementation
 
-    override fun getCurrentMemoryUsage(): Long {
-        return allocationManager.getTotalModelMemory()
-    }
+    override fun getCurrentMemoryUsage(): Long = allocationManager.getTotalModelMemory()
 
-    override fun getAvailableMemory(): Long {
-        return memoryMonitor.getAvailableMemory()
-    }
+    override fun getAvailableMemory(): Long = memoryMonitor.getAvailableMemory()
 
-    override fun hasAvailableMemory(size: Long): Boolean {
-        return getAvailableMemory() >= size
-    }
+    override fun hasAvailableMemory(size: Long): Boolean = getAvailableMemory() >= size
 
-    override suspend fun canAllocate(size: Long): Boolean {
-        return requestMemory(size)
-    }
+    override suspend fun canAllocate(size: Long): Boolean = requestMemory(size)
 
     override suspend fun handleMemoryPressure() {
         handleMemoryPressure(MemoryPressureLevel.WARNING)
@@ -102,22 +94,25 @@ class MemoryService(
         this.memoryThreshold = threshold
     }
 
-    override fun getLoadedModels(): List<LoadedModel> {
-        return allocationManager.getLoadedModels()
-    }
+    override fun getLoadedModels(): List<LoadedModel> = allocationManager.getLoadedModels()
 
     override fun isHealthy(): Boolean {
         // Basic health check - ensure all components are available
         return memoryMonitor.getAvailableMemory() > 0
     }
 
-    override suspend fun registerLoadedModel(modelId: String, size: Long, service: Any) {
-        val memoryModel = MemoryLoadedModel(
-            id = modelId,
-            name = modelId,
-            size = size,
-            framework = "llama.cpp"
-        )
+    override suspend fun registerLoadedModel(
+        modelId: String,
+        size: Long,
+        service: Any,
+    ) {
+        val memoryModel =
+            MemoryLoadedModel(
+                id = modelId,
+                name = modelId,
+                size = size,
+                framework = "llama.cpp",
+            )
         registerModel(memoryModel, size, service, MemoryPriority.NORMAL)
     }
 
@@ -139,20 +134,19 @@ class MemoryService(
             availableMemory = availableMemory,
             modelMemory = modelMemory,
             loadedModelCount = loadedModelCount,
-            memoryPressure = memoryPressure
+            memoryPressure = memoryPressure,
         )
     }
 
     // MARK: - Private Helpers
 
-    private fun calculateTargetMemory(level: MemoryPressureLevel): Long {
-        return when (level) {
+    private fun calculateTargetMemory(level: MemoryPressureLevel): Long =
+        when (level) {
             MemoryPressureLevel.NORMAL -> memoryThreshold
             MemoryPressureLevel.WARNING -> memoryThreshold / 2
             MemoryPressureLevel.CRITICAL -> criticalThreshold
             MemoryPressureLevel.URGENT -> criticalThreshold / 2
         }
-    }
 
     private suspend fun checkMemoryConditions() {
         val available = getAvailableMemory()
@@ -177,16 +171,28 @@ class MemoryService(
  */
 interface MemoryManager {
     fun getCurrentMemoryUsage(): Long
+
     fun getAvailableMemory(): Long
+
     fun hasAvailableMemory(size: Long): Boolean
+
     suspend fun canAllocate(size: Long): Boolean
+
     suspend fun handleMemoryPressure()
+
     fun setMemoryThreshold(threshold: Long)
+
     fun getLoadedModels(): List<LoadedModel>
+
     fun isHealthy(): Boolean
 
     // Methods required by ModelLoadingService - EXACT copy of iOS MemoryManager
-    suspend fun registerLoadedModel(modelId: String, size: Long, service: Any)
+    suspend fun registerLoadedModel(
+        modelId: String,
+        size: Long,
+        service: Any,
+    )
+
     suspend fun unregisterModel(modelId: String)
 }
 
@@ -199,7 +205,7 @@ enum class MemoryPressureLevel {
     NORMAL,
     WARNING,
     CRITICAL,
-    URGENT
+    URGENT,
 }
 
 /**
@@ -209,7 +215,7 @@ enum class MemoryPriority {
     LOW,
     NORMAL,
     HIGH,
-    CRITICAL
+    CRITICAL,
 }
 
 /**
@@ -220,7 +226,7 @@ data class MemoryLoadedModel(
     val name: String,
     val size: Long,
     val framework: String,
-    var lastAccessed: Long = System.currentTimeMillis()
+    var lastAccessed: Long = System.currentTimeMillis(),
 )
 
 /**
@@ -228,7 +234,7 @@ data class MemoryLoadedModel(
  */
 data class LoadedModel(
     val model: MemoryLoadedModel,
-    val service: Any // TODO: Replace with LLMService
+    val service: Any, // TODO: Replace with LLMService
 )
 
 /**
@@ -239,5 +245,5 @@ data class MemoryStatistics(
     val availableMemory: Long,
     val modelMemory: Long,
     val loadedModelCount: Int,
-    val memoryPressure: Boolean
+    val memoryPressure: Boolean,
 )

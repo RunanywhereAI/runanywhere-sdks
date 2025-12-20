@@ -1,8 +1,6 @@
 package com.runanywhere.sdk.features.speakerdiarization
 
 import com.runanywhere.sdk.core.capabilities.*
-import com.runanywhere.sdk.features.stt.STTOutput
-import com.runanywhere.sdk.features.stt.WordTimestamp
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.foundation.ServiceContainer
@@ -18,9 +16,8 @@ import kotlinx.coroutines.sync.withLock
  */
 class SpeakerDiarizationComponent(
     configuration: SpeakerDiarizationConfiguration,
-    serviceContainer: ServiceContainer? = null
+    serviceContainer: ServiceContainer? = null,
 ) : BaseComponent<SpeakerDiarizationService>(configuration, serviceContainer) {
-
     // MARK: - Component Properties
 
     override val componentType: SDKComponent = SDKComponent.SPEAKER_DIARIZATION
@@ -70,8 +67,9 @@ class SpeakerDiarizationComponent(
             val startTime = System.currentTimeMillis()
 
             try {
-                val service = this.service
-                    ?: throw SDKError.ServiceNotAvailable("Speaker Diarization service not available")
+                val service =
+                    this.service
+                        ?: throw SDKError.ServiceNotAvailable("Speaker Diarization service not available")
 
                 input.validate()
                 state = ComponentState.PROCESSING
@@ -95,13 +93,13 @@ class SpeakerDiarizationComponent(
 
                 state = ComponentState.READY
                 return result
-
             } catch (e: Exception) {
                 state = ComponentState.FAILED
-                val error = when (e) {
-                    is SpeakerDiarizationError -> e
-                    else -> SpeakerDiarizationError.ProcessingFailed(e.message ?: "Unknown processing error")
-                }
+                val error =
+                    when (e) {
+                        is SpeakerDiarizationError -> e
+                        else -> SpeakerDiarizationError.ProcessingFailed(e.message ?: "Unknown processing error")
+                    }
                 publishEvent(SpeakerDiarizationEvent.Error(error))
                 onError?.invoke(error)
                 throw error
@@ -114,35 +112,36 @@ class SpeakerDiarizationComponent(
     /**
      * Stream audio processing for real-time diarization
      */
-    fun processAudioStream(audioFlow: Flow<ByteArray>): Flow<SpeakerInfo> = flow {
-        ensureReady()
+    fun processAudioStream(audioFlow: Flow<ByteArray>): Flow<SpeakerInfo> =
+        flow {
+            ensureReady()
 
-        val service = this@SpeakerDiarizationComponent.service
-            ?: throw SDKError.ServiceNotAvailable("Speaker Diarization service not available")
+            val service =
+                this@SpeakerDiarizationComponent.service
+                    ?: throw SDKError.ServiceNotAvailable("Speaker Diarization service not available")
 
-        audioFlow.collect { audioData ->
-            try {
-                // Convert audio data to float array (assuming 16-bit PCM)
-                val samples = convertBytesToFloatArray(audioData)
+            audioFlow.collect { audioData ->
+                try {
+                    // Convert audio data to float array (assuming 16-bit PCM)
+                    val samples = convertBytesToFloatArray(audioData)
 
-                // Process audio chunk
-                val speaker = service.processAudio(samples)
+                    // Process audio chunk
+                    val speaker = service.processAudio(samples)
 
-                // Emit speaker detection events
-                if (speaker.id != "SILENCE") {
-                    onSpeakerDetected?.invoke(speaker)
-                    publishEvent(SpeakerDiarizationEvent.SpeakerDetected(speaker))
+                    // Emit speaker detection events
+                    if (speaker.id != "SILENCE") {
+                        onSpeakerDetected?.invoke(speaker)
+                        publishEvent(SpeakerDiarizationEvent.SpeakerDetected(speaker))
+                    }
+
+                    emit(speaker)
+                } catch (e: Exception) {
+                    val error = SpeakerDiarizationError.ProcessingFailed(e.message ?: "Stream processing error")
+                    publishEvent(SpeakerDiarizationEvent.Error(error))
+                    throw error
                 }
-
-                emit(speaker)
-
-            } catch (e: Exception) {
-                val error = SpeakerDiarizationError.ProcessingFailed(e.message ?: "Stream processing error")
-                publishEvent(SpeakerDiarizationEvent.Error(error))
-                throw error
             }
         }
-    }
 
     /**
      * Get all detected speakers
@@ -163,7 +162,10 @@ class SpeakerDiarizationComponent(
     /**
      * Update speaker name/label
      */
-    suspend fun updateSpeakerName(speakerId: String, name: String) {
+    suspend fun updateSpeakerName(
+        speakerId: String,
+        name: String,
+    ) {
         ensureReady()
         service?.updateSpeakerName(speakerId, name)
     }
@@ -226,61 +228,67 @@ class SpeakerDiarizationComponent(
      */
     private suspend fun performBatchDiarization(
         input: SpeakerDiarizationInput,
-        service: SpeakerDiarizationService
+        service: SpeakerDiarizationService,
     ): SpeakerDiarizationOutput {
-        val audioBuffer = input.audioBuffer
-            ?: throw SDKError.ValidationFailed("Audio buffer required for batch processing")
+        val audioBuffer =
+            input.audioBuffer
+                ?: throw SDKError.ValidationFailed("Audio buffer required for batch processing")
 
-        val result = service.performDetailedDiarization(audioBuffer, input.sampleRate)
-            ?: throw SpeakerDiarizationError.ProcessingFailed("Diarization returned no results")
+        val result =
+            service.performDetailedDiarization(audioBuffer, input.sampleRate)
+                ?: throw SpeakerDiarizationError.ProcessingFailed("Diarization returned no results")
 
         // Create speaker profiles from results
-        val speakerProfiles = result.speakers.map { speaker ->
-            SpeakerProfile(
-                id = speaker.id,
-                embedding = speaker.embedding,
-                totalSpeakingTime = result.segments
-                    .filter { it.speakerId == speaker.id }
-                    .sumOf { it.speechDuration },
-                segmentCount = result.segments.count { it.speakerId == speaker.id },
-                name = speaker.name,
-                averageConfidence = result.confidence,
-                lastUpdated = getCurrentTimeMillis()
-            )
-        }
-
-        // Create labeled transcription if STT output provided
-        val labeledTranscription = input.transcription?.let { sttOutput ->
-            if (sttOutput.wordTimestamps != null) {
-                TranscriptionSpeakerIntegrator.createLabeledTranscription(
-                    sttOutput.wordTimestamps,
-                    result.segments,
-                    speakerProfiles
-                )
-            } else {
-                TranscriptionSpeakerIntegrator.mapTranscriptionToSpeakers(
-                    sttOutput.text,
-                    result.segments,
-                    speakerProfiles
+        val speakerProfiles =
+            result.speakers.map { speaker ->
+                SpeakerProfile(
+                    id = speaker.id,
+                    embedding = speaker.embedding,
+                    totalSpeakingTime =
+                        result.segments
+                            .filter { it.speakerId == speaker.id }
+                            .sumOf { it.speechDuration },
+                    segmentCount = result.segments.count { it.speakerId == speaker.id },
+                    name = speaker.name,
+                    averageConfidence = result.confidence,
+                    lastUpdated = getCurrentTimeMillis(),
                 )
             }
-        }
+
+        // Create labeled transcription if STT output provided
+        val labeledTranscription =
+            input.transcription?.let { sttOutput ->
+                if (sttOutput.wordTimestamps != null) {
+                    TranscriptionSpeakerIntegrator.createLabeledTranscription(
+                        sttOutput.wordTimestamps,
+                        result.segments,
+                        speakerProfiles,
+                    )
+                } else {
+                    TranscriptionSpeakerIntegrator.mapTranscriptionToSpeakers(
+                        sttOutput.text,
+                        result.segments,
+                        speakerProfiles,
+                    )
+                }
+            }
 
         // Create metadata
-        val metadata = DiarizationMetadata(
-            processingTime = result.processingTime,
-            audioLength = audioBuffer.size.toDouble() / input.sampleRate,
-            speakerCount = result.speakers.size,
-            method = "energy",
-            averageConfidence = result.confidence,
-            segmentCount = result.segments.size
-        )
+        val metadata =
+            DiarizationMetadata(
+                processingTime = result.processingTime,
+                audioLength = audioBuffer.size.toDouble() / input.sampleRate,
+                speakerCount = result.speakers.size,
+                method = "energy",
+                averageConfidence = result.confidence,
+                segmentCount = result.segments.size,
+            )
 
         return SpeakerDiarizationOutput(
             segments = result.segments,
             speakers = speakerProfiles,
             labeledTranscription = labeledTranscription,
-            metadata = metadata
+            metadata = metadata,
         )
     }
 
@@ -289,52 +297,56 @@ class SpeakerDiarizationComponent(
      */
     private suspend fun performRealTimeDiarization(
         input: SpeakerDiarizationInput,
-        service: SpeakerDiarizationService
+        service: SpeakerDiarizationService,
     ): SpeakerDiarizationOutput {
-        val samples = if (input.audioBuffer != null) {
-            input.audioBuffer
-        } else {
-            convertBytesToFloatArray(input.audioData)
-        }
+        val samples =
+            if (input.audioBuffer != null) {
+                input.audioBuffer
+            } else {
+                convertBytesToFloatArray(input.audioData)
+            }
 
         // Process audio chunk
         val detectedSpeaker = service.processAudio(samples)
 
         // Create simple segment for real-time processing
-        val segment = SpeakerSegment(
-            speakerId = detectedSpeaker.id,
-            startTime = 0.0,
-            endTime = samples.size.toDouble() / input.sampleRate,
-            confidence = detectedSpeaker.confidence ?: 0.8f
-        )
+        val segment =
+            SpeakerSegment(
+                speakerId = detectedSpeaker.id,
+                startTime = 0.0,
+                endTime = samples.size.toDouble() / input.sampleRate,
+                confidence = detectedSpeaker.confidence ?: 0.8f,
+            )
 
         // Get all speakers for profiles
         val allSpeakers = service.getAllSpeakers()
-        val speakerProfiles = allSpeakers.map { speaker ->
-            SpeakerProfile(
-                id = speaker.id,
-                embedding = speaker.embedding,
-                name = speaker.name,
-                lastUpdated = getCurrentTimeMillis()
-            )
-        }
+        val speakerProfiles =
+            allSpeakers.map { speaker ->
+                SpeakerProfile(
+                    id = speaker.id,
+                    embedding = speaker.embedding,
+                    name = speaker.name,
+                    lastUpdated = getCurrentTimeMillis(),
+                )
+            }
 
         // Create metadata for real-time processing
         val audioLength = samples.size.toDouble() / input.sampleRate
-        val metadata = DiarizationMetadata(
-            processingTime = 0.05, // Estimated for real-time
-            audioLength = audioLength,
-            speakerCount = allSpeakers.size,
-            method = "energy",
-            averageConfidence = detectedSpeaker.confidence ?: 0.8f,
-            segmentCount = 1
-        )
+        val metadata =
+            DiarizationMetadata(
+                processingTime = 0.05, // Estimated for real-time
+                audioLength = audioLength,
+                speakerCount = allSpeakers.size,
+                method = "energy",
+                averageConfidence = detectedSpeaker.confidence ?: 0.8f,
+                segmentCount = 1,
+            )
 
         return SpeakerDiarizationOutput(
             segments = listOf(segment),
             speakers = speakerProfiles,
             labeledTranscription = null, // Real-time processing doesn't include transcription
-            metadata = metadata
+            metadata = metadata,
         )
     }
 
@@ -347,8 +359,9 @@ class SpeakerDiarizationComponent(
         val samples = FloatArray(audioData.size / 2)
         for (i in samples.indices) {
             val index = i * 2
-            val sample = (audioData[index].toInt() and 0xFF) or
-                        (audioData[index + 1].toInt() shl 8)
+            val sample =
+                (audioData[index].toInt() and 0xFF) or
+                    (audioData[index + 1].toInt() shl 8)
             samples[i] = sample.toShort() / 32768.0f
         }
         return samples
@@ -380,41 +393,4 @@ class SpeakerDiarizationComponent(
         // Reset processing state
         isProcessing = false
     }
-}
-
-// MARK: - Service Provider
-
-/**
- * Service provider for Speaker Diarization
- */
-interface SpeakerDiarizationServiceProvider {
-    suspend fun createSpeakerDiarizationService(configuration: SpeakerDiarizationConfiguration): SpeakerDiarizationService
-    fun canHandle(modelId: String?): Boolean
-    val name: String
-}
-
-/**
- * Default Speaker Diarization Service Provider
- */
-class DefaultSpeakerDiarizationServiceProvider : SpeakerDiarizationServiceProvider {
-
-    override suspend fun createSpeakerDiarizationService(
-        configuration: SpeakerDiarizationConfiguration
-    ): SpeakerDiarizationService {
-        val database = InMemorySpeakerDatabase()
-        val audioProcessor = PlatformAudioProcessor()
-
-        return DefaultSpeakerDiarizationService(
-            config = configuration,
-            database = database,
-            audioProcessor = audioProcessor
-        )
-    }
-
-    override fun canHandle(modelId: String?): Boolean {
-        // Default provider can handle any model or no model
-        return true
-    }
-
-    override val name: String = "DefaultSpeakerDiarization"
 }

@@ -8,7 +8,6 @@ import java.util.prefs.Preferences
  * JVM implementation of platform utilities
  */
 actual object PlatformUtils {
-
     private val prefs = Preferences.userNodeForPackage(PlatformUtils::class.java)
     private const val DEVICE_ID_KEY = "com.runanywhere.sdk.deviceId"
 
@@ -37,8 +36,8 @@ actual object PlatformUtils {
         }
     }
 
-    actual fun getDeviceInfo(): Map<String, String> {
-        return mapOf(
+    actual fun getDeviceInfo(): Map<String, String> =
+        mapOf(
             "platform" to getPlatformName(),
             "os_name" to System.getProperty("os.name", "Unknown"),
             "os_version" to getOSVersion(),
@@ -48,13 +47,10 @@ actual object PlatformUtils {
             "user_country" to System.getProperty("user.country", "Unknown"),
             "user_language" to System.getProperty("user.language", "Unknown"),
             "hostname" to getHostName(),
-            "device_model" to getDeviceModel()
+            "device_model" to getDeviceModel(),
         )
-    }
 
-    actual fun getOSVersion(): String {
-        return System.getProperty("os.version", "Unknown")
-    }
+    actual fun getOSVersion(): String = System.getProperty("os.version", "Unknown")
 
     actual fun getDeviceModel(): String {
         // For JVM, return the OS name and architecture
@@ -72,11 +68,10 @@ actual object PlatformUtils {
         }
     }
 
-    private fun getHostName(): String {
-        return try {
+    private fun getHostName(): String =
+        try {
             InetAddress.getLocalHost().hostName
         } catch (e: Exception) {
             "Unknown"
         }
-    }
 }

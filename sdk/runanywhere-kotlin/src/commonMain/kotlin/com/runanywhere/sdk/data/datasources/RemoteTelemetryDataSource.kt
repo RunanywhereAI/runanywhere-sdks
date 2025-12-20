@@ -20,7 +20,7 @@ import kotlin.time.Duration.Companion.seconds
  * to allow for custom backoff strategies and failure handling.
  */
 internal class RemoteTelemetryDataSource(
-    private val analyticsNetworkService: AnalyticsNetworkService
+    private val analyticsNetworkService: AnalyticsNetworkService,
 ) {
     private val logger = SDKLogger("RemoteTelemetryDataSource")
 
@@ -31,16 +31,19 @@ internal class RemoteTelemetryDataSource(
      * @param batch Telemetry batch to submit
      * @return Result indicating success or failure
      */
-    suspend fun submitBatch(batch: TelemetryBatch): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            withTimeout(30.seconds) {
-                logger.debug("Submitting telemetry batch with ${batch.events.size} events")
+    suspend fun submitBatch(batch: TelemetryBatch): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                withTimeout(30.seconds) {
+                    logger.debug("Submitting telemetry batch with ${batch.events.size} events")
 
-                analyticsNetworkService.submitTelemetryBatch(batch).getOrThrow()
-                    .also { logger.info("✅ Successfully submitted telemetry batch") }
+                    analyticsNetworkService
+                        .submitTelemetryBatch(batch)
+                        .getOrThrow()
+                        .also { logger.info("✅ Successfully submitted telemetry batch") }
+                }
             }
         }
-    }
 
     /**
      * Submit single event with timeout
@@ -49,14 +52,17 @@ internal class RemoteTelemetryDataSource(
      * @param event Telemetry event to submit
      * @return Result indicating success or failure
      */
-    suspend fun submitEvent(event: TelemetryData): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            withTimeout(30.seconds) {
-                logger.debug("Submitting single telemetry event: ${event.name}")
+    suspend fun submitEvent(event: TelemetryData): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                withTimeout(30.seconds) {
+                    logger.debug("Submitting single telemetry event: ${event.name}")
 
-                analyticsNetworkService.submitTelemetryEvent(event).getOrThrow()
-                    .also { logger.debug("✅ Successfully submitted telemetry event") }
+                    analyticsNetworkService
+                        .submitTelemetryEvent(event)
+                        .getOrThrow()
+                        .also { logger.debug("✅ Successfully submitted telemetry event") }
+                }
             }
         }
-    }
 }

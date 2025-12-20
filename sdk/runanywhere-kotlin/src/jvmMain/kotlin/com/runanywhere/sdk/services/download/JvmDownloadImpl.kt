@@ -10,7 +10,7 @@ internal actual suspend fun downloadWithPlatformImplementation(
     destinationPath: String,
     modelId: String,
     expectedSize: Long,
-    progressChannel: Channel<DownloadProgress>
+    progressChannel: Channel<DownloadProgress>,
 ) {
     throw UnsupportedOperationException("JVM platform-specific download not implemented yet - focus is on Android")
 }

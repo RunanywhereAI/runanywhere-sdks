@@ -1,10 +1,9 @@
 package com.runanywhere.sdk.services
 
-import com.runanywhere.sdk.data.models.GPUType
 import com.runanywhere.sdk.data.models.BatteryState
+import com.runanywhere.sdk.data.models.GPUType
 import com.runanywhere.sdk.data.models.ThermalState
 import com.runanywhere.sdk.foundation.JvmDeviceInfoCollector
-import java.lang.management.ManagementFactory
 import java.net.InetAddress
 
 /**
@@ -22,23 +21,25 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
     try {
         // Determine platform and form factor
         val osName = System.getProperty("os.name", "Unknown OS").lowercase()
-        val platform = when {
-            osName.contains("win") -> "windows"
-            osName.contains("mac") -> "macos"
-            osName.contains("linux") -> "linux"
-            else -> "linux"
-        }
+        val platform =
+            when {
+                osName.contains("win") -> "windows"
+                osName.contains("mac") -> "macos"
+                osName.contains("linux") -> "linux"
+                else -> "linux"
+            }
         val formFactor = "desktop" // JVM typically runs on desktop/laptop
 
         info["platform"] = platform
         info["form_factor"] = formFactor
 
         // Basic device information
-        info["device_name"] = try {
-            InetAddress.getLocalHost().hostName
-        } catch (e: Exception) {
-            "JVM-Device"
-        }
+        info["device_name"] =
+            try {
+                InetAddress.getLocalHost().hostName
+            } catch (e: Exception) {
+                "JVM-Device"
+            }
 
         info["system_name"] = System.getProperty("os.name", "Unknown OS")
         info["system_version"] = System.getProperty("os.version", "Unknown Version")
@@ -50,22 +51,17 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
 
         // Map architecture to expected values
         val osArch = System.getProperty("os.arch", "unknown").lowercase()
-        val architecture = when {
-            osArch.contains("aarch64") || osArch.contains("arm64") -> "arm64"
-            osArch.contains("x86_64") || osArch.contains("amd64") -> "x86_64"
-            else -> "unknown"
-        }
+        val architecture =
+            when {
+                osArch.contains("aarch64") || osArch.contains("arm64") -> "arm64"
+                osArch.contains("x86_64") || osArch.contains("amd64") -> "x86_64"
+                else -> "unknown"
+            }
         info["cpu_architecture"] = architecture
         info["cpu_core_count"] = runtime.availableProcessors()
 
-        // Try to get CPU frequency if available
-        try {
-            val osBean = ManagementFactory.getOperatingSystemMXBean()
-            // CPU frequency is not readily available through standard JVM APIs
-            info["cpu_frequency_mhz"] = null
-        } catch (e: Exception) {
-            info["cpu_frequency_mhz"] = null
-        }
+        // CPU frequency is not readily available through standard JVM APIs
+        info["cpu_frequency_mhz"] = null
 
         // Memory information (in MB)
         val maxMemory = runtime.maxMemory()
@@ -98,7 +94,7 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
         info["gpu_type"] = GPUType.UNKNOWN
         info["gpu_name"] = null
         info["gpu_vendor"] = null
-        info["gpu_family"] = "none"  // Add gpu_family field
+        info["gpu_family"] = "none" // Add gpu_family field
         info["supports_vulkan"] = false
         info["supports_opencl"] = false
         info["has_neural_engine"] = false
@@ -112,23 +108,22 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
 
         // Network capabilities (assume available on desktop)
         info["has_cellular"] = false
-        info["has_wifi"] = true  // Assume true for desktop
+        info["has_wifi"] = true // Assume true for desktop
         info["has_bluetooth"] = false
 
         // I/O capabilities (assume available on desktop)
-        info["has_camera"] = false  // Cannot determine without additional libraries
-        info["has_microphone"] = true  // Assume true for desktop
-        info["has_speakers"] = true   // Assume true for desktop
+        info["has_camera"] = false // Cannot determine without additional libraries
+        info["has_microphone"] = true // Assume true for desktop
+        info["has_speakers"] = true // Assume true for desktop
         info["has_biometric"] = false
 
         // Performance metrics
-        info["benchmark_score"] = null  // Would require benchmarking
+        info["benchmark_score"] = null // Would require benchmarking
         info["memory_pressure"] = (usedMemory.toFloat() / maxMemory.toFloat()).coerceAtMost(1.0f)
 
         // Add comprehensive device info from collector
         val collectorInfo = JvmDeviceInfoCollector.collectDeviceInfo()
         info.putAll(collectorInfo.filterKeys { !info.containsKey(it) })
-
     } catch (e: Exception) {
         info["collection_error"] = e.message ?: "Unknown error"
     }
@@ -139,10 +134,9 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
 /**
  * Get platform-specific capabilities for JVM
  */
-actual fun getPlatformCapabilities(): Map<String, Any> {
-    return try {
+actual fun getPlatformCapabilities(): Map<String, Any> =
+    try {
         JvmDeviceInfoCollector.getDeviceCapabilities()
     } catch (e: Exception) {
         mapOf("error" to (e.message ?: "Unknown error"))
     }
-}

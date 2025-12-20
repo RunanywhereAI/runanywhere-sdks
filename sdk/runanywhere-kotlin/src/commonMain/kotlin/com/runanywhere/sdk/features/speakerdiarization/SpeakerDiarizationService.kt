@@ -1,7 +1,6 @@
 package com.runanywhere.sdk.features.speakerdiarization
 
 import com.runanywhere.sdk.features.stt.WordTimestamp
-import kotlinx.coroutines.flow.Flow
 
 // MARK: - Speaker Diarization Service Protocol
 
@@ -24,7 +23,10 @@ interface SpeakerDiarizationService {
      * Perform detailed diarization on complete audio buffer
      * Returns comprehensive diarization result
      */
-    suspend fun performDetailedDiarization(audioBuffer: FloatArray, sampleRate: Int = 16000): SpeakerDiarizationResult?
+    suspend fun performDetailedDiarization(
+        audioBuffer: FloatArray,
+        sampleRate: Int = 16000,
+    ): SpeakerDiarizationResult?
 
     /**
      * Get all detected speakers
@@ -39,7 +41,10 @@ interface SpeakerDiarizationService {
     /**
      * Update speaker name/label
      */
-    fun updateSpeakerName(speakerId: String, name: String)
+    fun updateSpeakerName(
+        speakerId: String,
+        name: String,
+    )
 
     /**
      * Reset all speaker profiles and history
@@ -88,7 +93,10 @@ expect class PlatformAudioProcessor() {
      * Calculate cosine similarity between two embeddings
      * Uses platform-optimized vector operations
      */
-    fun cosineSimilarity(a: FloatArray, b: FloatArray): Float
+    fun cosineSimilarity(
+        a: FloatArray,
+        b: FloatArray,
+    ): Float
 
     /**
      * Calculate RMS energy of audio samples
@@ -98,12 +106,18 @@ expect class PlatformAudioProcessor() {
     /**
      * Extract audio features for speaker identification
      */
-    fun extractFeatures(samples: FloatArray, sampleRate: Int): AudioFeatures
+    fun extractFeatures(
+        samples: FloatArray,
+        sampleRate: Int,
+    ): AudioFeatures
 
     /**
      * Apply windowing function to audio samples
      */
-    fun applyWindow(samples: FloatArray, windowType: WindowType = WindowType.HANN): FloatArray
+    fun applyWindow(
+        samples: FloatArray,
+        windowType: WindowType = WindowType.HANN,
+    ): FloatArray
 
     /**
      * Segment audio into overlapping chunks
@@ -112,7 +126,7 @@ expect class PlatformAudioProcessor() {
         samples: FloatArray,
         sampleRate: Int,
         windowSize: Double,
-        stepSize: Double
+        stepSize: Double,
     ): List<AudioChunk>
 }
 
@@ -123,7 +137,7 @@ enum class WindowType {
     RECTANGULAR,
     HANN,
     HAMMING,
-    BLACKMAN
+    BLACKMAN,
 }
 
 // MARK: - Speaker Database Interface
@@ -165,7 +179,10 @@ interface SpeakerDatabase {
     /**
      * Find speakers similar to embedding
      */
-    suspend fun findSimilarSpeakers(embedding: FloatArray, threshold: Float): List<Pair<SpeakerProfile, Float>>
+    suspend fun findSimilarSpeakers(
+        embedding: FloatArray,
+        threshold: Float,
+    ): List<Pair<SpeakerProfile, Float>>
 }
 
 // MARK: - Speaker Manager
@@ -176,7 +193,7 @@ interface SpeakerDatabase {
 class SpeakerManager(
     private val database: SpeakerDatabase,
     private val audioProcessor: PlatformAudioProcessor,
-    private val configuration: SpeakerDiarizationConfiguration
+    private val configuration: SpeakerDiarizationConfiguration,
 ) {
     private val activeSpeakers = mutableMapOf<String, SpeakerInfo>()
     private var speakerCounter = 0
@@ -187,7 +204,7 @@ class SpeakerManager(
     suspend fun processAudioChunk(
         samples: FloatArray,
         startTime: Double,
-        endTime: Double
+        endTime: Double,
     ): SpeakerInfo {
         // Extract features from audio
         val features = audioProcessor.extractFeatures(samples, configuration.sampleRate)
@@ -234,12 +251,13 @@ class SpeakerManager(
             val similarSpeakers = database.findSimilarSpeakers(embedding, configuration.speakerChangeThreshold)
             if (similarSpeakers.isNotEmpty()) {
                 val (profile, similarity) = similarSpeakers.first()
-                val speakerInfo = SpeakerInfo(
-                    id = profile.id,
-                    name = profile.name,
-                    confidence = similarity,
-                    embedding = profile.embedding
-                )
+                val speakerInfo =
+                    SpeakerInfo(
+                        id = profile.id,
+                        name = profile.name,
+                        confidence = similarity,
+                        embedding = profile.embedding,
+                    )
                 activeSpeakers[profile.id] = speakerInfo
                 return speakerInfo
             }
@@ -254,26 +272,28 @@ class SpeakerManager(
     private suspend fun createNewSpeaker(
         embedding: FloatArray,
         startTime: Double,
-        endTime: Double
+        endTime: Double,
     ): SpeakerInfo {
         val speakerId = "Speaker_${++speakerCounter}"
-        val speaker = SpeakerInfo(
-            id = speakerId,
-            name = null, // Will be assigned later
-            confidence = 0.8f, // Default confidence for new speakers
-            embedding = embedding
-        )
+        val speaker =
+            SpeakerInfo(
+                id = speakerId,
+                name = null, // Will be assigned later
+                confidence = 0.8f, // Default confidence for new speakers
+                embedding = embedding,
+            )
 
         // Add to active speakers
         activeSpeakers[speakerId] = speaker
 
         // Create and store profile
-        val profile = SpeakerProfile(
-            id = speakerId,
-            embedding = embedding,
-            totalSpeakingTime = endTime - startTime,
-            segmentCount = 1
-        )
+        val profile =
+            SpeakerProfile(
+                id = speakerId,
+                embedding = embedding,
+                totalSpeakingTime = endTime - startTime,
+                segmentCount = 1,
+            )
         database.storeSpeaker(profile)
 
         return speaker
@@ -284,19 +304,20 @@ class SpeakerManager(
      */
     private suspend fun updateSpeakerActivity(
         speaker: SpeakerInfo,
-        features: AudioFeatures,
+        @Suppress("UNUSED_PARAMETER") features: AudioFeatures,
         startTime: Double,
-        endTime: Double
+        endTime: Double,
     ) {
         // Get current profile
         val profile = database.getSpeaker(speaker.id) ?: return
 
         // Update profile with new activity
-        val updatedProfile = profile.copy(
-            totalSpeakingTime = profile.totalSpeakingTime + (endTime - startTime),
-            segmentCount = profile.segmentCount + 1,
-            lastUpdated = System.currentTimeMillis()
-        )
+        val updatedProfile =
+            profile.copy(
+                totalSpeakingTime = profile.totalSpeakingTime + (endTime - startTime),
+                segmentCount = profile.segmentCount + 1,
+                lastUpdated = System.currentTimeMillis(),
+            )
 
         database.updateSpeaker(updatedProfile)
     }
@@ -304,14 +325,13 @@ class SpeakerManager(
     /**
      * Create silence/no speaker indicator
      */
-    private fun createSilenceSpeaker(): SpeakerInfo {
-        return SpeakerInfo(
+    private fun createSilenceSpeaker(): SpeakerInfo =
+        SpeakerInfo(
             id = "SILENCE",
             name = "Silence",
             confidence = 1.0f,
-            embedding = null
+            embedding = null,
         )
-    }
 
     /**
      * Get all active speakers
@@ -326,7 +346,10 @@ class SpeakerManager(
     /**
      * Update speaker name
      */
-    suspend fun updateSpeakerName(speakerId: String, name: String) {
+    suspend fun updateSpeakerName(
+        speakerId: String,
+        name: String,
+    ) {
         // Update active speaker
         activeSpeakers[speakerId]?.let { speaker ->
             activeSpeakers[speakerId] = speaker.copy(name = name)
@@ -368,32 +391,34 @@ object TranscriptionSpeakerIntegrator {
     fun createLabeledTranscription(
         wordTimestamps: List<WordTimestamp>,
         segments: List<SpeakerSegment>,
-        speakers: List<SpeakerProfile>
+        speakers: List<SpeakerProfile>,
     ): LabeledTranscription {
         val labeledSegments = mutableListOf<LabeledTranscription.LabeledSegment>()
 
         // Group words by speaker segments
         for (segment in segments) {
-            val wordsInSegment = wordTimestamps.filter { word ->
-                word.startTime >= segment.startTime && word.endTime <= segment.endTime
-            }
+            val wordsInSegment =
+                wordTimestamps.filter { word ->
+                    word.startTime >= segment.startTime && word.endTime <= segment.endTime
+                }
 
             if (wordsInSegment.isNotEmpty()) {
                 val text = wordsInSegment.joinToString(" ") { it.word }
-                val labeledSegment = LabeledTranscription.LabeledSegment(
-                    speakerId = segment.speakerId,
-                    text = text,
-                    startTime = segment.startTime,
-                    endTime = segment.endTime,
-                    confidence = segment.confidence
-                )
+                val labeledSegment =
+                    LabeledTranscription.LabeledSegment(
+                        speakerId = segment.speakerId,
+                        text = text,
+                        startTime = segment.startTime,
+                        endTime = segment.endTime,
+                        confidence = segment.confidence,
+                    )
                 labeledSegments.add(labeledSegment)
             }
         }
 
         return LabeledTranscription(
             segments = labeledSegments,
-            speakers = speakers
+            speakers = speakers,
         )
     }
 
@@ -403,30 +428,31 @@ object TranscriptionSpeakerIntegrator {
     fun mapTranscriptionToSpeakers(
         transcriptionText: String,
         segments: List<SpeakerSegment>,
-        speakers: List<SpeakerProfile>
+        speakers: List<SpeakerProfile>,
     ): LabeledTranscription {
         // Simple text mapping based on segment timing
         // In practice, this would use more sophisticated alignment
         val words = transcriptionText.split(" ")
         val wordsPerSegment = if (segments.isNotEmpty()) words.size / segments.size else 0
 
-        val labeledSegments = segments.mapIndexed { index, segment ->
-            val startIndex = index * wordsPerSegment
-            val endIndex = minOf((index + 1) * wordsPerSegment, words.size)
-            val segmentText = words.subList(startIndex, endIndex).joinToString(" ")
+        val labeledSegments =
+            segments.mapIndexed { index, segment ->
+                val startIndex = index * wordsPerSegment
+                val endIndex = minOf((index + 1) * wordsPerSegment, words.size)
+                val segmentText = words.subList(startIndex, endIndex).joinToString(" ")
 
-            LabeledTranscription.LabeledSegment(
-                speakerId = segment.speakerId,
-                text = segmentText,
-                startTime = segment.startTime,
-                endTime = segment.endTime,
-                confidence = segment.confidence
-            )
-        }
+                LabeledTranscription.LabeledSegment(
+                    speakerId = segment.speakerId,
+                    text = segmentText,
+                    startTime = segment.startTime,
+                    endTime = segment.endTime,
+                    confidence = segment.confidence,
+                )
+            }
 
         return LabeledTranscription(
             segments = labeledSegments,
-            speakers = speakers
+            speakers = speakers,
         )
     }
 }

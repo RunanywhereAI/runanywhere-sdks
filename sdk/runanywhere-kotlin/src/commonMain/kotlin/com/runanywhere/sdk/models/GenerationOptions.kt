@@ -10,56 +10,39 @@ import kotlinx.serialization.Serializable
 data class LLMGenerationOptions(
     /** Maximum number of tokens to generate */
     val maxTokens: Int = 100,
-
     /** Temperature for sampling (0.0 - 1.0) */
     val temperature: Float = 0.7f,
-
     /** Top-p sampling parameter */
     val topP: Float = 1.0f,
-
     /** Enable real-time tracking for cost dashboard */
     val enableRealTimeTracking: Boolean = true,
-
     /** Stop sequences */
     val stopSequences: List<String> = emptyList(),
-
     /** Enable streaming mode */
     val streamingEnabled: Boolean = false,
-
     /** Preferred execution target */
     val preferredExecutionTarget: ExecutionTarget? = null,
-
     /** Structured output configuration (optional) */
     val structuredOutput: StructuredOutputConfig? = null,
-
     /** System prompt to define AI behavior and formatting rules */
     val systemPrompt: String? = null,
-
     /** Top-K sampling parameter */
     val topK: Int? = null,
-
     /** Repetition penalty */
     val repetitionPenalty: Float? = null,
-
     /** Frequency penalty */
     val frequencyPenalty: Float? = null,
-
     /** Presence penalty */
     val presencePenalty: Float? = null,
-
     /** Random seed for reproducible generation */
     val seed: Int? = null,
-
     /** Context window size */
     val contextLength: Int? = null,
-
     /** Enable thinking mode for reasoning models */
     val enableThinking: Boolean = false,
-
     /** Maximum thinking tokens (for reasoning models) */
-    val maxThinkingTokens: Int? = null
+    val maxThinkingTokens: Int? = null,
 ) {
-
     /**
      * Validate generation options
      */
@@ -77,45 +60,36 @@ data class LLMGenerationOptions(
     /**
      * Create a copy with different streaming setting
      */
-    fun withStreaming(enabled: Boolean): LLMGenerationOptions {
-        return copy(streamingEnabled = enabled)
-    }
+    fun withStreaming(enabled: Boolean): LLMGenerationOptions = copy(streamingEnabled = enabled)
 
     /**
      * Create a copy with different system prompt
      */
-    fun withSystemPrompt(prompt: String?): LLMGenerationOptions {
-        return copy(systemPrompt = prompt)
-    }
+    fun withSystemPrompt(prompt: String?): LLMGenerationOptions = copy(systemPrompt = prompt)
 
     /**
      * Create a copy with different execution target
      */
-    fun withExecutionTarget(target: ExecutionTarget?): LLMGenerationOptions {
-        return copy(preferredExecutionTarget = target)
-    }
+    fun withExecutionTarget(target: ExecutionTarget?): LLMGenerationOptions = copy(preferredExecutionTarget = target)
 
     /**
      * Create a copy with structured output configuration
      */
-    fun withStructuredOutput(config: StructuredOutputConfig?): LLMGenerationOptions {
-        return copy(structuredOutput = config)
-    }
+    fun withStructuredOutput(config: StructuredOutputConfig?): LLMGenerationOptions = copy(structuredOutput = config)
 
     /**
      * Convert to GenerationOptions for GenerationService
      */
-    fun toGenerationOptions(): com.runanywhere.sdk.generation.GenerationOptions {
-        return com.runanywhere.sdk.generation.GenerationOptions(
+    fun toGenerationOptions(): com.runanywhere.sdk.generation.GenerationOptions =
+        com.runanywhere.sdk.generation.GenerationOptions(
             temperature = temperature,
             maxTokens = maxTokens,
             topP = topP,
             topK = topK ?: 40,
             stopSequences = stopSequences,
             streaming = streamingEnabled,
-            seed = seed
+            seed = seed,
         )
-    }
 
     companion object {
         /**
@@ -126,37 +100,41 @@ data class LLMGenerationOptions(
         /**
          * Options optimized for streaming
          */
-        val STREAMING = LLMGenerationOptions(
-            streamingEnabled = true,
-            maxTokens = 1000
-        )
+        val STREAMING =
+            LLMGenerationOptions(
+                streamingEnabled = true,
+                maxTokens = 1000,
+            )
 
         /**
          * Options for creative writing (higher temperature)
          */
-        val CREATIVE = LLMGenerationOptions(
-            temperature = 1.0f,
-            maxTokens = 2000,
-            topP = 0.9f
-        )
+        val CREATIVE =
+            LLMGenerationOptions(
+                temperature = 1.0f,
+                maxTokens = 2000,
+                topP = 0.9f,
+            )
 
         /**
          * Options for factual/analytical responses (lower temperature)
          */
-        val FACTUAL = LLMGenerationOptions(
-            temperature = 0.1f,
-            maxTokens = 500,
-            topP = 0.95f
-        )
+        val FACTUAL =
+            LLMGenerationOptions(
+                temperature = 0.1f,
+                maxTokens = 500,
+                topP = 0.95f,
+            )
 
         /**
          * Options for code generation
          */
-        val CODE = LLMGenerationOptions(
-            temperature = 0.2f,
-            maxTokens = 1500,
-            stopSequences = listOf("```", "\n\n\n")
-        )
+        val CODE =
+            LLMGenerationOptions(
+                temperature = 0.2f,
+                maxTokens = 1500,
+                stopSequences = listOf("```", "\n\n\n"),
+            )
     }
 }
 

@@ -6,7 +6,9 @@ import kotlinx.serialization.Serializable
  * Simple Instant replacement for avoiding kotlinx-datetime issues
  */
 @Serializable
-data class SimpleInstant(val millis: Long) {
+data class SimpleInstant(
+    val millis: Long,
+) {
     companion object {
         fun now(): SimpleInstant = SimpleInstant(getCurrentTimeMillis())
     }

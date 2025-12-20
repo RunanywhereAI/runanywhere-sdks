@@ -1,11 +1,10 @@
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.features.vad.VADCapability
-import com.runanywhere.sdk.features.vad.VADOutput
-import com.runanywhere.sdk.features.vad.VADCapabilityConfiguration
-import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.features.vad.SpeechActivityEvent
+import com.runanywhere.sdk.features.vad.VADCapabilityConfiguration
+import com.runanywhere.sdk.features.vad.VADOutput
+import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -27,8 +26,9 @@ import kotlinx.coroutines.flow.Flow
 suspend fun RunAnywhere.initializeVAD() {
     requireInitialized()
 
-    val capability = vadCapability
-        ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
+    val capability =
+        vadCapability
+            ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
 
     capability.initialize()
 }
@@ -42,8 +42,9 @@ suspend fun RunAnywhere.initializeVAD() {
 suspend fun RunAnywhere.initializeVAD(config: VADCapabilityConfiguration) {
     requireInitialized()
 
-    val capability = vadCapability
-        ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
+    val capability =
+        vadCapability
+            ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
 
     capability.initialize(config.toComponentConfiguration())
 }
@@ -68,8 +69,9 @@ val RunAnywhere.isVADReady: Boolean
 fun RunAnywhere.detectSpeech(samples: FloatArray): VADOutput {
     requireInitialized()
 
-    val capability = vadCapability
-        ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
+    val capability =
+        vadCapability
+            ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
 
     return capability.detectSpeech(samples)
 }
@@ -81,11 +83,15 @@ fun RunAnywhere.detectSpeech(samples: FloatArray): VADOutput {
  * @param energyThresholdOverride Optional threshold override
  * @return VADOutput with detection result
  */
-fun RunAnywhere.detectSpeech(samples: FloatArray, energyThresholdOverride: Float): VADOutput {
+fun RunAnywhere.detectSpeech(
+    samples: FloatArray,
+    energyThresholdOverride: Float,
+): VADOutput {
     requireInitialized()
 
-    val capability = vadCapability
-        ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
+    val capability =
+        vadCapability
+            ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
 
     return capability.detectSpeech(samples, energyThresholdOverride)
 }
@@ -99,8 +105,9 @@ fun RunAnywhere.detectSpeech(samples: FloatArray, energyThresholdOverride: Float
 fun RunAnywhere.streamDetectSpeech(audioStream: Flow<FloatArray>): Flow<VADOutput> {
     requireInitialized()
 
-    val capability = vadCapability
-        ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
+    val capability =
+        vadCapability
+            ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
 
     return capability.streamDetectSpeech(audioStream)
 }
@@ -116,12 +123,13 @@ fun RunAnywhere.streamDetectSpeech(audioStream: Flow<FloatArray>): Flow<VADOutpu
 fun RunAnywhere.detectSpeechSegments(
     audioStream: Flow<FloatArray>,
     onSpeechStart: () -> Unit = {},
-    onSpeechEnd: () -> Unit = {}
+    onSpeechEnd: () -> Unit = {},
 ): Flow<VADOutput> {
     requireInitialized()
 
-    val capability = vadCapability
-        ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
+    val capability =
+        vadCapability
+            ?: throw SDKError.ComponentNotInitialized("VAD capability not available")
 
     return capability.detectSpeechSegments(audioStream, onSpeechStart, onSpeechEnd)
 }

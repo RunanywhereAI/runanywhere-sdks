@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.foundation
 
+import java.lang.management.ManagementFactory
 import java.net.InetAddress
 import java.security.MessageDigest
-import java.lang.management.ManagementFactory
 
 /**
  * JVM-specific implementations for PersistentDeviceIdentity
@@ -15,32 +15,33 @@ import java.lang.management.ManagementFactory
 /**
  * Get platform vendor UUID - uses hardware identifiers when available
  */
-actual suspend fun getPlatformVendorUUID(): String? {
-    return try {
+actual suspend fun getPlatformVendorUUID(): String? =
+    try {
         // Try to create a stable identifier based on hardware characteristics
-        val identifier = buildString {
-            append(System.getProperty("user.name", ""))
-            append(System.getProperty("os.name", ""))
-            append(System.getProperty("os.arch", ""))
-            append(System.getProperty("java.vm.vendor", ""))
+        val identifier =
+            buildString {
+                append(System.getProperty("user.name", ""))
+                append(System.getProperty("os.name", ""))
+                append(System.getProperty("os.arch", ""))
+                append(System.getProperty("java.vm.vendor", ""))
 
-            // Try to get hostname as a stable identifier
-            try {
-                append(InetAddress.getLocalHost().hostName)
-            } catch (e: Exception) {
-                append("localhost")
-            }
-
-            // Add hardware serial if available (requires special permissions)
-            try {
-                val systemSerial = System.getProperty("system.serial")
-                if (!systemSerial.isNullOrBlank()) {
-                    append(systemSerial)
+                // Try to get hostname as a stable identifier
+                try {
+                    append(InetAddress.getLocalHost().hostName)
+                } catch (e: Exception) {
+                    append("localhost")
                 }
-            } catch (e: Exception) {
-                // Ignore - not available
+
+                // Add hardware serial if available (requires special permissions)
+                try {
+                    val systemSerial = System.getProperty("system.serial")
+                    if (!systemSerial.isNullOrBlank()) {
+                        append(systemSerial)
+                    }
+                } catch (e: Exception) {
+                    // Ignore - not available
+                }
             }
-        }
 
         // Create a stable UUID from the identifier
         val digest = MessageDigest.getInstance("SHA-256")
@@ -51,20 +52,31 @@ actual suspend fun getPlatformVendorUUID(): String? {
         bytes[6] = (bytes[6].toInt() and 0x0f or 0x40).toByte() // Version 4
         bytes[8] = (bytes[8].toInt() and 0x3f or 0x80).toByte() // Variant bits
 
-        val uuid = "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x".format(
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5],
-            bytes[6], bytes[7],
-            bytes[8], bytes[9],
-            bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
-        )
+        val uuid =
+            "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x".format(
+                bytes[0],
+                bytes[1],
+                bytes[2],
+                bytes[3],
+                bytes[4],
+                bytes[5],
+                bytes[6],
+                bytes[7],
+                bytes[8],
+                bytes[9],
+                bytes[10],
+                bytes[11],
+                bytes[12],
+                bytes[13],
+                bytes[14],
+                bytes[15],
+            )
 
         uuid
     } catch (e: Exception) {
         // Return null to fall back to generated UUID
         null
     }
-}
 
 /**
  * Get comprehensive platform device information for fingerprinting
@@ -83,37 +95,39 @@ actual fun getPlatformDeviceInfo(): PlatformDeviceInfo {
     val coreCount = runtime.availableProcessors()
 
     // Get device model (hostname + JVM info)
-    val deviceModel = try {
-        val hostname = InetAddress.getLocalHost().hostName
-        val jvmName = System.getProperty("java.vm.name", "Unknown JVM")
-        "$hostname ($jvmName)"
-    } catch (e: Exception) {
-        "JVM-${System.getProperty("java.vm.name", "Unknown")}"
-    }
+    val deviceModel =
+        try {
+            val hostname = InetAddress.getLocalHost().hostName
+            val jvmName = System.getProperty("java.vm.name", "Unknown JVM")
+            "$hostname ($jvmName)"
+        } catch (e: Exception) {
+            "JVM-${System.getProperty("java.vm.name", "Unknown")}"
+        }
 
     // Get OS major version
-    val osMajorVersion = try {
-        val osVersion = System.getProperty("os.version", "unknown")
-        // Extract major version (e.g., "10.15.7" -> "10")
-        osVersion.split(".").firstOrNull() ?: osVersion
-    } catch (e: Exception) {
-        "unknown"
-    }
+    val osMajorVersion =
+        try {
+            val osVersion = System.getProperty("os.version", "unknown")
+            // Extract major version (e.g., "10.15.7" -> "10")
+            osVersion.split(".").firstOrNull() ?: osVersion
+        } catch (e: Exception) {
+            "unknown"
+        }
 
     return PlatformDeviceInfo(
         totalMemory = totalMemory,
         architecture = architecture,
         coreCount = coreCount,
         deviceModel = deviceModel,
-        osMajorVersion = osMajorVersion
+        osMajorVersion = osMajorVersion,
     )
 }
 
 /**
  * Platform-specific SHA256 implementation
  */
-actual fun platformSha256(input: String): String {
-    return try {
+actual fun platformSha256(input: String): String =
+    try {
         val digest = MessageDigest.getInstance("SHA-256")
         val hash = digest.digest(input.toByteArray(Charsets.UTF_8))
         hash.joinToString("") { "%02x".format(it) }
@@ -121,14 +135,12 @@ actual fun platformSha256(input: String): String {
         // Fallback to hashCode if SHA256 is not available
         input.hashCode().toString(16)
     }
-}
 
 /**
  * Extended JVM device information collector
  * Provides comprehensive system information for device registration
  */
 object JvmDeviceInfoCollector {
-
     /**
      * Collect comprehensive device information for registration
      */
@@ -189,7 +201,6 @@ object JvmDeviceInfoCollector {
             // Additional system properties
             info["temp_dir"] = System.getProperty("java.io.tmpdir", "unknown")
             info["class_path"] = System.getProperty("java.class.path", "unknown").length // Just the length for privacy
-
         } catch (e: Exception) {
             info["collection_error"] = e.message ?: "Unknown error"
         }
@@ -209,35 +220,39 @@ object JvmDeviceInfoCollector {
             val processors = runtime.availableProcessors()
 
             // Memory capability
-            capabilities["memory_tier"] = when {
-                maxMemoryMB >= 16384 -> "high"    // 16GB+
-                maxMemoryMB >= 8192 -> "medium"   // 8GB+
-                maxMemoryMB >= 4096 -> "low"      // 4GB+
-                else -> "minimal"                 // < 4GB
-            }
+            capabilities["memory_tier"] =
+                when {
+                    maxMemoryMB >= 16384 -> "high" // 16GB+
+                    maxMemoryMB >= 8192 -> "medium" // 8GB+
+                    maxMemoryMB >= 4096 -> "low" // 4GB+
+                    else -> "minimal" // < 4GB
+                }
 
             // CPU capability
-            capabilities["cpu_tier"] = when {
-                processors >= 16 -> "high"       // 16+ cores
-                processors >= 8 -> "medium"      // 8+ cores
-                processors >= 4 -> "low"         // 4+ cores
-                else -> "minimal"                 // < 4 cores
-            }
+            capabilities["cpu_tier"] =
+                when {
+                    processors >= 16 -> "high" // 16+ cores
+                    processors >= 8 -> "medium" // 8+ cores
+                    processors >= 4 -> "low" // 4+ cores
+                    else -> "minimal" // < 4 cores
+                }
 
             // Overall capability score (0-100)
             var score = 0
-            score += when {
-                maxMemoryMB >= 16384 -> 40
-                maxMemoryMB >= 8192 -> 30
-                maxMemoryMB >= 4096 -> 20
-                else -> 10
-            }
-            score += when {
-                processors >= 16 -> 30
-                processors >= 8 -> 20
-                processors >= 4 -> 15
-                else -> 5
-            }
+            score +=
+                when {
+                    maxMemoryMB >= 16384 -> 40
+                    maxMemoryMB >= 8192 -> 30
+                    maxMemoryMB >= 4096 -> 20
+                    else -> 10
+                }
+            score +=
+                when {
+                    processors >= 16 -> 30
+                    processors >= 8 -> 20
+                    processors >= 4 -> 15
+                    else -> 5
+                }
             // Add bonus for 64-bit architecture
             if (System.getProperty("os.arch", "").contains("64")) {
                 score += 10
@@ -249,13 +264,13 @@ object JvmDeviceInfoCollector {
             }
 
             capabilities["capability_score"] = minOf(score, 100)
-            capabilities["recommended_models"] = when {
-                score >= 80 -> listOf("large", "medium", "small", "tiny")
-                score >= 60 -> listOf("medium", "small", "tiny")
-                score >= 40 -> listOf("small", "tiny")
-                else -> listOf("tiny")
-            }
-
+            capabilities["recommended_models"] =
+                when {
+                    score >= 80 -> listOf("large", "medium", "small", "tiny")
+                    score >= 60 -> listOf("medium", "small", "tiny")
+                    score >= 40 -> listOf("small", "tiny")
+                    else -> listOf("tiny")
+                }
         } catch (e: Exception) {
             capabilities["error"] = e.message ?: "Unknown error"
         }

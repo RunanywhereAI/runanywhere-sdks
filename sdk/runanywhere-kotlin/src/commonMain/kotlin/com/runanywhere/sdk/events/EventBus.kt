@@ -26,7 +26,6 @@ import kotlinx.coroutines.launch
  * ```
  */
 object EventBus {
-
     // Main events publisher - only events with PUBLIC_ONLY or ALL destination
     private val _events = MutableSharedFlow<SDKEvent>()
 
@@ -39,8 +38,7 @@ object EventBus {
     /**
      * Get events filtered by category.
      */
-    fun events(category: EventCategory): Flow<SDKEvent> =
-        events.filter { it.category == category }
+    fun events(category: EventCategory): Flow<SDKEvent> = events.filter { it.category == category }
 
     // MARK: - Legacy typed event publishers (for backwards compatibility)
 
@@ -86,7 +84,9 @@ object EventBus {
 
     // Legacy support - Speaker Diarization Events
     private val _speakerDiarizationEvents = MutableSharedFlow<com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationEvent>()
-    val speakerDiarizationEvents: SharedFlow<com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationEvent> = _speakerDiarizationEvents.asSharedFlow()
+    val speakerDiarizationEvents: SharedFlow<com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationEvent> =
+        _speakerDiarizationEvents
+            .asSharedFlow()
 
     // Legacy support - Bootstrap Events
     private val _bootstrapEvents = MutableSharedFlow<SDKBootstrapEvent>()
@@ -221,7 +221,7 @@ object EventBus {
     }
 
     // Legacy support method for ComponentEvent (excluding ComponentInitializationEvent)
-    @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION", "UNUSED_PARAMETER")
     fun publishComponentEvent(event: ComponentEvent) {
         // For ComponentEvent types, emit a generic SDK event
         _events.tryEmit(object : BaseSDKEvent(EventCategory.SDK) {})
@@ -246,16 +246,15 @@ object EventBus {
  */
 inline fun <reified T : SDKEvent> EventBus.on(
     scope: CoroutineScope,
-    crossinline handler: (T) -> Unit
-): Job {
-    return scope.launch {
+    crossinline handler: (T) -> Unit,
+): Job =
+    scope.launch {
         events
             .filterIsInstance<T>()
             .collect { event ->
                 handler(event)
             }
     }
-}
 
 /**
  * Subscribe to events by category with a closure.
@@ -263,154 +262,143 @@ inline fun <reified T : SDKEvent> EventBus.on(
 fun EventBus.on(
     category: EventCategory,
     scope: CoroutineScope,
-    handler: (SDKEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (SDKEvent) -> Unit,
+): Job =
+    scope.launch {
         events(category).collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to specific initialization events
  */
 fun EventBus.onInitialization(
     scope: CoroutineScope,
-    handler: (SDKInitializationEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (SDKInitializationEvent) -> Unit,
+): Job =
+    scope.launch {
         initializationEvents.collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to specific generation events
  */
 fun EventBus.onGeneration(
     scope: CoroutineScope,
-    handler: (SDKGenerationEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (SDKGenerationEvent) -> Unit,
+): Job =
+    scope.launch {
         generationEvents.collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to specific model events
  */
 fun EventBus.onModel(
     scope: CoroutineScope,
-    handler: (SDKModelEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (SDKModelEvent) -> Unit,
+): Job =
+    scope.launch {
         modelEvents.collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to specific voice events
  */
 fun EventBus.onVoice(
     scope: CoroutineScope,
-    handler: (SDKVoiceEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (SDKVoiceEvent) -> Unit,
+): Job =
+    scope.launch {
         voiceEvents.collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to specific performance events
  */
 fun EventBus.onPerformance(
     scope: CoroutineScope,
-    handler: (SDKPerformanceEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (SDKPerformanceEvent) -> Unit,
+): Job =
+    scope.launch {
         performanceEvents.collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to specific network events
  */
 fun EventBus.onNetwork(
     scope: CoroutineScope,
-    handler: (SDKNetworkEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (SDKNetworkEvent) -> Unit,
+): Job =
+    scope.launch {
         networkEvents.collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to specific storage events
  */
 fun EventBus.onStorage(
     scope: CoroutineScope,
-    handler: (SDKStorageEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (SDKStorageEvent) -> Unit,
+): Job =
+    scope.launch {
         storageEvents.collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to specific framework events
  */
 fun EventBus.onFramework(
     scope: CoroutineScope,
-    handler: (SDKFrameworkEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (SDKFrameworkEvent) -> Unit,
+): Job =
+    scope.launch {
         frameworkEvents.collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to specific device events
  */
 fun EventBus.onDevice(
     scope: CoroutineScope,
-    handler: (SDKDeviceEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (SDKDeviceEvent) -> Unit,
+): Job =
+    scope.launch {
         deviceEvents.collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to component initialization events
  */
 fun EventBus.onComponentInitialization(
     scope: CoroutineScope,
-    handler: (ComponentInitializationEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (ComponentInitializationEvent) -> Unit,
+): Job =
+    scope.launch {
         componentEvents.collect { event ->
             handler(event)
         }
     }
-}
 
 /**
  * Subscribe to specific component events
@@ -418,16 +406,15 @@ fun EventBus.onComponentInitialization(
 fun EventBus.onComponent(
     componentName: String,
     scope: CoroutineScope,
-    handler: (ComponentInitializationEvent) -> Unit
-): Job {
-    return scope.launch {
+    handler: (ComponentInitializationEvent) -> Unit,
+): Job =
+    scope.launch {
         componentEvents
             .filter { it.componentName == componentName }
             .collect { event ->
                 handler(event)
             }
     }
-}
 
 // All event definitions have been moved to SDKEvent.kt for better organization
 
@@ -438,42 +425,85 @@ fun EventBus.onComponent(
 sealed class SDKBootstrapEvent {
     // Step 1: Network Services Configuration
     object NetworkServicesConfigured : SDKBootstrapEvent()
-    data class NetworkServicesConfigurationFailed(val error: String) : SDKBootstrapEvent()
+
+    data class NetworkServicesConfigurationFailed(
+        val error: String,
+    ) : SDKBootstrapEvent()
 
     // Step 2: Device Information Collection and Sync
-    data class DeviceInfoCollected(val deviceInfo: com.runanywhere.sdk.data.models.DeviceInfoData) : SDKBootstrapEvent()
-    data class DeviceInfoCollectionFailed(val error: String) : SDKBootstrapEvent()
-    data class DeviceInfoSynced(val deviceInfo: com.runanywhere.sdk.data.models.DeviceInfoData) : SDKBootstrapEvent()
-    data class DeviceInfoSyncFailed(val error: String) : SDKBootstrapEvent()
+    data class DeviceInfoCollected(
+        val deviceInfo: com.runanywhere.sdk.data.models.DeviceInfoData,
+    ) : SDKBootstrapEvent()
+
+    data class DeviceInfoCollectionFailed(
+        val error: String,
+    ) : SDKBootstrapEvent()
+
+    data class DeviceInfoSynced(
+        val deviceInfo: com.runanywhere.sdk.data.models.DeviceInfoData,
+    ) : SDKBootstrapEvent()
+
+    data class DeviceInfoSyncFailed(
+        val error: String,
+    ) : SDKBootstrapEvent()
 
     // Step 3: Configuration Service with Repository Pattern
-    data class ConfigurationLoaded(val config: ConfigurationData) : SDKBootstrapEvent()
-    data class ConfigurationLoadFailed(val error: String) : SDKBootstrapEvent()
+    data class ConfigurationLoaded(
+        val config: ConfigurationData,
+    ) : SDKBootstrapEvent()
+
+    data class ConfigurationLoadFailed(
+        val error: String,
+    ) : SDKBootstrapEvent()
 
     // Step 4: Model Catalog Sync from Backend
-    data class ModelCatalogSynced(val models: List<com.runanywhere.sdk.models.ModelInfo>) : SDKBootstrapEvent()
-    data class ModelCatalogSyncFailed(val error: String) : SDKBootstrapEvent()
+    data class ModelCatalogSynced(
+        val models: List<com.runanywhere.sdk.models.ModelInfo>,
+    ) : SDKBootstrapEvent()
+
+    data class ModelCatalogSyncFailed(
+        val error: String,
+    ) : SDKBootstrapEvent()
 
     // Step 5: Model Registry Initialization
     object ModelRegistryInitialized : SDKBootstrapEvent()
-    data class ModelRegistryInitializationFailed(val error: String) : SDKBootstrapEvent()
+
+    data class ModelRegistryInitializationFailed(
+        val error: String,
+    ) : SDKBootstrapEvent()
 
     // Step 6: Memory Management Configuration
-    data class MemoryConfigured(val threshold: Long) : SDKBootstrapEvent()
-    data class MemoryConfigurationFailed(val error: String) : SDKBootstrapEvent()
+    data class MemoryConfigured(
+        val threshold: Long,
+    ) : SDKBootstrapEvent()
+
+    data class MemoryConfigurationFailed(
+        val error: String,
+    ) : SDKBootstrapEvent()
 
     // Step 7: Voice Services Initialization (Optional)
     object VoiceServicesInitialized : SDKBootstrapEvent()
-    data class VoiceServicesInitializationFailed(val error: String) : SDKBootstrapEvent()
+
+    data class VoiceServicesInitializationFailed(
+        val error: String,
+    ) : SDKBootstrapEvent()
 
     // Step 8: Analytics Initialization
     object AnalyticsInitialized : SDKBootstrapEvent()
-    data class AnalyticsInitializationFailed(val error: String) : SDKBootstrapEvent()
+
+    data class AnalyticsInitializationFailed(
+        val error: String,
+    ) : SDKBootstrapEvent()
 
     // Bootstrap start/completion
     object BootstrapStarted : SDKBootstrapEvent()
+
     object BootstrapCompleted : SDKBootstrapEvent()
-    data class BootstrapFailed(val step: String, val error: String) : SDKBootstrapEvent()
+
+    data class BootstrapFailed(
+        val step: String,
+        val error: String,
+    ) : SDKBootstrapEvent()
 }
 
 // Device Events are now defined in SDKEvent.kt to avoid duplication

@@ -14,19 +14,20 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RunAnywhereSTTTest {
-
     @Before
-    fun setup() = runTest {
-        // Clean up any previous state
-        if (RunAnywhereSTT.isInitialized()) {
-            RunAnywhereSTT.cleanup()
+    fun setup() =
+        runTest {
+            // Clean up any previous state
+            if (RunAnywhereSTT.isInitialized()) {
+                RunAnywhereSTT.cleanup()
+            }
         }
-    }
 
     @After
-    fun tearDown() = runTest {
-        RunAnywhereSTT.cleanup()
-    }
+    fun tearDown() =
+        runTest {
+            RunAnywhereSTT.cleanup()
+        }
 
     @Test
     fun `test SDK initialization state`() {
@@ -52,11 +53,12 @@ class RunAnywhereSTTTest {
 
     @Test
     fun `test configuration creation`() {
-        val config = STTSDKConfig(
-            modelId = "whisper-base",
-            enableVAD = true,
-            language = "en"
-        )
+        val config =
+            STTSDKConfig(
+                modelId = "whisper-base",
+                enableVAD = true,
+                language = "en",
+            )
 
         assertEquals("whisper-base", config.modelId)
         assertTrue(config.enableVAD)
@@ -64,62 +66,69 @@ class RunAnywhereSTTTest {
     }
 
     @Test
-    fun `test initialization`() = runTest {
-        assertFalse(RunAnywhereSTT.isInitialized())
+    fun `test initialization`() =
+        runTest {
+            assertFalse(RunAnywhereSTT.isInitialized())
 
-        RunAnywhereSTT.initialize()
+            RunAnywhereSTT.initialize()
 
-        assertTrue(RunAnywhereSTT.isInitialized())
-    }
-
-    @Test
-    fun `test initialization with custom config`() = runTest {
-        val config = STTSDKConfig(
-            modelId = "whisper-small",
-            enableVAD = false,
-            language = "es"
-        )
-
-        RunAnywhereSTT.initialize(config)
-
-        assertTrue(RunAnywhereSTT.isInitialized())
-    }
+            assertTrue(RunAnywhereSTT.isInitialized())
+        }
 
     @Test
-    fun `test transcribe returns mock result`() = runTest {
-        RunAnywhereSTT.initialize()
+    fun `test initialization with custom config`() =
+        runTest {
+            val config =
+                STTSDKConfig(
+                    modelId = "whisper-small",
+                    enableVAD = false,
+                    language = "es",
+                )
 
-        val audioData = ByteArray(1000)
-        val result = RunAnywhereSTT.transcribe(audioData)
+            RunAnywhereSTT.initialize(config)
 
-        assertEquals("This is a mock transcription result", result)
-    }
+            assertTrue(RunAnywhereSTT.isInitialized())
+        }
 
     @Test
-    fun `test transcribe stream returns expected events`() = runTest {
-        RunAnywhereSTT.initialize()
+    fun `test transcribe returns mock result`() =
+        runTest {
+            RunAnywhereSTT.initialize()
 
-        val audioStream = flowOf(ByteArray(100), ByteArray(200))
-        val events = RunAnywhereSTT.transcribeStream(audioStream).toList()
+            val audioData = ByteArray(1000)
+            val result = RunAnywhereSTT.transcribe(audioData)
 
-        assertTrue(events.any { it is TranscriptionEvent.SpeechStart })
-        assertTrue(events.any { it is TranscriptionEvent.PartialTranscription })
-        assertTrue(events.any { it is TranscriptionEvent.FinalTranscription })
-        assertTrue(events.any { it is TranscriptionEvent.SpeechEnd })
-    }
+            assertEquals("This is a mock transcription result", result)
+        }
+
+    @Test
+    fun `test transcribe stream returns expected events`() =
+        runTest {
+            RunAnywhereSTT.initialize()
+
+            val audioStream = flowOf(ByteArray(100), ByteArray(200))
+            val events = RunAnywhereSTT.transcribeStream(audioStream).toList()
+
+            assertTrue(events.any { it is TranscriptionEvent.SpeechStart })
+            assertTrue(events.any { it is TranscriptionEvent.PartialTranscription })
+            assertTrue(events.any { it is TranscriptionEvent.FinalTranscription })
+            assertTrue(events.any { it is TranscriptionEvent.SpeechEnd })
+        }
 
     @Test(expected = IllegalStateException::class)
-    fun `test transcribe without initialization throws exception`() = runTest {
-        val audioData = ByteArray(1000)
-        RunAnywhereSTT.transcribe(audioData)
-    }
+    fun `test transcribe without initialization throws exception`() =
+        runTest {
+            val audioData = ByteArray(1000)
+            RunAnywhereSTT.transcribe(audioData)
+        }
 
     @Test
-    fun `test cleanup`() = runTest {
-        RunAnywhereSTT.initialize()
-        assertTrue(RunAnywhereSTT.isInitialized())
+    fun `test cleanup`() =
+        runTest {
+            RunAnywhereSTT.initialize()
+            assertTrue(RunAnywhereSTT.isInitialized())
 
-        RunAnywhereSTT.cleanup()
-        assertFalse(RunAnywhereSTT.isInitialized())
-    }
+            RunAnywhereSTT.cleanup()
+            assertFalse(RunAnywhereSTT.isInitialized())
+        }
 }

@@ -1,11 +1,9 @@
 package com.runanywhere.sdk.data.models
 
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerialName
-import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import com.runanywhere.sdk.models.enums.InferenceFramework
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Configuration data models
@@ -23,7 +21,7 @@ data class SDKInitParams(
     val apiKey: String,
     val baseURL: String? = null,
     val environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT,
-    val configuration: ConfigurationData? = null
+    val configuration: ConfigurationData? = null,
 ) {
     /**
      * Internal Supabase configuration (auto-configured based on environment)
@@ -32,7 +30,9 @@ data class SDKInitParams(
      * Matches iOS: internal var supabaseConfig
      */
     internal val supabaseConfig: com.runanywhere.sdk.foundation.supabase.SupabaseConfig?
-        get() = com.runanywhere.sdk.foundation.supabase.SupabaseConfig.configuration(environment)
+        get() =
+            com.runanywhere.sdk.foundation.supabase.SupabaseConfig
+                .configuration(environment)
 }
 
 /**
@@ -43,10 +43,12 @@ data class SDKInitParams(
 enum class ConfigurationSource {
     @SerialName("remote")
     REMOTE,
+
     @SerialName("consumer")
     CONSUMER,
+
     @SerialName("defaults")
-    DEFAULTS
+    DEFAULTS,
 }
 
 /**
@@ -57,14 +59,18 @@ enum class ConfigurationSource {
 enum class RoutingPolicy {
     @SerialName("device_only")
     DEVICE_ONLY,
+
     @SerialName("device_preferred")
     DEVICE_PREFERRED,
+
     @SerialName("cloud_preferred")
     CLOUD_PREFERRED,
+
     @SerialName("cloud_only")
     CLOUD_ONLY,
+
     @SerialName("custom")
-    CUSTOM
+    CUSTOM,
 }
 
 /**
@@ -75,10 +81,12 @@ enum class RoutingPolicy {
 enum class PrivacyMode {
     @SerialName("standard")
     STANDARD,
+
     @SerialName("enhanced")
     ENHANCED,
+
     @SerialName("strict")
-    STRICT
+    STRICT,
 }
 
 /**
@@ -89,12 +97,15 @@ enum class PrivacyMode {
 enum class DownloadPolicy {
     @SerialName("automatic")
     AUTOMATIC,
+
     @SerialName("wifi_only")
     WIFI_ONLY,
+
     @SerialName("manual")
     MANUAL,
+
     @SerialName("never")
-    NEVER
+    NEVER,
 }
 
 /**
@@ -105,14 +116,16 @@ enum class DownloadPolicy {
 enum class CacheEvictionPolicy {
     @SerialName("lru")
     LEAST_RECENTLY_USED,
+
     @SerialName("lfu")
     LEAST_FREQUENTLY_USED,
+
     @SerialName("fifo")
     FIFO,
-    @SerialName("largest_first")
-    LARGEST_FIRST
-}
 
+    @SerialName("largest_first")
+    LARGEST_FIRST,
+}
 
 /**
  * SDK Environment enumeration
@@ -121,7 +134,7 @@ enum class CacheEvictionPolicy {
 enum class SDKEnvironment {
     DEVELOPMENT,
     STAGING,
-    PRODUCTION
+    PRODUCTION,
 }
 
 /**
@@ -130,68 +143,56 @@ enum class SDKEnvironment {
  */
 @Serializable
 data class ConfigurationData(
-    /// Unique identifier for this configuration
+    // / Unique identifier for this configuration
     val id: String,
-
-    /// Routing configuration
+    // / Routing configuration
     val routing: RoutingConfiguration,
-
-    /// Generation configuration
+    // / Generation configuration
     val generation: GenerationConfiguration,
-
-    /// Storage configuration (includes memory threshold)
+    // / Storage configuration (includes memory threshold)
     val storage: StorageConfiguration,
-
-    /// API configuration (baseURL, timeouts, etc)
+    // / API configuration (baseURL, timeouts, etc)
     val api: APIConfiguration,
-
-    /// Download configuration
+    // / Download configuration
     val download: ModelDownloadConfiguration,
-
-    /// Hardware preferences (optional)
+    // / Hardware preferences (optional)
     val hardware: HardwareConfiguration? = null,
-
-    /// Debug mode flag
+    // / Debug mode flag
     @SerialName("debug_mode")
     val debugMode: Boolean = false,
-
-    /// API key for authentication (optional - can be provided separately)
+    // / API key for authentication (optional - can be provided separately)
     @SerialName("api_key")
     val apiKey: String? = null,
-
-    /// Whether user can override configuration
+    // / Whether user can override configuration
     @SerialName("allow_user_override")
     val allowUserOverride: Boolean = true,
-
-    /// Configuration source
+    // / Configuration source
     val source: ConfigurationSource = ConfigurationSource.DEFAULTS,
-
-    /// Metadata
+    // / Metadata
     @SerialName("created_at")
     val createdAt: Long = getCurrentTimeMillis(),
     @SerialName("updated_at")
     val updatedAt: Long = getCurrentTimeMillis(),
     @SerialName("sync_pending")
-    val syncPending: Boolean = false
+    val syncPending: Boolean = false,
 ) {
-
     /**
      * Mark configuration as updated
      * Equivalent to iOS markUpdated() extension method
      */
-    fun markUpdated(): ConfigurationData {
-        return copy(
+    fun markUpdated(): ConfigurationData =
+        copy(
             updatedAt = getCurrentTimeMillis(),
-            syncPending = true
+            syncPending = true,
         )
-    }
+
     companion object {
         /**
          * Create SDK default configuration
          * Exact match to iOS sdkDefaults(apiKey:) factory method
          */
-        fun sdkDefaults(apiKey: String): ConfigurationData {
-            return ConfigurationData(
+        fun sdkDefaults(apiKey: String): ConfigurationData =
+            ConfigurationData(
                 id = "default-${generateUUID()}",
                 routing = RoutingConfiguration(),
                 generation = GenerationConfiguration(),
@@ -205,9 +206,8 @@ data class ConfigurationData(
                 source = ConfigurationSource.DEFAULTS,
                 createdAt = getCurrentTimeMillis(),
                 updatedAt = getCurrentTimeMillis(),
-                syncPending = false
+                syncPending = false,
             )
-        }
 
         /**
          * Legacy method for backward compatibility
@@ -222,9 +222,7 @@ data class ConfigurationData(
         /**
          * Generate a simple UUID for configuration IDs
          */
-        private fun generateUUID(): String {
-            return "${getCurrentTimeMillis()}-${(0..9999).random()}"
-        }
+        private fun generateUUID(): String = "${getCurrentTimeMillis()}-${(0..9999).random()}"
     }
 }
 
@@ -234,28 +232,23 @@ data class ConfigurationData(
  */
 @Serializable
 data class RoutingConfiguration(
-    /// The routing policy to use
+    // / The routing policy to use
     val policy: RoutingPolicy = RoutingPolicy.DEVICE_ONLY,
-
-    /// Whether cloud routing is enabled
+    // / Whether cloud routing is enabled
     @SerialName("cloud_enabled")
     val cloudEnabled: Boolean = false,
-
-    /// Privacy mode for routing decisions
+    // / Privacy mode for routing decisions
     @SerialName("privacy_mode")
     val privacyMode: PrivacyMode = PrivacyMode.STANDARD,
-
-    /// Custom routing rules (only used when policy is .custom)
+    // / Custom routing rules (only used when policy is .custom)
     @SerialName("custom_rules")
     val customRules: Map<String, String> = emptyMap(),
-
-    /// Maximum latency threshold for routing decisions (milliseconds)
+    // / Maximum latency threshold for routing decisions (milliseconds)
     @SerialName("max_latency_threshold")
     val maxLatencyThreshold: Int? = null,
-
-    /// Minimum confidence score for on-device execution (0.0 - 1.0)
+    // / Minimum confidence score for on-device execution (0.0 - 1.0)
     @SerialName("min_confidence_score")
-    val minConfidenceScore: Double? = null
+    val minConfidenceScore: Double? = null,
 )
 
 /**
@@ -264,28 +257,23 @@ data class RoutingConfiguration(
  */
 @Serializable
 data class GenerationConfiguration(
-    /// Default generation settings
+    // / Default generation settings
     val defaults: DefaultGenerationSettings = DefaultGenerationSettings(),
-
-    /// Token budget configuration (optional)
+    // / Token budget configuration (optional)
     @SerialName("token_budget")
     val tokenBudget: TokenBudgetConfiguration? = null,
-
-    /// Preferred frameworks for generation in order of preference
+    // / Preferred frameworks for generation in order of preference
     @SerialName("framework_preferences")
     val frameworkPreferences: List<InferenceFramework> = emptyList(),
-
-    /// Maximum context length
+    // / Maximum context length
     @SerialName("max_context_length")
     val maxContextLength: Int = 4096,
-
-    /// Whether to enable thinking/reasoning extraction
+    // / Whether to enable thinking/reasoning extraction
     @SerialName("enable_thinking_extraction")
     val enableThinkingExtraction: Boolean = false,
-
-    /// Pattern for thinking content extraction
+    // / Pattern for thinking content extraction
     @SerialName("thinking_pattern")
-    val thinkingPattern: String? = null
+    val thinkingPattern: String? = null,
 )
 
 /**
@@ -294,28 +282,23 @@ data class GenerationConfiguration(
  */
 @Serializable
 data class DefaultGenerationSettings(
-    /// Default temperature for generation
+    // / Default temperature for generation
     val temperature: Double = 0.7,
-
-    /// Default maximum tokens for generation
+    // / Default maximum tokens for generation
     @SerialName("max_tokens")
     val maxTokens: Int = 256,
-
-    /// Default top-p value
+    // / Default top-p value
     @SerialName("top_p")
     val topP: Double = 0.9,
-
-    /// Default top-k value
+    // / Default top-k value
     @SerialName("top_k")
     val topK: Int? = null,
-
-    /// Default repetition penalty
+    // / Default repetition penalty
     @SerialName("repetition_penalty")
     val repetitionPenalty: Double? = null,
-
-    /// Default stop sequences
+    // / Default stop sequences
     @SerialName("stop_sequences")
-    val stopSequences: List<String> = emptyList()
+    val stopSequences: List<String> = emptyList(),
 )
 
 /**
@@ -324,21 +307,18 @@ data class DefaultGenerationSettings(
  */
 @Serializable
 data class TokenBudgetConfiguration(
-    /// Maximum tokens per request
+    // / Maximum tokens per request
     @SerialName("max_tokens_per_request")
     val maxTokensPerRequest: Int? = null,
-
-    /// Maximum tokens per day
+    // / Maximum tokens per day
     @SerialName("max_tokens_per_day")
     val maxTokensPerDay: Int? = null,
-
-    /// Maximum tokens per month
+    // / Maximum tokens per month
     @SerialName("max_tokens_per_month")
     val maxTokensPerMonth: Int? = null,
-
-    /// Whether to enforce token limits strictly
+    // / Whether to enforce token limits strictly
     @SerialName("enforce_strictly")
-    val enforceStrictly: Boolean = false
+    val enforceStrictly: Boolean = false,
 )
 
 /**
@@ -347,33 +327,27 @@ data class TokenBudgetConfiguration(
  */
 @Serializable
 data class StorageConfiguration(
-    /// Maximum cache size in bytes
+    // / Maximum cache size in bytes
     @SerialName("max_cache_size")
     val maxCacheSize: Long = 1_073_741_824L, // 1GB
-
-    /// Cache eviction policy
+    // / Cache eviction policy
     @SerialName("eviction_policy")
     val evictionPolicy: CacheEvictionPolicy = CacheEvictionPolicy.LEAST_RECENTLY_USED,
-
-    /// Storage directory name
+    // / Storage directory name
     @SerialName("directory_name")
     val directoryName: String = "RunAnywhere",
-
-    /// Whether to enable automatic cleanup
+    // / Whether to enable automatic cleanup
     @SerialName("enable_auto_cleanup")
     val enableAutoCleanup: Boolean = true,
-
-    /// Auto cleanup interval in seconds
+    // / Auto cleanup interval in seconds
     @SerialName("auto_cleanup_interval")
     val autoCleanupInterval: Double = 86400.0, // 24 hours
-
-    /// Minimum free space to maintain (in bytes)
+    // / Minimum free space to maintain (in bytes)
     @SerialName("minimum_free_space")
     val minimumFreeSpace: Long = 500_000_000L, // 500MB
-
-    /// Whether to compress stored models
+    // / Whether to compress stored models
     @SerialName("enable_compression")
-    val enableCompression: Boolean = false
+    val enableCompression: Boolean = false,
 )
 
 /**
@@ -382,24 +356,22 @@ data class StorageConfiguration(
  */
 @Serializable
 data class APIConfiguration(
-    /// Base URL for API requests
+    // / Base URL for API requests
     @SerialName("base_url")
     val baseURL: String = "https://api.runanywhere.ai",
-
-    /// Timeout interval for requests (in seconds)
+    // / Timeout interval for requests (in seconds)
     @SerialName("timeout_interval")
-    val timeoutInterval: Double = 30.0
+    val timeoutInterval: Double = 30.0,
 ) {
     companion object {
         /**
          * Create default API configuration matching iOS defaults
          */
-        fun createDefault(baseURL: String = "https://api.runanywhere.ai"): APIConfiguration {
-            return APIConfiguration(
+        fun createDefault(baseURL: String = "https://api.runanywhere.ai"): APIConfiguration =
+            APIConfiguration(
                 baseURL = baseURL,
-                timeoutInterval = 30.0
+                timeoutInterval = 30.0,
             )
-        }
     }
 }
 
@@ -409,36 +381,34 @@ data class APIConfiguration(
  */
 @Serializable
 data class ModelDownloadConfiguration(
-    /// Download policy
+    // / Download policy
     val policy: DownloadPolicy = DownloadPolicy.AUTOMATIC,
-
-    /// Maximum concurrent downloads
+    // / Maximum concurrent downloads
     @SerialName("max_concurrent_downloads")
     val maxConcurrentDownloads: Int = 3,
-
-    /// Number of retry attempts
+    // / Number of retry attempts
     @SerialName("retry_count")
     val retryCount: Int = 3,
-
-    /// Download timeout in seconds
+    // / Download timeout in seconds
     val timeout: Double = 300.0,
-
-    /// Enable background downloads
+    // / Enable background downloads
     @SerialName("enable_background_downloads")
-    val enableBackgroundDownloads: Boolean = false
+    val enableBackgroundDownloads: Boolean = false,
 ) {
     /**
      * Check if download is allowed
      * Exact match to iOS shouldAllowDownload method
      */
-    fun shouldAllowDownload(isWiFi: Boolean = false, userConfirmed: Boolean = false): Boolean {
-        return when (policy) {
+    fun shouldAllowDownload(
+        isWiFi: Boolean = false,
+        userConfirmed: Boolean = false,
+    ): Boolean =
+        when (policy) {
             DownloadPolicy.AUTOMATIC -> true
             DownloadPolicy.WIFI_ONLY -> isWiFi
             DownloadPolicy.MANUAL -> userConfirmed
             DownloadPolicy.NEVER -> false
         }
-    }
 }
 
 /**
@@ -458,7 +428,7 @@ data class HardwareConfiguration(
     @SerialName("enable_metal")
     val enableMetal: Boolean = false, // Android specific: would be Vulkan
     @SerialName("enable_opencl")
-    val enableOpenCL: Boolean = true
+    val enableOpenCL: Boolean = true,
 )
 
 /**
@@ -472,7 +442,7 @@ data class ConfigurationUpdateRequest(
     val storage: StorageConfiguration? = null,
     val api: APIConfiguration? = null,
     val download: ModelDownloadConfiguration? = null,
-    val hardware: HardwareConfiguration? = null
+    val hardware: HardwareConfiguration? = null,
 )
 
 /**
@@ -483,7 +453,7 @@ enum class ConfigurationSyncStatus {
     IDLE,
     SYNCING,
     SUCCESS,
-    FAILED
+    FAILED,
 }
 
 /**
@@ -494,5 +464,5 @@ data class ConfigurationSyncResult(
     val status: ConfigurationSyncStatus,
     val timestamp: Long,
     val error: String? = null,
-    val configurationId: String? = null
+    val configurationId: String? = null,
 )

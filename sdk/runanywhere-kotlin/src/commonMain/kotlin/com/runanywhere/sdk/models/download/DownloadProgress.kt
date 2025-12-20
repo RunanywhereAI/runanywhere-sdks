@@ -16,25 +16,24 @@ data class DownloadProgress(
     val modelId: String,
     val bytesDownloaded: Long,
     val totalBytes: Long,
-    val percentage: Double,            // 0.0 to 100.0
-    val speed: Long,                   // bytes per second
-    val estimatedTimeRemaining: Long?,  // seconds, null if unknown
+    val percentage: Double, // 0.0 to 100.0
+    val speed: Long, // bytes per second
+    val estimatedTimeRemaining: Long?, // seconds, null if unknown
     val state: DownloadState,
     @Contextual val startTime: Instant,
-    val error: String? = null
+    val error: String? = null,
 ) {
     /**
      * Formatted download speed (e.g., "1.5 MB/s")
      * Matches iOS formattedSpeed computed property
      */
-    fun formattedSpeed(): String {
-        return when {
+    fun formattedSpeed(): String =
+        when {
             speed >= 1_000_000_000 -> String.format("%.2f GB/s", speed / 1_000_000_000.0)
             speed >= 1_000_000 -> String.format("%.2f MB/s", speed / 1_000_000.0)
             speed >= 1_000 -> String.format("%.2f KB/s", speed / 1_000.0)
             else -> "$speed B/s"
         }
-    }
 
     /**
      * Formatted time remaining (e.g., "2m 30s")
@@ -57,18 +56,15 @@ data class DownloadProgress(
      * Formatted download size (e.g., "1.5 MB / 2.0 GB")
      * Matches iOS formattedSize computed property
      */
-    fun formattedSize(): String {
-        return "${formatBytes(bytesDownloaded)} / ${formatBytes(totalBytes)}"
-    }
+    fun formattedSize(): String = "${formatBytes(bytesDownloaded)} / ${formatBytes(totalBytes)}"
 
-    private fun formatBytes(bytes: Long): String {
-        return when {
+    private fun formatBytes(bytes: Long): String =
+        when {
             bytes >= 1_000_000_000 -> String.format("%.2f GB", bytes / 1_000_000_000.0)
             bytes >= 1_000_000 -> String.format("%.2f MB", bytes / 1_000_000.0)
             bytes >= 1_000 -> String.format("%.2f KB", bytes / 1_000.0)
             else -> "$bytes B"
         }
-    }
 }
 
 /**
@@ -77,12 +73,12 @@ data class DownloadProgress(
  */
 @Serializable
 enum class DownloadState {
-    PENDING,        // Waiting to start
-    DOWNLOADING,    // Currently downloading
-    PAUSED,         // Paused by user
-    COMPLETED,      // Download finished successfully
-    FAILED,         // Download failed
-    CANCELLED       // Download cancelled by user
+    PENDING, // Waiting to start
+    DOWNLOADING, // Currently downloading
+    PAUSED, // Paused by user
+    COMPLETED, // Download finished successfully
+    FAILED, // Download failed
+    CANCELLED, // Download cancelled by user
 }
 
 /**
@@ -99,5 +95,5 @@ data class DownloadTask(
     val state: DownloadState,
     val progress: DownloadProgress?,
     @Contextual val createdAt: Instant,
-    @Contextual val updatedAt: Instant
+    @Contextual val updatedAt: Instant,
 )

@@ -2,19 +2,33 @@ package com.runanywhere.sdk.network
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.suspendCancellableCoroutine
-import okhttp3.*
+import okhttp3.Cache
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.CertificatePinner
+import okhttp3.ConnectionPool
+import okhttp3.ConnectionSpec
+import okhttp3.Credentials
+import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import okhttp3.TlsVersion
 import okhttp3.logging.HttpLoggingInterceptor
-import okio.*
+import okio.Buffer
+import okio.BufferedSink
+import okio.ForwardingSink
+import okio.Sink
+import okio.buffer
 import java.io.File
 import java.io.IOException
 import java.net.Proxy
-import java.security.SecureRandom
-import java.security.cert.CertificateException
-import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
-import javax.net.ssl.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -22,9 +36,8 @@ import kotlin.coroutines.resumeWithException
  * Enhanced OkHttp implementation for JVM and Android with comprehensive configuration support
  */
 internal class OkHttpEngine(
-    private val config: NetworkConfiguration = NetworkConfiguration.production()
+    private val config: NetworkConfiguration = NetworkConfiguration.production(),
 ) : HttpClient {
-
     private val logger = SDKLogger("OkHttpEngine")
     private var defaultHeaders = config.customHeaders.toMutableMap()
 
@@ -44,18 +57,20 @@ internal class OkHttpEngine(
         builder.callTimeout(config.callTimeoutMs, TimeUnit.MILLISECONDS)
 
         // Connection pool configuration
-        val connectionPool = ConnectionPool(
-            maxIdleConnections = config.maxIdleConnections,
-            keepAliveDuration = config.keepAliveDurationMs,
-            timeUnit = TimeUnit.MILLISECONDS
-        )
+        val connectionPool =
+            ConnectionPool(
+                maxIdleConnections = config.maxIdleConnections,
+                keepAliveDuration = config.keepAliveDurationMs,
+                timeUnit = TimeUnit.MILLISECONDS,
+            )
         builder.connectionPool(connectionPool)
 
         // Protocol configuration
-        val protocols = mutableListOf<Protocol>().apply {
-            if (config.enableHttp2) add(Protocol.HTTP_2)
-            add(Protocol.HTTP_1_1)
-        }
+        val protocols =
+            mutableListOf<Protocol>().apply {
+                if (config.enableHttp2) add(Protocol.HTTP_2)
+                add(Protocol.HTTP_1_1)
+            }
         builder.protocols(protocols)
 
         // Redirect configuration
@@ -83,7 +98,8 @@ internal class OkHttpEngine(
                     if (proxyConfig.username != null && proxyConfig.password != null) {
                         builder.proxyAuthenticator { _, response ->
                             val credential = Credentials.basic(proxyConfig.username, proxyConfig.password)
-                            response.request.newBuilder()
+                            response.request
+                                .newBuilder()
                                 .header("Proxy-Authorization", credential)
                                 .build()
                         }
@@ -104,31 +120,36 @@ internal class OkHttpEngine(
 
         // Logging interceptor
         if (config.enableLogging) {
-            val loggingLevel = when (config.logLevel) {
-                NetworkLogLevel.NONE -> HttpLoggingInterceptor.Level.NONE
-                NetworkLogLevel.BASIC -> HttpLoggingInterceptor.Level.BASIC
-                NetworkLogLevel.HEADERS -> HttpLoggingInterceptor.Level.HEADERS
-                NetworkLogLevel.BODY -> HttpLoggingInterceptor.Level.BODY
-                NetworkLogLevel.INFO -> HttpLoggingInterceptor.Level.HEADERS
-                NetworkLogLevel.DEBUG -> HttpLoggingInterceptor.Level.BODY
-            }
-
-            val loggingInterceptor = HttpLoggingInterceptor { message ->
-                logger.debug(message)
-            }.apply {
-                level = loggingLevel
-                if (config.logBodySizeLimit > 0) {
-                    setLevel(loggingLevel)
+            val loggingLevel =
+                when (config.logLevel) {
+                    NetworkLogLevel.NONE -> HttpLoggingInterceptor.Level.NONE
+                    NetworkLogLevel.BASIC -> HttpLoggingInterceptor.Level.BASIC
+                    NetworkLogLevel.HEADERS -> HttpLoggingInterceptor.Level.HEADERS
+                    NetworkLogLevel.BODY -> HttpLoggingInterceptor.Level.BODY
+                    NetworkLogLevel.INFO -> HttpLoggingInterceptor.Level.HEADERS
+                    NetworkLogLevel.DEBUG -> HttpLoggingInterceptor.Level.BODY
                 }
-            }
+
+            val loggingInterceptor =
+                HttpLoggingInterceptor { message ->
+                    logger.debug(message)
+                }.apply {
+                    level = loggingLevel
+                    if (config.logBodySizeLimit > 0) {
+                        setLevel(loggingLevel)
+                    }
+                }
             builder.addNetworkInterceptor(loggingInterceptor)
         }
 
         // User-Agent interceptor
         builder.addInterceptor { chain ->
-            val request = chain.request().newBuilder()
-                .header("User-Agent", config.userAgent)
-                .build()
+            val request =
+                chain
+                    .request()
+                    .newBuilder()
+                    .header("User-Agent", config.userAgent)
+                    .build()
             chain.proceed(request)
         }
 
@@ -141,15 +162,19 @@ internal class OkHttpEngine(
     private fun configureTls(builder: OkHttpClient.Builder) {
         try {
             // Configure TLS versions
-            val connectionSpec = ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
-                .tlsVersions(*config.enableTlsVersions.map {
-                    when (it) {
-                        "TLSv1.2" -> TlsVersion.TLS_1_2
-                        "TLSv1.3" -> TlsVersion.TLS_1_3
-                        else -> TlsVersion.TLS_1_2
-                    }
-                }.toTypedArray())
-                .build()
+            val connectionSpec =
+                ConnectionSpec
+                    .Builder(ConnectionSpec.MODERN_TLS)
+                    .tlsVersions(
+                        *config.enableTlsVersions
+                            .map {
+                                when (it) {
+                                    "TLSv1.2" -> TlsVersion.TLS_1_2
+                                    "TLSv1.3" -> TlsVersion.TLS_1_3
+                                    else -> TlsVersion.TLS_1_2
+                                }
+                            }.toTypedArray(),
+                    ).build()
 
             builder.connectionSpecs(listOf(connectionSpec, ConnectionSpec.CLEARTEXT))
 
@@ -160,31 +185,37 @@ internal class OkHttpEngine(
 
             // Certificate pinning
             config.certificatePinning?.let { pinningConfig ->
-                val certificatePinner = CertificatePinner.Builder().apply {
-                    pinningConfig.pins.forEach { (hostname, pins) ->
-                        pins.forEach { pin ->
-                            add(hostname, "sha256/$pin")
-                        }
-                    }
-                }.build()
+                val certificatePinner =
+                    CertificatePinner
+                        .Builder()
+                        .apply {
+                            pinningConfig.pins.forEach { (hostname, pins) ->
+                                pins.forEach { pin ->
+                                    add(hostname, "sha256/$pin")
+                                }
+                            }
+                        }.build()
                 builder.certificatePinner(certificatePinner)
             }
-
         } catch (e: Exception) {
             logger.warn("Failed to configure TLS: ${e.message}")
         }
     }
 
-    override suspend fun get(url: String, headers: Map<String, String>): HttpResponse {
-        val request = Request.Builder()
-            .url(url)
-            .apply {
-                (defaultHeaders + headers).forEach { (key, value) ->
-                    addHeader(key, value)
-                }
-            }
-            .get()
-            .build()
+    override suspend fun get(
+        url: String,
+        headers: Map<String, String>,
+    ): HttpResponse {
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .apply {
+                    (defaultHeaders + headers).forEach { (key, value) ->
+                        addHeader(key, value)
+                    }
+                }.get()
+                .build()
 
         return executeRequest(request)
     }
@@ -192,10 +223,8 @@ internal class OkHttpEngine(
     override suspend fun post(
         url: String,
         body: ByteArray,
-        headers: Map<String, String>
-    ): HttpResponse {
-        return postWithProgress(url, body, headers, null)
-    }
+        headers: Map<String, String>,
+    ): HttpResponse = postWithProgress(url, body, headers, null)
 
     /**
      * POST request with progress tracking
@@ -204,25 +233,27 @@ internal class OkHttpEngine(
         url: String,
         body: ByteArray,
         headers: Map<String, String>,
-        onProgress: ((bytesUploaded: Long, totalBytes: Long) -> Unit)?
+        onProgress: ((bytesUploaded: Long, totalBytes: Long) -> Unit)?,
     ): HttpResponse {
         val contentType = headers["Content-Type"]?.toMediaType() ?: "application/octet-stream".toMediaType()
 
-        val requestBody = if (onProgress != null) {
-            ProgressRequestBody(body.toRequestBody(contentType), onProgress)
-        } else {
-            body.toRequestBody(contentType)
-        }
-
-        val request = Request.Builder()
-            .url(url)
-            .apply {
-                (defaultHeaders + headers).forEach { (key, value) ->
-                    addHeader(key, value)
-                }
+        val requestBody =
+            if (onProgress != null) {
+                ProgressRequestBody(body.toRequestBody(contentType), onProgress)
+            } else {
+                body.toRequestBody(contentType)
             }
-            .post(requestBody)
-            .build()
+
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .apply {
+                    (defaultHeaders + headers).forEach { (key, value) ->
+                        addHeader(key, value)
+                    }
+                }.post(requestBody)
+                .build()
 
         return executeRequest(request)
     }
@@ -230,33 +261,38 @@ internal class OkHttpEngine(
     override suspend fun put(
         url: String,
         body: ByteArray,
-        headers: Map<String, String>
+        headers: Map<String, String>,
     ): HttpResponse {
         val contentType = headers["Content-Type"]?.toMediaType() ?: "application/octet-stream".toMediaType()
         val requestBody = body.toRequestBody(contentType)
-        val request = Request.Builder()
-            .url(url)
-            .apply {
-                (defaultHeaders + headers).forEach { (key, value) ->
-                    addHeader(key, value)
-                }
-            }
-            .put(requestBody)
-            .build()
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .apply {
+                    (defaultHeaders + headers).forEach { (key, value) ->
+                        addHeader(key, value)
+                    }
+                }.put(requestBody)
+                .build()
 
         return executeRequest(request)
     }
 
-    override suspend fun delete(url: String, headers: Map<String, String>): HttpResponse {
-        val request = Request.Builder()
-            .url(url)
-            .apply {
-                (defaultHeaders + headers).forEach { (key, value) ->
-                    addHeader(key, value)
-                }
-            }
-            .delete()
-            .build()
+    override suspend fun delete(
+        url: String,
+        headers: Map<String, String>,
+    ): HttpResponse {
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .apply {
+                    (defaultHeaders + headers).forEach { (key, value) ->
+                        addHeader(key, value)
+                    }
+                }.delete()
+                .build()
 
         return executeRequest(request)
     }
@@ -264,17 +300,18 @@ internal class OkHttpEngine(
     override suspend fun download(
         url: String,
         headers: Map<String, String>,
-        onProgress: ((bytesDownloaded: Long, totalBytes: Long) -> Unit)?
+        onProgress: ((bytesDownloaded: Long, totalBytes: Long) -> Unit)?,
     ): ByteArray {
-        val request = Request.Builder()
-            .url(url)
-            .apply {
-                (defaultHeaders + headers).forEach { (key, value) ->
-                    addHeader(key, value)
-                }
-            }
-            .get()
-            .build()
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .apply {
+                    (defaultHeaders + headers).forEach { (key, value) ->
+                        addHeader(key, value)
+                    }
+                }.get()
+                .build()
 
         return suspendCancellableCoroutine { continuation ->
             val call = client.newCall(request)
@@ -283,51 +320,59 @@ internal class OkHttpEngine(
                 call.cancel()
             }
 
-            call.enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    continuation.resumeWithException(e)
-                }
+            call.enqueue(
+                object : Callback {
+                    override fun onFailure(
+                        call: Call,
+                        e: IOException,
+                    ) {
+                        continuation.resumeWithException(e)
+                    }
 
-                override fun onResponse(call: Call, response: Response) {
-                    try {
-                        if (!response.isSuccessful) {
-                            continuation.resumeWithException(
-                                IOException("Download failed with status: ${response.code}")
-                            )
-                            return
-                        }
-
-                        val body = response.body ?: throw IOException("Response body is null")
-                        val contentLength = body.contentLength()
-
-                        if (onProgress != null && contentLength > 0) {
-                            // Download with progress tracking
-                            val buffer = ByteArray(8192)
-                            val outputBuffer = mutableListOf<Byte>()
-                            var totalBytesRead = 0L
-
-                            body.byteStream().use { inputStream ->
-                                var bytesRead: Int
-                                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                                    outputBuffer.addAll(buffer.take(bytesRead))
-                                    totalBytesRead += bytesRead
-                                    onProgress(totalBytesRead, contentLength)
-                                }
+                    override fun onResponse(
+                        call: Call,
+                        response: Response,
+                    ) {
+                        try {
+                            if (!response.isSuccessful) {
+                                continuation.resumeWithException(
+                                    IOException("Download failed with status: ${response.code}"),
+                                )
+                                return
                             }
 
-                            continuation.resume(outputBuffer.toByteArray())
-                        } else {
-                            // Simple download without progress
-                            val bytes = body.bytes()
-                            continuation.resume(bytes)
+                            val body = response.body ?: throw IOException("Response body is null")
+                            val contentLength = body.contentLength()
+
+                            if (onProgress != null && contentLength > 0) {
+                                // Download with progress tracking
+                                val buffer = ByteArray(8192)
+                                val outputBuffer = mutableListOf<Byte>()
+                                var totalBytesRead = 0L
+
+                                body.byteStream().use { inputStream ->
+                                    var bytesRead: Int
+                                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                        outputBuffer.addAll(buffer.take(bytesRead))
+                                        totalBytesRead += bytesRead
+                                        onProgress(totalBytesRead, contentLength)
+                                    }
+                                }
+
+                                continuation.resume(outputBuffer.toByteArray())
+                            } else {
+                                // Simple download without progress
+                                val bytes = body.bytes()
+                                continuation.resume(bytes)
+                            }
+                        } catch (e: Exception) {
+                            continuation.resumeWithException(e)
+                        } finally {
+                            response.close()
                         }
-                    } catch (e: Exception) {
-                        continuation.resumeWithException(e)
-                    } finally {
-                        response.close()
                     }
-                }
-            })
+                },
+            )
         }
     }
 
@@ -335,10 +380,8 @@ internal class OkHttpEngine(
         url: String,
         data: ByteArray,
         headers: Map<String, String>,
-        onProgress: ((bytesUploaded: Long, totalBytes: Long) -> Unit)?
-    ): HttpResponse {
-        return postWithProgress(url, data, headers, onProgress)
-    }
+        onProgress: ((bytesUploaded: Long, totalBytes: Long) -> Unit)?,
+    ): HttpResponse = postWithProgress(url, data, headers, onProgress)
 
     /**
      * Multipart form upload
@@ -347,7 +390,7 @@ internal class OkHttpEngine(
         url: String,
         parts: List<MultipartPart>,
         headers: Map<String, String> = emptyMap(),
-        onProgress: ((bytesUploaded: Long, totalBytes: Long) -> Unit)? = null
+        onProgress: ((bytesUploaded: Long, totalBytes: Long) -> Unit)? = null,
     ): HttpResponse {
         val multipartBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)
 
@@ -361,28 +404,30 @@ internal class OkHttpEngine(
                     multipartBuilder.addFormDataPart(
                         part.name,
                         part.filename,
-                        part.data.toRequestBody(mediaType)
+                        part.data.toRequestBody(mediaType),
                     )
                 }
             }
         }
 
         val multipartBody = multipartBuilder.build()
-        val requestBody = if (onProgress != null) {
-            ProgressRequestBody(multipartBody, onProgress)
-        } else {
-            multipartBody
-        }
-
-        val request = Request.Builder()
-            .url(url)
-            .apply {
-                (defaultHeaders + headers).forEach { (key, value) ->
-                    addHeader(key, value)
-                }
+        val requestBody =
+            if (onProgress != null) {
+                ProgressRequestBody(multipartBody, onProgress)
+            } else {
+                multipartBody
             }
-            .post(requestBody)
-            .build()
+
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .apply {
+                    (defaultHeaders + headers).forEach { (key, value) ->
+                        addHeader(key, value)
+                    }
+                }.post(requestBody)
+                .build()
 
         return executeRequest(request)
     }
@@ -409,30 +454,38 @@ internal class OkHttpEngine(
                 call.cancel()
             }
 
-            call.enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    continuation.resumeWithException(e)
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    try {
-                        val body = response.body?.bytes() ?: ByteArray(0)
-                        val headers = response.headers.toMultimap()
-
-                        continuation.resume(
-                            HttpResponse(
-                                statusCode = response.code,
-                                body = body,
-                                headers = headers
-                            )
-                        )
-                    } catch (e: Exception) {
+            call.enqueue(
+                object : Callback {
+                    override fun onFailure(
+                        call: Call,
+                        e: IOException,
+                    ) {
                         continuation.resumeWithException(e)
-                    } finally {
-                        response.close()
                     }
-                }
-            })
+
+                    override fun onResponse(
+                        call: Call,
+                        response: Response,
+                    ) {
+                        try {
+                            val body = response.body?.bytes() ?: ByteArray(0)
+                            val headers = response.headers.toMultimap()
+
+                            continuation.resume(
+                                HttpResponse(
+                                    statusCode = response.code,
+                                    body = body,
+                                    headers = headers,
+                                ),
+                            )
+                        } catch (e: Exception) {
+                            continuation.resumeWithException(e)
+                        } finally {
+                            response.close()
+                        }
+                    }
+                },
+            )
         }
 }
 
@@ -441,9 +494,8 @@ internal class OkHttpEngine(
  */
 private class ProgressRequestBody(
     private val delegate: RequestBody,
-    private val progressCallback: (bytesUploaded: Long, totalBytes: Long) -> Unit
+    private val progressCallback: (bytesUploaded: Long, totalBytes: Long) -> Unit,
 ) : RequestBody() {
-
     override fun contentType(): MediaType? = delegate.contentType()
 
     override fun contentLength(): Long = delegate.contentLength()
@@ -462,12 +514,14 @@ private class ProgressRequestBody(
 private class ProgressSink(
     delegate: Sink,
     private val totalBytes: Long,
-    private val progressCallback: (bytesUploaded: Long, totalBytes: Long) -> Unit
+    private val progressCallback: (bytesUploaded: Long, totalBytes: Long) -> Unit,
 ) : ForwardingSink(delegate) {
-
     private var bytesWritten = 0L
 
-    override fun write(source: Buffer, byteCount: Long) {
+    override fun write(
+        source: Buffer,
+        byteCount: Long,
+    ) {
         super.write(source, byteCount)
         bytesWritten += byteCount
         progressCallback(bytesWritten, totalBytes)

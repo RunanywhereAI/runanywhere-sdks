@@ -1,0 +1,24 @@
+# EditorConfig for ktlint
+root = true
+
+[*.{kt,kts}]
+# Disable wildcard import rule - too many existing violations
+ktlint_standard_no-wildcard-imports = disabled
+# Disable backing property naming - conflicts with conventional patterns
+ktlint_standard_backing-property-naming = disabled
+# Disable consecutive comments check - KDoc patterns conflict
+ktlint_standard_no-consecutive-comments = disabled
+# Disable property naming for Android-style INSTANCE singletons
+ktlint_standard_property-naming = disabled
+# Disable filename rule - actual implementations may have different names
+ktlint_standard_filename = disabled
+# Disable enum entry name case - existing code uses camelCase
+ktlint_standard_enum-entry-name-case = disabled
+# Disable class naming - sealed class entries use camelCase
+ktlint_standard_class-naming = disabled
+# Disable function signature - stylistic preference
+ktlint_standard_function-signature = disabled
+# Set max line length higher
+max_line_length = 250
+# Disable function expression body - stylistic preference
+ktlint_standard_function-expression-body = disabled

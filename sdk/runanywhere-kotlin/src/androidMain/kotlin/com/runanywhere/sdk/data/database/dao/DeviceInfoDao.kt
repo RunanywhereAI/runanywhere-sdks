@@ -1,6 +1,11 @@
 package com.runanywhere.sdk.data.database.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import com.runanywhere.sdk.data.database.entities.DeviceInfoEntity
 
 /**
@@ -9,7 +14,6 @@ import com.runanywhere.sdk.data.database.entities.DeviceInfoEntity
  */
 @Dao
 interface DeviceInfoDao {
-
     @Query("SELECT * FROM device_info WHERE device_id = :deviceId")
     suspend fun getDeviceInfoById(deviceId: String): DeviceInfoEntity?
 
@@ -25,7 +29,8 @@ interface DeviceInfoDao {
     @Update
     suspend fun updateDeviceInfo(deviceInfo: DeviceInfoEntity)
 
-    @Query("""
+    @Query(
+        """
         UPDATE device_info
         SET available_memory_mb = :availableMemoryMB,
             available_storage_mb = :availableStorageMB,
@@ -33,14 +38,15 @@ interface DeviceInfoDao {
             memory_pressure = :memoryPressure,
             updated_at = :updatedAt
         WHERE device_id = :deviceId
-    """)
+    """,
+    )
     suspend fun updateDynamicInfo(
         deviceId: String,
         availableMemoryMB: Long,
         availableStorageMB: Long,
         batteryLevel: Float?,
         memoryPressure: Float,
-        updatedAt: Long
+        updatedAt: Long,
     )
 
     @Delete

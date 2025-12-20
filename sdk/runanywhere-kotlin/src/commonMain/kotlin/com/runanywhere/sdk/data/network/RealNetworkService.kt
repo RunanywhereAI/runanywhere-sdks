@@ -1,17 +1,17 @@
 package com.runanywhere.sdk.data.network
 
+import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.network.HttpClient
 import com.runanywhere.sdk.network.HttpResponse
-import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.services.AuthenticationService
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
+import kotlinx.coroutines.delay
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.math.pow
 import kotlin.random.Random
-import kotlinx.coroutines.delay
 
 /**
  * Real NetworkService implementation that makes actual HTTP calls
@@ -23,18 +23,18 @@ class RealNetworkService(
     private val baseURL: String,
     private val authenticationService: AuthenticationService? = null,
     private val maxRetryAttempts: Int = 3,
-    private val baseDelayMs: Long = 1000
+    private val baseDelayMs: Long = 1000,
 ) : NetworkService {
-
     private val logger = SDKLogger("RealNetworkService")
 
-    private val jsonSerializer = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = false
-        prettyPrint = false
-        coerceInputValues = true
-    }
+    private val jsonSerializer =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            encodeDefaults = false
+            prettyPrint = false
+            coerceInputValues = true
+        }
 
     /**
      * POST request with JSON payload and typed response
@@ -43,10 +43,8 @@ class RealNetworkService(
     override suspend fun <T : Any, R : Any> post(
         endpoint: APIEndpoint,
         payload: T,
-        requiresAuth: Boolean
-    ): R {
-        throw UnsupportedOperationException("Use postTyped extension function with reified types instead")
-    }
+        requiresAuth: Boolean,
+    ): R = throw UnsupportedOperationException("Use postTyped extension function with reified types instead")
 
     /**
      * GET request with typed response
@@ -54,10 +52,8 @@ class RealNetworkService(
      */
     override suspend fun <R : Any> get(
         endpoint: APIEndpoint,
-        requiresAuth: Boolean
-    ): R {
-        throw UnsupportedOperationException("Use getTyped extension function with reified types instead")
-    }
+        requiresAuth: Boolean,
+    ): R = throw UnsupportedOperationException("Use getTyped extension function with reified types instead")
 
     /**
      * POST request with raw data payload
@@ -65,7 +61,7 @@ class RealNetworkService(
     override suspend fun postRaw(
         endpoint: APIEndpoint,
         payload: ByteArray,
-        requiresAuth: Boolean
+        requiresAuth: Boolean,
     ): ByteArray {
         logger.debug("POST raw request to: ${endpoint.url}")
         return executeWithRetry("POST", endpoint, payload, requiresAuth)
@@ -76,7 +72,7 @@ class RealNetworkService(
      */
     override suspend fun getRaw(
         endpoint: APIEndpoint,
-        requiresAuth: Boolean
+        requiresAuth: Boolean,
     ): ByteArray {
         logger.debug("GET raw request from: ${endpoint.url}")
         return executeWithRetry("GET", endpoint, null, requiresAuth)
@@ -90,7 +86,7 @@ class RealNetworkService(
         method: String,
         endpoint: APIEndpoint,
         payload: ByteArray?,
-        requiresAuth: Boolean
+        requiresAuth: Boolean,
     ): ByteArray {
         var attempt = 0
         var lastException: Exception? = null
@@ -102,11 +98,12 @@ class RealNetworkService(
 
                 logger.debug("$method request to: $url (attempt ${attempt + 1}/$maxRetryAttempts)")
 
-                val response = when (method) {
-                    "GET" -> httpClient.get(url, headers)
-                    "POST" -> httpClient.post(url, payload ?: ByteArray(0), headers)
-                    else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
-                }
+                val response =
+                    when (method) {
+                        "GET" -> httpClient.get(url, headers)
+                        "POST" -> httpClient.post(url, payload ?: ByteArray(0), headers)
+                        else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
+                    }
 
                 if (response.isSuccessful) {
                     logger.debug("$method request successful: $url")
@@ -160,13 +157,12 @@ class RealNetworkService(
     /**
      * Build full URL from endpoint
      */
-    private fun buildFullUrl(endpoint: APIEndpoint): String {
-        return if (endpoint.url.startsWith("http")) {
+    private fun buildFullUrl(endpoint: APIEndpoint): String =
+        if (endpoint.url.startsWith("http")) {
             endpoint.url
         } else {
             "$baseURL${if (!endpoint.url.startsWith("/")) "/" else ""}${endpoint.url}"
         }
-    }
 
     /**
      * Build headers for the request with authentication
@@ -175,16 +171,17 @@ class RealNetworkService(
     private suspend fun buildHeaders(
         endpoint: APIEndpoint,
         requiresAuth: Boolean,
-        payload: ByteArray?
+        payload: ByteArray?,
     ): Map<String, String> {
-        val headers = mutableMapOf<String, String>(
-            "Content-Type" to "application/json",
-            "Accept" to "application/json",
-            "User-Agent" to "RunAnywhere-Kotlin-SDK/0.1.0",
-            "X-SDK-Client" to "RunAnywhereKotlinSDK",
-            "X-SDK-Version" to "0.1.0",
-            "X-Platform" to "Kotlin"
-        )
+        val headers =
+            mutableMapOf<String, String>(
+                "Content-Type" to "application/json",
+                "Accept" to "application/json",
+                "User-Agent" to "RunAnywhere-Kotlin-SDK/0.1.0",
+                "X-SDK-Client" to "RunAnywhereKotlinSDK",
+                "X-SDK-Version" to "0.1.0",
+                "X-Platform" to "Kotlin",
+            )
 
         // Set content type based on payload
         if (payload != null) {
@@ -203,13 +200,16 @@ class RealNetworkService(
      * Add authentication header based on endpoint type
      * Matches iOS authentication patterns
      */
-    private suspend fun addAuthHeader(headers: MutableMap<String, String>, endpoint: APIEndpoint) {
+    private suspend fun addAuthHeader(
+        headers: MutableMap<String, String>,
+        endpoint: APIEndpoint,
+    ) {
         try {
             when {
                 // Authentication endpoints - DO NOT add Authorization header
                 endpoint.url.contains("/auth/sdk/authenticate") ||
-                endpoint.url.contains("/auth/sdk/refresh") ||
-                endpoint.url.contains("/auth/token") -> {
+                    endpoint.url.contains("/auth/sdk/refresh") ||
+                    endpoint.url.contains("/auth/token") -> {
                     logger.debug("Skipping Authorization header for authentication endpoint: ${endpoint.url}")
                 }
                 // All other endpoints - use access token
@@ -244,12 +244,17 @@ class RealNetworkService(
      * Handle HTTP errors and create appropriate SDKError
      * Matches iOS error handling patterns
      */
-    private fun handleHttpError(response: HttpResponse, endpoint: APIEndpoint, method: String): SDKError {
-        val responseBody = try {
-            response.body.decodeToString()
-        } catch (e: Exception) {
-            null
-        }
+    private fun handleHttpError(
+        response: HttpResponse,
+        endpoint: APIEndpoint,
+        method: String,
+    ): SDKError {
+        val responseBody =
+            try {
+                response.body.decodeToString()
+            } catch (e: Exception) {
+                null
+            }
 
         // Log detailed error info for debugging
         logger.error("HTTP ${response.statusCode} for $method ${endpoint.url}${if (responseBody != null) ": $responseBody" else ""}")
@@ -259,7 +264,10 @@ class RealNetworkService(
             403 -> SDKError.InvalidAPIKey("Access forbidden for $method ${endpoint.url}")
             404 -> SDKError.NetworkError("Endpoint not found: $method ${endpoint.url}")
             408 -> SDKError.NetworkError("Request timeout for $method ${endpoint.url}")
-            422 -> SDKError.NetworkError("Validation error for $method ${endpoint.url}${if (responseBody != null) ": $responseBody" else ""}")
+            422 ->
+                SDKError.NetworkError(
+                    "Validation error for $method ${endpoint.url}${if (responseBody != null) ": $responseBody" else ""}",
+                )
             429 -> SDKError.NetworkError("Rate limit exceeded for $method ${endpoint.url}")
             in 500..599 -> SDKError.NetworkError("Server error ${response.statusCode} for $method ${endpoint.url}")
             else -> SDKError.NetworkError("HTTP ${response.statusCode} for $method ${endpoint.url}")
@@ -269,32 +277,38 @@ class RealNetworkService(
     /**
      * Determine if we should retry based on HTTP status code
      */
-    private fun shouldRetry(statusCode: Int, attempt: Int): Boolean {
+    private fun shouldRetry(
+        statusCode: Int,
+        attempt: Int,
+    ): Boolean {
         if (attempt >= maxRetryAttempts - 1) return false
 
         return when (statusCode) {
-            408, 429 -> true  // Timeout, Rate limit
-            in 500..599 -> true  // Server errors
-            else -> false  // Client errors should not be retried
+            408, 429 -> true // Timeout, Rate limit
+            in 500..599 -> true // Server errors
+            else -> false // Client errors should not be retried
         }
     }
 
     /**
      * Determine if we should retry based on exception type
      */
-    private fun shouldRetryException(exception: Exception, attempt: Int): Boolean {
+    private fun shouldRetryException(
+        exception: Exception,
+        attempt: Int,
+    ): Boolean {
         if (attempt >= maxRetryAttempts - 1) return false
 
         return when (exception) {
-            is SDKError.InvalidAPIKey -> false  // Don't retry auth errors
+            is SDKError.InvalidAPIKey -> false // Don't retry auth errors
             is SDKError.NetworkError -> {
                 val message = exception.message?.lowercase() ?: ""
                 message.contains("timeout") ||
-                message.contains("connection") ||
-                message.contains("network") ||
-                message.contains("host")
+                    message.contains("connection") ||
+                    message.contains("network") ||
+                    message.contains("host")
             }
-            else -> true  // Retry on other exceptions
+            else -> true // Retry on other exceptions
         }
     }
 
@@ -316,23 +330,25 @@ class RealNetworkService(
 suspend inline fun <reified T : Any, reified R : Any> RealNetworkService.postTyped(
     endpoint: APIEndpoint,
     payload: T,
-    requiresAuth: Boolean = true
+    requiresAuth: Boolean = true,
 ): R {
-    val jsonSerializer = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = false
-    }
+    val jsonSerializer =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            encodeDefaults = false
+        }
 
     // Serialize payload to JSON
     val jsonPayload = jsonSerializer.encodeToString(payload)
 
     // Make raw request
-    val responseBytes = this.postRaw(
-        endpoint = endpoint,
-        payload = jsonPayload.encodeToByteArray(),
-        requiresAuth = requiresAuth
-    )
+    val responseBytes =
+        this.postRaw(
+            endpoint = endpoint,
+            payload = jsonPayload.encodeToByteArray(),
+            requiresAuth = requiresAuth,
+        )
 
     // Deserialize response
     val responseString = responseBytes.decodeToString()
@@ -341,18 +357,20 @@ suspend inline fun <reified T : Any, reified R : Any> RealNetworkService.postTyp
 
 suspend inline fun <reified R : Any> RealNetworkService.getTyped(
     endpoint: APIEndpoint,
-    requiresAuth: Boolean = true
+    requiresAuth: Boolean = true,
 ): R {
-    val jsonSerializer = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
+    val jsonSerializer =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
 
     // Make raw request
-    val responseBytes = this.getRaw(
-        endpoint = endpoint,
-        requiresAuth = requiresAuth
-    )
+    val responseBytes =
+        this.getRaw(
+            endpoint = endpoint,
+            requiresAuth = requiresAuth,
+        )
 
     // Deserialize response
     val responseString = responseBytes.decodeToString()

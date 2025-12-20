@@ -2,12 +2,12 @@ package com.runanywhere.sdk.foundation.storage
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.foundation.filemanager.SimplifiedFileManager
 import com.runanywhere.sdk.foundation.filemanager.StoredModelData
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.ModelRegistry
 import com.runanywhere.sdk.models.storage.*
-import com.runanywhere.sdk.foundation.currentTimeMillis
 import kotlinx.datetime.Instant
 
 /**
@@ -33,7 +33,10 @@ interface StorageAnalyzer {
      * Check storage availability for a model
      * Matches iOS: func checkStorageAvailable(for modelSize: Int64, safetyMargin: Double) -> StorageAvailability
      */
-    fun checkStorageAvailable(modelSize: Long, safetyMargin: Double = 0.1): StorageAvailabilityResult
+    fun checkStorageAvailable(
+        modelSize: Long,
+        safetyMargin: Double = 0.1,
+    ): StorageAvailabilityResult
 
     /**
      * Get storage recommendations
@@ -63,19 +66,19 @@ interface StorageAnalyzer {
 @Suppress("DEPRECATION")
 class DefaultStorageAnalyzer(
     private val fileManager: SimplifiedFileManager = SimplifiedFileManager.shared,
-    private val logger: SDKLogger = SDKLogger.shared
+    private val logger: SDKLogger = SDKLogger.shared,
 ) : StorageAnalyzer {
-
     /**
      * Get model registry from ServiceContainer
      * Matches iOS's use of modelRegistry for enriching stored model data
      */
     private val modelRegistry: ModelRegistry?
-        get() = try {
-            ServiceContainer.shared.modelRegistry
-        } catch (e: Exception) {
-            null
-        }
+        get() =
+            try {
+                ServiceContainer.shared.modelRegistry
+            } catch (e: Exception) {
+                null
+            }
 
     /**
      * Analyze overall storage situation
@@ -104,26 +107,28 @@ class DefaultStorageAnalyzer(
 
         // Get app storage info - matches iOS pattern
         val totalAppSize = fileManager.getTotalStorageSize()
-        val appStorage = AppStorageInfo(
-            documentsSize = totalAppSize,
-            cacheSize = 0, // Could be enhanced to track cache separately
-            appSupportSize = 0,
-            totalSize = totalAppSize
-        )
+        val appStorage =
+            AppStorageInfo(
+                documentsSize = totalAppSize,
+                cacheSize = 0, // Could be enhanced to track cache separately
+                appSupportSize = 0,
+                totalSize = totalAppSize,
+            )
 
         // Get stored models list - matches iOS getStoredModelsList()
         val storedModels = getStoredModelsList()
 
-        val storageInfo = StorageInfo(
-            appStorage = appStorage,
-            deviceStorage = deviceStorage,
-            modelStorage = modelStorage,
-            cacheSize = 0,
-            storedModels = storedModels,
-            availability = StorageAvailability.HEALTHY, // Determined below
-            recommendations = emptyList(),
-            lastUpdated = Instant.fromEpochMilliseconds(currentTimeMillis())
-        )
+        val storageInfo =
+            StorageInfo(
+                appStorage = appStorage,
+                deviceStorage = deviceStorage,
+                modelStorage = modelStorage,
+                cacheSize = 0,
+                storedModels = storedModels,
+                availability = StorageAvailability.HEALTHY, // Determined below
+                recommendations = emptyList(),
+                lastUpdated = Instant.fromEpochMilliseconds(currentTimeMillis()),
+            )
 
         // Determine availability status
         val availability = determineStorageAvailability(deviceStorage)
@@ -133,7 +138,7 @@ class DefaultStorageAnalyzer(
 
         return storageInfo.copy(
             availability = availability,
-            recommendations = recommendations
+            recommendations = recommendations,
         )
     }
 
@@ -169,7 +174,7 @@ class DefaultStorageAnalyzer(
             totalSize = modelStorageSize,
             modelCount = storedModels.size,
             largestModel = largestModel,
-            models = storedModels
+            models = storedModels,
         )
     }
 
@@ -188,31 +193,35 @@ class DefaultStorageAnalyzer(
      * }
      * ```
      */
-    override fun checkStorageAvailable(modelSize: Long, safetyMargin: Double): StorageAvailabilityResult {
+    override fun checkStorageAvailable(
+        modelSize: Long,
+        safetyMargin: Double,
+    ): StorageAvailabilityResult {
         val availableSpace = fileManager.getAvailableSpace()
         val requiredSpace = (modelSize * (1 + safetyMargin)).toLong()
 
         val isAvailable = availableSpace > requiredSpace
         val hasWarning = availableSpace < requiredSpace * 2 // Warn if less than 2x space available
 
-        val recommendation: String? = when {
-            !isAvailable -> {
-                val shortfall = requiredSpace - availableSpace
-                val shortfallMB = shortfall / (1024 * 1024)
-                "Need ${shortfallMB}MB more space. Clear cache or remove unused models."
+        val recommendation: String? =
+            when {
+                !isAvailable -> {
+                    val shortfall = requiredSpace - availableSpace
+                    val shortfallMB = shortfall / (1024 * 1024)
+                    "Need ${shortfallMB}MB more space. Clear cache or remove unused models."
+                }
+                hasWarning -> {
+                    "Storage space is getting low. Consider clearing cache after download."
+                }
+                else -> null
             }
-            hasWarning -> {
-                "Storage space is getting low. Consider clearing cache after download."
-            }
-            else -> null
-        }
 
         return StorageAvailabilityResult(
             isAvailable = isAvailable,
             requiredSpace = requiredSpace,
             availableSpace = availableSpace,
             hasWarning = hasWarning,
-            recommendation = recommendation
+            recommendation = recommendation,
         )
     }
 
@@ -251,8 +260,8 @@ class DefaultStorageAnalyzer(
                     StorageRecommendation(
                         type = RecommendationType.WARNING,
                         message = "Low storage space. Clear cache to free up space.",
-                        action = "Clear Cache"
-                    )
+                        action = "Clear Cache",
+                    ),
                 )
             }
 
@@ -262,8 +271,8 @@ class DefaultStorageAnalyzer(
                     StorageRecommendation(
                         type = RecommendationType.CRITICAL,
                         message = "Critical storage shortage. Consider removing unused models.",
-                        action = "Delete Models"
-                    )
+                        action = "Delete Models",
+                    ),
                 )
             }
         }
@@ -274,8 +283,8 @@ class DefaultStorageAnalyzer(
                 StorageRecommendation(
                     type = RecommendationType.SUGGESTION,
                     message = "Multiple models stored. Consider removing models you don't use.",
-                    action = "Review Models"
-                )
+                    action = "Review Models",
+                ),
             )
         }
 
@@ -303,8 +312,8 @@ class DefaultStorageAnalyzer(
      * }
      * ```
      */
-    override suspend fun calculateSize(path: String): Long {
-        return try {
+    override suspend fun calculateSize(path: String): Long =
+        try {
             if (!fileManager.fileExists(path)) {
                 throw IllegalArgumentException("File not found at path: $path")
             }
@@ -320,7 +329,6 @@ class DefaultStorageAnalyzer(
             logger.error("Error calculating size for $path", e)
             0L
         }
-    }
 
     // MARK: - Private Helpers
 
@@ -334,7 +342,7 @@ class DefaultStorageAnalyzer(
         return DeviceStorageInfo(
             totalSpace = storageInfo.totalSpace,
             freeSpace = storageInfo.freeSpace,
-            usedSpace = storageInfo.usedSpace
+            usedSpace = storageInfo.usedSpace,
         )
     }
 
@@ -385,12 +393,13 @@ class DefaultStorageAnalyzer(
         val storedModelsData: List<StoredModelData> = fileManager.getAllStoredModels()
 
         // Get all registered models from registry - matches iOS
-        val registeredModels: List<ModelInfo> = try {
-            modelRegistry?.discoverModels() ?: emptyList()
-        } catch (e: Exception) {
-            logger.debug("Could not discover models from registry: ${e.message}")
-            emptyList()
-        }
+        val registeredModels: List<ModelInfo> =
+            try {
+                modelRegistry?.discoverModels() ?: emptyList()
+            } catch (e: Exception) {
+                logger.debug("Could not discover models from registry: ${e.message}")
+                emptyList()
+            }
 
         // Create a map of registered models for quick lookup - matches iOS
         val registeredModelsMap = registeredModels.associateBy { it.id }
@@ -411,18 +420,19 @@ class DefaultStorageAnalyzer(
                     continue
                 }
 
-                val storedModel = StoredModel(
-                    id = modelData.modelId,
-                    name = registeredModel?.name ?: modelData.modelId,
-                    path = modelPath,
-                    size = modelData.size,
-                    format = modelData.format.value,
-                    framework = modelData.framework?.displayName ?: registeredModel?.preferredFramework?.displayName,
-                    createdDate = Instant.fromEpochMilliseconds(currentTimeMillis()), // TODO: Get actual creation date
-                    lastUsed = null, // TODO: Get actual last access date
-                    contextLength = registeredModel?.contextLength,
-                    checksum = null
-                )
+                val storedModel =
+                    StoredModel(
+                        id = modelData.modelId,
+                        name = registeredModel?.name ?: modelData.modelId,
+                        path = modelPath,
+                        size = modelData.size,
+                        format = modelData.format.value,
+                        framework = modelData.framework?.displayName ?: registeredModel?.preferredFramework?.displayName,
+                        createdDate = Instant.fromEpochMilliseconds(currentTimeMillis()), // TODO: Get actual creation date
+                        lastUsed = null, // TODO: Get actual last access date
+                        contextLength = registeredModel?.contextLength,
+                        checksum = null,
+                    )
 
                 storedModels.add(storedModel)
                 logger.debug("Added stored model: ${storedModel.name} (${storedModel.size} bytes)")
@@ -439,11 +449,12 @@ class DefaultStorageAnalyzer(
      * Determine storage availability status from device storage info
      */
     private fun determineStorageAvailability(deviceStorage: DeviceStorageInfo): StorageAvailability {
-        val availablePercentage = if (deviceStorage.totalSpace > 0) {
-            (deviceStorage.freeSpace.toDouble() / deviceStorage.totalSpace.toDouble()) * 100.0
-        } else {
-            0.0
-        }
+        val availablePercentage =
+            if (deviceStorage.totalSpace > 0) {
+                (deviceStorage.freeSpace.toDouble() / deviceStorage.totalSpace.toDouble()) * 100.0
+            } else {
+                0.0
+            }
 
         return when {
             availablePercentage > 20.0 -> StorageAvailability.HEALTHY
@@ -463,5 +474,5 @@ data class StorageAvailabilityResult(
     val requiredSpace: Long,
     val availableSpace: Long,
     val hasWarning: Boolean,
-    val recommendation: String?
+    val recommendation: String?,
 )

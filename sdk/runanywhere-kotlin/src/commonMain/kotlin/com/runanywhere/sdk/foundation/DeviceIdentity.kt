@@ -12,7 +12,6 @@ import kotlin.uuid.Uuid
  * Matches iOS DeviceIdentity exactly
  */
 object DeviceIdentity {
-
     private val logger = SDKLogger("DeviceIdentity")
     private val secureStorage: SecureStorage by lazy { SecureStorageFactory.create() }
 
@@ -127,9 +126,7 @@ object DeviceIdentity {
      * Validate if a device UUID is properly formatted
      * Matches iOS DeviceIdentity.validateUUID(_:)
      */
-    fun validateUUID(uuid: String): Boolean {
-        return uuid.length == 36 && uuid.contains("-")
-    }
+    fun validateUUID(uuid: String): Boolean = uuid.length == 36 && uuid.contains("-")
 
     /**
      * Clear device identity (for testing or privacy purposes)
@@ -146,23 +143,20 @@ object DeviceIdentity {
     /**
      * Check if device identity exists
      */
-    suspend fun hasDeviceIdentity(): Boolean {
-        return secureStorage.containsKey(DEVICE_UUID_KEY)
-    }
+    suspend fun hasDeviceIdentity(): Boolean = secureStorage.containsKey(DEVICE_UUID_KEY)
 
     // MARK: - Private Methods
 
     /**
      * Get vendor-based UUID (platform-specific implementation)
      */
-    private suspend fun getVendorBasedUUID(): String? {
-        return try {
+    private suspend fun getVendorBasedUUID(): String? =
+        try {
             getPlatformVendorUUID()
         } catch (e: Exception) {
             logger.debug("Failed to get vendor UUID: ${e.message}")
             null
         }
-    }
 
     /**
      * Generate and store a completely new UUID
@@ -184,15 +178,14 @@ object DeviceIdentity {
     /**
      * Create SHA256 hash of a string
      */
-    private fun sha256(string: String): String {
-        return try {
+    private fun sha256(string: String): String =
+        try {
             // Platform-specific SHA256 implementation
             platformSha256(string)
         } catch (e: Exception) {
             logger.error("Failed to generate SHA256", e)
             string.hashCode().toString()
         }
-    }
 }
 
 /**
@@ -209,12 +202,14 @@ data class PlatformDeviceInfo(
     val architecture: String,
     val coreCount: Int,
     val deviceModel: String,
-    val osMajorVersion: String
+    val osMajorVersion: String,
 )
 
 /**
  * Platform-specific functions - implemented in each platform module
  */
 expect suspend fun getPlatformVendorUUID(): String?
+
 expect fun getPlatformDeviceInfo(): PlatformDeviceInfo
+
 expect fun platformSha256(input: String): String

@@ -9,7 +9,9 @@ import kotlinx.serialization.Serializable
  * iOS reference: Core/Types/AudioTypes.swift
  */
 @Serializable
-enum class AudioFormat(val rawValue: String) {
+enum class AudioFormat(
+    val rawValue: String,
+) {
     PCM("pcm"),
     WAV("wav"),
     MP3("mp3"),
@@ -17,7 +19,8 @@ enum class AudioFormat(val rawValue: String) {
     AAC("aac"),
     FLAC("flac"),
     OGG("ogg"),
-    PCM_16BIT("pcm_16bit");  // Android-specific raw PCM format
+    PCM_16BIT("pcm_16bit"), // Android-specific raw PCM format
+    ;
 
     /**
      * File extension for this format (matches iOS fileExtension)
@@ -29,7 +32,6 @@ enum class AudioFormat(val rawValue: String) {
         /**
          * Get AudioFormat from raw value string
          */
-        fun fromRawValue(value: String): AudioFormat? =
-            entries.find { it.rawValue == value.lowercase() }
+        fun fromRawValue(value: String): AudioFormat? = entries.find { it.rawValue == value.lowercase() }
     }
 }

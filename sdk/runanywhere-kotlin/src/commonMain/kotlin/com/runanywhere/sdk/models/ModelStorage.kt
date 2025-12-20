@@ -5,17 +5,25 @@ package com.runanywhere.sdk.models
  */
 expect class PlatformFile {
     val path: String
+
     fun exists(): Boolean
+
     fun delete(): Boolean
+
     fun length(): Long
+
     val name: String
     val nameWithoutExtension: String
+
     fun isFile(): Boolean
 }
 
 expect fun createPlatformFile(path: String): PlatformFile
+
 expect fun getPlatformBaseDir(): String
+
 expect fun createDirectory(path: String): Boolean
+
 expect fun listFiles(directory: String): List<PlatformFile>
 
 /**
@@ -30,9 +38,7 @@ class ModelStorage {
             createDirectory(modelsDir)
         }
 
-        fun getModelDestination(modelId: String): String {
-            return "$modelsDir/$modelId.bin"
-        }
+        fun getModelDestination(modelId: String): String = "$modelsDir/$modelId.bin"
     }
 
     /**
@@ -58,20 +64,18 @@ class ModelStorage {
     /**
      * Get total size of all models
      */
-    fun getTotalModelsSize(): Long {
-        return listFiles(modelsDir)
+    fun getTotalModelsSize(): Long =
+        listFiles(modelsDir)
             .filter { it.isFile() }
             .sumOf { it.length() }
-    }
 
     /**
      * List all stored models
      */
-    fun listStoredModels(): List<String> {
-        return listFiles(modelsDir)
+    fun listStoredModels(): List<String> =
+        listFiles(modelsDir)
             .filter { it.isFile() && it.name.endsWith(".bin") }
             .map { it.nameWithoutExtension }
-    }
 
     /**
      * Clear all models

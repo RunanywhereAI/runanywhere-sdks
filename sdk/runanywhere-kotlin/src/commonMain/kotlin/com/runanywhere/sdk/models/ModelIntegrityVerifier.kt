@@ -10,8 +10,14 @@ import kotlinx.coroutines.withContext
  */
 sealed class VerificationResult {
     object Success : VerificationResult()
-    data class Failed(val reason: String) : VerificationResult()
-    data class Unsupported(val reason: String) : VerificationResult()
+
+    data class Failed(
+        val reason: String,
+    ) : VerificationResult()
+
+    data class Unsupported(
+        val reason: String,
+    ) : VerificationResult()
 }
 
 /**
@@ -19,7 +25,7 @@ sealed class VerificationResult {
  * EXACT copy of iOS model verification patterns
  */
 class ModelIntegrityVerifier(
-    private val fileSystem: FileSystem
+    private val fileSystem: FileSystem,
 ) {
     private val logger = SDKLogger("ModelIntegrityVerifier")
 
@@ -29,55 +35,59 @@ class ModelIntegrityVerifier(
      * @param filePath The path to the downloaded file
      * @return Verification result
      */
-    suspend fun verifyModel(modelInfo: ModelInfo, filePath: String): VerificationResult = withContext(Dispatchers.IO) {
-        logger.info("🔍 Verifying integrity of model: ${modelInfo.id}")
+    suspend fun verifyModel(
+        modelInfo: ModelInfo,
+        filePath: String,
+    ): VerificationResult =
+        withContext(Dispatchers.IO) {
+            logger.info("🔍 Verifying integrity of model: ${modelInfo.id}")
 
-        // Check if file exists
-        if (!fileSystem.exists(filePath)) {
-            return@withContext VerificationResult.Failed("File does not exist: $filePath")
-        }
-
-        // Check file size if available
-        modelInfo.downloadSize?.let { expectedSize ->
-            val actualSize = fileSystem.fileSize(filePath)
-            if (actualSize != expectedSize) {
-                return@withContext VerificationResult.Failed(
-                    "File size mismatch. Expected: $expectedSize bytes, Actual: $actualSize bytes"
-                )
+            // Check if file exists
+            if (!fileSystem.exists(filePath)) {
+                return@withContext VerificationResult.Failed("File does not exist: $filePath")
             }
-            logger.info("✅ File size verification passed: $actualSize bytes")
-        }
 
-        // Verify SHA256 checksum if available
-        modelInfo.sha256Checksum?.let { expectedSha256 ->
-            logger.info("🔐 Verifying SHA256 checksum...")
-            val actualSha256 = calculateSHA256(filePath)
-            if (actualSha256 != expectedSha256.lowercase()) {
-                return@withContext VerificationResult.Failed(
-                    "SHA256 checksum mismatch. Expected: $expectedSha256, Actual: $actualSha256"
-                )
+            // Check file size if available
+            modelInfo.downloadSize?.let { expectedSize ->
+                val actualSize = fileSystem.fileSize(filePath)
+                if (actualSize != expectedSize) {
+                    return@withContext VerificationResult.Failed(
+                        "File size mismatch. Expected: $expectedSize bytes, Actual: $actualSize bytes",
+                    )
+                }
+                logger.info("✅ File size verification passed: $actualSize bytes")
             }
-            logger.info("✅ SHA256 verification passed")
-            return@withContext VerificationResult.Success
-        }
 
-        // Verify MD5 checksum if available (fallback)
-        modelInfo.md5Checksum?.let { expectedMd5 ->
-            logger.info("🔐 Verifying MD5 checksum...")
-            val actualMd5 = calculateMD5(filePath)
-            if (actualMd5 != expectedMd5.lowercase()) {
-                return@withContext VerificationResult.Failed(
-                    "MD5 checksum mismatch. Expected: $expectedMd5, Actual: $actualMd5"
-                )
+            // Verify SHA256 checksum if available
+            modelInfo.sha256Checksum?.let { expectedSha256 ->
+                logger.info("🔐 Verifying SHA256 checksum...")
+                val actualSha256 = calculateSHA256(filePath)
+                if (actualSha256 != expectedSha256.lowercase()) {
+                    return@withContext VerificationResult.Failed(
+                        "SHA256 checksum mismatch. Expected: $expectedSha256, Actual: $actualSha256",
+                    )
+                }
+                logger.info("✅ SHA256 verification passed")
+                return@withContext VerificationResult.Success
             }
-            logger.info("✅ MD5 verification passed")
-            return@withContext VerificationResult.Success
-        }
 
-        // No checksum available - log warning but allow
-        logger.warn("⚠️ No checksums available for verification of model: ${modelInfo.id}")
-        return@withContext VerificationResult.Unsupported("No checksums provided")
-    }
+            // Verify MD5 checksum if available (fallback)
+            modelInfo.md5Checksum?.let { expectedMd5 ->
+                logger.info("🔐 Verifying MD5 checksum...")
+                val actualMd5 = calculateMD5(filePath)
+                if (actualMd5 != expectedMd5.lowercase()) {
+                    return@withContext VerificationResult.Failed(
+                        "MD5 checksum mismatch. Expected: $expectedMd5, Actual: $actualMd5",
+                    )
+                }
+                logger.info("✅ MD5 verification passed")
+                return@withContext VerificationResult.Success
+            }
+
+            // No checksum available - log warning but allow
+            logger.warn("⚠️ No checksums available for verification of model: ${modelInfo.id}")
+            return@withContext VerificationResult.Unsupported("No checksums provided")
+        }
 
     /**
      * Calculate SHA256 checksum of a file
@@ -85,7 +95,8 @@ class ModelIntegrityVerifier(
      */
     private suspend fun calculateSHA256(filePath: String): String {
         logger.debug("Calculating SHA256 for: $filePath")
-        return com.runanywhere.sdk.platform.calculateSHA256(filePath)
+        return com.runanywhere.sdk.platform
+            .calculateSHA256(filePath)
     }
 
     /**
@@ -94,7 +105,8 @@ class ModelIntegrityVerifier(
      */
     private suspend fun calculateMD5(filePath: String): String {
         logger.debug("Calculating MD5 for: $filePath")
-        return com.runanywhere.sdk.platform.calculateMD5(filePath)
+        return com.runanywhere.sdk.platform
+            .calculateMD5(filePath)
     }
 
     /**
@@ -103,21 +115,25 @@ class ModelIntegrityVerifier(
      * @param filePath The path to the downloaded file
      * @return True if basic checks pass
      */
-    suspend fun quickIntegrityCheck(modelInfo: ModelInfo, filePath: String): Boolean = withContext(Dispatchers.IO) {
-        if (!fileSystem.exists(filePath)) {
-            logger.warn("❌ Quick check failed: File does not exist: $filePath")
-            return@withContext false
-        }
-
-        modelInfo.downloadSize?.let { expectedSize ->
-            val actualSize = fileSystem.fileSize(filePath)
-            if (actualSize != expectedSize) {
-                logger.warn("❌ Quick check failed: Size mismatch for ${modelInfo.id}. Expected: $expectedSize, Actual: $actualSize")
+    suspend fun quickIntegrityCheck(
+        modelInfo: ModelInfo,
+        filePath: String,
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            if (!fileSystem.exists(filePath)) {
+                logger.warn("❌ Quick check failed: File does not exist: $filePath")
                 return@withContext false
             }
-        }
 
-        logger.info("✅ Quick integrity check passed for: ${modelInfo.id}")
-        return@withContext true
-    }
+            modelInfo.downloadSize?.let { expectedSize ->
+                val actualSize = fileSystem.fileSize(filePath)
+                if (actualSize != expectedSize) {
+                    logger.warn("❌ Quick check failed: Size mismatch for ${modelInfo.id}. Expected: $expectedSize, Actual: $actualSize")
+                    return@withContext false
+                }
+            }
+
+            logger.info("✅ Quick integrity check passed for: ${modelInfo.id}")
+            return@withContext true
+        }
 }

@@ -10,18 +10,19 @@ import kotlinx.coroutines.flow.Flow
  * Hardware acceleration type used during generation.
  * Matches iOS HardwareAcceleration enum.
  */
-enum class HardwareAcceleration(val value: String) {
+enum class HardwareAcceleration(
+    val value: String,
+) {
     CPU("cpu"),
     GPU("gpu"),
     NEURAL_ENGINE("neural_engine"),
-    ANE("ane"),  // Apple Neural Engine alias
-    NPU("npu"),  // Android Neural Processing Unit
-    HYBRID("hybrid");
+    ANE("ane"), // Apple Neural Engine alias
+    NPU("npu"), // Android Neural Processing Unit
+    HYBRID("hybrid"),
+    ;
 
     companion object {
-        fun fromValue(value: String): HardwareAcceleration {
-            return values().find { it.value == value } ?: CPU
-        }
+        fun fromValue(value: String): HardwareAcceleration = values().find { it.value == value } ?: CPU
     }
 }
 
@@ -32,7 +33,7 @@ enum class HardwareAcceleration(val value: String) {
 data class StructuredOutputValidation(
     val isValid: Boolean,
     val errors: List<String> = emptyList(),
-    val warnings: List<String> = emptyList()
+    val warnings: List<String> = emptyList(),
 )
 
 /**
@@ -44,45 +45,32 @@ data class StructuredOutputValidation(
 data class GenerationResult(
     /** Generated text (with thinking content removed if extracted) */
     val text: String,
-
     /** Thinking/reasoning content extracted from the response */
     val thinkingContent: String? = null,
-
     /** Number of tokens used */
     val tokensUsed: Int,
-
     /** Model used for generation */
     val modelUsed: String,
-
     /** Latency in milliseconds */
     val latencyMs: Double,
-
     /** Execution target (device/cloud/hybrid) */
     val executionTarget: ExecutionTarget,
-
     /** Amount saved by using on-device execution */
     val savedAmount: Double = 0.0,
-
     /** Framework used for generation (if on-device) */
     val framework: InferenceFramework? = null,
-
     /** Hardware acceleration used */
     val hardwareUsed: HardwareAcceleration = HardwareAcceleration.CPU,
-
     /** Memory used during generation (in bytes) */
     val memoryUsed: Long = 0,
-
     /** Detailed performance metrics */
     val performanceMetrics: PerformanceMetrics,
-
     /** Structured output validation result (if structured output was requested) */
     val structuredOutputValidation: StructuredOutputValidation? = null,
-
     /** Number of tokens used for thinking/reasoning (if model supports thinking mode) */
     val thinkingTokens: Int? = null,
-
     /** Number of tokens in the actual response content (excluding thinking) */
-    val responseTokens: Int? = null
+    val responseTokens: Int? = null,
 ) {
     /**
      * Check if generation was successful
@@ -100,8 +88,9 @@ data class GenerationResult(
      * Get effective tokens per second
      */
     val effectiveTokensPerSecond: Double
-        get() = performanceMetrics.tokensPerSecond.takeIf { it > 0 }
-            ?: if (latencyMs > 0) tokensUsed.toDouble() / (latencyMs / 1000.0) else 0.0
+        get() =
+            performanceMetrics.tokensPerSecond.takeIf { it > 0 }
+                ?: if (latencyMs > 0) tokensUsed.toDouble() / (latencyMs / 1000.0) else 0.0
 
     companion object {
         /**
@@ -112,19 +101,19 @@ data class GenerationResult(
             text: String,
             tokensUsed: Int = text.length / 4,
             modelUsed: String = "unknown",
-            latencyMs: Double = 0.0
-        ): GenerationResult {
-            return GenerationResult(
+            latencyMs: Double = 0.0,
+        ): GenerationResult =
+            GenerationResult(
                 text = text,
                 tokensUsed = tokensUsed,
                 modelUsed = modelUsed,
                 latencyMs = latencyMs,
                 executionTarget = ExecutionTarget.ON_DEVICE,
-                performanceMetrics = PerformanceMetrics(
-                    tokensPerSecond = if (latencyMs > 0) tokensUsed / (latencyMs / 1000.0) else 0.0
-                )
+                performanceMetrics =
+                    PerformanceMetrics(
+                        tokensPerSecond = if (latencyMs > 0) tokensUsed / (latencyMs / 1000.0) else 0.0,
+                    ),
             )
-        }
     }
 }
 
@@ -154,11 +143,10 @@ data class GenerationResult(
 data class StreamingResult(
     /** Stream of tokens as they are generated */
     val stream: Flow<String>,
-
     /** Deferred that completes with final generation result including metrics.
      *  Resolves after streaming is complete.
      */
-    val result: Deferred<GenerationResult>
+    val result: Deferred<GenerationResult>,
 ) {
     /**
      * Collect all tokens into a single string.

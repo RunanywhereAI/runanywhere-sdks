@@ -7,7 +7,6 @@ import com.runanywhere.sdk.data.models.ConfigurationData
  * Exact match to iOS ConfigurationServiceProtocol
  */
 interface ConfigurationServiceProtocol {
-
     /**
      * Get current configuration
      * Exact match to iOS getConfiguration() method
@@ -33,6 +32,7 @@ interface ConfigurationServiceProtocol {
     suspend fun syncToCloud()
 
     // Simple configuration methods
+
     /**
      * Load configuration on app launch with simple fallback
      * Exact match to iOS loadConfigurationOnLaunch method
@@ -46,6 +46,7 @@ interface ConfigurationServiceProtocol {
     suspend fun setConsumerConfiguration(config: ConfigurationData)
 
     // Legacy methods for compatibility
+
     /**
      * Legacy method for compatibility
      * Maps to loadConfigurationOnLaunch

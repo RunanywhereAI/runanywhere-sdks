@@ -1,10 +1,9 @@
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.features.stt.STTCapability
+import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.features.stt.STTOptions
 import com.runanywhere.sdk.features.stt.STTOutput
-import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -26,8 +25,9 @@ suspend fun RunAnywhere.loadSTTModel(modelId: String) {
     requireInitialized()
     ensureServicesReady()
 
-    val capability = sttCapability
-        ?: throw SDKError.ComponentNotInitialized("STT capability not available")
+    val capability =
+        sttCapability
+            ?: throw SDKError.ComponentNotInitialized("STT capability not available")
 
     capability.loadModel(modelId)
 }
@@ -68,8 +68,9 @@ suspend fun RunAnywhere.transcribe(audioData: ByteArray): String {
     requireInitialized()
     ensureServicesReady()
 
-    val capability = sttCapability
-        ?: throw SDKError.ComponentNotReady("STT capability not available. Call loadSTTModel() first.")
+    val capability =
+        sttCapability
+            ?: throw SDKError.ComponentNotReady("STT capability not available. Call loadSTTModel() first.")
 
     val result = capability.transcribe(audioData)
     return result.text
@@ -84,13 +85,14 @@ suspend fun RunAnywhere.transcribe(audioData: ByteArray): String {
  */
 suspend fun RunAnywhere.transcribeWithOptions(
     audioData: ByteArray,
-    options: STTOptions = STTOptions()
+    options: STTOptions = STTOptions(),
 ): STTOutput {
     requireInitialized()
     ensureServicesReady()
 
-    val capability = sttCapability
-        ?: throw SDKError.ComponentNotReady("STT capability not available. Call loadSTTModel() first.")
+    val capability =
+        sttCapability
+            ?: throw SDKError.ComponentNotReady("STT capability not available. Call loadSTTModel() first.")
 
     return capability.transcribe(audioData, options)
 }
@@ -104,12 +106,13 @@ suspend fun RunAnywhere.transcribeWithOptions(
  */
 fun RunAnywhere.transcribeStream(
     audioStream: Flow<ByteArray>,
-    options: STTOptions = STTOptions()
+    options: STTOptions = STTOptions(),
 ): Flow<String> {
     requireInitialized()
 
-    val capability = sttCapability
-        ?: throw SDKError.ComponentNotReady("STT capability not available. Call loadSTTModel() first.")
+    val capability =
+        sttCapability
+            ?: throw SDKError.ComponentNotReady("STT capability not available. Call loadSTTModel() first.")
 
     return capability.streamTranscribe(audioStream, options)
 }

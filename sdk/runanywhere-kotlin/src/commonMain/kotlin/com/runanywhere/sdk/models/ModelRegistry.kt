@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.models
 
-import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.InferenceFramework
+import com.runanywhere.sdk.models.enums.ModelCategory
 
 /**
  * Model criteria for filtering models - EXACT copy of iOS ModelCriteria
@@ -12,7 +12,7 @@ data class ModelCriteria(
     val minMemoryRequired: Long? = null,
     val maxMemoryRequired: Long? = null,
     val format: String? = null,
-    val isDownloaded: Boolean? = null
+    val isDownloaded: Boolean? = null,
 )
 
 /**
@@ -72,8 +72,11 @@ interface ModelRegistry {
 
     // Legacy methods for backward compatibility
     fun hasModel(id: String): Boolean = getModel(id) != null
+
     fun clearRegistry() = getAllModels().forEach { removeModel(it.id) }
+
     fun discoverModelsLegacy(): List<ModelInfo> = getAllModels()
+
     fun loadMockModels(mockModels: List<ModelInfo>) = mockModels.forEach { registerModel(it) }
 }
 
@@ -83,20 +86,16 @@ interface ModelRegistry {
 class DefaultModelRegistry : ModelRegistry {
     private val models = mutableMapOf<String, ModelInfo>()
 
-    override suspend fun discoverModels(): List<ModelInfo> {
-        return models.values.toList()
-    }
+    override suspend fun discoverModels(): List<ModelInfo> = models.values.toList()
 
     override fun registerModel(model: ModelInfo) {
         models[model.id] = model
     }
 
-    override fun getModel(id: String): ModelInfo? {
-        return models[id]
-    }
+    override fun getModel(id: String): ModelInfo? = models[id]
 
-    override fun filterModels(criteria: ModelCriteria): List<ModelInfo> {
-        return models.values.filter { model ->
+    override fun filterModels(criteria: ModelCriteria): List<ModelInfo> =
+        models.values.filter { model ->
             var matches = true
 
             criteria.category?.let { category ->
@@ -104,8 +103,11 @@ class DefaultModelRegistry : ModelRegistry {
             }
 
             criteria.framework?.let { framework ->
-                matches = matches && (model.preferredFramework == framework ||
-                                    model.compatibleFrameworks.contains(framework))
+                matches = matches &&
+                    (
+                        model.preferredFramework == framework ||
+                            model.compatibleFrameworks.contains(framework)
+                    )
             }
 
             criteria.minMemoryRequired?.let { minMemory ->
@@ -126,7 +128,6 @@ class DefaultModelRegistry : ModelRegistry {
 
             matches
         }
-    }
 
     override fun updateModel(model: ModelInfo) {
         models[model.id] = model
@@ -136,9 +137,7 @@ class DefaultModelRegistry : ModelRegistry {
         models.remove(id)
     }
 
-    override fun getAllModels(): List<ModelInfo> {
-        return models.values.toList()
-    }
+    override fun getAllModels(): List<ModelInfo> = models.values.toList()
 
     override fun isModelDownloaded(id: String): Boolean {
         val model = models[id]

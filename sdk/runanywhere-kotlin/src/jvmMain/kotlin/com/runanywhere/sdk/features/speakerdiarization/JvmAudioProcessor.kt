@@ -7,7 +7,6 @@ import kotlin.math.*
  * Matches iOS Accelerate framework functionality using Java/Kotlin optimizations
  */
 actual class PlatformAudioProcessor {
-
     /**
      * Create speaker embedding from audio samples
      * Uses energy-based features with spectral analysis
@@ -46,7 +45,10 @@ actual class PlatformAudioProcessor {
      * Calculate cosine similarity between two embeddings
      * Optimized vector operations matching iOS Accelerate framework
      */
-    actual fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
+    actual fun cosineSimilarity(
+        a: FloatArray,
+        b: FloatArray,
+    ): Float {
         if (a.size != b.size || a.isEmpty()) return 0.0f
 
         var dotProduct = 0.0f
@@ -77,7 +79,10 @@ actual class PlatformAudioProcessor {
     /**
      * Extract comprehensive audio features for speaker identification
      */
-    actual fun extractFeatures(samples: FloatArray, sampleRate: Int): AudioFeatures {
+    actual fun extractFeatures(
+        samples: FloatArray,
+        sampleRate: Int,
+    ): AudioFeatures {
         if (samples.isEmpty()) {
             return AudioFeatures(0.0f, 0.0f, 0.0f, FloatArray(128))
         }
@@ -91,32 +96,38 @@ actual class PlatformAudioProcessor {
             rmsEnergy = rmsEnergy,
             zeroCrossingRate = zeroCrossingRate,
             spectralCentroid = spectralCentroid,
-            embedding = embedding
+            embedding = embedding,
         )
     }
 
     /**
      * Apply windowing function to audio samples
      */
-    actual fun applyWindow(samples: FloatArray, windowType: WindowType): FloatArray {
+    actual fun applyWindow(
+        samples: FloatArray,
+        windowType: WindowType,
+    ): FloatArray {
         if (samples.isEmpty()) return samples
 
         val windowed = samples.copyOf()
         val n = samples.size
 
         for (i in samples.indices) {
-            val window = when (windowType) {
-                WindowType.RECTANGULAR -> 1.0f
-                WindowType.HANN -> (0.5f * (1.0f - cos(2.0f * PI.toFloat() * i / (n - 1)))).toFloat()
-                WindowType.HAMMING -> (0.54f - 0.46f * cos(2.0f * PI.toFloat() * i / (n - 1))).toFloat()
-                WindowType.BLACKMAN -> {
-                    val a0 = 0.42f
-                    val a1 = 0.5f
-                    val a2 = 0.08f
-                    (a0 - a1 * cos(2.0f * PI.toFloat() * i / (n - 1)) +
-                     a2 * cos(4.0f * PI.toFloat() * i / (n - 1))).toFloat()
+            val window =
+                when (windowType) {
+                    WindowType.RECTANGULAR -> 1.0f
+                    WindowType.HANN -> (0.5f * (1.0f - cos(2.0f * PI.toFloat() * i / (n - 1)))).toFloat()
+                    WindowType.HAMMING -> (0.54f - 0.46f * cos(2.0f * PI.toFloat() * i / (n - 1))).toFloat()
+                    WindowType.BLACKMAN -> {
+                        val a0 = 0.42f
+                        val a1 = 0.5f
+                        val a2 = 0.08f
+                        (
+                            a0 - a1 * cos(2.0f * PI.toFloat() * i / (n - 1)) +
+                                a2 * cos(4.0f * PI.toFloat() * i / (n - 1))
+                        ).toFloat()
+                    }
                 }
-            }
             windowed[i] *= window
         }
 
@@ -130,14 +141,15 @@ actual class PlatformAudioProcessor {
         samples: FloatArray,
         sampleRate: Int,
         windowSize: Double,
-        stepSize: Double
+        stepSize: Double,
     ): List<AudioChunk> {
         if (samples.isEmpty()) return emptyList()
 
         val chunks = mutableListOf<AudioChunk>()
         val windowSamples = (windowSize * sampleRate).toInt()
+
+        @Suppress("UNUSED_VARIABLE")
         val stepSamples = (stepSize * sampleRate).toInt()
-        val totalDuration = samples.size.toDouble() / sampleRate
 
         var startSample = 0
         while (startSample < samples.size) {
@@ -153,8 +165,8 @@ actual class PlatformAudioProcessor {
                         samples = chunkSamples,
                         startTime = startTime,
                         endTime = endTime,
-                        sampleRate = sampleRate
-                    )
+                        sampleRate = sampleRate,
+                    ),
                 )
             }
 
@@ -178,7 +190,8 @@ actual class PlatformAudioProcessor {
         var crossings = 0
         for (i in 1 until samples.size) {
             if ((samples[i] >= 0 && samples[i - 1] < 0) ||
-                (samples[i] < 0 && samples[i - 1] >= 0)) {
+                (samples[i] < 0 && samples[i - 1] >= 0)
+            ) {
                 crossings++
             }
         }
@@ -189,7 +202,10 @@ actual class PlatformAudioProcessor {
     /**
      * Calculate spectral centroid for voice characterization
      */
-    private fun calculateSpectralCentroid(samples: FloatArray, sampleRate: Int): Float {
+    private fun calculateSpectralCentroid(
+        samples: FloatArray,
+        sampleRate: Int,
+    ): Float {
         if (samples.isEmpty()) return 0.0f
 
         // Simple spectral centroid calculation using FFT approximation
@@ -249,93 +265,6 @@ actual class PlatformAudioProcessor {
             vector.map { it / norm }.toFloatArray()
         } else {
             vector
-        }
-    }
-
-    /**
-     * Apply Gaussian window for smoothing
-     */
-    private fun applyGaussianSmoothing(samples: FloatArray, sigma: Float = 1.0f): FloatArray {
-        if (samples.size < 3) return samples
-
-        val smoothed = FloatArray(samples.size)
-        val kernelSize = min(7, samples.size) // Adaptive kernel size
-        val halfKernel = kernelSize / 2
-
-        for (i in samples.indices) {
-            var sum = 0.0f
-            var weightSum = 0.0f
-
-            for (j in -halfKernel..halfKernel) {
-                val idx = i + j
-                if (idx in samples.indices) {
-                    val weight = exp(-(j * j).toFloat() / (2 * sigma * sigma))
-                    sum += samples[idx] * weight
-                    weightSum += weight
-                }
-            }
-
-            smoothed[i] = if (weightSum > 0) sum / weightSum else samples[i]
-        }
-
-        return smoothed
-    }
-
-    /**
-     * Compute autocorrelation for pitch analysis
-     */
-    private fun computeAutocorrelation(samples: FloatArray, maxLag: Int): FloatArray {
-        val lags = min(maxLag, samples.size / 2)
-        val autocorr = FloatArray(lags)
-
-        for (lag in 0 until lags) {
-            var sum = 0.0f
-            val count = samples.size - lag
-
-            for (i in 0 until count) {
-                sum += samples[i] * samples[i + lag]
-            }
-
-            autocorr[lag] = if (count > 0) sum / count else 0.0f
-        }
-
-        // Normalize by first value (lag 0)
-        if (autocorr[0] > 0) {
-            for (i in autocorr.indices) {
-                autocorr[i] /= autocorr[0]
-            }
-        }
-
-        return autocorr
-    }
-
-    /**
-     * Detect fundamental frequency (F0) for voice characterization
-     */
-    private fun detectFundamentalFrequency(samples: FloatArray, sampleRate: Int): Float {
-        if (samples.size < 64) return 0.0f
-
-        val minF0 = 50.0f  // Hz
-        val maxF0 = 500.0f // Hz
-        val minPeriod = (sampleRate / maxF0).toInt()
-        val maxPeriod = (sampleRate / minF0).toInt()
-
-        val autocorr = computeAutocorrelation(samples, maxPeriod)
-        var bestLag = minPeriod
-        var maxCorr = 0.0f
-
-        // Find peak in autocorrelation (excluding lag 0)
-        for (lag in minPeriod until min(maxPeriod, autocorr.size)) {
-            if (autocorr[lag] > maxCorr) {
-                maxCorr = autocorr[lag]
-                bestLag = lag
-            }
-        }
-
-        return if (maxCorr > 0.3f) { // Threshold for reliable pitch detection
-            sampleRate.toFloat() / bestLag
-        } else {
-            0.0f // No reliable pitch detected
         }
     }
 }

@@ -21,44 +21,37 @@ data class ModelRegistration(
      * If not provided, auto-generated from URL's last path component.
      */
     val id: String,
-
     /**
      * Display name for the model.
      * If not provided, defaults to URL's last path component.
      */
     val name: String,
-
     /**
      * URL to download the model from (HuggingFace, GitHub, etc.)
      */
     val url: String,
-
     /**
      * The framework this model is compatible with.
      * Strongly typed - uses InferenceFramework enum.
      */
     val framework: InferenceFramework,
-
     /**
      * The modality/capability this model provides (STT, TTS, text-to-text, etc.)
      * Strongly typed - uses FrameworkModality enum.
      */
     val modality: FrameworkModality,
-
     /**
      * Model format (auto-detected from URL if null)
      */
     val format: ModelFormat? = null,
-
     /**
      * Estimated memory requirement in bytes (optional)
      */
     val memoryRequirement: Long? = null,
-
     /**
      * Maximum context length for LLM models (optional)
      */
-    val contextLength: Int? = null
+    val contextLength: Int? = null,
 ) {
     /**
      * Convert this registration to a full ModelInfo for storage in the registry.
@@ -80,10 +73,11 @@ data class ModelRegistration(
             preferredFramework = framework,
             contextLength = contextLength,
             supportsThinking = false,
-            metadata = ModelInfoMetadata(
-                tags = listOf("registered"),
-                description = "Model registered via ModelRegistration"
-            )
+            metadata =
+                ModelInfoMetadata(
+                    tags = listOf("registered"),
+                    description = "Model registered via ModelRegistration",
+                ),
         )
     }
 
@@ -109,13 +103,15 @@ data class ModelRegistration(
             name: String? = null,
             format: ModelFormat? = null,
             memoryRequirement: Long? = null,
-            contextLength: Int? = null
+            contextLength: Int? = null,
         ): ModelRegistration {
             // Auto-generate ID from URL if not provided
-            val effectiveId = id ?: url.substringAfterLast("/")
-                .replace(".", "_")
-                .replace("-", "_")
-                .lowercase()
+            val effectiveId =
+                id ?: url
+                    .substringAfterLast("/")
+                    .replace(".", "_")
+                    .replace("-", "_")
+                    .lowercase()
 
             // Auto-generate name from URL if not provided
             val effectiveName = name ?: url.substringAfterLast("/")
@@ -128,7 +124,7 @@ data class ModelRegistration(
                 modality = modality,
                 format = format,
                 memoryRequirement = memoryRequirement,
-                contextLength = contextLength
+                contextLength = contextLength,
             )
         }
     }

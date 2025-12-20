@@ -1,7 +1,6 @@
 package com.runanywhere.sdk.events
 
-import com.runanywhere.sdk.core.capabilities.ComponentState
-import com.runanywhere.sdk.core.capabilities.SDKComponent
+import com.runanywhere.sdk.features.speakerdiarization.SpeakerInfo
 
 // MARK: - Component Events
 
@@ -15,44 +14,44 @@ sealed class ComponentEvent
 sealed class LegacyComponentInitializationEvent : ComponentEvent() {
     data class ComponentChecking(
         val component: String, // Changed to String to avoid dependency issues
-        val modelId: String?
+        val modelId: String?,
     ) : LegacyComponentInitializationEvent()
 
     data class ComponentInitializing(
         val component: String,
-        val modelId: String?
+        val modelId: String?,
     ) : LegacyComponentInitializationEvent()
 
     data class ComponentDownloadStarted(
         val component: String,
-        val modelId: String
+        val modelId: String,
     ) : LegacyComponentInitializationEvent()
 
     data class ComponentDownloadProgress(
         val component: String,
         val modelId: String,
-        val progress: Float
+        val progress: Float,
     ) : LegacyComponentInitializationEvent()
 
     data class ComponentDownloadCompleted(
         val component: String,
-        val modelId: String
+        val modelId: String,
     ) : LegacyComponentInitializationEvent()
 
     data class ComponentReady(
         val component: String,
-        val modelId: String?
+        val modelId: String?,
     ) : LegacyComponentInitializationEvent()
 
     data class ComponentFailed(
         val component: String,
-        val error: Throwable
+        val error: Throwable,
     ) : LegacyComponentInitializationEvent()
 
     data class ComponentStateChanged(
         val component: String,
         val oldState: String,
-        val newState: String
+        val newState: String,
     ) : LegacyComponentInitializationEvent()
 }
 
@@ -62,23 +61,23 @@ sealed class STTEvent : ComponentEvent() {
     object Initialized : STTEvent()
 
     data class TranscriptionStarted(
-        val sessionId: String
+        val sessionId: String,
     ) : STTEvent()
 
     data class TranscriptionCompleted(
         val text: String,
         val duration: Long,
-        val sessionId: String? = null
+        val sessionId: String? = null,
     ) : STTEvent()
 
     data class PartialTranscription(
         val text: String,
-        val sessionId: String
+        val sessionId: String,
     ) : STTEvent()
 
     data class Error(
         val error: Throwable,
-        val sessionId: String? = null
+        val sessionId: String? = null,
     ) : STTEvent()
 }
 
@@ -86,20 +85,21 @@ sealed class STTEvent : ComponentEvent() {
 
 sealed class TranscriptionEvent : ComponentEvent() {
     object SpeechStart : TranscriptionEvent()
+
     object SpeechEnd : TranscriptionEvent()
 
     data class PartialTranscription(
         val text: String,
-        val confidence: Float? = null
+        val confidence: Float? = null,
     ) : TranscriptionEvent()
 
     data class FinalTranscription(
         val text: String,
-        val confidence: Float? = null
+        val confidence: Float? = null,
     ) : TranscriptionEvent()
 
     data class Error(
-        val error: Throwable
+        val error: Throwable,
     ) : TranscriptionEvent()
 }
 
@@ -110,16 +110,16 @@ sealed class VADEvent : ComponentEvent() {
 
     data class SpeechDetected(
         val timestamp: Long,
-        val confidence: Float
+        val confidence: Float,
     ) : VADEvent()
 
     data class SilenceDetected(
         val timestamp: Long,
-        val duration: Long
+        val duration: Long,
     ) : VADEvent()
 
     data class Error(
-        val error: Throwable
+        val error: Throwable,
     ) : VADEvent()
 }
 
@@ -128,32 +128,32 @@ sealed class VADEvent : ComponentEvent() {
 sealed class ModelEvent : ComponentEvent() {
     data class DownloadStarted(
         val modelId: String,
-        val modelSize: Long? = null
+        val modelSize: Long? = null,
     ) : ModelEvent()
 
     data class DownloadProgress(
         val modelId: String,
         val progress: Float,
         val downloadedBytes: Long? = null,
-        val totalBytes: Long? = null
+        val totalBytes: Long? = null,
     ) : ModelEvent()
 
     data class DownloadCompleted(
         val modelId: String,
-        val modelPath: String
+        val modelPath: String,
     ) : ModelEvent()
 
     data class DownloadFailed(
         val modelId: String,
-        val error: Throwable
+        val error: Throwable,
     ) : ModelEvent()
 
     data class ModelLoaded(
-        val modelId: String
+        val modelId: String,
     ) : ModelEvent()
 
     data class ModelUnloaded(
-        val modelId: String
+        val modelId: String,
     ) : ModelEvent()
 }
 
@@ -163,11 +163,14 @@ sealed class ModelEvent : ComponentEvent() {
  * Stages in the voice pipeline
  * Matches iOS PipelineStage enum
  */
-enum class PipelineStage(val displayName: String) {
+enum class PipelineStage(
+    val displayName: String,
+) {
     VAD("VAD"),
     TRANSCRIPTION("Speech-to-Text"),
     LLM_GENERATION("LLM Generation"),
-    TEXT_TO_SPEECH("Text-to-Speech");
+    TEXT_TO_SPEECH("Text-to-Speech"),
+    ;
 
     companion object {
         val allCases: List<PipelineStage> = values().toList()
@@ -181,41 +184,68 @@ enum class PipelineStage(val displayName: String) {
 sealed class ModularPipelineEvent {
     // VAD events
     object vadSpeechStart : ModularPipelineEvent()
+
     object vadSpeechEnd : ModularPipelineEvent()
-    data class vadAudioLevel(val level: Float) : ModularPipelineEvent()
+
+    data class vadAudioLevel(
+        val level: Float,
+    ) : ModularPipelineEvent()
 
     // STT specific events matching iOS patterns
-    data class sttPartialTranscript(val partial: String) : ModularPipelineEvent()
-    data class sttFinalTranscript(val transcript: String) : ModularPipelineEvent()
-    data class sttLanguageDetected(val language: String) : ModularPipelineEvent()
+    data class sttPartialTranscript(
+        val partial: String,
+    ) : ModularPipelineEvent()
+
+    data class sttFinalTranscript(
+        val transcript: String,
+    ) : ModularPipelineEvent()
+
+    data class sttLanguageDetected(
+        val language: String,
+    ) : ModularPipelineEvent()
 
     data class sttFinalTranscriptWithSpeaker(
         val transcript: String,
-        val speaker: SpeakerInfo
+        val speaker: SpeakerInfo,
     ) : ModularPipelineEvent()
 
     data class sttPartialTranscriptWithSpeaker(
         val text: String,
-        val speaker: SpeakerInfo
+        val speaker: SpeakerInfo,
     ) : ModularPipelineEvent()
 
-    data class sttNewSpeakerDetected(val speaker: SpeakerInfo) : ModularPipelineEvent()
+    data class sttNewSpeakerDetected(
+        val speaker: SpeakerInfo,
+    ) : ModularPipelineEvent()
 
     data class sttSpeakerChanged(
         val from: SpeakerInfo?,
-        val to: SpeakerInfo
+        val to: SpeakerInfo,
     ) : ModularPipelineEvent()
 
     // LLM events
     object llmThinking : ModularPipelineEvent()
-    data class llmPartialResponse(val text: String) : ModularPipelineEvent()
-    data class llmFinalResponse(val text: String) : ModularPipelineEvent()
+
+    data class llmPartialResponse(
+        val text: String,
+    ) : ModularPipelineEvent()
+
+    data class llmFinalResponse(
+        val text: String,
+    ) : ModularPipelineEvent()
+
     object llmStreamStarted : ModularPipelineEvent()
-    data class llmStreamToken(val token: String) : ModularPipelineEvent()
+
+    data class llmStreamToken(
+        val token: String,
+    ) : ModularPipelineEvent()
 
     // TTS events
     object ttsStarted : ModularPipelineEvent()
-    data class ttsAudioChunk(val data: ByteArray) : ModularPipelineEvent() {
+
+    data class ttsAudioChunk(
+        val data: ByteArray,
+    ) : ModularPipelineEvent() {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is ttsAudioChunk) return false
@@ -228,27 +258,30 @@ sealed class ModularPipelineEvent {
     object ttsCompleted : ModularPipelineEvent()
 
     // Initialization events
-    data class componentInitializing(val componentName: String) : ModularPipelineEvent()
-    data class componentInitialized(val componentName: String) : ModularPipelineEvent()
-    data class componentInitializationFailed(val componentName: String, val error: Throwable) :
-        ModularPipelineEvent()
+    data class componentInitializing(
+        val componentName: String,
+    ) : ModularPipelineEvent()
+
+    data class componentInitialized(
+        val componentName: String,
+    ) : ModularPipelineEvent()
+
+    data class componentInitializationFailed(
+        val componentName: String,
+        val error: Throwable,
+    ) : ModularPipelineEvent()
 
     object allComponentsInitialized : ModularPipelineEvent()
 
     // Pipeline events
     object pipelineStarted : ModularPipelineEvent()
-    data class pipelineError(val error: Throwable) : ModularPipelineEvent()
+
+    data class pipelineError(
+        val error: Throwable,
+    ) : ModularPipelineEvent()
+
     object pipelineCompleted : ModularPipelineEvent()
 }
-
-/**
- * Speaker information for diarization (matches iOS SpeakerInfo)
- */
-data class SpeakerInfo(
-    val id: String,
-    val name: String? = null,
-    val confidence: Float? = null
-)
 
 /**
  * Complete result from voice pipeline
@@ -259,19 +292,19 @@ data class VoicePipelineResult(
     val llmResponse: String,
     val audioOutput: ByteArray? = null,
     val processingTime: Double = 0.0,
-    val stageTiming: Map<PipelineStage, Double> = emptyMap()
+    val stageTiming: Map<PipelineStage, Double> = emptyMap(),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is VoicePipelineResult) return false
 
         return transcription == other.transcription &&
-                llmResponse == other.llmResponse &&
-                audioOutput?.contentEquals(
-                    other.audioOutput ?: ByteArray(0)
-                ) ?: (other.audioOutput == null) &&
-                processingTime == other.processingTime &&
-                stageTiming == other.stageTiming
+            llmResponse == other.llmResponse &&
+            audioOutput?.contentEquals(
+                other.audioOutput ?: ByteArray(0),
+            ) ?: (other.audioOutput == null) &&
+            processingTime == other.processingTime &&
+            stageTiming == other.stageTiming
     }
 
     override fun hashCode(): Int {

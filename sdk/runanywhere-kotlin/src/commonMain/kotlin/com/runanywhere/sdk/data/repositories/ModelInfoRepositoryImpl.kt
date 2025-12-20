@@ -13,11 +13,12 @@ import kotlinx.coroutines.sync.withLock
  * Uses in-memory storage - can be extended with platform-specific persistence later
  */
 class ModelInfoRepositoryImpl : ModelInfoRepository {
-
     // In-memory storage (can be backed by PlatformStorage in the future)
     private val models = mutableMapOf<String, ModelInfo>()
     private val mutex = Mutex()
-    private val logger = com.runanywhere.sdk.foundation.SDKLogger("ModelInfoRepositoryImpl")
+    private val logger =
+        com.runanywhere.sdk.foundation
+            .SDKLogger("ModelInfoRepositoryImpl")
 
     override suspend fun save(entity: ModelInfo) {
         mutex.withLock {
@@ -35,7 +36,10 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
      * Uses registered ModelStorageStrategy from each framework adapter
      * to detect framework-specific model structures.
      */
-    suspend fun scanAndUpdateDownloadedModels(baseModelsPath: String, fileSystem: com.runanywhere.sdk.storage.FileSystem) {
+    suspend fun scanAndUpdateDownloadedModels(
+        baseModelsPath: String,
+        fileSystem: com.runanywhere.sdk.storage.FileSystem,
+    ) {
         mutex.withLock {
             logger.info("🔍 Scanning for downloaded models in: $baseModelsPath")
             var foundCount = 0
@@ -73,12 +77,13 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
 
                     // Fallback: Check standard path patterns for frameworks without storage strategy
                     // Use framework.value to match iOS pattern exactly
-                    val pathVariations = listOf(
-                        // Primary pattern matching iOS: Models/{framework.rawValue}/{modelId}/{filename}
-                        "$baseModelsPath/${framework.value}/${model.id}/${model.id}.${model.format.value}",
-                        // Also check for directory-based models (ONNX)
-                        "$baseModelsPath/${framework.value}/${model.id}"
-                    )
+                    val pathVariations =
+                        listOf(
+                            // Primary pattern matching iOS: Models/{framework.rawValue}/{modelId}/{filename}
+                            "$baseModelsPath/${framework.value}/${model.id}/${model.id}.${model.format.value}",
+                            // Also check for directory-based models (ONNX)
+                            "$baseModelsPath/${framework.value}/${model.id}",
+                        )
 
                     for (expectedPath in pathVariations) {
                         logger.debug("Checking path for ${model.id}: $expectedPath")
@@ -100,14 +105,13 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
         }
     }
 
-    override suspend fun fetch(id: String): ModelInfo? {
-        return mutex.withLock {
+    override suspend fun fetch(id: String): ModelInfo? =
+        mutex.withLock {
             models[id]
         }
-    }
 
-    override suspend fun fetchAll(): List<ModelInfo> {
-        return mutex.withLock {
+    override suspend fun fetchAll(): List<ModelInfo> =
+        mutex.withLock {
             val allModels = models.values.toList()
             logger.debug("Fetching all models. Count: ${allModels.size}")
             allModels.forEach { model ->
@@ -115,7 +119,6 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
             }
             allModels
         }
-    }
 
     override suspend fun delete(id: String) {
         mutex.withLock {
@@ -123,27 +126,27 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
         }
     }
 
-    override suspend fun fetchByFramework(framework: InferenceFramework): List<ModelInfo> {
-        return mutex.withLock {
+    override suspend fun fetchByFramework(framework: InferenceFramework): List<ModelInfo> =
+        mutex.withLock {
             models.values.filter { model ->
                 model.compatibleFrameworks.contains(framework)
             }
         }
-    }
 
-    override suspend fun fetchByCategory(category: ModelCategory): List<ModelInfo> {
-        return mutex.withLock {
+    override suspend fun fetchByCategory(category: ModelCategory): List<ModelInfo> =
+        mutex.withLock {
             models.values.filter { it.category == category }
         }
-    }
 
-    override suspend fun fetchDownloaded(): List<ModelInfo> {
-        return mutex.withLock {
+    override suspend fun fetchDownloaded(): List<ModelInfo> =
+        mutex.withLock {
             models.values.filter { it.isDownloaded }
         }
-    }
 
-    override suspend fun updateDownloadStatus(modelId: String, localPath: String?) {
+    override suspend fun updateDownloadStatus(
+        modelId: String,
+        localPath: String?,
+    ) {
         mutex.withLock {
             models[modelId]?.let { model ->
                 model.localPath = localPath
@@ -162,11 +165,10 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
         }
     }
 
-    override suspend fun fetchPendingSync(): List<ModelInfo> {
-        return mutex.withLock {
+    override suspend fun fetchPendingSync(): List<ModelInfo> =
+        mutex.withLock {
             models.values.filter { it.syncPending }
         }
-    }
 
     override suspend fun markSynced(ids: List<String>) {
         mutex.withLock {

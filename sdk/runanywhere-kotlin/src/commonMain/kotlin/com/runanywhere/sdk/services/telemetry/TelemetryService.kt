@@ -26,9 +26,8 @@ import kotlinx.coroutines.sync.withLock
  */
 class TelemetryService(
     private val telemetryRepository: TelemetryRepository,
-    private val syncCoordinator: SyncCoordinator?
+    private val syncCoordinator: SyncCoordinator?,
 ) {
-
     private val logger = SDKLogger("TelemetryService")
     private val mutex = Mutex()
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -39,7 +38,7 @@ class TelemetryService(
 
     // Batching configuration - optimized for immediate delivery
     // Events are sent immediately (batch size 1) to prevent data loss on app kill/background
-    private val batchSize = 1  // Send immediately on each event
+    private val batchSize = 1 // Send immediately on each event
     private val batchTimeoutMs = 500L // 500ms backup flush (in case any events slip through)
     private var pendingEvents = mutableListOf<TelemetryData>()
     private var lastBatchSent = getCurrentTimeMillis()
@@ -63,27 +62,31 @@ class TelemetryService(
      * Track a telemetry event data
      * Simple event tracking for components
      */
-    suspend fun trackEvent(event: TelemetryEventData) = mutex.withLock {
-        logger.debug("Tracking event data: ${event.type}")
+    suspend fun trackEvent(event: TelemetryEventData) =
+        mutex.withLock {
+            logger.debug("Tracking event data: ${event.type}")
 
-        try {
-            telemetryRepository.saveEventData(event)
-            logger.debug("Event data tracked: ${event.type}")
-        } catch (e: Exception) {
-            logger.error("Failed to track event data: ${event.type} - ${e.message}")
+            try {
+                telemetryRepository.saveEventData(event)
+                logger.debug("Event data tracked: ${event.type}")
+            } catch (e: Exception) {
+                logger.error("Failed to track event data: ${event.type} - ${e.message}")
+            }
         }
-    }
 
     /**
      * Track a telemetry event
      * Equivalent to iOS: func trackEvent(_ type: TelemetryEventType, properties: [String: String]) async throws
      */
-    suspend fun trackEvent(type: TelemetryEventType, properties: Map<String, String> = emptyMap()) =
-        mutex.withLock {
-            logger.debug("Tracking event: $type")
+    suspend fun trackEvent(
+        type: TelemetryEventType,
+        properties: Map<String, String> = emptyMap(),
+    ) = mutex.withLock {
+        logger.debug("Tracking event: $type")
 
-            try {
-                val event = TelemetryData(
+        try {
+            val event =
+                TelemetryData(
                     type = type,
                     name = type.name.lowercase().replace('_', '.'),
                     properties = properties,
@@ -91,38 +94,40 @@ class TelemetryService(
                     deviceId = deviceId ?: "unknown",
                     appVersion = appVersion,
                     sdkVersion = sdkVersion,
-                    osVersion = "Android"
+                    osVersion = "Android",
                 )
 
-                // Save to repository
-                telemetryRepository.saveEvent(event)
+            // Save to repository
+            telemetryRepository.saveEvent(event)
 
-                // Add to pending batch
-                pendingEvents.add(event)
+            // Add to pending batch
+            pendingEvents.add(event)
 
-                // Send batch if full
-                if (pendingEvents.size >= batchSize) {
-                    sendBatch()
-                }
-
-                logger.debug("Event tracked: $type")
-
-            } catch (e: Exception) {
-                logger.error("Failed to track event: $type - ${e.message}")
-                // Don't throw - telemetry failures shouldn't break the app
+            // Send batch if full
+            if (pendingEvents.size >= batchSize) {
+                sendBatch()
             }
+
+            logger.debug("Event tracked: $type")
+        } catch (e: Exception) {
+            logger.error("Failed to track event: $type - ${e.message}")
+            // Don't throw - telemetry failures shouldn't break the app
         }
+    }
 
     /**
      * Track a custom event
      * Equivalent to iOS: func trackCustomEvent(_ name: String, properties: [String: String]) async throws
      */
-    suspend fun trackCustomEvent(name: String, properties: Map<String, String> = emptyMap()) =
-        mutex.withLock {
-            logger.debug("Tracking custom event: $name")
+    suspend fun trackCustomEvent(
+        name: String,
+        properties: Map<String, String> = emptyMap(),
+    ) = mutex.withLock {
+        logger.debug("Tracking custom event: $name")
 
-            try {
-                val event = TelemetryData(
+        try {
+            val event =
+                TelemetryData(
                     type = TelemetryEventType.CUSTOM_EVENT,
                     name = name,
                     properties = properties,
@@ -130,93 +135,94 @@ class TelemetryService(
                     deviceId = deviceId ?: "unknown",
                     appVersion = appVersion,
                     sdkVersion = sdkVersion,
-                    osVersion = "Android"
+                    osVersion = "Android",
                 )
 
-                telemetryRepository.saveEvent(event)
-                pendingEvents.add(event)
+            telemetryRepository.saveEvent(event)
+            pendingEvents.add(event)
 
-                if (pendingEvents.size >= batchSize) {
-                    sendBatch()
-                }
-
-                logger.debug("Custom event tracked: $name")
-
-            } catch (e: Exception) {
-                logger.error("Failed to track custom event: $name - ${e.message}")
+            if (pendingEvents.size >= batchSize) {
+                sendBatch()
             }
+
+            logger.debug("Custom event tracked: $name")
+        } catch (e: Exception) {
+            logger.error("Failed to track custom event: $name - ${e.message}")
         }
+    }
 
     /**
      * Get all events
      * Equivalent to iOS: func getAllEvents() async throws -> [TelemetryData]
      */
-    suspend fun getAllEvents(): List<TelemetryData> = mutex.withLock {
-        logger.debug("Getting all events")
+    suspend fun getAllEvents(): List<TelemetryData> =
+        mutex.withLock {
+            logger.debug("Getting all events")
 
-        return try {
-            telemetryRepository.getAllEvents()
-        } catch (e: Exception) {
-            logger.error("Failed to get all events: ${e.message}")
-            throw SDKError.RuntimeError("Failed to get all events: ${e.message}")
+            return try {
+                telemetryRepository.getAllEvents()
+            } catch (e: Exception) {
+                logger.error("Failed to get all events: ${e.message}")
+                throw SDKError.RuntimeError("Failed to get all events: ${e.message}")
+            }
         }
-    }
 
     /**
      * Mark events as sent
      * Equivalent to iOS: func markEventsSent(_ eventIds: [String]) async throws
      */
-    suspend fun markEventsSent(eventIds: List<String>) = mutex.withLock {
-        logger.debug("Marking ${eventIds.size} events as sent")
+    suspend fun markEventsSent(eventIds: List<String>) =
+        mutex.withLock {
+            logger.debug("Marking ${eventIds.size} events as sent")
 
-        try {
-            telemetryRepository.markEventsSent(eventIds, getCurrentTimeMillis())
-            logger.info("${eventIds.size} events marked as sent")
-
-        } catch (e: Exception) {
-            logger.error("Failed to mark events as sent: ${e.message}")
-            throw SDKError.RuntimeError("Failed to mark events as sent: ${e.message}")
+            try {
+                telemetryRepository.markEventsSent(eventIds, getCurrentTimeMillis())
+                logger.info("${eventIds.size} events marked as sent")
+            } catch (e: Exception) {
+                logger.error("Failed to mark events as sent: ${e.message}")
+                throw SDKError.RuntimeError("Failed to mark events as sent: ${e.message}")
+            }
         }
-    }
 
     /**
      * Sync telemetry to remote
      * Equivalent to iOS: func syncTelemetry() async throws
      */
-    suspend fun syncTelemetry() = mutex.withLock {
-        logger.debug("Syncing telemetry")
+    suspend fun syncTelemetry() =
+        mutex.withLock {
+            logger.debug("Syncing telemetry")
 
-        try {
-            // Send pending batches first
-            sendBatch()
+            try {
+                // Send pending batches first
+                sendBatch()
 
-            // Use sync coordinator if available
-            syncCoordinator?.let { coordinator ->
-                coordinator.syncTelemetry()
-            } ?: run {
-                // Direct sync without coordinator
-                val unsentEvents = telemetryRepository.getUnsentEvents()
-                if (unsentEvents.isNotEmpty()) {
-                    val batch = TelemetryBatch(
-                        events = unsentEvents,
-                        deviceId = deviceId ?: "unknown",
-                        sessionId = sessionId,
-                        appVersion = appVersion,
-                        sdkVersion = sdkVersion
-                    )
+                // Use sync coordinator if available
+                syncCoordinator?.let { coordinator ->
+                    coordinator.syncTelemetry()
+                } ?: run {
+                    // Direct sync without coordinator
+                    val unsentEvents = telemetryRepository.getUnsentEvents()
+                    if (unsentEvents.isNotEmpty()) {
+                        val batch =
+                            TelemetryBatch(
+                                events = unsentEvents,
+                                deviceId = deviceId ?: "unknown",
+                                sessionId = sessionId,
+                                appVersion = appVersion,
+                                sdkVersion = sdkVersion,
+                            )
 
-                    telemetryRepository.sendBatch(batch)
-                    markEventsSent(unsentEvents.map { it.id })
+                        telemetryRepository.sendBatch(batch)
+                        markEventsSent(unsentEvents.map { it.id })
+                    }
                 }
+
+                logger.info("Telemetry synced successfully")
+            } catch (e: Exception) {
+                logger.error("Failed to sync telemetry: ${e.message}")
+                throw SDKError.NetworkError("Failed to sync telemetry: ${e.message}")
             }
-
-            logger.info("Telemetry synced successfully")
-
-        } catch (e: Exception) {
-            logger.error("Failed to sync telemetry: ${e.message}")
-            throw SDKError.NetworkError("Failed to sync telemetry: ${e.message}")
         }
-    }
 
     // STT-specific analytics helpers (equivalent to iOS helpers)
 
@@ -224,7 +230,11 @@ class TelemetryService(
      * Track STT initialization
      * Equivalent to iOS STT analytics helper
      */
-    suspend fun trackSTTInitialization(modelId: String, success: Boolean, loadTime: Long? = null) {
+    suspend fun trackSTTInitialization(
+        modelId: String,
+        success: Boolean,
+        loadTime: Long? = null,
+    ) {
         val properties = mutableMapOf<String, String>()
         properties["model_id"] = modelId
         properties["success"] = success.toString()
@@ -241,7 +251,7 @@ class TelemetryService(
         modelId: String,
         success: Boolean,
         loadTime: Long,
-        modelSizeMB: Long
+        modelSizeMB: Long,
     ) {
         val properties = mutableMapOf<String, String>()
         properties["model_id"] = modelId
@@ -263,7 +273,7 @@ class TelemetryService(
         audioDuration: Long? = null,
         wordCount: Int? = null,
         confidence: Float? = null,
-        language: String? = null
+        language: String? = null,
     ) {
         val properties = mutableMapOf<String, String>()
         properties["model_id"] = modelId
@@ -281,7 +291,10 @@ class TelemetryService(
      * Track VAD detection
      * STT-specific analytics for voice activity detection
      */
-    suspend fun trackVADDetection(detected: Boolean, confidence: Float? = null) {
+    suspend fun trackVADDetection(
+        detected: Boolean,
+        confidence: Float? = null,
+    ) {
         val properties = mutableMapOf<String, String>()
         properties["detected"] = detected.toString()
         confidence?.let { properties["confidence"] = it.toString() }
@@ -295,12 +308,16 @@ class TelemetryService(
      * Track initialization
      * Equivalent to iOS analytics helper
      */
-    suspend fun trackInitialization(apiKey: String, version: String) {
-        val properties = mapOf(
-            "api_key_hash" to apiKey.hashCode().toString(),
-            "version" to version,
-            "platform" to "android"
-        )
+    suspend fun trackInitialization(
+        apiKey: String,
+        version: String,
+    ) {
+        val properties =
+            mapOf(
+                "api_key_hash" to apiKey.hashCode().toString(),
+                "version" to version,
+                "platform" to "android",
+            )
 
         trackEvent(TelemetryEventType.SDK_INITIALIZATION, properties)
     }
@@ -309,12 +326,17 @@ class TelemetryService(
      * Track model load
      * Equivalent to iOS analytics helper
      */
-    suspend fun trackModelLoad(modelId: String, success: Boolean, loadTime: Long) {
-        val properties = mapOf(
-            "model_id" to modelId,
-            "success" to success.toString(),
-            "load_time_ms" to loadTime.toString()
-        )
+    suspend fun trackModelLoad(
+        modelId: String,
+        success: Boolean,
+        loadTime: Long,
+    ) {
+        val properties =
+            mapOf(
+                "model_id" to modelId,
+                "success" to success.toString(),
+                "load_time_ms" to loadTime.toString(),
+            )
 
         trackEvent(TelemetryEventType.MODEL_LOAD_COMPLETED, properties)
     }
@@ -327,15 +349,16 @@ class TelemetryService(
         modelId: String,
         inputTokens: Int,
         outputTokens: Int,
-        duration: Long
+        duration: Long,
     ) {
-        val properties = mapOf(
-            "model_id" to modelId,
-            "input_tokens" to inputTokens.toString(),
-            "output_tokens" to outputTokens.toString(),
-            "duration_ms" to duration.toString(),
-            "tokens_per_second" to (outputTokens.toFloat() / (duration / 1000f)).toString()
-        )
+        val properties =
+            mapOf(
+                "model_id" to modelId,
+                "input_tokens" to inputTokens.toString(),
+                "output_tokens" to outputTokens.toString(),
+                "duration_ms" to duration.toString(),
+                "tokens_per_second" to (outputTokens.toFloat() / (duration / 1000f)).toString(),
+            )
 
         trackEvent(TelemetryEventType.GENERATION_COMPLETED, properties)
     }
@@ -347,7 +370,7 @@ class TelemetryService(
     suspend fun trackError(
         error: Throwable,
         context: String,
-        additionalInfo: Map<String, String> = emptyMap()
+        additionalInfo: Map<String, String> = emptyMap(),
     ) {
         val properties = mutableMapOf<String, String>()
         properties["error_type"] = error::class.java.simpleName
@@ -366,7 +389,7 @@ class TelemetryService(
         operation: String,
         duration: Long,
         memoryUsageMB: Long? = null,
-        cpuUsage: Float? = null
+        cpuUsage: Float? = null,
     ) {
         val properties = mutableMapOf<String, String>()
         properties["operation"] = operation
@@ -393,7 +416,7 @@ class TelemetryService(
         device: String,
         osVersion: String,
         success: Boolean,
-        errorMessage: String? = null
+        errorMessage: String? = null,
     ) {
         val properties = mutableMapOf<String, String>()
         properties["model_id"] = modelId
@@ -407,11 +430,12 @@ class TelemetryService(
         modelSizeBytes?.let { properties["model_size_bytes"] = it.toString() }
         errorMessage?.let { properties["error_message"] = it }
 
-        val eventType = if (success) {
-            TelemetryEventType.STT_MODEL_LOADED
-        } else {
-            TelemetryEventType.STT_MODEL_LOAD_FAILED
-        }
+        val eventType =
+            if (success) {
+                TelemetryEventType.STT_MODEL_LOADED
+            } else {
+                TelemetryEventType.STT_MODEL_LOAD_FAILED
+            }
 
         trackEvent(eventType, properties)
     }
@@ -427,20 +451,23 @@ class TelemetryService(
         framework: String,
         language: String,
         device: String,
-        osVersion: String
+        osVersion: String,
     ) {
-        val properties = mapOf(
-            "session_id" to sessionId,
-            "model_id" to modelId,
-            "model_name" to modelName,
-            "framework" to framework,
-            "modality" to "stt",  // Add modality field
-            "language" to language,
-            "device" to device,
-            "os_version" to osVersion
-        )
+        val properties =
+            mapOf(
+                "session_id" to sessionId,
+                "model_id" to modelId,
+                "model_name" to modelName,
+                "framework" to framework,
+                "modality" to "stt", // Add modality field
+                "language" to language,
+                "device" to device,
+                "os_version" to osVersion,
+            )
 
-        logger.debug("🔍 STT_TRANSCRIPTION_STARTED properties: modality=${properties["modality"]}, model_id=${properties["model_id"]}, model_name=${properties["model_name"]}")
+        logger.debug(
+            "🔍 STT_TRANSCRIPTION_STARTED properties: modality=${properties["modality"]}, model_id=${properties["model_id"]}, model_name=${properties["model_name"]}",
+        )
         trackEvent(TelemetryEventType.STT_TRANSCRIPTION_STARTED, properties)
     }
 
@@ -461,24 +488,25 @@ class TelemetryService(
         characterCount: Int,
         confidence: Float,
         device: String,
-        osVersion: String
+        osVersion: String,
     ) {
-        val properties = mapOf(
-            "session_id" to sessionId,
-            "model_id" to modelId,
-            "model_name" to modelName,
-            "framework" to framework,
-            "modality" to "stt",  // Add modality field
-            "language" to language,
-            "audio_duration_ms" to String.format("%.1f", audioDurationMs),
-            "processing_time_ms" to String.format("%.1f", processingTimeMs),
-            "real_time_factor" to String.format("%.3f", realTimeFactor),
-            "word_count" to wordCount.toString(),
-            "character_count" to characterCount.toString(),
-            "confidence" to String.format("%.3f", confidence),
-            "device" to device,
-            "os_version" to osVersion
-        )
+        val properties =
+            mapOf(
+                "session_id" to sessionId,
+                "model_id" to modelId,
+                "model_name" to modelName,
+                "framework" to framework,
+                "modality" to "stt", // Add modality field
+                "language" to language,
+                "audio_duration_ms" to String.format("%.1f", audioDurationMs),
+                "processing_time_ms" to String.format("%.1f", processingTimeMs),
+                "real_time_factor" to String.format("%.3f", realTimeFactor),
+                "word_count" to wordCount.toString(),
+                "character_count" to characterCount.toString(),
+                "confidence" to String.format("%.3f", confidence),
+                "device" to device,
+                "os_version" to osVersion,
+            )
 
         trackEvent(TelemetryEventType.STT_TRANSCRIPTION_COMPLETED, properties)
     }
@@ -497,21 +525,22 @@ class TelemetryService(
         processingTimeMs: Double,
         errorMessage: String,
         device: String,
-        osVersion: String
+        osVersion: String,
     ) {
-        val properties = mapOf(
-            "session_id" to sessionId,
-            "model_id" to modelId,
-            "model_name" to modelName,
-            "framework" to framework,
-            "modality" to "stt",  // Add modality field
-            "language" to language,
-            "audio_duration_ms" to String.format("%.1f", audioDurationMs),
-            "processing_time_ms" to String.format("%.1f", processingTimeMs),
-            "error_message" to errorMessage,
-            "device" to device,
-            "os_version" to osVersion
-        )
+        val properties =
+            mapOf(
+                "session_id" to sessionId,
+                "model_id" to modelId,
+                "model_name" to modelName,
+                "framework" to framework,
+                "modality" to "stt", // Add modality field
+                "language" to language,
+                "audio_duration_ms" to String.format("%.1f", audioDurationMs),
+                "processing_time_ms" to String.format("%.1f", processingTimeMs),
+                "error_message" to errorMessage,
+                "device" to device,
+                "os_version" to osVersion,
+            )
 
         trackEvent(TelemetryEventType.STT_TRANSCRIPTION_FAILED, properties)
     }
@@ -525,15 +554,16 @@ class TelemetryService(
         modelId: String,
         framework: String,
         partialWordCount: Int,
-        elapsedMs: Double
+        elapsedMs: Double,
     ) {
-        val properties = mapOf(
-            "session_id" to sessionId,
-            "model_id" to modelId,
-            "framework" to framework,
-            "partial_word_count" to partialWordCount.toString(),
-            "elapsed_ms" to String.format("%.1f", elapsedMs)
-        )
+        val properties =
+            mapOf(
+                "session_id" to sessionId,
+                "model_id" to modelId,
+                "framework" to framework,
+                "partial_word_count" to partialWordCount.toString(),
+                "elapsed_ms" to String.format("%.1f", elapsedMs),
+            )
 
         trackEvent(TelemetryEventType.STT_STREAMING_UPDATE, properties)
     }
@@ -554,7 +584,7 @@ class TelemetryService(
         device: String,
         osVersion: String,
         success: Boolean,
-        errorMessage: String? = null
+        errorMessage: String? = null,
     ) {
         val properties = mutableMapOf<String, String>()
         properties["model_id"] = modelId
@@ -568,11 +598,12 @@ class TelemetryService(
         modelSizeBytes?.let { properties["model_size_bytes"] = it.toString() }
         errorMessage?.let { properties["error_message"] = it }
 
-        val eventType = if (success) {
-            TelemetryEventType.TTS_MODEL_LOADED
-        } else {
-            TelemetryEventType.TTS_MODEL_LOAD_FAILED
-        }
+        val eventType =
+            if (success) {
+                TelemetryEventType.TTS_MODEL_LOADED
+            } else {
+                TelemetryEventType.TTS_MODEL_LOAD_FAILED
+            }
 
         trackEvent(eventType, properties)
     }
@@ -592,25 +623,28 @@ class TelemetryService(
         speakingRate: Float,
         pitch: Float,
         device: String,
-        osVersion: String
+        osVersion: String,
     ) {
-        val properties = mapOf(
-            "session_id" to synthesisId,  // Use session_id for API compatibility
-            "synthesis_id" to synthesisId,
-            "model_id" to modelId,
-            "model_name" to modelName,
-            "framework" to framework,
-            "modality" to "tts",
-            "language" to language,
-            "voice" to voice,
-            "character_count" to characterCount.toString(),
-            "speaking_rate" to String.format("%.2f", speakingRate),
-            "pitch" to String.format("%.2f", pitch),
-            "device" to device,
-            "os_version" to osVersion
-        )
+        val properties =
+            mapOf(
+                "session_id" to synthesisId, // Use session_id for API compatibility
+                "synthesis_id" to synthesisId,
+                "model_id" to modelId,
+                "model_name" to modelName,
+                "framework" to framework,
+                "modality" to "tts",
+                "language" to language,
+                "voice" to voice,
+                "character_count" to characterCount.toString(),
+                "speaking_rate" to String.format("%.2f", speakingRate),
+                "pitch" to String.format("%.2f", pitch),
+                "device" to device,
+                "os_version" to osVersion,
+            )
 
-        logger.debug("🔍 TTS_SYNTHESIS_STARTED properties: modality=${properties["modality"]}, model_id=${properties["model_id"]}, model_name=${properties["model_name"]}")
+        logger.debug(
+            "🔍 TTS_SYNTHESIS_STARTED properties: modality=${properties["modality"]}, model_id=${properties["model_id"]}, model_name=${properties["model_name"]}",
+        )
         trackEvent(TelemetryEventType.TTS_SYNTHESIS_STARTED, properties)
     }
 
@@ -629,23 +663,24 @@ class TelemetryService(
         processingTimeMs: Double,
         realTimeFactor: Double,
         device: String,
-        osVersion: String
+        osVersion: String,
     ) {
-        val properties = mapOf(
-            "session_id" to synthesisId,  // Use session_id for API compatibility
-            "synthesis_id" to synthesisId,
-            "model_id" to modelId,
-            "model_name" to modelName,
-            "framework" to framework,
-            "modality" to "tts",
-            "language" to language,
-            "character_count" to characterCount.toString(),
-            "audio_duration_ms" to String.format("%.1f", audioDurationMs),
-            "processing_time_ms" to String.format("%.1f", processingTimeMs),
-            "real_time_factor" to String.format("%.3f", realTimeFactor),
-            "device" to device,
-            "os_version" to osVersion
-        )
+        val properties =
+            mapOf(
+                "session_id" to synthesisId, // Use session_id for API compatibility
+                "synthesis_id" to synthesisId,
+                "model_id" to modelId,
+                "model_name" to modelName,
+                "framework" to framework,
+                "modality" to "tts",
+                "language" to language,
+                "character_count" to characterCount.toString(),
+                "audio_duration_ms" to String.format("%.1f", audioDurationMs),
+                "processing_time_ms" to String.format("%.1f", processingTimeMs),
+                "real_time_factor" to String.format("%.3f", realTimeFactor),
+                "device" to device,
+                "os_version" to osVersion,
+            )
 
         trackEvent(TelemetryEventType.TTS_SYNTHESIS_COMPLETED, properties)
     }
@@ -664,22 +699,23 @@ class TelemetryService(
         processingTimeMs: Double,
         errorMessage: String,
         device: String,
-        osVersion: String
+        osVersion: String,
     ) {
-        val properties = mapOf(
-            "session_id" to synthesisId,  // Use session_id for API compatibility
-            "synthesis_id" to synthesisId,
-            "model_id" to modelId,
-            "model_name" to modelName,
-            "framework" to framework,
-            "modality" to "tts",
-            "language" to language,
-            "character_count" to characterCount.toString(),
-            "processing_time_ms" to String.format("%.1f", processingTimeMs),
-            "error_message" to errorMessage,
-            "device" to device,
-            "os_version" to osVersion
-        )
+        val properties =
+            mapOf(
+                "session_id" to synthesisId, // Use session_id for API compatibility
+                "synthesis_id" to synthesisId,
+                "model_id" to modelId,
+                "model_name" to modelName,
+                "framework" to framework,
+                "modality" to "tts",
+                "language" to language,
+                "character_count" to characterCount.toString(),
+                "processing_time_ms" to String.format("%.1f", processingTimeMs),
+                "error_message" to errorMessage,
+                "device" to device,
+                "os_version" to osVersion,
+            )
 
         trackEvent(TelemetryEventType.TTS_SYNTHESIS_FAILED, properties)
     }
@@ -699,20 +735,21 @@ class TelemetryService(
         promptTokens: Int,
         maxTokens: Int,
         device: String,
-        osVersion: String
+        osVersion: String,
     ) {
-        val properties = mapOf(
-            "session_id" to generationId,  // Use session_id for API compatibility
-            "generation_id" to generationId,
-            "model_id" to modelId,
-            "model_name" to modelName,
-            "framework" to framework,
-            "modality" to "llm",
-            "prompt_tokens" to promptTokens.toString(),
-            "max_tokens" to maxTokens.toString(),
-            "device" to device,
-            "os_version" to osVersion
-        )
+        val properties =
+            mapOf(
+                "session_id" to generationId, // Use session_id for API compatibility
+                "generation_id" to generationId,
+                "model_id" to modelId,
+                "model_name" to modelName,
+                "framework" to framework,
+                "modality" to "llm",
+                "prompt_tokens" to promptTokens.toString(),
+                "max_tokens" to maxTokens.toString(),
+                "device" to device,
+                "os_version" to osVersion,
+            )
 
         trackEvent(TelemetryEventType.GENERATION_STARTED, properties)
     }
@@ -732,24 +769,25 @@ class TelemetryService(
         timeToFirstTokenMs: Double,
         tokensPerSecond: Double,
         device: String,
-        osVersion: String
+        osVersion: String,
     ) {
-        val properties = mapOf(
-            "session_id" to generationId,  // Use session_id for API compatibility
-            "generation_id" to generationId,
-            "model_id" to modelId,
-            "model_name" to modelName,
-            "framework" to framework,
-            "modality" to "llm",
-            "input_tokens" to inputTokens.toString(),
-            "output_tokens" to outputTokens.toString(),
-            "total_tokens" to (inputTokens + outputTokens).toString(),
-            "total_time_ms" to String.format("%.1f", totalTimeMs),
-            "time_to_first_token_ms" to String.format("%.1f", timeToFirstTokenMs),
-            "tokens_per_second" to String.format("%.2f", tokensPerSecond),
-            "device" to device,
-            "os_version" to osVersion
-        )
+        val properties =
+            mapOf(
+                "session_id" to generationId, // Use session_id for API compatibility
+                "generation_id" to generationId,
+                "model_id" to modelId,
+                "model_name" to modelName,
+                "framework" to framework,
+                "modality" to "llm",
+                "input_tokens" to inputTokens.toString(),
+                "output_tokens" to outputTokens.toString(),
+                "total_tokens" to (inputTokens + outputTokens).toString(),
+                "total_time_ms" to String.format("%.1f", totalTimeMs),
+                "time_to_first_token_ms" to String.format("%.1f", timeToFirstTokenMs),
+                "tokens_per_second" to String.format("%.2f", tokensPerSecond),
+                "device" to device,
+                "os_version" to osVersion,
+            )
 
         trackEvent(TelemetryEventType.GENERATION_COMPLETED, properties)
     }
@@ -767,21 +805,22 @@ class TelemetryService(
         totalTimeMs: Double,
         errorMessage: String,
         device: String,
-        osVersion: String
+        osVersion: String,
     ) {
-        val properties = mapOf(
-            "session_id" to generationId,  // Use session_id for API compatibility
-            "generation_id" to generationId,
-            "model_id" to modelId,
-            "model_name" to modelName,
-            "framework" to framework,
-            "modality" to "llm",
-            "input_tokens" to inputTokens.toString(),
-            "total_time_ms" to String.format("%.1f", totalTimeMs),
-            "error_message" to errorMessage,
-            "device" to device,
-            "os_version" to osVersion
-        )
+        val properties =
+            mapOf(
+                "session_id" to generationId, // Use session_id for API compatibility
+                "generation_id" to generationId,
+                "model_id" to modelId,
+                "model_name" to modelName,
+                "framework" to framework,
+                "modality" to "llm",
+                "input_tokens" to inputTokens.toString(),
+                "total_time_ms" to String.format("%.1f", totalTimeMs),
+                "error_message" to errorMessage,
+                "device" to device,
+                "os_version" to osVersion,
+            )
 
         trackEvent(TelemetryEventType.GENERATION_FAILED, properties)
     }
@@ -796,72 +835,81 @@ class TelemetryService(
     /**
      * Cleanup telemetry service
      */
-    suspend fun cleanup() = mutex.withLock {
-        // Send any pending events
-        sendBatch()
-        logger.info("Telemetry service cleaned up")
-    }
+    suspend fun cleanup() =
+        mutex.withLock {
+            // Send any pending events
+            sendBatch()
+            logger.info("Telemetry service cleaned up")
+        }
 
     /**
      * Set device and app information
      * Initialize telemetry context
      */
-    suspend fun setContext(deviceId: String, appVersion: String?, sdkVersion: String) =
-        mutex.withLock {
-            this.deviceId = deviceId
-            this.appVersion = appVersion
-            this.sdkVersion = sdkVersion
+    suspend fun setContext(
+        deviceId: String,
+        appVersion: String?,
+        sdkVersion: String,
+    ) = mutex.withLock {
+        this.deviceId = deviceId
+        this.appVersion = appVersion
+        this.sdkVersion = sdkVersion
 
-            // Start session
-            currentSession = SessionTelemetryData(
+        // Start session
+        currentSession =
+            SessionTelemetryData(
                 sessionId = sessionId,
                 startTime = getCurrentTimeMillis(),
                 deviceId = deviceId,
                 appVersion = appVersion,
-                sdkVersion = sdkVersion
+                sdkVersion = sdkVersion,
             )
 
-            logger.info("Telemetry context set - Device: $deviceId, App: $appVersion, SDK: $sdkVersion")
-        }
+        logger.info("Telemetry context set - Device: $deviceId, App: $appVersion, SDK: $sdkVersion")
+    }
 
     /**
      * End current session
      * Track session completion
      */
-    suspend fun endSession() = mutex.withLock {
-        currentSession?.let { session ->
-            val endTime = getCurrentTimeMillis()
-            val updatedSession = session.copy(
-                endTime = endTime,
-                duration = endTime - session.startTime
-            )
+    suspend fun endSession() =
+        mutex.withLock {
+            currentSession?.let { session ->
+                val endTime = getCurrentTimeMillis()
+                val updatedSession =
+                    session.copy(
+                        endTime = endTime,
+                        duration = endTime - session.startTime,
+                    )
 
-            // Track session completion
-            val properties = mapOf(
-                "session_duration_ms" to updatedSession.duration.toString(),
-                "events_count" to updatedSession.eventsCount.toString()
-            )
+                // Track session completion
+                val properties =
+                    mapOf(
+                        "session_duration_ms" to updatedSession.duration.toString(),
+                        "events_count" to updatedSession.eventsCount.toString(),
+                    )
 
-            trackEvent(
-                TelemetryEventType.CUSTOM_EVENT,
-                properties + ("event_name" to "session_ended")
-            )
+                trackEvent(
+                    TelemetryEventType.CUSTOM_EVENT,
+                    properties + ("event_name" to "session_ended"),
+                )
+            }
+
+            // Send final batch
+            sendBatch()
         }
-
-        // Send final batch
-        sendBatch()
-    }
 
     /**
      * Flush all pending telemetry events immediately
      * Call this on app pause/stop/background to ensure events are sent before app is killed
      */
-    suspend fun flush() = mutex.withLock {
-        logger.info("Flushing telemetry events (${pendingEvents.size} pending)")
-        if (pendingEvents.isNotEmpty()) {
-            sendBatch()
+    suspend fun flush() =
+        mutex.withLock {
+            logger.info("Flushing telemetry events (${pendingEvents.size} pending)")
+            if (pendingEvents.isNotEmpty()) {
+                sendBatch()
+            }
         }
-    }
 
     // Private helper methods
 
@@ -869,13 +917,14 @@ class TelemetryService(
         if (pendingEvents.isEmpty()) return
 
         try {
-            val batch = TelemetryBatch(
-                events = pendingEvents.toList(),
-                deviceId = deviceId ?: "unknown",
-                sessionId = sessionId,
-                appVersion = appVersion,
-                sdkVersion = sdkVersion
-            )
+            val batch =
+                TelemetryBatch(
+                    events = pendingEvents.toList(),
+                    deviceId = deviceId ?: "unknown",
+                    sessionId = sessionId,
+                    appVersion = appVersion,
+                    sdkVersion = sdkVersion,
+                )
 
             telemetryRepository.sendBatch(batch)
             markEventsSent(pendingEvents.map { it.id })
@@ -884,7 +933,6 @@ class TelemetryService(
             lastBatchSent = getCurrentTimeMillis()
 
             logger.debug("Telemetry batch sent with ${batch.size} events")
-
         } catch (e: Exception) {
             logger.error("Failed to send telemetry batch: ${e.message}")
             // Keep events in pending list for retry

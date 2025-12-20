@@ -7,9 +7,9 @@ package com.runanywhere.sdk.platform
  * Reference: iOS uses different APIs per platform (iOS: FileManager, macOS: URL.volumeAvailableCapacityKey)
  */
 data class PlatformStorageInfo(
-    val totalSpace: Long,       // Total storage capacity in bytes
-    val availableSpace: Long,   // Available storage in bytes
-    val usedSpace: Long         // Used storage in bytes
+    val totalSpace: Long, // Total storage capacity in bytes
+    val availableSpace: Long, // Available storage in bytes
+    val usedSpace: Long, // Used storage in bytes
 )
 
 /**

@@ -15,25 +15,23 @@ import kotlinx.serialization.Serializable
 data class HardwareConfiguration(
     /** Whether to prefer GPU execution */
     val preferGPU: Boolean = true,
-
     /** Minimum memory required in MB */
     val minMemoryMB: Int = 4096,
-
     /** Recommended number of threads */
     val recommendedThreads: Int = 4,
-
     /** Whether to use memory mapping */
     val useMmap: Boolean = true,
-
     /** Whether to lock memory */
-    val lockMemory: Boolean = false
+    val lockMemory: Boolean = false,
 )
 
 /**
  * Quantization levels for model optimization - exact match with iOS QuantizationLevel
  */
 @Serializable
-enum class QuantizationLevel(val value: String) {
+enum class QuantizationLevel(
+    val value: String,
+) {
     Q2_K("Q2_K"),
     Q3_K_S("Q3_K_S"),
     Q3_K_M("Q3_K_M"),
@@ -55,19 +53,16 @@ enum class QuantizationLevel(val value: String) {
     IQ3_S("IQ3_S"),
     IQ3_XXS("IQ3_XXS"),
     IQ4_NL("IQ4_NL"),
-    IQ4_XS("IQ4_XS");
+    IQ4_XS("IQ4_XS"),
+    ;
 
     companion object {
-        fun fromValue(value: String): QuantizationLevel? {
-            return values().find { it.value == value }
-        }
+        fun fromValue(value: String): QuantizationLevel? = values().find { it.value == value }
 
         /**
          * Get quantization level by compression ratio
          */
-        fun byCompressionRatio(high: Boolean = false): QuantizationLevel {
-            return if (high) Q4_K_M else Q8_0
-        }
+        fun byCompressionRatio(high: Boolean = false): QuantizationLevel = if (high) Q4_K_M else Q8_0
 
         /**
          * Get quantization level optimized for speed
@@ -84,17 +79,18 @@ enum class QuantizationLevel(val value: String) {
      * Get estimated compression ratio
      */
     val compressionRatio: Float
-        get() = when (this) {
-            Q2_K -> 0.25f
-            Q3_K_S, Q3_K_M, Q3_K_L -> 0.375f
-            Q4_0, Q4_1, Q4_K_S, Q4_K_M -> 0.5f
-            Q5_0, Q5_1, Q5_K_S, Q5_K_M -> 0.625f
-            Q6_K -> 0.75f
-            Q8_0 -> 1.0f
-            F16 -> 2.0f
-            F32 -> 4.0f
-            else -> 0.5f // Default for IQ variants
-        }
+        get() =
+            when (this) {
+                Q2_K -> 0.25f
+                Q3_K_S, Q3_K_M, Q3_K_L -> 0.375f
+                Q4_0, Q4_1, Q4_K_S, Q4_K_M -> 0.5f
+                Q5_0, Q5_1, Q5_K_S, Q5_K_M -> 0.625f
+                Q6_K -> 0.75f
+                Q8_0 -> 1.0f
+                F16 -> 2.0f
+                F32 -> 4.0f
+                else -> 0.5f // Default for IQ variants
+            }
 }
 
 /**
@@ -104,108 +100,72 @@ enum class QuantizationLevel(val value: String) {
 @Serializable
 data class LLMConfiguration(
     // MARK: - Component Identification
-
     /** Model ID to load */
     override val modelId: String? = null,
-
     // MARK: - Model Loading Parameters
-
     /** Context length/window size */
     val contextLength: Int = 2048,
-
     /** Use GPU acceleration if available */
     val useGPUIfAvailable: Boolean = true,
-
     /** Quantization level for model optimization */
     val quantizationLevel: QuantizationLevel? = null,
-
     /** Token cache size in MB */
     val cacheSize: Int = 100,
-
     /** Optional system prompt to preload into context */
     val preloadContext: String? = null,
-
     // MARK: - Default Generation Parameters
-
     /** Default temperature for generation */
     val temperature: Double = 0.7,
-
     /** Default maximum tokens to generate */
     val maxTokens: Int = 100,
-
     /** Default system prompt */
     val systemPrompt: String? = null,
-
     /** Enable streaming by default */
     val streamingEnabled: Boolean = true,
-
     // MARK: - Hardware Optimization Parameters
-
     /** Number of CPU threads to use */
     val cpuThreads: Int? = null,
-
     /** Number of GPU layers to offload (hybrid execution) */
     val gpuLayers: Int? = null,
-
     /** Memory mapping mode */
     val memoryMapping: Boolean = true,
-
     /** Use memory locking to prevent swapping */
     val memoryLock: Boolean = false,
-
     /** NUMA node to bind to (for multi-socket systems) */
     val numaNode: Int? = null,
-
     // MARK: - Advanced Configuration
-
     /** RoPE (Rotary Position Embedding) frequency base */
     val ropeFreqBase: Float? = null,
-
     /** RoPE frequency scaling factor */
     val ropeFreqScale: Float? = null,
-
     /** Enable attention optimization */
     val optimizeAttention: Boolean = true,
-
     /** Batch size for processing multiple requests */
     val batchSize: Int = 1,
-
     /** Enable continuous batching */
     val continuousBatching: Boolean = false,
-
     /** Flash attention configuration */
     val flashAttention: Boolean = true,
-
     /** KV cache optimization */
     val kvCacheOptimization: Boolean = true,
-
     // MARK: - Framework-Specific Options
-
     /** The inference framework to use for generation */
     val framework: InferenceFramework? = null,
-
     /** Framework-specific configuration options */
     val frameworkOptions: Map<String, String> = emptyMap(),
-
     /** Preferred execution target */
     val preferredExecutionTarget: ExecutionTarget? = null,
-
     /** Hardware configuration override */
     val hardwareConfiguration: HardwareConfiguration? = null,
-
     // MARK: - Debugging and Monitoring
-
     /** Enable verbose logging */
     val verboseLogging: Boolean = false,
-
     /** Enable performance monitoring */
     val performanceMonitoring: Boolean = true,
-
     /** Enable memory usage tracking */
-    val memoryTracking: Boolean = true
-
-) : ComponentConfiguration, ComponentInitParameters {
-
+    val memoryTracking: Boolean = true,
+) : ComponentConfiguration,
+    ComponentInitParameters {
     override val componentType: SDKComponent
         get() = SDKComponent.LLM
 
@@ -287,8 +247,8 @@ data class LLMConfiguration(
     /**
      * Create optimized configuration for mobile devices
      */
-    fun forMobile(): LLMConfiguration {
-        return copy(
+    fun forMobile(): LLMConfiguration =
+        copy(
             contextLength = minOf(contextLength, 2048),
             cacheSize = minOf(cacheSize, 50),
             cpuThreads = minOf(cpuThreads ?: 4, 4),
@@ -297,15 +257,14 @@ data class LLMConfiguration(
             memoryLock = false,
             batchSize = 1,
             continuousBatching = false,
-            verboseLogging = false
+            verboseLogging = false,
         )
-    }
 
     /**
      * Create optimized configuration for desktop/server
      */
-    fun forDesktop(): LLMConfiguration {
-        return copy(
+    fun forDesktop(): LLMConfiguration =
+        copy(
             contextLength = maxOf(contextLength, 4096),
             cacheSize = maxOf(cacheSize, 200),
             cpuThreads = cpuThreads ?: 8,
@@ -315,37 +274,34 @@ data class LLMConfiguration(
             batchSize = maxOf(batchSize, 2),
             continuousBatching = true,
             flashAttention = true,
-            kvCacheOptimization = true
+            kvCacheOptimization = true,
         )
-    }
 
     /**
      * Create configuration optimized for speed
      */
-    fun forSpeed(): LLMConfiguration {
-        return copy(
+    fun forSpeed(): LLMConfiguration =
+        copy(
             quantizationLevel = quantizationLevel ?: QuantizationLevel.forSpeed(),
             useGPUIfAvailable = true,
             gpuLayers = gpuLayers ?: 64,
             flashAttention = true,
             kvCacheOptimization = true,
             optimizeAttention = true,
-            memoryMapping = true
+            memoryMapping = true,
         )
-    }
 
     /**
      * Create configuration optimized for quality
      */
-    fun forQuality(): LLMConfiguration {
-        return copy(
+    fun forQuality(): LLMConfiguration =
+        copy(
             quantizationLevel = quantizationLevel ?: QuantizationLevel.forQuality(),
             contextLength = maxOf(contextLength, 4096),
             temperature = minOf(temperature, 0.3),
             flashAttention = false, // Disable for maximum precision
-            performanceMonitoring = true
+            performanceMonitoring = true,
         )
-    }
 
     /**
      * Create configuration with specific hardware constraints
@@ -358,7 +314,7 @@ data class LLMConfiguration(
             cacheSize = adjustedCacheSize,
             contextLength = adjustedContextLength,
             memoryMapping = maxMemoryMB < 500, // Use memory mapping for low-memory systems
-            quantizationLevel = quantizationLevel ?: if (maxMemoryMB < 1000) QuantizationLevel.Q4_K_M else QuantizationLevel.Q8_0
+            quantizationLevel = quantizationLevel ?: if (maxMemoryMB < 1000) QuantizationLevel.Q4_K_M else QuantizationLevel.Q8_0,
         )
     }
 

@@ -1,23 +1,16 @@
 package com.runanywhere.sdk.features.voiceagent
 
-import com.runanywhere.sdk.features.stt.STTCapability
-import com.runanywhere.sdk.features.tts.TTSCapability
-import com.runanywhere.sdk.features.llm.LLMCapability
-import com.runanywhere.sdk.models.LLMGenerationOptions
-import com.runanywhere.sdk.features.vad.VADCapability
-import com.runanywhere.sdk.features.voiceagent.VoiceAgentComponent
-import com.runanywhere.sdk.features.voiceagent.VoiceAgentConfiguration
-import com.runanywhere.sdk.features.voiceagent.VoiceAgentResult
-import com.runanywhere.sdk.features.voiceagent.VoiceAgentEvent
-import com.runanywhere.sdk.features.voiceagent.VoiceAgentPipelineState
-import com.runanywhere.sdk.features.stt.STTConfiguration
-import com.runanywhere.sdk.features.llm.LLMConfiguration
-import com.runanywhere.sdk.features.tts.TTSConfiguration
-import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.events.EventPublisher
 import com.runanywhere.sdk.events.SDKVoiceEvent
+import com.runanywhere.sdk.features.llm.LLMCapability
+import com.runanywhere.sdk.features.llm.LLMConfiguration
+import com.runanywhere.sdk.features.stt.STTCapability
+import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.tts.TTSCapability
+import com.runanywhere.sdk.features.tts.TTSConfiguration
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -41,8 +34,7 @@ class VoiceAgentCapability internal constructor(
     private val getSTTCapability: () -> STTCapability?,
     private val getLLMCapability: () -> LLMCapability?,
     private val getTTSCapability: () -> TTSCapability?,
-    private val getVADCapability: () -> VADCapability?,
-    private val getOrCreateComponent: (VoiceAgentConfiguration) -> VoiceAgentComponent
+    private val getOrCreateComponent: (VoiceAgentConfiguration) -> VoiceAgentComponent,
 ) {
     private val logger = SDKLogger("VoiceAgentCapability")
 
@@ -89,9 +81,30 @@ class VoiceAgentCapability internal constructor(
         val tts = getTTSCapability()
 
         return VoiceAgentComponentStates(
-            stt = if (stt?.isModelLoaded == true) ComponentLoadState.Loaded(stt.currentModelId ?: "unknown") else ComponentLoadState.NotLoaded,
-            llm = if (llm?.isModelLoaded == true) ComponentLoadState.Loaded(llm.currentModelId ?: "unknown") else ComponentLoadState.NotLoaded,
-            tts = if (tts?.isVoiceLoaded == true) ComponentLoadState.Loaded(tts.currentVoiceId ?: "unknown") else ComponentLoadState.NotLoaded
+            stt =
+                if (stt?.isModelLoaded ==
+                    true
+                ) {
+                    ComponentLoadState.Loaded(stt.currentModelId ?: "unknown")
+                } else {
+                    ComponentLoadState.NotLoaded
+                },
+            llm =
+                if (llm?.isModelLoaded ==
+                    true
+                ) {
+                    ComponentLoadState.Loaded(llm.currentModelId ?: "unknown")
+                } else {
+                    ComponentLoadState.NotLoaded
+                },
+            tts =
+                if (tts?.isVoiceLoaded ==
+                    true
+                ) {
+                    ComponentLoadState.Loaded(tts.currentVoiceId ?: "unknown")
+                } else {
+                    ComponentLoadState.NotLoaded
+                },
         )
     }
 
@@ -105,30 +118,30 @@ class VoiceAgentCapability internal constructor(
      * @param config VoiceAgentConfiguration with all sub-component configs
      * @throws SDKError if initialization fails
      */
-    suspend fun initialize(config: VoiceAgentConfiguration) = mutex.withLock {
-        logger.info("Initializing Voice Agent with full configuration")
+    suspend fun initialize(config: VoiceAgentConfiguration) =
+        mutex.withLock {
+            logger.info("Initializing Voice Agent with full configuration")
 
-        try {
-            EventPublisher.track(SDKVoiceEvent.PipelineStarted)
+            try {
+                EventPublisher.track(SDKVoiceEvent.PipelineStarted)
 
-            // Create and initialize the component
-            component = getOrCreateComponent(config)
-            component?.initialize()
+                // Create and initialize the component
+                component = getOrCreateComponent(config)
+                component?.initialize()
 
-            currentConfiguration = config
-            isConfigured = true
+                currentConfiguration = config
+                isConfigured = true
 
-            logger.info("✅ Voice Agent initialized successfully")
-            EventPublisher.track(SDKVoiceEvent.PipelineCompleted)
-
-        } catch (e: Exception) {
-            logger.error("Failed to initialize Voice Agent", e)
-            isConfigured = false
-            component = null
-            EventPublisher.track(SDKVoiceEvent.PipelineError(e))
-            throw SDKError.InitializationFailed("Voice Agent initialization failed: ${e.message}")
+                logger.info("✅ Voice Agent initialized successfully")
+                EventPublisher.track(SDKVoiceEvent.PipelineCompleted)
+            } catch (e: Exception) {
+                logger.error("Failed to initialize Voice Agent", e)
+                isConfigured = false
+                component = null
+                EventPublisher.track(SDKVoiceEvent.PipelineError(e))
+                throw SDKError.InitializationFailed("Voice Agent initialization failed: ${e.message}")
+            }
         }
-    }
 
     /**
      * Quick initialization with model IDs
@@ -141,16 +154,17 @@ class VoiceAgentCapability internal constructor(
     suspend fun initialize(
         sttModelId: String,
         llmModelId: String,
-        ttsVoice: String
+        ttsVoice: String,
     ) {
         logger.info("Initializing Voice Agent with model IDs: STT=$sttModelId, LLM=$llmModelId, TTS=$ttsVoice")
 
-        val config = VoiceAgentConfiguration(
-            vadConfig = VADConfiguration(),
-            sttConfig = STTConfiguration(modelId = sttModelId.ifEmpty { "whisper-base" }),
-            llmConfig = LLMConfiguration(modelId = llmModelId.ifEmpty { "llama-2-7b-chat" }),
-            ttsConfig = TTSConfiguration(voice = ttsVoice.ifEmpty { "default" })
-        )
+        val config =
+            VoiceAgentConfiguration(
+                vadConfig = VADConfiguration(),
+                sttConfig = STTConfiguration(modelId = sttModelId.ifEmpty { "whisper-base" }),
+                llmConfig = LLMConfiguration(modelId = llmModelId.ifEmpty { "llama-2-7b-chat" }),
+                ttsConfig = TTSConfiguration(voice = ttsVoice.ifEmpty { "default" }),
+            )
 
         initialize(config)
     }
@@ -183,7 +197,7 @@ class VoiceAgentCapability internal constructor(
         initialize(
             sttModelId = stt?.currentModelId ?: "",
             llmModelId = llm?.currentModelId ?: "",
-            ttsVoice = tts?.currentVoiceId ?: ""
+            ttsVoice = tts?.currentVoiceId ?: "",
         )
     }
 
@@ -291,21 +305,22 @@ class VoiceAgentCapability internal constructor(
     /**
      * Cleanup Voice Agent and release resources
      */
-    suspend fun cleanup() = mutex.withLock {
-        logger.info("Cleaning up Voice Agent")
+    suspend fun cleanup() =
+        mutex.withLock {
+            logger.info("Cleaning up Voice Agent")
 
-        try {
-            component?.cleanup()
-        } catch (e: Exception) {
-            logger.warn("Error during Voice Agent cleanup: ${e.message}")
+            try {
+                component?.cleanup()
+            } catch (e: Exception) {
+                logger.warn("Error during Voice Agent cleanup: ${e.message}")
+            }
+
+            component = null
+            isConfigured = false
+            currentConfiguration = null
+
+            logger.info("✅ Voice Agent cleaned up")
         }
-
-        component = null
-        isConfigured = false
-        currentConfiguration = null
-
-        logger.info("✅ Voice Agent cleaned up")
-    }
 
     // ============================================================================
     // MARK: - Private Helpers
@@ -328,9 +343,16 @@ class VoiceAgentCapability internal constructor(
  */
 sealed class ComponentLoadState {
     object NotLoaded : ComponentLoadState()
+
     object Loading : ComponentLoadState()
-    data class Loaded(val modelId: String) : ComponentLoadState()
-    data class Error(val message: String) : ComponentLoadState()
+
+    data class Loaded(
+        val modelId: String,
+    ) : ComponentLoadState()
+
+    data class Error(
+        val message: String,
+    ) : ComponentLoadState()
 
     val isLoaded: Boolean
         get() = this is Loaded
@@ -346,7 +368,7 @@ sealed class ComponentLoadState {
 data class VoiceAgentComponentStates(
     val stt: ComponentLoadState,
     val llm: ComponentLoadState,
-    val tts: ComponentLoadState
+    val tts: ComponentLoadState,
 ) {
     /**
      * Check if all components are fully ready
@@ -364,11 +386,12 @@ data class VoiceAgentComponentStates(
      * Get list of missing (not loaded) component names
      */
     val missingComponents: List<String>
-        get() = buildList {
-            if (!stt.isLoaded) add("STT")
-            if (!llm.isLoaded) add("LLM")
-            if (!tts.isLoaded) add("TTS")
-        }
+        get() =
+            buildList {
+                if (!stt.isLoaded) add("STT")
+                if (!llm.isLoaded) add("LLM")
+                if (!tts.isLoaded) add("TTS")
+            }
 }
 
 /**
@@ -378,16 +401,22 @@ data class VoiceAgentComponentStates(
 enum class AudioPipelineState {
     /** Ready to start */
     IDLE,
+
     /** Listening for speech */
     LISTENING,
+
     /** Processing STT */
     PROCESSING_SPEECH,
+
     /** Running LLM */
     GENERATING_RESPONSE,
+
     /** Playing TTS output */
     PLAYING_TTS,
+
     /** Cooldown after TTS (feedback prevention) */
     COOLDOWN,
+
     /** Error state */
-    ERROR
+    ERROR,
 }

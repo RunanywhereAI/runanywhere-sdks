@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.utils
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 /**
  * SDK Constants Management
@@ -10,15 +10,15 @@ import kotlinx.serialization.decodeFromString
  * Environment-specific values loaded from external config files
  */
 object SDKConstants {
-
     // Configuration holder - will be populated from external config
     private var config: SDKConfig = SDKConfig()
 
     // JSON parser for config files
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
 
     /**
      * Initialize constants from configuration string
@@ -38,9 +38,10 @@ object SDKConstants {
 
     // MARK: - SDK Information
     const val VERSION = "0.1.0"
+
     /** Alias for VERSION to match core.SDKConstants naming */
     const val SDK_VERSION = VERSION
-    val USER_AGENT get() = "RunAnywhere-Kotlin-SDK/${VERSION}"
+    val USER_AGENT get() = "RunAnywhere-Kotlin-SDK/$VERSION"
     const val SDK_NAME = "runanywhere-kotlin"
 
     // Platform-specific constants matching iOS SDKConstants
@@ -51,7 +52,7 @@ object SDKConstants {
     enum class Environment {
         DEVELOPMENT,
         STAGING,
-        PRODUCTION
+        PRODUCTION,
     }
 
     val ENVIRONMENT: Environment get() = config.environment
@@ -246,13 +247,13 @@ data class SDKConfig(
     val enableVerboseLogging: Boolean = false,
     val enableMockServices: Boolean = false,
     val modelUrls: ModelUrlConfig = ModelUrlConfig(),
-    val features: FeatureConfig = FeatureConfig()
+    val features: FeatureConfig = FeatureConfig(),
 )
 
 @Serializable
 data class ModelUrlConfig(
     // Default Speech Model - Whisper Base only
-    val whisperBase: String = ""
+    val whisperBase: String = "",
 )
 
 @Serializable
@@ -267,5 +268,5 @@ data class FeatureConfig(
     val vad: Boolean = true,
     val sttAnalytics: Boolean = true,
     val realTimeStt: Boolean = true,
-    val sttConfidenceScoring: Boolean = true
+    val sttConfidenceScoring: Boolean = true,
 )

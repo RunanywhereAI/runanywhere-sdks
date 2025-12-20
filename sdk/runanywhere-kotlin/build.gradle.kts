@@ -4,7 +4,39 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
     id("maven-publish")
+}
+
+// =============================================================================
+// Detekt Configuration
+// =============================================================================
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("detekt.yml"))
+    source.setFrom(
+        "src/commonMain/kotlin",
+        "src/jvmMain/kotlin",
+        "src/jvmAndroidMain/kotlin",
+        "src/androidMain/kotlin",
+    )
+}
+
+// =============================================================================
+// ktlint Configuration
+// =============================================================================
+ktlint {
+    version.set("1.5.0")
+    android.set(true)
+    verbose.set(true)
+    outputToConsole.set(true)
+    enableExperimentalRules.set(false)
+    filter {
+        exclude("**/generated/**")
+        include("**/kotlin/**")
+    }
 }
 
 group = "com.runanywhere.sdk"
@@ -22,11 +54,12 @@ version = "0.1.3"
 // - When SDK is at ":sdk:runanywhere-kotlin": path → ":sdk:runanywhere-kotlin:modules:$moduleName"
 fun resolveModulePath(moduleName: String): String {
     val basePath = project.path
-    val computedPath = if (basePath == ":") {
-        ":modules:$moduleName"
-    } else {
-        "$basePath:modules:$moduleName"
-    }
+    val computedPath =
+        if (basePath == ":") {
+            ":modules:$moduleName"
+        } else {
+            "$basePath:modules:$moduleName"
+        }
 
     // Try to find the project using rootProject to handle Android Studio sync ordering
     val foundProject = rootProject.findProject(computedPath)
@@ -172,7 +205,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }

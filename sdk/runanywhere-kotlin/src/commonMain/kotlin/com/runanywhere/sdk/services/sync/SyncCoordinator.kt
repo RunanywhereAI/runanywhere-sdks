@@ -12,7 +12,6 @@ import kotlinx.coroutines.sync.withLock
  * Coordinates synchronization operations across services
  */
 class SyncCoordinator {
-
     private val logger = SDKLogger("SyncCoordinator")
     private val mutex = Mutex()
 
@@ -22,118 +21,121 @@ class SyncCoordinator {
      * Sync configuration data
      * Coordinate configuration synchronization
      */
-    suspend fun syncConfiguration(configurationData: ConfigurationData) = mutex.withLock {
-        logger.debug("Syncing configuration data")
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun syncConfiguration(configurationData: ConfigurationData) =
+        mutex.withLock {
+            logger.debug("Syncing configuration data")
 
-        if (isSyncing) {
-            logger.warn("Sync already in progress, skipping configuration sync")
-            return
+            if (isSyncing) {
+                logger.warn("Sync already in progress, skipping configuration sync")
+                return
+            }
+
+            try {
+                isSyncing = true
+
+                // Implement configuration sync logic here
+                // This would typically involve uploading to remote services
+
+                logger.info("Configuration synced successfully")
+            } catch (e: Exception) {
+                logger.error("Failed to sync configuration", e)
+                throw e
+            } finally {
+                isSyncing = false
+            }
         }
-
-        try {
-            isSyncing = true
-
-            // Implement configuration sync logic here
-            // This would typically involve uploading to remote services
-
-            logger.info("Configuration synced successfully")
-
-        } catch (e: Exception) {
-            logger.error("Failed to sync configuration", e)
-            throw e
-        } finally {
-            isSyncing = false
-        }
-    }
 
     /**
      * Sync device info data
      * Coordinate device info synchronization
      */
-    suspend fun syncDeviceInfo(deviceInfoData: DeviceInfoData) = mutex.withLock {
-        logger.debug("Syncing device info data")
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun syncDeviceInfo(deviceInfoData: DeviceInfoData) =
+        mutex.withLock {
+            logger.debug("Syncing device info data")
 
-        if (isSyncing) {
-            logger.warn("Sync already in progress, skipping device info sync")
-            return
+            if (isSyncing) {
+                logger.warn("Sync already in progress, skipping device info sync")
+                return
+            }
+
+            try {
+                isSyncing = true
+
+                // Implement device info sync logic here
+                // This would typically involve uploading to remote services
+
+                logger.info("Device info synced successfully")
+            } catch (e: Exception) {
+                logger.error("Failed to sync device info", e)
+                throw e
+            } finally {
+                isSyncing = false
+            }
         }
-
-        try {
-            isSyncing = true
-
-            // Implement device info sync logic here
-            // This would typically involve uploading to remote services
-
-            logger.info("Device info synced successfully")
-
-        } catch (e: Exception) {
-            logger.error("Failed to sync device info", e)
-            throw e
-        } finally {
-            isSyncing = false
-        }
-    }
 
     /**
      * Sync model info
      * Coordinate model info synchronization
      */
-    suspend fun syncModelInfo() = mutex.withLock {
-        logger.debug("Syncing model info")
+    suspend fun syncModelInfo() =
+        mutex.withLock {
+            logger.debug("Syncing model info")
 
-        if (isSyncing) {
-            logger.warn("Sync already in progress, skipping model info sync")
-            return
+            if (isSyncing) {
+                logger.warn("Sync already in progress, skipping model info sync")
+                return
+            }
+
+            try {
+                isSyncing = true
+
+                // Implement model info sync logic here
+                // This would typically involve downloading latest model catalog
+
+                logger.info("Model info synced successfully")
+            } catch (e: Exception) {
+                logger.error("Failed to sync model info", e)
+                throw e
+            } finally {
+                isSyncing = false
+            }
         }
-
-        try {
-            isSyncing = true
-
-            // Implement model info sync logic here
-            // This would typically involve downloading latest model catalog
-
-            logger.info("Model info synced successfully")
-
-        } catch (e: Exception) {
-            logger.error("Failed to sync model info", e)
-            throw e
-        } finally {
-            isSyncing = false
-        }
-    }
 
     /**
      * Sync telemetry data
      * Coordinate telemetry synchronization
      */
-    suspend fun syncTelemetry() = mutex.withLock {
-        logger.debug("Syncing telemetry data")
+    suspend fun syncTelemetry() =
+        mutex.withLock {
+            logger.debug("Syncing telemetry data")
 
-        if (isSyncing) {
-            logger.warn("Sync already in progress, skipping telemetry sync")
-            return
+            if (isSyncing) {
+                logger.warn("Sync already in progress, skipping telemetry sync")
+                return
+            }
+
+            try {
+                isSyncing = true
+
+                // Implement telemetry sync logic here
+                // This would typically involve uploading analytics data
+
+                logger.info("Telemetry synced successfully")
+            } catch (e: Exception) {
+                logger.error("Failed to sync telemetry", e)
+                throw e
+            } finally {
+                isSyncing = false
+            }
         }
-
-        try {
-            isSyncing = true
-
-            // Implement telemetry sync logic here
-            // This would typically involve uploading analytics data
-
-            logger.info("Telemetry synced successfully")
-
-        } catch (e: Exception) {
-            logger.error("Failed to sync telemetry", e)
-            throw e
-        } finally {
-            isSyncing = false
-        }
-    }
 
     /**
      * Check if sync is in progress
      */
-    suspend fun isSyncInProgress(): Boolean = mutex.withLock {
-        return isSyncing
-    }
+    suspend fun isSyncInProgress(): Boolean =
+        mutex.withLock {
+            return isSyncing
+        }
 }

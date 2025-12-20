@@ -10,38 +10,35 @@ package com.runanywhere.sdk.data.models
  * Convert TelemetryData (with properties dict) to TelemetryEventPayload (typed) for API
  * Matches iOS extension TelemetryEventPayload(from: TelemetryData)
  */
-fun TelemetryData.toPayload(): TelemetryEventPayload {
-    return TelemetryEventPayload(
+fun TelemetryData.toPayload(): TelemetryEventPayload =
+    TelemetryEventPayload(
         id = id,
-        eventType = type.name.lowercase(),  // Convert to lowercase to match iOS and backend expectations
+        eventType = type.name.lowercase(), // Convert to lowercase to match iOS and backend expectations
         timestamp = timestamp,
         createdAt = timestamp, // Use timestamp as created_at
-
         // Session
         sessionId = properties["session_id"],
-
         // Model info
         modelId = properties["model_id"],
         modelName = properties["model_name"],
         framework = properties["framework"],
-        modality = properties["modality"],  // Extract modality from properties
-
+        modality = properties["modality"], // Extract modality from properties
         // Device info
         device = properties["device"],
         osVersion = properties["os_version"],
         platform = platform,
         sdkVersion = sdkVersion,
-
         // Common metrics
-        processingTimeMs = properties["processing_time_ms"]?.toDoubleOrNull()
-            ?: properties["total_time_ms"]?.toDoubleOrNull(),
+        processingTimeMs =
+            properties["processing_time_ms"]?.toDoubleOrNull()
+                ?: properties["total_time_ms"]?.toDoubleOrNull(),
         success = success,
         errorMessage = errorMessage,
         errorCode = errorCode,
-
         // LLM
-        inputTokens = properties["input_tokens"]?.toIntOrNull()
-            ?: properties["prompt_tokens"]?.toIntOrNull(),
+        inputTokens =
+            properties["input_tokens"]?.toIntOrNull()
+                ?: properties["prompt_tokens"]?.toIntOrNull(),
         outputTokens = properties["output_tokens"]?.toIntOrNull(),
         totalTokens = properties["total_tokens"]?.toIntOrNull(),
         tokensPerSecond = properties["tokens_per_second"]?.toDoubleOrNull(),
@@ -51,7 +48,6 @@ fun TelemetryData.toPayload(): TelemetryEventPayload {
         contextLength = properties["context_length"]?.toIntOrNull(),
         temperature = properties["temperature"]?.toDoubleOrNull(),
         maxTokens = properties["max_tokens"]?.toIntOrNull(),
-
         // STT
         audioDurationMs = properties["audio_duration_ms"]?.toDoubleOrNull(),
         realTimeFactor = properties["real_time_factor"]?.toDoubleOrNull(),
@@ -60,14 +56,13 @@ fun TelemetryData.toPayload(): TelemetryEventPayload {
         language = properties["language"],
         isStreaming = properties["is_streaming"]?.toBooleanStrictOrNull(),
         segmentIndex = properties["segment_index"]?.toIntOrNull(),
-
         // TTS
         characterCount = properties["character_count"]?.toIntOrNull(),
         charactersPerSecond = properties["characters_per_second"]?.toDoubleOrNull(),
         audioSizeBytes = properties["audio_size_bytes"]?.toIntOrNull(),
         sampleRate = properties["sample_rate"]?.toIntOrNull(),
         voice = properties["voice"],
-        outputDurationMs = properties["output_duration_ms"]?.toDoubleOrNull()
-            ?: properties["audio_duration_ms"]?.toDoubleOrNull()
+        outputDurationMs =
+            properties["output_duration_ms"]?.toDoubleOrNull()
+                ?: properties["audio_duration_ms"]?.toDoubleOrNull(),
     )
-}

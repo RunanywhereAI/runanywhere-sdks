@@ -7,7 +7,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * Implements LRU (Least Recently Used) with priority awareness
  */
 class CacheEviction {
-
     private val logger = SDKLogger("CacheEviction")
     private val allocationManager = AllocationManager()
 
@@ -24,10 +23,10 @@ class CacheEviction {
      * Eviction strategies
      */
     enum class EvictionStrategy {
-        LRU,        // Least Recently Used
-        LFU,        // Least Frequently Used
-        FIFO,       // First In First Out
-        PRIORITY    // Priority-based
+        LRU, // Least Recently Used
+        LFU, // Least Frequently Used
+        FIFO, // First In First Out
+        PRIORITY, // Priority-based
     }
 
     /**
@@ -35,7 +34,7 @@ class CacheEviction {
      */
     fun selectModelsWithStrategy(
         targetMemory: Long,
-        strategy: EvictionStrategy = EvictionStrategy.LRU
+        strategy: EvictionStrategy = EvictionStrategy.LRU,
     ): List<String> {
         logger.debug("Using $strategy strategy to select models for eviction")
 

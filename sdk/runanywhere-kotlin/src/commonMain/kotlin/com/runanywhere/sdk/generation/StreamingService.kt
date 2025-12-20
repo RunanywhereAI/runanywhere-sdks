@@ -4,23 +4,22 @@ import com.runanywhere.sdk.features.llm.LLMService
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.currentTimeMillis
-import com.runanywhere.sdk.models.LoadedModelWithService
 import com.runanywhere.sdk.models.LLMGenerationOptions
+import com.runanywhere.sdk.models.LoadedModelWithService
 import com.runanywhere.sdk.services.analytics.PerformanceMetrics
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 
 /**
  * Service for handling streaming text generation
  */
 class StreamingService {
-
     private val logger = SDKLogger("StreamingService")
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Reference to the currently loaded model and service
     private var currentModel: LoadedModelWithService? = null
@@ -43,83 +42,89 @@ class StreamingService {
      */
     fun stream(
         prompt: String,
-        options: GenerationOptions
-    ): Flow<GenerationChunk> = flow {
-        val model = currentModel
-            ?: throw IllegalStateException("No model loaded for streaming. Call loadModel() first.")
+        options: GenerationOptions,
+    ): Flow<GenerationChunk> =
+        flow {
+            val model =
+                currentModel
+                    ?: throw IllegalStateException("No model loaded for streaming. Call loadModel() first.")
 
-        logger.info("🚀 Starting streaming with model: ${model.model.id}")
-        logger.info("📝 User prompt: $prompt")
+            logger.info("🚀 Starting streaming with model: ${model.model.id}")
+            logger.info("📝 User prompt: $prompt")
 
-        // Track analytics
-        val generationId = "gen_${currentTimeMillis()}_${(0..9999).random()}"
-        val startTime = currentTimeMillis()
-        var timeToFirstTokenMs: Double? = null
+            // Track analytics
+            val generationId = "gen_${currentTimeMillis()}_${(0..9999).random()}"
+            val startTime = currentTimeMillis()
+            var timeToFirstTokenMs: Double? = null
 
-        // Convert to LLMGenerationOptions
-        val llmOptions = LLMGenerationOptions(
-            temperature = options.temperature,
-            maxTokens = options.maxTokens,
-            streamingEnabled = true
-        )
+            // Convert to LLMGenerationOptions
+            val llmOptions =
+                LLMGenerationOptions(
+                    temperature = options.temperature,
+                    maxTokens = options.maxTokens,
+                    streamingEnabled = true,
+                )
 
-        // Get LLM service - all services now support chat templates automatically
-        val llmService = model.service as? LLMService
-            ?: throw IllegalStateException("Loaded service is not an LLM service")
+            // Get LLM service - all services now support chat templates automatically
+            val llmService =
+                model.service as? LLMService
+                    ?: throw IllegalStateException("Loaded service is not an LLM service")
 
-        logger.info("✅ Streaming with automatic chat template support")
+            logger.info("✅ Streaming with automatic chat template support")
 
-        try {
-            // Use streamGenerate - it now automatically applies chat templates internally
-            // The user just passes a simple prompt, and the SDK handles everything
-            val fullText = StringBuilder()
-            var firstTokenReceived = false
+            try {
+                // Use streamGenerate - it now automatically applies chat templates internally
+                // The user just passes a simple prompt, and the SDK handles everything
+                val fullText = StringBuilder()
+                var firstTokenReceived = false
 
-            llmService.streamGenerate(prompt, llmOptions) { token ->
-                // Track time to first token (matches iOS analytics)
-                if (!firstTokenReceived) {
-                    timeToFirstTokenMs = (currentTimeMillis() - startTime).toDouble()
-                    firstTokenReceived = true
+                llmService.streamGenerate(prompt, llmOptions) { token ->
+                    // Track time to first token (matches iOS analytics)
+                    if (!firstTokenReceived) {
+                        timeToFirstTokenMs = (currentTimeMillis() - startTime).toDouble()
+                        firstTokenReceived = true
+                    }
+                    fullText.append(token)
                 }
-                fullText.append(token)
+
+                val generatedText = fullText.toString()
+                val latencyMs = currentTimeMillis() - startTime
+
+                emit(
+                    GenerationChunk(
+                        text = generatedText,
+                        tokenCount = generatedText.length / 4,
+                        isComplete = true,
+                    ),
+                )
+
+                // Submit analytics after successful generation (non-blocking)
+                submitAnalytics(
+                    generationId = generationId,
+                    modelName = model.model.name, // Use human-readable name instead of hash ID
+                    prompt = prompt,
+                    response = generatedText,
+                    latencyMs = latencyMs,
+                    timeToFirstTokenMs = timeToFirstTokenMs,
+                    success = true,
+                )
+            } catch (e: Exception) {
+                val latencyMs = currentTimeMillis() - startTime
+
+                // Submit analytics for failure (non-blocking)
+                submitAnalytics(
+                    generationId = generationId,
+                    modelName = model.model.name, // Use human-readable name instead of hash ID
+                    prompt = prompt,
+                    response = "",
+                    latencyMs = latencyMs,
+                    timeToFirstTokenMs = timeToFirstTokenMs,
+                    success = false,
+                )
+
+                throw e
             }
-
-            val generatedText = fullText.toString()
-            val latencyMs = currentTimeMillis() - startTime
-
-            emit(GenerationChunk(
-                text = generatedText,
-                tokenCount = generatedText.length / 4,
-                isComplete = true
-            ))
-
-            // Submit analytics after successful generation (non-blocking)
-            submitAnalytics(
-                generationId = generationId,
-                modelName = model.model.name, // Use human-readable name instead of hash ID
-                prompt = prompt,
-                response = generatedText,
-                latencyMs = latencyMs,
-                timeToFirstTokenMs = timeToFirstTokenMs,
-                success = true
-            )
-        } catch (e: Exception) {
-            val latencyMs = currentTimeMillis() - startTime
-
-            // Submit analytics for failure (non-blocking)
-            submitAnalytics(
-                generationId = generationId,
-                modelName = model.model.name, // Use human-readable name instead of hash ID
-                prompt = prompt,
-                response = "",
-                latencyMs = latencyMs,
-                timeToFirstTokenMs = timeToFirstTokenMs,
-                success = false
-            )
-
-            throw e
         }
-    }
 
     /**
      * Submit analytics for generation (non-blocking)
@@ -132,7 +137,7 @@ class StreamingService {
         response: String,
         latencyMs: Long,
         timeToFirstTokenMs: Double?,
-        success: Boolean
+        success: Boolean,
     ) {
         val analytics = ServiceContainer.shared.analyticsService
         if (analytics == null) {
@@ -140,24 +145,28 @@ class StreamingService {
             return
         }
 
-        logger.debug("📊 Submitting stream analytics: generationId=$generationId, modelName=$modelName, success=$success, timeToFirstToken=${timeToFirstTokenMs}ms")
+        logger.debug(
+            "📊 Submitting stream analytics: generationId=$generationId, modelName=$modelName, success=$success, timeToFirstToken=${timeToFirstTokenMs}ms",
+        )
 
         // Non-blocking background submission
-        GlobalScope.launch(Dispatchers.IO) {
+        serviceScope.launch {
             try {
                 val inputTokens = prompt.split(Regex("\\s+")).size.coerceAtLeast(1)
                 val outputTokens = if (success) response.split(Regex("\\s+")).size.coerceAtLeast(1) else 0
-                val tokensPerSecond = if (latencyMs > 0 && outputTokens > 0) {
-                    (outputTokens / (latencyMs / 1000.0))
-                } else {
-                    0.0
-                }
+                val tokensPerSecond =
+                    if (latencyMs > 0 && outputTokens > 0) {
+                        (outputTokens / (latencyMs / 1000.0))
+                    } else {
+                        0.0
+                    }
 
-                val performanceMetrics = PerformanceMetrics(
-                    inferenceTimeMs = latencyMs.toDouble(),
-                    tokensPerSecond = tokensPerSecond,
-                    timeToFirstTokenMs = timeToFirstTokenMs // Now passing actual value
-                )
+                val performanceMetrics =
+                    PerformanceMetrics(
+                        inferenceTimeMs = latencyMs.toDouble(),
+                        tokensPerSecond = tokensPerSecond,
+                        timeToFirstTokenMs = timeToFirstTokenMs, // Now passing actual value
+                    )
 
                 analytics.submitGenerationAnalytics(
                     generationId = generationId,
@@ -166,75 +175,13 @@ class StreamingService {
                     inputTokens = inputTokens,
                     outputTokens = outputTokens,
                     success = success,
-                    executionTarget = "onDevice"
+                    executionTarget = "onDevice",
                 )
 
                 logger.debug("✅ Analytics submitted successfully for generation: $generationId")
             } catch (e: Exception) {
                 logger.debug("Analytics submission failed (non-critical): ${e.message}")
             }
-        }
-    }
-
-    /**
-     * Stream with token-by-token generation
-     */
-    fun streamTokens(
-        prompt: String,
-        options: GenerationOptions
-    ): Flow<TokenChunk> = flow {
-        logger.debug("Starting token streaming for prompt: ${prompt.take(50)}...")
-
-        // TODO: Implement actual token streaming
-        // This is a mock implementation
-
-        val tokens = listOf("This", " is", " a", " token", " stream", ".")
-
-        for ((index, token) in tokens.withIndex()) {
-            val chunk = TokenChunk(
-                token = token,
-                tokenId = index,
-                logProb = -0.5f, // Mock log probability
-                isComplete = index == tokens.lastIndex
-            )
-            emit(chunk)
-
-            // Simulate processing delay
-            delay(30)
-        }
-    }
-
-    /**
-     * Stream with partial completions (useful for code generation)
-     */
-    fun streamPartial(
-        prompt: String,
-        options: GenerationOptions
-    ): Flow<PartialCompletion> = flow {
-        logger.debug("Starting partial streaming for prompt: ${prompt.take(50)}...")
-
-        // TODO: Implement actual partial streaming
-        // This is a mock implementation
-
-        val parts = listOf(
-            "def hello",
-            "def hello_world",
-            "def hello_world():",
-            "def hello_world():\n    ",
-            "def hello_world():\n    print",
-            "def hello_world():\n    print('Hello, World!')"
-        )
-
-        for ((index, part) in parts.withIndex()) {
-            val completion = PartialCompletion(
-                text = part,
-                confidence = 0.9f - (index * 0.05f),
-                isComplete = index == parts.lastIndex
-            )
-            emit(completion)
-
-            // Simulate processing delay
-            delay(100)
         }
     }
 
@@ -246,36 +193,3 @@ class StreamingService {
         logger.info("Streaming operation cancelled")
     }
 }
-
-/**
- * Token chunk for token-level streaming
- */
-data class TokenChunk(
-    val token: String,
-    val tokenId: Int,
-    val logProb: Float,
-    val isComplete: Boolean = false
-)
-
-/**
- * Partial completion for incremental generation
- */
-data class PartialCompletion(
-    val text: String,
-    val confidence: Float,
-    val isComplete: Boolean = false
-)
-
-/**
- * Represents a streaming token with type information.
- *
- * Used for streaming text generation where tokens need to be
- * classified as either thinking/reasoning or actual content.
- */
-data class StreamingToken(
-    val text: String,
-    val tokenIndex: Int,
-    val isLast: Boolean,
-    val timestamp: Long = currentTimeMillis(),
-    val type: TokenType = TokenType.CONTENT
-)

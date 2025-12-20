@@ -1,11 +1,10 @@
 package com.runanywhere.sdk.voice.handlers
 
+import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.features.vad.VADComponent
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.vad.VADInput
 import com.runanywhere.sdk.features.vad.VADOutput
-import com.runanywhere.sdk.features.vad.VADMetadata
-import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.voice.vad.SimpleEnergyVAD
 import kotlinx.coroutines.flow.Flow
@@ -17,9 +16,8 @@ import kotlinx.coroutines.flow.flow
  */
 class VADHandler(
     private val vadComponent: VADComponent? = null,
-    private val simpleVAD: SimpleEnergyVAD? = null
+    private val simpleVAD: SimpleEnergyVAD? = null,
 ) {
-
     private val logger = SDKLogger("VADHandler")
 
     // Speech detection state
@@ -54,7 +52,7 @@ class VADHandler(
             return vadComponent.process(input) as? VADOutput
                 ?: VADOutput(
                     isSpeechDetected = false,
-                    energyLevel = 0.0f
+                    energyLevel = 0.0f,
                 )
         }
 
@@ -65,7 +63,7 @@ class VADHandler(
             val isSpeech = result.isSpeechDetected
             return VADOutput(
                 isSpeechDetected = isSpeech,
-                energyLevel = 0.5f // TODO: Get actual energy from SimpleVAD
+                energyLevel = 0.5f, // TODO: Get actual energy from SimpleVAD
             )
         }
 
@@ -73,96 +71,99 @@ class VADHandler(
         logger.warning("No VAD available, assuming speech")
         return VADOutput(
             isSpeechDetected = true,
-            energyLevel = 0.5f
+            energyLevel = 0.5f,
         )
     }
 
     /**
      * Stream VAD processing
      */
-    fun streamVAD(audioStream: Flow<ByteArray>): Flow<VADOutput> = flow {
-        audioStream.collect { chunk ->
-            val vadOutput = detectSpeech(chunk)
-            emit(vadOutput)
+    fun streamVAD(audioStream: Flow<ByteArray>): Flow<VADOutput> =
+        flow {
+            audioStream.collect { chunk ->
+                val vadOutput = detectSpeech(chunk)
+                emit(vadOutput)
+            }
         }
-    }
 
     /**
      * Process continuous audio stream with speech segmentation
      */
-    fun segmentSpeech(audioStream: Flow<ByteArray>): Flow<SpeechSegment> = flow {
-        val audioBuffer = mutableListOf<ByteArray>()
-        var isInSpeech = false
-        var silenceDuration = 0L
-        val chunkDuration = 100L // Assume 100ms chunks
+    fun segmentSpeech(audioStream: Flow<ByteArray>): Flow<SpeechSegment> =
+        flow {
+            val audioBuffer = mutableListOf<ByteArray>()
+            var isInSpeech = false
+            var silenceDuration = 0L
+            val chunkDuration = 100L // Assume 100ms chunks
 
-        audioStream.collect { chunk ->
-            val vadOutput = detectSpeech(chunk)
+            audioStream.collect { chunk ->
+                val vadOutput = detectSpeech(chunk)
 
-            if (vadOutput.isSpeechDetected) {
-                if (!isInSpeech) {
-                    // Speech started
-                    isInSpeech = true
-                    speechStartTime = System.currentTimeMillis()
-                    audioBuffer.clear()
-                    onSpeechStart?.invoke()
-                    logger.debug("Speech segment started")
-                }
-
-                audioBuffer.add(chunk)
-                silenceDuration = 0
-
-            } else {
-                if (isInSpeech) {
-                    audioBuffer.add(chunk)
-                    silenceDuration += chunkDuration
-
-                    // Check if silence exceeds threshold
-                    if (silenceDuration >= maxSilenceDuration) {
-                        // Speech ended
-                        isInSpeech = false
-                        speechEndTime = System.currentTimeMillis()
-                        val duration = speechEndTime!! - speechStartTime!!
-
-                        if (duration >= minSpeechDuration) {
-                            // Emit speech segment
-                            val segment = SpeechSegment(
-                                audio = combineAudioBuffers(audioBuffer),
-                                startTime = speechStartTime!!,
-                                endTime = speechEndTime!!,
-                                duration = duration
-                            )
-                            emit(segment)
-                            onSpeechEnd?.invoke(duration)
-                            logger.debug("Speech segment ended: ${duration}ms")
-                        } else {
-                            logger.debug("Speech segment too short: ${duration}ms")
-                        }
-
+                if (vadOutput.isSpeechDetected) {
+                    if (!isInSpeech) {
+                        // Speech started
+                        isInSpeech = true
+                        speechStartTime = System.currentTimeMillis()
                         audioBuffer.clear()
+                        onSpeechStart?.invoke()
+                        logger.debug("Speech segment started")
+                    }
+
+                    audioBuffer.add(chunk)
+                    silenceDuration = 0
+                } else {
+                    if (isInSpeech) {
+                        audioBuffer.add(chunk)
+                        silenceDuration += chunkDuration
+
+                        // Check if silence exceeds threshold
+                        if (silenceDuration >= maxSilenceDuration) {
+                            // Speech ended
+                            isInSpeech = false
+                            speechEndTime = System.currentTimeMillis()
+                            val duration = speechEndTime!! - speechStartTime!!
+
+                            if (duration >= minSpeechDuration) {
+                                // Emit speech segment
+                                val segment =
+                                    SpeechSegment(
+                                        audio = combineAudioBuffers(audioBuffer),
+                                        startTime = speechStartTime!!,
+                                        endTime = speechEndTime!!,
+                                        duration = duration,
+                                    )
+                                emit(segment)
+                                onSpeechEnd?.invoke(duration)
+                                logger.debug("Speech segment ended: ${duration}ms")
+                            } else {
+                                logger.debug("Speech segment too short: ${duration}ms")
+                            }
+
+                            audioBuffer.clear()
+                        }
                     }
                 }
             }
-        }
 
-        // Emit final segment if in speech
-        if (isInSpeech && audioBuffer.isNotEmpty()) {
-            speechEndTime = System.currentTimeMillis()
-            val duration = speechEndTime!! - speechStartTime!!
+            // Emit final segment if in speech
+            if (isInSpeech && audioBuffer.isNotEmpty()) {
+                speechEndTime = System.currentTimeMillis()
+                val duration = speechEndTime!! - speechStartTime!!
 
-            if (duration >= minSpeechDuration) {
-                val segment = SpeechSegment(
-                    audio = combineAudioBuffers(audioBuffer),
-                    startTime = speechStartTime!!,
-                    endTime = speechEndTime!!,
-                    duration = duration,
-                    isFinal = true
-                )
-                emit(segment)
-                onSpeechEnd?.invoke(duration)
+                if (duration >= minSpeechDuration) {
+                    val segment =
+                        SpeechSegment(
+                            audio = combineAudioBuffers(audioBuffer),
+                            startTime = speechStartTime!!,
+                            endTime = speechEndTime!!,
+                            duration = duration,
+                            isFinal = true,
+                        )
+                    emit(segment)
+                    onSpeechEnd?.invoke(duration)
+                }
             }
         }
-    }
 
     /**
      * Configure VAD handler
@@ -170,7 +171,7 @@ class VADHandler(
     fun configure(
         minSpeechDuration: Long? = null,
         maxSilenceDuration: Long? = null,
-        energyThreshold: Float? = null
+        energyThreshold: Float? = null,
     ) {
         minSpeechDuration?.let { this.minSpeechDuration = it }
         maxSilenceDuration?.let { this.maxSilenceDuration = it }
@@ -257,16 +258,16 @@ data class SpeechSegment(
     val startTime: Long,
     val endTime: Long,
     val duration: Long,
-    val isFinal: Boolean = false
+    val isFinal: Boolean = false,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is SpeechSegment) return false
         return audio.contentEquals(other.audio) &&
-                startTime == other.startTime &&
-                endTime == other.endTime &&
-                duration == other.duration &&
-                isFinal == other.isFinal
+            startTime == other.startTime &&
+            endTime == other.endTime &&
+            duration == other.duration &&
+            isFinal == other.isFinal
     }
 
     override fun hashCode(): Int {
