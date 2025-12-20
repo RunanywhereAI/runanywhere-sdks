@@ -4,7 +4,6 @@ import '../../capabilities/model_loading/model_loading_service.dart';
 import '../../capabilities/text_generation/generation_service.dart';
 import '../../capabilities/streaming/streaming_service.dart';
 import '../../capabilities/voice/voice_capability_service.dart';
-import '../../capabilities/routing/routing_service.dart';
 import '../../capabilities/memory/memory_service.dart';
 import '../../capabilities/memory/allocation_manager.dart';
 import '../../capabilities/memory/pressure_handler.dart';
@@ -35,11 +34,9 @@ class ServiceContainer {
   GenerationService? _generationService;
   StreamingService? _streamingService;
   VoiceCapabilityService? _voiceCapabilityService;
-  RoutingService? _routingService;
   MemoryService? _memoryService;
   DownloadService? _downloadService;
   AnalyticsService? _analyticsService;
-  HardwareCapabilityManager? _hardwareManager;
   SDKLogger? _logger;
 
   // Analytics pipeline
@@ -77,7 +74,6 @@ class ServiceContainer {
   /// Generation service
   GenerationService get generationService {
     return _generationService ??= GenerationService(
-      routingService: routingService,
       modelLoadingService: modelLoadingService,
     );
   }
@@ -93,14 +89,6 @@ class ServiceContainer {
   /// Voice capability service
   VoiceCapabilityService get voiceCapabilityService {
     return _voiceCapabilityService ??= VoiceCapabilityService();
-  }
-
-  /// Routing service
-  RoutingService get routingService {
-    return _routingService ??= RoutingService(
-      costCalculator: CostCalculator(),
-      resourceChecker: ResourceChecker(hardwareManager: hardwareManager),
-    );
   }
 
   /// Memory service
@@ -124,11 +112,6 @@ class ServiceContainer {
     return _analyticsService ??= AnalyticsService(
       initParams: _initParams,
     );
-  }
-
-  /// Hardware manager
-  HardwareCapabilityManager get hardwareManager {
-    return _hardwareManager ??= HardwareCapabilityManager.shared;
   }
 
   /// Logger
@@ -281,9 +264,7 @@ class ServiceContainer {
     _generationService = null;
     _streamingService = null;
     _voiceCapabilityService = null;
-    _routingService = null;
     _memoryService = null;
-    _hardwareManager = null;
     _logger = null;
     _initParams = null;
 
@@ -292,18 +273,4 @@ class ServiceContainer {
     _networkService = null;
     _authenticationService = null;
   }
-}
-
-/// Hardware capability manager placeholder
-class HardwareCapabilityManager {
-  static final HardwareCapabilityManager shared = HardwareCapabilityManager._();
-  HardwareCapabilityManager._();
-}
-
-/// Placeholder classes for routing
-class CostCalculator {}
-
-class ResourceChecker {
-  final HardwareCapabilityManager hardwareManager;
-  ResourceChecker({required this.hardwareManager});
 }

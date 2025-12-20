@@ -13,7 +13,8 @@ export 'public/events/component_initialization_event.dart';
 export 'public/configuration/configuration.dart';
 export 'core/types/component_state.dart';
 export 'core/types/sdk_component.dart';
-export 'core/module_registry.dart' hide LLMGenerationOptions;
+export 'core/module_registry.dart'
+    hide LLMGenerationOptions, TTSOptions, TTSService;
 export 'features/stt/stt_capability.dart';
 export 'features/llm/llm_capability.dart';
 export 'features/tts/tts_capability.dart';

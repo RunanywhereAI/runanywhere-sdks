@@ -1,7 +1,6 @@
 import 'dart:async';
 import '../model_loading/models/loaded_model.dart';
 import '../model_loading/model_loading_service.dart';
-import '../routing/routing_service.dart';
 import '../../foundation/logging/sdk_logger.dart';
 import '../../foundation/error_types/sdk_error.dart';
 import '../../core/module_registry.dart';
@@ -10,8 +9,8 @@ import '../analytics/analytics_service.dart';
 import '../../foundation/dependency_injection/service_container.dart';
 
 /// Main service for text generation
+/// Matches iOS GenerationService (routing handled internally, not as external service)
 class GenerationService {
-  final RoutingService routingService;
   final ModelLoadingService modelLoadingService;
   final SDKLogger logger = SDKLogger(category: 'GenerationService');
 
@@ -19,7 +18,6 @@ class GenerationService {
   LoadedModel? _currentLoadedModel;
 
   GenerationService({
-    required this.routingService,
     required this.modelLoadingService,
   });
 
@@ -115,19 +113,65 @@ class GenerationService {
 }
 
 /// Generation result
+/// Matches iOS LLMGenerationResult from Features/LLM/Models/LLMGenerationResult.swift
 class GenerationResult {
+  /// Generated text (with thinking content removed if extracted)
   final String text;
+
+  /// Thinking/reasoning content extracted from the response
+  /// Only populated if the model supports thinking mode and returned thinking tokens
+  final String? thinkingContent;
+
+  /// Number of tokens used (output tokens)
   final int tokensUsed;
+
+  /// Total latency in milliseconds
   final int latencyMs;
+
+  /// Cost savings from on-device vs cloud execution
   final double savedAmount;
+
+  /// Detailed performance metrics
   final PerformanceMetrics performanceMetrics;
+
+  /// Structured output validation result (if structured output was requested)
+  final StructuredOutputValidation? structuredOutputValidation;
+
+  /// Number of tokens used for thinking/reasoning (if model supports thinking mode)
+  final int? thinkingTokens;
+
+  /// Number of tokens in the actual response content (excluding thinking)
+  final int? responseTokens;
 
   GenerationResult({
     required this.text,
+    this.thinkingContent,
     required this.tokensUsed,
     required this.latencyMs,
     this.savedAmount = 0,
     required this.performanceMetrics,
+    this.structuredOutputValidation,
+    this.thinkingTokens,
+    this.responseTokens,
+  });
+}
+
+/// Structured output validation result
+/// Matches iOS StructuredOutputValidation from StructuredOutputHandler.swift
+class StructuredOutputValidation {
+  /// Whether the structured output is valid
+  final bool isValid;
+
+  /// Whether the output contains JSON
+  final bool containsJSON;
+
+  /// Error message if validation failed
+  final String? error;
+
+  StructuredOutputValidation({
+    required this.isValid,
+    required this.containsJSON,
+    this.error,
   });
 }
 

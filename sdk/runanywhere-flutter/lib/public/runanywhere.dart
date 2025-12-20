@@ -15,6 +15,12 @@ import '../capabilities/text_generation/generation_service.dart';
 import '../capabilities/structured_output/structured_output_handler.dart';
 import '../features/stt/stt_capability.dart';
 import '../features/tts/tts_capability.dart';
+import '../features/tts/tts_options.dart';
+import '../features/tts/tts_output.dart';
+import '../features/vad/vad_capability.dart';
+import '../features/vad/vad_configuration.dart';
+import '../features/voice_agent/voice_agent_capability.dart';
+import '../core/module_registry.dart' hide TTSOptions, TTSService;
 
 // Export generation options
 export '../capabilities/text_generation/generation_service.dart'
@@ -44,7 +50,30 @@ export '../core/model_lifecycle_manager.dart';
 export '../core/models/framework/llm_framework.dart';
 export '../core/models/framework/framework_modality.dart';
 export '../core/models/framework/model_format.dart';
+export '../core/models/framework/model_artifact_type.dart';
 export '../core/models/model/model_category.dart';
+
+// Export speaker diarization types
+export '../features/speaker_diarization/speaker_info.dart';
+
+// Export VAD types for top-level access
+export '../features/vad/vad_capability.dart' show VADCapability;
+export '../features/vad/vad_service.dart'
+    show VADResult, VADService, SpeechActivityEvent;
+export '../features/vad/vad_configuration.dart' show VADConfiguration;
+
+// Export TTS options for top-level synthesize
+export '../features/tts/tts_options.dart' show TTSOptions;
+
+// Export VoiceAgent types
+export '../features/voice_agent/voice_agent_capability.dart'
+    show
+        VoiceAgentCapability,
+        VoiceAgentConfiguration,
+        VoiceAgentResult,
+        VoiceAgentEvent,
+        ComponentLoadState,
+        VoiceAgentComponentStates;
 
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
@@ -82,6 +111,7 @@ class RunAnywhere {
   // Loaded capability storage
   static STTCapability? _loadedSTTCapability;
   static TTSCapability? _loadedTTSCapability;
+  static VADCapability? _loadedVADCapability;
 
   // MARK: - SDK State
 
@@ -103,6 +133,17 @@ class RunAnywhere {
   /// Current environment (null if not initialized)
   static SDKEnvironment? get environment => _currentEnvironment;
 
+  /// Current SDK version
+  /// Matches iOS RunAnywhere.version property
+  static String get version => SDKConstants.version;
+
+  /// Device ID (persisted across app reinstalls)
+  /// Matches iOS RunAnywhere.deviceId property
+  /// Note: This is async in Flutter due to platform channel access
+  static Future<String> get deviceId async {
+    return await DeviceManager.shared.getDeviceId();
+  }
+
   /// Access to all SDK events for subscription-based patterns
   static EventBus get events => EventBus.shared;
 
@@ -111,6 +152,9 @@ class RunAnywhere {
 
   /// Get the currently loaded TTS capability
   static TTSCapability? get loadedTTSCapability => _loadedTTSCapability;
+
+  /// Get the currently loaded VAD capability
+  static VADCapability? get loadedVADCapability => _loadedVADCapability;
 
   /// Initialize the RunAnywhere SDK
   ///
@@ -511,6 +555,279 @@ class RunAnywhere {
     }
   }
 
+  /// Synthesize speech from text
+  /// Matches iOS RunAnywhere.synthesize(_:, options:)
+  /// [text] The text to synthesize
+  /// [options] Optional TTS options (voice, language, rate, etc.)
+  /// Returns TTSOutput containing audio data and metadata
+  static Future<TTSOutput> synthesize(
+    String text, {
+    TTSOptions? options,
+  }) async {
+    // Ensure initialized
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    // Lazy device registration on first API call
+    await _ensureDeviceRegistered();
+
+    // Use loaded TTS capability if available
+    final capability = _loadedTTSCapability;
+    if (capability != null && capability.isReady) {
+      return await capability.synthesize(
+        text,
+        voice: options?.voice,
+        language: options?.language,
+      );
+    }
+
+    // Otherwise, try to get TTS service from the module registry
+    final provider = ModuleRegistry.shared.ttsProvider(modelId: null);
+    if (provider == null) {
+      throw SDKError.featureNotAvailable(
+        'No TTS service available. Call loadTTSModel() first or register a TTS provider.',
+      );
+    }
+
+    // Create a temporary TTS capability
+    final ttsConfig = TTSConfiguration(
+      voice: options?.voice ?? 'system',
+      language: options?.language ?? 'en-US',
+      speakingRate: options?.rate ?? 1.0,
+      pitch: options?.pitch ?? 1.0,
+      volume: options?.volume ?? 1.0,
+    );
+    final tempCapability = TTSCapability(ttsConfiguration: ttsConfig);
+    await tempCapability.initialize();
+
+    final result = await tempCapability.synthesize(
+      text,
+      voice: options?.voice,
+      language: options?.language,
+    );
+
+    // Clean up temporary capability
+    await tempCapability.cleanup();
+
+    return result;
+  }
+
+  /// Initialize Voice Activity Detection (VAD)
+  /// Matches iOS RunAnywhere.initializeVAD(_:)
+  /// [configuration] VAD configuration (optional, uses defaults if not provided)
+  static Future<void> initializeVAD([VADConfiguration? configuration]) async {
+    // Ensure initialized
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final logger = SDKLogger(category: 'RunAnywhere.VAD');
+    logger.info('Initializing VAD...');
+
+    try {
+      final config = configuration ?? const VADConfiguration();
+
+      // Create and initialize VAD capability
+      final vadCapability = VADCapability(
+        vadConfiguration: config,
+        serviceContainer: serviceContainer,
+      );
+      await vadCapability.initialize();
+
+      // Store the capability for later use
+      _loadedVADCapability = vadCapability;
+
+      logger.info('VAD initialized successfully');
+    } catch (e) {
+      logger.error('Failed to initialize VAD: $e');
+      rethrow;
+    }
+  }
+
+  /// Check if VAD is ready
+  /// Matches iOS RunAnywhere.isVADReady
+  static bool get isVADReady => _loadedVADCapability?.isReady ?? false;
+
+  /// Detect speech in audio buffer
+  /// Matches iOS RunAnywhere.detectSpeech(in:)
+  /// [audioData] Audio data (16-bit PCM samples)
+  /// Returns true if speech is detected
+  static Future<bool> detectSpeech(List<int> audioData) async {
+    final capability = _loadedVADCapability;
+    if (capability == null || !capability.isReady) {
+      throw SDKError.componentNotReady('VAD');
+    }
+
+    final result = await capability.detectSpeech(buffer: audioData);
+    return result.hasSpeech;
+  }
+
+  /// Start continuous VAD processing
+  /// Matches iOS RunAnywhere.startVAD()
+  static void startVAD() {
+    final capability = _loadedVADCapability;
+    if (capability == null || !capability.isReady) {
+      throw SDKError.componentNotReady('VAD');
+    }
+    capability.start();
+  }
+
+  /// Stop VAD processing
+  /// Matches iOS RunAnywhere.stopVAD()
+  static void stopVAD() {
+    final capability = _loadedVADCapability;
+    if (capability == null) return;
+    capability.stop();
+  }
+
+  /// Reset VAD state
+  /// Matches iOS RunAnywhere.resetVAD()
+  static void resetVAD() {
+    final capability = _loadedVADCapability;
+    if (capability == null) return;
+    capability.reset();
+  }
+
+  /// Set VAD energy threshold
+  /// Matches iOS RunAnywhere.setVADEnergyThreshold(_:)
+  static void setVADEnergyThreshold(double threshold) {
+    final capability = _loadedVADCapability;
+    if (capability == null || !capability.isReady) {
+      throw SDKError.componentNotReady('VAD');
+    }
+    capability.setEnergyThreshold(threshold);
+  }
+
+  /// Set VAD speech activity callback
+  /// Matches iOS RunAnywhere.setVADSpeechActivityCallback(_:)
+  static void setVADSpeechActivityCallback(
+    void Function(SpeechActivityEvent) callback,
+  ) {
+    final capability = _loadedVADCapability;
+    if (capability == null || !capability.isReady) {
+      throw SDKError.componentNotReady('VAD');
+    }
+    capability.setSpeechActivityCallback(callback);
+  }
+
+  // MARK: - VoiceAgent Component States
+
+  /// Get the current state of all voice agent components (STT, LLM, TTS)
+  ///
+  /// Use this to check which models are loaded and ready for the voice pipeline.
+  /// This is useful for UI that needs to show the setup state before starting voice.
+  /// Matches iOS RunAnywhere.getVoiceAgentComponentStates()
+  static Future<VoiceAgentComponentStates>
+      getVoiceAgentComponentStates() async {
+    if (!_isInitialized) {
+      return VoiceAgentComponentStates();
+    }
+
+    // Query each capability for its current state
+    final sttCapability = _loadedSTTCapability;
+    final ttsCapability = _loadedTTSCapability;
+
+    // STT state
+    ComponentLoadState sttState;
+    if (sttCapability != null && sttCapability.isReady) {
+      final modelId = sttCapability.sttConfig.modelId ?? 'unknown';
+      sttState = ComponentLoadState.loaded(modelId: modelId);
+    } else {
+      sttState = ComponentLoadState.notLoaded;
+    }
+
+    // LLM state - check via currentModel
+    ComponentLoadState llmState;
+    final currentModelInfo = currentModel;
+    if (currentModelInfo != null) {
+      llmState = ComponentLoadState.loaded(modelId: currentModelInfo.id);
+    } else {
+      llmState = ComponentLoadState.notLoaded;
+    }
+
+    // TTS state
+    ComponentLoadState ttsState;
+    if (ttsCapability != null && ttsCapability.isReady) {
+      final voiceId = ttsCapability.currentVoice ?? 'unknown';
+      ttsState = ComponentLoadState.loaded(modelId: voiceId);
+    } else {
+      ttsState = ComponentLoadState.notLoaded;
+    }
+
+    return VoiceAgentComponentStates(
+      stt: sttState,
+      llm: llmState,
+      tts: ttsState,
+    );
+  }
+
+  /// Check if all voice agent components are loaded and ready
+  ///
+  /// Convenience method that returns true only when STT, LLM, and TTS are all loaded.
+  /// Matches iOS RunAnywhere.areAllVoiceComponentsReady
+  static Future<bool> get areAllVoiceComponentsReady async {
+    final states = await getVoiceAgentComponentStates();
+    return states.isFullyReady;
+  }
+
+  // MARK: - Speaker Diarization
+
+  /// Update a speaker's display name
+  /// Matches iOS RunAnywhere.updateSpeakerName(speakerId:, name:)
+  ///
+  /// [speakerId] The ID of the speaker to update
+  /// [name] The new display name for the speaker
+  static Future<void> updateSpeakerName({
+    required String speakerId,
+    required String name,
+  }) async {
+    // Ensure initialized
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final provider = ModuleRegistry.shared.speakerDiarizationProvider();
+    if (provider == null) {
+      throw SDKError.featureNotAvailable(
+        'No speaker diarization service available. Register a SpeakerDiarizationServiceProvider first.',
+      );
+    }
+
+    // Get or create the service
+    final service = await provider.createSpeakerDiarizationService(null);
+    if (!service.isReady) {
+      throw SDKError.componentNotReady('SpeakerDiarization');
+    }
+
+    service.updateSpeakerName(speakerId: speakerId, name: name);
+  }
+
+  /// Reset speaker diarization state
+  /// Clears all identified speakers and resets the diarization service
+  /// Matches iOS RunAnywhere.resetSpeakerDiarization()
+  static Future<void> resetSpeakerDiarization() async {
+    // Ensure initialized
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final provider = ModuleRegistry.shared.speakerDiarizationProvider();
+    if (provider == null) {
+      throw SDKError.featureNotAvailable(
+        'No speaker diarization service available. Register a SpeakerDiarizationServiceProvider first.',
+      );
+    }
+
+    // Get or create the service
+    final service = await provider.createSpeakerDiarizationService(null);
+    if (!service.isReady) {
+      throw SDKError.componentNotReady('SpeakerDiarization');
+    }
+
+    await service.reset();
+  }
+
   // MARK: - Model Management
 
   /// Load a model by ID (LLM model)
@@ -609,6 +926,50 @@ class RunAnywhere {
       EventBus.shared.publish(
         SDKModelEvent.loadFailed(modelId: modelId, error: e),
       );
+      rethrow;
+    }
+  }
+
+  /// Unload the currently loaded STT model
+  /// Cleans up resources and frees memory
+  /// Matches iOS RunAnywhere.unloadSTTModel()
+  static Future<void> unloadSTTModel() async {
+    final capability = _loadedSTTCapability;
+    if (capability == null) {
+      return;
+    }
+
+    final logger = SDKLogger(category: 'RunAnywhere.STT');
+    logger.info('Unloading STT model...');
+
+    try {
+      await capability.cleanup();
+      _loadedSTTCapability = null;
+      logger.info('✅ STT model unloaded');
+    } catch (e) {
+      logger.error('❌ Failed to unload STT model: $e');
+      rethrow;
+    }
+  }
+
+  /// Unload the currently loaded TTS voice
+  /// Cleans up resources and frees memory
+  /// Matches iOS RunAnywhere.unloadTTSVoice()
+  static Future<void> unloadTTSVoice() async {
+    final capability = _loadedTTSCapability;
+    if (capability == null) {
+      return;
+    }
+
+    final logger = SDKLogger(category: 'RunAnywhere.TTS');
+    logger.info('Unloading TTS voice...');
+
+    try {
+      await capability.cleanup();
+      _loadedTTSCapability = null;
+      logger.info('✅ TTS voice unloaded');
+    } catch (e) {
+      logger.error('❌ Failed to unload TTS voice: $e');
       rethrow;
     }
   }
@@ -790,6 +1151,7 @@ class RunAnywhere {
     // Clear loaded capabilities
     _loadedSTTCapability = null;
     _loadedTTSCapability = null;
+    _loadedVADCapability = null;
 
     // Reset service container if needed
     serviceContainer.reset();
