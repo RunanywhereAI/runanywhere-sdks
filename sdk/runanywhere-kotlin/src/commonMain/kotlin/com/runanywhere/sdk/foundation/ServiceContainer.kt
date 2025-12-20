@@ -5,17 +5,14 @@ import com.runanywhere.sdk.data.datasources.RemoteTelemetryDataSource
 import com.runanywhere.sdk.data.models.ConfigurationData
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.SDKInitParams
+import com.runanywhere.sdk.data.network.AuthenticationService
 import com.runanywhere.sdk.data.network.NetworkService
 import com.runanywhere.sdk.data.network.NetworkServiceFactory
+import com.runanywhere.sdk.data.network.createHttpClient
 import com.runanywhere.sdk.data.network.services.AnalyticsNetworkService
 import com.runanywhere.sdk.data.repositories.ModelInfoRepository
 import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
 import com.runanywhere.sdk.data.repositories.TelemetryRepository
-import com.runanywhere.sdk.events.EventBus
-import com.runanywhere.sdk.events.EventPublisher
-import com.runanywhere.sdk.events.SDKBootstrapEvent
-import com.runanywhere.sdk.events.SDKEvent
-import com.runanywhere.sdk.events.SDKInitializationEvent
 import com.runanywhere.sdk.features.llm.LLMCapability
 import com.runanywhere.sdk.features.llm.LLMComponent
 import com.runanywhere.sdk.features.llm.LLMConfiguration
@@ -33,10 +30,20 @@ import com.runanywhere.sdk.features.vad.VADComponent
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentCapability
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentComponent
-import com.runanywhere.sdk.foundation.analytics.AnalyticsEvent
-import com.runanywhere.sdk.foundation.analytics.AnalyticsQueueManager
 import com.runanywhere.sdk.generation.GenerationService
 import com.runanywhere.sdk.generation.StreamingService
+import com.runanywhere.sdk.infrastructure.analytics.AnalyticsEvent
+import com.runanywhere.sdk.infrastructure.analytics.AnalyticsQueueManager
+import com.runanywhere.sdk.infrastructure.analytics.AnalyticsService
+import com.runanywhere.sdk.infrastructure.download.DownloadConfiguration
+import com.runanywhere.sdk.infrastructure.download.DownloadService
+import com.runanywhere.sdk.infrastructure.download.KtorDownloadService
+import com.runanywhere.sdk.infrastructure.download.KtorDownloadServiceAdapter
+import com.runanywhere.sdk.infrastructure.events.EventBus
+import com.runanywhere.sdk.infrastructure.events.EventPublisher
+import com.runanywhere.sdk.infrastructure.events.SDKBootstrapEvent
+import com.runanywhere.sdk.infrastructure.events.SDKEvent
+import com.runanywhere.sdk.infrastructure.events.SDKInitializationEvent
 import com.runanywhere.sdk.memory.MemoryManager
 import com.runanywhere.sdk.memory.MemoryService
 import com.runanywhere.sdk.models.DefaultModelRegistry
@@ -50,15 +57,8 @@ import com.runanywhere.sdk.models.collectDeviceInfo
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-import com.runanywhere.sdk.network.createHttpClient
 import com.runanywhere.sdk.security.SecureStorageFactory
-import com.runanywhere.sdk.services.AuthenticationService
 import com.runanywhere.sdk.services.ValidationService
-import com.runanywhere.sdk.services.analytics.AnalyticsService
-import com.runanywhere.sdk.services.download.DownloadConfiguration
-import com.runanywhere.sdk.services.download.DownloadService
-import com.runanywhere.sdk.services.download.KtorDownloadService
-import com.runanywhere.sdk.services.download.KtorDownloadServiceAdapter
 import com.runanywhere.sdk.services.modelinfo.ModelInfoService
 import com.runanywhere.sdk.services.sync.SyncCoordinator
 import com.runanywhere.sdk.storage.createFileSystem
@@ -891,7 +891,7 @@ class ServiceContainer {
         val simpleVADProvider =
             object : com.runanywhere.sdk.core.VADServiceProvider {
                 override suspend fun createVADService(configuration: VADConfiguration): com.runanywhere.sdk.features.vad.VADService =
-                    com.runanywhere.sdk.voice.vad.SimpleEnergyVAD(
+                    com.runanywhere.sdk.features.vad.SimpleEnergyVAD(
                         vadConfig = configuration,
                     )
 

@@ -3,15 +3,24 @@ package com.runanywhere.sdk.data.network
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.services.AuthenticationService
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.get
+import io.ktor.client.request.headers
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.readBytes
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.append
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlin.math.pow
 import kotlin.random.Random
+import io.ktor.client.HttpClient as KtorClient
+import io.ktor.client.statement.HttpResponse as KtorHttpResponse
 
 /**
  * Ktor-based NetworkService implementation for cross-platform real networking
@@ -19,7 +28,7 @@ import kotlin.random.Random
  * Alternative to platform-specific implementations when Ktor is preferred
  */
 class KtorNetworkService(
-    private val ktorClient: HttpClient,
+    private val ktorClient: KtorClient,
     private val baseURL: String,
     private val authenticationService: AuthenticationService? = null,
     private val maxRetryAttempts: Int = 3,
@@ -95,7 +104,7 @@ class KtorNetworkService(
                 val url = buildFullUrl(endpoint)
                 logger.debug("$method request to: $url (attempt ${attempt + 1}/$maxRetryAttempts)")
 
-                val response: HttpResponse =
+                val response: KtorHttpResponse =
                     when (method) {
                         "GET" ->
                             ktorClient.get(url) {
@@ -250,7 +259,7 @@ class KtorNetworkService(
      * Handle Ktor HTTP errors and create appropriate SDKError
      */
     private suspend fun handleKtorHttpError(
-        response: HttpResponse,
+        response: KtorHttpResponse,
         endpoint: APIEndpoint,
         method: String,
     ): SDKError {

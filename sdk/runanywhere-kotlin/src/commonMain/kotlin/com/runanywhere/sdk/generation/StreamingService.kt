@@ -4,9 +4,9 @@ import com.runanywhere.sdk.features.llm.LLMService
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.currentTimeMillis
+import com.runanywhere.sdk.infrastructure.analytics.PerformanceMetrics
 import com.runanywhere.sdk.models.LLMGenerationOptions
 import com.runanywhere.sdk.models.LoadedModelWithService
-import com.runanywhere.sdk.services.analytics.PerformanceMetrics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

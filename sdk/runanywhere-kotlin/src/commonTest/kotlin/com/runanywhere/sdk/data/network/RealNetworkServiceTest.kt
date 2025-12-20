@@ -2,9 +2,6 @@ package com.runanywhere.sdk.data.network
 
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.network.models.APIEndpoint
-import com.runanywhere.sdk.network.HttpClient
-import com.runanywhere.sdk.network.HttpResponse
-import com.runanywhere.sdk.services.AuthenticationService
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test

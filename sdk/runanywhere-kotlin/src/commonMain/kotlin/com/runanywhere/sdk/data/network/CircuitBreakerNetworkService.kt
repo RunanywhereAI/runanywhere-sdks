@@ -2,7 +2,6 @@ package com.runanywhere.sdk.data.network
 
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.network.CircuitBreaker
 
 /**
  * NetworkService wrapper that adds circuit breaker protection

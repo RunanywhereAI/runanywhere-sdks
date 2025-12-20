@@ -2,8 +2,8 @@ package com.runanywhere.sdk.features.speakerdiarization
 
 import com.runanywhere.sdk.core.capabilities.*
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.infrastructure.events.EventBus
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow

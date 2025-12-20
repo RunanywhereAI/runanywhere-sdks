@@ -85,17 +85,7 @@ data class DeviceRegistrationRequest(
     val privacySettings: Map<String, Boolean> = emptyMap(),
 )
 
-@Serializable
-data class DeviceRegistrationResponse(
-    @SerialName("device_id")
-    val deviceId: String,
-    @SerialName("registration_status")
-    val registrationStatus: String,
-    @SerialName("created_at")
-    val createdAt: Long,
-    @SerialName("capabilities_verified")
-    val capabilitiesVerified: Boolean = false,
-)
+// DeviceRegistrationResponse moved to data/network/models/AuthModels.kt - use import from there
 
 @Serializable
 data class HealthCheckResponse(
