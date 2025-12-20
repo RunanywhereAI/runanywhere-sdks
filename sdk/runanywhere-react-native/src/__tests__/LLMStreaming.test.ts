@@ -2,14 +2,14 @@
  * Tests for LLM Streaming functionality
  */
 
-import { LLMComponent } from '../components/LLM/LLMComponent';
-import { LLMConfigurationImpl } from '../components/LLM/LLMConfiguration';
+import { LLMCapability } from '../Features/LLM/LLMCapability';
+import { LLMConfigurationImpl } from '../Features/LLM/LLMConfiguration';
 import { ConversationManager } from '../services/ConversationManager';
-import { MessageRole } from '../components/LLM/LLMModels';
+import { MessageRole } from '../Features/LLM/LLMModels';
 
 // Mock the LLM service
-jest.mock('../Core/ModuleRegistry', () => ({
-  ModuleRegistry: {
+jest.mock('../Foundation/DependencyInjection/ServiceRegistry', () => ({
+  ServiceRegistry: {
     shared: {
       llmProvider: jest.fn(() => ({
         createLLMService: jest.fn(() => ({
@@ -56,8 +56,8 @@ describe('LLM Streaming', () => {
     });
   });
 
-  describe('LLMComponent.generateStreamWithMetrics', () => {
-    let llm: LLMComponent;
+  describe('LLMCapability.generateStreamWithMetrics', () => {
+    let llm: LLMCapability;
 
     beforeEach(async () => {
       const config = new LLMConfigurationImpl({
@@ -65,7 +65,7 @@ describe('LLM Streaming', () => {
         maxTokens: 100,
         temperature: 0.7,
       });
-      llm = new LLMComponent(config);
+      llm = new LLMCapability(config);
       await llm.initialize();
     });
 
@@ -315,7 +315,7 @@ describe('LLM Streaming', () => {
   });
 
   describe('Integration: Streaming with Conversation', () => {
-    let llm: LLMComponent;
+    let llm: LLMCapability;
     let conversation: ConversationManager;
 
     beforeEach(async () => {
@@ -329,7 +329,7 @@ describe('LLM Streaming', () => {
         temperature: 0.7,
       };
 
-      llm = new LLMComponent(config);
+      llm = new LLMCapability(config);
       await llm.initialize();
     });
 

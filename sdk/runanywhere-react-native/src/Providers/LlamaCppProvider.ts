@@ -9,8 +9,12 @@
 
 import type { LLMServiceProvider } from '../Core/Protocols/LLM/LLMServiceProvider';
 import type { LLMService } from '../Core/Protocols/LLM/LLMService';
-import type { ModelInfo, GenerationOptions, GenerationResult } from '../types';
-import { LLMFramework } from '../types';
+import type { ModelInfo } from '../types';
+import type { GenerationOptions } from '../Capabilities/TextGeneration/Models/GenerationOptions';
+import type { GenerationResult } from '../Capabilities/TextGeneration/Models/GenerationResult';
+import { LLMFramework } from '../Core/Models/Framework/LLMFramework';
+import { LLMFramework as CatalogFramework } from '../types'; // For catalog lookup
+import { PerformanceMetricsImpl } from '../Capabilities/TextGeneration/Models/PerformanceMetrics';
 import { getCatalogModelsByFramework } from '../Data/modelCatalog';
 import { SDKError, SDKErrorCode } from '../Public/Errors/SDKError';
 import { requireNativeModule } from '../native';
@@ -42,18 +46,18 @@ export class LlamaCppProvider implements LLMServiceProvider {
   }
 
   /**
-   * Register the LlamaCPP provider with ModuleRegistry
+   * Register the LlamaCPP provider with ServiceRegistry
    *
    * This is called during SDK initialization (like Swift SDK's onRegistration)
    */
   static register(): void {
     console.log('[LlamaCppProvider] Registering LlamaCPP service provider');
 
-    // Import ModuleRegistry dynamically to avoid circular dependency
-    const { ModuleRegistry } = require('../Core/ModuleRegistry');
+    // Import ServiceRegistry dynamically to avoid circular dependency
+    const { ServiceRegistry } = require('../Foundation/DependencyInjection/ServiceRegistry');
 
     // Register with priority 100 (default priority)
-    ModuleRegistry.shared.registerLLM(LlamaCppProvider.shared, 100);
+    ServiceRegistry.shared.registerLLMProvider(LlamaCppProvider.shared, 100);
 
     console.log('[LlamaCppProvider] LlamaCPP service provider registered successfully');
   }
@@ -121,8 +125,8 @@ export class LlamaCppProvider implements LLMServiceProvider {
    * Called during provider registration to populate ModelRegistry.
    */
   getProvidedModels(): ModelInfo[] {
-    // Get all GGUF models from catalog
-    const ggufModels = getCatalogModelsByFramework(LLMFramework.LlamaCpp);
+    // Get all GGUF models from catalog (use types/enums version for catalog lookup)
+    const ggufModels = getCatalogModelsByFramework(CatalogFramework.LlamaCpp);
 
     console.log(`[LlamaCppProvider] Providing ${ggufModels.length} GGUF models`);
 
@@ -183,7 +187,7 @@ export class LlamaCppProvider implements LLMServiceProvider {
    * Lifecycle hook called when provider is registered
    *
    * This matches Swift SDK's onRegistration() pattern.
-   * Called automatically by ModuleRegistry during registration.
+   * Called automatically by ServiceRegistry during registration.
    */
   onRegistration(): void {
     console.log('[LlamaCppProvider] onRegistration() called');
@@ -245,6 +249,8 @@ class LlamaCppService implements LLMService {
   }
 
   async generate(prompt: string, options?: GenerationOptions): Promise<GenerationResult> {
+    const startTime = Date.now();
+
     const result = await this.native.generate(
       prompt,
       options?.systemPrompt || null,
@@ -252,7 +258,28 @@ class LlamaCppService implements LLMService {
       options?.temperature || 0.7
     );
 
-    return { text: result, finishReason: 'stop' };
+    const latencyMs = Date.now() - startTime;
+
+    // Import enums at runtime to avoid type issues
+    const { ExecutionTarget, HardwareAcceleration } = require('../types/enums');
+
+    // Return full GenerationResult matching the interface
+    return {
+      text: result,
+      thinkingContent: null,
+      tokensUsed: 0, // Native layer should provide this
+      modelUsed: this.currentModel || 'unknown',
+      latencyMs,
+      executionTarget: ExecutionTarget.OnDevice,
+      savedAmount: 0,
+      framework: LLMFramework.LlamaCpp,
+      hardwareUsed: HardwareAcceleration.CPU,
+      memoryUsed: 0,
+      performanceMetrics: new PerformanceMetricsImpl({ inferenceTimeMs: latencyMs }),
+      structuredOutputValidation: null,
+      thinkingTokens: null,
+      responseTokens: 0,
+    };
   }
 
   async cleanup(): Promise<void> {

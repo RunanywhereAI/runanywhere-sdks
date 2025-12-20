@@ -40,7 +40,7 @@ export interface LLMServiceProvider {
   /**
    * Lifecycle hook called when provider is registered (optional)
    *
-   * Called by ModuleRegistry after provider registration.
+   * Called by ServiceRegistry after provider registration.
    * Use this to register models, configure dependencies, etc.
    */
   onRegistration?(): void;

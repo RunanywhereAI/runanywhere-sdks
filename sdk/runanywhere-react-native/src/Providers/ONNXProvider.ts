@@ -32,15 +32,15 @@ export class ONNXSTTProvider {
   }
 
   /**
-   * Register the ONNX STT provider with ModuleRegistry
+   * Register the ONNX STT provider with ServiceRegistry
    */
   static register(): void {
     console.log('[ONNXSTTProvider] Registering ONNX STT service provider');
 
-    const { ModuleRegistry } = require('../Core/ModuleRegistry');
+    const { ServiceRegistry } = require('../Foundation/DependencyInjection/ServiceRegistry');
 
     // Register with priority 90 (slightly lower than LlamaCpp)
-    ModuleRegistry.shared.registerSTT(ONNXSTTProvider.shared, 90);
+    ServiceRegistry.shared.registerSTTProvider(ONNXSTTProvider.shared, 90);
 
     console.log('[ONNXSTTProvider] ONNX STT service provider registered successfully');
   }
@@ -132,15 +132,15 @@ export class ONNXTTSProvider {
   }
 
   /**
-   * Register the ONNX TTS provider with ModuleRegistry
+   * Register the ONNX TTS provider with ServiceRegistry
    */
   static register(): void {
     console.log('[ONNXTTSProvider] Registering ONNX TTS service provider');
 
-    const { ModuleRegistry } = require('../Core/ModuleRegistry');
+    const { ServiceRegistry } = require('../Foundation/DependencyInjection/ServiceRegistry');
 
     // Register with priority 90 (slightly lower than system TTS)
-    ModuleRegistry.shared.registerTTS(ONNXTTSProvider.shared, 90);
+    ServiceRegistry.shared.registerTTSProvider(ONNXTTSProvider.shared, 90);
 
     console.log('[ONNXTTSProvider] ONNX TTS service provider registered successfully');
   }

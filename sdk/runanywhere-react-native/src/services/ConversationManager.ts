@@ -10,7 +10,7 @@
  * - Conversation state
  */
 
-import { Message, MessageRole } from '../components/LLM/LLMModels';
+import { Message, MessageRole } from '../Features/LLM/LLMModels';
 
 /**
  * Configuration for conversation manager

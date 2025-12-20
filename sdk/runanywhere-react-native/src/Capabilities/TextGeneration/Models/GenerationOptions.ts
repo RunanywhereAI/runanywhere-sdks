@@ -7,27 +7,10 @@
  */
 
 import { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
+import { ExecutionTarget, HardwareAcceleration } from '../../../types/enums';
 
-/**
- * Execution target for model inference
- */
-export enum ExecutionTarget {
-  OnDevice = 'onDevice',
-  Cloud = 'cloud',
-  Hybrid = 'hybrid',
-}
-
-/**
- * Hardware acceleration options
- */
-export enum HardwareAcceleration {
-  CPU = 'CPU',
-  GPU = 'GPU',
-  NeuralEngine = 'NeuralEngine',
-  Metal = 'Metal',
-  CoreML = 'CoreML',
-  Auto = 'Auto',
-}
+// Re-export for consumers who import from this module
+export { ExecutionTarget, HardwareAcceleration };
 
 /**
  * Structured output configuration

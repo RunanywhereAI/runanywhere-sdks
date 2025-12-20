@@ -1,15 +1,30 @@
 /**
  * Authentication Service for RunAnywhere React Native SDK
  *
- * Manages authentication state and token management.
- * The actual auth logic lives in the native SDK.
+ * Manages authentication state, token management, and token refresh.
+ * The actual auth logic lives in the native SDK - this TS layer provides:
+ * - Token expiration tracking (with 60-second buffer like iOS)
+ * - Lazy token refresh (on demand via getAccessToken)
+ * - Secure storage of tokens via SecureStorageService
+ * - State caching for fast access
+ *
+ * Also implements AuthenticationProvider interface for APIClient integration.
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Data/Network/Services/AuthenticationService.swift
  */
 
 import { requireNativeModule } from '../native';
-import { EventBus } from '../Public/Events';
+import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+import { SecureStorageService } from '../Foundation/Security';
+import { DeviceIdentityService } from '../Foundation/DeviceIdentity/DeviceIdentityService';
 import type { SDKEnvironment } from '../types';
+import type { AuthenticationProvider } from '../Data/Network';
+
+/**
+ * Token expiration buffer in milliseconds (60 seconds)
+ * Matches iOS: expiresAt > Date().addingTimeInterval(60)
+ */
+const TOKEN_EXPIRATION_BUFFER_MS = 60 * 1000;
 
 /**
  * Authentication response from the backend
@@ -90,15 +105,39 @@ export interface AuthenticationState {
 }
 
 /**
+ * Stored token info with expiration
+ */
+interface TokenInfo {
+  accessToken: string;
+  refreshToken: string;
+  /** Unix timestamp (ms) when token expires */
+  expiresAt: number;
+}
+
+/**
  * Authentication Service
  *
- * Handles SDK authentication and token management.
+ * Handles SDK authentication, token management, and automatic refresh.
+ * Implements the same lazy refresh pattern as iOS.
+ *
+ * Also implements AuthenticationProvider interface for use with APIClient.
  */
-class AuthenticationServiceImpl {
+class AuthenticationServiceImpl implements AuthenticationProvider {
+  private readonly logger = new SDKLogger('AuthenticationService');
+
   private state: AuthenticationState = {
     isAuthenticated: false,
     isAuthenticating: false,
   };
+
+  /** Cached token info */
+  private tokenInfo: TokenInfo | null = null;
+
+  /** Flag to prevent concurrent refresh operations */
+  private isRefreshing = false;
+
+  /** Promise for in-flight refresh (for request coalescing) */
+  private refreshPromise: Promise<string> | null = null;
 
   /**
    * Authenticate with the backend
@@ -108,6 +147,7 @@ class AuthenticationServiceImpl {
    */
   async authenticate(apiKey: string): Promise<AuthenticationResponse> {
     this.state.isAuthenticating = true;
+    this.logger.info('Starting authentication');
 
     try {
       const native = requireNativeModule();
@@ -125,6 +165,26 @@ class AuthenticationServiceImpl {
         native.getAccessToken(),
       ]);
 
+      // Build response
+      const expiresIn = 3600; // Default 1 hour, native may provide actual value
+      const response: AuthenticationResponse = {
+        accessToken: accessToken ?? '',
+        refreshToken: '', // Native handles refresh tokens
+        expiresIn,
+        deviceId: deviceId ?? '',
+        userId: userId ?? undefined,
+        organizationId: orgId ?? '',
+      };
+
+      // Store tokens locally with expiration
+      const expiresAt = Date.now() + expiresIn * 1000;
+      this.tokenInfo = {
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+        expiresAt,
+      };
+
+      // Update state
       this.state = {
         isAuthenticated: true,
         isAuthenticating: false,
@@ -133,19 +193,14 @@ class AuthenticationServiceImpl {
         deviceId: deviceId ?? undefined,
       };
 
-      // Build response from fetched data
-      const response: AuthenticationResponse = {
-        accessToken: accessToken ?? '',
-        refreshToken: '', // Not exposed by native module
-        expiresIn: 3600, // Default expiration
-        deviceId: deviceId ?? '',
-        userId: userId ?? undefined,
-        organizationId: orgId ?? '',
-      };
+      // Store tokens and identity in secure storage
+      await this.persistAuthData(response, expiresAt);
 
+      this.logger.info('Authentication successful');
       return response;
     } catch (error) {
       this.state.isAuthenticating = false;
+      this.logger.error('Authentication failed', error);
       throw error;
     }
   }
@@ -153,25 +208,114 @@ class AuthenticationServiceImpl {
   /**
    * Get the current access token
    *
-   * Will automatically refresh if expired.
+   * Automatically refreshes if token is expired or about to expire.
+   * Uses 60-second buffer matching iOS behavior.
    *
-   * @returns Current access token
+   * @returns Current valid access token
    */
   async getAccessToken(): Promise<string> {
-    const native = requireNativeModule();
-    const token = await native.getAccessToken();
-    return token ?? '';
+    // Check if we have a valid cached token
+    if (this.tokenInfo && this.isTokenValid()) {
+      return this.tokenInfo.accessToken;
+    }
+
+    // Token is expired or missing - need to refresh
+    this.logger.debug('Token expired or missing, attempting refresh');
+
+    // Try to refresh
+    try {
+      const token = await this.refreshAccessToken();
+      return token;
+    } catch (error) {
+      // If refresh fails, try native as fallback
+      this.logger.warning('Token refresh failed, trying native fallback');
+      const native = requireNativeModule();
+      const token = await native.getAccessToken();
+      return token ?? '';
+    }
+  }
+
+  /**
+   * Check if the current token is valid
+   *
+   * Uses 60-second expiration buffer matching iOS.
+   */
+  private isTokenValid(): boolean {
+    if (!this.tokenInfo) {
+      return false;
+    }
+
+    const now = Date.now();
+    const bufferTime = now + TOKEN_EXPIRATION_BUFFER_MS;
+    return this.tokenInfo.expiresAt > bufferTime;
   }
 
   /**
    * Refresh the access token
    *
+   * Implements request coalescing - concurrent refresh requests
+   * will share the same underlying network request.
+   *
    * @returns New access token
    */
   async refreshAccessToken(): Promise<string> {
-    const native = requireNativeModule();
-    const token = await native.refreshAccessToken();
-    return token ?? '';
+    // If already refreshing, return the existing promise (coalescing)
+    if (this.isRefreshing && this.refreshPromise) {
+      this.logger.debug('Joining existing refresh request');
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = this.performRefresh();
+
+    try {
+      return await this.refreshPromise;
+    } finally {
+      this.isRefreshing = false;
+      this.refreshPromise = null;
+    }
+  }
+
+  /**
+   * Actually perform the token refresh
+   */
+  private async performRefresh(): Promise<string> {
+    this.logger.info('Refreshing access token');
+
+    try {
+      const native = requireNativeModule();
+      const token = await native.refreshAccessToken();
+
+      if (!token) {
+        throw new Error('Token refresh returned empty token');
+      }
+
+      // Update cached token info
+      // Native handles the actual refresh, we just update our cache
+      const expiresIn = 3600; // Default, native may provide actual
+      const expiresAt = Date.now() + expiresIn * 1000;
+
+      this.tokenInfo = {
+        accessToken: token,
+        refreshToken: this.tokenInfo?.refreshToken ?? '',
+        expiresAt,
+      };
+
+      // Persist updated tokens
+      if (this.tokenInfo) {
+        await SecureStorageService.storeAuthTokens(
+          this.tokenInfo.accessToken,
+          this.tokenInfo.refreshToken,
+          this.tokenInfo.expiresAt
+        );
+      }
+
+      this.logger.info('Token refresh successful');
+      return token;
+    } catch (error) {
+      this.logger.error('Token refresh failed', error);
+      throw error;
+    }
   }
 
   /**
@@ -195,34 +339,67 @@ class AuthenticationServiceImpl {
    * Clear authentication state
    */
   async clearAuthentication(): Promise<void> {
+    this.logger.info('Clearing authentication');
+
     const native = requireNativeModule();
     await native.clearAuthentication();
 
+    // Clear local state
+    this.tokenInfo = null;
     this.state = {
       isAuthenticated: false,
       isAuthenticating: false,
     };
+
+    // Clear secure storage
+    await Promise.all([
+      SecureStorageService.clearAuthTokens(),
+      SecureStorageService.clearIdentity(),
+    ]);
+
+    this.logger.info('Authentication cleared');
   }
 
   /**
    * Load stored tokens from secure storage
+   *
+   * Called on SDK startup to restore authentication state.
    */
   async loadStoredTokens(): Promise<void> {
-    const native = requireNativeModule();
-    await native.loadStoredTokens();
+    this.logger.debug('Loading stored tokens');
 
-    // Update state after loading
-    const [userId, orgId, deviceId] = await Promise.all([
-      native.getUserId(),
-      native.getOrganizationId(),
-      native.getDeviceId(),
-    ]);
+    try {
+      // Load from native first (it may have more up-to-date tokens)
+      const native = requireNativeModule();
+      await native.loadStoredTokens();
 
-    if (userId || orgId) {
-      this.state.isAuthenticated = true;
-      this.state.userId = userId ?? undefined;
-      this.state.organizationId = orgId ?? undefined;
-      this.state.deviceId = deviceId ?? undefined;
+      // Load from our secure storage
+      const [tokens, identity] = await Promise.all([
+        SecureStorageService.retrieveAuthTokens(),
+        SecureStorageService.retrieveIdentity(),
+      ]);
+
+      if (tokens) {
+        this.tokenInfo = tokens;
+        this.logger.debug('Loaded tokens from storage');
+      }
+
+      // Get identity info
+      const [userId, orgId, deviceId] = await Promise.all([
+        native.getUserId(),
+        native.getOrganizationId(),
+        native.getDeviceId(),
+      ]);
+
+      if (userId || orgId) {
+        this.state.isAuthenticated = true;
+        this.state.userId = userId ?? identity?.userId;
+        this.state.organizationId = orgId ?? identity?.organizationId;
+        this.state.deviceId = deviceId ?? identity?.deviceId;
+        this.logger.info('Restored authentication state');
+      }
+    } catch (error) {
+      this.logger.warning('Failed to load stored tokens');
     }
   }
 
@@ -269,6 +446,16 @@ class AuthenticationServiceImpl {
   }
 
   /**
+   * Get persistent device UUID
+   *
+   * This UUID is stored locally and survives app reinstalls.
+   * Different from deviceId which is assigned by the backend.
+   */
+  async getPersistentDeviceUUID(): Promise<string> {
+    return DeviceIdentityService.getPersistentDeviceUUID();
+  }
+
+  /**
    * Register device with backend
    *
    * Collects device information and registers with the backend.
@@ -276,10 +463,15 @@ class AuthenticationServiceImpl {
    * @returns Device registration response
    */
   async registerDevice(): Promise<{ deviceId: string }> {
+    this.logger.info('Registering device');
+
     const native = requireNativeModule();
-    // Native module expects deviceInfo JSON and returns boolean
-    const deviceInfoJson = JSON.stringify({});
-    const success = await native.registerDevice(deviceInfoJson);
+
+    // Get persistent device UUID - stored for reference
+    const _persistentUUID = await this.getPersistentDeviceUUID();
+
+    // Native module collects device info internally
+    const success = await native.registerDevice();
 
     if (!success) {
       throw new Error('Device registration failed');
@@ -287,6 +479,9 @@ class AuthenticationServiceImpl {
 
     // Get device ID after registration
     const deviceId = await native.getDeviceId();
+    this.state.deviceId = deviceId ?? undefined;
+
+    this.logger.info('Device registration successful');
     return { deviceId: deviceId ?? '' };
   }
 
@@ -312,13 +507,66 @@ class AuthenticationServiceImpl {
   }
 
   /**
+   * Get token expiration time
+   *
+   * @returns Unix timestamp (ms) when token expires, or null if no token
+   */
+  getTokenExpiresAt(): number | null {
+    return this.tokenInfo?.expiresAt ?? null;
+  }
+
+  /**
+   * Get time until token expires
+   *
+   * @returns Milliseconds until expiration, or null if no token
+   */
+  getTimeUntilExpiration(): number | null {
+    if (!this.tokenInfo) {
+      return null;
+    }
+    return Math.max(0, this.tokenInfo.expiresAt - Date.now());
+  }
+
+  /**
    * Reset the authentication service
    */
   reset(): void {
+    this.tokenInfo = null;
+    this.isRefreshing = false;
+    this.refreshPromise = null;
     this.state = {
       isAuthenticated: false,
       isAuthenticating: false,
     };
+    this.logger.debug('Authentication service reset');
+  }
+
+  /**
+   * Persist auth data to secure storage
+   */
+  private async persistAuthData(
+    response: AuthenticationResponse,
+    expiresAt: number
+  ): Promise<void> {
+    try {
+      await Promise.all([
+        // Store tokens
+        SecureStorageService.storeAuthTokens(
+          response.accessToken,
+          response.refreshToken,
+          expiresAt
+        ),
+        // Store identity
+        SecureStorageService.storeIdentity(
+          response.deviceId,
+          response.organizationId,
+          response.userId
+        ),
+      ]);
+    } catch (error) {
+      this.logger.warning('Failed to persist auth data');
+      // Don't throw - auth was successful, storage failure is non-fatal
+    }
   }
 }
 

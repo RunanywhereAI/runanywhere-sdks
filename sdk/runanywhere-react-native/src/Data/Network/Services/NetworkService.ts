@@ -6,8 +6,12 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Data/Network/Protocols/NetworkService.swift
  */
 
+import type { APIEndpointDefinition } from '../APIEndpoint';
+
 /**
  * API endpoint
+ *
+ * @deprecated Use APIEndpointDefinition from APIEndpoint.ts instead
  */
 export interface APIEndpoint {
   readonly path: string;
@@ -16,27 +20,44 @@ export interface APIEndpoint {
 
 /**
  * Protocol defining the network service interface
+ *
+ * Matches iOS NetworkService protocol.
+ * Use APIClient for actual implementation with auth integration.
  */
 export interface NetworkService {
   /**
-   * Perform a POST request
+   * Perform a typed POST request
    */
-  post<T, R>(endpoint: APIEndpoint, payload: T, requiresAuth?: boolean): Promise<R>;
+  post<T, R>(
+    endpoint: APIEndpoint | APIEndpointDefinition,
+    payload: T,
+    requiresAuth?: boolean
+  ): Promise<R>;
 
   /**
-   * Perform a GET request
+   * Perform a typed GET request
    */
-  get<R>(endpoint: APIEndpoint, requiresAuth?: boolean): Promise<R>;
+  get<R>(
+    endpoint: APIEndpoint | APIEndpointDefinition,
+    requiresAuth?: boolean
+  ): Promise<R>;
 
   /**
-   * Perform a raw POST request (returns Data)
+   * Perform a raw POST request (returns ArrayBuffer/Data)
    */
-  postRaw(endpoint: APIEndpoint, payload: ArrayBuffer, requiresAuth?: boolean): Promise<ArrayBuffer>;
+  postRaw(
+    endpoint: APIEndpoint | APIEndpointDefinition,
+    payload: ArrayBuffer,
+    requiresAuth?: boolean
+  ): Promise<ArrayBuffer>;
 
   /**
-   * Perform a raw GET request (returns Data)
+   * Perform a raw GET request (returns ArrayBuffer/Data)
    */
-  getRaw(endpoint: APIEndpoint, requiresAuth?: boolean): Promise<ArrayBuffer>;
+  getRaw(
+    endpoint: APIEndpoint | APIEndpointDefinition,
+    requiresAuth?: boolean
+  ): Promise<ArrayBuffer>;
 }
 
 /**
