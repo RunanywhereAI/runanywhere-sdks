@@ -86,6 +86,7 @@ workManager = "2.10.0"
 # File Management
 # ============================================================================
 commonsIo = "2.18.0"
+commonsCompress = "1.27.1"
 okio = "3.9.0"
 
 # ============================================================================
@@ -249,6 +250,7 @@ androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx"
 # File Management
 # ----------------------------------------------------------------------------
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commonsIo" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 okio-fakefilesystem = { group = "com.squareup.okio", name = "okio-fakefilesystem", version.ref = "okio" }
 
