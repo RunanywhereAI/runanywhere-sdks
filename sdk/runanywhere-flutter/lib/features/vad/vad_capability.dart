@@ -2,6 +2,7 @@ import 'dart:async';
 import '../../core/capabilities_base/base_capability.dart';
 import '../../core/types/sdk_component.dart';
 import '../../core/module_registry.dart';
+import '../../infrastructure/analytics/services/vad_analytics_service.dart';
 import 'vad_configuration.dart';
 import 'simple_energy_vad.dart';
 
@@ -13,10 +14,16 @@ class VADCapability extends BaseCapability<VADService> {
 
   final VADConfiguration vadConfiguration;
 
+  /// Analytics service for tracking VAD operations.
+  /// Matches iOS VADCapability.analyticsService
+  final VADAnalyticsService _analyticsService;
+
   VADCapability({
     required this.vadConfiguration,
     super.serviceContainer,
-  }) : super(configuration: vadConfiguration);
+    VADAnalyticsService? analyticsService,
+  })  : _analyticsService = analyticsService ?? VADAnalyticsService(),
+        super(configuration: vadConfiguration);
 
   /// Whether speech is currently active.
   /// Matches iOS VADCapability.isSpeechActive property.
@@ -54,20 +61,24 @@ class VADCapability extends BaseCapability<VADService> {
     return service;
   }
 
-  /// Pause VAD processing
+  /// Pause VAD processing.
+  /// Matches iOS VADCapability.pause() method.
   void pause() {
     final vadService = service;
     if (vadService is SimpleEnergyVAD) {
       vadService.pause();
     }
+    _analyticsService.trackPaused();
   }
 
-  /// Resume VAD processing
+  /// Resume VAD processing.
+  /// Matches iOS VADCapability.resume() method.
   void resume() {
     final vadService = service;
     if (vadService is SimpleEnergyVAD) {
       vadService.resume();
     }
+    _analyticsService.trackResumed();
   }
 
   /// Detect speech in audio buffer (16-bit PCM samples)
@@ -171,20 +182,24 @@ class VADCapability extends BaseCapability<VADService> {
     }
   }
 
-  /// Start VAD processing
+  /// Start VAD processing.
+  /// Matches iOS VADCapability.start() method.
   void start() {
     final vadService = service;
     if (vadService is SimpleEnergyVAD) {
       vadService.start();
     }
+    _analyticsService.trackStarted();
   }
 
-  /// Stop VAD processing
+  /// Stop VAD processing.
+  /// Matches iOS VADCapability.stop() method.
   void stop() {
     final vadService = service;
     if (vadService is SimpleEnergyVAD) {
       vadService.stop();
     }
+    _analyticsService.trackStopped();
   }
 
   /// Get the underlying VAD service
@@ -260,5 +275,13 @@ class VADCapability extends BaseCapability<VADService> {
     if (vadService is SimpleEnergyVAD) {
       vadService.notifyTTSDidFinish();
     }
+  }
+
+  // MARK: - Analytics
+
+  /// Get current VAD analytics metrics.
+  /// Matches iOS VADCapability.getAnalyticsMetrics().
+  VADMetrics getAnalyticsMetrics() {
+    return _analyticsService.getMetrics();
   }
 }

@@ -10,8 +10,9 @@ import 'tts_output.dart';
 /// Matches iOS SystemTTSService from TTSComponent.swift
 class SystemTTSService implements TTSService {
   final FlutterTts _flutterTts = FlutterTts();
-  List<TTSVoice> _availableVoices = [];
+  List<TTSVoice> _availableVoicesList = [];
   TTSConfiguration? _configuration;
+  bool _isSynthesizing = false;
 
   SystemTTSService();
 
@@ -20,6 +21,13 @@ class SystemTTSService implements TTSService {
 
   @override
   bool get isReady => _configuration != null;
+
+  @override
+  bool get isSynthesizing => _isSynthesizing;
+
+  @override
+  List<String> get availableVoices =>
+      _availableVoicesList.map((v) => v.id).toList();
 
   @override
   Future<void> initialize(TTSConfiguration configuration) async {
@@ -31,10 +39,11 @@ class SystemTTSService implements TTSService {
     // Get available voices
     final voices = await _flutterTts.getVoices;
     if (voices is List) {
-      _availableVoices = voices
+      _availableVoicesList = voices
           .map((v) {
             if (v is Map) {
-              final locale = v['locale']?.toString() ?? v['name']?.toString() ?? 'en-US';
+              final locale =
+                  v['locale']?.toString() ?? v['name']?.toString() ?? 'en-US';
               final name = v['name']?.toString() ?? 'System Voice';
               return TTSVoice(
                 id: locale,
@@ -50,15 +59,15 @@ class SystemTTSService implements TTSService {
 
     // Set up completion handlers
     _flutterTts.setCompletionHandler(() {
-      // Synthesis complete
+      _isSynthesizing = false;
     });
 
     _flutterTts.setErrorHandler((msg) {
-      // Synthesis error
+      _isSynthesizing = false;
     });
 
     _flutterTts.setStartHandler(() {
-      // Synthesis started
+      _isSynthesizing = true;
     });
   }
 
@@ -107,7 +116,8 @@ class SystemTTSService implements TTSService {
     // Wait for synthesis to complete
     await completer.future;
 
-    final processingTime = DateTime.now().difference(startTime).inMilliseconds / 1000.0;
+    final processingTime =
+        DateTime.now().difference(startTime).inMilliseconds / 1000.0;
 
     // Note: flutter_tts doesn't provide direct audio data access
     // It plays audio directly through the system
@@ -134,13 +144,20 @@ class SystemTTSService implements TTSService {
   }
 
   @override
+  Future<void> stop() async {
+    await _flutterTts.stop();
+    _isSynthesizing = false;
+  }
+
+  @override
   Future<List<TTSVoice>> getAvailableVoices() async {
-    return _availableVoices;
+    return _availableVoicesList;
   }
 
   @override
   Future<void> cleanup() async {
     await _flutterTts.stop();
+    _isSynthesizing = false;
     _configuration = null;
   }
 }
