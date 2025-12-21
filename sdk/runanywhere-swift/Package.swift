@@ -83,6 +83,15 @@ let package = Package(
             name: "RunAnywhereFluidAudio",
             targets: ["FluidAudioDiarization"]
         ),
+
+        // =================================================================
+        // WhisperCPP Backend - adds STT via whisper.cpp (GGML models)
+        // Uses Metal acceleration on Apple devices
+        // =================================================================
+        .library(
+            name: "RunAnywhereWhisperCPP",
+            targets: ["WhisperCPPRuntime"]
+        ),
     ],
     dependencies: [
         // Core SDK dependencies
@@ -181,6 +190,27 @@ let package = Package(
                 "RunAnywhereCoreBinary",
             ],
             path: "Sources/LlamaCPPRuntime",
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+                .unsafeFlags(["-ObjC", "-all_load"])
+            ]
+        ),
+
+        // =================================================================
+        // WhisperCPP Runtime Backend
+        // Provides: Speech-to-Text (STT) with GGML whisper models
+        // =================================================================
+        .target(
+            name: "WhisperCPPRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "CRunAnywhereCore",
+                "RunAnywhereCoreBinary",
+            ],
+            path: "Sources/WhisperCPPRuntime",
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
