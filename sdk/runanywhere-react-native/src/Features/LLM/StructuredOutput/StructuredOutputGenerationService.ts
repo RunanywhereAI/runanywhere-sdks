@@ -15,6 +15,7 @@ import {
 } from './StreamToken';
 import { StreamAccumulator } from './StreamAccumulator';
 import type { LLMOutput } from '../LLMModels';
+import type { LLMFramework } from '../../../types/enums';
 
 /**
  * StructuredOutputHandler types (imported from existing implementation)
@@ -38,7 +39,7 @@ export interface LLMGenerationOptions {
   readonly topP?: number;
   readonly stopSequences?: string[];
   readonly streamingEnabled?: boolean;
-  readonly preferredFramework?: any;
+  readonly preferredFramework?: LLMFramework;
   readonly structuredOutput?: StructuredOutputConfig;
   readonly systemPrompt?: string | null;
 }
