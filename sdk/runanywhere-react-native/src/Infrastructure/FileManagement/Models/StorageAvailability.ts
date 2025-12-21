@@ -131,7 +131,9 @@ export function formatStorageSize(bytes: number): string {
  * @param availability - StorageAvailability instance
  * @returns Human-readable description
  */
-export function getStorageDescription(availability: StorageAvailability): string {
+export function getStorageDescription(
+  availability: StorageAvailability
+): string {
   const required = formatStorageSize(availability.requiredSpace);
   const available = formatStorageSize(availability.availableSpace);
 

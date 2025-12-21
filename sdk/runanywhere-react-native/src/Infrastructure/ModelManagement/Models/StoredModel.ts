@@ -7,8 +7,8 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/ModelManagement/Models/Domain/StoredModel.swift
  */
 
-import { ModelFormat } from '../../../Core/Models/Model/ModelFormat';
-import { InferenceFramework } from './InferenceFramework';
+import type { ModelFormat } from '../../../Core/Models/Model/ModelFormat';
+import type { InferenceFramework } from './InferenceFramework';
 
 /**
  * Stored model information representing a downloaded/stored model on disk

@@ -7,10 +7,10 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/FileManagement/Protocol/StorageAnalyzer.swift
  */
 
-import { StorageInfo } from '../Models/StorageInfo';
-import { ModelStorageInfo } from '../../ModelManagement/Models/ModelStorageInfo';
-import { StorageAvailability } from '../Models/StorageAvailability';
-import { StorageRecommendation } from '../Models/StorageRecommendation';
+import type { StorageInfo } from '../Models/StorageInfo';
+import type { ModelStorageInfo } from '../../ModelManagement/Models/ModelStorageInfo';
+import type { StorageAvailability } from '../Models/StorageAvailability';
+import type { StorageRecommendation } from '../Models/StorageRecommendation';
 
 /**
  * Protocol for storage analysis operations
@@ -37,7 +37,10 @@ export interface StorageAnalyzer {
    * @param safetyMargin - Safety margin as a percentage (e.g., 0.1 for 10%)
    * @returns Storage availability information
    */
-  checkStorageAvailable(modelSize: number, safetyMargin: number): StorageAvailability;
+  checkStorageAvailable(
+    modelSize: number,
+    safetyMargin: number
+  ): StorageAvailability;
 
   /**
    * Get storage recommendations

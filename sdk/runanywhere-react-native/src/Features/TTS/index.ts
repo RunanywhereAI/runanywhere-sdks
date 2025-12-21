@@ -34,17 +34,7 @@ export type {
 } from '../../Core/Protocols/Voice/TTSService';
 
 // Export errors
-export {
-  TTSError,
-  TTSErrorCode,
-  isTTSError,
-  isTTSErrorCode,
-  isInitializationError,
-  isConfigurationError,
-  isInputError,
-  isRuntimeError,
-  isResourceError,
-} from './Errors/TTSError';
+export { TTSError } from './Errors/TTSError';
 
 /**
  * Default TTS configuration

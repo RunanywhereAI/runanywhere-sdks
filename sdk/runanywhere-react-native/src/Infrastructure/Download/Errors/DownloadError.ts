@@ -43,32 +43,46 @@ export class DownloadError extends SDKError {
    * Partial download - file incomplete
    */
   static partialDownload(): DownloadError {
-    return new DownloadError(ErrorCode.DownloadFailed, 'Partial download - file incomplete');
+    return new DownloadError(
+      ErrorCode.DownloadFailed,
+      'Partial download - file incomplete'
+    );
   }
 
   /**
    * Downloaded file checksum doesn't match expected
    */
   static checksumMismatch(): DownloadError {
-    return new DownloadError(ErrorCode.FileCorrupted, "Downloaded file checksum doesn't match expected");
+    return new DownloadError(
+      ErrorCode.FileCorrupted,
+      "Downloaded file checksum doesn't match expected"
+    );
   }
 
   /**
    * Archive extraction failed
    */
   static extractionFailed(reason: string): DownloadError {
-    return new DownloadError(ErrorCode.DownloadFailed, `Archive extraction failed: ${reason}`, {
-      details: { reason },
-    });
+    return new DownloadError(
+      ErrorCode.DownloadFailed,
+      `Archive extraction failed: ${reason}`,
+      {
+        details: { reason },
+      }
+    );
   }
 
   /**
    * Unsupported archive format
    */
   static unsupportedArchive(format: string): DownloadError {
-    return new DownloadError(ErrorCode.DownloadFailed, `Unsupported archive format: ${format}`, {
-      details: { format },
-    });
+    return new DownloadError(
+      ErrorCode.DownloadFailed,
+      `Unsupported archive format: ${format}`,
+      {
+        details: { format },
+      }
+    );
   }
 
   /**
@@ -98,14 +112,20 @@ export class DownloadError extends SDKError {
    * Download was cancelled
    */
   static cancelled(): DownloadError {
-    return new DownloadError(ErrorCode.OperationCancelled, 'Download was cancelled');
+    return new DownloadError(
+      ErrorCode.OperationCancelled,
+      'Download was cancelled'
+    );
   }
 
   /**
    * Insufficient storage space
    */
   static insufficientSpace(): DownloadError {
-    return new DownloadError(ErrorCode.InsufficientStorage, 'Insufficient storage space');
+    return new DownloadError(
+      ErrorCode.InsufficientStorage,
+      'Insufficient storage space'
+    );
   }
 
   /**
@@ -119,7 +139,10 @@ export class DownloadError extends SDKError {
    * Network connection lost
    */
   static connectionLost(): DownloadError {
-    return new DownloadError(ErrorCode.NetworkUnavailable, 'Network connection lost');
+    return new DownloadError(
+      ErrorCode.NetworkUnavailable,
+      'Network connection lost'
+    );
   }
 
   private constructor(

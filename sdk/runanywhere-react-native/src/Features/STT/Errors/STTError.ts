@@ -16,7 +16,10 @@ export class STTError extends SDKError {
    * Service not initialized
    */
   static serviceNotInitialized(): STTError {
-    return new STTError(ErrorCode.NotInitialized, 'STT service is not initialized');
+    return new STTError(
+      ErrorCode.NotInitialized,
+      'STT service is not initialized'
+    );
   }
 
   /**
@@ -36,16 +39,23 @@ export class STTError extends SDKError {
    * Streaming transcription is not supported
    */
   static streamingNotSupported(): STTError {
-    return new STTError(ErrorCode.GenerationFailed, 'Streaming transcription is not supported');
+    return new STTError(
+      ErrorCode.GenerationFailed,
+      'Streaming transcription is not supported'
+    );
   }
 
   /**
    * Language not supported
    */
   static languageNotSupported(language: string): STTError {
-    return new STTError(ErrorCode.InvalidInput, `Language not supported: ${language}`, {
-      details: { language },
-    });
+    return new STTError(
+      ErrorCode.InvalidInput,
+      `Language not supported: ${language}`,
+      {
+        details: { language },
+      }
+    );
   }
 
   /**
@@ -61,49 +71,70 @@ export class STTError extends SDKError {
    * Audio format is not supported
    */
   static audioFormatNotSupported(): STTError {
-    return new STTError(ErrorCode.InvalidInput, 'Audio format is not supported');
+    return new STTError(
+      ErrorCode.InvalidInput,
+      'Audio format is not supported'
+    );
   }
 
   /**
    * Insufficient audio data for transcription
    */
   static insufficientAudioData(): STTError {
-    return new STTError(ErrorCode.InvalidInput, 'Insufficient audio data for transcription');
+    return new STTError(
+      ErrorCode.InvalidInput,
+      'Insufficient audio data for transcription'
+    );
   }
 
   /**
    * Insufficient memory for voice processing
    */
   static insufficientMemory(): STTError {
-    return new STTError(ErrorCode.HardwareUnavailable, 'Insufficient memory for voice processing');
+    return new STTError(
+      ErrorCode.HardwareUnavailable,
+      'Insufficient memory for voice processing'
+    );
   }
 
   /**
    * No STT service available for transcription
    */
   static noVoiceServiceAvailable(): STTError {
-    return new STTError(ErrorCode.GenerationFailed, 'No STT service available for transcription');
+    return new STTError(
+      ErrorCode.GenerationFailed,
+      'No STT service available for transcription'
+    );
   }
 
   /**
    * Audio session is not configured
    */
   static audioSessionNotConfigured(): STTError {
-    return new STTError(ErrorCode.NotInitialized, 'Audio session is not configured');
+    return new STTError(
+      ErrorCode.NotInitialized,
+      'Audio session is not configured'
+    );
   }
 
   /**
    * Failed to activate audio session
    */
   static audioSessionActivationFailed(): STTError {
-    return new STTError(ErrorCode.HardwareUnavailable, 'Failed to activate audio session');
+    return new STTError(
+      ErrorCode.HardwareUnavailable,
+      'Failed to activate audio session'
+    );
   }
 
   /**
    * Microphone permission was denied
    */
   static microphonePermissionDenied(): STTError {
-    return new STTError(ErrorCode.AuthorizationDenied, 'Microphone permission was denied');
+    return new STTError(
+      ErrorCode.AuthorizationDenied,
+      'Microphone permission was denied'
+    );
   }
 
   private constructor(

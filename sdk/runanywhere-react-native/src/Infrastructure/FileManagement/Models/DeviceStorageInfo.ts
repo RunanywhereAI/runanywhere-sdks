@@ -43,7 +43,9 @@ export function createDeviceStorageInfo(params: {
  * @param info - DeviceStorageInfo instance
  * @returns Usage percentage (0-100)
  */
-export function getDeviceStorageUsagePercentage(info: DeviceStorageInfo): number {
+export function getDeviceStorageUsagePercentage(
+  info: DeviceStorageInfo
+): number {
   if (info.totalSpace <= 0) {
     return 0;
   }

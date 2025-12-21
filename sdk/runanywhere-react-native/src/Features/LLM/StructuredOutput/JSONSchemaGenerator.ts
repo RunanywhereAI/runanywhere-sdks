@@ -71,7 +71,10 @@ export function createObjectSchema(
 /**
  * Creates a string property
  */
-export function stringProperty(description?: string, format?: string): SchemaProperty {
+export function stringProperty(
+  description?: string,
+  format?: string
+): SchemaProperty {
   const prop: SchemaProperty = { type: 'string' };
   if (description) prop.description = description;
   if (format) prop.format = format;

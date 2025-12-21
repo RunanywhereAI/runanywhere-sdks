@@ -6,8 +6,6 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/LLM/StructuredOutput/StreamToken.swift
  */
 
-import type { Generatable } from './Generatable';
-
 /**
  * Token emitted during streaming
  * Matches iOS StreamToken

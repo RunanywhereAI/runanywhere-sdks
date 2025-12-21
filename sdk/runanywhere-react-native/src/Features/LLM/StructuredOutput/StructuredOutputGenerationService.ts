@@ -9,7 +9,10 @@
 import type { Generatable, StructuredOutputConfig } from './Generatable';
 import type { LLMStreamResult } from '../LLMModels';
 import type { StreamToken, StructuredOutputStreamResult } from './StreamToken';
-import { createStreamToken, createStructuredOutputStreamResult } from './StreamToken';
+import {
+  createStreamToken,
+  createStructuredOutputStreamResult,
+} from './StreamToken';
 import { StreamAccumulator } from './StreamAccumulator';
 import type { LLMOutput } from '../LLMModels';
 
@@ -18,7 +21,10 @@ import type { LLMOutput } from '../LLMModels';
  */
 export interface StructuredOutputHandler {
   getSystemPrompt<T extends { jsonSchema: string }>(type: T): string;
-  buildUserPrompt<T extends { jsonSchema: string }>(type: T, content: string): string;
+  buildUserPrompt<T extends { jsonSchema: string }>(
+    type: T,
+    content: string
+  ): string;
   parseStructuredOutput<T>(text: string, schema: { jsonSchema: string }): T;
 }
 
@@ -66,7 +72,10 @@ export class StructuredOutputError extends Error {
   }
 
   static validationFailed(detail: string): StructuredOutputError {
-    return new StructuredOutputError(`Validation failed: ${detail}`, 'validationFailed');
+    return new StructuredOutputError(
+      `Validation failed: ${detail}`,
+      'validationFailed'
+    );
   }
 
   static extractionFailed(detail: string): StructuredOutputError {
@@ -113,7 +122,8 @@ export class StructuredOutputGenerationService {
     // Create effective options with system prompt
     const effectiveOptions: LLMGenerationOptions = {
       maxTokens: options?.maxTokens ?? type.generationHints?.maxTokens ?? 1500,
-      temperature: options?.temperature ?? type.generationHints?.temperature ?? 0.7,
+      temperature:
+        options?.temperature ?? type.generationHints?.temperature ?? 0.7,
       topP: options?.topP ?? 1.0,
       stopSequences: options?.stopSequences ?? [],
       streamingEnabled: false,
@@ -129,10 +139,16 @@ export class StructuredOutputGenerationService {
     const userPrompt = this.handler.buildUserPrompt(type, prompt);
 
     // Generate the text using LLMCapability
-    const generationResult = await llmCapability.generate(userPrompt, effectiveOptions);
+    const generationResult = await llmCapability.generate(
+      userPrompt,
+      effectiveOptions
+    );
 
     // Parse using StructuredOutputHandler
-    const result = this.handler.parseStructuredOutput<T>(generationResult.text, type);
+    const result = this.handler.parseStructuredOutput<T>(
+      generationResult.text,
+      type
+    );
 
     return result;
   }
@@ -166,7 +182,8 @@ export class StructuredOutputGenerationService {
     // Create effective options with system prompt
     const effectiveOptions: LLMGenerationOptions = {
       maxTokens: options?.maxTokens ?? type.generationHints?.maxTokens ?? 1500,
-      temperature: options?.temperature ?? type.generationHints?.temperature ?? 0.7,
+      temperature:
+        options?.temperature ?? type.generationHints?.temperature ?? 0.7,
       topP: options?.topP ?? 1.0,
       stopSequences: options?.stopSequences ?? [],
       streamingEnabled: true,
@@ -190,7 +207,11 @@ export class StructuredOutputGenerationService {
     );
 
     // Create result task that waits for streaming to complete
-    const resultPromise = this.createResultPromise<T>(type, accumulator, handler);
+    const resultPromise = this.createResultPromise<T>(
+      type,
+      accumulator,
+      handler
+    );
 
     return createStructuredOutputStreamResult(tokenStream, resultPromise);
   }
@@ -211,10 +232,17 @@ export class StructuredOutputGenerationService {
       let tokenIndex = 0;
 
       // Stream tokens
-      const streamingResult = await streamGenerator(userPrompt, effectiveOptions);
+      const streamingResult = await streamGenerator(
+        userPrompt,
+        effectiveOptions
+      );
 
       for await (const token of streamingResult.stream) {
-        const streamToken = createStreamToken(token.token, tokenIndex, token.timestamp);
+        const streamToken = createStreamToken(
+          token.token,
+          tokenIndex,
+          token.timestamp
+        );
 
         // Accumulate for parsing
         accumulator.append(token.token);

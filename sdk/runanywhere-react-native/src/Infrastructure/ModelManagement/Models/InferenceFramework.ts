@@ -31,9 +31,7 @@ export enum InferenceFramework {
 /**
  * Get human-readable display name for the framework
  */
-export function getFrameworkDisplayName(
-  framework: InferenceFramework
-): string {
+export function getFrameworkDisplayName(framework: InferenceFramework): string {
   switch (framework) {
     case InferenceFramework.CoreML:
       return 'Core ML';

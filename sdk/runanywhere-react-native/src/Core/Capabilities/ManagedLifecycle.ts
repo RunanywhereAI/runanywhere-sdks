@@ -273,10 +273,7 @@ export class ManagedLifecycle<TService> {
    */
   getLifecycleMetrics(): ModelLifecycleMetrics {
     const successfulLoads = this.loadCount - this.failedLoadCount;
-    const totalEvents =
-      this.loadCount +
-      this.unloadCount +
-      this.downloadCount;
+    const totalEvents = this.loadCount + this.unloadCount + this.downloadCount;
 
     return {
       totalEvents,
