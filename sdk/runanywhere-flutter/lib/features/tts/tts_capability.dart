@@ -104,11 +104,54 @@ class TTSCapability extends BaseCapability<TTSService> {
   String? currentVoice;
   String? _modelPath;
 
+  /// Whether a voice/model is currently loaded
+  bool _isVoiceLoaded = false;
+
   TTSCapability({
     required this.ttsConfiguration,
     super.serviceContainer,
   })  : currentVoice = ttsConfiguration.voice,
         super(configuration: ttsConfiguration);
+
+  /// Whether a voice/model is currently loaded.
+  /// Matches iOS TTSCapability.isVoiceLoaded property.
+  bool get isVoiceLoaded => _isVoiceLoaded && service != null;
+
+  /// Alias for isVoiceLoaded to match ModelLoadableCapability pattern.
+  /// Matches iOS TTSCapability.isModelLoaded property.
+  bool get isModelLoaded => isVoiceLoaded;
+
+  /// Currently loaded voice ID.
+  /// Matches iOS TTSCapability.currentVoiceId property.
+  String? get currentVoiceId => currentVoice;
+
+  /// Alias for currentVoiceId to match ModelLoadableCapability pattern.
+  /// Matches iOS TTSCapability.currentModelId property.
+  String? get currentModelId => currentVoiceId;
+
+  /// Load a voice by ID.
+  /// Matches iOS TTSCapability.loadVoice(_:) method.
+  ///
+  /// [voiceId] - The voice identifier to load.
+  Future<void> loadVoice(String voiceId) async {
+    currentVoice = voiceId;
+    _isVoiceLoaded = true;
+  }
+
+  /// Load a model by ID (alias for loadVoice for parity with other capabilities).
+  /// Matches iOS TTSCapability.loadModel(_:) method.
+  ///
+  /// [modelId] - The model/voice identifier to load.
+  Future<void> loadModel(String modelId) async {
+    await loadVoice(modelId);
+  }
+
+  /// Unload the currently loaded voice/model.
+  /// Matches iOS TTSCapability.unload() method.
+  Future<void> unload() async {
+    currentVoice = null;
+    _isVoiceLoaded = false;
+  }
 
   @override
   Future<TTSService> createService() async {

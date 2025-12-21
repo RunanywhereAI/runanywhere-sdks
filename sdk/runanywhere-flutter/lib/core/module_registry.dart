@@ -353,6 +353,23 @@ class ModuleRegistry {
     if (hasSpeakerDiarization) modules.add('SpeakerDiarization');
     return modules;
   }
+
+  // ============================================================================
+  // Module Discovery (iOS Parity)
+  // ============================================================================
+
+  /// Register all modules that have been discovered.
+  /// This should be called at app startup after all imports.
+  /// Matches iOS ModuleRegistry.registerDiscoveredModules().
+  void registerDiscoveredModules() {
+    final discovered = ModuleDiscovery.discoveredModules;
+
+    for (final module in discovered) {
+      if (!_registeredModules.containsKey(module.moduleId)) {
+        registerModule(module);
+      }
+    }
+  }
 }
 
 /// Internal structure to track providers with their priorities
@@ -425,6 +442,16 @@ abstract class LLMService {
     required LLMGenerationOptions options,
   });
   bool get isReady;
+
+  /// Whether this service supports true streaming generation.
+  /// Matches iOS LLMService.supportsStreaming property.
+  bool get supportsStreaming;
+
+  /// Cancel the current generation operation.
+  /// Note: Best-effort; some backends may not support mid-generation cancellation.
+  /// Matches iOS LLMService.cancel() method.
+  Future<void> cancel();
+
   Future<void> cleanup();
 }
 
@@ -494,9 +521,66 @@ class LLMGenerationOptions {
   });
 }
 
+/// Result of a text generation request.
+/// Matches iOS LLMGenerationResult from Features/LLM/Models/LLMGenerationResult.swift
 class LLMGenerationResult {
+  /// Generated text (with thinking content removed if extracted)
   final String text;
-  LLMGenerationResult({required this.text});
+
+  /// Thinking/reasoning content extracted from the response (for reasoning models)
+  /// Matches iOS LLMGenerationResult.thinkingContent
+  final String? thinkingContent;
+
+  /// Number of input/prompt tokens
+  final int inputTokens;
+
+  /// Number of output tokens used
+  final int tokensUsed;
+
+  /// Model used for generation
+  final String modelUsed;
+
+  /// Total latency in milliseconds (from start to completion)
+  final double latencyMs;
+
+  /// Framework used for generation
+  final String? framework;
+
+  /// Tokens generated per second
+  final double tokensPerSecond;
+
+  /// Time to first token in milliseconds (only available for streaming generations).
+  /// This is null for non-streaming generate() calls since the entire response
+  /// is returned at once. Use generateStream() to get TTFT metrics.
+  /// Matches iOS LLMGenerationResult.timeToFirstTokenMs
+  final double? timeToFirstTokenMs;
+
+  /// Number of tokens used for thinking/reasoning
+  final int thinkingTokens;
+
+  /// Number of response tokens (excluding thinking tokens)
+  final int responseTokens;
+
+  LLMGenerationResult({
+    required this.text,
+    this.thinkingContent,
+    this.inputTokens = 0,
+    this.tokensUsed = 0,
+    this.modelUsed = 'unknown',
+    this.latencyMs = 0,
+    this.framework,
+    this.tokensPerSecond = 0,
+    this.timeToFirstTokenMs,
+    this.thinkingTokens = 0,
+    this.responseTokens = 0,
+  });
+
+  /// Total tokens (prompt + completion)
+  int get totalTokens => inputTokens + tokensUsed;
+
+  /// Whether this result includes thinking content
+  bool get hasThinkingContent =>
+      thinkingContent != null && thinkingContent!.isNotEmpty;
 }
 
 /// Options for text-to-speech synthesis
@@ -523,3 +607,61 @@ class TTSOptions {
 // VADResult is exported from features/vad/vad_service.dart (see top of file)
 
 class SpeakerDiarizationResult {}
+
+// ============================================================================
+// Module Discovery (iOS Parity)
+// ============================================================================
+
+/// Central registry for module auto-discovery.
+///
+/// Matches iOS ModuleDiscovery class for enabling auto-registration of modules.
+///
+/// ## Usage
+///
+/// Modules can register themselves for auto-discovery:
+///
+/// ```dart
+/// // In your module's initialization:
+/// ModuleDiscovery.register(MyModule());
+///
+/// // At app startup:
+/// ModuleRegistry.shared.registerDiscoveredModules();
+/// ```
+class ModuleDiscovery {
+  /// Private constructor - singleton pattern.
+  ModuleDiscovery._();
+
+  /// Discovered module instances.
+  static final List<RunAnywhereModule> _discoveredModules = [];
+
+  /// Get all discovered modules.
+  static List<RunAnywhereModule> get discoveredModules =>
+      List.unmodifiable(_discoveredModules);
+
+  /// Register a module for auto-discovery.
+  ///
+  /// Call this from your module's initialization to enable auto-registration.
+  ///
+  /// ```dart
+  /// // In your module file:
+  /// class MyModule implements RunAnywhereModule {
+  ///   static void autoRegister() {
+  ///     ModuleDiscovery.register(MyModule());
+  ///   }
+  ///   // ... module implementation ...
+  /// }
+  /// ```
+  ///
+  /// [module] - The module instance to register for discovery.
+  static void register(RunAnywhereModule module) {
+    // Only add if not already registered
+    if (!_discoveredModules.any((m) => m.moduleId == module.moduleId)) {
+      _discoveredModules.add(module);
+    }
+  }
+
+  /// Clear all discovered modules (for testing).
+  static void reset() {
+    _discoveredModules.clear();
+  }
+}

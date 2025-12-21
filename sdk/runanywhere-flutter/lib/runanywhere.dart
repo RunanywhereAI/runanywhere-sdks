@@ -31,9 +31,8 @@ export 'core/protocols/downloading/download_state.dart';
 
 // Native FFI bindings for on-device AI capabilities
 // Access via: NativeBackend, PlatformLoader
-export 'backends/native/platform_loader.dart' show PlatformLoader;
-export 'backends/native/native_backend.dart'
-    show NativeBackend, NativeBackendException;
+export 'native/platform_loader.dart' show PlatformLoader;
+export 'native/native_backend.dart' show NativeBackend, NativeBackendException;
 
 // Backend modules (modular architecture - import specific backends as needed)
 // Use: import 'package:runanywhere/backends/onnx/onnx.dart';

@@ -18,6 +18,26 @@ class VADCapability extends BaseCapability<VADService> {
     super.serviceContainer,
   }) : super(configuration: vadConfiguration);
 
+  /// Whether speech is currently active.
+  /// Matches iOS VADCapability.isSpeechActive property.
+  bool get isSpeechActive {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      return vadService.isSpeechActive;
+    }
+    return false;
+  }
+
+  /// Current energy threshold.
+  /// Matches iOS VADCapability.energyThreshold property.
+  double get energyThreshold {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      return vadService.energyThreshold;
+    }
+    return 0.0;
+  }
+
   @override
   Future<VADService> createService() async {
     // Try to get a registered VAD provider from central registry
@@ -220,5 +240,25 @@ class VADCapability extends BaseCapability<VADService> {
       return vadService.energyThreshold;
     }
     return null;
+  }
+
+  // MARK: - TTS Integration
+
+  /// Notify VAD that TTS is about to start (to adjust sensitivity).
+  /// Matches iOS VADCapability.notifyTTSWillStart() method.
+  void notifyTTSWillStart() {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      vadService.notifyTTSWillStart();
+    }
+  }
+
+  /// Notify VAD that TTS has finished.
+  /// Matches iOS VADCapability.notifyTTSDidFinish() method.
+  void notifyTTSDidFinish() {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      vadService.notifyTTSDidFinish();
+    }
   }
 }

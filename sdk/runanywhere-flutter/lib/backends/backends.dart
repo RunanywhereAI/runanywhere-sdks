@@ -36,4 +36,5 @@ export 'onnx/onnx.dart';
 export 'llamacpp/llamacpp.dart';
 
 // Native utilities (for advanced usage)
-export 'native/native.dart';
+// Note: Native backend is in lib/native/, import via:
+// import 'package:runanywhere/native/native.dart';
