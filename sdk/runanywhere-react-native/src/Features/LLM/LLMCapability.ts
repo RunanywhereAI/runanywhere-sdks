@@ -204,8 +204,9 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
         // Update running average of TTFT
         const ttftCount = this._analyticsMetrics.streamingGenerations;
         this._analyticsMetrics.averageTimeToFirstToken =
-          ((this._analyticsMetrics.averageTimeToFirstToken * (ttftCount - 1)) +
-            metrics.timeToFirstToken) / ttftCount;
+          (this._analyticsMetrics.averageTimeToFirstToken * (ttftCount - 1) +
+            metrics.timeToFirstToken) /
+          ttftCount;
       }
     } else {
       this._analyticsMetrics.nonStreamingGenerations++;
@@ -214,8 +215,9 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
     // Update running average of tokens per second
     const genCount = this._analyticsMetrics.totalGenerations;
     this._analyticsMetrics.averageTokensPerSecond =
-      ((this._analyticsMetrics.averageTokensPerSecond * (genCount - 1)) +
-        metrics.tokensPerSecond) / genCount;
+      (this._analyticsMetrics.averageTokensPerSecond * (genCount - 1) +
+        metrics.tokensPerSecond) /
+      genCount;
 
     this._analyticsMetrics.totalInputTokens += metrics.inputTokens;
     this._analyticsMetrics.totalOutputTokens += metrics.outputTokens;
@@ -620,7 +622,8 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
 
         this.updateAnalytics({
           isStreaming: true,
-          timeToFirstToken: timeToFirstTokenMs !== null ? timeToFirstTokenMs / 1000 : undefined,
+          timeToFirstToken:
+            timeToFirstTokenMs !== null ? timeToFirstTokenMs / 1000 : undefined,
           tokensPerSecond,
           inputTokens: Math.floor(fullPrompt.length / 4), // Rough estimate
           outputTokens: collector.tokenCount,

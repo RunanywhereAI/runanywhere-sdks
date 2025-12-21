@@ -18,7 +18,6 @@ import {
   ExecutionTarget,
   HardwareAcceleration,
   ModelCategory,
-  LLMFramework,
 } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
@@ -49,6 +48,7 @@ import type {
   TTSConfiguration,
   TTSResult,
   ModelInfo,
+  LLMFramework,
 } from '../types';
 import { StructuredOutputHandler } from '../Capabilities/StructuredOutput/Services/StructuredOutputHandler';
 import type { GeneratableType } from '../Capabilities/StructuredOutput/Services/StructuredOutputHandler';
@@ -285,14 +285,15 @@ export const RunAnywhere = {
       return null;
     }
     try {
-      const { AuthenticationService } = await import(
-        '../Data/Network/Services/AuthenticationService'
-      );
+      const { AuthenticationService } =
+        await import('../Data/Network/Services/AuthenticationService');
       const authService = ServiceContainer.shared.authenticationService;
       if (!authService || !(authService instanceof AuthenticationService)) {
         return null;
       }
-      return (authService as InstanceType<typeof AuthenticationService>).getUserId();
+      return (
+        authService as InstanceType<typeof AuthenticationService>
+      ).getUserId();
     } catch {
       return null;
     }
@@ -310,14 +311,15 @@ export const RunAnywhere = {
       return null;
     }
     try {
-      const { AuthenticationService } = await import(
-        '../Data/Network/Services/AuthenticationService'
-      );
+      const { AuthenticationService } =
+        await import('../Data/Network/Services/AuthenticationService');
       const authService = ServiceContainer.shared.authenticationService;
       if (!authService || !(authService instanceof AuthenticationService)) {
         return null;
       }
-      return (authService as InstanceType<typeof AuthenticationService>).getOrganizationId();
+      return (
+        authService as InstanceType<typeof AuthenticationService>
+      ).getOrganizationId();
     } catch {
       return null;
     }
@@ -329,9 +331,8 @@ export const RunAnywhere = {
    * Matches iOS: static func isDeviceRegistered() async -> Bool
    */
   async isDeviceRegistered(): Promise<boolean> {
-    const { DeviceRegistrationService } = await import(
-      '../Infrastructure/Device'
-    );
+    const { DeviceRegistrationService } =
+      await import('../Infrastructure/Device');
     return DeviceRegistrationService.shared.isRegistered();
   },
 
@@ -633,9 +634,8 @@ export const RunAnywhere = {
       const environment = initState.environment ?? SDKEnvironment.Production;
 
       if (apiClient) {
-        const { DeviceRegistrationService } = await import(
-          '../Infrastructure/Device'
-        );
+        const { DeviceRegistrationService } =
+          await import('../Infrastructure/Device');
         await DeviceRegistrationService.shared.registerIfNeeded(
           apiClient,
           environment
@@ -1900,12 +1900,14 @@ export const RunAnywhere = {
 
     logger.info('Fetching model assignments...');
 
-    const modelAssignmentService = ServiceContainer.shared.modelAssignmentService;
+    const modelAssignmentService =
+      ServiceContainer.shared.modelAssignmentService;
     if (!modelAssignmentService) {
       throw new Error('ModelAssignmentService not available');
     }
 
-    const models = await modelAssignmentService.fetchModelAssignments(forceRefresh);
+    const models =
+      await modelAssignmentService.fetchModelAssignments(forceRefresh);
     logger.info(`Successfully fetched ${models.length} model assignments`);
     return models;
   },
@@ -1931,7 +1933,8 @@ export const RunAnywhere = {
 
     await this.ensureServicesReady();
 
-    const modelAssignmentService = ServiceContainer.shared.modelAssignmentService;
+    const modelAssignmentService =
+      ServiceContainer.shared.modelAssignmentService;
     if (!modelAssignmentService) {
       // Fallback to local filtering if service not available
       const allModels = await ModelRegistry.getAvailableModels();
@@ -1951,7 +1954,8 @@ export const RunAnywhere = {
       return;
     }
 
-    const modelAssignmentService = ServiceContainer.shared.modelAssignmentService;
+    const modelAssignmentService =
+      ServiceContainer.shared.modelAssignmentService;
     if (modelAssignmentService) {
       modelAssignmentService.clearCache();
     }
@@ -1992,7 +1996,9 @@ export const RunAnywhere = {
       id: options.id ?? this._generateModelId(options.url),
       name: options.name,
       category: options.category ?? ModelCategory.Language,
-      format: options.url.includes('.gguf') ? ModelFormat.GGUF : ModelFormat.GGUF,
+      format: options.url.includes('.gguf')
+        ? ModelFormat.GGUF
+        : ModelFormat.GGUF,
       downloadURL: options.url,
       localPath: undefined,
       downloadSize: undefined,
@@ -2000,12 +2006,14 @@ export const RunAnywhere = {
       compatibleFrameworks: [options.framework],
       preferredFramework: options.framework,
       supportsThinking: options.supportsThinking ?? false,
-      tags: [],
+      metadata: { tags: [] },
       source: ConfigurationSource.Local,
       createdAt: now,
       updatedAt: now,
       syncPending: false,
       usageCount: 0,
+      isDownloaded: false,
+      isAvailable: true,
     };
 
     await ModelRegistry.registerModel(modelInfo);
@@ -2298,4 +2306,3 @@ export interface DownloadProgress {
 }
 
 // Default export
-export default RunAnywhere;

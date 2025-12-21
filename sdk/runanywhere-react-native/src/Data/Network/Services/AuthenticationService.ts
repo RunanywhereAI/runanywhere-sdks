@@ -12,7 +12,7 @@ import { DeviceIdentityService } from '../../../Foundation/DeviceIdentity/Device
 import { SecureStorageService } from '../../../Foundation/Security';
 import { SDKError, SDKErrorCode } from '../../../Public/Errors/SDKError';
 import type { APIClient, AuthenticationProvider } from './APIClient';
-import { APIEndpoints } from '../Endpoints/APIEndpoints';
+import { APIEndpoints } from '../APIEndpoint';
 import type { SDKEnvironment } from '../../../types';
 import {
   type AuthenticationRequest,
@@ -159,11 +159,11 @@ export class AuthenticationService implements AuthenticationProvider {
 
     logger.debug('Authenticating with backend');
 
-    const endpoint = APIEndpoints.authenticate(this.environment);
+    const endpoint = APIEndpoints.authenticate();
     const authResponse = await this.apiClient.post<
       AuthenticationRequest,
       AuthenticationResponse
-    >(endpoint.path, request);
+    >(endpoint, request);
 
     // Store tokens and additional info
     const internal = toInternalAuthResponse(authResponse);
@@ -189,8 +189,8 @@ export class AuthenticationService implements AuthenticationProvider {
   async healthCheck(): Promise<HealthCheckResponse> {
     logger.debug('Performing health check');
 
-    const endpoint = APIEndpoints.healthCheck(this.environment);
-    return this.apiClient.get<HealthCheckResponse>(endpoint.path);
+    const endpoint = APIEndpoints.healthCheck();
+    return this.apiClient.get<HealthCheckResponse>(endpoint);
   }
 
   /**
@@ -235,15 +235,21 @@ export class AuthenticationService implements AuthenticationProvider {
    */
   async loadStoredTokens(): Promise<void> {
     try {
-      const [accessToken, refreshToken, deviceId, userId, organizationId, expiresAt] =
-        await Promise.all([
-          SecureStorageService.retrieve(AUTH_KEYS.accessToken),
-          SecureStorageService.retrieve(AUTH_KEYS.refreshToken),
-          SecureStorageService.retrieve(AUTH_KEYS.deviceId),
-          SecureStorageService.retrieve(AUTH_KEYS.userId),
-          SecureStorageService.retrieve(AUTH_KEYS.organizationId),
-          SecureStorageService.retrieve(AUTH_KEYS.tokenExpiresAt),
-        ]);
+      const [
+        accessToken,
+        refreshToken,
+        deviceId,
+        userId,
+        organizationId,
+        expiresAt,
+      ] = await Promise.all([
+        SecureStorageService.retrieve(AUTH_KEYS.accessToken),
+        SecureStorageService.retrieve(AUTH_KEYS.refreshToken),
+        SecureStorageService.retrieve(AUTH_KEYS.deviceId),
+        SecureStorageService.retrieve(AUTH_KEYS.userId),
+        SecureStorageService.retrieve(AUTH_KEYS.organizationId),
+        SecureStorageService.retrieve(AUTH_KEYS.tokenExpiresAt),
+      ]);
 
       this.state = {
         accessToken,
@@ -309,11 +315,11 @@ export class AuthenticationService implements AuthenticationProvider {
       refresh_token: this.state.refreshToken,
     };
 
-    const endpoint = APIEndpoints.refreshToken(this.environment);
+    const endpoint = APIEndpoints.refreshToken();
     const refreshResponse = await this.apiClient.post<
       RefreshTokenRequest,
       RefreshTokenResponse
-    >(endpoint.path, request);
+    >(endpoint, request);
 
     // Update stored tokens
     const internal = toInternalAuthResponse(refreshResponse);
@@ -339,12 +345,18 @@ export class AuthenticationService implements AuthenticationProvider {
 
       if (this.state.accessToken) {
         promises.push(
-          SecureStorageService.store(AUTH_KEYS.accessToken, this.state.accessToken)
+          SecureStorageService.store(
+            AUTH_KEYS.accessToken,
+            this.state.accessToken
+          )
         );
       }
       if (this.state.refreshToken) {
         promises.push(
-          SecureStorageService.store(AUTH_KEYS.refreshToken, this.state.refreshToken)
+          SecureStorageService.store(
+            AUTH_KEYS.refreshToken,
+            this.state.refreshToken
+          )
         );
       }
       if (this.state.deviceId) {
@@ -359,7 +371,10 @@ export class AuthenticationService implements AuthenticationProvider {
       }
       if (this.state.organizationId) {
         promises.push(
-          SecureStorageService.store(AUTH_KEYS.organizationId, this.state.organizationId)
+          SecureStorageService.store(
+            AUTH_KEYS.organizationId,
+            this.state.organizationId
+          )
         );
       }
       if (this.state.tokenExpiresAt) {
@@ -384,5 +399,3 @@ export class AuthenticationService implements AuthenticationProvider {
     AuthenticationService._instance = null;
   }
 }
-
-export default AuthenticationService;

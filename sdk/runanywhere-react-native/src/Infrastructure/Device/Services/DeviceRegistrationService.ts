@@ -10,9 +10,13 @@
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { DeviceIdentityService } from '../../../Foundation/DeviceIdentity/DeviceIdentityService';
 import { EventPublisher } from '../../Events/EventPublisher';
+import {
+  createDeviceRegisteredEvent,
+  createDeviceRegistrationFailedEvent,
+} from '../../Events/CommonEvents';
 import type { SDKEnvironment } from '../../../types';
 import type { APIClient } from '../../../Data/Network/Services/APIClient';
-import { APIEndpoints } from '../../../Data/Network/Endpoints/APIEndpoints';
+import { APIEndpoints } from '../../../Data/Network/APIEndpoint';
 
 const logger = new SDKLogger('DeviceRegistration');
 
@@ -56,8 +60,9 @@ function getStorage(): AsyncStorageInterface {
   }
   try {
     // Try to dynamically import @react-native-async-storage/async-storage
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+
+    const AsyncStorage =
+      require('@react-native-async-storage/async-storage').default;
     asyncStorage = AsyncStorage;
     return AsyncStorage;
   } catch {
@@ -144,36 +149,36 @@ export class DeviceRegistrationService {
     }
 
     const deviceId = await this.getDeviceId();
-    logger.info(`Registering device: ${deviceId.substring(0, 8)}... [${environment}]`);
+    logger.info(
+      `Registering device: ${deviceId.substring(0, 8)}... [${environment}]`
+    );
 
     try {
       const request = await this.createRegistrationRequest(deviceId);
-      const endpoint = APIEndpoints.deviceRegistration(environment);
+      const endpoint =
+        APIEndpoints.deviceRegistrationForEnvironment(environment);
 
       // Use APIClient for the request
-      const response = await apiClient.post<DeviceRegistrationRequest, DeviceRegistrationResponse>(
-        endpoint.path,
-        request
-      );
+      const response = await apiClient.post<
+        DeviceRegistrationRequest,
+        DeviceRegistrationResponse
+      >(endpoint, request);
 
       if (response.registered) {
         await this.markAsRegistered();
-        EventPublisher.shared.trackEvent({
-          type: 'device.registered',
-          timestamp: new Date(),
-          data: { deviceId },
-        });
+        EventPublisher.shared.track(createDeviceRegisteredEvent(deviceId));
         logger.info('Device registration successful');
       }
     } catch (error) {
       // Registration failure is non-critical - log and continue
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      EventPublisher.shared.trackEvent({
-        type: 'device.registration_failed',
-        timestamp: new Date(),
-        data: { error: errorMessage },
-      });
-      logger.warning(`Device registration failed (non-critical): ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      EventPublisher.shared.track(
+        createDeviceRegistrationFailedEvent(errorMessage)
+      );
+      logger.warning(
+        `Device registration failed (non-critical): ${errorMessage}`
+      );
     }
   }
 
@@ -205,7 +210,9 @@ export class DeviceRegistrationService {
   /**
    * Create device registration request from current device info
    */
-  private async createRegistrationRequest(deviceId: string): Promise<DeviceRegistrationRequest> {
+  private async createRegistrationRequest(
+    deviceId: string
+  ): Promise<DeviceRegistrationRequest> {
     // Try to get device info from native module
     let platform: 'ios' | 'android' = 'ios';
     let deviceModel = 'Unknown';
@@ -214,9 +221,11 @@ export class DeviceRegistrationService {
     try {
       const { requireDeviceInfoModule } = await import('../../../native');
       const deviceInfo = requireDeviceInfoModule();
-      platform = (deviceInfo.getPlatform?.() ?? 'ios') as 'ios' | 'android';
-      deviceModel = deviceInfo.getDeviceModel?.() ?? 'Unknown';
-      osVersion = deviceInfo.getOSVersion?.() ?? 'Unknown';
+      platform = ((await deviceInfo.getPlatform?.()) ?? 'ios') as
+        | 'ios'
+        | 'android';
+      deviceModel = (await deviceInfo.getDeviceModel?.()) ?? 'Unknown';
+      osVersion = (await deviceInfo.getOSVersion?.()) ?? 'Unknown';
     } catch {
       // Use fallback values if native module not available
       logger.debug('Native device info not available, using fallback values');
@@ -239,5 +248,3 @@ export class DeviceRegistrationService {
     DeviceRegistrationService._instance = null;
   }
 }
-
-export default DeviceRegistrationService;

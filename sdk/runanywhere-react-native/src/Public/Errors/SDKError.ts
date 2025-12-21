@@ -31,5 +31,11 @@ export {
 } from '../../Foundation/ErrorTypes/SDKError';
 
 // Re-export error codes and categories
-export { ErrorCode, getErrorCodeMessage } from '../../Foundation/ErrorTypes/ErrorCodes';
-export { ErrorCategory, getCategoryFromCode } from '../../Foundation/ErrorTypes/ErrorCategory';
+export {
+  ErrorCode,
+  getErrorCodeMessage,
+} from '../../Foundation/ErrorTypes/ErrorCodes';
+export {
+  ErrorCategory,
+  getCategoryFromCode,
+} from '../../Foundation/ErrorTypes/ErrorCategory';

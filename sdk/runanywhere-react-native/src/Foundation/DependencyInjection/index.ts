@@ -21,8 +21,5 @@ export {
 // Service Container - lazy initialization of services
 export { ServiceContainer } from './ServiceContainer';
 
-// Adapter Registry - framework adapters
-export { AdapterRegistry } from './AdapterRegistry';
-
 // Re-export AuthenticationProvider from Data/Network for convenience
 export type { AuthenticationProvider } from '../../Data/Network';

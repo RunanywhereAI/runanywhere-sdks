@@ -9,12 +9,6 @@
 
 // Import actual services
 import { RegistryService } from '../../Capabilities/Registry/Services/RegistryService';
-import { ModelLoadingService } from '../../Capabilities/ModelLoading/Services/ModelLoadingService';
-import { GenerationService } from '../../Capabilities/TextGeneration/Services/GenerationService';
-import { StreamingService } from '../../Capabilities/TextGeneration/Services/StreamingService';
-import { RoutingService } from '../../Capabilities/Routing/Services/RoutingService';
-import { CostCalculator } from '../../Capabilities/Routing/Services/CostCalculator';
-import { ResourceChecker } from '../../Capabilities/Routing/Services/ResourceChecker';
 import { HardwareCapabilityManager } from '../../Capabilities/DeviceCapability/Services/HardwareCapabilityManager';
 import { SDKLogger } from '../Logging/Logger/SDKLogger';
 import { FileManager } from '../FileOperations/FileManager';
@@ -25,10 +19,8 @@ import { AnalyticsQueueManager } from '../../Infrastructure/Analytics/AnalyticsQ
 import { ModelInfoService } from '../../Data/Services/ModelInfoService';
 import { ModelInfoRepositoryImpl } from '../../Data/Repositories/ModelInfoRepository';
 import type { ModelRegistry } from '../../Core/Protocols/Registry/ModelRegistry';
-import type { MemoryManager } from '../../Core/Protocols/Memory/MemoryManager';
 import { LLMCapability } from '../../Features/LLM/LLMCapability';
 import { LLMConfigurationImpl } from '../../Features/LLM/LLMConfiguration';
-import { AdapterRegistry } from './AdapterRegistry';
 import {
   APIClient,
   type APIClientConfig,
@@ -61,17 +53,6 @@ export class ServiceContainer {
     return this._modelRegistry;
   }
 
-  /**
-   * Single adapter registry for all frameworks (text and voice)
-   */
-  private _adapterRegistry?: AdapterRegistry;
-  public get adapterRegistry(): AdapterRegistry {
-    if (!this._adapterRegistry) {
-      this._adapterRegistry = new AdapterRegistry();
-    }
-    return this._adapterRegistry;
-  }
-
   // ============================================================================
   // Capability Services (Matches iOS: simplified capabilities)
   // ============================================================================
@@ -86,65 +67,6 @@ export class ServiceContainer {
       this._llmCapability = new LLMCapability(new LLMConfigurationImpl({}));
     }
     return this._llmCapability;
-  }
-
-  /**
-   * Model loading service
-   */
-  private _modelLoadingService?: ModelLoadingService;
-  public get modelLoadingService(): ModelLoadingService {
-    if (!this._modelLoadingService) {
-      this._modelLoadingService = new ModelLoadingService(
-        this.modelRegistry,
-        this.memoryService,
-        this.adapterRegistry
-      );
-    }
-    return this._modelLoadingService;
-  }
-
-  /**
-   * Routing service
-   */
-  private _routingService?: RoutingService;
-  public get routingService(): RoutingService {
-    if (!this._routingService) {
-      const costCalculator = new CostCalculator();
-      const resourceChecker = new ResourceChecker(this.hardwareManager);
-      this._routingService = new RoutingService(
-        costCalculator,
-        resourceChecker
-      );
-    }
-    return this._routingService;
-  }
-
-  /**
-   * Generation service
-   */
-  private _generationService?: GenerationService;
-  public get generationService(): GenerationService {
-    if (!this._generationService) {
-      this._generationService = new GenerationService(
-        this.routingService,
-        this.modelLoadingService
-      );
-    }
-    return this._generationService;
-  }
-
-  /**
-   * Streaming service
-   */
-  private _streamingService?: StreamingService;
-  public get streamingService(): StreamingService {
-    if (!this._streamingService) {
-      this._streamingService = new StreamingService(
-        this.generationService,
-        this.modelLoadingService
-      );
-    }
-    return this._streamingService;
   }
 
   /**
@@ -179,38 +101,6 @@ export class ServiceContainer {
       this._hardwareManager = HardwareCapabilityManager.shared;
     }
     return this._hardwareManager;
-  }
-
-  /**
-   * Memory service (implements MemoryManager protocol)
-   * Stub implementation - native memory management is handled by the platform
-   */
-  private _memoryService?: MemoryManager;
-  public get memoryService(): MemoryManager {
-    if (!this._memoryService) {
-      // Stub implementation - memory management is delegated to native layer
-      this._memoryService = {
-        registerLoadedModel: () => {},
-        unregisterModel: () => {},
-        getCurrentMemoryUsage: () => 0,
-        getAvailableMemory: () => 2_000_000_000, // 2GB default
-        hasAvailableMemory: () => true,
-        canAllocate: async () => true,
-        handleMemoryPressure: async () => {},
-        setMemoryThreshold: () => {},
-        getLoadedModels: () => [],
-        requestMemory: async () => true,
-        isHealthy: () => true,
-      };
-    }
-    return this._memoryService;
-  }
-
-  /**
-   * Get memory service (public alias)
-   */
-  public get memory(): MemoryManager {
-    return this.memoryService;
   }
 
   /**
@@ -249,7 +139,9 @@ export class ServiceContainer {
     | import('../../Infrastructure/ModelManagement/Services/ModelAssignmentService').ModelAssignmentService
     | undefined {
     if (!this._modelAssignmentService && this._apiClient && this._environment) {
-      const { ModelAssignmentService } = require('../../Infrastructure/ModelManagement/Services/ModelAssignmentService');
+      const {
+        ModelAssignmentService,
+      } = require('../../Infrastructure/ModelManagement/Services/ModelAssignmentService');
       this._modelAssignmentService = new ModelAssignmentService(
         this._apiClient,
         this._environment
@@ -407,11 +299,6 @@ export class ServiceContainer {
     // Reset core services
     this._modelRegistry = undefined;
     this._llmCapability = undefined;
-    this._modelLoadingService = undefined;
-    this._generationService = undefined;
-    this._streamingService = undefined;
-    this._routingService = undefined;
-    this._memoryService = undefined;
     this._hardwareManager = undefined;
     this._fileManager = undefined;
     this._logger = undefined;
