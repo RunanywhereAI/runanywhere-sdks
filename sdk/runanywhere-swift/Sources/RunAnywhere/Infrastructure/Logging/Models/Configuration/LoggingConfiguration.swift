@@ -138,8 +138,8 @@ extension LoggingConfiguration {
     /// NOTE: Temporarily enabled verbose logging for debugging
     public static var production: LoggingConfiguration {
         LoggingConfiguration(
-            enableLocalLogging: true,  // TEMP: Enable for debugging
-            minLogLevel: .debug,       // TEMP: Show all logs for debugging
+            enableLocalLogging: false,
+            minLogLevel: .warning,
             includeDeviceMetadata: true,
             enableSentryLogging: false
         )
