@@ -25,27 +25,29 @@ internal actual suspend fun extractTarBz2Impl(
     sourcePath: String,
     destinationPath: String,
     progressHandler: ((Double) -> Unit)?,
-) = withContext(Dispatchers.IO) {
-    logger.info("Extracting tar.bz2 archive: $sourcePath")
-    progressHandler?.invoke(0.05)
+) {
+    withContext(Dispatchers.IO) {
+        logger.info("Extracting tar.bz2 archive: $sourcePath")
+        progressHandler?.invoke(0.05)
 
-    val destDir = File(destinationPath)
-    if (!destDir.exists()) {
-        destDir.mkdirs()
-    }
+        val destDir = File(destinationPath)
+        if (!destDir.exists()) {
+            destDir.mkdirs()
+        }
 
-    FileInputStream(sourcePath).use { fileIn ->
-        BufferedInputStream(fileIn).use { bufferedIn ->
-            BZip2CompressorInputStream(bufferedIn).use { bz2In ->
-                TarArchiveInputStream(bz2In).use { tarIn ->
-                    extractTarEntries(tarIn, destDir, progressHandler)
+        FileInputStream(sourcePath).use { fileIn ->
+            BufferedInputStream(fileIn).use { bufferedIn ->
+                BZip2CompressorInputStream(bufferedIn).use { bz2In ->
+                    TarArchiveInputStream(bz2In).use { tarIn ->
+                        extractTarEntries(tarIn, destDir, progressHandler)
+                    }
                 }
             }
         }
-    }
 
-    logger.info("tar.bz2 extraction completed")
-    progressHandler?.invoke(1.0)
+        logger.info("tar.bz2 extraction completed")
+        progressHandler?.invoke(1.0)
+    }
 }
 
 /**
@@ -55,27 +57,29 @@ internal actual suspend fun extractTarGzImpl(
     sourcePath: String,
     destinationPath: String,
     progressHandler: ((Double) -> Unit)?,
-) = withContext(Dispatchers.IO) {
-    logger.info("Extracting tar.gz archive: $sourcePath")
-    progressHandler?.invoke(0.05)
+) {
+    withContext(Dispatchers.IO) {
+        logger.info("Extracting tar.gz archive: $sourcePath")
+        progressHandler?.invoke(0.05)
 
-    val destDir = File(destinationPath)
-    if (!destDir.exists()) {
-        destDir.mkdirs()
-    }
+        val destDir = File(destinationPath)
+        if (!destDir.exists()) {
+            destDir.mkdirs()
+        }
 
-    FileInputStream(sourcePath).use { fileIn ->
-        BufferedInputStream(fileIn).use { bufferedIn ->
-            GzipCompressorInputStream(bufferedIn).use { gzIn ->
-                TarArchiveInputStream(gzIn).use { tarIn ->
-                    extractTarEntries(tarIn, destDir, progressHandler)
+        FileInputStream(sourcePath).use { fileIn ->
+            BufferedInputStream(fileIn).use { bufferedIn ->
+                GzipCompressorInputStream(bufferedIn).use { gzIn ->
+                    TarArchiveInputStream(gzIn).use { tarIn ->
+                        extractTarEntries(tarIn, destDir, progressHandler)
+                    }
                 }
             }
         }
-    }
 
-    logger.info("tar.gz extraction completed")
-    progressHandler?.invoke(1.0)
+        logger.info("tar.gz extraction completed")
+        progressHandler?.invoke(1.0)
+    }
 }
 
 /**
@@ -85,27 +89,29 @@ internal actual suspend fun extractTarXzImpl(
     sourcePath: String,
     destinationPath: String,
     progressHandler: ((Double) -> Unit)?,
-) = withContext(Dispatchers.IO) {
-    logger.info("Extracting tar.xz archive: $sourcePath")
-    progressHandler?.invoke(0.05)
+) {
+    withContext(Dispatchers.IO) {
+        logger.info("Extracting tar.xz archive: $sourcePath")
+        progressHandler?.invoke(0.05)
 
-    val destDir = File(destinationPath)
-    if (!destDir.exists()) {
-        destDir.mkdirs()
-    }
+        val destDir = File(destinationPath)
+        if (!destDir.exists()) {
+            destDir.mkdirs()
+        }
 
-    FileInputStream(sourcePath).use { fileIn ->
-        BufferedInputStream(fileIn).use { bufferedIn ->
-            XZCompressorInputStream(bufferedIn).use { xzIn ->
-                TarArchiveInputStream(xzIn).use { tarIn ->
-                    extractTarEntries(tarIn, destDir, progressHandler)
+        FileInputStream(sourcePath).use { fileIn ->
+            BufferedInputStream(fileIn).use { bufferedIn ->
+                XZCompressorInputStream(bufferedIn).use { xzIn ->
+                    TarArchiveInputStream(xzIn).use { tarIn ->
+                        extractTarEntries(tarIn, destDir, progressHandler)
+                    }
                 }
             }
         }
-    }
 
-    logger.info("tar.xz extraction completed")
-    progressHandler?.invoke(1.0)
+        logger.info("tar.xz extraction completed")
+        progressHandler?.invoke(1.0)
+    }
 }
 
 /**
@@ -115,28 +121,29 @@ internal actual suspend fun extractZipImpl(
     sourcePath: String,
     destinationPath: String,
     progressHandler: ((Double) -> Unit)?,
-) = withContext(Dispatchers.IO) {
-    logger.info("Extracting zip archive: $sourcePath")
-    progressHandler?.invoke(0.05)
+) {
+    withContext(Dispatchers.IO) {
+        logger.info("Extracting zip archive: $sourcePath")
+        progressHandler?.invoke(0.05)
 
-    val destDir = File(destinationPath)
-    if (!destDir.exists()) {
-        destDir.mkdirs()
-    }
-
-    // First pass: count entries for progress
-    var totalEntries = 0
-    ZipInputStream(FileInputStream(sourcePath)).use { zipIn ->
-        while (zipIn.nextEntry != null) {
-            totalEntries++
+        val destDir = File(destinationPath)
+        if (!destDir.exists()) {
+            destDir.mkdirs()
         }
-    }
 
-    if (totalEntries == 0) {
-        logger.warning("Zip archive appears to be empty")
-        progressHandler?.invoke(1.0)
-        return@withContext
-    }
+        // First pass: count entries for progress
+        var totalEntries = 0
+        ZipInputStream(FileInputStream(sourcePath)).use { zipIn ->
+            while (zipIn.nextEntry != null) {
+                totalEntries++
+            }
+        }
+
+        if (totalEntries == 0) {
+            logger.warning("Zip archive appears to be empty")
+            progressHandler?.invoke(1.0)
+            return@withContext
+        }
 
     // Second pass: extract entries
     var extractedCount = 0
@@ -188,8 +195,9 @@ internal actual suspend fun extractZipImpl(
         }
     }
 
-    logger.info("Extracted $extractedCount files from zip archive")
-    progressHandler?.invoke(1.0)
+        logger.info("Extracted $extractedCount files from zip archive")
+        progressHandler?.invoke(1.0)
+    }
 }
 
 /**

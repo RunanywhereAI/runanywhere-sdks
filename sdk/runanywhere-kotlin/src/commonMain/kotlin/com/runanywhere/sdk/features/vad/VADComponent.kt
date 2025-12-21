@@ -41,7 +41,7 @@ class VADComponent(
                         framework = InferenceFramework.BUILT_IN,
                     )
                     throw SDKError.ComponentNotInitialized(
-                        "No VAD service provider registered. Please register WebRTCVADServiceProvider.register()",
+                        "No VAD service provider registered. Please register a VAD service provider.",
                     )
                 }
 
@@ -142,7 +142,7 @@ class VADComponent(
                 emit(output)
             }
         }.catch { error ->
-            throw VADError.ProcessingFailed(error)
+            throw VADError.ProcessingFailed(error.message ?: "Unknown processing error", error)
         }
 
     /**
