@@ -309,7 +309,7 @@ Remember: Output ONLY the JSON object, nothing else.`;
    * @returns The parsed and validated object
    * @throws Error if extraction or parsing fails
    */
-  public parseStructuredOutput<T>(text: string, schema: GeneratableType): T {
+  public parseStructuredOutput<T>(text: string, _schema: GeneratableType): T {
     // Extract JSON from the response
     const jsonString = this.extractJSON(text);
 

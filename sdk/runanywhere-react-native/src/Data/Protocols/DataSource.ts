@@ -8,7 +8,7 @@
 /**
  * Base protocol for all data sources
  */
-export interface DataSource<Entity> {
+export interface DataSource<_Entity> {
   /**
    * Check if the data source is available and healthy
    */
