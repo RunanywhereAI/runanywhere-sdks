@@ -187,19 +187,38 @@ class NetworkIntegrationTest {
 class APIEndpointTest {
     @Test
     fun `should have correct endpoint URLs`() {
-        assertEquals("/v1/models", APIEndpoint.models.url)
-        assertEquals("/v1/configuration", APIEndpoint.configuration.url)
-        assertEquals("/v1/telemetry", APIEndpoint.telemetry.url)
-        assertEquals("/v1/health", APIEndpoint.healthCheck.url)
-        assertEquals("/v1/device", APIEndpoint.deviceInfo.url)
-        assertEquals("/v1/history", APIEndpoint.history.url)
-        assertEquals("/v1/preferences", APIEndpoint.preferences.url)
+        // Core endpoints (matches iOS exactly)
+        assertEquals("/api/v1/models", APIEndpoint.models.url)
+        assertEquals("/api/v1/configuration", APIEndpoint.configuration.url)
+        assertEquals("/api/v1/sdk/telemetry", APIEndpoint.telemetry.url)
+        assertEquals("/v1/health", APIEndpoint.healthCheck.url) // No /api prefix (matches iOS)
+        assertEquals("/api/v1/device", APIEndpoint.deviceInfo.url)
+        assertEquals("/api/v1/history", APIEndpoint.generationHistory.url)
+        assertEquals("/api/v1/preferences", APIEndpoint.userPreferences.url)
     }
 
     @Test
     fun `should construct correct authentication URLs`() {
         assertEquals("/api/v1/auth/sdk/authenticate", APIEndpoint.authenticate.url)
         assertEquals("/api/v1/auth/sdk/refresh", APIEndpoint.refreshToken.url)
-        assertEquals("/api/v1/devices/register", APIEndpoint.registerDevice.url)
+        assertEquals("/api/v1/devices/register", APIEndpoint.deviceRegistration.url)
+    }
+
+    @Test
+    fun `should construct correct development endpoints`() {
+        // Supabase REST format for development (matches iOS)
+        assertEquals("/rest/v1/device_registrations", APIEndpoint.devDeviceRegistration.url)
+        assertEquals("/rest/v1/analytics_events", APIEndpoint.devAnalytics.url)
+    }
+
+    @Test
+    fun `should return correct endpoint for environment`() {
+        // Development uses Supabase REST endpoints
+        assertEquals(APIEndpoint.devDeviceRegistration, APIEndpoint.deviceRegistrationEndpoint(com.runanywhere.sdk.utils.SDKConstants.Environment.DEVELOPMENT))
+        assertEquals(APIEndpoint.devAnalytics, APIEndpoint.analyticsEndpoint(com.runanywhere.sdk.utils.SDKConstants.Environment.DEVELOPMENT))
+
+        // Production/Staging use standard API endpoints
+        assertEquals(APIEndpoint.deviceRegistration, APIEndpoint.deviceRegistrationEndpoint(com.runanywhere.sdk.utils.SDKConstants.Environment.PRODUCTION))
+        assertEquals(APIEndpoint.analytics, APIEndpoint.analyticsEndpoint(com.runanywhere.sdk.utils.SDKConstants.Environment.PRODUCTION))
     }
 }

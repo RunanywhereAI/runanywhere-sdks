@@ -288,4 +288,14 @@ sealed class SDKError : Exception() {
     ) : SDKError() {
         override val errorCode = ErrorCode.GENERATION_FAILED
     }
+
+    /**
+     * Provider not found for a capability
+     * Matches iOS CapabilityError.providerNotFound
+     */
+    data class ProviderNotFound(
+        override val message: String,
+    ) : SDKError() {
+        override val errorCode = ErrorCode.NOT_INITIALIZED
+    }
 }

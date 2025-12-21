@@ -24,15 +24,26 @@ import kotlinx.coroutines.sync.Mutex
  *
  * Matches iOS VoiceAgentComponent.swift exactly:
  * - Sequential initialization of sub-components
+ * - Smart component reuse (like iOS) - reuses existing components if same model loaded
  * - Full pipeline processing: Audio -> VAD -> STT -> LLM -> TTS -> Audio
  * - Individual component access for custom orchestration
  * - Event-driven architecture with EventBus integration
- * - Streaming support via Flow
+ * - Granular streaming events (matches iOS)
  */
 class VoiceAgentComponent(
     private val agentConfiguration: VoiceAgentConfiguration,
     serviceContainer: ServiceContainer? = null,
+    // Optional: Pass existing components for reuse (matches iOS pattern)
+    existingVAD: VADComponent? = null,
+    existingSTT: STTComponent? = null,
+    existingLLM: LLMComponent? = null,
+    existingTTS: TTSComponent? = null,
 ) : BaseComponent<VoiceAgentService>(agentConfiguration, serviceContainer) {
+    // Store external components for potential reuse
+    private val externalVAD = existingVAD
+    private val externalSTT = existingSTT
+    private val externalLLM = existingLLM
+    private val externalTTS = existingTTS
     private val logger = SDKLogger("VoiceAgentComponent")
 
     override val componentType: SDKComponent = SDKComponent.VOICE_AGENT
@@ -81,66 +92,94 @@ class VoiceAgentComponent(
 
     /**
      * Initialize all sub-components in order
-     * Matches iOS initializeComponents() exactly
+     * Matches iOS initializeComponents() exactly with smart component reuse
      */
     private suspend fun initializeComponents() {
         logger.info("Initializing VoiceAgent sub-components...")
 
-        // 1. Initialize VAD
+        // 1. Initialize VAD - reuse if provided and ready with same model
         try {
             logger.info("Initializing VAD component...")
-            vadComponent = VADComponent(agentConfiguration.vadConfig)
-            vadComponent?.initialize()
+            vadComponent = tryReuseOrCreateVAD()
+            vadComponent?.let { vad ->
+                if (!vad.isReady) {
+                    vad.initialize()
+                }
+            }
             logger.info("VAD component initialized successfully")
         } catch (e: Exception) {
             logger.error("Failed to initialize VAD component", e)
             throw VoiceAgentError.ComponentInitializationFailed("VAD", e)
         }
 
-        // 2. Initialize STT
+        // 2. Initialize STT - reuse if provided and ready with same model
         try {
             logger.info("Initializing STT component...")
-            sttComponent = STTComponent(agentConfiguration.sttConfig)
-            sttComponent?.initialize()
+            sttComponent = tryReuseOrCreateSTT()
+            sttComponent?.let { stt ->
+                if (!stt.isReady) {
+                    stt.initialize()
+                }
+            }
             logger.info("STT component initialized successfully")
         } catch (e: Exception) {
             logger.error("Failed to initialize STT component", e)
-            // Cleanup VAD before throwing
-            vadComponent?.cleanup()
+            // Cleanup VAD before throwing (only if we created it)
+            if (externalVAD == null) {
+                vadComponent?.cleanup()
+            }
             vadComponent = null
             throw VoiceAgentError.ComponentInitializationFailed("STT", e)
         }
 
-        // 3. Initialize LLM
+        // 3. Initialize LLM - reuse if provided and ready with same model
         try {
             logger.info("Initializing LLM component...")
-            llmComponent = LLMComponent(agentConfiguration.llmConfig)
-            llmComponent?.initialize()
+            llmComponent = tryReuseOrCreateLLM()
+            llmComponent?.let { llm ->
+                if (!llm.isReady) {
+                    llm.initialize()
+                }
+            }
             logger.info("LLM component initialized successfully")
         } catch (e: Exception) {
             logger.error("Failed to initialize LLM component", e)
-            // Cleanup STT and VAD before throwing
-            sttComponent?.cleanup()
+            // Cleanup STT and VAD before throwing (only if we created them)
+            if (externalSTT == null) {
+                sttComponent?.cleanup()
+            }
             sttComponent = null
-            vadComponent?.cleanup()
+            if (externalVAD == null) {
+                vadComponent?.cleanup()
+            }
             vadComponent = null
             throw VoiceAgentError.ComponentInitializationFailed("LLM", e)
         }
 
-        // 4. Initialize TTS
+        // 4. Initialize TTS - reuse if provided and ready with same model
         try {
             logger.info("Initializing TTS component...")
-            ttsComponent = TTSComponent(agentConfiguration.ttsConfig)
-            ttsComponent?.initialize()
+            ttsComponent = tryReuseOrCreateTTS()
+            ttsComponent?.let { tts ->
+                if (!tts.isReady) {
+                    tts.initialize()
+                }
+            }
             logger.info("TTS component initialized successfully")
         } catch (e: Exception) {
             logger.error("Failed to initialize TTS component", e)
-            // Cleanup LLM, STT, and VAD before throwing
-            llmComponent?.cleanup()
+            // Cleanup LLM, STT, and VAD before throwing (only if we created them)
+            if (externalLLM == null) {
+                llmComponent?.cleanup()
+            }
             llmComponent = null
-            sttComponent?.cleanup()
+            if (externalSTT == null) {
+                sttComponent?.cleanup()
+            }
             sttComponent = null
-            vadComponent?.cleanup()
+            if (externalVAD == null) {
+                vadComponent?.cleanup()
+            }
             vadComponent = null
             throw VoiceAgentError.ComponentInitializationFailed("TTS", e)
         }
@@ -148,35 +187,130 @@ class VoiceAgentComponent(
         logger.info("All VoiceAgent sub-components initialized successfully")
     }
 
+    // MARK: - Smart Component Reuse (matches iOS pattern)
+
+    /**
+     * Try to reuse existing VAD component or create new one
+     * Matches iOS smart reuse pattern - reuses if same model is loaded
+     */
+    private fun tryReuseOrCreateVAD(): VADComponent {
+        externalVAD?.let { external ->
+            if (external.isReady && canReuseComponent(external.configuration, agentConfiguration.vadConfig)) {
+                logger.info("Reusing existing VAD component")
+                return external
+            }
+        }
+        logger.info("Creating new VAD component")
+        return VADComponent(agentConfiguration.vadConfig)
+    }
+
+    /**
+     * Try to reuse existing STT component or create new one
+     */
+    private fun tryReuseOrCreateSTT(): STTComponent {
+        externalSTT?.let { external ->
+            if (external.isReady && canReuseComponent(external.configuration, agentConfiguration.sttConfig)) {
+                logger.info("Reusing existing STT component")
+                return external
+            }
+        }
+        logger.info("Creating new STT component")
+        return STTComponent(agentConfiguration.sttConfig)
+    }
+
+    /**
+     * Try to reuse existing LLM component or create new one
+     */
+    private fun tryReuseOrCreateLLM(): LLMComponent {
+        externalLLM?.let { external ->
+            if (external.isReady && canReuseComponent(external.configuration, agentConfiguration.llmConfig)) {
+                logger.info("Reusing existing LLM component")
+                return external
+            }
+        }
+        logger.info("Creating new LLM component")
+        return LLMComponent(agentConfiguration.llmConfig)
+    }
+
+    /**
+     * Try to reuse existing TTS component or create new one
+     */
+    private fun tryReuseOrCreateTTS(): TTSComponent {
+        externalTTS?.let { external ->
+            if (external.isReady && canReuseComponent(external.configuration, agentConfiguration.ttsConfig)) {
+                logger.info("Reusing existing TTS component")
+                return external
+            }
+        }
+        logger.info("Creating new TTS component")
+        return TTSComponent(agentConfiguration.ttsConfig)
+    }
+
+    /**
+     * Check if existing component configuration matches requested configuration
+     * Compares model IDs to determine if component can be reused
+     */
+    private fun canReuseComponent(
+        existing: com.runanywhere.sdk.core.capabilities.ComponentConfiguration,
+        requested: com.runanywhere.sdk.core.capabilities.ComponentConfiguration,
+    ): Boolean {
+        // Compare model IDs - if same model is loaded, can reuse
+        val existingModelId = getModelIdFromConfig(existing)
+        val requestedModelId = getModelIdFromConfig(requested)
+        return existingModelId == requestedModelId
+    }
+
+    /**
+     * Extract model ID from configuration for comparison
+     */
+    private fun getModelIdFromConfig(config: com.runanywhere.sdk.core.capabilities.ComponentConfiguration): String? =
+        when (config) {
+            is com.runanywhere.sdk.features.vad.VADConfiguration -> config.modelId
+            is com.runanywhere.sdk.features.stt.STTConfiguration -> config.modelId
+            is com.runanywhere.sdk.features.llm.LLMConfiguration -> config.modelId
+            is com.runanywhere.sdk.features.tts.TTSConfiguration -> config.modelId
+            else -> null
+        }
+
     override suspend fun performCleanup() {
         pipelineState = VoiceAgentPipelineState.IDLE
 
-        // Cleanup all sub-components in order
-        try {
-            vadComponent?.cleanup()
-        } catch (e: Exception) {
-            logger.warn("Error cleaning up VAD component: ${e.message}")
+        // Only cleanup components that we created (not external ones)
+        // Matches iOS pattern - don't cleanup reused components
+
+        if (externalVAD == null) {
+            try {
+                vadComponent?.cleanup()
+            } catch (e: Exception) {
+                logger.warn("Error cleaning up VAD component: ${e.message}")
+            }
         }
         vadComponent = null
 
-        try {
-            sttComponent?.cleanup()
-        } catch (e: Exception) {
-            logger.warn("Error cleaning up STT component: ${e.message}")
+        if (externalSTT == null) {
+            try {
+                sttComponent?.cleanup()
+            } catch (e: Exception) {
+                logger.warn("Error cleaning up STT component: ${e.message}")
+            }
         }
         sttComponent = null
 
-        try {
-            llmComponent?.cleanup()
-        } catch (e: Exception) {
-            logger.warn("Error cleaning up LLM component: ${e.message}")
+        if (externalLLM == null) {
+            try {
+                llmComponent?.cleanup()
+            } catch (e: Exception) {
+                logger.warn("Error cleaning up LLM component: ${e.message}")
+            }
         }
         llmComponent = null
 
-        try {
-            ttsComponent?.cleanup()
-        } catch (e: Exception) {
-            logger.warn("Error cleaning up TTS component: ${e.message}")
+        if (externalTTS == null) {
+            try {
+                ttsComponent?.cleanup()
+            } catch (e: Exception) {
+                logger.warn("Error cleaning up TTS component: ${e.message}")
+            }
         }
         ttsComponent = null
 
@@ -268,8 +402,9 @@ class VoiceAgentComponent(
     }
 
     /**
-     * Process a continuous audio stream through the pipeline
+     * Process a continuous audio stream through the pipeline with granular events
      * Matches iOS processStream(_ audioStream: AsyncStream<Data>) -> AsyncThrowingStream<VoiceAgentEvent, Error>
+     * Emits intermediate events for each pipeline stage
      *
      * @param audioStream Flow of audio data chunks
      * @return Flow of VoiceAgentEvent for reactive consumption
@@ -281,7 +416,10 @@ class VoiceAgentComponent(
             try {
                 audioStream.collect { audioData ->
                     try {
-                        val result = processAudio(audioData)
+                        // Process with granular events at each stage
+                        val result = processAudioWithEvents(audioData) { event ->
+                            emit(event)
+                        }
                         emit(VoiceAgentEvent.Processed(result))
                     } catch (e: Exception) {
                         emit(VoiceAgentEvent.Error(e))
@@ -291,6 +429,99 @@ class VoiceAgentComponent(
                 emit(VoiceAgentEvent.Error(e))
             }
         }
+
+    /**
+     * Process audio through the pipeline with granular event emission
+     * Matches iOS pattern of emitting events at each stage
+     *
+     * @param audioData Raw audio data (PCM format expected)
+     * @param emitEvent Callback to emit intermediate events
+     * @return VoiceAgentResult with all intermediate results
+     */
+    private suspend fun processAudioWithEvents(
+        audioData: ByteArray,
+        emitEvent: suspend (VoiceAgentEvent) -> Unit,
+    ): VoiceAgentResult {
+        if (!processingMutex.tryLock()) {
+            throw SDKError.InvalidState("Pipeline is already processing")
+        }
+
+        try {
+            pipelineState = VoiceAgentPipelineState.VAD_PROCESSING
+            var result = VoiceAgentResult()
+
+            // Step 1: VAD - Voice Activity Detection
+            val audioSamples = audioData.toFloatArray()
+            val speechDetected = detectVoiceActivity(audioSamples)
+            result = result.copy(speechDetected = speechDetected)
+
+            // Emit VAD triggered event (matches iOS granular events)
+            emitEvent(VoiceAgentEvent.VadTriggered(speechDetected))
+
+            if (!speechDetected) {
+                logger.debug("No speech detected, returning early")
+                pipelineState = VoiceAgentPipelineState.COMPLETED
+                return result
+            }
+
+            // Publish speech detected event
+            EventPublisher.track(SDKVoiceEvent.SpeechDetected)
+
+            // Step 2: STT - Speech to Text
+            pipelineState = VoiceAgentPipelineState.STT_PROCESSING
+            val transcription = transcribe(audioData)
+            result = result.copy(transcription = transcription)
+
+            if (!transcription.isNullOrBlank()) {
+                // Emit transcription available event (matches iOS granular events)
+                emitEvent(VoiceAgentEvent.TranscriptionAvailable(transcription))
+                // Publish transcription event
+                EventPublisher.track(SDKVoiceEvent.TranscriptionFinal(transcription))
+            } else {
+                logger.debug("No transcription result, returning early")
+                pipelineState = VoiceAgentPipelineState.COMPLETED
+                return result
+            }
+
+            // Step 3: LLM - Generate Response
+            pipelineState = VoiceAgentPipelineState.LLM_PROCESSING
+            val response = generateResponse(transcription)
+            result = result.copy(response = response)
+
+            if (!response.isNullOrBlank()) {
+                // Emit response generated event (matches iOS granular events)
+                emitEvent(VoiceAgentEvent.ResponseGenerated(response))
+                // Publish response generated event
+                EventPublisher.track(SDKVoiceEvent.ResponseGenerated(response))
+            } else {
+                logger.debug("No LLM response, returning early")
+                pipelineState = VoiceAgentPipelineState.COMPLETED
+                return result
+            }
+
+            // Step 4: TTS - Text to Speech
+            pipelineState = VoiceAgentPipelineState.TTS_PROCESSING
+            val synthesizedAudio = synthesizeSpeech(response)
+            result = result.copy(synthesizedAudio = synthesizedAudio)
+
+            if (synthesizedAudio != null) {
+                // Emit audio synthesized event (matches iOS granular events)
+                emitEvent(VoiceAgentEvent.AudioSynthesized(synthesizedAudio))
+                // Publish audio generated event
+                EventPublisher.track(SDKVoiceEvent.AudioGenerated(synthesizedAudio))
+            }
+
+            pipelineState = VoiceAgentPipelineState.COMPLETED
+            return result
+        } catch (e: Exception) {
+            pipelineState = VoiceAgentPipelineState.ERROR
+            logger.error("Pipeline processing failed", e)
+            EventPublisher.track(SDKVoiceEvent.PipelineError(e))
+            throw e
+        } finally {
+            processingMutex.unlock()
+        }
+    }
 
     // MARK: - Individual Component Access (for custom orchestration)
 

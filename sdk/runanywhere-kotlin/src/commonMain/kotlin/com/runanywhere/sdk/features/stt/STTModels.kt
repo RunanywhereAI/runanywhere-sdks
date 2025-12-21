@@ -325,6 +325,9 @@ sealed class STTError : Exception() {
 
     object insufficientAudioData : STTError()
 
+    /** Not enough memory available to load the model (matches iOS) */
+    object insufficientMemory : STTError()
+
     object noVoiceServiceAvailable : STTError()
 
     object audioSessionNotConfigured : STTError()
@@ -346,6 +349,7 @@ sealed class STTError : Exception() {
                 is modelNotFound -> "Model not found: $model"
                 is audioFormatNotSupported -> "Audio format is not supported"
                 is insufficientAudioData -> "Insufficient audio data for transcription"
+                is insufficientMemory -> "Insufficient memory to load the STT model"
                 is noVoiceServiceAvailable -> "No STT service available for transcription"
                 is audioSessionNotConfigured -> "Audio session is not configured"
                 is audioSessionActivationFailed -> "Failed to activate audio session"
