@@ -6,42 +6,6 @@
  * Matches iOS: Infrastructure/FileManagement/Models/Configuration/StorageConfiguration.swift
  */
 
-// MARK: - Cache Eviction Policy
-
-/**
- * Cache eviction policy
- */
-export enum CacheEvictionPolicy {
-  /** Least recently used items are evicted first */
-  LeastRecentlyUsed = 'lru',
-  /** Least frequently used items are evicted first */
-  LeastFrequentlyUsed = 'lfu',
-  /** First in, first out */
-  FIFO = 'fifo',
-  /** Largest items are evicted first */
-  LargestFirst = 'largest_first',
-}
-
-/**
- * Get human-readable description for eviction policy
- */
-export function getCacheEvictionPolicyDescription(
-  policy: CacheEvictionPolicy
-): string {
-  switch (policy) {
-    case CacheEvictionPolicy.LeastRecentlyUsed:
-      return 'Least Recently Used';
-    case CacheEvictionPolicy.LeastFrequentlyUsed:
-      return 'Least Frequently Used';
-    case CacheEvictionPolicy.FIFO:
-      return 'First In, First Out';
-    case CacheEvictionPolicy.LargestFirst:
-      return 'Largest First';
-  }
-}
-
-// MARK: - Storage Configuration
-
 /**
  * Configuration for storage behavior
  */
@@ -51,12 +15,6 @@ export interface StorageConfiguration {
    * @default 1073741824 (1GB)
    */
   maxCacheSize: number;
-
-  /**
-   * Cache eviction policy
-   * @default CacheEvictionPolicy.LeastRecentlyUsed
-   */
-  evictionPolicy: CacheEvictionPolicy;
 
   /**
    * Storage directory name
@@ -94,7 +52,6 @@ export interface StorageConfiguration {
  */
 export const DEFAULT_STORAGE_CONFIGURATION: StorageConfiguration = {
   maxCacheSize: 1_073_741_824, // 1GB
-  evictionPolicy: CacheEvictionPolicy.LeastRecentlyUsed,
   directoryName: 'RunAnywhere',
   enableAutoCleanup: true,
   autoCleanupInterval: 86400, // 24 hours
@@ -147,6 +104,5 @@ export const StorageConfigurationPresets = {
   aggressiveCleanup: {
     ...DEFAULT_STORAGE_CONFIGURATION,
     autoCleanupInterval: 3600, // 1 hour
-    evictionPolicy: CacheEvictionPolicy.LargestFirst,
   } as StorageConfiguration,
 };
