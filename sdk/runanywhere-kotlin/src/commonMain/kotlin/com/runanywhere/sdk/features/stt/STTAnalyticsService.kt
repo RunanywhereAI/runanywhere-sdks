@@ -2,6 +2,7 @@ package com.runanywhere.sdk.features.stt
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.currentTimeMillis
+import com.runanywhere.sdk.infrastructure.events.EventPublisher
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -41,6 +42,7 @@ class STTAnalyticsService {
         val startTime: Long,
         val audioLengthMs: Double,
         val audioSizeBytes: Int,
+        val language: String,
         val framework: InferenceFramework,
     )
 
@@ -50,12 +52,11 @@ class STTAnalyticsService {
      * Start tracking a transcription.
      * @param audioLengthMs Duration of audio in milliseconds
      * @param audioSizeBytes Size of audio data in bytes
-     * @param language Language code for transcription (reserved for future analytics)
+     * @param language Language code for transcription
      * @param framework The inference framework being used
      * @return A unique transcription ID for tracking
      */
     @OptIn(ExperimentalUuidApi::class)
-    @Suppress("UNUSED_PARAMETER")
     fun startTranscription(
         audioLengthMs: Double,
         audioSizeBytes: Int,
@@ -70,9 +71,20 @@ class STTAnalyticsService {
                     startTime = currentTimeMillis(),
                     audioLengthMs = audioLengthMs,
                     audioSizeBytes = audioSizeBytes,
+                    language = language,
                     framework = framework,
                 )
         }
+
+        EventPublisher.track(
+            STTEvent.TranscriptionStarted(
+                transcriptionId = id,
+                audioLengthMs = audioLengthMs,
+                audioSizeBytes = audioSizeBytes,
+                language = language,
+                framework = framework,
+            ),
+        )
 
         logger.debug("Transcription started: $id, audio: ${String.format("%.1f", audioLengthMs)}ms, $audioSizeBytes bytes")
         return id
@@ -83,6 +95,14 @@ class STTAnalyticsService {
      */
     fun trackPartialTranscript(text: String) {
         val wordCount = text.split(" ").filter { it.isNotBlank() }.size
+
+        EventPublisher.track(
+            STTEvent.PartialTranscript(
+                text = text,
+                wordCount = wordCount,
+            ),
+        )
+
         logger.debug("Partial transcript: $wordCount words")
     }
 
@@ -90,6 +110,13 @@ class STTAnalyticsService {
      * Track final transcript (for streaming transcription).
      */
     fun trackFinalTranscript(text: String, confidence: Float) {
+        EventPublisher.track(
+            STTEvent.FinalTranscript(
+                text = text,
+                confidence = confidence,
+            ),
+        )
+
         logger.debug("Final transcript: ${text.length} chars, confidence: ${String.format("%.3f", confidence)}")
     }
 
@@ -132,6 +159,20 @@ class STTAnalyticsService {
             lastEventTime = endTime
         }
 
+        EventPublisher.track(
+            STTEvent.TranscriptionCompleted(
+                transcriptionId = transcriptionId,
+                text = text,
+                confidence = confidence,
+                durationMs = processingTimeMs,
+                audioLengthMs = tracker.audioLengthMs,
+                audioSizeBytes = tracker.audioSizeBytes,
+                wordCount = wordCount,
+                realTimeFactor = realTimeFactor,
+                framework = tracker.framework,
+            ),
+        )
+
         logger.debug("Transcription completed: $transcriptionId, RTF: ${String.format("%.3f", realTimeFactor)}")
     }
 
@@ -146,6 +187,14 @@ class STTAnalyticsService {
             activeTranscriptions.remove(transcriptionId)
         }
         lastEventTime = currentTimeMillis()
+
+        EventPublisher.track(
+            STTEvent.TranscriptionFailed(
+                transcriptionId = transcriptionId,
+                error = errorMessage,
+            ),
+        )
+
         logger.error("Transcription failed: $transcriptionId - $errorMessage")
     }
 
@@ -153,8 +202,14 @@ class STTAnalyticsService {
      * Track language detection (analytics only).
      */
     fun trackLanguageDetection(language: String, confidence: Float) {
+        EventPublisher.track(
+            STTEvent.LanguageDetected(
+                language = language,
+                confidence = confidence,
+            ),
+        )
+
         logger.debug("Language detected: $language with confidence ${String.format("%.3f", confidence)}")
-        // Language detection can be added via a specific event if needed
     }
 
     /**
