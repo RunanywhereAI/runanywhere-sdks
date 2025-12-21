@@ -191,8 +191,12 @@ class LlamaCppLLMService implements LLMService {
     // In a full implementation, we might maintain history in Dart
   }
 
+  @override
+  bool get supportsStreaming => false; // Currently simulated streaming
+
   /// Cancel ongoing text generation.
-  void cancel() {
+  @override
+  Future<void> cancel() async {
     _backend.cancelTextGeneration();
   }
 

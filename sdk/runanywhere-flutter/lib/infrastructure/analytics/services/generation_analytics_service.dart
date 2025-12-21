@@ -1,9 +1,9 @@
-/// LLM Generation analytics service.
-/// Tracks generation operations and metrics.
-/// Matches iOS GenerationAnalyticsService.
-///
-/// NOTE: ⚠️ Token estimation uses ~4 chars/token (approximation, not exact tokenizer count).
-/// Actual token counts may vary depending on the model's tokenizer and input content.
+// LLM Generation analytics service.
+// Tracks generation operations and metrics.
+// Matches iOS GenerationAnalyticsService.
+//
+// NOTE: Token estimation uses ~4 chars/token (approximation, not exact tokenizer count).
+// Actual token counts may vary depending on the model's tokenizer and input content.
 
 import 'dart:async';
 

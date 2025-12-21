@@ -100,8 +100,7 @@ mixin DefaultModelStorageStrategy implements ModelStorageStrategy {
         final ext = file.path.split('.').last.toLowerCase();
         final format = ModelFormat.fromRawValue(ext);
         if (format != ModelFormat.unknown) {
-          final stat = file.statSync();
-          return (format, stat.size);
+          return (format, file.statSync().size);
         }
       }
     } catch (_) {

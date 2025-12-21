@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'models/speech_activity_event.dart';
+export 'models/speech_activity_event.dart';
+
 /// VAD detection result
 class VADResult {
   final bool hasSpeech;
@@ -65,19 +68,4 @@ abstract class VADService {
 
   /// Cleanup resources
   Future<void> cleanup();
-}
-
-/// Speech activity events
-enum SpeechActivityEvent {
-  started,
-  ended;
-
-  String get value {
-    switch (this) {
-      case SpeechActivityEvent.started:
-        return 'started';
-      case SpeechActivityEvent.ended:
-        return 'ended';
-    }
-  }
 }

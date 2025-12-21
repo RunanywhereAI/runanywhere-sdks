@@ -63,6 +63,14 @@ class NativeLLMService implements LLMService {
     }
     _isInitialized = false;
   }
+
+  @override
+  bool get supportsStreaming => false; // Currently simulated streaming
+
+  @override
+  Future<void> cancel() async {
+    _backend.cancelTextGeneration();
+  }
 }
 
 /// Provider for native LLM service.

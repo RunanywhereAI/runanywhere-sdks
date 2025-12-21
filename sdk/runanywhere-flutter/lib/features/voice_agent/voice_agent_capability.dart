@@ -10,6 +10,10 @@ import '../vad/vad_configuration.dart';
 import '../stt/stt_capability.dart';
 import '../llm/llm_capability.dart';
 import '../tts/tts_capability.dart';
+import '../tts/models/tts_configuration.dart';
+import 'models/voice_agent_result.dart';
+export 'models/voice_agent_result.dart';
+export 'models/voice_agent_component_state.dart';
 
 /// Voice Agent Component Configuration
 /// Matches iOS VoiceAgentConfiguration from VoiceAgentComponent.swift
@@ -31,7 +35,7 @@ class VoiceAgentConfiguration implements ComponentConfiguration {
   })  : vadConfig = vadConfig ?? const VADConfiguration(),
         sttConfig = sttConfig ?? STTConfiguration(),
         llmConfig = llmConfig ?? LLMConfiguration(),
-        ttsConfig = ttsConfig ?? TTSConfiguration();
+        ttsConfig = ttsConfig ?? const TTSConfiguration();
 
   @override
   void validate() {
@@ -267,145 +271,5 @@ class VoiceAgentCapability extends BaseCapability<VoiceAgentService> {
     sttCapability = null;
     llmCapability = null;
     ttsCapability = null;
-  }
-}
-
-// MARK: - Voice Agent Result
-
-/// Result from voice agent processing
-class VoiceAgentResult {
-  bool speechDetected;
-  String? transcription;
-  String? response;
-  Uint8List? synthesizedAudio;
-
-  VoiceAgentResult({
-    this.speechDetected = false,
-    this.transcription,
-    this.response,
-    this.synthesizedAudio,
-  });
-}
-
-// MARK: - Voice Agent Events
-
-/// Events emitted by the voice agent
-abstract class VoiceAgentEvent {
-  static VoiceAgentEvent processed(VoiceAgentResult result) =>
-      VoiceAgentProcessed(result);
-  static VoiceAgentEvent vadTriggered(bool isSpeech) =>
-      VoiceAgentVADTriggered(isSpeech);
-  static VoiceAgentEvent transcriptionAvailable(String text) =>
-      VoiceAgentTranscriptionAvailable(text);
-  static VoiceAgentEvent responseGenerated(String text) =>
-      VoiceAgentResponseGenerated(text);
-  static VoiceAgentEvent audioSynthesized(Uint8List data) =>
-      VoiceAgentAudioSynthesized(data);
-  static VoiceAgentEvent error(Object error) => VoiceAgentError(error);
-}
-
-class VoiceAgentProcessed extends VoiceAgentEvent {
-  final VoiceAgentResult result;
-  VoiceAgentProcessed(this.result);
-}
-
-class VoiceAgentVADTriggered extends VoiceAgentEvent {
-  final bool isSpeech;
-  VoiceAgentVADTriggered(this.isSpeech);
-}
-
-class VoiceAgentTranscriptionAvailable extends VoiceAgentEvent {
-  final String text;
-  VoiceAgentTranscriptionAvailable(this.text);
-}
-
-class VoiceAgentResponseGenerated extends VoiceAgentEvent {
-  final String text;
-  VoiceAgentResponseGenerated(this.text);
-}
-
-class VoiceAgentAudioSynthesized extends VoiceAgentEvent {
-  final Uint8List data;
-  VoiceAgentAudioSynthesized(this.data);
-}
-
-class VoiceAgentError extends VoiceAgentEvent {
-  final Object error;
-  VoiceAgentError(this.error);
-}
-
-// MARK: - Component Load State
-
-/// State of a voice agent component
-/// Matches iOS ComponentLoadState from RunAnywhere+VoiceAgent.swift
-sealed class ComponentLoadState {
-  const ComponentLoadState();
-
-  /// Component is not loaded
-  static const ComponentLoadState notLoaded = NotLoadedState();
-
-  /// Component is currently loading
-  static const ComponentLoadState loading = LoadingState();
-
-  /// Component is loaded with a specific model/voice
-  const factory ComponentLoadState.loaded({required String modelId}) =
-      LoadedState;
-
-  /// Component failed to load
-  const factory ComponentLoadState.failed({required Object error}) =
-      FailedState;
-}
-
-class NotLoadedState extends ComponentLoadState {
-  const NotLoadedState();
-}
-
-class LoadingState extends ComponentLoadState {
-  const LoadingState();
-}
-
-class LoadedState extends ComponentLoadState {
-  final String modelId;
-  const LoadedState({required this.modelId});
-}
-
-class FailedState extends ComponentLoadState {
-  final Object error;
-  const FailedState({required this.error});
-}
-
-/// State of all voice agent components
-/// Matches iOS VoiceAgentComponentStates from RunAnywhere+VoiceAgent.swift
-class VoiceAgentComponentStates {
-  /// STT component state
-  final ComponentLoadState stt;
-
-  /// LLM component state
-  final ComponentLoadState llm;
-
-  /// TTS component state
-  final ComponentLoadState tts;
-
-  VoiceAgentComponentStates({
-    this.stt = ComponentLoadState.notLoaded,
-    this.llm = ComponentLoadState.notLoaded,
-    this.tts = ComponentLoadState.notLoaded,
-  });
-
-  /// Check if all components are loaded
-  bool get isFullyReady =>
-      stt is LoadedState && llm is LoadedState && tts is LoadedState;
-
-  /// Check if any component is loading
-  bool get isLoading =>
-      stt is LoadingState || llm is LoadingState || tts is LoadingState;
-
-  /// Get list of components that are not ready
-  List<String> get notReadyComponents {
-    final notReady = <String>[];
-    if (stt is! LoadedState) notReady.add('STT');
-    if (llm is! LoadedState) notReady.add('LLM');
-    if (tts is! LoadedState) notReady.add('TTS');
-    return notReady;
   }
 }

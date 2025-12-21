@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../device_info.dart';
 import '../../../../foundation/configuration/sdk_constants.dart';
 

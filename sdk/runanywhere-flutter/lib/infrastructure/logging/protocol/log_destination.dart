@@ -1,4 +1,5 @@
 import '../../../foundation/logging/models/log_entry.dart';
+import '../../../foundation/logging/models/log_level.dart';
 
 /// Protocol for log output destinations
 /// Implementations handle writing logs to specific backends (Console, File, etc.)
@@ -55,8 +56,6 @@ class ConsoleLogDestination extends LogDestination {
 
   String _levelPrefix(LogLevel level) {
     switch (level) {
-      case LogLevel.trace:
-        return 'TRACE';
       case LogLevel.debug:
         return 'DEBUG';
       case LogLevel.info:
@@ -65,8 +64,8 @@ class ConsoleLogDestination extends LogDestination {
         return 'WARN';
       case LogLevel.error:
         return 'ERROR';
-      case LogLevel.critical:
-        return 'CRITICAL';
+      case LogLevel.fault:
+        return 'FAULT';
     }
   }
 }
@@ -110,6 +109,3 @@ class FileLogDestination extends LogDestination {
     _buffer.clear();
   }
 }
-
-// Re-export LogLevel for convenience
-export '../../../foundation/logging/models/log_level.dart';

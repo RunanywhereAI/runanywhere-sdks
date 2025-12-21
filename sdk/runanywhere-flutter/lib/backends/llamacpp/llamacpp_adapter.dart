@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../core/models/framework/framework_modality.dart';
 import '../../core/models/framework/llm_framework.dart';
 import '../../core/models/framework/model_format.dart';

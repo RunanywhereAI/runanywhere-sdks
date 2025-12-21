@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:typed_data';
 import '../models/tts_configuration.dart';
 import '../models/tts_input.dart';
+import '../tts_output.dart';
 
 /// Protocol for TTS services
 /// Defines the contract for text-to-speech synthesis
@@ -30,32 +32,6 @@ abstract class TTSService {
 
   /// Cleanup resources
   Future<void> cleanup();
-}
-
-/// Output from TTS synthesis
-/// Matches iOS TTSOutput from Features/TTS/Models/TTSOutput.swift
-class TTSOutput {
-  /// Synthesized audio data
-  final Uint8List audioData;
-
-  /// Sample rate of the audio
-  final int sampleRate;
-
-  /// Duration of the audio in seconds
-  final double duration;
-
-  /// Format of the audio (e.g., 'wav', 'pcm')
-  final String format;
-
-  const TTSOutput({
-    required this.audioData,
-    this.sampleRate = 22050,
-    this.duration = 0.0,
-    this.format = 'wav',
-  });
-
-  /// Check if audio data is empty
-  bool get isEmpty => audioData.isEmpty;
 }
 
 /// Information about a TTS voice

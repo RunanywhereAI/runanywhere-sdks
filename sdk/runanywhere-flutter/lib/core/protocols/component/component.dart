@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../types/component_state.dart';
 import '../../types/sdk_component.dart';
 import 'component_configuration.dart';

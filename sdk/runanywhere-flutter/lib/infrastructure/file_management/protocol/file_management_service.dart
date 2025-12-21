@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../core/models/storage/device_storage_info.dart';
 
 /// Protocol defining file management capabilities

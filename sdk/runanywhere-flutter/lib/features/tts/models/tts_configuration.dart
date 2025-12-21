@@ -1,51 +1,63 @@
 import '../../../core/protocols/component/component_configuration.dart';
+import '../../../core/models/audio_format.dart';
 
 /// Configuration for TTS component
 /// Matches iOS TTSConfiguration from Features/TTS/Models/TTSConfiguration.swift
 class TTSConfiguration implements ComponentConfiguration {
   /// Model ID for the TTS model
-  @override
   final String? modelId;
 
   /// Voice to use for synthesis
-  final String? voice;
+  final String voice;
+
+  /// Language code (e.g., 'en-US')
+  final String language;
 
   /// Speaking rate (0.5 - 2.0, default 1.0)
-  final double rate;
+  final double speakingRate;
 
-  /// Pitch adjustment (-1.0 to 1.0, default 0.0)
+  /// Pitch adjustment (0.5 to 2.0, default 1.0)
   final double pitch;
 
   /// Volume (0.0 - 1.0, default 1.0)
   final double volume;
 
-  /// Language code (e.g., 'en-US')
-  final String language;
+  /// Audio format for output
+  final AudioFormat audioFormat;
 
   /// Sample rate for output audio
   final int sampleRate;
+
+  /// Whether to use neural voice
+  final bool useNeuralVoice;
+
+  /// Whether to enable SSML parsing
+  final bool enableSSML;
 
   /// Whether to enable caching
   final bool enableCaching;
 
   const TTSConfiguration({
     this.modelId,
-    this.voice,
-    this.rate = 1.0,
-    this.pitch = 0.0,
-    this.volume = 1.0,
+    this.voice = 'system',
     this.language = 'en-US',
+    this.speakingRate = 1.0,
+    this.pitch = 1.0,
+    this.volume = 1.0,
+    this.audioFormat = AudioFormat.pcm,
     this.sampleRate = 22050,
+    this.useNeuralVoice = true,
+    this.enableSSML = false,
     this.enableCaching = true,
   });
 
   @override
   void validate() {
-    if (rate < 0.5 || rate > 2.0) {
-      throw ArgumentError('Rate must be between 0.5 and 2.0');
+    if (speakingRate < 0.5 || speakingRate > 2.0) {
+      throw ArgumentError('Speaking rate must be between 0.5 and 2.0');
     }
-    if (pitch < -1.0 || pitch > 1.0) {
-      throw ArgumentError('Pitch must be between -1.0 and 1.0');
+    if (pitch < 0.5 || pitch > 2.0) {
+      throw ArgumentError('Pitch must be between 0.5 and 2.0');
     }
     if (volume < 0.0 || volume > 1.0) {
       throw ArgumentError('Volume must be between 0.0 and 1.0');
@@ -56,21 +68,27 @@ class TTSConfiguration implements ComponentConfiguration {
   TTSConfiguration copyWith({
     String? modelId,
     String? voice,
-    double? rate,
+    String? language,
+    double? speakingRate,
     double? pitch,
     double? volume,
-    String? language,
+    AudioFormat? audioFormat,
     int? sampleRate,
+    bool? useNeuralVoice,
+    bool? enableSSML,
     bool? enableCaching,
   }) {
     return TTSConfiguration(
       modelId: modelId ?? this.modelId,
       voice: voice ?? this.voice,
-      rate: rate ?? this.rate,
+      language: language ?? this.language,
+      speakingRate: speakingRate ?? this.speakingRate,
       pitch: pitch ?? this.pitch,
       volume: volume ?? this.volume,
-      language: language ?? this.language,
+      audioFormat: audioFormat ?? this.audioFormat,
       sampleRate: sampleRate ?? this.sampleRate,
+      useNeuralVoice: useNeuralVoice ?? this.useNeuralVoice,
+      enableSSML: enableSSML ?? this.enableSSML,
       enableCaching: enableCaching ?? this.enableCaching,
     );
   }

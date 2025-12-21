@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../core/models/framework/framework_modality.dart';
 import '../../core/models/framework/llm_framework.dart';
 import '../../core/models/framework/model_format.dart';
@@ -15,6 +17,7 @@ import 'services/onnx_stt_service.dart';
 import 'services/onnx_tts_service.dart';
 import 'services/onnx_vad_service.dart';
 import 'services/onnx_llm_service.dart';
+import '../../features/tts/models/tts_configuration.dart';
 
 /// ONNX Runtime adapter for multi-modal inference.
 ///
@@ -169,7 +172,7 @@ class OnnxAdapter
 
       case FrameworkModality.textToVoice:
         final service = _cachedTTSService ?? OnnxTTSService(_backend!);
-        await service.initialize(modelPath: modelPath);
+        await service.initialize(TTSConfiguration(modelId: modelPath));
         _cachedTTSService = service;
         _lastTTSUsage = DateTime.now();
         return service;

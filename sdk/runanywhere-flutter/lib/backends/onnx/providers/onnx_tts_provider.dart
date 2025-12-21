@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../core/module_registry.dart';
 import '../../../native/native_backend.dart';
 import '../services/onnx_tts_service.dart';

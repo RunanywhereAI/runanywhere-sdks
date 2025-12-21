@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
@@ -44,7 +45,10 @@ class OnnxDownloadStrategy implements DownloadStrategy {
   }) async {
     final downloadURL = model.downloadURL;
     if (downloadURL == null) {
-      throw SDKError.downloadFailed('Model ${model.id} has no download URL');
+      throw SDKError.downloadFailed(
+        'Model ${model.id}',
+        'Model has no download URL',
+      );
     }
 
     final urlString = downloadURL.toString().toLowerCase();
@@ -67,7 +71,9 @@ class OnnxDownloadStrategy implements DownloadStrategy {
       );
     } else {
       throw SDKError.downloadFailed(
-          'Unsupported ONNX model format: $urlString');
+        urlString,
+        'Unsupported ONNX model format',
+      );
     }
   }
 
@@ -230,6 +236,7 @@ class OnnxDownloadStrategy implements DownloadStrategy {
 
     if (response.statusCode != 200) {
       throw SDKError.downloadFailed(
+        from.toString(),
         'Download failed with status ${response.statusCode}',
       );
     }

@@ -1,43 +1,46 @@
+import '../../../core/module_registry.dart' show TTSOptions;
+import '../../../core/protocols/component/component_configuration.dart';
+
 /// Input for TTS synthesis
 /// Matches iOS TTSInput from Features/TTS/Models/TTSInput.swift
-class TTSInput {
-  /// Text to synthesize
-  final String text;
+class TTSInput implements ComponentInput {
+  /// Text to synthesize (optional if SSML is provided)
+  final String? text;
 
-  /// Optional SSML markup
+  /// Optional SSML markup (overrides text if provided)
   final String? ssml;
 
-  /// Voice override for this input
-  final String? voice;
+  /// Voice ID override
+  final String? voiceId;
 
-  /// Rate override for this input
-  final double? rate;
+  /// Language override
+  final String? language;
 
-  /// Pitch override for this input
-  final double? pitch;
+  /// Custom options override
+  final TTSOptions? options;
 
   const TTSInput({
-    required this.text,
+    this.text,
     this.ssml,
-    this.voice,
-    this.rate,
-    this.pitch,
+    this.voiceId,
+    this.language,
+    this.options,
   });
 
   /// Create input from plain text
-  factory TTSInput.plainText(String text) {
-    return TTSInput(text: text);
+  factory TTSInput.plainText(String text, {String? voiceId, String? language}) {
+    return TTSInput(text: text, voiceId: voiceId, language: language);
   }
 
   /// Create input from SSML
-  factory TTSInput.fromSSML(String ssml) {
-    return TTSInput(text: '', ssml: ssml);
+  factory TTSInput.fromSSML(String ssml, {String? voiceId, String? language}) {
+    return TTSInput(ssml: ssml, voiceId: voiceId, language: language);
   }
 
-  /// Validate the input
+  @override
   void validate() {
-    if (text.isEmpty && (ssml == null || ssml!.isEmpty)) {
-      throw ArgumentError('Either text or SSML must be provided');
+    if ((text == null || text!.isEmpty) && (ssml == null || ssml!.isEmpty)) {
+      throw ArgumentError('TTSInput must contain either text or SSML');
     }
   }
 }

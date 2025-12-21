@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../native/native_backend.dart';
 import '../../native/platform_loader.dart';
 import 'llamacpp_adapter.dart';
