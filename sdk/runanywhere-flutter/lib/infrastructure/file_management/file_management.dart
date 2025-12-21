@@ -6,5 +6,7 @@ library file_management;
 export '../../core/models/storage/storage.dart';
 
 export 'protocol/file_management_error.dart';
+export 'protocol/file_management_protocol.dart';
 export 'protocol/file_management_service.dart';
+export 'services/default_file_management_service.dart';
 export 'services/simplified_file_manager.dart';

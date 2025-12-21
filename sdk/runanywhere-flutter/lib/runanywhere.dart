@@ -14,7 +14,8 @@ export 'public/configuration/configuration.dart';
 export 'core/types/component_state.dart';
 export 'core/types/sdk_component.dart';
 export 'core/module_registry.dart'
-    hide LLMGenerationOptions, TTSOptions, TTSService;
+    hide LLMGenerationOptions, TTSService;
+export 'features/tts/models/tts_options.dart' show TTSOptions;
 export 'features/stt/stt_capability.dart';
 export 'features/llm/llm_capability.dart';
 export 'features/tts/tts_capability.dart';

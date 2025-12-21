@@ -27,6 +27,7 @@ dependencies:
   logger: ^2.3.0
   collection: ^1.18.0
   json_annotation: ^4.9.0
+  path: ^1.9.0
   # Archive extraction (tar.bz2, zip)
   archive: ^3.6.1
   # TTS fallback (system TTS)

@@ -3,3 +3,5 @@
 
 export 'errors/errors.dart';
 export 'network/network.dart';
+export 'protocols/protocols.dart';
+export 'sync/sync.dart';

@@ -1,49 +1,139 @@
 /// Voice Session Models
 ///
 /// Matches iOS VoiceSession.swift from Capabilities/Voice/Models/
+/// and RunAnywhere+VoiceSession.swift from Public/Extensions/
 library voice_session;
 
+import 'dart:typed_data';
 import '../../../features/stt/stt_capability.dart' show STTOutput;
 
-/// Configuration for a voice session
-/// Matches iOS VoiceSessionConfig from VoiceSession.swift
+/// Events emitted during a voice session
+/// Matches iOS VoiceSessionEvent from RunAnywhere+VoiceSession.swift
+sealed class VoiceSessionEvent {
+  const VoiceSessionEvent();
+}
+
+/// Session started and ready
+class VoiceSessionStarted extends VoiceSessionEvent {
+  const VoiceSessionStarted();
+}
+
+/// Listening for speech with current audio level (0.0 - 1.0)
+class VoiceSessionListening extends VoiceSessionEvent {
+  final double audioLevel;
+  const VoiceSessionListening({required this.audioLevel});
+}
+
+/// Speech detected, started accumulating audio
+class VoiceSessionSpeechStarted extends VoiceSessionEvent {
+  const VoiceSessionSpeechStarted();
+}
+
+/// Speech ended, processing audio
+class VoiceSessionProcessing extends VoiceSessionEvent {
+  const VoiceSessionProcessing();
+}
+
+/// Got transcription from STT
+class VoiceSessionTranscribed extends VoiceSessionEvent {
+  final String text;
+  const VoiceSessionTranscribed({required this.text});
+}
+
+/// Got response from LLM
+class VoiceSessionResponded extends VoiceSessionEvent {
+  final String text;
+  const VoiceSessionResponded({required this.text});
+}
+
+/// Playing TTS audio
+class VoiceSessionSpeaking extends VoiceSessionEvent {
+  const VoiceSessionSpeaking();
+}
+
+/// Complete turn result
+class VoiceSessionTurnCompleted extends VoiceSessionEvent {
+  final String transcript;
+  final String response;
+  final Uint8List? audio;
+  const VoiceSessionTurnCompleted({
+    required this.transcript,
+    required this.response,
+    this.audio,
+  });
+}
+
+/// Session stopped
+class VoiceSessionStopped extends VoiceSessionEvent {
+  const VoiceSessionStopped();
+}
+
+/// Error occurred
+class VoiceSessionError extends VoiceSessionEvent {
+  final String message;
+  const VoiceSessionError({required this.message});
+}
+
+/// Configuration for voice session behavior
+/// Matches iOS VoiceSessionConfig from RunAnywhere+VoiceSession.swift
 class VoiceSessionConfig {
-  /// Whether to enable speech-to-text transcription
-  final bool enableTranscription;
+  /// Silence duration (seconds) before processing speech
+  final double silenceDuration;
 
-  /// Whether to enable LLM processing
-  final bool enableLLM;
+  /// Minimum audio level to detect speech (0.0 - 1.0)
+  final double speechThreshold;
 
-  /// Whether to enable text-to-speech
-  final bool enableTTS;
+  /// Whether to auto-play TTS response
+  final bool autoPlayTTS;
 
-  /// Language code for the session
-  final String language;
+  /// Whether to auto-resume listening after TTS playback
+  final bool continuousMode;
 
   const VoiceSessionConfig({
-    this.enableTranscription = true,
-    this.enableLLM = false,
-    this.enableTTS = false,
-    this.language = 'en',
+    this.silenceDuration = 1.5,
+    this.speechThreshold = 0.1,
+    this.autoPlayTTS = true,
+    this.continuousMode = true,
   });
+
+  /// Default configuration
+  static const VoiceSessionConfig defaultConfig = VoiceSessionConfig();
 
   /// Create a copy with modified values
   VoiceSessionConfig copyWith({
-    bool? enableTranscription,
-    bool? enableLLM,
-    bool? enableTTS,
-    String? language,
+    double? silenceDuration,
+    double? speechThreshold,
+    bool? autoPlayTTS,
+    bool? continuousMode,
   }) {
     return VoiceSessionConfig(
-      enableTranscription: enableTranscription ?? this.enableTranscription,
-      enableLLM: enableLLM ?? this.enableLLM,
-      enableTTS: enableTTS ?? this.enableTTS,
-      language: language ?? this.language,
+      silenceDuration: silenceDuration ?? this.silenceDuration,
+      speechThreshold: speechThreshold ?? this.speechThreshold,
+      autoPlayTTS: autoPlayTTS ?? this.autoPlayTTS,
+      continuousMode: continuousMode ?? this.continuousMode,
     );
   }
 }
 
-/// Voice session state
+/// Voice session errors
+/// Matches iOS VoiceSessionError from RunAnywhere+VoiceSession.swift
+class VoiceSessionException implements Exception {
+  final VoiceSessionErrorType type;
+  final String message;
+
+  const VoiceSessionException(this.type, this.message);
+
+  @override
+  String toString() => message;
+}
+
+enum VoiceSessionErrorType {
+  microphonePermissionDenied,
+  notReady,
+  alreadyRunning,
+}
+
+/// Voice session state (for internal tracking)
 /// Matches iOS VoiceSessionState from VoiceSession.swift
 enum VoiceSessionState {
   idle('idle'),
@@ -64,8 +154,7 @@ enum VoiceSessionState {
   }
 }
 
-/// Voice session state tracking
-/// Matches iOS VoiceSession from VoiceSession.swift
+/// Voice session state tracking (for internal use)
 class VoiceSession {
   /// Unique session identifier
   final String id;

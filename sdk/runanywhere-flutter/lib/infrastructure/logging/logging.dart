@@ -10,3 +10,6 @@ export '../../foundation/logging/models/logging_configuration.dart';
 // Infrastructure-specific protocols
 export 'protocol/log_destination.dart';
 export 'protocol/logging_service.dart';
+
+// Log destination implementations
+export 'destinations/sentry_destination.dart';
