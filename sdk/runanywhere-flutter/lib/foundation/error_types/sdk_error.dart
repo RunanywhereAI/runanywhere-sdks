@@ -21,15 +21,21 @@ class SDKError implements Exception {
     switch (type) {
       case SDKErrorType.notInitialized:
         return 'Call RunAnywhere.initialize() before using the SDK.';
+      case SDKErrorType.alreadyInitialized:
+        return 'The SDK is already initialized. You can use it directly.';
       case SDKErrorType.invalidAPIKey:
         return 'Provide a valid API key in the configuration.';
       case SDKErrorType.invalidConfiguration:
         return 'Check your configuration settings and ensure all required fields are provided.';
+      case SDKErrorType.environmentMismatch:
+        return 'Use .development or .staging for DEBUG builds. Production environment requires a Release build.';
 
       case SDKErrorType.modelNotFound:
         return 'Check the model identifier or download the model first.';
       case SDKErrorType.modelLoadFailed:
         return 'Ensure the model file is not corrupted and is compatible with your device.';
+      case SDKErrorType.loadingFailed:
+        return 'The loading operation failed. Check logs for details.';
       case SDKErrorType.modelValidationFailed:
         return 'The model file may be corrupted or incompatible. Try re-downloading.';
       case SDKErrorType.modelIncompatible:
@@ -45,6 +51,8 @@ class SDKError implements Exception {
         return 'Reduce the context size or use a model with larger context window.';
       case SDKErrorType.tokenLimitExceeded:
         return 'Reduce the number of tokens requested.';
+      case SDKErrorType.costLimitExceeded:
+        return 'Increase your cost limit or use a more cost-effective model.';
 
       case SDKErrorType.networkError:
       case SDKErrorType.networkUnavailable:
@@ -75,7 +83,15 @@ class SDKError implements Exception {
       case SDKErrorType.invalidState:
         return 'Check the current state and ensure operations are called in the correct order.';
 
+      case SDKErrorType.authenticationFailed:
+        return 'Check your credentials and try again.';
+
+      case SDKErrorType.databaseInitializationFailed:
+        return 'Try reinstalling the app or clearing app data.';
+
       case SDKErrorType.validationFailed:
+        return 'Check your input parameters and ensure they are valid.';
+      case SDKErrorType.unsupportedModality:
         return 'Check your input parameters and ensure they are valid.';
 
       case SDKErrorType.featureNotAvailable:
@@ -92,10 +108,31 @@ class SDKError implements Exception {
     );
   }
 
+  static SDKError alreadyInitialized([String? message]) {
+    return SDKError(
+      message ?? 'SDK is already initialized',
+      SDKErrorType.alreadyInitialized,
+    );
+  }
+
   static SDKError invalidAPIKey([String? message]) {
     return SDKError(
       message ?? 'Invalid API key',
       SDKErrorType.invalidAPIKey,
+    );
+  }
+
+  static SDKError invalidConfiguration([String? message]) {
+    return SDKError(
+      message ?? 'Invalid configuration',
+      SDKErrorType.invalidConfiguration,
+    );
+  }
+
+  static SDKError environmentMismatch([String? message]) {
+    return SDKError(
+      message ?? 'Environment configuration mismatch',
+      SDKErrorType.environmentMismatch,
     );
   }
 
@@ -116,8 +153,8 @@ class SDKError implements Exception {
 
   static SDKError loadingFailed([String? message]) {
     return SDKError(
-      message ?? 'Model loading failed',
-      SDKErrorType.modelLoadFailed,
+      message ?? 'Loading failed',
+      SDKErrorType.loadingFailed,
     );
   }
 
@@ -183,18 +220,129 @@ class SDKError implements Exception {
       SDKErrorType.generationFailed,
     );
   }
+
+  static SDKError generationTimeout([String? message]) {
+    return SDKError(
+      message ?? 'Generation timed out',
+      SDKErrorType.generationTimeout,
+    );
+  }
+
+  static SDKError contextTooLong(int provided, int maximum) {
+    return SDKError(
+      'Context too long: $provided tokens (maximum: $maximum)',
+      SDKErrorType.contextTooLong,
+    );
+  }
+
+  static SDKError tokenLimitExceeded(int requested, int maximum) {
+    return SDKError(
+      'Token limit exceeded: requested $requested, maximum $maximum',
+      SDKErrorType.tokenLimitExceeded,
+    );
+  }
+
+  static SDKError costLimitExceeded(double estimated, double limit) {
+    return SDKError(
+      'Cost limit exceeded: estimated \$${estimated.toStringAsFixed(2)}, limit \$${limit.toStringAsFixed(2)}',
+      SDKErrorType.costLimitExceeded,
+    );
+  }
+
+  static SDKError authenticationFailed([String? message]) {
+    return SDKError(
+      message ?? 'Authentication failed',
+      SDKErrorType.authenticationFailed,
+    );
+  }
+
+  static SDKError databaseInitializationFailed(Object error) {
+    return SDKError(
+      'Database initialization failed: $error',
+      SDKErrorType.databaseInitializationFailed,
+      underlyingError: error,
+    );
+  }
+
+  static SDKError unsupportedModality([String? message]) {
+    return SDKError(
+      message ?? 'Unsupported modality',
+      SDKErrorType.unsupportedModality,
+    );
+  }
+
+  static SDKError insufficientStorage(int required, int available) {
+    return SDKError(
+      'Insufficient storage: $required bytes required, $available bytes available',
+      SDKErrorType.insufficientStorage,
+    );
+  }
+
+  static SDKError hardwareUnsupported([String? message]) {
+    return SDKError(
+      message ?? 'Hardware not supported',
+      SDKErrorType.hardwareUnsupported,
+    );
+  }
+
+  static SDKError serverError([String? message]) {
+    return SDKError(
+      message ?? 'Server error occurred',
+      SDKErrorType.serverError,
+    );
+  }
+
+  static SDKError requestFailed(Object error) {
+    return SDKError(
+      'Request failed: $error',
+      SDKErrorType.requestFailed,
+      underlyingError: error,
+    );
+  }
+
+  static SDKError networkUnavailable([String? message]) {
+    return SDKError(
+      message ?? 'Network connection unavailable',
+      SDKErrorType.networkUnavailable,
+    );
+  }
+
+  static SDKError modelValidationFailed(String modelId, List<String> errors) {
+    return SDKError(
+      'Model \'$modelId\' validation failed: ${errors.join(', ')}',
+      SDKErrorType.modelValidationFailed,
+    );
+  }
+
+  static SDKError modelIncompatible(String modelId, String reason) {
+    return SDKError(
+      'Model \'$modelId\' is incompatible: $reason',
+      SDKErrorType.modelIncompatible,
+    );
+  }
+
+  static SDKError frameworkNotAvailable([String? message]) {
+    return SDKError(
+      message ?? 'Required framework not available',
+      SDKErrorType.frameworkNotAvailable,
+    );
+  }
 }
 
 /// SDK error types
+/// Matches iOS RunAnywhereError cases
 enum SDKErrorType {
   // Initialization errors
   notInitialized,
+  alreadyInitialized,
   invalidAPIKey,
   invalidConfiguration,
+  environmentMismatch,
 
   // Model errors
   modelNotFound,
   modelLoadFailed,
+  loadingFailed, // Separate from modelLoadFailed for iOS parity
   modelValidationFailed,
   modelIncompatible,
   frameworkNotAvailable,
@@ -204,6 +352,7 @@ enum SDKErrorType {
   generationTimeout,
   contextTooLong,
   tokenLimitExceeded,
+  costLimitExceeded,
 
   // Network errors
   networkError,
@@ -225,12 +374,21 @@ enum SDKErrorType {
   componentNotReady,
   componentNotInitialized,
 
+  // Authentication errors
+  authenticationFailed,
+
+  // Database errors
+  databaseInitializationFailed,
+
   // Feature errors
   featureNotAvailable,
   notImplemented,
 
-  // General errors
+  // Validation errors
   validationFailed,
+  unsupportedModality,
+
+  // General errors
   invalidState,
   timeout,
   serverError,

@@ -308,6 +308,26 @@ class STTCapability extends BaseCapability<STTService> {
     super.serviceContainer,
   }) : super(configuration: sttConfig);
 
+  /// Currently loaded model ID.
+  /// Matches iOS STTCapability.currentModelId property.
+  String? get currentModelId => _modelPath;
+
+  /// Load a model by ID.
+  /// Matches iOS STTCapability.loadModel(_:) method.
+  ///
+  /// [modelId] - The model identifier to load.
+  Future<void> loadModel(String modelId) async {
+    _modelPath = modelId;
+    _isModelLoaded = true;
+  }
+
+  /// Unload the currently loaded model.
+  /// Matches iOS STTCapability.unload() method.
+  Future<void> unload() async {
+    _modelPath = null;
+    _isModelLoaded = false;
+  }
+
   @override
   Future<STTService> createService() async {
     // Get model info from registry to get the actual model path

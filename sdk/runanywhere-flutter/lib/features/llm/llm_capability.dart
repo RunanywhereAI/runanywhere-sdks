@@ -416,6 +416,28 @@ class LLMCapability extends BaseCapability<core.LLMService> {
   /// Check if model is loaded
   bool get isModelLoaded => _managedLifecycle.isLoaded;
 
+  /// Whether the currently loaded service supports true streaming generation.
+  ///
+  /// Matches iOS `supportsStreaming` property.
+  /// Returns `false` if no model is loaded.
+  bool get supportsStreaming {
+    final llmService = service;
+    if (llmService == null) return false;
+    return llmService.supportsStreaming;
+  }
+
+  /// Cancel the current generation operation.
+  ///
+  /// Matches iOS `cancel()` method.
+  /// Note: This is a best-effort cancellation; some backends may not support
+  /// mid-generation cancellation.
+  Future<void> cancel() async {
+    final llmService = service;
+    if (llmService != null) {
+      await llmService.cancel();
+    }
+  }
+
   // MARK: - Private Helpers
 
   String _buildPrompt(List<Message> messages, {String? systemPrompt}) {
