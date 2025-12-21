@@ -6,7 +6,7 @@ import '../features/vad/vad_service.dart' show VADService;
 // STT types are imported from centralized location to avoid duplication
 import '../features/stt/stt_types.dart';
 // SpeakerInfo types for diarization service return type
-import '../features/speaker_diarization/speaker_info.dart';
+import '../features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
 // Export all VAD types for external consumers
 export '../features/vad/vad_service.dart'
     show VADService, VADResult, SpeechActivityEvent;
@@ -15,7 +15,7 @@ export '../features/stt/stt_types.dart';
 // Export module types for external consumers
 export 'module/module.dart';
 // Export speaker diarization types
-export '../features/speaker_diarization/speaker_info.dart';
+export '../features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
 
 /// Central registry for external AI module implementations.
 ///

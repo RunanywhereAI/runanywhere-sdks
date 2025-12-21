@@ -1,5 +1,5 @@
 import '../../../core/module_registry.dart';
-import '../../native/native_backend.dart';
+import '../../../native/native_backend.dart';
 
 /// ONNX-based Language Model service.
 ///

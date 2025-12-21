@@ -2,12 +2,28 @@ import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
-import '../../models/storage/storage_availability.dart';
 import '../../models/storage/storage_info.dart';
 import '../../models/storage/model_storage_info.dart';
 import '../../models/storage/storage_recommendation.dart';
 import '../../models/storage/app_storage_info.dart';
 import '../../models/storage/device_storage_info.dart';
+
+/// Represents storage availability status
+class StorageAvailability {
+  final bool isAvailable;
+  final int requiredSpace;
+  final int availableSpace;
+  final bool hasWarning;
+  final String? recommendation;
+
+  const StorageAvailability({
+    required this.isAvailable,
+    required this.requiredSpace,
+    required this.availableSpace,
+    required this.hasWarning,
+    this.recommendation,
+  });
+}
 
 /// Protocol for storage analysis operations.
 /// Matches iOS StorageAnalyzer from Infrastructure/FileManagement/Protocol/StorageAnalyzer.swift

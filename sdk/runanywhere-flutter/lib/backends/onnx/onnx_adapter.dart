@@ -5,7 +5,7 @@ import '../../core/models/hardware/hardware_configuration.dart';
 import '../../core/models/model/model_info.dart';
 import '../../core/module_registry.dart';
 import '../../core/protocols/frameworks/unified_framework_adapter.dart';
-import '../native/native_backend.dart';
+import '../../native/native_backend.dart';
 import 'onnx_download_strategy.dart';
 import 'providers/onnx_stt_provider.dart';
 import 'providers/onnx_tts_provider.dart';

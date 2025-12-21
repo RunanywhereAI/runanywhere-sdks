@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../features/tts/tts_service.dart' as component_tts;
-import '../../../features/tts/tts_options.dart';
-import '../../native/native_backend.dart';
+import '../../../features/tts/protocol/tts_service.dart' as component_tts;
+import '../../../core/module_registry.dart' show TTSOptions;
+import '../../../native/native_backend.dart';
 
 /// ONNX-based Text-to-Speech service.
 ///

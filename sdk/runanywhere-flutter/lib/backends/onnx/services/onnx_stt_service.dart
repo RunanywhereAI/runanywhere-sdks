@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import '../../../core/module_registry.dart';
-import '../../native/native_backend.dart';
+import '../../../native/native_backend.dart';
 
 /// ONNX-based Speech-to-Text service.
 ///

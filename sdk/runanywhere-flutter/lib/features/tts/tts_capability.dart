@@ -7,10 +7,9 @@ import '../../core/capabilities_base/base_capability.dart';
 import '../../core/types/sdk_component.dart';
 import '../../core/protocols/component/component_configuration.dart';
 import '../../core/models/audio_format.dart';
-import '../../core/module_registry.dart' hide TTSService, TTSOptions;
+import '../../core/module_registry.dart' hide TTSService;
 import '../../foundation/dependency_injection/service_container.dart';
-import 'tts_service.dart';
-import 'tts_options.dart';
+import 'protocol/tts_service.dart';
 import 'tts_output.dart';
 import 'system_tts_service.dart';
 
