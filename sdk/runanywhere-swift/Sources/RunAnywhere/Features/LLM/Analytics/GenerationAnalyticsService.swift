@@ -47,6 +47,10 @@ public actor GenerationAnalyticsService {
         let startTime: Date
         let isStreaming: Bool
         let framework: InferenceFrameworkType
+        let modelId: String
+        let temperature: Float?
+        let maxTokens: Int?
+        let contextLength: Int?
         var firstTokenTime: Date?
     }
 
@@ -60,16 +64,26 @@ public actor GenerationAnalyticsService {
     /// - Parameters:
     ///   - modelId: The model ID being used
     ///   - framework: The inference framework type
+    ///   - temperature: Generation temperature
+    ///   - maxTokens: Maximum tokens to generate
+    ///   - contextLength: Context window size
     /// - Returns: A unique generation ID for tracking
     public func startGeneration(
         modelId: String,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFrameworkType = .unknown,
+        temperature: Float? = nil,
+        maxTokens: Int? = nil,
+        contextLength: Int? = nil
     ) -> String {
         let id = UUID().uuidString
         activeGenerations[id] = GenerationTracker(
             startTime: Date(),
             isStreaming: false,
-            framework: framework
+            framework: framework,
+            modelId: modelId,
+            temperature: temperature,
+            maxTokens: maxTokens,
+            contextLength: contextLength
         )
 
         EventPublisher.shared.track(LLMEvent.generationStarted(
@@ -88,16 +102,26 @@ public actor GenerationAnalyticsService {
     /// - Parameters:
     ///   - modelId: The model ID being used
     ///   - framework: The inference framework type
+    ///   - temperature: Generation temperature
+    ///   - maxTokens: Maximum tokens to generate
+    ///   - contextLength: Context window size
     /// - Returns: A unique generation ID for tracking
     public func startStreamingGeneration(
         modelId: String,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFrameworkType = .unknown,
+        temperature: Float? = nil,
+        maxTokens: Int? = nil,
+        contextLength: Int? = nil
     ) -> String {
         let id = UUID().uuidString
         activeGenerations[id] = GenerationTracker(
             startTime: Date(),
             isStreaming: true,
-            framework: framework
+            framework: framework,
+            modelId: modelId,
+            temperature: temperature,
+            maxTokens: maxTokens,
+            contextLength: contextLength
         )
 
         EventPublisher.shared.track(LLMEvent.generationStarted(
@@ -127,14 +151,16 @@ public actor GenerationAnalyticsService {
         tracker.firstTokenTime = firstTokenTime
         activeGenerations[generationId] = tracker
 
-        let latencyMs = firstTokenTime.timeIntervalSince(tracker.startTime) * 1000
+        let timeToFirstTokenMs = firstTokenTime.timeIntervalSince(tracker.startTime) * 1000
 
         EventPublisher.shared.track(LLMEvent.firstToken(
             generationId: generationId,
-            latencyMs: latencyMs
+            modelId: tracker.modelId,
+            timeToFirstTokenMs: timeToFirstTokenMs,
+            framework: tracker.framework
         ))
 
-        logger.debug("First token received for \(generationId): \(String(format: "%.1f", latencyMs))ms")
+        logger.debug("First token received for \(generationId): \(String(format: "%.1f", timeToFirstTokenMs))ms")
     }
 
     /// Track streaming update (analytics only)
@@ -198,7 +224,10 @@ public actor GenerationAnalyticsService {
             tokensPerSecond: tokensPerSecond,
             isStreaming: tracker.isStreaming,
             timeToFirstTokenMs: timeToFirstTokenMs,
-            framework: tracker.framework
+            framework: tracker.framework,
+            temperature: tracker.temperature,
+            maxTokens: tracker.maxTokens,
+            contextLength: tracker.contextLength
         ))
 
         let modeStr = tracker.isStreaming ? "streaming" : "non-streaming"

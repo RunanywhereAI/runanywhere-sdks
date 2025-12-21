@@ -22,6 +22,7 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     public init(databaseManager: DatabaseManager, apiClient: APIClient?, environment: SDKEnvironment = .development) {
         self.localDataSource = LocalTelemetryDataSource(databaseManager: databaseManager)
         self._remoteDataSource = RemoteTelemetryDataSource(apiClient: apiClient, environment: environment)
+        // Note: Can't use logger in actor init - will log on first operation
     }
 
     // MARK: - Repository Implementation

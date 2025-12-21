@@ -135,10 +135,11 @@ extension LoggingConfiguration {
     }
 
     /// Configuration preset for production environment
+    /// NOTE: Temporarily enabled verbose logging for debugging
     public static var production: LoggingConfiguration {
         LoggingConfiguration(
-            enableLocalLogging: false,
-            minLogLevel: .warning,
+            enableLocalLogging: true,  // TEMP: Enable for debugging
+            minLogLevel: .debug,       // TEMP: Show all logs for debugging
             includeDeviceMetadata: true,
             enableSentryLogging: false
         )

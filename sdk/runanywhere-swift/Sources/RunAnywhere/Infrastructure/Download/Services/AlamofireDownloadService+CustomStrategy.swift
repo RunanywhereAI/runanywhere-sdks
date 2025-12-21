@@ -62,7 +62,6 @@ extension AlamofireDownloadService {
 
                 do {
                     let destinationFolder = try getDestinationFolder(for: model.id, framework: model.preferredFramework)
-                    var lastReportedProgress = 0.0
 
                     let resultURL = try await strategy.download(
                         model: model,
@@ -74,16 +73,7 @@ extension AlamofireDownloadService {
                                 state: .downloading
                             ))
 
-                            // Track progress at 10% intervals (analytics only)
-                            if progress - lastReportedProgress >= 0.1 {
-                                lastReportedProgress = progress
-                                EventPublisher.shared.track(ModelEvent.downloadProgress(
-                                    modelId: model.id,
-                                    progress: progress,
-                                    bytesDownloaded: Int64(progress * Double(model.downloadSize ?? 100)),
-                                    totalBytes: Int64(model.downloadSize ?? 100)
-                                ))
-                            }
+                            // Progress updates are for UI only - analytics tracks start/complete only
                         }
                     )
 

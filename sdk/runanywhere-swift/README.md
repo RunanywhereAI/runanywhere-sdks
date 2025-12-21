@@ -116,7 +116,7 @@ Add the RunAnywhere SDK to your project using Xcode:
    ```
    https://github.com/RunanywhereAI/runanywhere-sdks
    ```
-4. Select the version (e.g., `from: "0.15.8"`)
+4. Select the version (e.g., `from: "0.16.0"`)
 5. Choose the products you need:
    - **RunAnywhere** (required) — Core SDK
    - **RunAnywhereONNX** — ONNX Runtime for STT/TTS/VAD
@@ -128,7 +128,7 @@ Add the RunAnywhere SDK to your project using Xcode:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.15.8")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.16.0")
 ],
 targets: [
     .target(

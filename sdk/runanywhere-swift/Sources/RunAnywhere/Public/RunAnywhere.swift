@@ -244,6 +244,14 @@ public enum RunAnywhere {
             // Step 1: Initialize logging system
             RunAnywhere.setLogLevel(params.environment.defaultLogLevel)
 
+            // Step 1.5: Initialize database for local storage
+            do {
+                try DatabaseManager.shared.setup()
+            } catch {
+                // Continue without database - analytics will fail gracefully
+                logger.warning("Database setup failed (non-critical): \(error)")
+            }
+
             // Step 2: Store parameters
             initParams = params
             currentEnvironment = params.environment

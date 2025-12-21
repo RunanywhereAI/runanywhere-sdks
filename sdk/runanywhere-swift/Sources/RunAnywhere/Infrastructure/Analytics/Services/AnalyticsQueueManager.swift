@@ -71,7 +71,9 @@ public actor AnalyticsQueueManager {
     }
 
     private func flushBatch() async {
-        guard !eventQueue.isEmpty else { return }
+        guard !eventQueue.isEmpty else {
+            return
+        }
 
         let batch = Array(eventQueue.prefix(batchSize))
         await processBatch(batch)
@@ -79,16 +81,26 @@ public actor AnalyticsQueueManager {
 
     private func processBatch(_ batch: [any SDKEvent]) async {
         guard let telemetryRepository = telemetryRepository else {
-            logger.warning("No telemetry repository configured - events will be dropped")
             eventQueue.removeFirst(min(batch.count, eventQueue.count))
             return
         }
 
-        // Convert SDKEvent to TelemetryData
+        // Get device info for enrichment
+        let deviceInfo = DeviceInfo.current
+        let deviceMetadata: [String: String] = [
+            "device": deviceInfo.deviceModel,
+            "device_model": deviceInfo.deviceModel,
+            "os_version": deviceInfo.osVersion,
+            "platform": deviceInfo.platform,
+            "sdk_version": SDKConstants.version
+        ]
+
+        // Convert SDKEvent to TelemetryData with device info
         let telemetryEvents = batch.map { event in
-            TelemetryData(
+            let enrichedProperties = event.properties.merging(deviceMetadata) { eventValue, _ in eventValue }
+            return TelemetryData(
                 eventType: event.type,
-                properties: event.properties,
+                properties: enrichedProperties,
                 timestamp: event.timestamp
             )
         }

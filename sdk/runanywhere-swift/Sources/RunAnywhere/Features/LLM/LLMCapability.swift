@@ -102,9 +102,14 @@ public actor LLMCapability: ModelLoadableCapability {
         let startTime = Date()
 
         // Start generation tracking (non-streaming mode)
+        // Use service's actual context length, fallback to config if not available
+        let contextLength = service.contextLength ?? config?.contextLength
         let generationId = await analyticsService.startGeneration(
             modelId: modelId,
-            framework: service.inferenceFramework
+            framework: service.inferenceFramework,
+            temperature: effectiveOptions.temperature,
+            maxTokens: effectiveOptions.maxTokens,
+            contextLength: contextLength
         )
 
         // Generate text
@@ -189,9 +194,14 @@ public actor LLMCapability: ModelLoadableCapability {
         logger.info("Starting streaming generation with model: \(modelId)")
 
         // Start streaming generation tracking
+        // Use service's actual context length, fallback to config if not available
+        let contextLength = service.contextLength ?? config?.contextLength
         let generationId = await analyticsService.startStreamingGeneration(
             modelId: modelId,
-            framework: framework
+            framework: framework,
+            temperature: effectiveOptions.temperature,
+            maxTokens: effectiveOptions.maxTokens,
+            contextLength: contextLength
         )
 
         // Create metrics collector

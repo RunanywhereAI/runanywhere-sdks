@@ -40,7 +40,7 @@ public enum LLMEvent: SDKEvent {
     )
 
     /// First token received (only applicable for streaming generation)
-    case firstToken(generationId: String, latencyMs: Double)
+    case firstToken(generationId: String, modelId: String, timeToFirstTokenMs: Double, framework: InferenceFrameworkType = .unknown)
 
     /// Streaming update (only applicable for streaming generation)
     case streamingUpdate(generationId: String, tokensGenerated: Int)
@@ -58,7 +58,10 @@ public enum LLMEvent: SDKEvent {
         tokensPerSecond: Double,
         isStreaming: Bool = false,
         timeToFirstTokenMs: Double? = nil,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFrameworkType = .unknown,
+        temperature: Float? = nil,
+        maxTokens: Int? = nil,
+        contextLength: Int? = nil
     )
     case generationFailed(generationId: String, error: String)
 
@@ -106,8 +109,9 @@ public enum LLMEvent: SDKEvent {
         case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
             var props = [
                 "model_id": modelId,
-                "duration_ms": String(format: "%.1f", durationMs),
-                "framework": framework.rawValue
+                "processing_time_ms": String(format: "%.1f", durationMs),
+                "framework": framework.rawValue,
+                "success": "true"
             ]
             if modelSizeBytes > 0 {
                 props["model_size_bytes"] = String(modelSizeBytes)
@@ -117,8 +121,9 @@ public enum LLMEvent: SDKEvent {
         case .modelLoadFailed(let modelId, let error, let framework):
             return [
                 "model_id": modelId,
-                "error": error,
-                "framework": framework.rawValue
+                "error_message": error,
+                "framework": framework.rawValue,
+                "success": "false"
             ]
 
         case .modelUnloaded(let modelId):
@@ -139,10 +144,12 @@ public enum LLMEvent: SDKEvent {
             }
             return props
 
-        case .firstToken(let generationId, let latencyMs):
+        case .firstToken(let generationId, let modelId, let timeToFirstTokenMs, let framework):
             return [
                 "generation_id": generationId,
-                "latency_ms": String(format: "%.1f", latencyMs)
+                "model_id": modelId,
+                "time_to_first_token_ms": String(format: "%.1f", timeToFirstTokenMs),
+                "framework": framework.rawValue
             ]
 
         case .streamingUpdate(let generationId, let tokensGenerated):
@@ -160,27 +167,43 @@ public enum LLMEvent: SDKEvent {
             let tokensPerSecond,
             let isStreaming,
             let timeToFirstTokenMs,
-            let framework
+            let framework,
+            let temperature,
+            let maxTokens,
+            let contextLength
         ):
             var props = [
                 "generation_id": generationId,
                 "model_id": modelId,
                 "input_tokens": String(inputTokens),
                 "output_tokens": String(outputTokens),
-                "duration_ms": String(format: "%.1f", durationMs),
+                "total_tokens": String(inputTokens + outputTokens),
+                "processing_time_ms": String(format: "%.1f", durationMs),
+                "generation_time_ms": String(format: "%.1f", durationMs),
                 "tokens_per_second": String(format: "%.2f", tokensPerSecond),
                 "is_streaming": String(isStreaming),
-                "framework": framework.rawValue
+                "framework": framework.rawValue,
+                "success": "true"
             ]
             if let ttft = timeToFirstTokenMs {
                 props["time_to_first_token_ms"] = String(format: "%.1f", ttft)
+            }
+            if let temp = temperature {
+                props["temperature"] = String(format: "%.2f", temp)
+            }
+            if let maxTok = maxTokens {
+                props["max_tokens"] = String(maxTok)
+            }
+            if let ctx = contextLength {
+                props["context_length"] = String(ctx)
             }
             return props
 
         case .generationFailed(let generationId, let error):
             return [
                 "generation_id": generationId,
-                "error": error
+                "error_message": error,
+                "success": "false"
             ]
         }
     }
