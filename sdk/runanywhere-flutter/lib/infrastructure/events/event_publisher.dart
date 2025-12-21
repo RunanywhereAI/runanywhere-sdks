@@ -7,6 +7,8 @@
 //  Corresponds to iOS SDK's EventPublisher.swift
 //
 
+import 'dart:async';
+
 import '../../public/events/event_bus.dart';
 import '../../public/events/sdk_event.dart';
 import '../analytics/analytics_queue_manager.dart';

@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'models/loaded_model.dart';
 import '../registry/registry_service.dart';
-import '../memory/memory_service.dart';
+// TODO: MemoryService has been moved/removed - stubbed out for now
+// import '../memory/memory_service.dart';
 import '../../foundation/logging/sdk_logger.dart';
 import '../../foundation/error_types/sdk_error.dart';
 import '../../core/service_registry/unified_service_registry.dart';
@@ -15,7 +16,7 @@ import '../../core/module_registry.dart';
 class ModelLoadingService {
   final ModelRegistry registry;
   final UnifiedServiceRegistry adapterRegistry;
-  final MemoryService memoryService;
+  final MemoryService? memoryService;
   final SDKLogger logger = SDKLogger(category: 'ModelLoadingService');
 
   final Map<String, LoadedModel> _loadedModels = {};
@@ -100,13 +101,15 @@ class ModelLoadingService {
       );
     }
 
-    // Check memory availability
-    final memoryRequired =
-        modelInfo.memoryRequired ?? 1024 * 1024 * 1024; // Default 1GB
-    final canAllocate = await memoryService.canAllocate(memoryRequired);
-    if (!canAllocate) {
-      logger.warning(
-          'Memory might be insufficient: ${memoryRequired ~/ (1024 * 1024)}MB required');
+    // Check memory availability (if service is available)
+    if (memoryService != null) {
+      final memoryRequired =
+          modelInfo.memoryRequired ?? 1024 * 1024 * 1024; // Default 1GB
+      final canAllocate = await memoryService!.canAllocate(memoryRequired);
+      if (!canAllocate) {
+        logger.warning(
+            'Memory might be insufficient: ${memoryRequired ~/ (1024 * 1024)}MB required');
+      }
     }
 
     // Get framework and model name for lifecycle tracking
@@ -317,4 +320,14 @@ class LLMConfiguration {
     this.useGPUIfAvailable = true,
     this.quantizationLevel,
   });
+}
+
+// TODO: Stub for MemoryService until proper memory management is implemented
+// This should be moved to lib/capabilities/memory/memory_service.dart
+class MemoryService {
+  Future<bool> canAllocate(int bytes) async {
+    // Stub: Always return true for now
+    // In a real implementation, this would check available memory
+    return true;
+  }
 }

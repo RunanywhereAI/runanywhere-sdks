@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';

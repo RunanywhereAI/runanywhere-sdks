@@ -1,10 +1,10 @@
-/// TTS analytics service.
-/// Tracks synthesis operations and metrics.
-/// Matches iOS TTSAnalyticsService.
-///
-/// NOTE: ⚠️ Audio duration estimation assumes 16-bit PCM @ 22050Hz (standard for TTS).
-/// Formula: audioDurationMs = (bytes / 2) / 22050 * 1000
-/// Actual sample rates may vary depending on the TTS model/voice configuration.
+// TTS analytics service.
+// Tracks synthesis operations and metrics.
+// Matches iOS TTSAnalyticsService.
+//
+// NOTE: Audio duration estimation assumes 16-bit PCM @ 22050Hz (standard for TTS).
+// Formula: audioDurationMs = (bytes / 2) / 22050 * 1000
+// Actual sample rates may vary depending on the TTS model/voice configuration.
 
 import '../../../foundation/logging/sdk_logger.dart';
 

@@ -21,8 +21,10 @@ import 'events/sdk_event.dart';
 import 'models/models.dart';
 import '../capabilities/text_generation/generation_service.dart';
 import '../features/llm/structured_output/structured_output_handler.dart';
+import '../features/llm/structured_output/generatable.dart';
 import '../features/stt/stt_capability.dart';
 import '../features/tts/tts_capability.dart';
+import '../features/tts/models/tts_configuration.dart';
 import '../core/module_registry.dart' show TTSOptions;
 import '../features/tts/tts_output.dart';
 import '../features/vad/vad_capability.dart';
@@ -38,8 +40,8 @@ export '../capabilities/text_generation/generation_service.dart'
 // Export capability types for public use
 export '../features/stt/stt_capability.dart'
     show STTCapability, STTConfiguration, STTOutput, STTMode, STTOptions;
-export '../features/tts/tts_capability.dart'
-    show TTSCapability, TTSConfiguration;
+export '../features/tts/tts_capability.dart' show TTSCapability;
+export '../features/tts/models/tts_configuration.dart' show TTSConfiguration;
 export '../features/tts/tts_output.dart' show TTSOutput, SynthesisMetadata;
 export '../features/llm/llm_capability.dart'
     show
@@ -1060,10 +1062,14 @@ class RunAnywhere {
   static bool get isTTSVoiceLoaded =>
       _loadedTTSCapability?.isReady ?? false;
 
-  /// Get available TTS voices
+  /// Get available TTS voices (async version)
   /// Matches iOS RunAnywhere.availableTTSVoices
-  static List<String> get availableTTSVoices =>
-      _loadedTTSCapability?.getAvailableVoices() ?? [];
+  static Future<List<String>> getAvailableTTSVoices() async {
+    final capability = _loadedTTSCapability;
+    if (capability == null) return [];
+    final voices = await capability.getAvailableVoices();
+    return voices.map((v) => v.id).toList();
+  }
 
   /// Stream synthesis for long text
   /// Matches iOS RunAnywhere.synthesizeStream(_:options:)
@@ -1090,10 +1096,12 @@ class RunAnywhere {
 
   /// Stop current TTS synthesis
   /// Matches iOS RunAnywhere.stopSynthesis()
-  static void stopSynthesis() {
+  /// Note: This is a no-op for system TTS which doesn't support stopping mid-synthesis
+  static Future<void> stopSynthesis() async {
     final capability = _loadedTTSCapability;
     if (capability != null && capability.isReady) {
-      capability.stopSynthesis();
+      // Cleanup will stop any ongoing synthesis
+      await capability.cleanup();
     }
   }
 
@@ -1245,24 +1253,26 @@ class RunAnywhere {
   /// [prompt] The prompt to generate from
   /// [options] Generation options (optional)
   /// Returns The generated object of the specified type
-  static Future<T> generateStructuredOutput<T>({
-    required Type type,
+  static Future<T> generateStructuredOutput<T extends Generatable>({
+    required T Function(Map<String, dynamic>) fromJson,
+    required String schema,
     required String prompt,
     RunAnywhereGenerationOptions? options,
   }) async {
     // Import structured output handler
     final handler = StructuredOutputHandler();
 
-    // Get schema from type
-    final schema = (type as dynamic).jsonSchema as String?;
-    if (schema == null) {
-      throw ArgumentError('Type must implement Generatable with jsonSchema');
-    }
+    // Create config for structured output
+    final config = StructuredOutputConfig(
+      type: T,
+      schema: schema,
+      includeSchemaInPrompt: true,
+    );
 
     // Build prompt with schema
-    final enhancedPrompt = handler.buildPromptWithSchema(
+    final enhancedPrompt = handler.preparePrompt(
       originalPrompt: prompt,
-      schema: schema,
+      config: config,
     );
 
     // Generate text
@@ -1272,10 +1282,7 @@ class RunAnywhere {
     );
 
     // Parse structured output
-    return handler.parseStructuredOutput(
-      from: result.text,
-      type: type,
-    ) as T;
+    return handler.parseStructuredOutput<T>(result.text, fromJson);
   }
 
   /// Estimate token count in text
@@ -1897,7 +1904,7 @@ class RunAnywhere {
     // Verify all components are loaded
     final states = await getVoiceAgentComponentStates();
     if (!states.isFullyReady) {
-      final missing = states.notReadyComponents.join(', ');
+      final missing = states.missingComponents.join(', ');
       throw SDKError.componentNotReady(
         'Not all voice components are loaded. Missing: $missing',
       );

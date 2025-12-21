@@ -2,6 +2,8 @@
 ///
 /// Matches iOS VoiceSessionManager.swift from Capabilities/Voice/Services/
 library voice_session_manager;
+import 'dart:async';
+
 
 import '../../../foundation/logging/sdk_logger.dart';
 import '../../../features/stt/stt_capability.dart' show STTOutput;

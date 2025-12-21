@@ -187,6 +187,7 @@ class DownloadService implements DownloadManager {
 
       if (response.statusCode != 200) {
         throw SDKError.downloadFailed(
+          url.toString(),
           'Download failed with status ${response.statusCode}',
         );
       }

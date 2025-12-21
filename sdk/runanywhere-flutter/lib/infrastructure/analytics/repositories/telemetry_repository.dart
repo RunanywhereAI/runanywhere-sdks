@@ -6,6 +6,8 @@
 //  Matches iOS SDK's TelemetryRepositoryImpl.swift
 //
 
+import 'dart:async';
+
 import '../../../foundation/logging/sdk_logger.dart';
 import '../data_sources/local_telemetry_data_source.dart';
 import '../data_sources/remote_telemetry_data_source.dart';

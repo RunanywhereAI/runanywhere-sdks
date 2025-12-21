@@ -58,7 +58,7 @@ class DevelopmentNetworkConfig {
   /// Create an APIClient configured for development mode
   APIClient createAPIClient() {
     return APIClient(
-      baseUrl: baseURL,
+      baseURL: baseURL,
       apiKey: apiKey,
     );
   }

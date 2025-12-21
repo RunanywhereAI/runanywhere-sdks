@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../core/module_registry.dart';
 import '../../../native/native_backend.dart';
 
@@ -76,8 +78,12 @@ class OnnxLLMService implements LLMService {
     _isInitialized = false;
   }
 
+  @override
+  bool get supportsStreaming => false; // Currently simulated streaming
+
   /// Cancel ongoing text generation.
-  void cancel() {
+  @override
+  Future<void> cancel() async {
     _backend.cancelTextGeneration();
   }
 }

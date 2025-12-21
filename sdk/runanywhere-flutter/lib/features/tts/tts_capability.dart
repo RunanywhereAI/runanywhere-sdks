@@ -5,93 +5,13 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/capabilities_base/base_capability.dart';
 import '../../core/types/sdk_component.dart';
-import '../../core/protocols/component/component_configuration.dart';
-import '../../core/models/audio_format.dart';
 import '../../core/module_registry.dart' hide TTSService;
 import '../../foundation/dependency_injection/service_container.dart';
 import 'protocol/tts_service.dart';
+import 'models/tts_configuration.dart';
+import 'models/tts_input.dart';
 import 'tts_output.dart';
 import 'system_tts_service.dart';
-
-/// TTS (Text-to-Speech) Component Configuration
-/// Matches iOS TTSConfiguration from TTSComponent.swift
-class TTSConfiguration
-    implements ComponentConfiguration, ComponentInitParameters {
-  @override
-  String get componentType => SDKComponent.tts.value;
-
-  @override
-  final String? modelId;
-
-  // TTS-specific parameters
-  final String voice;
-  final String language;
-  final double speakingRate; // 0.5 to 2.0
-  final double pitch; // 0.5 to 2.0
-  final double volume; // 0.0 to 1.0
-  final AudioFormat audioFormat;
-  final bool useNeuralVoice;
-  final bool enableSSML;
-
-  TTSConfiguration({
-    this.modelId,
-    this.voice = 'system',
-    this.language = 'en-US',
-    this.speakingRate = 1.0,
-    this.pitch = 1.0,
-    this.volume = 1.0,
-    this.audioFormat = AudioFormat.pcm,
-    this.useNeuralVoice = true,
-    this.enableSSML = false,
-  });
-
-  @override
-  void validate() {
-    if (speakingRate < 0.5 || speakingRate > 2.0) {
-      throw ArgumentError('Speaking rate must be between 0.5 and 2.0');
-    }
-    if (pitch < 0.5 || pitch > 2.0) {
-      throw ArgumentError('Pitch must be between 0.5 and 2.0');
-    }
-    if (volume < 0.0 || volume > 1.0) {
-      throw ArgumentError('Volume must be between 0.0 and 1.0');
-    }
-  }
-}
-
-/// Input for Text-to-Speech (conforms to ComponentInput protocol)
-/// Matches iOS TTSInput from TTSComponent.swift
-class TTSInput implements ComponentInput {
-  /// Text to synthesize (optional if SSML is provided)
-  final String? text;
-
-  /// Optional SSML markup (overrides text if provided)
-  final String? ssml;
-
-  /// Voice ID override
-  final String? voiceId;
-
-  /// Language override
-  final String? language;
-
-  /// Custom options override
-  final TTSOptions? options;
-
-  TTSInput({
-    this.text,
-    this.ssml,
-    this.voiceId,
-    this.language,
-    this.options,
-  });
-
-  @override
-  void validate() {
-    if ((text == null || text!.isEmpty) && ssml == null) {
-      throw ArgumentError('TTSInput must contain either text or SSML');
-    }
-  }
-}
 
 /// TTS Capability
 /// Matches iOS TTSCapability from TTSCapability.swift
@@ -222,16 +142,18 @@ class TTSCapability extends BaseCapability<TTSService> {
       if (service is! TTSService) {
         throw StateError('Provider returned invalid service type');
       }
-      // Initialize with model path
+      // Initialize with configuration
       debugPrint(
           '[TTSComponent] Initializing service with modelPath: $_modelPath');
-      await service.initialize(modelPath: _modelPath);
+      // Create a configuration with the model path for initialization
+      final initConfig = ttsConfiguration.copyWith(modelId: _modelPath);
+      await service.initialize(initConfig);
       ttsService = service;
     } else {
       // Fallback to system TTS
       debugPrint('[TTSComponent] No provider, falling back to SystemTTS');
       ttsService = SystemTTSService();
-      await ttsService.initialize();
+      await ttsService.initialize(ttsConfiguration);
     }
 
     return ttsService;
@@ -293,55 +215,11 @@ class TTSCapability extends BaseCapability<TTSService> {
     // Validate input
     input.validate();
 
-    // Get text to synthesize (prioritize SSML, then text, then empty string)
-    final String textToSynthesize = input.ssml ?? input.text ?? '';
+    // Perform synthesis using the service protocol
+    // The service will handle the input and return a TTSOutput
+    final output = await ttsService.synthesize(input);
 
-    // Create options from input or use defaults
-    final options = input.options ??
-        TTSOptions(
-          voice: input.voiceId ?? ttsConfiguration.voice,
-          language: input.language ?? ttsConfiguration.language,
-          rate: ttsConfiguration.speakingRate,
-          pitch: ttsConfiguration.pitch,
-          volume: ttsConfiguration.volume,
-          audioFormat: ttsConfiguration.audioFormat,
-          sampleRate:
-              ttsConfiguration.audioFormat == AudioFormat.pcm ? 16000 : 44100,
-          useSSML: input.ssml != null,
-        );
-
-    // Track processing time
-    final startTime = DateTime.now();
-
-    // Perform synthesis
-    final audioData = await ttsService.synthesize(
-      text: textToSynthesize,
-      options: options,
-    );
-
-    final processingTime =
-        DateTime.now().difference(startTime).inMilliseconds / 1000.0;
-
-    // Calculate audio duration (estimate)
-    final duration = _estimateAudioDuration(
-      audioData.length,
-      ttsConfiguration.audioFormat,
-    );
-
-    final metadata = SynthesisMetadata(
-      voice: options.voice ?? ttsConfiguration.voice,
-      language: options.language,
-      processingTime: processingTime,
-      characterCount: textToSynthesize.length,
-    );
-
-    return TTSOutput(
-      audioData: audioData,
-      format: ttsConfiguration.audioFormat,
-      duration: duration,
-      phonemeTimestamps: null, // Would be extracted from service if available
-      metadata: metadata,
-    );
+    return output;
   }
 
   /// Stream synthesis for long text
@@ -357,60 +235,25 @@ class TTSCapability extends BaseCapability<TTSService> {
       throw StateError('TTS service not available');
     }
 
-    final options = TTSOptions(
-      voice: voice ?? ttsConfiguration.voice,
-      language: language ?? ttsConfiguration.language,
-      rate: ttsConfiguration.speakingRate,
-      pitch: ttsConfiguration.pitch,
-      volume: ttsConfiguration.volume,
-      audioFormat: ttsConfiguration.audioFormat,
-      sampleRate: 16000,
-      useSSML: false,
+    final input = TTSInput(
+      text: text,
+      voiceId: voice,
+      language: language,
     );
 
-    // Use StreamController to yield chunks as they arrive
-    final controller = StreamController<Uint8List>();
-
-    // Start synthesis in background and add chunks to stream as they arrive
-    // We intentionally don't await here to allow chunks to be yielded as they arrive
-    unawaited(
-      ttsService
-          .synthesizeStream(
-        text: text,
-        options: options,
-        onChunk: (chunk) {
-          controller.add(chunk);
-        },
-      )
-          .then((_) {
-        // Close the stream when synthesis is complete
-        controller.close();
-      }).catchError((error) {
-        // Forward errors to the stream
-        controller.addError(error);
-        controller.close();
-      }),
-    );
-
-    // Yield chunks as they become available
-    await for (final chunk in controller.stream) {
+    // Call the service's synthesizeStream method which returns a Stream
+    await for (final chunk in ttsService.synthesizeStream(input)) {
       yield chunk;
     }
   }
 
   /// Get available voices
-  List<String> getAvailableVoices() {
-    return service?.availableVoices ?? [];
-  }
-
-  /// Stop current synthesis
-  void stopSynthesis() {
-    service?.stop();
-  }
-
-  /// Check if currently synthesizing
-  bool get isSynthesizing {
-    return service?.isSynthesizing ?? false;
+  Future<List<TTSVoice>> getAvailableVoices() async {
+    final ttsService = service;
+    if (ttsService == null) {
+      return [];
+    }
+    return await ttsService.getAvailableVoices();
   }
 
   /// Get service for compatibility
@@ -422,28 +265,7 @@ class TTSCapability extends BaseCapability<TTSService> {
 
   @override
   Future<void> performCleanup() async {
-    service?.stop();
     await service?.cleanup();
     currentVoice = null;
-  }
-
-  // MARK: - Private Helpers
-
-  double _estimateAudioDuration(int dataSize, AudioFormat format) {
-    // Rough estimation based on format and typical bitrates
-    final int bytesPerSecond;
-    switch (format) {
-      case AudioFormat.pcm:
-      case AudioFormat.wav:
-        bytesPerSecond = 32000; // 16-bit PCM at 16kHz
-        break;
-      case AudioFormat.mp3:
-        bytesPerSecond = 16000; // 128kbps MP3
-        break;
-      default:
-        bytesPerSecond = 32000;
-    }
-
-    return dataSize / bytesPerSecond;
   }
 }

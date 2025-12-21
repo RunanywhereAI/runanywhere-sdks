@@ -4,10 +4,11 @@ import '../../capabilities/model_loading/model_loading_service.dart';
 import '../../capabilities/text_generation/generation_service.dart';
 import '../../capabilities/streaming/streaming_service.dart';
 import '../../capabilities/voice/voice_capability_service.dart';
-import '../../capabilities/memory/memory_service.dart';
-import '../../capabilities/memory/allocation_manager.dart';
-import '../../capabilities/memory/pressure_handler.dart';
-import '../../capabilities/memory/cache_eviction.dart';
+// TODO: Memory management has been moved/removed - using stub from model_loading_service
+// import '../../capabilities/memory/memory_service.dart';
+// import '../../capabilities/memory/allocation_manager.dart';
+// import '../../capabilities/memory/pressure_handler.dart';
+// import '../../capabilities/memory/cache_eviction.dart';
 import '../../capabilities/download/download_service.dart';
 import '../../capabilities/analytics/analytics_service.dart';
 import '../../core/protocols/storage/storage_analyzer.dart';
@@ -93,13 +94,9 @@ class ServiceContainer {
     return _voiceCapabilityService ??= VoiceCapabilityService();
   }
 
-  /// Memory service
+  /// Memory service (stubbed - using temporary implementation from model_loading_service)
   MemoryService get memoryService {
-    return _memoryService ??= MemoryService(
-      allocationManager: AllocationManager(),
-      pressureHandler: PressureHandler(),
-      cacheEviction: CacheEviction(),
-    );
+    return _memoryService ??= MemoryService();
   }
 
   /// Download service

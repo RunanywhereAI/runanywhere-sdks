@@ -19,7 +19,7 @@ class LoggingManager {
   }
 
   /// Current logging configuration
-  LoggingConfiguration configuration = LoggingConfiguration();
+  LoggingConfiguration configuration = const LoggingConfiguration();
 
   /// SDK Environment (set during SDK initialization)
   SDKEnvironment _environment = SDKEnvironment.production;

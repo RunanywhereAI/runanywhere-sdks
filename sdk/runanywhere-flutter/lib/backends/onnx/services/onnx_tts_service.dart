@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
-import '../../../features/tts/protocol/tts_service.dart' as component_tts;
-import '../../../core/module_registry.dart' show TTSOptions;
+import '../../../core/models/audio_format.dart';
+import '../../../features/tts/protocol/tts_service.dart';
+import '../../../features/tts/models/tts_configuration.dart';
+import '../../../features/tts/models/tts_input.dart';
+import '../../../features/tts/tts_output.dart';
 import '../../../native/native_backend.dart';
 
 /// ONNX-based Text-to-Speech service.
@@ -16,24 +21,31 @@ import '../../../native/native_backend.dart';
 /// backend.create('onnx');
 ///
 /// final tts = OnnxTTSService(backend);
-/// await tts.initialize(modelPath: '/path/to/model');
+/// final config = TTSConfiguration(modelId: 'tts-model');
+/// await tts.initialize(config);
 ///
-/// final audio = await tts.synthesize(
-///   text: 'Hello, world!',
-///   options: TTSOptions(voice: 'default'),
-/// );
+/// final input = TTSInput.plainText('Hello, world!');
+/// final output = await tts.synthesize(input);
 /// ```
-class OnnxTTSService implements component_tts.TTSService {
+class OnnxTTSService implements TTSService {
   final NativeBackend _backend;
   bool _isInitialized = false;
-  bool _isSynthesizing = false;
-  List<String> _voices = [];
+  List<TTSVoice> _voices = [];
+  TTSConfiguration? _configuration;
 
   /// Create a new ONNX TTS service.
   OnnxTTSService(this._backend);
 
   @override
-  Future<void> initialize({String? modelPath}) async {
+  String get inferenceFramework => 'onnx';
+
+  @override
+  bool get isReady => _isInitialized && _backend.isTtsModelLoaded;
+
+  @override
+  Future<void> initialize(TTSConfiguration configuration) async {
+    _configuration = configuration;
+    final modelPath = configuration.modelId;
     debugPrint('[ONNXTTS] initialize() called with modelPath: $modelPath');
     debugPrint(
         '[ONNXTTS] Current state - isInitialized: $_isInitialized, modelLoaded: ${_backend.isTtsModelLoaded}');
@@ -72,9 +84,14 @@ class OnnxTTSService implements component_tts.TTSService {
       debugPrint('[ONNXTTS] Model verified as loaded, getting voices...');
 
       // Get available voices
-      _voices = _backend.getTtsVoices();
+      final voiceStrings = _backend.getTtsVoices();
+      _voices = voiceStrings.map((voiceId) => TTSVoice(
+        id: voiceId,
+        name: voiceId,
+        language: 'en-US', // Default language, could be parsed from voice ID
+      )).toList();
 
-      debugPrint('[ONNXTTS] Found ${_voices.length} voices: $_voices');
+      debugPrint('[ONNXTTS] Found ${_voices.length} voices: $voiceStrings');
     } catch (e, stackTrace) {
       debugPrint('[ONNXTTS] ERROR during initialization: $e');
       debugPrint('[ONNXTTS] Stack trace: $stackTrace');
@@ -87,41 +104,29 @@ class OnnxTTSService implements component_tts.TTSService {
         '[ONNXTTS] Initialization complete. isReady: $isReady (isInitialized: $_isInitialized, modelLoaded: ${_backend.isTtsModelLoaded})');
   }
 
-  /// Check if TTS is ready.
-  bool get isReady => _isInitialized && _backend.isTtsModelLoaded;
-
   @override
-  bool get isSynthesizing => _isSynthesizing;
-
-  @override
-  List<String> get availableVoices => _voices;
-
-  /// Whether streaming synthesis is supported.
-  bool get supportsStreaming => _backend.ttsSupportsStreaming;
-
-  @override
-  Future<Uint8List> synthesize({
-    required String text,
-    required TTSOptions options,
-  }) async {
+  Future<TTSOutput> synthesize(TTSInput input) async {
     if (!isReady) {
       throw Exception(
           'TTS service not ready. isInitialized: $_isInitialized, modelLoaded: ${_backend.isTtsModelLoaded}');
     }
 
-    _isSynthesizing = true;
+    final startTime = DateTime.now();
+    final text = input.ssml ?? input.text ?? '';
+    final voice = input.voiceId ?? _configuration?.voice ?? 'default';
+    final rate = _configuration?.speakingRate ?? 1.0;
+    final pitch = _configuration?.pitch ?? 1.0;
 
     try {
       debugPrint(
           '[ONNXTTS] Synthesizing text: "${text.substring(0, text.length > 50 ? 50 : text.length)}..."');
-      debugPrint(
-          '[ONNXTTS] Voice: ${options.voice}, Rate: ${options.rate}, Pitch: ${options.pitch}');
+      debugPrint('[ONNXTTS] Voice: $voice, Rate: $rate, Pitch: $pitch');
 
       final result = _backend.synthesize(
         text,
-        voiceId: options.voice,
-        speed: options.rate,
-        pitch: options.pitch - 1.0, // Convert from 0.5-2.0 range to -0.5-1.0
+        voiceId: voice,
+        speed: rate,
+        pitch: pitch - 1.0, // Convert from 0.5-2.0 range to -0.5-1.0
       );
 
       final samples = result['samples'] as Float32List;
@@ -131,38 +136,49 @@ class OnnxTTSService implements component_tts.TTSService {
           '[ONNXTTS] Synthesis successful. Samples: ${samples.length}, Rate: $sampleRate');
 
       // Convert Float32 samples to PCM16 bytes
-      return Uint8List.fromList(_convertToPCM16(samples, sampleRate));
-    } finally {
-      _isSynthesizing = false;
+      final audioData = Uint8List.fromList(_convertToPCM16(samples, sampleRate));
+      final processingTime = DateTime.now().difference(startTime).inMilliseconds / 1000.0;
+      final duration = samples.length / sampleRate;
+
+      return TTSOutput(
+        audioData: audioData,
+        format: _configuration?.audioFormat ?? AudioFormat.pcm,
+        duration: duration,
+        metadata: SynthesisMetadata(
+          voice: voice,
+          language: input.language ?? _configuration?.language ?? 'en-US',
+          processingTime: processingTime,
+          characterCount: text.length,
+        ),
+      );
+    } catch (e) {
+      debugPrint('[ONNXTTS] ERROR during synthesis: $e');
+      rethrow;
     }
   }
 
   @override
-  Future<void> synthesizeStream({
-    required String text,
-    required TTSOptions options,
-    required void Function(Uint8List chunk) onChunk,
-  }) async {
+  Stream<Uint8List> synthesizeStream(TTSInput input) async* {
     // For now, use batch synthesis and emit as single chunk
     // TODO: Implement true streaming when supported by native backend
-    final audio = await synthesize(text: text, options: options);
-    onChunk(audio);
+    final output = await synthesize(input);
+    yield output.audioData;
   }
 
   @override
-  void stop() {
-    _backend.cancelTts();
-    _isSynthesizing = false;
+  Future<List<TTSVoice>> getAvailableVoices() async {
+    return _voices;
   }
 
   @override
   Future<void> cleanup() async {
-    stop();
     if (_backend.isTtsModelLoaded) {
+      _backend.cancelTts();
       _backend.unloadTtsModel();
     }
     _isInitialized = false;
     _voices = [];
+    _configuration = null;
   }
 
   // ============================================================================

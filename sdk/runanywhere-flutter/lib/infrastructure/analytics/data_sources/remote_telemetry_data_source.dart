@@ -6,6 +6,8 @@
 //  Matches iOS RemoteTelemetryDataSource.swift exactly.
 //
 
+import 'dart:async';
+
 import '../../../data/network/api_endpoint.dart';
 import '../../../data/network/network_service.dart';
 import '../../../foundation/logging/sdk_logger.dart';

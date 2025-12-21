@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../core/capabilities_base/base_capability.dart';
 import '../../core/types/sdk_component.dart';
 import '../../foundation/logging/sdk_logger.dart';

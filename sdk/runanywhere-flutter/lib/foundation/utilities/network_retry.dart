@@ -1,5 +1,5 @@
-/// Reusable async retry utility for network operations.
-/// Matches iOS NetworkRetry from Foundation/Utilities/NetworkRetry.swift.
+// Reusable async retry utility for network operations.
+// Matches iOS NetworkRetry from Foundation/Utilities/NetworkRetry.swift.
 
 import 'dart:async';
 import 'dart:io';

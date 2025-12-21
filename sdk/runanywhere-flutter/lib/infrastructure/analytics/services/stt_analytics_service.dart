@@ -1,12 +1,12 @@
-/// STT analytics service.
-/// Tracks transcription operations and metrics.
-/// Matches iOS STTAnalyticsService.
-///
-/// NOTE: ⚠️ Audio length estimation assumes 16-bit PCM @ 16kHz (standard for STT).
-/// Formula: audioLengthMs = (bytes / 2) / 16000 * 1000
-///
-/// NOTE: ⚠️ Real-Time Factor (RTF) will be 0 or undefined for streaming transcription
-/// since audioLengthMs = 0 when audio is processed in chunks of unknown total length.
+// STT analytics service.
+// Tracks transcription operations and metrics.
+// Matches iOS STTAnalyticsService.
+//
+// NOTE: Audio length estimation assumes 16-bit PCM @ 16kHz (standard for STT).
+// Formula: audioLengthMs = (bytes / 2) / 16000 * 1000
+//
+// NOTE: Real-Time Factor (RTF) will be 0 or undefined for streaming transcription
+// since audioLengthMs = 0 when audio is processed in chunks of unknown total length.
 
 import '../../../foundation/logging/sdk_logger.dart';
 

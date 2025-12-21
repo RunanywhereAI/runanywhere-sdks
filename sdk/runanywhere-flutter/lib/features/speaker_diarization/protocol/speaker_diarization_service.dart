@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../models/speaker_diarization_speaker_info.dart';
 
 /// Protocol for speaker diarization services

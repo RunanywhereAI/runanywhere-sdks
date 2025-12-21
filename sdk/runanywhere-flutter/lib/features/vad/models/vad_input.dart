@@ -24,13 +24,6 @@ class VADInput {
         audioSamples = samples,
         energyThresholdOverride = energyThresholdOverride;
 
-  /// Private constructor
-  VADInput._({
-    this.buffer,
-    this.audioSamples,
-    this.energyThresholdOverride,
-  });
-
   /// Validate the input
   void validate() {
     // Must have either buffer or audioSamples

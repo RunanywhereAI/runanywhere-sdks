@@ -8,6 +8,8 @@
 //  Corresponds to iOS SDK's analytics initialization in RunAnywhere.swift
 //
 
+import 'dart:async';
+
 import '../../data/network/api_client.dart';
 import '../../foundation/logging/sdk_logger.dart';
 import '../../public/configuration/sdk_environment.dart';
