@@ -24,3 +24,19 @@ export {
   STTAnalyticsService,
   TTSAnalyticsService,
 } from './Services';
+
+// Errors
+export { AnalyticsError, AnalyticsErrorCode, isAnalyticsError } from './Errors';
+
+// Configuration
+export {
+  type AnalyticsConfiguration,
+  DEFAULT_ANALYTICS_CONFIGURATION,
+  AnalyticsConfigurationPresets,
+  createAnalyticsConfiguration,
+  validateAnalyticsConfiguration,
+  AnalyticsConfigurationBuilder,
+} from './Models/Configuration';
+
+// Constants
+export { AnalyticsConstants, type AnalyticsConstantsType } from './Constants';

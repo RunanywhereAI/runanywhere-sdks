@@ -1712,6 +1712,95 @@ export const RunAnywhere = {
   },
 
   // ============================================================================
+  // Voice Session (High-Level Voice Assistant API)
+  // ============================================================================
+
+  /**
+   * Start a voice session with event-based handling
+   *
+   * This is the simplest way to integrate voice assistant.
+   * The session handles audio capture, VAD, and processing internally.
+   *
+   * **Note:** In React Native, actual audio capture must be handled by the app
+   * using external packages like react-native-live-audio-stream. Feed audio
+   * to the session using `session.feedAudio()`.
+   *
+   * Matches iOS: static func startVoiceSession(config:) async throws -> VoiceSessionHandle
+   *
+   * @param config - Optional session configuration
+   * @returns Session handle for control and event subscription
+   *
+   * @example
+   * ```typescript
+   * const session = await RunAnywhere.startVoiceSession();
+   *
+   * // Subscribe to events
+   * const unsubscribe = session.onEvent((event) => {
+   *   switch (event.type) {
+   *     case 'listening':
+   *       updateAudioMeter(event.audioLevel);
+   *       break;
+   *     case 'turnCompleted':
+   *       showResult(event.transcript, event.response);
+   *       break;
+   *   }
+   * });
+   *
+   * // Feed audio from external capture (e.g., react-native-live-audio-stream)
+   * audioCapture.on('data', (pcmData: ArrayBuffer) => {
+   *   session.feedAudio(pcmData, getAudioLevel());
+   * });
+   *
+   * // Stop when done
+   * await session.stop();
+   * unsubscribe();
+   * ```
+   */
+  async startVoiceSession(
+    config?: Partial<import('../Features/VoiceSession').VoiceSessionConfig>
+  ): Promise<import('../Features/VoiceSession').VoiceSessionHandle> {
+    const { VoiceSessionHandle } = await import('../Features/VoiceSession');
+    const session = new VoiceSessionHandle(config);
+    await session.start();
+    return session;
+  },
+
+  /**
+   * Start a voice session with callback-based event handling
+   *
+   * Alternative API using callbacks instead of event subscription.
+   *
+   * Matches iOS: static func startVoiceSession(config:onEvent:) async throws -> VoiceSessionHandle
+   *
+   * @param config - Session configuration
+   * @param onEvent - Callback for each event
+   * @returns Session handle for control
+   *
+   * @example
+   * ```typescript
+   * const session = await RunAnywhere.startVoiceSessionWithCallback(
+   *   { continuousMode: true },
+   *   (event) => {
+   *     if (event.type === 'turnCompleted') {
+   *       console.log('User:', event.transcript);
+   *       console.log('Assistant:', event.response);
+   *     }
+   *   }
+   * );
+   * ```
+   */
+  async startVoiceSessionWithCallback(
+    config: Partial<import('../Features/VoiceSession').VoiceSessionConfig>,
+    onEvent: import('../Features/VoiceSession').VoiceSessionEventListener
+  ): Promise<import('../Features/VoiceSession').VoiceSessionHandle> {
+    const { VoiceSessionHandle } = await import('../Features/VoiceSession');
+    const session = new VoiceSessionHandle(config);
+    session.onEvent(onEvent);
+    await session.start();
+    return session;
+  },
+
+  // ============================================================================
   // Utilities
   // ============================================================================
 
