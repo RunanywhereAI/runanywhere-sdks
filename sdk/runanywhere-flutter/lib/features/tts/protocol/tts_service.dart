@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
-import '../models/tts_configuration.dart';
-import '../models/tts_input.dart';
-import '../tts_output.dart';
+import 'package:runanywhere/features/tts/models/tts_configuration.dart';
+import 'package:runanywhere/features/tts/models/tts_input.dart';
+import 'package:runanywhere/features/tts/tts_output.dart';
 
 /// Protocol for TTS services
 /// Defines the contract for text-to-speech synthesis

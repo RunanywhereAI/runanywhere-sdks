@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import '../../../features/vad/vad_service.dart';
-import '../../../native/native_backend.dart';
+import 'package:runanywhere/features/vad/vad_service.dart';
+import 'package:runanywhere/native/ffi_types.dart' show RaStreamHandle;
+import 'package:runanywhere/native/native_backend.dart';
 
 /// ONNX-based Voice Activity Detection service.
 ///
@@ -129,7 +130,7 @@ class OnnxVADService implements VADService {
     _onAudioBuffer?.call(buffer);
 
     // Process for VAD
-    detect(audioData: buffer);
+    unawaited(detect(audioData: buffer));
   }
 
   @override
@@ -186,7 +187,7 @@ class OnnxVADService implements VADService {
 
   /// Destroy streaming session.
   void destroyStream(Object stream) {
-    _backend.destroyVadStream(stream as dynamic);
+    _backend.destroyVadStream(stream as RaStreamHandle);
   }
 
   // ============================================================================

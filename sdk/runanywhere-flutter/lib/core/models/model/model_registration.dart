@@ -1,10 +1,10 @@
-import '../framework/llm_framework.dart';
-import '../framework/framework_modality.dart';
-import '../framework/model_format.dart';
-import '../common/configuration_source.dart';
-import 'model_info.dart';
-import 'model_category.dart';
-import 'model_info_metadata.dart';
+import 'package:runanywhere/core/models/common/configuration_source.dart';
+import 'package:runanywhere/core/models/framework/framework_modality.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/framework/model_format.dart';
+import 'package:runanywhere/core/models/model/model_category.dart';
+import 'package:runanywhere/core/models/model/model_info.dart';
+import 'package:runanywhere/core/models/model/model_info_metadata.dart';
 
 /// Helper class for registering models with framework adapters
 /// Matches iOS ModelRegistration from Public/Models/ModelRegistration.swift

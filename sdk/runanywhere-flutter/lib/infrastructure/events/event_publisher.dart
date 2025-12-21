@@ -9,9 +9,9 @@
 
 import 'dart:async';
 
-import '../../public/events/event_bus.dart';
-import '../../public/events/sdk_event.dart';
-import '../analytics/analytics_queue_manager.dart';
+import 'package:runanywhere/infrastructure/analytics/analytics_queue_manager.dart';
+import 'package:runanywhere/public/events/event_bus.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// Simple event router for the SDK.
 ///

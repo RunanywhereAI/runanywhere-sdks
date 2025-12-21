@@ -1,26 +1,28 @@
 import 'dart:async';
-import 'models/framework/llm_framework.dart';
-import 'module/module.dart';
-// VADService is imported for use in VADServiceProvider return type
-import '../features/vad/vad_service.dart' show VADService;
-// STT types are imported from centralized location to avoid duplication
-import '../features/stt/stt_types.dart';
+
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/module/module.dart';
 // SpeakerInfo types for diarization service return type
-import '../features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
+import 'package:runanywhere/features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
+// STT types are imported from centralized location to avoid duplication
+import 'package:runanywhere/features/stt/stt_types.dart';
 // TTS types imported from canonical locations
-import '../features/tts/protocol/tts_service.dart';
-// Export all VAD types for external consumers
-export '../features/vad/vad_service.dart'
-    show VADService, VADResult, SpeechActivityEvent;
-// Export STT types for external consumers
-export '../features/stt/stt_types.dart';
-// Export module types for external consumers
-export 'module/module.dart';
+import 'package:runanywhere/features/tts/protocol/tts_service.dart';
+// VADService is imported for use in VADServiceProvider return type
+import 'package:runanywhere/features/vad/vad_service.dart' show VADService;
+
 // Export speaker diarization types
 export '../features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
+// Export STT types for external consumers
+export '../features/stt/stt_types.dart';
 // Export TTS types for external consumers
 export '../features/tts/models/tts_options.dart';
 export '../features/tts/protocol/tts_service.dart';
+// Export all VAD types for external consumers
+export '../features/vad/vad_service.dart'
+    show VADService, VADResult, SpeechActivityEvent;
+// Export module types for external consumers
+export 'module/module.dart';
 
 /// Central registry for external AI module implementations.
 ///

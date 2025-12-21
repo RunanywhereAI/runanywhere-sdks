@@ -1,4 +1,4 @@
-import 'api_client.dart';
+import 'package:runanywhere/data/network/api_client.dart';
 
 /// Development mode network configuration
 /// Used when SDK is initialized with `.development` environment

@@ -6,7 +6,7 @@
 //  Matches iOS TelemetryBatchRequest and TelemetryBatchResponse.
 //
 
-import 'telemetry_event_payload.dart';
+import 'package:runanywhere/infrastructure/analytics/models/output/telemetry_event_payload.dart';
 
 /// Batch telemetry request for API
 class TelemetryBatchRequest {

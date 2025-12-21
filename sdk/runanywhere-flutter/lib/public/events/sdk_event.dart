@@ -1,7 +1,6 @@
+import 'package:runanywhere/infrastructure/events/event_category.dart';
+import 'package:runanywhere/infrastructure/events/event_destination.dart';
 import 'package:uuid/uuid.dart';
-
-import '../../infrastructure/events/event_category.dart';
-import '../../infrastructure/events/event_destination.dart';
 
 export '../../infrastructure/events/event_category.dart';
 export '../../infrastructure/events/event_destination.dart';

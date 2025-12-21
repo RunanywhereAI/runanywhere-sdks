@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
-import '../../../foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Manages audio playback for TTS services
 /// Matches iOS AudioPlaybackManager from Features/TTS/Services/AudioPlaybackManager.swift
@@ -20,7 +20,7 @@ class AudioPlaybackManager {
   double _currentTime = 0.0;
 
   /// Total duration of current audio in seconds
-  double _duration = 0.0;
+  final double _duration = 0.0;
 
   /// Playback completion callback
   void Function(bool success)? _playbackCompletion;
@@ -78,7 +78,7 @@ class AudioPlaybackManager {
     _playbackCompletion = completion;
 
     try {
-      _startPlayback(audioData);
+      unawaited(_startPlayback(audioData));
     } catch (e) {
       _logger.error('Failed to start playback: $e');
       _playbackCompletion = null;
@@ -169,7 +169,7 @@ class AudioPlaybackManager {
   /// Dispose resources
   void dispose() {
     stop();
-    _stateController.close();
+    unawaited(_stateController.close());
   }
 }
 

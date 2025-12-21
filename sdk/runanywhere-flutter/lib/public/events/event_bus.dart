@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'sdk_event.dart';
-import 'component_initialization_event.dart';
+
+import 'package:runanywhere/public/events/component_initialization_event.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// Central event bus for SDK-wide event distribution
 /// Thread-safe event bus using Dart Streams

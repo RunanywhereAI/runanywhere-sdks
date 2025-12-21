@@ -1,6 +1,6 @@
-import 'error_category.dart';
-import 'error_code.dart';
-import 'error_context.dart';
+import 'package:runanywhere/foundation/error_types/error_category.dart';
+import 'package:runanywhere/foundation/error_types/error_code.dart';
+import 'package:runanywhere/foundation/error_types/error_context.dart';
 
 export 'error_category.dart';
 export 'error_code.dart';
@@ -570,8 +570,9 @@ class SDKError implements Exception {
   static String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024)
+    if (bytes < 1024 * 1024 * 1024) {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

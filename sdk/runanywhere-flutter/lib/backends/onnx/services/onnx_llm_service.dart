@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import '../../../core/module_registry.dart';
-import '../../../native/native_backend.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// ONNX-based Language Model service.
 ///

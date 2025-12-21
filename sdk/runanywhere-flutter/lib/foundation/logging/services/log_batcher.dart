@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import '../models/log_entry.dart';
-import '../models/logging_configuration.dart';
+import 'package:runanywhere/foundation/logging/models/log_entry.dart';
+import 'package:runanywhere/foundation/logging/models/logging_configuration.dart';
 
 /// Manages batching of log entries for remote submission
 ///

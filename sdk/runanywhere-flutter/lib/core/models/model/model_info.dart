@@ -1,11 +1,11 @@
 import 'dart:io';
 
-import '../common/configuration_source.dart';
-import '../common/thinking_tag_pattern.dart';
-import '../framework/llm_framework.dart';
-import '../framework/model_format.dart';
-import 'model_category.dart';
-import 'model_info_metadata.dart';
+import 'package:runanywhere/core/models/common/configuration_source.dart';
+import 'package:runanywhere/core/models/common/thinking_tag_pattern.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/framework/model_format.dart';
+import 'package:runanywhere/core/models/model/model_category.dart';
+import 'package:runanywhere/core/models/model/model_info_metadata.dart';
 
 /// Information about a model
 /// Matches iOS ModelInfo from Core/Models/Model/ModelInfo.swift

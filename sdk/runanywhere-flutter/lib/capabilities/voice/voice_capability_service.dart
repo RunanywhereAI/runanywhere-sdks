@@ -7,17 +7,17 @@ library voice_capability_service;
 import 'dart:async';
 import 'dart:typed_data';
 
-import '../../core/module_registry.dart'
+import 'package:runanywhere/capabilities/voice/services/voice_session_manager.dart';
+import 'package:runanywhere/core/module_registry.dart'
     show ModuleRegistry, STTService, LLMService;
-import '../../features/tts/protocol/tts_service.dart' show TTSService;
-import '../../features/stt/stt_capability.dart' show STTConfiguration;
-import '../../features/llm/llm_capability.dart' show LLMConfiguration;
-import '../../features/tts/models/tts_configuration.dart' show TTSConfiguration;
-import '../../features/vad/vad_configuration.dart' show VADConfiguration;
-import '../../features/voice_agent/voice_agent_capability.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../../foundation/dependency_injection/service_container.dart';
-import 'services/voice_session_manager.dart';
+import 'package:runanywhere/features/llm/llm_capability.dart' show LLMConfiguration;
+import 'package:runanywhere/features/stt/stt_capability.dart' show STTConfiguration;
+import 'package:runanywhere/features/tts/models/tts_configuration.dart' show TTSConfiguration;
+import 'package:runanywhere/features/tts/protocol/tts_service.dart' show TTSService;
+import 'package:runanywhere/features/vad/vad_configuration.dart' show VADConfiguration;
+import 'package:runanywhere/features/voice_agent/voice_agent_capability.dart';
+import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Voice audio chunk for streaming
 class VoiceAudioChunk {
@@ -73,7 +73,7 @@ class VoiceCapabilityService {
       vadConfig: vadParams ?? const VADConfiguration(),
       sttConfig: sttParams ?? STTConfiguration(),
       llmConfig: llmParams ?? LLMConfiguration(),
-      ttsConfig: ttsParams ?? TTSConfiguration(),
+      ttsConfig: ttsParams ?? const TTSConfiguration(),
     );
 
     // Create and initialize agent
@@ -96,11 +96,11 @@ class VoiceCapabilityService {
     String? sttModelId,
     String? llmModelId,
   }) async {
-    return await createVoiceAgent(
+    return createVoiceAgent(
       vadParams: const VADConfiguration(),
       sttParams: STTConfiguration(modelId: sttModelId),
       llmParams: LLMConfiguration(modelId: llmModelId),
-      ttsParams: TTSConfiguration(),
+      ttsParams: const TTSConfiguration(),
     );
   }
 
@@ -212,7 +212,7 @@ extension VoiceCapabilityServiceBackwardCompat on VoiceCapabilityService {
     TTSConfiguration? ttsParams,
   }) async {
     // Use the new VoiceAgent component which is the modern pipeline
-    return await createVoiceAgent(
+    return createVoiceAgent(
       vadParams: vadParams,
       sttParams: sttParams,
       llmParams: llmParams,

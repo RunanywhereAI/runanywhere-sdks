@@ -1,20 +1,19 @@
 import 'dart:async';
 import 'dart:io';
 
-import '../../core/capabilities_base/base_capability.dart';
-import '../../core/types/sdk_component.dart';
-import '../../core/protocols/component/component_configuration.dart';
-import '../../core/models/audio_format.dart';
-import '../../core/module_registry.dart';
-import '../../foundation/dependency_injection/service_container.dart';
-import '../../infrastructure/analytics/services/stt_analytics_service.dart';
-import '../vad/vad_output.dart' show VADOutput;
-
-// Re-export STT types for external consumers
-export 'stt_types.dart';
+import 'package:runanywhere/core/capabilities_base/base_capability.dart';
+import 'package:runanywhere/core/models/audio_format.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/features/vad/vad_output.dart' show VADOutput;
+import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
+import 'package:runanywhere/infrastructure/analytics/services/stt_analytics_service.dart';
 
 // Re-export STT services
 export 'services/audio_capture_manager.dart';
+// Re-export STT types for external consumers
+export 'stt_types.dart';
 
 /// Transcription mode for speech-to-text
 /// Matches iOS STTMode from STTComponent.swift

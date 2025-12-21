@@ -1,6 +1,6 @@
-import '../../../foundation/logging/models/log_entry.dart';
-import '../../../foundation/logging/models/log_level.dart';
-import '../protocol/log_destination.dart';
+import 'package:runanywhere/foundation/logging/models/log_entry.dart';
+import 'package:runanywhere/foundation/logging/models/log_level.dart';
+import 'package:runanywhere/infrastructure/logging/protocol/log_destination.dart';
 
 /// Log destination that sends logs to Sentry for crash reporting and error tracking.
 /// Only logs at warning level and above are sent to Sentry.

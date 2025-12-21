@@ -29,11 +29,10 @@
 /// ```
 library runanywhere_backends;
 
-// ONNX Runtime backend (STT, TTS, VAD)
-export 'onnx/onnx.dart';
-
 // LlamaCpp backend (LLM)
 export 'llamacpp/llamacpp.dart';
+// ONNX Runtime backend (STT, TTS, VAD)
+export 'onnx/onnx.dart';
 
 // Native utilities (for advanced usage)
 // Note: Native backend is in lib/native/, import via:

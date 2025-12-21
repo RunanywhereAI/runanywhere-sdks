@@ -5,8 +5,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
-import '../error_types/sdk_error.dart';
-import '../logging/sdk_logger.dart';
+import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Configuration for retry behavior.
 /// Matches iOS RetryConfig.

@@ -6,10 +6,8 @@ library logging;
 export '../../foundation/logging/models/log_entry.dart';
 export '../../foundation/logging/models/log_level.dart';
 export '../../foundation/logging/models/logging_configuration.dart';
-
+// Log destination implementations
+export 'destinations/sentry_destination.dart';
 // Infrastructure-specific protocols
 export 'protocol/log_destination.dart';
 export 'protocol/logging_service.dart';
-
-// Log destination implementations
-export 'destinations/sentry_destination.dart';

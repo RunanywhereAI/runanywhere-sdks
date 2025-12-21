@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import '../protocols/component/component.dart';
-import '../protocols/component/component_configuration.dart';
-import '../types/component_state.dart';
-import '../types/sdk_component.dart';
-import '../../public/events/event_bus.dart';
-import '../../public/events/component_initialization_event.dart';
-import '../../foundation/dependency_injection/service_container.dart';
+import 'package:runanywhere/core/protocols/component/component.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/core/types/component_state.dart';
+import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
+import 'package:runanywhere/public/events/component_initialization_event.dart';
+import 'package:runanywhere/public/events/event_bus.dart';
 
 /// Simplified base capability for all SDK capabilities
 /// Matches iOS BaseCapability pattern from Features/

@@ -1,13 +1,13 @@
 import 'dart:async';
 
-import '../../../foundation/configuration/sdk_constants.dart';
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../foundation/security/keychain_manager.dart';
-import '../../../infrastructure/device/services/device_identity.dart';
-import '../../errors/repository_error.dart';
-import '../api_client.dart';
-import '../api_endpoint.dart';
-import '../models/auth/auth.dart';
+import 'package:runanywhere/data/errors/repository_error.dart';
+import 'package:runanywhere/data/network/api_client.dart';
+import 'package:runanywhere/data/network/api_endpoint.dart';
+import 'package:runanywhere/data/network/models/auth/auth.dart';
+import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/foundation/security/keychain_manager.dart';
+import 'package:runanywhere/infrastructure/device/services/device_identity.dart';
 
 /// Service responsible for authentication and token management.
 ///
@@ -112,7 +112,7 @@ class AuthenticationService implements AuthTokenProvider {
 
     // Try to refresh token if we have a refresh token
     if (_refreshToken != null) {
-      return await _refreshAccessToken();
+      return _refreshAccessToken();
     }
 
     // Otherwise, we can't re-authenticate without API key
@@ -125,7 +125,7 @@ class AuthenticationService implements AuthTokenProvider {
     _logger.debug('Performing health check');
 
     // Health check requires authentication
-    return await _apiClient.get<HealthCheckResponse>(
+    return _apiClient.get<HealthCheckResponse>(
       APIEndpoint.healthCheck,
       requiresAuth: true,
       fromJson: HealthCheckResponse.fromJson,

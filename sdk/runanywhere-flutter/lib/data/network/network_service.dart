@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'api_endpoint.dart';
+import 'package:runanywhere/data/network/api_endpoint.dart';
 
 /// Protocol defining the network service interface.
 ///

@@ -1,5 +1,5 @@
-import 'analytics_context.dart';
-import 'analytics_event.dart';
+import 'package:runanywhere/core/protocols/analytics/analytics_context.dart';
+import 'package:runanywhere/core/protocols/analytics/analytics_event.dart';
 
 /// Structured event data models for strongly typed analytics
 ///

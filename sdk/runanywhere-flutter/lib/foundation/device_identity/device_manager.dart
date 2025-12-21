@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:runanywhere/foundation/security/keychain_manager.dart';
 import 'package:uuid/uuid.dart';
-import '../security/keychain_manager.dart';
 
 /// Device identity manager
 class DeviceManager {

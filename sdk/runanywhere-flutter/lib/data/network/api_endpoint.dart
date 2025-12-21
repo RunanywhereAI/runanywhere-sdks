@@ -1,4 +1,4 @@
-import '../../public/configuration/sdk_environment.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// API endpoints matching iOS APIEndpoint.swift exactly.
 ///

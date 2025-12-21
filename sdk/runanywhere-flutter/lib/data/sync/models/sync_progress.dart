@@ -5,7 +5,7 @@
 //  Progress information for a sync operation
 //
 
-import 'sync_state.dart';
+import 'package:runanywhere/data/sync/models/sync_state.dart';
 
 /// Progress information for a sync operation
 class SyncProgress {

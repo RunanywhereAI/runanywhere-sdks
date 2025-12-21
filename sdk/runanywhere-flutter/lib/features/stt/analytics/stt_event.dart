@@ -1,13 +1,4 @@
-/// STT (Speech-to-Text) Events.
-///
-/// All STT-related events in one place.
-/// Each event declares its destination (public, analytics, or both).
-///
-/// Matches iOS `STTEvent` enum from STTEvent.swift
-
-import '../../../infrastructure/events/event_category.dart';
-import '../../../infrastructure/events/event_destination.dart';
-import '../../../public/events/sdk_event.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// All STT (Speech-to-Text) related events.
 ///

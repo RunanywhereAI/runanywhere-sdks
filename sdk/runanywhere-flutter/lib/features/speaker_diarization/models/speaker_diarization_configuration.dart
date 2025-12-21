@@ -1,6 +1,6 @@
-import '../../../core/protocols/component/component_configuration.dart';
-import '../../../core/types/sdk_component.dart';
-import '../protocol/speaker_diarization_error.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/features/speaker_diarization/protocol/speaker_diarization_error.dart';
 
 /// Configuration for Speaker Diarization component
 /// Matches iOS SpeakerDiarizationConfiguration from Features/SpeakerDiarization/Models/SpeakerDiarizationConfiguration.swift

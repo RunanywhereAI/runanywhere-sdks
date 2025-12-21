@@ -1,10 +1,11 @@
 import 'dart:async';
-import '../../core/capabilities_base/base_capability.dart';
-import '../../core/types/sdk_component.dart';
-import '../../core/module_registry.dart';
-import '../../infrastructure/analytics/services/vad_analytics_service.dart';
-import 'vad_configuration.dart';
-import 'simple_energy_vad.dart';
+
+import 'package:runanywhere/core/capabilities_base/base_capability.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/features/vad/simple_energy_vad.dart';
+import 'package:runanywhere/features/vad/vad_configuration.dart';
+import 'package:runanywhere/infrastructure/analytics/services/vad_analytics_service.dart';
 
 /// Voice Activity Detection capability following the clean architecture
 /// Matches iOS VADCapability from VADCapability.swift
@@ -91,7 +92,7 @@ class VADCapability extends BaseCapability<VADService> {
     }
 
     // Process using the VADService interface
-    return await vadService.detect(audioData: buffer);
+    return vadService.detect(audioData: buffer);
   }
 
   /// Detect speech in audio samples (Float32 format)
@@ -124,7 +125,7 @@ class VADCapability extends BaseCapability<VADService> {
 
     // Convert float samples to 16-bit PCM for generic VADService
     final pcmSamples = samples.map((s) => (s * 32768.0).toInt()).toList();
-    return await vadService.detect(audioData: pcmSamples);
+    return vadService.detect(audioData: pcmSamples);
   }
 
   /// Calculate confidence value between 0.0 and 1.0 based on energy level relative to threshold

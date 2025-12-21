@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import '../protocol/file_management_error.dart';
-import '../protocol/file_management_protocol.dart';
+import 'package:runanywhere/infrastructure/file_management/protocol/file_management_error.dart';
+import 'package:runanywhere/infrastructure/file_management/protocol/file_management_protocol.dart';
 
 /// Default implementation of FileManagementProtocol using dart:io
 /// Provides platform-agnostic file operations

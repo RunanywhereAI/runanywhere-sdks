@@ -1,13 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-
-import '../../../core/models/audio_format.dart';
-import '../../../features/tts/protocol/tts_service.dart';
-import '../../../features/tts/models/tts_configuration.dart';
-import '../../../features/tts/models/tts_input.dart';
-import '../../../features/tts/tts_output.dart';
-import '../../../native/native_backend.dart';
+import 'package:runanywhere/core/models/audio_format.dart';
+import 'package:runanywhere/features/tts/models/tts_configuration.dart';
+import 'package:runanywhere/features/tts/models/tts_input.dart';
+import 'package:runanywhere/features/tts/protocol/tts_service.dart';
+import 'package:runanywhere/features/tts/tts_output.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// ONNX-based Text-to-Speech service.
 ///
@@ -30,6 +29,7 @@ import '../../../native/native_backend.dart';
 class OnnxTTSService implements TTSService {
   final NativeBackend _backend;
   bool _isInitialized = false;
+  bool _isSynthesizing = false;
   List<TTSVoice> _voices = [];
   TTSConfiguration? _configuration;
 
@@ -41,6 +41,12 @@ class OnnxTTSService implements TTSService {
 
   @override
   bool get isReady => _isInitialized && _backend.isTtsModelLoaded;
+
+  @override
+  bool get isSynthesizing => _isSynthesizing;
+
+  @override
+  List<String> get availableVoices => _voices.map((v) => v.id).toList();
 
   @override
   Future<void> initialize(TTSConfiguration configuration) async {
@@ -111,6 +117,7 @@ class OnnxTTSService implements TTSService {
           'TTS service not ready. isInitialized: $_isInitialized, modelLoaded: ${_backend.isTtsModelLoaded}');
     }
 
+    _isSynthesizing = true;
     final startTime = DateTime.now();
     final text = input.ssml ?? input.text ?? '';
     final voice = input.voiceId ?? _configuration?.voice ?? 'default';
@@ -154,6 +161,8 @@ class OnnxTTSService implements TTSService {
     } catch (e) {
       debugPrint('[ONNXTTS] ERROR during synthesis: $e');
       rethrow;
+    } finally {
+      _isSynthesizing = false;
     }
   }
 
@@ -168,6 +177,12 @@ class OnnxTTSService implements TTSService {
   @override
   Future<List<TTSVoice>> getAvailableVoices() async {
     return _voices;
+  }
+
+  @override
+  Future<void> stop() async {
+    // Cancel any ongoing synthesis via the native backend
+    _backend.cancelTts();
   }
 
   @override

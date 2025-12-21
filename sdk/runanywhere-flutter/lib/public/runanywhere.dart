@@ -1,110 +1,43 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
-import '../foundation/dependency_injection/service_container.dart';
-import '../foundation/error_types/sdk_error.dart';
-import '../foundation/logging/sdk_logger.dart';
-import '../foundation/logging/models/log_level.dart';
-import '../foundation/logging/services/logging_manager.dart';
-import '../infrastructure/analytics/analytics_queue_manager.dart';
-import '../foundation/security/keychain_manager.dart';
-import '../foundation/device_identity/device_manager.dart';
-import '../foundation/configuration/sdk_constants.dart';
-import '../foundation/file_operations/model_path_utils.dart';
-import '../core/protocols/frameworks/unified_framework_adapter.dart';
-import '../core/models/model/model_registration.dart';
-import '../core/models/storage/storage_info.dart';
-import '../core/protocols/downloading/download_progress.dart';
-import 'configuration/sdk_environment.dart';
-import 'events/event_bus.dart';
-import 'events/sdk_event.dart';
-import 'models/models.dart';
-import '../capabilities/text_generation/generation_service.dart';
-import '../features/llm/structured_output/structured_output_handler.dart';
-import '../features/llm/structured_output/generatable.dart';
-import '../features/stt/stt_capability.dart';
-import '../features/tts/tts_capability.dart';
-import '../features/tts/models/tts_configuration.dart';
-import '../features/tts/models/tts_options.dart';
-import '../features/tts/tts_output.dart';
-import '../features/vad/vad_capability.dart';
-import '../features/vad/vad_configuration.dart';
-import '../features/voice_agent/voice_agent_capability.dart';
-import '../features/llm/llm_capability.dart' show LLMConfiguration;
-import '../core/module_registry.dart' hide TTSService;
-import '../capabilities/voice/models/voice_session.dart';
-import '../capabilities/voice/models/voice_session_handle.dart';
+
+import 'package:runanywhere/capabilities/text_generation/generation_service.dart';
+import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
+import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
+import 'package:runanywhere/core/models/model/model_registration.dart';
+import 'package:runanywhere/core/models/storage/storage_info.dart';
+import 'package:runanywhere/core/module_registry.dart' hide TTSService;
+import 'package:runanywhere/core/protocols/downloading/download_progress.dart';
+import 'package:runanywhere/core/protocols/frameworks/unified_framework_adapter.dart';
+import 'package:runanywhere/features/llm/llm_capability.dart' show LLMConfiguration;
+import 'package:runanywhere/features/llm/structured_output/generatable.dart';
+import 'package:runanywhere/features/llm/structured_output/structured_output_handler.dart';
+import 'package:runanywhere/features/stt/stt_capability.dart';
+import 'package:runanywhere/features/tts/models/tts_configuration.dart';
+import 'package:runanywhere/features/tts/tts_capability.dart';
+import 'package:runanywhere/features/tts/tts_output.dart';
+import 'package:runanywhere/features/vad/vad_capability.dart';
+import 'package:runanywhere/features/vad/vad_configuration.dart';
+import 'package:runanywhere/features/voice_agent/voice_agent_capability.dart';
+import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
+import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
+import 'package:runanywhere/foundation/device_identity/device_manager.dart';
+import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/file_operations/model_path_utils.dart';
+import 'package:runanywhere/foundation/logging/models/log_level.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/foundation/logging/services/logging_manager.dart';
+import 'package:runanywhere/foundation/security/keychain_manager.dart';
+import 'package:runanywhere/infrastructure/analytics/analytics_queue_manager.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
+import 'package:runanywhere/public/events/event_bus.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
+import 'package:runanywhere/public/models/models.dart';
 
 // Export generation options
 export '../capabilities/text_generation/generation_service.dart'
     show RunAnywhereGenerationOptions, GenerationResult;
-
-// Export capability types for public use
-export '../features/stt/stt_capability.dart'
-    show STTCapability, STTConfiguration, STTOutput, STTMode, STTOptions;
-export '../features/tts/tts_capability.dart' show TTSCapability;
-export '../features/tts/models/tts_configuration.dart' show TTSConfiguration;
-export '../features/tts/tts_output.dart' show TTSOutput, SynthesisMetadata;
-export '../features/llm/llm_capability.dart'
-    show
-        LLMCapability,
-        LLMConfiguration,
-        LLMOutput,
-        Message,
-        MessageRole,
-        Context;
-
-// Export framework adapter types for registration
-export '../core/protocols/frameworks/unified_framework_adapter.dart';
-export '../core/models/model/model_registration.dart';
-export '../core/model_lifecycle_manager.dart';
-
-// Export core types for public use
-export '../core/models/framework/llm_framework.dart';
-export '../core/models/framework/framework_modality.dart';
-export '../core/models/framework/model_format.dart';
-export '../core/models/framework/model_artifact_type.dart';
-export '../core/models/model/model_category.dart';
-
-// Export speaker diarization types
-export '../features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
-
-// Export capability type for framework queries
-export '../core/module/capability_type.dart';
-
-// Export VAD types for top-level access
-export '../features/vad/vad_capability.dart' show VADCapability;
-export '../features/vad/vad_service.dart'
-    show VADResult, VADService, SpeechActivityEvent;
-export '../features/vad/vad_configuration.dart' show VADConfiguration;
-
-// Export TTS options for top-level synthesize
-export '../features/tts/models/tts_options.dart' show TTSOptions;
-
-// Export VoiceAgent types
-export '../features/voice_agent/voice_agent_capability.dart'
-    show
-        VoiceAgentCapability,
-        VoiceAgentConfiguration,
-        VoiceAgentResult,
-        VoiceAgentEvent,
-        ComponentLoadState,
-        VoiceAgentComponentStates;
-
-// Export storage types for public use
-export '../core/models/storage/storage_info.dart';
-export '../core/models/storage/app_storage_info.dart';
-export '../core/models/storage/device_storage_info.dart';
-export '../core/models/storage/model_storage_info.dart';
-export '../core/models/storage/stored_model.dart';
-
-// Export download progress types
-export '../core/protocols/downloading/download_progress.dart';
-export '../core/protocols/downloading/download_state.dart';
-
-// Export logging types for configuration
-export '../foundation/logging/models/log_level.dart';
-
 // Export voice session types for public use
 export '../capabilities/voice/models/voice_session.dart'
     show
@@ -124,10 +57,64 @@ export '../capabilities/voice/models/voice_session.dart'
         VoiceSessionErrorType;
 export '../capabilities/voice/models/voice_session_handle.dart'
     show VoiceSessionHandle, VoiceAgentProcessResult;
-
+export '../core/model_lifecycle_manager.dart';
+export '../core/models/framework/framework_modality.dart';
+// Export core types for public use
+export '../core/models/framework/llm_framework.dart';
+export '../core/models/framework/model_artifact_type.dart';
+export '../core/models/framework/model_format.dart';
+export '../core/models/model/model_category.dart';
+export '../core/models/model/model_registration.dart';
+export '../core/models/storage/app_storage_info.dart';
+export '../core/models/storage/device_storage_info.dart';
+export '../core/models/storage/model_storage_info.dart';
+// Export storage types for public use
+export '../core/models/storage/storage_info.dart';
+export '../core/models/storage/stored_model.dart';
+// Export capability type for framework queries
+export '../core/module/capability_type.dart';
+// Export download progress types
+export '../core/protocols/downloading/download_progress.dart';
+export '../core/protocols/downloading/download_state.dart';
+// Export framework adapter types for registration
+export '../core/protocols/frameworks/unified_framework_adapter.dart';
+export '../features/llm/llm_capability.dart'
+    show
+        LLMCapability,
+        LLMConfiguration,
+        LLMOutput,
+        Message,
+        MessageRole,
+        Context;
 // Export structured output types for streaming
 export '../features/llm/structured_output/structured_output_handler.dart'
     show StructuredOutputConfig, StructuredOutputStreamResult;
+// Export speaker diarization types
+export '../features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
+// Export capability types for public use
+export '../features/stt/stt_capability.dart'
+    show STTCapability, STTConfiguration, STTOutput, STTMode, STTOptions;
+export '../features/tts/models/tts_configuration.dart' show TTSConfiguration;
+// Export TTS options for top-level synthesize
+export '../features/tts/models/tts_options.dart' show TTSOptions;
+export '../features/tts/tts_capability.dart' show TTSCapability;
+export '../features/tts/tts_output.dart' show TTSOutput, SynthesisMetadata;
+// Export VAD types for top-level access
+export '../features/vad/vad_capability.dart' show VADCapability;
+export '../features/vad/vad_configuration.dart' show VADConfiguration;
+export '../features/vad/vad_service.dart'
+    show VADResult, VADService, SpeechActivityEvent;
+// Export VoiceAgent types
+export '../features/voice_agent/voice_agent_capability.dart'
+    show
+        VoiceAgentCapability,
+        VoiceAgentConfiguration,
+        VoiceAgentResult,
+        VoiceAgentEvent,
+        ComponentLoadState,
+        VoiceAgentComponentStates;
+// Export logging types for configuration
+export '../foundation/logging/models/log_level.dart';
 
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
@@ -195,7 +182,7 @@ class RunAnywhere {
   /// Matches iOS RunAnywhere.deviceId property
   /// Note: This is async in Flutter due to platform channel access
   static Future<String> get deviceId async {
-    return await DeviceManager.shared.getDeviceId();
+    return DeviceManager.shared.getDeviceId();
   }
 
   /// Access to all SDK events for subscription-based patterns
@@ -629,7 +616,7 @@ class RunAnywhere {
     // Use loaded TTS capability if available
     final capability = _loadedTTSCapability;
     if (capability != null && capability.isReady) {
-      return await capability.synthesize(
+      return capability.synthesize(
         text,
         voice: options?.voice,
         language: options?.language,
@@ -775,7 +762,7 @@ class RunAnywhere {
   static Future<VoiceAgentComponentStates>
       getVoiceAgentComponentStates() async {
     if (!_isInitialized) {
-      return VoiceAgentComponentStates();
+      return const VoiceAgentComponentStates();
     }
 
     // Query each capability for its current state
@@ -1053,7 +1040,7 @@ class RunAnywhere {
       throw SDKError.componentNotReady('STT');
     }
 
-    return await capability.transcribe(audioData, options: options);
+    return capability.transcribe(audioData, options: options);
   }
 
   /// Stream transcription for real-time processing
@@ -1145,7 +1132,7 @@ class RunAnywhere {
       throw SDKError.componentNotReady('VAD');
     }
 
-    return await capability.detectSpeech(buffer: audioData);
+    return capability.detectSpeech(buffer: audioData);
   }
 
   /// Cleanup VAD resources
@@ -1392,7 +1379,7 @@ class RunAnywhere {
   static Future<StorageInfo> getStorageInfo() async {
     // Use the storage analyzer from service container
     final storageAnalyzer = serviceContainer.storageAnalyzer;
-    return await storageAnalyzer.analyzeStorage();
+    return storageAnalyzer.analyzeStorage();
   }
 
   /// Clear cache
@@ -1788,7 +1775,7 @@ class RunAnywhere {
   /// Matches iOS RunAnywhere.identifySpeaker(_:)
   /// [samples] Audio samples to analyze (Float32 PCM samples)
   /// Returns information about the detected speaker
-  static Future<SpeakerInfo> identifySpeaker(List<double> samples) async {
+  static Future<SpeakerDiarizationSpeakerInfo> identifySpeaker(List<double> samples) async {
     if (!_isInitialized) {
       throw SDKError.notInitialized();
     }
@@ -1809,7 +1796,7 @@ class RunAnywhere {
     // Get the most recently identified speaker
     final speakers = await service.getAllSpeakers();
     if (speakers.isEmpty) {
-      return SpeakerInfo(id: 'unknown', confidence: 0.0);
+      return SpeakerDiarizationSpeakerInfo(id: 'unknown', confidence: 0.0);
     }
     return speakers.last;
   }
@@ -1817,7 +1804,7 @@ class RunAnywhere {
   /// Get all identified speakers
   /// Matches iOS RunAnywhere.getAllSpeakers()
   /// Returns array of all speakers detected so far
-  static Future<List<SpeakerInfo>> getAllSpeakers() async {
+  static Future<List<SpeakerDiarizationSpeakerInfo>> getAllSpeakers() async {
     if (!_isInitialized) {
       throw SDKError.notInitialized();
     }
@@ -1901,7 +1888,7 @@ class RunAnywhere {
             : LLMConfiguration(),
         ttsConfig: ttsVoice.isNotEmpty
             ? TTSConfiguration(modelId: ttsVoice)
-            : TTSConfiguration(),
+            : const TTSConfiguration(),
       );
 
       _voiceAgentCapability = VoiceAgentCapability(
@@ -2110,7 +2097,7 @@ class RunAnywhere {
       },
       isVoiceAgentReadyCallback: () async => isVoiceAgentReady,
       initializeVoiceAgentCallback: () async =>
-          await initializeVoiceAgentWithLoadedModels(),
+          initializeVoiceAgentWithLoadedModels(),
     );
 
     await session.start();
@@ -2180,7 +2167,7 @@ class RunAnywhere {
     if (!_isInitialized) {
       final errorController = StreamController<String>();
       errorController.addError(SDKError.notInitialized());
-      errorController.close();
+      unawaited(errorController.close());
       return StructuredOutputStreamResult<T>(
         stream: errorController.stream,
         result: Future.error(SDKError.notInitialized()),
@@ -2214,13 +2201,14 @@ class RunAnywhere {
     );
 
     // Forward tokens and accumulate
+    // ignore: cancel_subscriptions - lifecycle managed by asFuture() below
     final subscription = tokenStream.listen(
       (token) {
         accumulatedText.write(token);
         tokenController.add(token);
       },
-      onError: (e) => tokenController.addError(e),
-      onDone: () => tokenController.close(),
+      onError: tokenController.addError,
+      onDone: () => unawaited(tokenController.close()),
     );
 
     // Create the result future

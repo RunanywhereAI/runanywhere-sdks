@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 
-import 'models/framework/llm_framework.dart';
-import '../foundation/logging/sdk_logger.dart';
-import '../core/module_registry.dart' show LLMService;
+import 'package:flutter/foundation.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/module_registry.dart' show LLMService;
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Represents the current state of a model
 /// Matches iOS ModelLoadState from Core/ModelLifecycleManager.swift
@@ -418,7 +418,7 @@ class ModelLifecycleTracker extends ChangeNotifier {
 
   @override
   void dispose() {
-    _lifecycleEventsController.close();
+    unawaited(_lifecycleEventsController.close());
     super.dispose();
   }
 }

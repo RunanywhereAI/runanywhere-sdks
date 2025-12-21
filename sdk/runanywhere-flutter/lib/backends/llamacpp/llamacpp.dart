@@ -40,18 +40,14 @@
 /// - IQ2_XXS/XS, IQ3_S/XXS, IQ4_NL/XS
 library runanywhere_llamacpp;
 
-// Backend entry point
-export 'llamacpp_backend.dart';
-
 // Adapter
 export 'llamacpp_adapter.dart';
-
-// Services
-export 'services/llamacpp_llm_service.dart';
-
-// Providers
-export 'providers/llamacpp_llm_provider.dart';
-
+// Backend entry point
+export 'llamacpp_backend.dart';
+export 'llamacpp_error.dart';
 // Utilities
 export 'llamacpp_template_resolver.dart';
-export 'llamacpp_error.dart';
+// Providers
+export 'providers/llamacpp_llm_provider.dart';
+// Services
+export 'services/llamacpp_llm_service.dart';

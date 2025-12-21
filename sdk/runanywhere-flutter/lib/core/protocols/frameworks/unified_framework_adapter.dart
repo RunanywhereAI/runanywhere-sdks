@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import '../../../core/models/model/model_info.dart';
-import '../../../core/models/framework/llm_framework.dart';
-import '../../../core/models/framework/framework_modality.dart';
-import '../../../core/models/framework/model_format.dart';
-import '../../../core/models/hardware/hardware_configuration.dart';
-import '../downloading/download_strategy.dart';
+import 'package:runanywhere/core/models/framework/framework_modality.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/framework/model_format.dart';
+import 'package:runanywhere/core/models/hardware/hardware_configuration.dart';
+import 'package:runanywhere/core/models/model/model_info.dart';
+import 'package:runanywhere/core/protocols/downloading/download_strategy.dart';
 
 /// Unified protocol for all framework adapters (LLM, Voice, Image, etc.)
 /// Matches iOS UnifiedFrameworkAdapter from Core/Protocols/Frameworks/UnifiedFrameworkAdapter.swift

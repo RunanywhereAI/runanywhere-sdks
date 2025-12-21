@@ -1,5 +1,5 @@
-import '../../models/framework/model_format.dart';
-import '../downloading/download_strategy.dart';
+import 'package:runanywhere/core/models/framework/model_format.dart';
+import 'package:runanywhere/core/protocols/downloading/download_strategy.dart';
 
 /// Information about model storage details.
 /// Matches iOS ModelStorageDetails from Core/Protocols/Storage/ModelStorageStrategy.swift
@@ -89,7 +89,8 @@ mixin DefaultModelStorageStrategy on DownloadStrategy
   }
 
   @override
-  (ModelFormat format, int size)? detectModel(String modelFolder) {
+  (ModelFormat format, int size)? @override
+  Null detectModel(String modelFolder) {
     // Default implementation would scan for known model file extensions
     // Mock: Return null
     return null;

@@ -1,7 +1,7 @@
-import 'app_storage_info.dart';
-import 'device_storage_info.dart';
-import 'model_storage_info.dart';
-import 'stored_model.dart';
+import 'package:runanywhere/core/models/storage/app_storage_info.dart';
+import 'package:runanywhere/core/models/storage/device_storage_info.dart';
+import 'package:runanywhere/core/models/storage/model_storage_info.dart';
+import 'package:runanywhere/core/models/storage/stored_model.dart';
 
 /// Complete storage information.
 /// Matches iOS StorageInfo from Data/Models/Storage/StorageInfo.swift

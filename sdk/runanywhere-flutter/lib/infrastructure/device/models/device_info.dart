@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import '../services/device_identity.dart';
+import 'package:runanywhere/infrastructure/device/services/device_identity.dart';
 
 /// Core device hardware information.
 ///

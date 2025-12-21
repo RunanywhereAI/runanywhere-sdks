@@ -1,7 +1,7 @@
-import '../models/framework/llm_framework.dart';
-import '../models/framework/framework_modality.dart';
-import '../models/model/model_info.dart';
-import '../protocols/frameworks/unified_framework_adapter.dart';
+import 'package:runanywhere/core/models/framework/framework_modality.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/model/model_info.dart';
+import 'package:runanywhere/core/protocols/frameworks/unified_framework_adapter.dart';
 
 /// Wrapper for adapters with priority and metadata
 class _RegisteredAdapter {

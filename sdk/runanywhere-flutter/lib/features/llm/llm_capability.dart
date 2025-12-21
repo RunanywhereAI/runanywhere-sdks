@@ -1,17 +1,18 @@
 import 'dart:async';
-import '../../core/capabilities_base/base_capability.dart';
-import '../../core/types/sdk_component.dart';
-import '../../core/protocols/component/component_configuration.dart';
-import '../../core/module_registry.dart' as core
-    show ModuleRegistry, LLMService, LLMGenerationOptions;
-import '../../core/models/common.dart' show LLMFramework, QuantizationLevel;
-import '../../core/capabilities/managed_lifecycle.dart';
-import '../../public/models/conversation.dart';
 
-export '../../public/models/conversation.dart';
-export '../../core/models/common.dart' show LLMFramework, QuantizationLevel;
+import 'package:runanywhere/core/capabilities/managed_lifecycle.dart';
+import 'package:runanywhere/core/capabilities_base/base_capability.dart';
+import 'package:runanywhere/core/models/common.dart' show LLMFramework, QuantizationLevel;
+import 'package:runanywhere/core/module_registry.dart' as core
+    show ModuleRegistry, LLMService, LLMGenerationOptions;
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/public/models/conversation.dart';
+
 export '../../core/capabilities/managed_lifecycle.dart'
     show CapabilityLoadingState, CapabilityResourceType;
+export '../../core/models/common.dart' show LLMFramework, QuantizationLevel;
+export '../../public/models/conversation.dart';
 
 /// LLM (Language Model) Capability Configuration
 /// Matches iOS LLMConfiguration from LLMCapability.swift
@@ -229,7 +230,7 @@ class LLMCapability extends BaseCapability<core.LLMService> {
     // If a model ID is specified in config, use ManagedLifecycle to load it
     final modelId = llmConfig.modelId;
     if (modelId != null) {
-      return await _managedLifecycle.load(modelId);
+      return _managedLifecycle.load(modelId);
     }
 
     // Fallback to legacy loading for backward compatibility

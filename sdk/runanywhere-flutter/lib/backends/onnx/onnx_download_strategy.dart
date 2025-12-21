@@ -2,13 +2,12 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
-
-import '../../core/models/framework/llm_framework.dart';
-import '../../core/models/model/model_info.dart';
-import '../../core/protocols/downloading/download_strategy.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../../foundation/error_types/sdk_error.dart';
-import '../../foundation/file_operations/archive_utils.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/model/model_info.dart';
+import 'package:runanywhere/core/protocols/downloading/download_strategy.dart';
+import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/file_operations/archive_utils.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// ONNX download strategy for handling .onnx files and .tar.bz2 archives
 /// Matches iOS ONNXDownloadStrategy pattern
@@ -55,7 +54,7 @@ class OnnxDownloadStrategy implements DownloadStrategy {
 
     if (urlString.endsWith('.onnx')) {
       // Handle direct ONNX files (download model + config)
-      return await _downloadDirectOnnx(
+      return _downloadDirectOnnx(
         model: model,
         downloadURL: downloadURL,
         destinationFolder: destinationFolder,
@@ -63,7 +62,7 @@ class OnnxDownloadStrategy implements DownloadStrategy {
       );
     } else if (urlString.endsWith('.tar.bz2')) {
       // Handle tar.bz2 archives
-      return await _downloadTarBz2Archive(
+      return _downloadTarBz2Archive(
         model: model,
         downloadURL: downloadURL,
         destinationFolder: destinationFolder,

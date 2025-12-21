@@ -8,11 +8,11 @@
 
 import 'dart:async';
 
-import '../../../foundation/logging/sdk_logger.dart';
-import '../data_sources/local_telemetry_data_source.dart';
-import '../data_sources/remote_telemetry_data_source.dart';
-import '../models/domain/telemetry_data.dart';
-import '../models/domain/telemetry_event_type.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/infrastructure/analytics/data_sources/local_telemetry_data_source.dart';
+import 'package:runanywhere/infrastructure/analytics/data_sources/remote_telemetry_data_source.dart';
+import 'package:runanywhere/infrastructure/analytics/models/domain/telemetry_data.dart';
+import 'package:runanywhere/infrastructure/analytics/models/domain/telemetry_event_type.dart';
 
 /// Repository for managing telemetry data using DataSource pattern
 ///

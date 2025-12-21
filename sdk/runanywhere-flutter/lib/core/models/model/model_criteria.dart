@@ -1,5 +1,5 @@
-import '../framework/llm_framework.dart';
-import '../framework/model_format.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/framework/model_format.dart';
 
 /// Model criteria for filtering
 /// Matches iOS ModelCriteria from Core/Models/Model/ModelCriteria.swift

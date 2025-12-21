@@ -1,9 +1,8 @@
 import 'dart:async';
 
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/foundation/security/keychain_manager.dart';
 import 'package:uuid/uuid.dart';
-
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../foundation/security/keychain_manager.dart';
 
 /// Simple utility for device identity management.
 ///

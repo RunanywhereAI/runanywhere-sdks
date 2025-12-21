@@ -9,12 +9,11 @@
 import 'dart:async';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/infrastructure/analytics/constants/analytics_constants.dart';
+import 'package:runanywhere/infrastructure/analytics/models/domain/telemetry_data.dart';
+import 'package:runanywhere/infrastructure/analytics/models/domain/telemetry_event_type.dart';
 import 'package:sqflite/sqflite.dart';
-
-import '../../../foundation/logging/sdk_logger.dart';
-import '../constants/analytics_constants.dart';
-import '../models/domain/telemetry_data.dart';
-import '../models/domain/telemetry_event_type.dart';
 
 /// Storage info for data source
 class DataSourceStorageInfo {
@@ -158,7 +157,7 @@ class LocalTelemetryDataSource {
         orderBy: 'timestamp DESC',
       );
 
-      return result.map((row) => TelemetryData.fromMap(row)).toList();
+      return result.map(TelemetryData.fromMap).toList();
     } catch (e) {
       _logger.error('Failed to load all telemetry events: $e');
       rethrow;
@@ -260,7 +259,7 @@ class LocalTelemetryDataSource {
         limit: _batchSize,
       );
 
-      return result.map((row) => TelemetryData.fromMap(row)).toList();
+      return result.map(TelemetryData.fromMap).toList();
     } catch (e) {
       _logger.error('Failed to load pending sync events: $e');
       rethrow;
@@ -303,7 +302,7 @@ class LocalTelemetryDataSource {
         orderBy: 'timestamp DESC',
       );
 
-      return result.map((row) => TelemetryData.fromMap(row)).toList();
+      return result.map(TelemetryData.fromMap).toList();
     } catch (e) {
       _logger.error('Failed to load events by type: $e');
       rethrow;
@@ -372,7 +371,7 @@ class LocalTelemetryDataSource {
         orderBy: 'timestamp DESC',
       );
 
-      return result.map((row) => TelemetryData.fromMap(row)).toList();
+      return result.map(TelemetryData.fromMap).toList();
     } catch (e) {
       _logger.error('Failed to load events by time range: $e');
       rethrow;

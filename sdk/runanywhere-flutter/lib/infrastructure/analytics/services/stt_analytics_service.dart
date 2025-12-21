@@ -8,7 +8,7 @@
 // NOTE: Real-Time Factor (RTF) will be 0 or undefined for streaming transcription
 // since audioLengthMs = 0 when audio is processed in chunks of unknown total length.
 
-import '../../../foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// STT analytics service for tracking transcription operations.
 /// Model lifecycle events (load/unload) are handled by ManagedLifecycle.

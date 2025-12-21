@@ -5,8 +5,8 @@
 /// between module_registry.dart and stt_component.dart.
 library stt_types;
 
-import '../../core/models/audio_format.dart';
-import '../llm/llm_capability.dart' show LLMFramework;
+import 'package:runanywhere/core/models/audio_format.dart';
+import 'package:runanywhere/features/llm/llm_capability.dart' show LLMFramework;
 
 /// Options for speech-to-text transcription
 /// Matches iOS STTOptions from STTComponent.swift

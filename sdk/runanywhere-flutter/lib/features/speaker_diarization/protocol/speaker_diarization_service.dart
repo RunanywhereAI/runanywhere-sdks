@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import '../models/speaker_diarization_speaker_info.dart';
+import 'package:runanywhere/features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
 
 /// Protocol for speaker diarization services
 /// Defines the contract for identifying and tracking speakers in audio

@@ -1,4 +1,4 @@
-import 'hardware_acceleration.dart';
+import 'package:runanywhere/core/models/hardware/hardware_acceleration.dart';
 
 /// Memory pressure levels.
 /// Matches iOS MemoryPressureLevel from Capabilities/DeviceCapability/Models/DeviceCapabilities.swift

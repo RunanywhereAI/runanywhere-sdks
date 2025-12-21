@@ -1,26 +1,27 @@
 import 'dart:async';
-import '../../capabilities/registry/registry_service.dart';
-import '../../capabilities/model_loading/model_loading_service.dart';
-import '../../capabilities/text_generation/generation_service.dart';
-import '../../capabilities/streaming/streaming_service.dart';
-import '../../capabilities/voice/voice_capability_service.dart';
+
+import 'package:runanywhere/capabilities/analytics/analytics_service.dart';
 // TODO: Memory management has been moved/removed - using stub from model_loading_service
 // import '../../capabilities/memory/memory_service.dart';
 // import '../../capabilities/memory/allocation_manager.dart';
 // import '../../capabilities/memory/pressure_handler.dart';
 // import '../../capabilities/memory/cache_eviction.dart';
-import '../../capabilities/download/download_service.dart';
-import '../../capabilities/analytics/analytics_service.dart';
-import '../../core/protocols/storage/storage_analyzer.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../../public/configuration/sdk_environment.dart';
-import '../../core/service_registry/unified_service_registry.dart';
-import '../../core/protocols/frameworks/unified_framework_adapter.dart';
-import '../../core/models/model/model_registration.dart';
-import '../../infrastructure/analytics/sdk_analytics_initializer.dart';
-import '../../data/network/api_client.dart';
-import '../../data/network/network_service.dart';
-import '../../data/network/services/authentication_service.dart';
+import 'package:runanywhere/capabilities/download/download_service.dart';
+import 'package:runanywhere/capabilities/model_loading/model_loading_service.dart';
+import 'package:runanywhere/capabilities/registry/registry_service.dart';
+import 'package:runanywhere/capabilities/streaming/streaming_service.dart';
+import 'package:runanywhere/capabilities/text_generation/generation_service.dart';
+import 'package:runanywhere/capabilities/voice/voice_capability_service.dart';
+import 'package:runanywhere/core/models/model/model_registration.dart';
+import 'package:runanywhere/core/protocols/frameworks/unified_framework_adapter.dart';
+import 'package:runanywhere/core/protocols/storage/storage_analyzer.dart';
+import 'package:runanywhere/core/service_registry/unified_service_registry.dart';
+import 'package:runanywhere/data/network/api_client.dart';
+import 'package:runanywhere/data/network/network_service.dart';
+import 'package:runanywhere/data/network/services/authentication_service.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/infrastructure/analytics/sdk_analytics_initializer.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// Service container for dependency injection
 /// Matches iOS ServiceContainer from Foundation/DependencyInjection/ServiceContainer.swift

@@ -1,16 +1,15 @@
 import 'dart:async';
 
+import 'package:runanywhere/data/network/network_service.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/infrastructure/device/models/device_info.dart';
+import 'package:runanywhere/infrastructure/device/models/network/device_registration_request.dart';
+import 'package:runanywhere/infrastructure/device/models/network/device_registration_response.dart';
+import 'package:runanywhere/infrastructure/device/services/device_identity.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
+import 'package:runanywhere/public/events/event_bus.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../public/configuration/sdk_environment.dart';
-import '../../../public/events/event_bus.dart';
-import '../../../public/events/sdk_event.dart';
-import '../../../data/network/network_service.dart';
-import '../models/device_info.dart';
-import '../models/network/device_registration_request.dart';
-import '../models/network/device_registration_response.dart';
-import 'device_identity.dart';
 
 /// Unified service for device registration with backend.
 ///
@@ -33,12 +32,12 @@ class DeviceRegistrationService {
   /// Get current device information.
   /// Returns fresh data each time.
   Future<DeviceInfo> get currentDeviceInfo async {
-    return await DeviceInfo.fetchCurrent();
+    return DeviceInfo.fetchCurrent();
   }
 
   /// Get the persistent device ID (secure storage UUID).
   Future<String> get deviceId async {
-    return await DeviceIdentity.persistentUUID;
+    return DeviceIdentity.persistentUUID;
   }
 
   // MARK: - Registration API

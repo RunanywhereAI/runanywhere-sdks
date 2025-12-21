@@ -1,5 +1,5 @@
-import '../../core/protocols/component/component_configuration.dart';
-import '../../foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 
 /// Configuration for VAD component
 class VADConfiguration implements ComponentConfiguration {

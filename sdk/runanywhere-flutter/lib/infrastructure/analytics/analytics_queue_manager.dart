@@ -10,12 +10,12 @@
 import 'dart:async';
 import 'dart:math';
 
-import '../../core/protocols/analytics/analytics_event.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../../public/events/sdk_event.dart';
-import 'constants/analytics_constants.dart';
-import 'models/domain/telemetry_data.dart';
-import 'repositories/telemetry_repository.dart';
+import 'package:runanywhere/core/protocols/analytics/analytics_event.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/infrastructure/analytics/constants/analytics_constants.dart';
+import 'package:runanywhere/infrastructure/analytics/models/domain/telemetry_data.dart';
+import 'package:runanywhere/infrastructure/analytics/repositories/telemetry_repository.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// Internal wrapper to unify SDKEvent and AnalyticsEvent for the queue.
 class _QueuedEvent {
@@ -85,7 +85,7 @@ class AnalyticsQueueManager {
     _eventQueue.add(_QueuedEvent.fromSDKEvent(event));
 
     if (_eventQueue.length >= _batchSize) {
-      _flushBatch();
+      unawaited(_flushBatch());
     }
   }
 
@@ -94,7 +94,7 @@ class AnalyticsQueueManager {
     _eventQueue.add(_QueuedEvent.fromAnalyticsEvent(event));
 
     if (_eventQueue.length >= _batchSize) {
-      _flushBatch();
+      unawaited(_flushBatch());
     }
   }
 
@@ -139,7 +139,7 @@ class AnalyticsQueueManager {
 
   void _startFlushTimer() {
     _flushTimer = Timer.periodic(_flushInterval, (_) {
-      _flushBatch();
+      unawaited(_flushBatch());
     });
   }
 
@@ -190,7 +190,7 @@ class AnalyticsQueueManager {
         if (attempt < _maxRetries) {
           // Exponential backoff
           final delay = Duration(seconds: pow(2, attempt).toInt());
-          await Future.delayed(delay);
+          await Future<void>.delayed(delay);
         } else {
           _logger.error(
               'Failed to send batch after $_maxRetries attempts, stored locally');

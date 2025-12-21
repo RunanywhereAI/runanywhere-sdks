@@ -1,14 +1,15 @@
 import 'dart:async';
-import 'models/loaded_model.dart';
-import '../registry/registry_service.dart';
+
+import 'package:runanywhere/capabilities/model_loading/models/loaded_model.dart';
+import 'package:runanywhere/capabilities/registry/registry_service.dart';
+import 'package:runanywhere/core/model_lifecycle_manager.dart';
+import 'package:runanywhere/core/models/framework/framework_modality.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/core/service_registry/unified_service_registry.dart';
+import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 // TODO: MemoryService has been moved/removed - stubbed out for now
 // import '../memory/memory_service.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../../foundation/error_types/sdk_error.dart';
-import '../../core/service_registry/unified_service_registry.dart';
-import '../../core/models/framework/framework_modality.dart';
-import '../../core/model_lifecycle_manager.dart';
-import '../../core/module_registry.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Service responsible for loading models
 /// Ensures thread-safe access and prevents concurrent duplicate loads
@@ -43,7 +44,7 @@ class ModelLoadingService {
     if (_inflightLoads.containsKey(modelId)) {
       logger.info(
           '⏳ Model load already in progress, awaiting existing task: $modelId');
-      return await _inflightLoads[modelId]!;
+      return _inflightLoads[modelId]!;
     }
 
     // Create a new loading task
@@ -54,10 +55,11 @@ class ModelLoadingService {
 
     // Ensure task is removed when complete (don't await this)
     unawaited(loadTask.whenComplete(() {
-      _inflightLoads.remove(modelId);
+      // Discard the removed Future since we don't need to await it
+      unawaited(_inflightLoads.remove(modelId));
     }));
 
-    return await loadTask;
+    return loadTask;
   }
 
   /// Perform the actual model loading

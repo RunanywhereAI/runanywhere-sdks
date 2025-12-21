@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import '../../models/model/model_info.dart';
-import 'download_task.dart';
+import 'package:runanywhere/core/models/model/model_info.dart';
+import 'package:runanywhere/core/protocols/downloading/download_task.dart';
 
 /// Protocol for download management operations
 /// Matches iOS DownloadManager from Core/Protocols/Downloading/DownloadManager.swift

@@ -7,7 +7,7 @@
 //  NO properties dictionary - all fields are strongly typed.
 //
 
-import '../domain/telemetry_data.dart';
+import 'package:runanywhere/infrastructure/analytics/models/domain/telemetry_data.dart';
 
 /// Typed telemetry event payload for API transmission.
 /// Maps to backend SDKTelemetryEvent schema with strongly typed fields.

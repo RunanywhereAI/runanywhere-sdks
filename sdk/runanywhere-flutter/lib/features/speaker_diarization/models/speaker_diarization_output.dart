@@ -1,7 +1,7 @@
-import 'speaker_diarization_segment.dart';
-import 'speaker_diarization_profile.dart';
-import 'speaker_diarization_labeled_transcription.dart';
-import 'speaker_diarization_metadata.dart';
+import 'package:runanywhere/features/speaker_diarization/models/speaker_diarization_labeled_transcription.dart';
+import 'package:runanywhere/features/speaker_diarization/models/speaker_diarization_metadata.dart';
+import 'package:runanywhere/features/speaker_diarization/models/speaker_diarization_profile.dart';
+import 'package:runanywhere/features/speaker_diarization/models/speaker_diarization_segment.dart';
 
 /// Output from speaker diarization processing (conforms to ComponentOutput protocol)
 /// Matches iOS SpeakerDiarizationOutput from Features/SpeakerDiarization/Models/SpeakerDiarizationOutput.swift

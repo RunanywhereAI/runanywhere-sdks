@@ -6,10 +6,10 @@
 // Matches iOS RunAnywhereModule from Core/Module/RunAnywhereModule.swift
 //
 
-import 'capability_type.dart';
-import '../protocols/downloading/download_strategy.dart';
-import 'inference_framework.dart';
-import 'model_storage_strategy.dart';
+import 'package:runanywhere/core/module/capability_type.dart';
+import 'package:runanywhere/core/module/inference_framework.dart';
+import 'package:runanywhere/core/module/model_storage_strategy.dart';
+import 'package:runanywhere/core/protocols/downloading/download_strategy.dart';
 
 /// Protocol for RunAnywhere modules that provide AI services.
 ///

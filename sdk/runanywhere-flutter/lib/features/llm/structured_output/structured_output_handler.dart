@@ -1,5 +1,5 @@
 import 'dart:convert';
-import '../../../foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Handles structured output generation and validation
 /// Matches iOS StructuredOutputHandler from Features/LLM/StructuredOutput/StructuredOutputHandler.swift
@@ -218,7 +218,7 @@ Remember: Output ONLY the JSON object, nothing else.
     try {
       final jsonString = extractJSON(text);
       jsonDecode(jsonString);
-      return StructuredOutputValidation(
+      return const StructuredOutputValidation(
         isValid: true,
         containsJSON: true,
         error: null,

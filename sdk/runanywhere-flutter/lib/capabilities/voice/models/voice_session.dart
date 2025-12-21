@@ -5,7 +5,7 @@
 library voice_session;
 
 import 'dart:typed_data';
-import '../../../features/stt/stt_capability.dart' show STTOutput;
+import 'package:runanywhere/features/stt/stt_capability.dart' show STTOutput;
 
 /// Events emitted during a voice session
 /// Matches iOS VoiceSessionEvent from RunAnywhere+VoiceSession.swift

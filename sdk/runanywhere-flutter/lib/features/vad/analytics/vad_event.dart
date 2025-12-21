@@ -1,13 +1,4 @@
-/// VAD (Voice Activity Detection) Events.
-///
-/// All VAD-related events in one place.
-/// Each event declares its destination (public, analytics, or both).
-///
-/// Matches iOS `VADEvent` enum from VADEvent.swift
-
-import '../../../infrastructure/events/event_category.dart';
-import '../../../infrastructure/events/event_destination.dart';
-import '../../../public/events/sdk_event.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// All VAD (Voice Activity Detection) related events.
 ///

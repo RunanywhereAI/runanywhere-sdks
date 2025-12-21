@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import '../../core/module_registry.dart';
-import '../native_backend.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// Native VAD service using ONNX/Sherpa-ONNX backend via FFI (Silero VAD).
 ///

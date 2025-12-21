@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 // VADService and SpeechActivityEvent are exported from module_registry (sourced from vad_service.dart)
-import '../../core/module_registry.dart';
-import '../../foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Simple energy-based Voice Activity Detection
 /// Based on iOS WhisperKit's EnergyVAD implementation but simplified for real-time audio processing
@@ -387,7 +387,7 @@ class SimpleEnergyVAD implements VADService {
 
     // Wait for calibration to complete
     final timeoutSeconds = _calibrationFramesNeeded * frameLength + 2.0;
-    await Future.delayed(
+    await Future<void>.delayed(
         Duration(milliseconds: (timeoutSeconds * 1000).toInt()));
 
     if (_isCalibrating) {

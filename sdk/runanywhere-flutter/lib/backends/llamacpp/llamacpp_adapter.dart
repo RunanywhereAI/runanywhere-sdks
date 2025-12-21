@@ -1,16 +1,16 @@
 import 'dart:async';
 
-import '../../core/models/framework/framework_modality.dart';
-import '../../core/models/framework/llm_framework.dart';
-import '../../core/models/framework/model_format.dart';
-import '../../core/models/hardware/hardware_configuration.dart';
-import '../../core/models/model/model_info.dart';
-import '../../core/module_registry.dart';
-import '../../core/protocols/frameworks/unified_framework_adapter.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../../native/native_backend.dart';
-import 'providers/llamacpp_llm_provider.dart';
-import 'services/llamacpp_llm_service.dart';
+import 'package:runanywhere/backends/llamacpp/providers/llamacpp_llm_provider.dart';
+import 'package:runanywhere/backends/llamacpp/services/llamacpp_llm_service.dart';
+import 'package:runanywhere/core/models/framework/framework_modality.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/framework/model_format.dart';
+import 'package:runanywhere/core/models/hardware/hardware_configuration.dart';
+import 'package:runanywhere/core/models/model/model_info.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/core/protocols/frameworks/unified_framework_adapter.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// LlamaCpp adapter for LLM (Language Model) inference.
 ///
@@ -278,10 +278,10 @@ class LlamaCppAdapter
         now.difference(_lastLLMUsage!) > _cacheTimeout &&
         _cachedLLMService != null) {
       // Cleanup stale service asynchronously
-      _cachedLLMService!.cleanup().catchError((e) {
+      unawaited(_cachedLLMService!.cleanup().catchError((Object e) {
         // Log error but don't block
         _logger.error('Error cleaning up stale LlamaCpp service', error: e);
-      });
+      }));
       _cachedLLMService = null;
       _cachedModelPath = null;
       _lastLLMUsage = null;

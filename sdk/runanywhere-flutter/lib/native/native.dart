@@ -35,15 +35,11 @@ library native;
 
 // Core FFI types and constants
 export 'ffi_types.dart';
-
-// Platform-specific library loader
-export 'platform_loader.dart';
-
 // Main backend wrapper
 export 'native_backend.dart';
-
-// Native service providers
-export 'providers/providers.dart';
-
 // Provider registration helper
 export 'native_provider_registration.dart';
+// Platform-specific library loader
+export 'platform_loader.dart';
+// Native service providers
+export 'providers/providers.dart';
