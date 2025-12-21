@@ -10,6 +10,14 @@
 // Core analytics queue manager
 export { AnalyticsQueueManager } from './AnalyticsQueueManager';
 
+// Telemetry repository for persistence and sync
+export {
+  TelemetryRepository,
+  TelemetryEventType,
+  type TelemetryDataEntity,
+  type TelemetryStorage,
+} from './TelemetryRepository';
+
 // Component-specific analytics services
 export {
   LLMAnalyticsService,

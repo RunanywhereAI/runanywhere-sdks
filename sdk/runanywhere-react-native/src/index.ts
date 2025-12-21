@@ -22,12 +22,6 @@ export * from './types';
 // Export commonly used enums for easy access
 export { LLMFramework, ModelCategory, ModelFormat } from './types/enums';
 
-// Errors (legacy - from Public/Errors)
-export {
-  SDKError as LegacySDKError,
-  SDKErrorCode,
-} from './Public/Errors/SDKError';
-
 // Foundation (Core infrastructure matching iOS SDK)
 export {
   // Initialization (matching iOS two-phase initialization pattern)
@@ -59,6 +53,8 @@ export {
   withContext,
   getErrorContext,
   getUnderlyingError,
+  // SDKError (unified - supports both legacy SDKErrorCode and numeric ErrorCode)
+  SDKErrorCode,
   type SDKErrorProtocol,
   SDKError,
   asSDKError,

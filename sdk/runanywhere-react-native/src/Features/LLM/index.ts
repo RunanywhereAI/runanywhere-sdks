@@ -2,6 +2,7 @@
  * LLM Capability exports
  */
 export { LLMCapability, LLMServiceWrapper } from './LLMCapability';
+export type { GenerationMetrics } from './LLMCapability';
 
 export type { LLMConfiguration } from './LLMConfiguration';
 export { LLMConfigurationImpl, LLMQuantizationLevel } from './LLMConfiguration';

@@ -28,56 +28,27 @@ import type {
 import type { SpeakerDiarizationService } from '../../Core/Protocols/Voice/SpeakerDiarizationService';
 
 // ============================================================================
-// Default Speaker Diarization Service
+// Speaker Diarization Not Implemented Error
 // ============================================================================
 
 /**
- * Default Speaker Diarization Service implementation
+ * Error thrown when speaker diarization is used without a provider.
+ *
+ * Speaker diarization requires a platform-specific implementation:
+ * - iOS uses FluidAudio (iOS-only library)
+ * - React Native does not have a built-in diarization provider
+ *
+ * To use speaker diarization, register a SpeakerDiarizationProvider via ServiceRegistry.
  */
-class DefaultSpeakerDiarizationService implements SpeakerDiarizationService {
-  private speakers: Map<string, SpeakerInfo> = new Map();
-  private speakerCounter = 0;
-
-  async initialize(): Promise<void> {
-    // No initialization needed for default implementation
-  }
-
-  async processAudio(
-    _audioData: string | ArrayBuffer,
-    _sampleRate?: number
-  ): Promise<
-    import('../../Core/Models/SpeakerDiarization/SpeakerDiarizationResult').SpeakerDiarizationResult
-  > {
-    // Simple energy-based speaker detection
-    // In real implementation, this would use ML models
-    const speakerId = `speaker_${this.speakerCounter++}`;
-    const speakerInfo: SpeakerInfo = {
-      id: speakerId,
-      name: null,
-      confidence: 0.8,
-      embedding: null,
-    };
-    this.speakers.set(speakerId, speakerInfo);
-
-    // Return result matching SpeakerDiarizationResult interface
-    return {
-      segments: [],
-      speakers: Array.from(this.speakers.values()).map((s) => ({
-        id: s.id,
-        name: s.name,
-        confidence: s.confidence,
-        embedding: s.embedding,
-      })),
-    };
-  }
-
-  get isReady(): boolean {
-    return true;
-  }
-
-  async cleanup(): Promise<void> {
-    this.speakers.clear();
-    this.speakerCounter = 0;
+export class SpeakerDiarizationNotAvailableError extends Error {
+  constructor() {
+    super(
+      'Speaker diarization is not available. ' +
+        'No SpeakerDiarizationProvider has been registered. ' +
+        'iOS uses FluidAudio (platform-specific). ' +
+        'For React Native, consider using an ONNX-based diarization model or a cloud service.'
+    );
+    this.name = 'SpeakerDiarizationNotAvailableError';
   }
 }
 
@@ -208,6 +179,8 @@ export class SpeakerDiarizationCapability extends BaseComponent<SpeakerDiarizati
   /**
    * Load SpeakerDiarization service for a given model ID
    * Called by ManagedLifecycle during load()
+   *
+   * @throws SpeakerDiarizationNotAvailableError if no provider is registered
    */
   private async loadDiarizationService(
     modelId: string
@@ -215,26 +188,17 @@ export class SpeakerDiarizationCapability extends BaseComponent<SpeakerDiarizati
     // Try to get a registered speaker diarization provider from central registry
     const provider = ServiceRegistry.shared.speakerDiarizationProvider();
 
-    if (provider) {
-      try {
-        const diarizationService =
-          await provider.createSpeakerDiarizationService(
-            this.diarizationConfiguration
-          );
-        await diarizationService.initialize(modelId);
-        return diarizationService;
-      } catch {
-        // Fall through to default
-        console.warn(
-          '[SpeakerDiarization] Provider service creation failed, falling back to default'
-        );
-      }
+    if (!provider) {
+      // No provider registered - speaker diarization requires platform-specific implementation
+      throw new SpeakerDiarizationNotAvailableError();
     }
 
-    // Fallback to default implementation
-    const defaultService = new DefaultSpeakerDiarizationService();
-    await defaultService.initialize();
-    return defaultService;
+    // Use the registered provider to create the service
+    const diarizationService = await provider.createSpeakerDiarizationService(
+      this.diarizationConfiguration
+    );
+    await diarizationService.initialize(modelId);
+    return diarizationService;
   }
 
   // ============================================================================
