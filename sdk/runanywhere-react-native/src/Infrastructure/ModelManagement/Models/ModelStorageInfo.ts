@@ -8,8 +8,8 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/ModelManagement/Models/Domain/ModelStorageInfo.swift
  */
 
-import { InferenceFramework } from './InferenceFramework';
-import { StoredModel } from './StoredModel';
+import type { InferenceFramework } from './InferenceFramework';
+import type { StoredModel } from './StoredModel';
 
 /**
  * Aggregate information about all stored models

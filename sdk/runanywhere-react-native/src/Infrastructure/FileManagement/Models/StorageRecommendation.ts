@@ -69,7 +69,9 @@ export function createStorageRecommendation(
  * @param obj - Object to check
  * @returns True if object is a valid StorageRecommendation
  */
-export function isStorageRecommendation(obj: unknown): obj is StorageRecommendation {
+export function isStorageRecommendation(
+  obj: unknown
+): obj is StorageRecommendation {
   if (typeof obj !== 'object' || obj === null) {
     return false;
   }
@@ -78,7 +80,9 @@ export function isStorageRecommendation(obj: unknown): obj is StorageRecommendat
 
   return (
     typeof recommendation.type === 'string' &&
-    Object.values(RecommendationType).includes(recommendation.type as RecommendationType) &&
+    Object.values(RecommendationType).includes(
+      recommendation.type as RecommendationType
+    ) &&
     typeof recommendation.message === 'string' &&
     typeof recommendation.action === 'string'
   );

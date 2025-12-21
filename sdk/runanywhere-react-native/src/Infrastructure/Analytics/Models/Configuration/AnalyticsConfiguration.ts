@@ -186,7 +186,9 @@ export function validateAnalyticsConfiguration(
  * Builder class for AnalyticsConfiguration
  */
 export class AnalyticsConfigurationBuilder {
-  private config: AnalyticsConfiguration = { ...DEFAULT_ANALYTICS_CONFIGURATION };
+  private config: AnalyticsConfiguration = {
+    ...DEFAULT_ANALYTICS_CONFIGURATION,
+  };
 
   batchSize(value: number): this {
     this.config.batchSize = value;

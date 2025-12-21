@@ -18,7 +18,10 @@ export class FileManagementError extends SDKError {
   /**
    * Unable to access or create a directory
    */
-  static directoryAccessFailed(path: string, underlying?: Error): FileManagementError {
+  static directoryAccessFailed(
+    path: string,
+    underlying?: Error
+  ): FileManagementError {
     const message = underlying
       ? `Failed to access directory at '${path}': ${underlying.message}`
       : `Failed to access directory at '${path}'`;
@@ -32,15 +35,22 @@ export class FileManagementError extends SDKError {
    * Directory not found at specified path
    */
   static directoryNotFound(path: string): FileManagementError {
-    return new FileManagementError(ErrorCode.FileNotFound, `Directory not found at '${path}'`, {
-      details: { path },
-    });
+    return new FileManagementError(
+      ErrorCode.FileNotFound,
+      `Directory not found at '${path}'`,
+      {
+        details: { path },
+      }
+    );
   }
 
   /**
    * Unable to create directory
    */
-  static directoryCreationFailed(path: string, reason: string): FileManagementError {
+  static directoryCreationFailed(
+    path: string,
+    reason: string
+  ): FileManagementError {
     return new FileManagementError(
       ErrorCode.FileAccessDenied,
       `Failed to create directory at '${path}': ${reason}`,
@@ -56,9 +66,13 @@ export class FileManagementError extends SDKError {
    * File not found at specified path
    */
   static fileNotFound(path: string): FileManagementError {
-    return new FileManagementError(ErrorCode.FileNotFound, `File not found at '${path}'`, {
-      details: { path },
-    });
+    return new FileManagementError(
+      ErrorCode.FileNotFound,
+      `File not found at '${path}'`,
+      {
+        details: { path },
+      }
+    );
   }
 
   /**
@@ -77,7 +91,10 @@ export class FileManagementError extends SDKError {
   /**
    * Unable to write file
    */
-  static fileWriteFailed(path: string, underlying?: Error): FileManagementError {
+  static fileWriteFailed(
+    path: string,
+    underlying?: Error
+  ): FileManagementError {
     const message = underlying
       ? `Failed to write file at '${path}': ${underlying.message}`
       : `Failed to write file at '${path}'`;
@@ -104,9 +121,13 @@ export class FileManagementError extends SDKError {
    * File operation not permitted
    */
   static permissionDenied(path: string): FileManagementError {
-    return new FileManagementError(ErrorCode.FileAccessDenied, `Permission denied for '${path}'`, {
-      details: { path },
-    });
+    return new FileManagementError(
+      ErrorCode.FileAccessDenied,
+      `Permission denied for '${path}'`,
+      {
+        details: { path },
+      }
+    );
   }
 
   // MARK: - Model Storage Errors
@@ -115,15 +136,22 @@ export class FileManagementError extends SDKError {
    * Model file not found
    */
   static modelNotFound(modelId: string): FileManagementError {
-    return new FileManagementError(ErrorCode.ModelNotFound, `Model '${modelId}' not found in storage`, {
-      details: { modelId },
-    });
+    return new FileManagementError(
+      ErrorCode.ModelNotFound,
+      `Model '${modelId}' not found in storage`,
+      {
+        details: { modelId },
+      }
+    );
   }
 
   /**
    * Model folder not accessible
    */
-  static modelFolderAccessFailed(modelId: string, underlying?: Error): FileManagementError {
+  static modelFolderAccessFailed(
+    modelId: string,
+    underlying?: Error
+  ): FileManagementError {
     const message = underlying
       ? `Failed to access model folder for '${modelId}': ${underlying.message}`
       : `Failed to access model folder for '${modelId}'`;
@@ -136,7 +164,10 @@ export class FileManagementError extends SDKError {
   /**
    * Invalid model format
    */
-  static invalidModelFormat(expected: string, received: string): FileManagementError {
+  static invalidModelFormat(
+    expected: string,
+    received: string
+  ): FileManagementError {
     return new FileManagementError(
       ErrorCode.ModelFormatUnsupported,
       `Invalid model format. Expected '${expected}', received '${received}'`,
@@ -149,7 +180,10 @@ export class FileManagementError extends SDKError {
   /**
    * Model storage corrupted
    */
-  static modelStorageCorrupted(modelId: string, reason: string): FileManagementError {
+  static modelStorageCorrupted(
+    modelId: string,
+    reason: string
+  ): FileManagementError {
     return new FileManagementError(
       ErrorCode.ModelCorrupted,
       `Model storage for '${modelId}' is corrupted: ${reason}`,
@@ -164,7 +198,10 @@ export class FileManagementError extends SDKError {
   /**
    * Insufficient storage space
    */
-  static insufficientSpace(required: number, available: number): FileManagementError {
+  static insufficientSpace(
+    required: number,
+    available: number
+  ): FileManagementError {
     const requiredMB = (required / 1024 / 1024).toFixed(2);
     const availableMB = (available / 1024 / 1024).toFixed(2);
     return new FileManagementError(
@@ -180,7 +217,10 @@ export class FileManagementError extends SDKError {
    * Storage full
    */
   static storageFull(): FileManagementError {
-    return new FileManagementError(ErrorCode.StorageFull, 'Device storage is full');
+    return new FileManagementError(
+      ErrorCode.StorageFull,
+      'Device storage is full'
+    );
   }
 
   /**
@@ -202,15 +242,22 @@ export class FileManagementError extends SDKError {
    * Cache key not found
    */
   static cacheKeyNotFound(key: string): FileManagementError {
-    return new FileManagementError(ErrorCode.FileNotFound, `Cache entry not found for key '${key}'`, {
-      details: { key },
-    });
+    return new FileManagementError(
+      ErrorCode.FileNotFound,
+      `Cache entry not found for key '${key}'`,
+      {
+        details: { key },
+      }
+    );
   }
 
   /**
    * Cache write failed
    */
-  static cacheWriteFailed(key: string, underlying?: Error): FileManagementError {
+  static cacheWriteFailed(
+    key: string,
+    underlying?: Error
+  ): FileManagementError {
     const message = underlying
       ? `Failed to write cache for key '${key}': ${underlying.message}`
       : `Failed to write cache for key '${key}'`;
@@ -263,7 +310,11 @@ export class FileManagementError extends SDKError {
   /**
    * Move operation failed
    */
-  static moveFailed(from: string, to: string, underlying?: Error): FileManagementError {
+  static moveFailed(
+    from: string,
+    to: string,
+    underlying?: Error
+  ): FileManagementError {
     const message = underlying
       ? `Failed to move from '${from}' to '${to}': ${underlying.message}`
       : `Failed to move from '${from}' to '${to}'`;
@@ -279,15 +330,22 @@ export class FileManagementError extends SDKError {
    * Invalid path provided
    */
   static invalidPath(path: string, reason: string): FileManagementError {
-    return new FileManagementError(ErrorCode.InvalidInput, `Invalid path '${path}': ${reason}`, {
-      details: { path, reason },
-    });
+    return new FileManagementError(
+      ErrorCode.InvalidInput,
+      `Invalid path '${path}': ${reason}`,
+      {
+        details: { path, reason },
+      }
+    );
   }
 
   /**
    * Invalid file name
    */
-  static invalidFileName(fileName: string, reason: string): FileManagementError {
+  static invalidFileName(
+    fileName: string,
+    reason: string
+  ): FileManagementError {
     return new FileManagementError(
       ErrorCode.InvalidInput,
       `Invalid file name '${fileName}': ${reason}`,
@@ -300,7 +358,10 @@ export class FileManagementError extends SDKError {
   /**
    * Model validation failed
    */
-  static modelValidationFailed(modelId: string, reason: string): FileManagementError {
+  static modelValidationFailed(
+    modelId: string,
+    reason: string
+  ): FileManagementError {
     return new FileManagementError(
       ErrorCode.ModelValidationFailed,
       `Model validation failed for '${modelId}': ${reason}`,

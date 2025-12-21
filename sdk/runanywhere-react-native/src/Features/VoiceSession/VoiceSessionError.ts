@@ -64,8 +64,7 @@ export class VoiceSessionError extends Error {
   static notReady(reason?: string): VoiceSessionError {
     return new VoiceSessionError(
       VoiceSessionErrorCode.NotReady,
-      reason ||
-        'Voice agent not ready. Load STT, LLM, and TTS models first.',
+      reason || 'Voice agent not ready. Load STT, LLM, and TTS models first.',
       undefined,
       { reason }
     );
@@ -118,6 +117,8 @@ export class VoiceSessionError extends Error {
 /**
  * Type guard to check if an error is a VoiceSessionError
  */
-export function isVoiceSessionError(error: unknown): error is VoiceSessionError {
+export function isVoiceSessionError(
+  error: unknown
+): error is VoiceSessionError {
   return error instanceof VoiceSessionError;
 }

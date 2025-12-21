@@ -3,8 +3,4 @@
  * RunAnywhere SDK
  */
 
-export {
-  LoggingError,
-  LoggingErrorCode,
-  isLoggingError,
-} from './LoggingError';
+export { LoggingError, LoggingErrorCode, isLoggingError } from './LoggingError';

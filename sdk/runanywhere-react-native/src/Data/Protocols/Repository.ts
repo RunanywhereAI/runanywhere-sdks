@@ -47,8 +47,9 @@ export interface Repository<Entity> {
  * Extended repository protocol for entities that implement RepositoryEntity
  * Provides sync support methods
  */
-export interface SyncableRepository<Entity extends RepositoryEntity>
-  extends Repository<Entity> {
+export interface SyncableRepository<
+  Entity extends RepositoryEntity,
+> extends Repository<Entity> {
   /**
    * Fetch entities pending sync
    */

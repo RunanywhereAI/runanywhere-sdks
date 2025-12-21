@@ -142,21 +142,6 @@ export {
   type STTInput,
   type STTOutput,
   STTError,
-  STTErrorType,
-  isSTTError,
-  isSTTErrorType,
-  asSTTError,
-  serviceNotInitializedError,
-  transcriptionFailedError,
-  streamingNotSupportedError,
-  languageNotSupportedError,
-  audioFormatNotSupportedError,
-  insufficientAudioDataError,
-  insufficientMemoryError,
-  noVoiceServiceAvailableError,
-  audioSessionNotConfiguredError,
-  audioSessionActivationFailedError,
-  microphonePermissionDeniedError,
   // TTS Capability
   TTSCapability,
   TTSServiceWrapper,
@@ -164,6 +149,7 @@ export {
   type TTSInput,
   type TTSOutput,
   type TTSOptions,
+  TTSError,
   // LLM Capability
   LLMCapability,
   LLMServiceWrapper,
@@ -173,6 +159,10 @@ export {
   type Message,
   MessageRole,
   FinishReason,
+  LLMError,
+  // VAD Capability
+  VADCapability,
+  VADError,
 } from './Features';
 
 // Core Registry & Providers
@@ -233,20 +223,7 @@ export {
   DataSourceErrorCode,
   RemoteOperationHelper,
   // Repository Errors
-  type RepositoryError,
-  RepositoryError as RepositoryErrorFactory,
-  isRepositoryError,
-  isSaveFailure,
-  isFetchFailure,
-  isDeleteFailure,
-  isSyncFailure,
-  isDatabaseNotInitialized,
-  isEntityNotFound,
-  isNetworkUnavailable,
-  isNetworkNotAvailable,
-  isNetworkError as isRepositoryNetworkError,
-  isNetworkTimeout,
-  toError as repositoryToError,
+  RepositoryError,
 } from './Data/Protocols';
 
 // Data/Repositories (matching iOS Data/Repositories/)

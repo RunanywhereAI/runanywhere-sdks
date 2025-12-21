@@ -51,10 +51,7 @@ export {
 } from './ModelLifecycleManager';
 
 // Managed Lifecycle
-export {
-  ManagedLifecycle,
-  ManagedLifecycleOptions,
-} from './ManagedLifecycle';
+export { ManagedLifecycle, ManagedLifecycleOptions } from './ManagedLifecycle';
 
 // Analytics Types
 export {

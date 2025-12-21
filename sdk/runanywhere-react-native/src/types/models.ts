@@ -136,7 +136,11 @@ export interface PerformanceMetrics {
 
 // Re-export structured output types from StructuredOutputHandler for convenience
 // These match iOS Generatable protocol and StructuredOutputConfig
-export type { GeneratableType, StructuredOutputConfig, StructuredOutputValidation };
+export type {
+  GeneratableType,
+  StructuredOutputConfig,
+  StructuredOutputValidation,
+};
 
 /**
  * Result of a text generation request

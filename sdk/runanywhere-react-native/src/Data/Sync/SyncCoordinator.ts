@@ -65,8 +65,7 @@ export class SyncCoordinator {
       for (const batch of batches) {
         try {
           // Use the remote data source to sync
-          const syncedIds =
-            await repository.remoteDataSource!.syncBatch(batch);
+          const syncedIds = await repository.remoteDataSource!.syncBatch(batch);
 
           // Mark successfully synced items
           if (syncedIds.length > 0) {

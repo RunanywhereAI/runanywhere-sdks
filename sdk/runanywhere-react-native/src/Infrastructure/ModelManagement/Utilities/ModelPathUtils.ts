@@ -12,7 +12,10 @@
 import RNFS from 'react-native-fs';
 import { ModelFormat } from '../../../Core/Models/Model/ModelFormat';
 import { InferenceFramework } from '../Models/InferenceFramework';
-import { SDKError, SDKErrorCode } from '../../../Foundation/ErrorTypes/SDKError';
+import {
+  SDKError,
+  SDKErrorCode,
+} from '../../../Foundation/ErrorTypes/SDKError';
 
 /**
  * Centralized utility for calculating model paths and directories.
@@ -191,7 +194,7 @@ export class ModelPathUtils {
    * @returns The model ID if found, null otherwise
    */
   static extractModelId(path: string): string | null {
-    const pathComponents = path.split('/').filter(c => c.length > 0);
+    const pathComponents = path.split('/').filter((c) => c.length > 0);
 
     // Check if this is a model in our framework structure
     const modelsIndex = pathComponents.indexOf('Models');
@@ -221,7 +224,7 @@ export class ModelPathUtils {
    * @returns The framework if found, null otherwise
    */
   static extractFramework(path: string): InferenceFramework | null {
-    const pathComponents = path.split('/').filter(c => c.length > 0);
+    const pathComponents = path.split('/').filter((c) => c.length > 0);
 
     const modelsIndex = pathComponents.indexOf('Models');
     if (modelsIndex === -1 || modelsIndex + 1 >= pathComponents.length) {

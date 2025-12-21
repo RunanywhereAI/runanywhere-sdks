@@ -10,14 +10,10 @@
  * This class provides the session control interface and event streaming.
  */
 
-import {
-  VoiceSessionEvent,
-  VoiceSessionEventFactory,
-} from './VoiceSessionEvent';
-import {
-  VoiceSessionConfig,
-  DEFAULT_VOICE_SESSION_CONFIG,
-} from './VoiceSessionConfig';
+import type { VoiceSessionEvent } from './VoiceSessionEvent';
+import { VoiceSessionEventFactory } from './VoiceSessionEvent';
+import type { VoiceSessionConfig } from './VoiceSessionConfig';
+import { DEFAULT_VOICE_SESSION_CONFIG } from './VoiceSessionConfig';
 import { VoiceSessionError } from './VoiceSessionError';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 

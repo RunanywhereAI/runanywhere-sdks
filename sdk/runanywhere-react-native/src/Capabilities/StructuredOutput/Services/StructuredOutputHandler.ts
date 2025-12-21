@@ -318,8 +318,7 @@ Remember: Output ONLY the JSON object, nothing else.`;
       const parsed = JSON.parse(jsonString) as T;
       return parsed;
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       throw new Error(
         `${StructuredOutputError.InvalidJSON}: Failed to parse JSON - ${message}`
       );

@@ -18,7 +18,10 @@ export class TTSError extends SDKError {
    * Service not initialized before use
    */
   static notInitialized(): TTSError {
-    return new TTSError(ErrorCode.NotInitialized, 'TTS service not initialized. Call initialize() first.');
+    return new TTSError(
+      ErrorCode.NotInitialized,
+      'TTS service not initialized. Call initialize() first.'
+    );
   }
 
   /**
@@ -38,18 +41,26 @@ export class TTSError extends SDKError {
    * No provider found for the requested voice/model
    */
   static noProviderFound(voiceId: string): TTSError {
-    return new TTSError(ErrorCode.ModelNotFound, `No TTS provider found for voice: ${voiceId}`, {
-      details: { voiceId },
-    });
+    return new TTSError(
+      ErrorCode.ModelNotFound,
+      `No TTS provider found for voice: ${voiceId}`,
+      {
+        details: { voiceId },
+      }
+    );
   }
 
   /**
    * Model/voice file not found at path
    */
   static modelNotFound(path: string): TTSError {
-    return new TTSError(ErrorCode.ModelNotFound, `TTS model not found at: ${path}`, {
-      details: { path },
-    });
+    return new TTSError(
+      ErrorCode.ModelNotFound,
+      `TTS model not found at: ${path}`,
+      {
+        details: { path },
+      }
+    );
   }
 
   // MARK: - Configuration Errors
@@ -58,9 +69,13 @@ export class TTSError extends SDKError {
    * Invalid configuration provided
    */
   static invalidConfiguration(reason: string): TTSError {
-    return new TTSError(ErrorCode.InvalidInput, `Invalid TTS configuration: ${reason}`, {
-      details: { reason },
-    });
+    return new TTSError(
+      ErrorCode.InvalidInput,
+      `Invalid TTS configuration: ${reason}`,
+      {
+        details: { reason },
+      }
+    );
   }
 
   /**
@@ -108,7 +123,10 @@ export class TTSError extends SDKError {
    * Empty text provided for synthesis
    */
   static emptyText(): TTSError {
-    return new TTSError(ErrorCode.InvalidInput, 'Cannot synthesize empty text.');
+    return new TTSError(
+      ErrorCode.InvalidInput,
+      'Cannot synthesize empty text.'
+    );
   }
 
   /**
@@ -128,9 +146,13 @@ export class TTSError extends SDKError {
    * Invalid SSML markup
    */
   static invalidSSML(reason: string): TTSError {
-    return new TTSError(ErrorCode.InvalidInput, `Invalid SSML markup: ${reason}`, {
-      details: { reason },
-    });
+    return new TTSError(
+      ErrorCode.InvalidInput,
+      `Invalid SSML markup: ${reason}`,
+      {
+        details: { reason },
+      }
+    );
   }
 
   // MARK: - Runtime Errors
@@ -139,36 +161,52 @@ export class TTSError extends SDKError {
    * Synthesis failed
    */
   static synthesisFailed(reason: string): TTSError {
-    return new TTSError(ErrorCode.GenerationFailed, `TTS synthesis failed: ${reason}`, {
-      details: { reason },
-    });
+    return new TTSError(
+      ErrorCode.GenerationFailed,
+      `TTS synthesis failed: ${reason}`,
+      {
+        details: { reason },
+      }
+    );
   }
 
   /**
    * Voice not available
    */
   static voiceNotAvailable(voiceId: string): TTSError {
-    return new TTSError(ErrorCode.ModelNotFound, `Voice not available: ${voiceId}`, {
-      details: { voiceId },
-    });
+    return new TTSError(
+      ErrorCode.ModelNotFound,
+      `Voice not available: ${voiceId}`,
+      {
+        details: { voiceId },
+      }
+    );
   }
 
   /**
    * Language not supported
    */
   static languageNotSupported(language: string): TTSError {
-    return new TTSError(ErrorCode.InvalidInput, `Language not supported: ${language}`, {
-      details: { language },
-    });
+    return new TTSError(
+      ErrorCode.InvalidInput,
+      `Language not supported: ${language}`,
+      {
+        details: { language },
+      }
+    );
   }
 
   /**
    * Audio format not supported
    */
   static audioFormatNotSupported(format: string): TTSError {
-    return new TTSError(ErrorCode.InvalidInput, `Audio format not supported: ${format}`, {
-      details: { format },
-    });
+    return new TTSError(
+      ErrorCode.InvalidInput,
+      `Audio format not supported: ${format}`,
+      {
+        details: { format },
+      }
+    );
   }
 
   // MARK: - Resource Errors
@@ -190,14 +228,20 @@ export class TTSError extends SDKError {
    * Operation cancelled
    */
   static cancelled(): TTSError {
-    return new TTSError(ErrorCode.OperationCancelled, 'TTS operation was cancelled');
+    return new TTSError(
+      ErrorCode.OperationCancelled,
+      'TTS operation was cancelled'
+    );
   }
 
   /**
    * Service is busy with another operation
    */
   static busy(): TTSError {
-    return new TTSError(ErrorCode.GenerationFailed, 'TTS service is busy with another operation');
+    return new TTSError(
+      ErrorCode.GenerationFailed,
+      'TTS service is busy with another operation'
+    );
   }
 
   private constructor(

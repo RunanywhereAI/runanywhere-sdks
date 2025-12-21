@@ -7,11 +7,13 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/FileManagement/Models/Domain/StorageInfo.swift
  */
 
-import { AppStorageInfo, createAppStorageInfo } from './AppStorageInfo';
-import { DeviceStorageInfo, createDeviceStorageInfo } from './DeviceStorageInfo';
-import { ModelStorageInfo } from '../../ModelManagement/Models/ModelStorageInfo';
+import type { AppStorageInfo } from './AppStorageInfo';
+import { createAppStorageInfo } from './AppStorageInfo';
+import type { DeviceStorageInfo } from './DeviceStorageInfo';
+import { createDeviceStorageInfo } from './DeviceStorageInfo';
+import type { ModelStorageInfo } from '../../ModelManagement/Models/ModelStorageInfo';
 import { createEmptyModelStorageInfo } from '../../ModelManagement/Models/ModelStorageInfo';
-import { StoredModel } from '../../ModelManagement/Models/StoredModel';
+import type { StoredModel } from '../../ModelManagement/Models/StoredModel';
 
 /**
  * Storage information
