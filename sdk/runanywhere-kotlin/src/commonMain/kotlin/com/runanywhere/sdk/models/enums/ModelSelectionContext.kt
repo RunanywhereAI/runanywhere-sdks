@@ -95,6 +95,7 @@ enum class ModelSelectionContext(
                 ModelCategory.SPEECH_RECOGNITION, ModelCategory.AUDIO -> STT
                 ModelCategory.SPEECH_SYNTHESIS -> TTS
                 ModelCategory.MULTIMODAL, ModelCategory.VISION, ModelCategory.IMAGE_GENERATION -> LLM
+                ModelCategory.OTHER -> LLM // Default to LLM for other categories
             }
 
         /**

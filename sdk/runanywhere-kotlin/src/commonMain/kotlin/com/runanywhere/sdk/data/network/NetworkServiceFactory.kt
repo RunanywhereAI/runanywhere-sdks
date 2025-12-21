@@ -31,8 +31,13 @@ object NetworkServiceFactory {
 
         return when (environment) {
             SDKEnvironment.DEVELOPMENT -> {
-                logger.info("🔧 Creating MockNetworkService for DEVELOPMENT environment")
-                MockNetworkService()
+                logger.info("🔧 Creating Production APIClient for DEVELOPMENT environment")
+                createProductionAPIClient(
+                    baseURL = baseURL ?: getDefaultBaseURL(environment),
+                    apiKey = apiKey ?: throw IllegalArgumentException("API key is required for DEVELOPMENT environment"),
+                    authenticationService = authenticationService,
+                    networkConfig = networkConfig,
+                )
             }
 
             SDKEnvironment.STAGING -> {

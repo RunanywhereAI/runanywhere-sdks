@@ -20,6 +20,7 @@ enum class ModelCategory(
     IMAGE_GENERATION("image-generation", "Image Generation", "photo_badge_plus"),
     MULTIMODAL("multimodal", "Multimodal", "sparkles"),
     AUDIO("audio", "Audio Processing", "waveform"),
+    OTHER("other", "Other", "questionmark"),
     ;
 
     /**
@@ -36,6 +37,7 @@ enum class ModelCategory(
                 IMAGE_GENERATION -> FrameworkModality.TEXT_TO_IMAGE
                 MULTIMODAL -> FrameworkModality.MULTIMODAL
                 AUDIO -> FrameworkModality.VOICE_TO_TEXT // Audio processing maps to voice-to-text
+                OTHER -> FrameworkModality.MULTIMODAL // Other maps to multimodal
             }
 
     /**

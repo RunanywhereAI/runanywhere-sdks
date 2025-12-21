@@ -134,7 +134,7 @@ class AnyServiceWrapper<T : Any> : ServiceWrapper<T> {
  * Simplified base component for all SDK components
  */
 abstract class BaseComponent<TService : Any>(
-    protected val configuration: ComponentConfiguration,
+    val configuration: ComponentConfiguration,
     serviceContainer: ServiceContainer? = null,
 ) : Component {
     // MARK: - Core Properties

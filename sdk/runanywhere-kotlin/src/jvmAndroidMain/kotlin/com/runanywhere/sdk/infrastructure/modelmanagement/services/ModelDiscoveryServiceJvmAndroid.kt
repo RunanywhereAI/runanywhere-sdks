@@ -156,7 +156,7 @@ private fun inferFrameworkFromFormat(format: ModelFormat): InferenceFramework =
     when (format) {
         ModelFormat.GGUF -> InferenceFramework.LLAMA_CPP
         ModelFormat.ONNX -> InferenceFramework.ONNX
-        ModelFormat.TFLITE -> InferenceFramework.TENSORFLOW_LITE
+        ModelFormat.TFLITE -> InferenceFramework.TENSOR_FLOW_LITE
         ModelFormat.SAFETENSORS -> InferenceFramework.MLC
         else -> InferenceFramework.UNKNOWN
     }

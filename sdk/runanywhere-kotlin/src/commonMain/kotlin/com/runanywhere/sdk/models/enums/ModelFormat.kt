@@ -23,6 +23,7 @@ enum class ModelFormat(
     WEIGHTS("weights"),
     CHECKPOINT("checkpoint"),
     UNKNOWN("unknown"),
+    OTHER("other"),
     ;
 
     companion object {

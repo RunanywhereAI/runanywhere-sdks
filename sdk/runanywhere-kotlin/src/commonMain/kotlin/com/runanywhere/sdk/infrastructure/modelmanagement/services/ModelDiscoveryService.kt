@@ -210,8 +210,8 @@ class ModelDiscoveryService(
                         return createModelInfo(
                             modelId = modelId,
                             localPath = modelPath ?: modelFolder,
-                            format = detection.format,
-                            downloadSize = detection.size,
+                            format = detection.first,
+                            downloadSize = detection.second,
                             framework = framework,
                         )
                     }
@@ -362,7 +362,7 @@ class ModelDiscoveryService(
             ModelFormat.GGUF -> InferenceFramework.LLAMA_CPP
             ModelFormat.ONNX -> InferenceFramework.ONNX
             ModelFormat.MLMODEL -> InferenceFramework.CORE_ML
-            ModelFormat.TFLITE -> InferenceFramework.TENSORFLOW_LITE
+            ModelFormat.TFLITE -> InferenceFramework.TENSOR_FLOW_LITE
             ModelFormat.SAFETENSORS -> InferenceFramework.MLC
             else -> InferenceFramework.UNKNOWN
         }
