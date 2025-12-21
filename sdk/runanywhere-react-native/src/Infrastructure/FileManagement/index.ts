@@ -15,3 +15,16 @@ export * from './Models';
 
 // Protocol subsystem
 export * from './Protocol';
+
+// Configuration
+export {
+  type StorageConfiguration,
+  CacheEvictionPolicy,
+  getCacheEvictionPolicyDescription,
+  DEFAULT_STORAGE_CONFIGURATION,
+  createStorageConfiguration,
+  StorageConfigurationPresets,
+} from './Models/Configuration';
+
+// Constants
+export { StorageConstants, type StorageConstantsType } from './Constants';

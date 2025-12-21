@@ -22,3 +22,31 @@ export {
   getActiveFrameworks,
   formatTotalSize,
 } from './ModelStorageInfo';
+
+// Model Artifact Types
+export {
+  ArchiveType,
+  getArchiveTypeExtension,
+  detectArchiveType,
+  ArchiveStructure,
+  type ExpectedModelFiles,
+  EXPECTED_MODEL_FILES_NONE,
+  createExpectedModelFiles,
+  type ModelFileDescriptor,
+  createModelFileDescriptor,
+  ModelArtifactTypeKind,
+  type ModelArtifactType,
+  singleFileArtifact,
+  archiveArtifact,
+  zipArchiveArtifact,
+  tarBz2ArchiveArtifact,
+  tarGzArchiveArtifact,
+  multiFileArtifact,
+  customArtifact,
+  builtInArtifact,
+  inferArtifactType,
+  requiresExtraction,
+  requiresDownload,
+  getExpectedFiles,
+  getArtifactTypeDisplayName,
+} from './ModelArtifactType';

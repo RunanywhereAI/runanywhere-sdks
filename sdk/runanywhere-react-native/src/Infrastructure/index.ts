@@ -22,5 +22,8 @@ export * from './Events';
 // File Management subsystem
 export * from './FileManagement';
 
+// Logging subsystem
+export * from './Logging';
+
 // Model Management subsystem
 export * from './ModelManagement';

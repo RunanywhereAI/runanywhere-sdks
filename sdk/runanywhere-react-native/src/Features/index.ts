@@ -36,3 +36,6 @@ export * from './SpeakerDiarization';
 
 // Voice Agent (orchestrates VAD, STT, LLM, TTS)
 export * from './VoiceAgent';
+
+// Voice Session (high-level voice session API)
+export * from './VoiceSession';
