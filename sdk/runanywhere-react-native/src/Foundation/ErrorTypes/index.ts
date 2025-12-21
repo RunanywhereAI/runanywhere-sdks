@@ -31,8 +31,12 @@ export {
 
 // SDK Error class and utilities
 export {
+  // Legacy enum (backwards compatibility)
+  SDKErrorCode,
+  // Protocol and class
   SDKErrorProtocol,
   SDKError,
+  // Utility functions
   asSDKError,
   isSDKError,
   captureAndThrow,

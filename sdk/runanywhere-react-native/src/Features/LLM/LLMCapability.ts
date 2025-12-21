@@ -33,6 +33,33 @@ import { ManagedLifecycle } from '../../Core/Capabilities/ManagedLifecycle';
 import type { ComponentConfiguration } from '../../Core/Capabilities/CapabilityProtocols';
 
 /**
+ * Generation analytics metrics
+ * Matches iOS: GenerationMetrics struct
+ */
+export interface GenerationMetrics {
+  /** Total number of analytics events */
+  totalEvents: number;
+  /** Time when tracking started */
+  startTime: Date | null;
+  /** Time of last event */
+  lastEventTime: Date | null;
+  /** Total number of all generations (streaming + non-streaming) */
+  totalGenerations: number;
+  /** Number of streaming generations */
+  streamingGenerations: number;
+  /** Number of non-streaming generations */
+  nonStreamingGenerations: number;
+  /** Average time to first token in seconds (only for streaming generations) */
+  averageTimeToFirstToken: number;
+  /** Average tokens per second across all generations */
+  averageTokensPerSecond: number;
+  /** Total input tokens processed */
+  totalInputTokens: number;
+  /** Total output tokens generated */
+  totalOutputTokens: number;
+}
+
+/**
  * LLM Service Wrapper
  * Wrapper class to allow protocol-based LLM service to work with BaseComponent
  */
@@ -109,6 +136,89 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
    */
   get currentModelId(): string | null {
     return this.managedLifecycle.currentResourceId;
+  }
+
+  /**
+   * Whether the currently loaded service supports true streaming generation
+   * Matches iOS: public var supportsStreaming: Bool { get async { ... } }
+   * @returns `true` if streaming is supported, `false` otherwise
+   * @note Returns `false` if no model is loaded
+   */
+  get supportsStreaming(): boolean {
+    const service = this.managedLifecycle.currentService;
+    if (!service) {
+      return false;
+    }
+    // Check if the service has a generateStream method
+    return typeof service.generateStream === 'function';
+  }
+
+  // MARK: - Analytics
+
+  /**
+   * Get current generation analytics metrics
+   * Matches iOS: public func getAnalyticsMetrics() async -> GenerationMetrics
+   */
+  getAnalyticsMetrics(): GenerationMetrics {
+    return this._analyticsMetrics;
+  }
+
+  /**
+   * Internal analytics state
+   */
+  private _analyticsMetrics: GenerationMetrics = {
+    totalEvents: 0,
+    startTime: null,
+    lastEventTime: null,
+    totalGenerations: 0,
+    streamingGenerations: 0,
+    nonStreamingGenerations: 0,
+    averageTimeToFirstToken: 0,
+    averageTokensPerSecond: 0,
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+  };
+
+  /**
+   * Update analytics after a generation
+   */
+  private updateAnalytics(metrics: {
+    isStreaming: boolean;
+    timeToFirstToken?: number;
+    tokensPerSecond: number;
+    inputTokens: number;
+    outputTokens: number;
+  }): void {
+    const now = new Date();
+
+    if (!this._analyticsMetrics.startTime) {
+      this._analyticsMetrics.startTime = now;
+    }
+    this._analyticsMetrics.lastEventTime = now;
+    this._analyticsMetrics.totalEvents++;
+    this._analyticsMetrics.totalGenerations++;
+
+    if (metrics.isStreaming) {
+      this._analyticsMetrics.streamingGenerations++;
+      if (metrics.timeToFirstToken !== undefined) {
+        // Update running average of TTFT
+        const ttftCount = this._analyticsMetrics.streamingGenerations;
+        this._analyticsMetrics.averageTimeToFirstToken =
+          ((this._analyticsMetrics.averageTimeToFirstToken * (ttftCount - 1)) +
+            metrics.timeToFirstToken) / ttftCount;
+      }
+    } else {
+      this._analyticsMetrics.nonStreamingGenerations++;
+    }
+
+    // Update running average of tokens per second
+    const genCount = this._analyticsMetrics.totalGenerations;
+    this._analyticsMetrics.averageTokensPerSecond =
+      ((this._analyticsMetrics.averageTokensPerSecond * (genCount - 1)) +
+        metrics.tokensPerSecond) / genCount;
+
+    this._analyticsMetrics.totalInputTokens += metrics.inputTokens;
+    this._analyticsMetrics.totalOutputTokens += metrics.outputTokens;
   }
 
   /**
@@ -283,6 +393,14 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
     const completionTokens =
       result.tokensUsed ?? Math.floor(result.text.length / 4);
     const tokensPerSecond = completionTokens / generationTime;
+
+    // Update analytics
+    this.updateAnalytics({
+      isStreaming: false,
+      tokensPerSecond,
+      inputTokens: promptTokens,
+      outputTokens: completionTokens,
+    });
 
     // Create output
     return {
@@ -491,6 +609,22 @@ export class LLMCapability extends BaseComponent<LLMServiceWrapper> {
 
         // Mark as complete
         collector.isComplete = true;
+
+        // Update analytics for streaming generation
+        const totalTimeMs = Date.now() - collector.startTime;
+        const timeToFirstTokenMs = collector.firstTokenTime
+          ? collector.firstTokenTime - collector.startTime
+          : null;
+        const tokensPerSecond =
+          totalTimeMs > 0 ? (collector.tokenCount / totalTimeMs) * 1000 : 0;
+
+        this.updateAnalytics({
+          isStreaming: true,
+          timeToFirstToken: timeToFirstTokenMs !== null ? timeToFirstTokenMs / 1000 : undefined,
+          tokensPerSecond,
+          inputTokens: Math.floor(fullPrompt.length / 4), // Rough estimate
+          outputTokens: collector.tokenCount,
+        });
 
         // Enqueue final token
         enqueueToken({

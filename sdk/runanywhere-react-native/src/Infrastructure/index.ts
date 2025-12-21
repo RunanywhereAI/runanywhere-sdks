@@ -10,5 +10,11 @@
 // Analytics subsystem
 export * from './Analytics';
 
+// Device subsystem
+export * from './Device';
+
 // Events subsystem
 export * from './Events';
+
+// Model Management subsystem
+export * from './ModelManagement';

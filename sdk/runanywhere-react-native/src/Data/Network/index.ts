@@ -41,6 +41,8 @@ export {
   type AuthenticationProvider,
 } from './Services/APIClient';
 
+export { AuthenticationService } from './Services/AuthenticationService';
+
 // Models
 export {
   type AuthenticationRequest,

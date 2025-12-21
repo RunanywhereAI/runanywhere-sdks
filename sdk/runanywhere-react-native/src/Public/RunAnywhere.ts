@@ -17,11 +17,14 @@ import {
   SDKEnvironment,
   ExecutionTarget,
   HardwareAcceleration,
+  ModelCategory,
+  LLMFramework,
 } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { DeviceIdentityService } from '../Foundation/DeviceIdentity/DeviceIdentityService';
+import { SDKConstants } from '../Foundation/Constants/SDKConstants';
 
 const logger = new SDKLogger('RunAnywhere');
 import type {
@@ -234,6 +237,102 @@ export const RunAnywhere = {
    */
   async getDeviceId(): Promise<string> {
     return DeviceIdentityService.getPersistentDeviceUUID();
+  },
+
+  /**
+   * Whether the currently loaded LLM service supports true streaming generation
+   *
+   * Matches iOS: static var supportsLLMStreaming: Bool
+   *
+   * @returns `true` if streaming is supported, `false` otherwise
+   * @note Returns `false` if no LLM model is loaded
+   */
+  get supportsLLMStreaming(): boolean {
+    return ServiceContainer.shared.llmCapability.supportsStreaming;
+  },
+
+  /**
+   * Current SDK version
+   *
+   * Matches iOS: static var version: String
+   */
+  get version(): string {
+    return SDKConstants.version;
+  },
+
+  /**
+   * Current environment (null if not initialized)
+   *
+   * Matches iOS: static var environment: SDKEnvironment?
+   */
+  get environment(): SDKEnvironment | null {
+    return initState.environment;
+  },
+
+  // ============================================================================
+  // Authentication Info (Production/Staging only)
+  // ============================================================================
+
+  /**
+   * Get current user ID from authentication
+   *
+   * Matches iOS: static func getUserId() async -> String?
+   *
+   * @returns User ID if authenticated, null otherwise
+   */
+  async getUserId(): Promise<string | null> {
+    if (!initState.isCoreInitialized) {
+      return null;
+    }
+    try {
+      const { AuthenticationService } = await import(
+        '../Data/Network/Services/AuthenticationService'
+      );
+      const authService = ServiceContainer.shared.authenticationService;
+      if (!authService || !(authService instanceof AuthenticationService)) {
+        return null;
+      }
+      return (authService as InstanceType<typeof AuthenticationService>).getUserId();
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Get current organization ID from authentication
+   *
+   * Matches iOS: static func getOrganizationId() async -> String?
+   *
+   * @returns Organization ID if authenticated, null otherwise
+   */
+  async getOrganizationId(): Promise<string | null> {
+    if (!initState.isCoreInitialized) {
+      return null;
+    }
+    try {
+      const { AuthenticationService } = await import(
+        '../Data/Network/Services/AuthenticationService'
+      );
+      const authService = ServiceContainer.shared.authenticationService;
+      if (!authService || !(authService instanceof AuthenticationService)) {
+        return null;
+      }
+      return (authService as InstanceType<typeof AuthenticationService>).getOrganizationId();
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Check if device is registered with backend
+   *
+   * Matches iOS: static func isDeviceRegistered() async -> Bool
+   */
+  async isDeviceRegistered(): Promise<boolean> {
+    const { DeviceRegistrationService } = await import(
+      '../Infrastructure/Device'
+    );
+    return DeviceRegistrationService.shared.isRegistered();
   },
 
   // ============================================================================
@@ -527,6 +626,29 @@ export const RunAnywhere = {
       });
     }
 
+    // Step 4: Register device with backend
+    // Matches iOS: await serviceContainer.deviceRegistrationService.registerIfNeeded(...)
+    try {
+      const apiClient = ServiceContainer.shared.apiClient;
+      const environment = initState.environment ?? SDKEnvironment.Production;
+
+      if (apiClient) {
+        const { DeviceRegistrationService } = await import(
+          '../Infrastructure/Device'
+        );
+        await DeviceRegistrationService.shared.registerIfNeeded(
+          apiClient,
+          environment
+        );
+        logger.info('Device registration check complete');
+      } else {
+        logger.debug('No API client available, skipping device registration');
+      }
+    } catch (error) {
+      // Device registration failure is non-critical
+      logger.warning('Device registration failed (non-critical):', { error });
+    }
+
     // Mark Phase 2 complete
     const phase2Duration = Date.now() - phase2Start;
     logger.info(`Phase 2 complete (${phase2Duration}ms)`);
@@ -601,7 +723,77 @@ export const RunAnywhere = {
    */
   async getVersion(): Promise<string> {
     // Version is managed at the JS layer
-    return '0.1.0';
+    return SDKConstants.version;
+  },
+
+  // ============================================================================
+  // Logging
+  // ============================================================================
+
+  /**
+   * Set SDK log level
+   * Matches iOS: static func setLogLevel(_ level: LogLevel)
+   *
+   * @param level - The minimum log level to output
+   */
+  setLogLevel(
+    level: import('../Foundation/Logging/Models/LogLevel').LogLevel
+  ): void {
+    const { LoggingManager } = require('../Foundation/Logging');
+    LoggingManager.shared.setLogLevel(level);
+  },
+
+  /**
+   * Subscribe to all SDK log events
+   * Matches iOS pattern of exposing log events publicly.
+   *
+   * This allows consumers to receive log events for their own logging infrastructure
+   * (e.g., Sentry, LogRocket, custom analytics).
+   *
+   * @param callback - Function called for each log entry
+   * @returns Unsubscribe function
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = RunAnywhere.onLog((entry) => {
+   *   console.log(`[${entry.level}] ${entry.category}: ${entry.message}`);
+   *   // Or send to your logging service
+   *   Sentry.captureMessage(entry.message, entry.level);
+   * });
+   *
+   * // Later: unsubscribe();
+   * ```
+   */
+  onLog(
+    callback: import('../Foundation/Logging').LogEventCallback
+  ): () => void {
+    const { LoggingManager } = require('../Foundation/Logging');
+    return LoggingManager.shared.onLog(callback);
+  },
+
+  /**
+   * Add a custom log destination
+   * Matches iOS: static func addLogDestination(_ destination: LogDestination)
+   *
+   * Use this to add custom logging backends (file, remote service, etc.)
+   *
+   * @param destination - Log destination to add
+   */
+  addLogDestination(
+    destination: import('../Foundation/Logging').LogDestination
+  ): void {
+    const { LoggingManager } = require('../Foundation/Logging');
+    LoggingManager.shared.addDestination(destination);
+  },
+
+  /**
+   * Remove a log destination by identifier
+   *
+   * @param identifier - Destination identifier to remove
+   */
+  removeLogDestination(identifier: string): void {
+    const { LoggingManager } = require('../Foundation/Logging');
+    LoggingManager.shared.removeDestination(identifier);
   },
 
   // ============================================================================
@@ -1673,6 +1865,163 @@ export const RunAnywhere = {
         model.compatibleFrameworks.includes(framework) ||
         model.preferredFramework === framework
     );
+  },
+
+  // ============================================================================
+  // Model Assignments API
+  // ============================================================================
+
+  /**
+   * Fetch model assignments for the current device from the backend
+   *
+   * This method fetches models assigned to this device based on device type and platform.
+   * Uses the ModelAssignmentService for server-side model catalog.
+   *
+   * Matches iOS: static func fetchModelAssignments(forceRefresh:) async throws -> [ModelInfo]
+   *
+   * @param forceRefresh - Force refresh even if cached models are available
+   * @returns Array of ModelInfo objects assigned to this device
+   * @throws Error if fetching fails
+   *
+   * @example
+   * ```typescript
+   * const models = await RunAnywhere.fetchModelAssignments();
+   * console.log(`Found ${models.length} assigned models`);
+   * ```
+   */
+  async fetchModelAssignments(forceRefresh = false): Promise<ModelInfo[]> {
+    // Ensure SDK is initialized
+    if (!initState.isCoreInitialized) {
+      throw new Error('SDK not initialized. Call initialize() first.');
+    }
+
+    // Ensure services are ready
+    await this.ensureServicesReady();
+
+    logger.info('Fetching model assignments...');
+
+    const modelAssignmentService = ServiceContainer.shared.modelAssignmentService;
+    if (!modelAssignmentService) {
+      throw new Error('ModelAssignmentService not available');
+    }
+
+    const models = await modelAssignmentService.fetchModelAssignments(forceRefresh);
+    logger.info(`Successfully fetched ${models.length} model assignments`);
+    return models;
+  },
+
+  /**
+   * Get available models for a specific category
+   *
+   * Matches iOS: static func getModelsForCategory(_:) async throws -> [ModelInfo]
+   *
+   * @param category - The model category to filter models for
+   * @returns Array of ModelInfo objects in the specified category
+   *
+   * @example
+   * ```typescript
+   * const sttModels = await RunAnywhere.getModelsForCategory(ModelCategory.STT);
+   * ```
+   */
+  async getModelsForCategory(category: ModelCategory): Promise<ModelInfo[]> {
+    // Ensure SDK is initialized
+    if (!initState.isCoreInitialized) {
+      throw new Error('SDK not initialized. Call initialize() first.');
+    }
+
+    await this.ensureServicesReady();
+
+    const modelAssignmentService = ServiceContainer.shared.modelAssignmentService;
+    if (!modelAssignmentService) {
+      // Fallback to local filtering if service not available
+      const allModels = await ModelRegistry.getAvailableModels();
+      return allModels.filter((m) => m.category === category);
+    }
+
+    return modelAssignmentService.getModelsForCategory(category);
+  },
+
+  /**
+   * Clear cached model assignments
+   *
+   * Matches iOS: static func clearModelAssignmentsCache() async
+   */
+  async clearModelAssignmentsCache(): Promise<void> {
+    if (!initState.isCoreInitialized) {
+      return;
+    }
+
+    const modelAssignmentService = ServiceContainer.shared.modelAssignmentService;
+    if (modelAssignmentService) {
+      modelAssignmentService.clearCache();
+    }
+  },
+
+  /**
+   * Register a model from a download URL
+   *
+   * Use this to add models for development or offline use.
+   *
+   * Matches iOS: static func registerModel(id:name:url:framework:modality:...)
+   *
+   * @param options - Model registration options
+   * @returns The created ModelInfo
+   *
+   * @example
+   * ```typescript
+   * const model = await RunAnywhere.registerModel({
+   *   name: 'My Custom Model',
+   *   url: 'https://example.com/model.gguf',
+   *   framework: LLMFramework.LlamaCpp,
+   * });
+   * ```
+   */
+  async registerModel(options: {
+    id?: string;
+    name: string;
+    url: string;
+    framework: LLMFramework;
+    category?: ModelCategory;
+    memoryRequirement?: number;
+    supportsThinking?: boolean;
+  }): Promise<ModelInfo> {
+    const { ModelFormat, ConfigurationSource } = await import('../types/enums');
+    const now = new Date().toISOString();
+
+    const modelInfo: ModelInfo = {
+      id: options.id ?? this._generateModelId(options.url),
+      name: options.name,
+      category: options.category ?? ModelCategory.Language,
+      format: options.url.includes('.gguf') ? ModelFormat.GGUF : ModelFormat.GGUF,
+      downloadURL: options.url,
+      localPath: undefined,
+      downloadSize: undefined,
+      memoryRequired: options.memoryRequirement,
+      compatibleFrameworks: [options.framework],
+      preferredFramework: options.framework,
+      supportsThinking: options.supportsThinking ?? false,
+      tags: [],
+      source: ConfigurationSource.Local,
+      createdAt: now,
+      updatedAt: now,
+      syncPending: false,
+      usageCount: 0,
+    };
+
+    await ModelRegistry.registerModel(modelInfo);
+    return modelInfo;
+  },
+
+  /**
+   * Generate a stable model ID from URL
+   * @internal
+   */
+  _generateModelId(url: string): string {
+    // Extract filename without extension
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname;
+    const filename = pathname.split('/').pop() ?? 'model';
+    return filename.replace(/\.(gguf|bin|safetensors|tar\.gz|zip)$/i, '');
   },
 
   /**

@@ -18,7 +18,7 @@ import { ResourceChecker } from '../../Capabilities/Routing/Services/ResourceChe
 import { HardwareCapabilityManager } from '../../Capabilities/DeviceCapability/Services/HardwareCapabilityManager';
 import { SDKLogger } from '../Logging/Logger/SDKLogger';
 import { FileManager } from '../FileOperations/FileManager';
-import { DownloadServiceImpl } from '../../Data/Network/Services/DownloadService';
+import { DownloadService } from '../../services/DownloadService';
 import { SyncCoordinator } from '../../Data/Sync/SyncCoordinator';
 import { ConfigurationService } from '../Configuration/ConfigurationService';
 import { AnalyticsQueueManager } from '../../Infrastructure/Analytics/AnalyticsQueueManager';
@@ -26,7 +26,8 @@ import { ModelInfoService } from '../../Data/Services/ModelInfoService';
 import { ModelInfoRepositoryImpl } from '../../Data/Repositories/ModelInfoRepository';
 import type { ModelRegistry } from '../../Core/Protocols/Registry/ModelRegistry';
 import type { MemoryManager } from '../../Core/Protocols/Memory/MemoryManager';
-import type { DownloadService } from '../../Data/Network/Services/DownloadService';
+import { LLMCapability } from '../../Features/LLM/LLMCapability';
+import { LLMConfigurationImpl } from '../../Features/LLM/LLMConfiguration';
 import { AdapterRegistry } from './AdapterRegistry';
 import {
   APIClient,
@@ -72,8 +73,20 @@ export class ServiceContainer {
   }
 
   // ============================================================================
-  // Capability Services
+  // Capability Services (Matches iOS: simplified capabilities)
   // ============================================================================
+
+  /**
+   * LLM capability - handles all text generation operations
+   * Matches iOS: private(set) lazy var llmCapability: LLMCapability
+   */
+  private _llmCapability?: LLMCapability;
+  public get llmCapability(): LLMCapability {
+    if (!this._llmCapability) {
+      this._llmCapability = new LLMCapability(new LLMConfigurationImpl({}));
+    }
+    return this._llmCapability;
+  }
 
   /**
    * Model loading service
@@ -136,13 +149,10 @@ export class ServiceContainer {
 
   /**
    * Download service
+   * Uses the native-backed singleton from services/DownloadService
    */
-  private _downloadService?: DownloadService;
-  public get downloadService(): DownloadService {
-    if (!this._downloadService) {
-      this._downloadService = new DownloadServiceImpl();
-    }
-    return this._downloadService;
+  public get downloadService(): typeof DownloadService {
+    return DownloadService;
   }
 
   /**
@@ -225,6 +235,28 @@ export class ServiceContainer {
    * Implements AuthenticationProvider interface for APIClient token injection
    */
   public authenticationService?: AuthenticationProvider;
+
+  /**
+   * Model assignment service for server-side model catalog
+   */
+  private _modelAssignmentService?: import('../../Infrastructure/ModelManagement/Services/ModelAssignmentService').ModelAssignmentService;
+
+  /**
+   * Get or create the model assignment service
+   * Matches iOS: var modelAssignmentService: ModelAssignmentService
+   */
+  public get modelAssignmentService():
+    | import('../../Infrastructure/ModelManagement/Services/ModelAssignmentService').ModelAssignmentService
+    | undefined {
+    if (!this._modelAssignmentService && this._apiClient && this._environment) {
+      const { ModelAssignmentService } = require('../../Infrastructure/ModelManagement/Services/ModelAssignmentService');
+      this._modelAssignmentService = new ModelAssignmentService(
+        this._apiClient,
+        this._environment
+      );
+    }
+    return this._modelAssignmentService;
+  }
 
   /**
    * API client for sync operations
@@ -371,8 +403,10 @@ export class ServiceContainer {
     this._syncCoordinator = undefined;
     this._configurationService = undefined;
     this._modelInfoService = undefined;
+    this._modelAssignmentService = undefined;
     // Reset core services
     this._modelRegistry = undefined;
+    this._llmCapability = undefined;
     this._modelLoadingService = undefined;
     this._generationService = undefined;
     this._streamingService = undefined;
@@ -380,7 +414,8 @@ export class ServiceContainer {
     this._memoryService = undefined;
     this._hardwareManager = undefined;
     this._fileManager = undefined;
-    this._downloadService = undefined;
     this._logger = undefined;
+    // Reset the download service singleton state
+    DownloadService.reset();
   }
 }
