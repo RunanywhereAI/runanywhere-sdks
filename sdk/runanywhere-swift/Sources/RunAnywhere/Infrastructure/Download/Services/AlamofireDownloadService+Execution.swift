@@ -27,9 +27,9 @@ extension AlamofireDownloadService {
                     state: .downloading
                 )
 
-                // Log progress at 10% intervals
-                let progressPercent = progress.fractionCompleted * 100
-                if progressPercent.truncatingRemainder(dividingBy: 10) < 0.1 {
+                // Log progress at 25% intervals (local logging only, no analytics)
+                let progressPercent = Int(progress.fractionCompleted * 100)
+                if progressPercent % 25 == 0 && progressPercent > 0 {
                     self.logger.debug("Download progress", metadata: [
                         "modelId": model.id,
                         "progress": progressPercent,
@@ -37,14 +37,8 @@ extension AlamofireDownloadService {
                         "totalBytes": progress.totalUnitCount,
                         "speed": self.calculateDownloadSpeed(progress: progress)
                     ])
-
-                    EventPublisher.shared.track(ModelEvent.downloadProgress(
-                        modelId: model.id,
-                        progress: progress.fractionCompleted,
-                        bytesDownloaded: progress.completedUnitCount,
-                        totalBytes: progress.totalUnitCount
-                    ))
                 }
+                // Note: Progress events removed from analytics - only start/complete are tracked
 
                 progressContinuation.yield(downloadProgress)
             }
@@ -119,16 +113,11 @@ extension AlamofireDownloadService {
                 to: destinationFolder,
                 artifactType: model.artifactType,
                 progressHandler: { progress in
+                    // Progress updates are for UI only - analytics tracks start/complete only
                     progressContinuation.yield(.extraction(
                         modelId: model.id,
                         progress: progress,
                         totalBytes: model.downloadSize ?? 0
-                    ))
-
-                    // Track extraction progress
-                    EventPublisher.shared.track(ModelEvent.extractionProgress(
-                        modelId: model.id,
-                        progress: progress
                     ))
                 }
             )

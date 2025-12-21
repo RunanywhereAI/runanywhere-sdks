@@ -30,10 +30,12 @@ public enum TTSEvent: SDKEvent {
     /// Synthesis started event
     /// - Parameters:
     ///   - characterCount: Number of characters in the text to synthesize
+    ///   - sampleRate: Audio sample rate in Hz (default 22050 for most TTS)
     case synthesisStarted(
         synthesisId: String,
         voiceId: String,
         characterCount: Int,
+        sampleRate: Int = 22050,
         framework: InferenceFrameworkType = .unknown
     )
 
@@ -46,6 +48,7 @@ public enum TTSEvent: SDKEvent {
     ///   - audioSizeBytes: Size of generated audio in bytes
     ///   - processingDurationMs: Time taken to synthesize (processing time)
     ///   - charactersPerSecond: Synthesis speed (characters processed per second)
+    ///   - sampleRate: Audio sample rate in Hz
     case synthesisCompleted(
         synthesisId: String,
         voiceId: String,
@@ -54,9 +57,10 @@ public enum TTSEvent: SDKEvent {
         audioSizeBytes: Int,
         processingDurationMs: Double,
         charactersPerSecond: Double,
+        sampleRate: Int = 22050,
         framework: InferenceFrameworkType = .unknown
     )
-    case synthesisFailed(synthesisId: String, error: String)
+    case synthesisFailed(synthesisId: String, voiceId: String, error: String)
 
     // MARK: - SDKEvent Conformance
 
@@ -118,11 +122,13 @@ public enum TTSEvent: SDKEvent {
         case .modelUnloaded(let voiceId):
             return ["voice_id": voiceId]
 
-        case .synthesisStarted(let id, let voiceId, let characterCount, let framework):
+        case .synthesisStarted(let id, let voiceId, let characterCount, let sampleRate, let framework):
             return [
                 "synthesis_id": id,
                 "voice_id": voiceId,
+                "model_id": voiceId,  // Alias for consistency with backend
                 "character_count": String(characterCount),
+                "sample_rate": String(sampleRate),
                 "framework": framework.rawValue
             ]
 
@@ -140,21 +146,31 @@ public enum TTSEvent: SDKEvent {
             let audioSize,
             let processingDurationMs,
             let charsPerSecond,
+            let sampleRate,
             let framework
         ):
             return [
                 "synthesis_id": id,
                 "voice_id": voiceId,
+                "model_id": voiceId,  // Alias for consistency with backend
                 "character_count": String(charCount),
                 "audio_duration_ms": String(format: "%.1f", audioDurationMs),
                 "audio_size_bytes": String(audioSize),
                 "processing_duration_ms": String(format: "%.1f", processingDurationMs),
                 "chars_per_second": String(format: "%.2f", charsPerSecond),
+                "sample_rate": String(sampleRate),
+                "success": "true",
                 "framework": framework.rawValue
             ]
 
-        case .synthesisFailed(let id, let error):
-            return ["synthesis_id": id, "error": error]
+        case .synthesisFailed(let id, let voiceId, let error):
+            return [
+                "synthesis_id": id,
+                "voice_id": voiceId,
+                "model_id": voiceId,  // Alias for consistency with backend
+                "error": error,
+                "success": "false"
+            ]
         }
     }
 }

@@ -53,7 +53,7 @@ public actor AuthenticationService {
             sdkVersion: SDKConstants.version
         )
 
-        logger.debug("Authenticating with backend")
+        logger.info("Starting authentication...")
 
         // Use APIClient for the authentication request (doesn't require auth)
         let authResponse: AuthenticationResponse = try await apiClient.post(

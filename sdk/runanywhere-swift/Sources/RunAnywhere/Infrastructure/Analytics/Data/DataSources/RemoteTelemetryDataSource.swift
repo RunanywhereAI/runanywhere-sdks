@@ -13,6 +13,8 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
     public init(apiClient: APIClient?, environment: SDKEnvironment = .development) {
         self.apiClient = apiClient
         self.environment = environment
+        // Note: Can't use logger in init since it's an actor
+        // Logging will happen when sendBatch is called
     }
 
     // MARK: - DataSource Protocol
@@ -154,6 +156,7 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
 
         // Use analytics endpoint based on environment
         let endpoint = APIEndpoint.analyticsEndpoint(for: environment)
+
         let response: TelemetryBatchResponse = try await operationHelper.withTimeout {
             try await apiClient.post(
                 endpoint,

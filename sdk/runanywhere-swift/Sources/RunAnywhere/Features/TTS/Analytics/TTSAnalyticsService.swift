@@ -42,6 +42,7 @@ public actor TTSAnalyticsService {
         let startTime: Date
         let voiceId: String
         let characterCount: Int
+        let sampleRate: Int
         let framework: InferenceFrameworkType
     }
 
@@ -55,11 +56,13 @@ public actor TTSAnalyticsService {
     /// - Parameters:
     ///   - text: The text to synthesize
     ///   - voice: The voice ID being used
+    ///   - sampleRate: Audio sample rate in Hz (default 22050)
     ///   - framework: The inference framework being used
     /// - Returns: A unique synthesis ID for tracking
     public func startSynthesis(
         text: String,
         voice: String,
+        sampleRate: Int = 22050,
         framework: InferenceFrameworkType = .unknown
     ) -> String {
         let id = UUID().uuidString
@@ -69,6 +72,7 @@ public actor TTSAnalyticsService {
             startTime: Date(),
             voiceId: voice,
             characterCount: characterCount,
+            sampleRate: sampleRate,
             framework: framework
         )
 
@@ -76,10 +80,11 @@ public actor TTSAnalyticsService {
             synthesisId: id,
             voiceId: voice,
             characterCount: characterCount,
+            sampleRate: sampleRate,
             framework: framework
         ))
 
-        logger.debug("Synthesis started: \(id), \(characterCount) characters")
+        logger.debug("Synthesis started: \(id), voice: \(voice), \(characterCount) characters")
         return id
     }
 
@@ -127,10 +132,11 @@ public actor TTSAnalyticsService {
             audioSizeBytes: audioSizeBytes,
             processingDurationMs: processingTimeMs,
             charactersPerSecond: charsPerSecond,
+            sampleRate: tracker.sampleRate,
             framework: tracker.framework
         ))
 
-        logger.debug("Synthesis completed: \(synthesisId), audio: \(String(format: "%.1f", audioDurationMs))ms, \(audioSizeBytes) bytes")
+        logger.debug("Synthesis completed: \(synthesisId), voice: \(tracker.voiceId), audio: \(String(format: "%.1f", audioDurationMs))ms, \(audioSizeBytes) bytes")
     }
 
     /// Track synthesis failure
@@ -138,11 +144,12 @@ public actor TTSAnalyticsService {
         synthesisId: String,
         errorMessage: String
     ) {
-        activeSyntheses.removeValue(forKey: synthesisId)
+        let tracker = activeSyntheses.removeValue(forKey: synthesisId)
         lastEventTime = Date()
 
         EventPublisher.shared.track(TTSEvent.synthesisFailed(
             synthesisId: synthesisId,
+            voiceId: tracker?.voiceId ?? "unknown",
             error: errorMessage
         ))
     }

@@ -30,6 +30,9 @@ public class FoundationModelsService: LLMService {
     public var isReady: Bool { _isReady }
     public var currentModel: String? { _currentModel }
 
+    /// Foundation Models has a 4096 token context window
+    public var contextLength: Int? { 4096 }
+
     /// Apple Foundation Models does not support true token-by-token streaming
     public var supportsStreaming: Bool { false }
 

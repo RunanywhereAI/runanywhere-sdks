@@ -8,26 +8,31 @@
 import Foundation
 
 /// Response model for device registration
-/// Used for all SDK environments (development, staging, production)
+/// Matches backend schemas/device.py DeviceRegistrationResponse
 public struct DeviceRegistrationResponse: Codable, Sendable {
-    /// Whether registration was successful
-    public let success: Bool
-
     /// Device ID that was registered
     public let deviceId: String
 
-    /// ISO8601 timestamp when device was registered
-    public let registeredAt: String
+    /// Registration status ("registered" or "updated")
+    public let status: String
 
-    public init(success: Bool, deviceId: String, registeredAt: String) {
-        self.success = success
+    /// Sync status ("synced" or "pending")
+    public let syncStatus: String
+
+    public init(deviceId: String, status: String, syncStatus: String) {
         self.deviceId = deviceId
-        self.registeredAt = registeredAt
+        self.status = status
+        self.syncStatus = syncStatus
     }
 
     enum CodingKeys: String, CodingKey {
-        case success
         case deviceId = "device_id"
-        case registeredAt = "registered_at"
+        case status
+        case syncStatus = "sync_status"
+    }
+
+    /// Convenience: Check if registration was successful
+    public var isSuccess: Bool {
+        status == "registered" || status == "updated"
     }
 }

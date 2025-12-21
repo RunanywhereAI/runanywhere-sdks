@@ -52,7 +52,8 @@ public actor APIClient: NetworkService {
         _ payload: Data,
         requiresAuth: Bool
     ) async throws -> Data {
-        let token: String?
+        let token: String
+
         if requiresAuth {
             if let authService = authService {
                 token = try await authService.getAccessToken()
@@ -73,32 +74,33 @@ public actor APIClient: NetworkService {
         // Set authorization header (always set for Supabase compatibility)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await session.data(for: request)
+        do {
+            let (data, response) = try await session.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw RepositoryError.syncFailure("Invalid response")
-        }
-
-        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
-            // Try to parse error response
-            var errorMessage = "HTTP \(httpResponse.statusCode)"
-            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { // swiftlint:disable:this avoid_any_type
-                if let detail = errorData["detail"] as? String {
-                    errorMessage = detail
-                } else if let detail = errorData["detail"] as? [[String: Any]] { // swiftlint:disable:this avoid_any_type
-                    let errors = detail.compactMap { $0["msg"] as? String }.joined(separator: ", ")
-                    errorMessage = errors.isEmpty ? errorMessage : errors
-                } else if let message = errorData["message"] as? String {
-                    errorMessage = message
-                } else if let error = errorData["error"] as? String {
-                    errorMessage = error
-                }
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw RepositoryError.syncFailure("Invalid response")
             }
 
-            throw RepositoryError.syncFailure(errorMessage)
-        }
+            guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+                // Try to parse error response
+                var errorMessage = "HTTP \(httpResponse.statusCode)"
+                if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { // swiftlint:disable:this avoid_any_type
+                    if let detail = errorData["detail"] as? String {
+                        errorMessage = detail
+                    } else if let detail = errorData["detail"] as? [[String: Any]] { // swiftlint:disable:this avoid_any_type
+                        let errors = detail.compactMap { $0["msg"] as? String }.joined(separator: ", ")
+                        errorMessage = errors.isEmpty ? errorMessage : errors
+                    } else if let message = errorData["message"] as? String {
+                        errorMessage = message
+                    } else if let error = errorData["error"] as? String {
+                        errorMessage = error
+                    }
+                }
+                throw RepositoryError.syncFailure(errorMessage)
+            }
 
-        return data
+            return data
+        }
     }
 
     /// Perform a raw GET request
@@ -106,7 +108,7 @@ public actor APIClient: NetworkService {
         _ endpoint: APIEndpoint,
         requiresAuth: Bool
     ) async throws -> Data {
-        let token: String?
+        let token: String
         if requiresAuth {
             if let authService = authService {
                 token = try await authService.getAccessToken()

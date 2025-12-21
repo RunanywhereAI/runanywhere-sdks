@@ -68,10 +68,16 @@ public actor ManagedLifecycle<ServiceType> {
     /// Load a resource with automatic event tracking.
     @discardableResult
     public func load(_ resourceId: String) async throws -> ServiceType {
+        // Check if already loaded with same ID - skip duplicate events
+        if await lifecycle.currentResourceId == resourceId, let service = await lifecycle.currentService {
+            logger.info("Resource already loaded, skipping duplicate load: \(resourceId)")
+            return service
+        }
+
         let startTime = Date()
         logger.info("Loading \(resourceType.rawValue): \(resourceId)")
 
-        // Track load started
+        // Track load started (only if not already loaded)
         trackEvent(type: .loadStarted, resourceId: resourceId)
 
         do {
@@ -170,31 +176,59 @@ public actor ManagedLifecycle<ServiceType> {
         durationMs: Double? = nil,
         error: Error? = nil
     ) {
+        // Look up the framework from the model registry
+        let framework = lookupFramework(for: resourceId)
+
         // Create the appropriate event based on resource type
         let event: any SDKEvent = createEvent(
             type: type,
             resourceId: resourceId,
             durationMs: durationMs,
-            error: error
+            error: error,
+            framework: framework
         )
 
         // Track via EventPublisher - routes to both EventBus and Analytics
         EventPublisher.shared.track(event)
     }
 
+    /// Look up the framework for a model from the registry
+    private func lookupFramework(for resourceId: String) -> InferenceFrameworkType {
+        guard let modelInfo = ServiceContainer.shared.modelRegistry.getModel(by: resourceId) else {
+            return .unknown
+        }
+
+        // Get the framework from model info
+        let framework = modelInfo.preferredFramework ?? modelInfo.compatibleFrameworks.first
+        guard let framework = framework else {
+            return .unknown
+        }
+
+        // Try to match by case name (both enums use same case names like .onnx, .llamaCpp)
+        let caseName = String(describing: framework)
+        for frameworkType in InferenceFrameworkType.allCases {
+            if String(describing: frameworkType) == caseName {
+                return frameworkType
+            }
+        }
+
+        return .unknown
+    }
+
     private func createEvent(
         type: LifecycleEventType,
         resourceId: String,
         durationMs: Double?,
-        error: Error?
+        error: Error?,
+        framework: InferenceFrameworkType
     ) -> any SDKEvent {
         switch resourceType {
         case .llmModel:
-            return createLLMEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error)
+            return createLLMEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error, framework: framework)
         case .sttModel:
-            return createSTTEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error)
+            return createSTTEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error, framework: framework)
         case .ttsVoice:
-            return createTTSEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error)
+            return createTTSEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error, framework: framework)
         case .vadModel, .diarizationModel:
             // Use generic model event for VAD and diarization
             return createModelEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error)
@@ -205,15 +239,16 @@ public actor ManagedLifecycle<ServiceType> {
         type: LifecycleEventType,
         resourceId: String,
         durationMs: Double?,
-        error: Error?
+        error: Error?,
+        framework: InferenceFrameworkType
     ) -> LLMEvent {
         switch type {
         case .loadStarted:
-            return .modelLoadStarted(modelId: resourceId)
+            return .modelLoadStarted(modelId: resourceId, framework: framework)
         case .loadCompleted:
-            return .modelLoadCompleted(modelId: resourceId, durationMs: durationMs ?? 0)
+            return .modelLoadCompleted(modelId: resourceId, durationMs: durationMs ?? 0, framework: framework)
         case .loadFailed:
-            return .modelLoadFailed(modelId: resourceId, error: error?.localizedDescription ?? "Unknown error")
+            return .modelLoadFailed(modelId: resourceId, error: error?.localizedDescription ?? "Unknown error", framework: framework)
         case .unloaded:
             return .modelUnloaded(modelId: resourceId)
         }
@@ -223,15 +258,16 @@ public actor ManagedLifecycle<ServiceType> {
         type: LifecycleEventType,
         resourceId: String,
         durationMs: Double?,
-        error: Error?
+        error: Error?,
+        framework: InferenceFrameworkType
     ) -> STTEvent {
         switch type {
         case .loadStarted:
-            return .modelLoadStarted(modelId: resourceId)
+            return .modelLoadStarted(modelId: resourceId, framework: framework)
         case .loadCompleted:
-            return .modelLoadCompleted(modelId: resourceId, durationMs: durationMs ?? 0)
+            return .modelLoadCompleted(modelId: resourceId, durationMs: durationMs ?? 0, framework: framework)
         case .loadFailed:
-            return .modelLoadFailed(modelId: resourceId, error: error?.localizedDescription ?? "Unknown error")
+            return .modelLoadFailed(modelId: resourceId, error: error?.localizedDescription ?? "Unknown error", framework: framework)
         case .unloaded:
             return .modelUnloaded(modelId: resourceId)
         }
@@ -241,15 +277,16 @@ public actor ManagedLifecycle<ServiceType> {
         type: LifecycleEventType,
         resourceId: String,
         durationMs: Double?,
-        error: Error?
+        error: Error?,
+        framework: InferenceFrameworkType
     ) -> TTSEvent {
         switch type {
         case .loadStarted:
-            return .modelLoadStarted(voiceId: resourceId)
+            return .modelLoadStarted(voiceId: resourceId, framework: framework)
         case .loadCompleted:
-            return .modelLoadCompleted(voiceId: resourceId, durationMs: durationMs ?? 0)
+            return .modelLoadCompleted(voiceId: resourceId, durationMs: durationMs ?? 0, framework: framework)
         case .loadFailed:
-            return .modelLoadFailed(voiceId: resourceId, error: error?.localizedDescription ?? "Unknown error")
+            return .modelLoadFailed(voiceId: resourceId, error: error?.localizedDescription ?? "Unknown error", framework: framework)
         case .unloaded:
             return .modelUnloaded(voiceId: resourceId)
         }

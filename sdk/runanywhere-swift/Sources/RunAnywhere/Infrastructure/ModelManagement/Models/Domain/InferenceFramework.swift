@@ -75,4 +75,5 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
             return false
         }
     }
+
 }

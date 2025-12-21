@@ -20,7 +20,7 @@ public protocol AnalyticsMetrics: Sendable {
 
 /// Inference frameworks used for tracking which engine is processing requests.
 /// Use "none" for services that don't require a model/framework.
-public enum InferenceFrameworkType: String, Codable, Sendable {
+public enum InferenceFrameworkType: String, CaseIterable, Codable, Sendable {
     case llamaCpp = "llama_cpp"
     case whisperKit = "whisper_kit"
     case onnx = "onnx"

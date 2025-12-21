@@ -218,8 +218,8 @@ extension TelemetryEventPayload {
         // Session
         self.sessionId = props["session_id"]
 
-        // Model info
-        self.modelId = props["model_id"]
+        // Model info (voice_id is used as model_id for TTS/STT events)
+        self.modelId = props["model_id"] ?? props["voice_id"]
         self.modelName = props["model_name"]
         self.framework = props["framework"]
 
@@ -229,10 +229,12 @@ extension TelemetryEventPayload {
         self.platform = props["platform"]
         self.sdkVersion = props["sdk_version"]
 
-        // Common metrics
-        self.processingTimeMs = Self.parseDouble(props["processing_time_ms"] ?? props["total_time_ms"])
+        // Common metrics (processing_duration_ms used by TTS, duration_ms used by various events)
+        self.processingTimeMs = Self.parseDouble(
+            props["processing_time_ms"] ?? props["processing_duration_ms"] ?? props["duration_ms"] ?? props["total_time_ms"]
+        )
         self.success = Self.parseBool(props["success"])
-        self.errorMessage = props["error_message"]
+        self.errorMessage = props["error_message"] ?? props["error"]
         self.errorCode = props["error_code"]
 
         // LLM
@@ -247,8 +249,8 @@ extension TelemetryEventPayload {
         self.temperature = Self.parseDouble(props["temperature"])
         self.maxTokens = Self.parseInt(props["max_tokens"])
 
-        // STT
-        self.audioDurationMs = Self.parseDouble(props["audio_duration_ms"])
+        // STT (audio_length_ms is used by STT events)
+        self.audioDurationMs = Self.parseDouble(props["audio_duration_ms"] ?? props["audio_length_ms"])
         self.realTimeFactor = Self.parseDouble(props["real_time_factor"])
         self.wordCount = Self.parseInt(props["word_count"])
         self.confidence = Self.parseDouble(props["confidence"])
@@ -256,12 +258,12 @@ extension TelemetryEventPayload {
         self.isStreaming = Self.parseBool(props["is_streaming"])
         self.segmentIndex = Self.parseInt(props["segment_index"])
 
-        // TTS
-        self.characterCount = Self.parseInt(props["character_count"])
-        self.charactersPerSecond = Self.parseDouble(props["characters_per_second"])
+        // TTS/STT character count (STT uses text_length, TTS uses character_count)
+        self.characterCount = Self.parseInt(props["character_count"] ?? props["text_length"])
+        self.charactersPerSecond = Self.parseDouble(props["characters_per_second"] ?? props["chars_per_second"])
         self.audioSizeBytes = Self.parseInt(props["audio_size_bytes"])
         self.sampleRate = Self.parseInt(props["sample_rate"])
-        self.voice = props["voice"]
+        self.voice = props["voice"] ?? props["voice_id"]
         self.outputDurationMs = Self.parseDouble(props["output_duration_ms"] ?? props["audio_duration_ms"])
     }
 

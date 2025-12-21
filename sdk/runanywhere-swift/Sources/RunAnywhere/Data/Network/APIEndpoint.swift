@@ -39,7 +39,7 @@ public enum APIEndpoint: Equatable {
         case .deviceRegistration:
             return "/api/v1/devices/register"
         case .analytics:
-            return "/api/v1/analytics"
+            return "/api/v1/sdk/telemetry"  // Backend uses sdk/telemetry for production
 
         // Device Management - Development (Supabase REST API format)
         case .devDeviceRegistration:

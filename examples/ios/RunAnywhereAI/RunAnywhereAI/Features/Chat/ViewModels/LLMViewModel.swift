@@ -350,11 +350,11 @@ final class LLMViewModel {
         case .modelLoadStarted(let modelId, _, _):
             logger.info("LLM model loading: \(modelId)")
 
-        case .firstToken(let generationId, let latencyMs):
-            self.firstTokenLatencies[generationId] = latencyMs
-            logger.info("First token: \(latencyMs)ms")
+        case .firstToken(let generationId, _, let timeToFirstTokenMs, _):
+            self.firstTokenLatencies[generationId] = timeToFirstTokenMs
+            logger.info("First token: \(timeToFirstTokenMs)ms")
 
-        case .generationCompleted(let generationId, let modelId, let inputTokens, let outputTokens, let durationMs, let tokensPerSecond, _, _, _):
+        case .generationCompleted(let generationId, let modelId, let inputTokens, let outputTokens, let durationMs, let tokensPerSecond, _, _, _, _, _, _):
             let ttft = self.firstTokenLatencies[generationId]
             let metrics = GenerationMetricsFromSDK(
                 generationId: generationId,

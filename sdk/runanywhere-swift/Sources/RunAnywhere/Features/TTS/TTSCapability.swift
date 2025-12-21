@@ -122,6 +122,7 @@ public actor TTSCapability: ModelLoadableCapability {
         let synthesisId = await analyticsService.startSynthesis(
             text: text,
             voice: effectiveOptions.voice ?? voiceId,
+            sampleRate: effectiveOptions.sampleRate,
             framework: service.inferenceFramework
         )
 
@@ -196,6 +197,7 @@ public actor TTSCapability: ModelLoadableCapability {
                 let synthesisId = await self.analyticsService.startSynthesis(
                     text: text,
                     voice: effectiveOptions.voice ?? voiceId,
+                    sampleRate: effectiveOptions.sampleRate,
                     framework: service.inferenceFramework
                 )
 

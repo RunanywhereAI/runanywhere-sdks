@@ -31,11 +31,16 @@ public enum STTEvent: SDKEvent {
     /// - Parameters:
     ///   - audioLengthMs: Duration of audio in milliseconds
     ///   - audioSizeBytes: Size of audio data in bytes
+    ///   - isStreaming: Whether this is a streaming transcription
+    ///   - sampleRate: Audio sample rate in Hz (default 16000)
     case transcriptionStarted(
         transcriptionId: String,
+        modelId: String,
         audioLengthMs: Double,
         audioSizeBytes: Int,
         language: String,
+        isStreaming: Bool = false,
+        sampleRate: Int = 16000,
         framework: InferenceFrameworkType = .unknown
     )
     case partialTranscript(text: String, wordCount: Int)
@@ -46,6 +51,7 @@ public enum STTEvent: SDKEvent {
     ///   - realTimeFactor: Processing time / audio length (< 1.0 means faster than real-time)
     case transcriptionCompleted(
         transcriptionId: String,
+        modelId: String,
         text: String,
         confidence: Float,
         durationMs: Double,
@@ -53,9 +59,12 @@ public enum STTEvent: SDKEvent {
         audioSizeBytes: Int,
         wordCount: Int,
         realTimeFactor: Double,
+        language: String,
+        isStreaming: Bool = false,
+        sampleRate: Int = 16000,
         framework: InferenceFrameworkType = .unknown
     )
-    case transcriptionFailed(transcriptionId: String, error: String)
+    case transcriptionFailed(transcriptionId: String, modelId: String, error: String)
 
     // MARK: - Detection (Analytics Only)
 
@@ -82,8 +91,8 @@ public enum STTEvent: SDKEvent {
 
     public var destination: EventDestination {
         switch self {
-        // Analytics only - internal metrics
-        case .languageDetected:
+        // Analytics only - internal metrics / streaming chunks (too chatty for public API)
+        case .languageDetected, .partialTranscript, .finalTranscript:
             return .analyticsOnly
         // Both - app developers need these
         default:
@@ -124,12 +133,15 @@ public enum STTEvent: SDKEvent {
         case .modelUnloaded(let modelId):
             return ["model_id": modelId]
 
-        case .transcriptionStarted(let id, let audioLengthMs, let audioSizeBytes, let language, let framework):
+        case .transcriptionStarted(let id, let modelId, let audioLengthMs, let audioSizeBytes, let language, let isStreaming, let sampleRate, let framework):
             return [
                 "transcription_id": id,
+                "model_id": modelId,
                 "audio_length_ms": String(format: "%.1f", audioLengthMs),
                 "audio_size_bytes": String(audioSizeBytes),
                 "language": language,
+                "is_streaming": String(isStreaming),
+                "sample_rate": String(sampleRate),
                 "framework": framework.rawValue
             ]
 
@@ -147,6 +159,7 @@ public enum STTEvent: SDKEvent {
 
         case .transcriptionCompleted(
             let id,
+            let modelId,
             let text,
             let confidence,
             let durationMs,
@@ -154,10 +167,14 @@ public enum STTEvent: SDKEvent {
             let audioSizeBytes,
             let wordCount,
             let realTimeFactor,
+            let language,
+            let isStreaming,
+            let sampleRate,
             let framework
         ):
             return [
                 "transcription_id": id,
+                "model_id": modelId,
                 "text_length": String(text.count),
                 "confidence": String(format: "%.3f", confidence),
                 "duration_ms": String(format: "%.1f", durationMs),
@@ -165,11 +182,20 @@ public enum STTEvent: SDKEvent {
                 "audio_size_bytes": String(audioSizeBytes),
                 "word_count": String(wordCount),
                 "real_time_factor": String(format: "%.3f", realTimeFactor),
+                "language": language,
+                "is_streaming": String(isStreaming),
+                "sample_rate": String(sampleRate),
+                "success": "true",
                 "framework": framework.rawValue
             ]
 
-        case .transcriptionFailed(let id, let error):
-            return ["transcription_id": id, "error": error]
+        case .transcriptionFailed(let id, let modelId, let error):
+            return [
+                "transcription_id": id,
+                "model_id": modelId,
+                "error": error,
+                "success": "false"
+            ]
 
         case .languageDetected(let language, let confidence):
             return [

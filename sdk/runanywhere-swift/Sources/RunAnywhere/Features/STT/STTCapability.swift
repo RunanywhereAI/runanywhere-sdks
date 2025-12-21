@@ -100,9 +100,12 @@ public actor STTCapability: ModelLoadableCapability {
 
         // Start transcription tracking
         let transcriptionId = await analyticsService.startTranscription(
+            modelId: modelId,
             audioLengthMs: audioLengthMs,
             audioSizeBytes: audioSizeBytes,
             language: effectiveOptions.language,
+            isStreaming: false,
+            sampleRate: 16000,
             framework: service.inferenceFramework
         )
 
@@ -193,12 +196,16 @@ public actor STTCapability: ModelLoadableCapability {
                 }
 
                 let effectiveOptions = self.mergeOptions(options)
+                let modelId = await self.managedLifecycle.resourceIdOrUnknown()
 
                 // Start transcription tracking (streaming mode - audio length unknown upfront)
                 let transcriptionId = await self.analyticsService.startTranscription(
+                    modelId: modelId,
                     audioLengthMs: 0,  // Unknown for streaming
                     audioSizeBytes: 0, // Unknown for streaming
                     language: effectiveOptions.language,
+                    isStreaming: true,
+                    sampleRate: 16000,
                     framework: service.inferenceFramework
                 )
 
