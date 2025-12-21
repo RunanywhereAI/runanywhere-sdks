@@ -1,9 +1,11 @@
 {
   "compilerOptions": {
     "rootDir": ".",
+    "baseUrl": ".",
     "paths": {
       "@runanywhere/react-native-sdk": ["./src/index"]
     },
+    "typeRoots": ["./node_modules/@types", "./src/types"],
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "esModuleInterop": true,

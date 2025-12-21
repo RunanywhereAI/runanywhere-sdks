@@ -201,7 +201,7 @@ export const STTScreen: React.FC = () => {
 
       // Pass the path directly - C++ extractArchiveIfNeeded handles archive extraction
       // and finding the correct nested model folder
-      const success = await RunAnywhere.loadSTTModel(model.localPath, model.modelType || 'whisper');
+      const success = await RunAnywhere.loadSTTModel(model.localPath, model.category || 'whisper');
 
       if (success) {
         const isLoaded = await RunAnywhere.isSTTModelLoaded();

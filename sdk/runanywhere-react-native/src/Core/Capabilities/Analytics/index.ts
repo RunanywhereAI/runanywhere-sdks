@@ -2,10 +2,10 @@
  * Analytics module exports
  */
 
+export type { AnalyticsMetrics, ModelLifecycleMetrics } from './CoreAnalyticsTypes';
+
 export {
-  AnalyticsMetrics,
   InferenceFrameworkType,
   ModelLifecycleEventType,
-  ModelLifecycleMetrics,
   createModelLifecycleMetrics,
 } from './CoreAnalyticsTypes';

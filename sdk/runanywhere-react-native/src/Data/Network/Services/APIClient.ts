@@ -159,8 +159,9 @@ export interface AuthenticationProvider {
   /**
    * Get the current access token
    * Should handle refresh automatically if needed
+   * Returns null if no valid token is available
    */
-  getAccessToken(): Promise<string>;
+  getAccessToken(): Promise<string | null>;
 }
 
 /**
@@ -383,7 +384,8 @@ export class APIClient implements NetworkService {
 
     if (requiresAuth && this.authProvider) {
       try {
-        token = await this.authProvider.getAccessToken();
+        const accessToken = await this.authProvider.getAccessToken();
+        token = accessToken ?? this.apiKey;
       } catch {
         this.logger.warning(
           'Failed to get access token, falling back to API key'

@@ -11,6 +11,7 @@
 
 import { EventDestination, type SDKEvent } from './SDKEvent';
 import { EventBus } from '../../Public/Events/EventBus';
+import type { AnySDKEvent } from '../../types/events';
 import type { AnalyticsQueueManager } from '../Analytics/AnalyticsQueueManager';
 import type { AnalyticsEvent } from '../../types/analytics';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
@@ -137,7 +138,7 @@ class EventPublisherImpl {
       type: event.type,
       timestamp: event.timestamp.toISOString(),
       ...event.properties,
-    };
+    } as AnySDKEvent;
 
     EventBus.publish(eventType, busEvent);
   }

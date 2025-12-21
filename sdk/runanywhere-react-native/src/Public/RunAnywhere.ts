@@ -583,7 +583,7 @@ export const RunAnywhere = {
         ServiceContainer.shared.initializeAPIClient(
           {
             baseURL: params.baseURL ?? '',
-            apiKey: params.apiKey,
+            apiKey: params.apiKey ?? '',
             timeout: 30000,
           },
           environment,

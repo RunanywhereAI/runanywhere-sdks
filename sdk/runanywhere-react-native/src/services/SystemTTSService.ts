@@ -105,9 +105,9 @@ export class SystemTTSService implements TTSService {
       this._isSynthesizing = true;
 
       // Extract configuration parameters
-      const voiceId = configuration?.voice || null;
-      const speedRate = configuration?.speakingRate || 1.0;
-      const pitchShift = configuration?.pitch || 1.0;
+      const voiceId = configuration?.voice ?? '';
+      const speedRate = configuration?.speakingRate ?? 1.0;
+      const pitchShift = configuration?.pitch ?? 1.0;
 
       // Call native TTS synthesis
       const resultJson = await NativeRunAnywhere.synthesize(

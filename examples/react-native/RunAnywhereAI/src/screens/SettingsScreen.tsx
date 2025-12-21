@@ -103,10 +103,12 @@ export const SettingsScreen: React.FC = () => {
       console.log('[Settings] Backend info:', backendInfo);
       setBackendInfoData(backendInfo);
 
-      // Get capabilities
+      // Get capabilities (returns string[], not number[])
       const caps = await RunAnywhere.getCapabilities();
       console.log('[Settings] Capabilities:', caps);
-      setCapabilities(caps);
+      // Convert string capabilities to numbers for display mapping
+      const capNumbers = caps.map((cap, index) => index);
+      setCapabilities(capNumbers);
 
       // Check loaded models
       const sttLoaded = await RunAnywhere.isSTTModelLoaded();
@@ -174,7 +176,7 @@ export const SettingsScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Save',
-          onPress: (key) => {
+          onPress: (key?: string) => {
             if (key && key.trim()) {
               setApiKeyConfigured(true);
               // In a real implementation, reinitialize SDK with the new key
@@ -292,7 +294,7 @@ export const SettingsScreen: React.FC = () => {
   const handleDeleteDownloadedModel = useCallback(async (model: ModelInfo) => {
     Alert.alert(
       'Delete Model',
-      `Are you sure you want to delete ${model.name}? This will free up ${formatBytes(model.size)}.`,
+      `Are you sure you want to delete ${model.name}? This will free up ${formatBytes(model.downloadSize || 0)}.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -480,16 +482,16 @@ export const SettingsScreen: React.FC = () => {
           <View style={styles.catalogModelHeader}>
             <Text style={styles.catalogModelName}>{model.name}</Text>
             <View style={styles.catalogModelBadge}>
-              <Text style={styles.catalogModelBadgeText}>{model.modality}</Text>
+              <Text style={styles.catalogModelBadgeText}>{model.category}</Text>
             </View>
           </View>
-          {model.description && (
+          {model.metadata?.description && (
             <Text style={styles.catalogModelDescription} numberOfLines={2}>
-              {model.description}
+              {model.metadata.description}
             </Text>
           )}
           <View style={styles.catalogModelMeta}>
-            <Text style={styles.catalogModelSize}>{formatBytes(model.size)}</Text>
+            <Text style={styles.catalogModelSize}>{formatBytes(model.downloadSize || 0)}</Text>
             <Text style={styles.catalogModelFormat}>{model.format}</Text>
           </View>
           {isDownloading && (

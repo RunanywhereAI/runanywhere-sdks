@@ -12,9 +12,11 @@ export {
   isInitializing,
 } from './InitializationPhase';
 
+// Type exports
+export type { SDKInitParams, InitializationState } from './InitializationState';
+
+// Value exports
 export {
-  SDKInitParams,
-  InitializationState,
   createInitialState,
   markCoreInitialized,
   markServicesInitializing,

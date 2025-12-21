@@ -143,7 +143,7 @@ export const VoiceAssistantScreen: React.FC = () => {
       switch (modelSelectionType) {
         case 'stt':
           if (model.localPath) {
-            const sttSuccess = await RunAnywhere.loadSTTModel(model.localPath, model.modelType || 'whisper');
+            const sttSuccess = await RunAnywhere.loadSTTModel(model.localPath, model.category || 'whisper');
             if (sttSuccess) {
               setSTTModel({
                 id: model.id,
@@ -167,7 +167,7 @@ export const VoiceAssistantScreen: React.FC = () => {
           break;
         case 'tts':
           if (model.localPath) {
-            const ttsSuccess = await RunAnywhere.loadTTSModel(model.localPath, model.modelType || 'piper');
+            const ttsSuccess = await RunAnywhere.loadTTSModel(model.localPath, model.category || 'piper');
             if (ttsSuccess) {
               setTTSModel({
                 id: model.id,

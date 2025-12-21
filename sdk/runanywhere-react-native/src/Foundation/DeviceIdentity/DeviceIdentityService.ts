@@ -84,7 +84,7 @@ export class DeviceIdentityService {
       await SecureStorageService.storeDeviceUUID(deviceId);
       cachedDeviceUUID = deviceId;
     } catch (error) {
-      DeviceIdentityService.logger.error('Failed to store device ID', error);
+      DeviceIdentityService.logger.error('Failed to store device ID', { error });
       throw error;
     }
   }
@@ -100,7 +100,7 @@ export class DeviceIdentityService {
       cachedDeviceUUID = null;
       DeviceIdentityService.logger.info('Device ID cleared from storage');
     } catch (error) {
-      DeviceIdentityService.logger.error('Failed to clear device ID', error);
+      DeviceIdentityService.logger.error('Failed to clear device ID', { error });
       throw error;
     }
   }

@@ -16,9 +16,11 @@ export {
   inferCategoryFromError,
 } from './ErrorCategory';
 
-// Error context
+// Error context - Type exports
+export type { ErrorContext } from './ErrorContext';
+
+// Error context - Value exports
 export {
-  ErrorContext,
   createErrorContext,
   formatStackTrace,
   formatLocation,
@@ -29,12 +31,14 @@ export {
   getUnderlyingError,
 } from './ErrorContext';
 
-// SDK Error class and utilities
+// SDK Error - Type exports
+export type { SDKErrorProtocol } from './SDKError';
+
+// SDK Error - Value exports
 export {
   // Legacy enum (backwards compatibility)
   SDKErrorCode,
-  // Protocol and class
-  SDKErrorProtocol,
+  // Class
   SDKError,
   // Utility functions
   asSDKError,

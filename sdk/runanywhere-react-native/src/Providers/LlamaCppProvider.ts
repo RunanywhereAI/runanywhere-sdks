@@ -152,9 +152,14 @@ export class LlamaCppProvider implements LLMServiceProvider {
    * This mirrors Swift SDK's createLLMService implementation.
    */
   async createLLMService(
-    configuration: LlamaCppConfiguration
+    configuration: import('../Features/LLM/LLMConfiguration').LLMConfiguration
   ): Promise<LLMService> {
-    logger.info(`Creating LLM service for model: ${configuration?.modelId}`);
+    // Extract LlamaCpp-specific configuration
+    const llamaCppConfig: LlamaCppConfiguration = {
+      modelId: configuration.modelId ?? undefined,
+      configJson: undefined, // LLMConfiguration doesn't have configJson
+    };
+    logger.info(`Creating LLM service for model: ${llamaCppConfig.modelId}`);
 
     // Verify we can handle this model
     if (!this.canHandle(configuration?.modelId)) {
@@ -191,7 +196,7 @@ export class LlamaCppProvider implements LLMServiceProvider {
     }
 
     // Create native LLM service wrapper
-    const service = new LlamaCppService(configuration, modelPath);
+    const service = new LlamaCppService(llamaCppConfig, modelPath);
 
     logger.info('LLM service created successfully');
 
@@ -249,7 +254,7 @@ class LlamaCppService implements LLMService {
     serviceLogger.info(`Initializing with model: ${pathToLoad}`);
 
     // Load model via native module
-    const config = this.configuration?.configJson || null;
+    const config = this.configuration?.configJson ?? undefined;
     const success = await this.native.loadTextModel(pathToLoad, config);
 
     if (!success) {
