@@ -6,10 +6,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Security/
  */
 
-export {
-  SecureStorageService,
-  default as SecureStorage,
-} from './SecureStorageService';
+export { SecureStorageService } from './SecureStorageService';
 export { SecureStorageKeys, type SecureStorageKey } from './SecureStorageKeys';
 export {
   SecureStorageError,

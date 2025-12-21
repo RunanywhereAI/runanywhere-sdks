@@ -609,5 +609,3 @@ class JSDownloadServiceImpl {
  * Singleton instance
  */
 export const JSDownloadService = new JSDownloadServiceImpl();
-
-export default JSDownloadService;

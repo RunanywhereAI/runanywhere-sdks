@@ -78,12 +78,10 @@ export class ConsoleLogDestination implements LogDestination {
         console.info(logMessage, entry.metadata ?? '');
         break;
       case LogLevel.Warning:
-        // eslint-disable-next-line no-console
         console.warn(logMessage, entry.metadata ?? '');
         break;
       case LogLevel.Error:
       case LogLevel.Fault:
-        // eslint-disable-next-line no-console
         console.error(logMessage, entry.metadata ?? '');
         break;
     }

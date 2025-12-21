@@ -9,9 +9,14 @@
 
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import type { APIClient } from '../../../Data/Network/Services/APIClient';
-import { APIEndpoints } from '../../../Data/Network/Endpoints/APIEndpoints';
+import { APIEndpoints } from '../../../Data/Network/APIEndpoint';
 import type { ModelInfo } from '../../../types';
-import { ModelCategory, ModelFormat, LLMFramework } from '../../../types/enums';
+import {
+  ModelCategory,
+  ModelFormat,
+  LLMFramework,
+  ConfigurationSource,
+} from '../../../types/enums';
 import type { SDKEnvironment } from '../../../types';
 
 const logger = new SDKLogger('ModelAssignmentService');
@@ -91,9 +96,12 @@ function toModelInfo(assignment: ModelAssignment): ModelInfo {
 
   const preferredFramework = assignment.preferred_framework
     ? (Object.values(LLMFramework).find(
-        (lf) => lf.toLowerCase() === assignment.preferred_framework?.toLowerCase()
+        (lf) =>
+          lf.toLowerCase() === assignment.preferred_framework?.toLowerCase()
       ) as LLMFramework | undefined)
     : undefined;
+
+  const now = new Date().toISOString();
 
   return {
     id: assignment.id,
@@ -108,14 +116,18 @@ function toModelInfo(assignment: ModelAssignment): ModelInfo {
     preferredFramework,
     contextLength: assignment.context_length,
     supportsThinking: assignment.supports_thinking,
-    tags: assignment.metadata?.tags ?? [],
-    description: assignment.metadata?.description,
-    source: 'remote' as const,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    metadata: {
+      description: assignment.metadata?.description,
+      tags: assignment.metadata?.tags,
+    },
+    source: ConfigurationSource.Remote,
+    createdAt: now,
+    updatedAt: now,
     syncPending: false,
     lastUsed: undefined,
     usageCount: 0,
+    isDownloaded: false,
+    isAvailable: true,
   };
 }
 
@@ -143,9 +155,15 @@ export class ModelAssignmentService {
   /**
    * Get the singleton instance
    */
-  static getInstance(apiClient: APIClient, environment: SDKEnvironment): ModelAssignmentService {
+  static getInstance(
+    apiClient: APIClient,
+    environment: SDKEnvironment
+  ): ModelAssignmentService {
     if (!ModelAssignmentService._instance) {
-      ModelAssignmentService._instance = new ModelAssignmentService(apiClient, environment);
+      ModelAssignmentService._instance = new ModelAssignmentService(
+        apiClient,
+        environment
+      );
     }
     return ModelAssignmentService._instance;
   }
@@ -179,21 +197,17 @@ export class ModelAssignmentService {
     try {
       const { requireDeviceInfoModule } = await import('../../../native');
       const deviceInfo = requireDeviceInfoModule();
-      platform = deviceInfo.getPlatform?.() ?? 'ios';
+      platform = (await deviceInfo.getPlatform?.()) ?? 'ios';
       deviceType = 'phone'; // TODO: Detect phone vs tablet
     } catch {
       logger.debug('Native device info not available, using defaults');
     }
 
     try {
-      const endpoint = APIEndpoints.modelAssignments(this.environment, {
-        deviceType,
-        platform,
-      });
+      const endpoint = APIEndpoints.modelAssignments(deviceType, platform);
 
-      const response = await this.apiClient.get<ModelAssignmentResponse>(
-        endpoint.path
-      );
+      const response =
+        await this.apiClient.get<ModelAssignmentResponse>(endpoint);
 
       logger.info(`Received ${response.models.length} model assignments`);
 
@@ -207,7 +221,8 @@ export class ModelAssignmentService {
       logger.info('Model assignments cached');
       return modelInfos;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Failed to fetch model assignments: ${errorMessage}`);
 
       // Fall back to cached models if network fails
@@ -252,5 +267,3 @@ export class ModelAssignmentService {
     ModelAssignmentService._instance = null;
   }
 }
-
-export default ModelAssignmentService;

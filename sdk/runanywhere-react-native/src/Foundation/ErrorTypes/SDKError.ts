@@ -6,9 +6,17 @@
  */
 
 import { ErrorCode, getErrorCodeMessage } from './ErrorCodes';
-import { ErrorCategory, getCategoryFromCode, inferCategoryFromError } from './ErrorCategory';
+import {
+  ErrorCategory,
+  getCategoryFromCode,
+  inferCategoryFromError,
+} from './ErrorCategory';
 import type { ErrorContext } from './ErrorContext';
-import { createErrorContext, formatContext, formatLocation } from './ErrorContext';
+import {
+  createErrorContext,
+  formatContext,
+  formatLocation,
+} from './ErrorContext';
 
 /**
  * Legacy SDK error code enum (string-based).
@@ -482,7 +490,7 @@ function mapNativeCodeString(codeString: string): ErrorCode {
     return ErrorCode.DownloadFailed;
   }
   if (normalized.includes('cancelled') || normalized.includes('canceled')) {
-    return ErrorCode.GenerationCancelled;
+    return ErrorCode.OperationCancelled;
   }
 
   return ErrorCode.Unknown;

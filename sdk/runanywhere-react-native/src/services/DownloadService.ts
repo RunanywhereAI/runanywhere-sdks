@@ -512,5 +512,3 @@ class DownloadServiceImpl {
  * Singleton instance of the Download Service
  */
 export const DownloadService = new DownloadServiceImpl();
-
-export default DownloadService;

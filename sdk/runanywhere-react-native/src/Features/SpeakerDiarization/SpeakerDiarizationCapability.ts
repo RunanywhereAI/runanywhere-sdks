@@ -23,7 +23,6 @@ import type {
   SpeakerSegment,
   SpeakerProfile,
   LabeledTranscription,
-  SpeakerInfo,
 } from './SpeakerDiarizationModels';
 import type { SpeakerDiarizationService } from '../../Core/Protocols/Voice/SpeakerDiarizationService';
 

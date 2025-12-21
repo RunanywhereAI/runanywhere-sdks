@@ -421,5 +421,3 @@ class SecureStorageServiceImpl {
  * Singleton instance
  */
 export const SecureStorageService = new SecureStorageServiceImpl();
-
-export default SecureStorageService;

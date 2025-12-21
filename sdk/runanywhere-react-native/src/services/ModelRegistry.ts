@@ -358,5 +358,3 @@ class ModelRegistryImpl {
  * Singleton instance of the Model Registry
  */
 export const ModelRegistry = new ModelRegistryImpl();
-
-export default ModelRegistry;

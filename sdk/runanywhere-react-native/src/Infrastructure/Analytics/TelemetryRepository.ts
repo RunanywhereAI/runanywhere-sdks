@@ -5,7 +5,6 @@
  * Matches iOS: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Analytics/Protocol/TelemetryRepository.swift
  */
 
-import type { TelemetryData } from '../../types/analytics';
 import type { APIClient } from '../../Data/Network/Services/APIClient';
 import { analyticsEndpointForEnvironment } from '../../Data/Network/APIEndpoint';
 import { SDKEnvironment } from '../../types';
@@ -224,7 +223,9 @@ export class TelemetryRepository {
    */
   async cleanup(olderThan: Date): Promise<void> {
     await this.storage.deleteOlderThan(olderThan);
-    logger.info(`Cleaned up telemetry events older than ${olderThan.toISOString()}`);
+    logger.info(
+      `Cleaned up telemetry events older than ${olderThan.toISOString()}`
+    );
   }
 
   // ============================================================================
@@ -287,11 +288,10 @@ export class TelemetryRepository {
       errors?: string[];
     }
 
-    const response = await this.apiClient.post<typeof batchRequest, SyncResponse>(
-      endpoint,
-      batchRequest,
-      requiresAuth
-    );
+    const response = await this.apiClient.post<
+      typeof batchRequest,
+      SyncResponse
+    >(endpoint, batchRequest, requiresAuth);
 
     if (response.success && response.synced_ids) {
       return response.synced_ids;
@@ -302,7 +302,9 @@ export class TelemetryRepository {
       return events.map((e) => e.id);
     }
 
-    logger.warning(`Partial sync failure: ${response.errors?.join(', ') ?? 'unknown'}`);
+    logger.warning(
+      `Partial sync failure: ${response.errors?.join(', ') ?? 'unknown'}`
+    );
     return response.synced_ids ?? [];
   }
 

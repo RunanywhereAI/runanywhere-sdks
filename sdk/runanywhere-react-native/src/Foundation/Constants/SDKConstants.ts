@@ -43,5 +43,3 @@ export const SDKConstants = {
    */
   productionLogLevel: 'error',
 } as const;
-
-export default SDKConstants;
