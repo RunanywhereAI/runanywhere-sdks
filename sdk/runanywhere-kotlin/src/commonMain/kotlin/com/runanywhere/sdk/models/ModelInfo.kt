@@ -2,6 +2,7 @@ package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.data.models.fileExists
 import com.runanywhere.sdk.models.enums.InferenceFramework
+import com.runanywhere.sdk.models.enums.ModelArtifactType
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.utils.SimpleInstant
@@ -21,6 +22,8 @@ data class ModelInfo(
     val format: ModelFormat,
     val downloadURL: String? = null,
     var localPath: String? = null,
+    // Artifact type - describes how the model is packaged (matching iOS)
+    val artifactType: ModelArtifactType? = null,
     // Size information (in bytes)
     val downloadSize: Long? = null,
     val memoryRequired: Long? = null,
@@ -86,6 +89,25 @@ data class ModelInfo(
      */
     val effectiveSupportsThinking: Boolean
         get() = if (category.supportsThinking) supportsThinking else false
+
+    /**
+     * Get the effective artifact type (inferred from URL if not explicitly set)
+     * Matches iOS behavior
+     */
+    val effectiveArtifactType: ModelArtifactType
+        get() = artifactType ?: ModelArtifactType.infer(downloadURL, format)
+
+    /**
+     * Whether this model requires extraction after download
+     */
+    val requiresExtraction: Boolean
+        get() = effectiveArtifactType.requiresExtraction
+
+    /**
+     * Whether this model requires downloading
+     */
+    val requiresDownload: Boolean
+        get() = effectiveArtifactType.requiresDownload
 }
 
 /**

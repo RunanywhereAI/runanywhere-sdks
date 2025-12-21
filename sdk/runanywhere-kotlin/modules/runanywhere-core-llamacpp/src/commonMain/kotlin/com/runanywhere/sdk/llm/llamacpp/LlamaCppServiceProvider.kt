@@ -52,8 +52,54 @@ object LlamaCppServiceProvider : LLMServiceProvider {
     )
 
     override fun canHandle(modelId: String?): Boolean {
-        // LlamaCpp is the primary LLM provider and handles all GGUF/GGML models
-        return true
+        // Null model ID is not handled - require explicit model
+        if (modelId == null) return false
+
+        val lowercased = modelId.lowercase()
+
+        // Check if model format is GGUF/GGML by file extension
+        if (lowercased.endsWith(".gguf") || lowercased.contains(".gguf")) {
+            return true
+        }
+        if (lowercased.endsWith(".ggml") || lowercased.contains(".ggml")) {
+            return true
+        }
+
+        // Check for explicit gguf/ggml references in model name
+        if (lowercased.contains("gguf") || lowercased.contains("ggml")) {
+            return true
+        }
+
+        // Check for llamacpp framework references
+        if (lowercased.contains("llamacpp") ||
+            lowercased.contains("llama-cpp") ||
+            lowercased.contains("llama_cpp")) {
+            return true
+        }
+
+        // Check for GGUF quantization patterns (q2_k, q4_0, q5_1, q8_0, etc.)
+        // Pattern: q followed by 2-8, optionally followed by _k or _K, optionally followed by _m/_M/_s/_S/_0
+        val quantizationPattern = Regex("""q[2-8]([_-][kK])?([_-][mMsS0])?""")
+        if (quantizationPattern.containsMatchIn(lowercased)) {
+            return true
+        }
+
+        // Explicit format checks for common LLM model patterns
+        val llmPatterns = listOf(
+            "llama", "mistral", "mixtral", "phi", "qwen", "lfm",
+            "deepseek", "hermes", "gemma", "yi-", "tinyllama"
+        )
+        if (llmPatterns.any { lowercased.contains(it) }) {
+            // These are likely LLM models - check if they don't have other framework markers
+            if (!lowercased.contains("onnx") &&
+                !lowercased.contains("coreml") &&
+                !lowercased.contains("mlmodel") &&
+                !lowercased.contains("tflite")) {
+                return true
+            }
+        }
+
+        return false
     }
 
     override suspend fun createLLMService(configuration: LLMConfiguration): LLMService {

@@ -439,6 +439,40 @@ class STTComponent(
      */
     fun getService(): STTService? = service?.wrappedService
 
+    // MARK: - Analytics (matches iOS STTCapability.getAnalyticsMetrics())
+
+    // Internal analytics service for tracking transcription operations
+    private val analyticsService = STTAnalyticsService()
+
+    /**
+     * Get current STT analytics metrics
+     * Matches iOS STTCapability.getAnalyticsMetrics()
+     */
+    fun getAnalyticsMetrics(): STTMetrics = analyticsService.getMetrics()
+
+    /**
+     * Track a transcription for analytics
+     * Called internally when transcription completes
+     */
+    internal fun trackTranscription(
+        audioLengthMs: Double,
+        audioSizeBytes: Int,
+        language: String,
+        text: String,
+        confidence: Float,
+    ) {
+        val transcriptionId = analyticsService.startTranscription(
+            audioLengthMs = audioLengthMs,
+            audioSizeBytes = audioSizeBytes,
+            language = language,
+        )
+        analyticsService.completeTranscription(
+            transcriptionId = transcriptionId,
+            text = text,
+            confidence = confidence,
+        )
+    }
+
     // MARK: - Capabilities (matches iOS)
 
     /**

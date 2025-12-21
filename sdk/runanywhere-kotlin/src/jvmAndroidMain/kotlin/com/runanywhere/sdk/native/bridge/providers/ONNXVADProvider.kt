@@ -5,6 +5,7 @@ import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.vad.VADResult
 import com.runanywhere.sdk.features.vad.VADService
+import com.runanywhere.sdk.features.vad.VADStatistics
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeBridgeException
 import com.runanywhere.sdk.native.bridge.NativeResultCode
@@ -65,6 +66,16 @@ class ONNXVADService(
     private var consecutiveSilenceFrames = 0
     private val speechStartThreshold = 3 // Frames needed to confirm speech start
     private val speechEndThreshold = 10 // Frames needed to confirm speech end
+
+    // TTS feedback prevention (matching iOS)
+    override var isTTSActive: Boolean = false
+        private set
+    private var baseEnergyThreshold: Float = 0.0f
+    private var ttsThresholdMultiplier: Float = 3.0f
+
+    // Debug statistics tracking
+    private val recentConfidenceValues = mutableListOf<Float>()
+    private val maxRecentValues = 20
 
     override var energyThreshold: Float
         get() = _energyThreshold
@@ -144,6 +155,12 @@ class ONNXVADService(
             )
         }
 
+        // Block all processing during TTS (matching iOS TTS feedback prevention)
+        if (isTTSActive) {
+            logger.debug("VAD blocked during TTS playback")
+            return VADResult(isSpeechDetected = false, confidence = 0.0f)
+        }
+
         // Process through native VAD
         val result =
             runBlocking {
@@ -152,6 +169,12 @@ class ONNXVADService(
 
         val speechDetected = result.isSpeech
         val confidence = result.probability
+
+        // Track for statistics
+        recentConfidenceValues.add(confidence)
+        if (recentConfidenceValues.size > maxRecentValues) {
+            recentConfidenceValues.removeAt(0)
+        }
 
         // Apply hysteresis for stable speech detection
         updateSpeechState(speechDetected)
@@ -203,5 +226,85 @@ class ONNXVADService(
                 onSpeechActivity?.invoke(SpeechActivityEvent.ENDED)
             }
         }
+    }
+
+    // =========================================================================
+    // MARK: - TTS Feedback Prevention (matching iOS VADService protocol)
+    // =========================================================================
+
+    override fun notifyTTSWillStart() {
+        isTTSActive = true
+        baseEnergyThreshold = _energyThreshold
+
+        // Increase threshold to prevent TTS audio from triggering VAD
+        val newThreshold = _energyThreshold * ttsThresholdMultiplier
+        _energyThreshold = minOf(newThreshold, 0.1f)
+
+        logger.info("TTS starting - VAD blocked and threshold increased")
+
+        // End any current speech detection
+        if (_isSpeechActive) {
+            _isSpeechActive = false
+            onSpeechActivity?.invoke(SpeechActivityEvent.ENDED)
+        }
+
+        // Reset counters
+        consecutiveSpeechFrames = 0
+        consecutiveSilenceFrames = 0
+    }
+
+    override fun notifyTTSDidFinish() {
+        isTTSActive = false
+        _energyThreshold = baseEnergyThreshold
+
+        logger.info("TTS finished - VAD threshold restored")
+
+        // Reset state for immediate readiness
+        recentConfidenceValues.clear()
+        consecutiveSpeechFrames = 0
+        consecutiveSilenceFrames = 0
+        _isSpeechActive = false
+    }
+
+    override fun setTTSThresholdMultiplier(multiplier: Float) {
+        ttsThresholdMultiplier = multiplier.coerceIn(2.0f, 5.0f)
+        logger.info("TTS threshold multiplier set to ${ttsThresholdMultiplier}x")
+    }
+
+    // =========================================================================
+    // MARK: - Calibration (matching iOS VADService protocol)
+    // =========================================================================
+
+    /**
+     * Calibration is not supported by ONNX VAD.
+     * ONNX VAD uses pre-trained models that don't require calibration.
+     * Returns false to indicate calibration is not available.
+     */
+    override suspend fun startCalibration(): Boolean {
+        logger.info("Calibration not supported by ONNX VAD (pre-trained model)")
+        return false
+    }
+
+    // =========================================================================
+    // MARK: - Debug Statistics (matching iOS getStatistics)
+    // =========================================================================
+
+    override fun getStatistics(): VADStatistics {
+        val recent =
+            if (recentConfidenceValues.isEmpty()) {
+                0.0f
+            } else {
+                recentConfidenceValues.sum() / recentConfidenceValues.size
+            }
+
+        val maxValue = recentConfidenceValues.maxOrNull() ?: 0.0f
+
+        return VADStatistics(
+            current = recentConfidenceValues.lastOrNull() ?: 0.0f,
+            threshold = _energyThreshold,
+            ambient = 0.0f, // ONNX VAD doesn't track ambient
+            recentAvg = recent,
+            recentMax = maxValue,
+        )
     }
 }

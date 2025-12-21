@@ -53,69 +53,121 @@ object ModuleRegistry {
     private val _adaptersByFramework = mutableMapOf<InferenceFramework, UnifiedFrameworkAdapter>()
     private val _adaptersByModality = mutableMapOf<FrameworkModality, MutableList<RegisteredAdapter>>()
 
+    /**
+     * Wrapper for registered providers with priority
+     * Matches iOS ServiceRegistry.PrioritizedProvider pattern
+     */
+    private data class PrioritizedProvider<T>(
+        val provider: T,
+        val priority: Int,
+        val registrationTime: Long = currentTimeMillis(),
+    )
+
     // Provider lists - protected by synchronized blocks for thread safety
     // Matches iOS @MainActor pattern but using Kotlin's synchronized for cross-platform support
-    private val _sttProviders = mutableListOf<STTServiceProvider>()
-    private val _vadProviders = mutableListOf<VADServiceProvider>()
-    private val _llmProviders = mutableListOf<LLMServiceProvider>()
-    private val _ttsProviders = mutableListOf<TTSServiceProvider>()
-    private val _speakerDiarizationProviders = mutableListOf<SpeakerDiarizationServiceProvider>()
+    // Now using PrioritizedProvider for priority-based selection
+    private val _sttProviders = mutableListOf<PrioritizedProvider<STTServiceProvider>>()
+    private val _vadProviders = mutableListOf<PrioritizedProvider<VADServiceProvider>>()
+    private val _llmProviders = mutableListOf<PrioritizedProvider<LLMServiceProvider>>()
+    private val _ttsProviders = mutableListOf<PrioritizedProvider<TTSServiceProvider>>()
+    private val _speakerDiarizationProviders = mutableListOf<PrioritizedProvider<SpeakerDiarizationServiceProvider>>()
 
     // MARK: - Registration Methods
 
     /**
+     * Default priority for providers (matches iOS defaultPriority = 100)
+     */
+    const val DEFAULT_PRIORITY = 100
+
+    /**
      * Register a Speech-to-Text provider (e.g., WhisperCPP)
      * Thread-safe: Can be called from any thread
+     *
+     * @param provider The STT provider to register
+     * @param priority Priority for selection (higher = selected first). Default is 100.
      */
-    fun registerSTT(provider: STTServiceProvider) {
+    fun registerSTT(provider: STTServiceProvider, priority: Int = DEFAULT_PRIORITY) {
         synchronized(_sttProviders) {
-            _sttProviders.add(provider)
+            _sttProviders.add(PrioritizedProvider(provider, priority))
+            // Sort by priority descending, then registration time ascending
+            _sttProviders.sortWith(
+                compareByDescending<PrioritizedProvider<STTServiceProvider>> { it.priority }
+                    .thenBy { it.registrationTime }
+            )
         }
-        logger.info("Registered STT provider: ${provider.name}")
+        logger.info("Registered STT provider: ${provider.name} with priority $priority")
     }
 
     /**
      * Register a Voice Activity Detection provider
      * Thread-safe: Can be called from any thread
+     *
+     * @param provider The VAD provider to register
+     * @param priority Priority for selection (higher = selected first). Default is 100.
      */
-    fun registerVAD(provider: VADServiceProvider) {
+    fun registerVAD(provider: VADServiceProvider, priority: Int = DEFAULT_PRIORITY) {
         synchronized(_vadProviders) {
-            _vadProviders.add(provider)
+            _vadProviders.add(PrioritizedProvider(provider, priority))
+            _vadProviders.sortWith(
+                compareByDescending<PrioritizedProvider<VADServiceProvider>> { it.priority }
+                    .thenBy { it.registrationTime }
+            )
         }
-        logger.info("Registered VAD provider: ${provider.name}")
+        logger.info("Registered VAD provider: ${provider.name} with priority $priority")
     }
 
     /**
      * Register a Language Model provider (e.g., llama.cpp)
      * Thread-safe: Can be called from any thread
+     *
+     * @param provider The LLM provider to register
+     * @param priority Priority for selection (higher = selected first). Default is 100.
      */
-    fun registerLLM(provider: LLMServiceProvider) {
+    fun registerLLM(provider: LLMServiceProvider, priority: Int = DEFAULT_PRIORITY) {
         synchronized(_llmProviders) {
-            _llmProviders.add(provider)
+            _llmProviders.add(PrioritizedProvider(provider, priority))
+            _llmProviders.sortWith(
+                compareByDescending<PrioritizedProvider<LLMServiceProvider>> { it.priority }
+                    .thenBy { it.registrationTime }
+            )
         }
-        logger.info("Registered LLM provider: ${provider.name}")
+        logger.info("Registered LLM provider: ${provider.name} with priority $priority")
     }
 
     /**
      * Register a Text-to-Speech provider
      * Thread-safe: Can be called from any thread
+     *
+     * @param provider The TTS provider to register
+     * @param priority Priority for selection (higher = selected first). Default is 100.
      */
-    fun registerTTS(provider: TTSServiceProvider) {
+    fun registerTTS(provider: TTSServiceProvider, priority: Int = DEFAULT_PRIORITY) {
         synchronized(_ttsProviders) {
-            _ttsProviders.add(provider)
+            _ttsProviders.add(PrioritizedProvider(provider, priority))
+            _ttsProviders.sortWith(
+                compareByDescending<PrioritizedProvider<TTSServiceProvider>> { it.priority }
+                    .thenBy { it.registrationTime }
+            )
         }
-        logger.info("Registered TTS provider: ${provider.name}")
+        logger.info("Registered TTS provider: ${provider.name} with priority $priority")
     }
 
     /**
      * Register a Speaker Diarization provider
      * Thread-safe: Can be called from any thread
+     *
+     * @param provider The Speaker Diarization provider to register
+     * @param priority Priority for selection (higher = selected first). Default is 100.
      */
-    fun registerSpeakerDiarization(provider: SpeakerDiarizationServiceProvider) {
+    fun registerSpeakerDiarization(provider: SpeakerDiarizationServiceProvider, priority: Int = DEFAULT_PRIORITY) {
         synchronized(_speakerDiarizationProviders) {
-            _speakerDiarizationProviders.add(provider)
+            _speakerDiarizationProviders.add(PrioritizedProvider(provider, priority))
+            _speakerDiarizationProviders.sortWith(
+                compareByDescending<PrioritizedProvider<SpeakerDiarizationServiceProvider>> { it.priority }
+                    .thenBy { it.registrationTime }
+            )
         }
-        logger.info("Registered Speaker Diarization provider: ${provider.name}")
+        logger.info("Registered Speaker Diarization provider: ${provider.name} with priority $priority")
     }
 
     // MARK: - Framework Adapter Registration
@@ -286,91 +338,110 @@ object ModuleRegistry {
 
     /**
      * Get an STT provider for the specified model
+     * Returns the highest-priority provider that can handle the model
      * Thread-safe: Can be called from any thread
      */
     fun sttProvider(modelId: String? = null): STTServiceProvider? =
         synchronized(_sttProviders) {
             if (modelId != null) {
-                _sttProviders.firstOrNull { it.canHandle(modelId) }
+                _sttProviders.firstOrNull { it.provider.canHandle(modelId) }?.provider
             } else {
-                _sttProviders.firstOrNull()
+                _sttProviders.firstOrNull()?.provider
             }
         }
 
     /**
      * Get a VAD provider for the specified model
+     * Returns the highest-priority provider that can handle the model
      * Thread-safe: Can be called from any thread
      */
     fun vadProvider(modelId: String? = null): VADServiceProvider? =
         synchronized(_vadProviders) {
             if (modelId != null) {
-                _vadProviders.firstOrNull { it.canHandle(modelId) }
+                _vadProviders.firstOrNull { it.provider.canHandle(modelId) }?.provider
             } else {
-                _vadProviders.firstOrNull()
+                _vadProviders.firstOrNull()?.provider
             }
         }
 
     /**
      * Get an LLM provider for the specified model
+     * Returns the highest-priority provider that can handle the model
      * Thread-safe: Can be called from any thread
      */
     fun llmProvider(modelId: String? = null): LLMServiceProvider? =
         synchronized(_llmProviders) {
             if (modelId != null) {
-                _llmProviders.firstOrNull { it.canHandle(modelId) }
+                _llmProviders.firstOrNull { it.provider.canHandle(modelId) }?.provider
             } else {
-                _llmProviders.firstOrNull()
+                _llmProviders.firstOrNull()?.provider
             }
         }
 
     /**
      * Get a TTS provider for the specified model
+     * Returns the highest-priority provider that can handle the model
      * Thread-safe: Can be called from any thread
      */
     fun ttsProvider(modelId: String? = null): TTSServiceProvider? =
         synchronized(_ttsProviders) {
             if (modelId != null) {
-                _ttsProviders.firstOrNull { it.canHandle(modelId) }
+                _ttsProviders.firstOrNull { it.provider.canHandle(modelId) }?.provider
             } else {
-                _ttsProviders.firstOrNull()
+                _ttsProviders.firstOrNull()?.provider
             }
         }
 
     /**
      * Get a Speaker Diarization provider
+     * Returns the highest-priority provider that can handle the model
      * Thread-safe: Can be called from any thread
      */
     fun speakerDiarizationProvider(modelId: String? = null): SpeakerDiarizationServiceProvider? =
         synchronized(_speakerDiarizationProviders) {
             if (modelId != null) {
-                _speakerDiarizationProviders.firstOrNull { it.canHandle(modelId) }
+                _speakerDiarizationProviders.firstOrNull { it.provider.canHandle(modelId) }?.provider
             } else {
-                _speakerDiarizationProviders.firstOrNull()
+                _speakerDiarizationProviders.firstOrNull()?.provider
             }
         }
 
     // MARK: - Provider List Access (for framework management)
 
     /**
-     * Get all registered STT providers
+     * Get all registered STT providers, sorted by priority
      * Thread-safe: Returns a snapshot of the current provider list
      */
     val allSTTProviders: List<STTServiceProvider>
-        get() = synchronized(_sttProviders) { _sttProviders.toList() }
+        get() = synchronized(_sttProviders) { _sttProviders.map { it.provider } }
 
     /**
-     * Get all registered LLM providers
+     * Get all registered LLM providers, sorted by priority
      * Thread-safe: Returns a snapshot of the current provider list
      */
     val allLLMProviders: List<LLMServiceProvider>
-        get() = synchronized(_llmProviders) { _llmProviders.toList() }
+        get() = synchronized(_llmProviders) { _llmProviders.map { it.provider } }
 
     /**
-     * Get all registered TTS providers
+     * Get all registered TTS providers, sorted by priority
      * Thread-safe: Returns a snapshot of the current provider list
      */
     val allTTSProviders: List<TTSServiceProvider>
-        get() = synchronized(_ttsProviders) { _ttsProviders.toList() }
+        get() = synchronized(_ttsProviders) { _ttsProviders.map { it.provider } }
+
+    /**
+     * Get all registered VAD providers, sorted by priority
+     * Thread-safe: Returns a snapshot of the current provider list
+     */
+    val allVADProviders: List<VADServiceProvider>
+        get() = synchronized(_vadProviders) { _vadProviders.map { it.provider } }
+
+    /**
+     * Get all registered Speaker Diarization providers, sorted by priority
+     * Thread-safe: Returns a snapshot of the current provider list
+     */
+    val allSpeakerDiarizationProviders: List<SpeakerDiarizationServiceProvider>
+        get() = synchronized(_speakerDiarizationProviders) { _speakerDiarizationProviders.map { it.provider } }
 
     // MARK: - Availability Checking
 
@@ -422,6 +493,19 @@ object ModuleRegistry {
                 if (hasTTS) add("TTS")
                 if (hasSpeakerDiarization) add("SpeakerDiarization")
             }
+
+    /**
+     * Get provider count for each capability
+     * Returns a summary of all registered providers with their counts
+     */
+    val providerSummary: Map<String, Int>
+        get() = mapOf(
+            "STT" to synchronized(_sttProviders) { _sttProviders.size },
+            "VAD" to synchronized(_vadProviders) { _vadProviders.size },
+            "LLM" to synchronized(_llmProviders) { _llmProviders.size },
+            "TTS" to synchronized(_ttsProviders) { _ttsProviders.size },
+            "SpeakerDiarization" to synchronized(_speakerDiarizationProviders) { _speakerDiarizationProviders.size }
+        )
 
     /**
      * Singleton instance for convenience

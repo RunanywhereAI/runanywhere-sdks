@@ -123,12 +123,14 @@ class LLMCapability internal constructor(
                         topK = options.topK,
                         stopSequences = options.stopSequences,
                         streamingEnabled = false,
+                        enableThinking = options.enableThinking,
+                        maxThinkingTokens = options.maxThinkingTokens,
                     ),
             )
 
         val output = component.process(input)
 
-        return output.toLLMGenerationResult()
+        return output.toLLMGenerationResult(enableThinking = options.enableThinking)
     }
 
     /**
@@ -145,6 +147,7 @@ class LLMCapability internal constructor(
         ensureModelLoaded()
 
         val component = getComponent()
+        val enableThinking = options.enableThinking
 
         // Build input with options
         val input =
@@ -159,6 +162,8 @@ class LLMCapability internal constructor(
                         topK = options.topK,
                         stopSequences = options.stopSequences,
                         streamingEnabled = true,
+                        enableThinking = options.enableThinking,
+                        maxThinkingTokens = options.maxThinkingTokens,
                     ),
             )
 
@@ -176,7 +181,7 @@ class LLMCapability internal constructor(
                 // Generate after streaming completes - this is a simplified version
                 // In production, we'd accumulate metrics during streaming
                 val result = component.process(input)
-                result.toLLMGenerationResult()
+                result.toLLMGenerationResult(enableThinking = enableThinking)
             },
         )
     }
@@ -203,9 +208,18 @@ class LLMCapability internal constructor(
         }
     }
 
-    private fun LLMOutput.toLLMGenerationResult(): LLMGenerationResult =
-        LLMGenerationResult(
-            text = this.text,
+    private fun LLMOutput.toLLMGenerationResult(enableThinking: Boolean = false): LLMGenerationResult {
+        // Extract thinking content if enabled
+        val (responseText, thinkingContent, thinkingTokens) =
+            if (enableThinking) {
+                val extraction = ThinkingTagPattern.autoExtract(this.text)
+                Triple(extraction.responseContent, extraction.thinkingContent, extraction.thinkingTokens)
+            } else {
+                Triple(this.text, null, null)
+            }
+
+        return LLMGenerationResult(
+            text = responseText,
             tokensUsed = this.tokenUsage.totalTokens,
             latencyMs = (this.metadata.generationTime ?: 0L).toDouble(),
             performanceMetrics =
@@ -214,9 +228,10 @@ class LLMCapability internal constructor(
                     timeToFirstTokenMs = null, // Not tracked in component
                     inferenceTimeMs = (this.metadata.generationTime ?: 0L).toDouble(),
                 ),
-            thinkingTokensUsed = null,
-            thinkingContent = null,
+            thinkingTokensUsed = thinkingTokens,
+            thinkingContent = thinkingContent,
         )
+    }
 }
 
 // ============================================================================

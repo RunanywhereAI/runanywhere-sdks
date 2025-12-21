@@ -510,6 +510,62 @@ data class TTSConfiguration(
         require(pitch >= 0.5f && pitch <= 2.0f) { "Pitch must be between 0.5 and 2.0" }
         require(volume >= 0f && volume <= 1f) { "Volume must be between 0.0 and 1.0" }
     }
+
+    companion object {
+        /**
+         * Create configuration with builder pattern
+         * Matches iOS TTSConfiguration.builder()
+         *
+         * Usage:
+         * ```kotlin
+         * val config = TTSConfiguration.builder("com.apple.ttsbundle.siri_female_en-US_compact")
+         *     .language("en-US")
+         *     .speakingRate(1.2f)
+         *     .pitch(1.0f)
+         *     .build()
+         * ```
+         */
+        fun builder(voice: String = "default"): Builder = Builder(voice)
+    }
+
+    /**
+     * Builder pattern for TTSConfiguration
+     * Matches iOS TTSConfiguration.Builder exactly
+     *
+     * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/TTS/Models/TTSConfiguration.swift
+     */
+    class Builder(private var voice: String) {
+        private var modelId: String? = null
+        private var language: String = "en-US"
+        private var speakingRate: Float = 1.0f
+        private var pitch: Float = 1.0f
+        private var volume: Float = 1.0f
+        private var audioFormat: AudioFormat = AudioFormat.PCM
+        private var useNeuralVoice: Boolean = true
+        private var enableSSML: Boolean = false
+
+        fun modelId(modelId: String?) = apply { this.modelId = modelId }
+        fun voice(voice: String) = apply { this.voice = voice }
+        fun language(language: String) = apply { this.language = language }
+        fun speakingRate(rate: Float) = apply { this.speakingRate = rate }
+        fun pitch(pitch: Float) = apply { this.pitch = pitch }
+        fun volume(volume: Float) = apply { this.volume = volume }
+        fun audioFormat(format: AudioFormat) = apply { this.audioFormat = format }
+        fun useNeuralVoice(enabled: Boolean) = apply { this.useNeuralVoice = enabled }
+        fun enableSSML(enabled: Boolean) = apply { this.enableSSML = enabled }
+
+        fun build(): TTSConfiguration = TTSConfiguration(
+            modelId = modelId,
+            voice = voice,
+            language = language,
+            speakingRate = speakingRate,
+            pitch = pitch,
+            volume = volume,
+            audioFormat = audioFormat,
+            useNeuralVoice = useNeuralVoice,
+            enableSSML = enableSSML
+        )
+    }
 }
 
 /**

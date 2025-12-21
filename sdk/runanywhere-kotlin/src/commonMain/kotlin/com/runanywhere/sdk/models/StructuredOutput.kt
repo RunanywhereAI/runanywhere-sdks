@@ -19,7 +19,23 @@ interface Generatable {
      */
     fun getGenerationInstructions(): String? = null
 
+    /**
+     * The JSON schema for this type (matches iOS jsonSchema property)
+     * Override in companion object for type-specific schema
+     */
+    val jsonSchema: String
+        get() = DEFAULT_SCHEMA
+
     companion object {
+        /**
+         * Default schema for types that don't provide their own
+         */
+        const val DEFAULT_SCHEMA = """
+            {
+              "type": "object",
+              "additionalProperties": false
+            }
+        """
         /**
          * Generate comprehensive JSON schema from the type
          * Enhanced with proper Kotlin serialization support

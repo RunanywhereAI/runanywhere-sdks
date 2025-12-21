@@ -21,16 +21,124 @@ import kotlin.uuid.Uuid
 
 /**
  * Download progress information - EXACT copy of iOS DownloadProgress
+ * Now includes multi-stage progress tracking matching iOS implementation.
+ *
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Download/Models/Output/DownloadProgress.swift
  */
 data class DownloadProgress(
+    /**
+     * Current stage in the download pipeline
+     * Matches iOS DownloadProgress.stage
+     */
+    val stage: DownloadStage = DownloadStage.DOWNLOADING,
+
+    /**
+     * Bytes downloaded (for download stage)
+     */
     val bytesDownloaded: Long,
+
+    /**
+     * Total bytes to download
+     */
     val totalBytes: Long,
+
+    /**
+     * Current download state (downloading, extracting, failed, etc.)
+     */
     val state: DownloadState,
-    val estimatedTimeRemaining: Double? = null, // TimeInterval in seconds
-    val speed: Double? = null, // bytes per second
+
+    /**
+     * Estimated time remaining in seconds
+     */
+    val estimatedTimeRemaining: Double? = null,
+
+    /**
+     * Download speed in bytes per second
+     */
+    val speed: Double? = null,
+
+    /**
+     * Progress within current stage (0.0 to 1.0)
+     * Matches iOS DownloadProgress.stageProgress
+     */
+    val stageProgress: Double = if (totalBytes > 0) bytesDownloaded.toDouble() / totalBytes else 0.0,
 ) {
+    /**
+     * Overall progress across all stages (0.0 to 1.0)
+     * Matches iOS DownloadProgress.overallProgress computed property
+     */
+    val overallProgress: Double
+        get() = stage.calculateOverallProgress(stageProgress)
+
+    /**
+     * Legacy percentage property (maps to stageProgress for download stage, overallProgress otherwise)
+     * Matches iOS DownloadProgress.percentage computed property
+     */
     val percentage: Double
-        get() = if (totalBytes > 0) bytesDownloaded.toDouble() / totalBytes else 0.0
+        get() = when (stage) {
+            DownloadStage.DOWNLOADING -> stageProgress
+            else -> overallProgress
+        }
+
+    companion object {
+        /**
+         * Create progress for extraction stage
+         * Matches iOS DownloadProgress.extraction(modelId:progress:totalBytes:)
+         */
+        fun extraction(
+            modelId: String,
+            progress: Double,
+            totalBytes: Long = 0
+        ): DownloadProgress = DownloadProgress(
+            stage = DownloadStage.EXTRACTING,
+            bytesDownloaded = (progress * totalBytes).toLong(),
+            totalBytes = totalBytes,
+            stageProgress = progress,
+            state = DownloadState.Extracting
+        )
+
+        /**
+         * Create progress for validation stage
+         */
+        fun validating(
+            progress: Double,
+            totalBytes: Long = 0
+        ): DownloadProgress = DownloadProgress(
+            stage = DownloadStage.VALIDATING,
+            bytesDownloaded = totalBytes,
+            totalBytes = totalBytes,
+            stageProgress = progress,
+            state = DownloadState.Downloading // No specific validation state
+        )
+
+        /**
+         * Create completed progress
+         * Matches iOS DownloadProgress.completed(totalBytes:)
+         */
+        fun completed(totalBytes: Long): DownloadProgress = DownloadProgress(
+            stage = DownloadStage.COMPLETED,
+            bytesDownloaded = totalBytes,
+            totalBytes = totalBytes,
+            stageProgress = 1.0,
+            state = DownloadState.Completed
+        )
+
+        /**
+         * Create failed progress
+         * Matches iOS DownloadProgress.failed(_:bytesDownloaded:totalBytes:)
+         */
+        fun failed(
+            error: Throwable,
+            bytesDownloaded: Long = 0,
+            totalBytes: Long = 0
+        ): DownloadProgress = DownloadProgress(
+            stage = DownloadStage.DOWNLOADING,
+            bytesDownloaded = bytesDownloaded,
+            totalBytes = totalBytes,
+            stageProgress = if (totalBytes > 0) bytesDownloaded.toDouble() / totalBytes else 0.0,
+            state = DownloadState.Failed(error)
+        )
+    }
 }
 
 /**
@@ -69,39 +177,50 @@ enum class DownloadStage {
     /** Extracting archive - 80-95% of overall progress */
     EXTRACTING,
 
-    /** Validating downloaded content - 95-100% of overall progress */
+    /** Validating downloaded content - 95-99% of overall progress */
     VALIDATING,
 
     /** Download complete - 100% */
-    COMPLETED,
+    COMPLETED;
 
-    ;
+    /**
+     * Display name for UI
+     * Matches iOS DownloadStage.displayName
+     */
+    val displayName: String
+        get() = when (this) {
+            DOWNLOADING -> "Downloading"
+            EXTRACTING -> "Extracting"
+            VALIDATING -> "Validating"
+            COMPLETED -> "Completed"
+        }
+
+    /**
+     * Weight of this stage for overall progress calculation
+     * Download: 0-80%, Extraction: 80-95%, Validation: 95-99%
+     * Matches iOS DownloadStage.progressRange
+     */
+    val progressRange: Pair<Double, Double>
+        get() = when (this) {
+            DOWNLOADING -> 0.0 to 0.80
+            EXTRACTING -> 0.80 to 0.95
+            VALIDATING -> 0.95 to 0.99
+            COMPLETED -> 1.0 to 1.0
+        }
 
     /**
      * Weight for this stage in overall progress calculation.
-     * Matches iOS stageWeight computed property.
+     * Derived from progressRange for convenience.
      */
     val weight: Double
-        get() =
-            when (this) {
-                DOWNLOADING -> 0.8 // 80% of overall progress
-                EXTRACTING -> 0.15 // 15% of overall progress
-                VALIDATING -> 0.05 // 5% of overall progress
-                COMPLETED -> 0.0 // No weight, already complete
-            }
+        get() = progressRange.second - progressRange.first
 
     /**
      * Starting progress for this stage.
      * Matches iOS stageStartProgress computed property.
      */
     val startProgress: Double
-        get() =
-            when (this) {
-                DOWNLOADING -> 0.0
-                EXTRACTING -> 0.8
-                VALIDATING -> 0.95
-                COMPLETED -> 1.0
-            }
+        get() = progressRange.first
 
     /**
      * Calculate overall progress given stage-specific progress (0.0 to 1.0)
@@ -186,9 +305,43 @@ sealed class DownloadError : Exception() {
 }
 
 /**
+ * Download policy for models - EXACT copy of iOS DownloadPolicy
+ *
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Download/Models/Configuration/DownloadConfiguration.swift
+ */
+enum class DownloadPolicy(val value: String) {
+    /**
+     * Download automatically if needed
+     */
+    AUTOMATIC("automatic"),
+
+    /**
+     * Only download on WiFi
+     */
+    WIFI_ONLY("wifi_only"),
+
+    /**
+     * Require user confirmation
+     */
+    MANUAL("manual"),
+
+    /**
+     * Don't download, fail if not available
+     */
+    NEVER("never")
+}
+
+/**
  * Configuration for download behavior - EXACT copy of iOS DownloadConfiguration
+ *
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Download/Models/Configuration/DownloadConfiguration.swift
  */
 data class DownloadConfiguration(
+    /**
+     * Download policy
+     */
+    val policy: DownloadPolicy = DownloadPolicy.AUTOMATIC,
+
     val maxConcurrentDownloads: Int = 3,
     val retryCount: Int = 3,
     val retryDelay: Double = 2.0, // TimeInterval equivalent
@@ -196,7 +349,29 @@ data class DownloadConfiguration(
     val chunkSize: Int = 1024 * 1024, // 1MB chunks
     val resumeOnFailure: Boolean = true,
     val verifyChecksum: Boolean = true,
-)
+
+    /**
+     * Enable background downloads
+     */
+    val enableBackgroundDownloads: Boolean = false,
+) {
+    /**
+     * Check if download should be allowed based on policy
+     * Matches iOS DownloadConfiguration.shouldAllowDownload(isWiFi:userConfirmed:)
+     *
+     * @param isWiFi Whether device is on WiFi
+     * @param userConfirmed Whether user has confirmed download
+     * @return true if download should be allowed
+     */
+    fun shouldAllowDownload(isWiFi: Boolean = false, userConfirmed: Boolean = false): Boolean {
+        return when (policy) {
+            DownloadPolicy.AUTOMATIC -> true
+            DownloadPolicy.WIFI_ONLY -> isWiFi
+            DownloadPolicy.MANUAL -> userConfirmed
+            DownloadPolicy.NEVER -> false
+        }
+    }
+}
 
 /**
  * Protocol for custom download strategies - EXACT copy of iOS DownloadStrategy

@@ -19,6 +19,8 @@ data class SpeakerDiarizationConfiguration(
     val maxSpeakers: Int = 10,
     val minSpeechDuration: Double = 0.5, // seconds
     val speakerChangeThreshold: Float = 0.7f, // cosine similarity threshold
+    /** Enable voice identification features (matches iOS) */
+    val enableVoiceIdentification: Boolean = false,
     val windowSize: Double = 2.0, // seconds
     val stepSize: Double = 0.5, // seconds
     // Audio processing parameters
@@ -55,6 +57,67 @@ data class SpeakerDiarizationConfiguration(
         if (embeddingSize <= 0 || embeddingSize > 512) {
             throw SDKError.ValidationFailed("Embedding size must be between 1 and 512")
         }
+    }
+
+    companion object {
+        /**
+         * Create configuration with builder pattern
+         * Matches iOS SpeakerDiarizationConfiguration.builder()
+         */
+        fun builder(modelId: String? = null): Builder = Builder(modelId)
+    }
+
+    /**
+     * Builder pattern for SpeakerDiarizationConfiguration
+     * Matches iOS SpeakerDiarizationConfiguration.Builder exactly
+     *
+     * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/SpeakerDiarization/Models/SpeakerDiarizationConfiguration.swift
+     */
+    class Builder(private val modelId: String?) {
+        private var maxSpeakers: Int = 10
+        private var minSpeechDuration: Double = 0.5
+        private var speakerChangeThreshold: Float = 0.7f
+        private var enableVoiceIdentification: Boolean = false
+        private var windowSize: Double = 2.0
+        private var stepSize: Double = 0.5
+        private var sampleRate: Int = 16000
+        private var embeddingSize: Int = 128
+        private var energyThreshold: Float = 0.01f
+        private var silenceThreshold: Float = 0.005f
+        private var useGPUIfAvailable: Boolean = true
+        private var enableRealTimeProcessing: Boolean = true
+        private var batchProcessingMode: Boolean = false
+
+        fun maxSpeakers(value: Int) = apply { this.maxSpeakers = value }
+        fun minSpeechDuration(value: Double) = apply { this.minSpeechDuration = value }
+        fun speakerChangeThreshold(value: Float) = apply { this.speakerChangeThreshold = value }
+        fun enableVoiceIdentification(enabled: Boolean) = apply { this.enableVoiceIdentification = enabled }
+        fun windowSize(value: Double) = apply { this.windowSize = value }
+        fun stepSize(value: Double) = apply { this.stepSize = value }
+        fun sampleRate(value: Int) = apply { this.sampleRate = value }
+        fun embeddingSize(value: Int) = apply { this.embeddingSize = value }
+        fun energyThreshold(value: Float) = apply { this.energyThreshold = value }
+        fun silenceThreshold(value: Float) = apply { this.silenceThreshold = value }
+        fun useGPUIfAvailable(enabled: Boolean) = apply { this.useGPUIfAvailable = enabled }
+        fun enableRealTimeProcessing(enabled: Boolean) = apply { this.enableRealTimeProcessing = enabled }
+        fun batchProcessingMode(enabled: Boolean) = apply { this.batchProcessingMode = enabled }
+
+        fun build(): SpeakerDiarizationConfiguration = SpeakerDiarizationConfiguration(
+            modelId = modelId,
+            maxSpeakers = maxSpeakers,
+            minSpeechDuration = minSpeechDuration,
+            speakerChangeThreshold = speakerChangeThreshold,
+            enableVoiceIdentification = enableVoiceIdentification,
+            windowSize = windowSize,
+            stepSize = stepSize,
+            sampleRate = sampleRate,
+            embeddingSize = embeddingSize,
+            energyThreshold = energyThreshold,
+            silenceThreshold = silenceThreshold,
+            useGPUIfAvailable = useGPUIfAvailable,
+            enableRealTimeProcessing = enableRealTimeProcessing,
+            batchProcessingMode = batchProcessingMode
+        )
     }
 }
 
