@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import '../../core/module_registry.dart';
+import '../../features/tts/models/tts_options.dart';
 import '../native_backend.dart';
 
 /// Native TTS service using ONNX/Sherpa-ONNX backend via FFI (Piper/VITS models).

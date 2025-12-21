@@ -12,6 +12,9 @@ import '../vad/vad_output.dart' show VADOutput;
 // Re-export STT types for external consumers
 export 'stt_types.dart';
 
+// Re-export STT services
+export 'services/audio_capture_manager.dart';
+
 /// Transcription mode for speech-to-text
 /// Matches iOS STTMode from STTComponent.swift
 enum STTMode {

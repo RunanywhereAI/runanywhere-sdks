@@ -7,6 +7,9 @@ import '../features/vad/vad_service.dart' show VADService;
 import '../features/stt/stt_types.dart';
 // SpeakerInfo types for diarization service return type
 import '../features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
+// TTS types imported from canonical locations
+import '../features/tts/models/tts_options.dart';
+import '../features/tts/protocol/tts_service.dart';
 // Export all VAD types for external consumers
 export '../features/vad/vad_service.dart'
     show VADService, VADResult, SpeechActivityEvent;
@@ -16,6 +19,9 @@ export '../features/stt/stt_types.dart';
 export 'module/module.dart';
 // Export speaker diarization types
 export '../features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
+// Export TTS types for external consumers
+export '../features/tts/models/tts_options.dart';
+export '../features/tts/protocol/tts_service.dart';
 
 /// Central registry for external AI module implementations.
 ///
@@ -394,13 +400,11 @@ abstract class LLMServiceProvider {
 }
 
 /// Provider for Text-to-Speech services
-/// Note: Returns dynamic to avoid circular dependency with features/tts/tts_service.dart
-/// Actual return type should be TTSService from features/tts/tts_service.dart
 abstract class TTSServiceProvider {
   String get name;
   String get version;
   bool canHandle({String? modelId});
-  Future<dynamic> createTTSService(dynamic configuration);
+  Future<TTSService> createTTSService(dynamic configuration);
 }
 
 /// Provider for Voice Activity Detection services
@@ -455,23 +459,7 @@ abstract class LLMService {
   Future<void> cleanup();
 }
 
-/// Protocol for text-to-speech services
-abstract class TTSService {
-  Future<void> initialize();
-  Future<List<int>> synthesize({
-    required String text,
-    required TTSOptions options,
-  });
-  Future<void> synthesizeStream({
-    required String text,
-    required TTSOptions options,
-    required void Function(List<int>) onChunk,
-  });
-  void stop();
-  bool get isSynthesizing;
-  List<String> get availableVoices;
-  Future<void> cleanup();
-}
+// TTSService is imported from features/tts/protocol/tts_service.dart (see top of file)
 
 // VADService is exported from features/vad/vad_service.dart (see top of file)
 
@@ -583,26 +571,7 @@ class LLMGenerationResult {
       thinkingContent != null && thinkingContent!.isNotEmpty;
 }
 
-/// Options for text-to-speech synthesis
-class TTSOptions {
-  final String? voice;
-  final String language;
-  final double rate;
-  final double pitch;
-  final double volume;
-  final int sampleRate;
-  final bool useSSML;
-
-  TTSOptions({
-    this.voice,
-    this.language = 'en-US',
-    this.rate = 1.0,
-    this.pitch = 1.0,
-    this.volume = 1.0,
-    this.sampleRate = 16000,
-    this.useSSML = false,
-  });
-}
+// TTSOptions is imported from features/tts/models/tts_options.dart (see top of file)
 
 // VADResult is exported from features/vad/vad_service.dart (see top of file)
 

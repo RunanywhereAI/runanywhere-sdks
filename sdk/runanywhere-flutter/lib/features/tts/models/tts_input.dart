@@ -1,5 +1,5 @@
-import '../../../core/module_registry.dart' show TTSOptions;
 import '../../../core/protocols/component/component_configuration.dart';
+import 'tts_options.dart';
 
 /// Input for TTS synthesis
 /// Matches iOS TTSInput from Features/TTS/Models/TTSInput.swift

@@ -25,13 +25,15 @@ import '../features/llm/structured_output/generatable.dart';
 import '../features/stt/stt_capability.dart';
 import '../features/tts/tts_capability.dart';
 import '../features/tts/models/tts_configuration.dart';
-import '../core/module_registry.dart' show TTSOptions;
+import '../features/tts/models/tts_options.dart';
 import '../features/tts/tts_output.dart';
 import '../features/vad/vad_capability.dart';
 import '../features/vad/vad_configuration.dart';
 import '../features/voice_agent/voice_agent_capability.dart';
 import '../features/llm/llm_capability.dart' show LLMConfiguration;
-import '../core/module_registry.dart' hide TTSOptions, TTSService;
+import '../core/module_registry.dart' hide TTSService;
+import '../capabilities/voice/models/voice_session.dart';
+import '../capabilities/voice/models/voice_session_handle.dart';
 
 // Export generation options
 export '../capabilities/text_generation/generation_service.dart'
@@ -77,7 +79,7 @@ export '../features/vad/vad_service.dart'
 export '../features/vad/vad_configuration.dart' show VADConfiguration;
 
 // Export TTS options for top-level synthesize
-export '../core/module_registry.dart' show TTSOptions;
+export '../features/tts/models/tts_options.dart' show TTSOptions;
 
 // Export VoiceAgent types
 export '../features/voice_agent/voice_agent_capability.dart'
@@ -102,6 +104,30 @@ export '../core/protocols/downloading/download_state.dart';
 
 // Export logging types for configuration
 export '../foundation/logging/models/log_level.dart';
+
+// Export voice session types for public use
+export '../capabilities/voice/models/voice_session.dart'
+    show
+        VoiceSessionEvent,
+        VoiceSessionStarted,
+        VoiceSessionListening,
+        VoiceSessionSpeechStarted,
+        VoiceSessionProcessing,
+        VoiceSessionTranscribed,
+        VoiceSessionResponded,
+        VoiceSessionSpeaking,
+        VoiceSessionTurnCompleted,
+        VoiceSessionStopped,
+        VoiceSessionError,
+        VoiceSessionConfig,
+        VoiceSessionException,
+        VoiceSessionErrorType;
+export '../capabilities/voice/models/voice_session_handle.dart'
+    show VoiceSessionHandle, VoiceAgentProcessResult;
+
+// Export structured output types for streaming
+export '../features/llm/structured_output/structured_output_handler.dart'
+    show StructuredOutputConfig, StructuredOutputStreamResult;
 
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
@@ -1059,8 +1085,7 @@ class RunAnywhere {
 
   /// Check if a TTS voice is loaded
   /// Matches iOS RunAnywhere.isTTSVoiceLoaded
-  static bool get isTTSVoiceLoaded =>
-      _loadedTTSCapability?.isReady ?? false;
+  static bool get isTTSVoiceLoaded => _loadedTTSCapability?.isReady ?? false;
 
   /// Get available TTS voices (async version)
   /// Matches iOS RunAnywhere.availableTTSVoices
@@ -1938,8 +1963,7 @@ class RunAnywhere {
 
   /// Check if voice agent is ready (all components initialized)
   /// Matches iOS RunAnywhere.isVoiceAgentReady
-  static bool get isVoiceAgentReady =>
-      _voiceAgentCapability?.isReady ?? false;
+  static bool get isVoiceAgentReady => _voiceAgentCapability?.isReady ?? false;
 
   /// Process a complete voice turn: audio → transcription → LLM response → synthesized speech
   /// Matches iOS RunAnywhere.processVoiceTurn(_:)
@@ -2034,6 +2058,218 @@ class RunAnywhere {
       await capability.cleanup();
       _voiceAgentCapability = null;
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Voice Session API (High-Level)
+  // Matches iOS RunAnywhere+VoiceSession.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Start a voice session with async stream of events
+  ///
+  /// This is the simplest way to integrate voice assistant.
+  /// The session handles audio capture, VAD, and processing internally.
+  ///
+  /// Matches iOS RunAnywhere.startVoiceSession(config:)
+  ///
+  /// Example:
+  /// ```dart
+  /// final session = await RunAnywhere.startVoiceSession();
+  ///
+  /// // Consume events
+  /// session.events.listen((event) {
+  ///   switch (event) {
+  ///     case VoiceSessionListening(:final audioLevel):
+  ///       updateAudioMeter(audioLevel);
+  ///     case VoiceSessionTurnCompleted(:final transcript, :final response, :final audio):
+  ///       updateUI(transcript, response);
+  ///     default:
+  ///       break;
+  ///   }
+  /// });
+  /// ```
+  static Future<VoiceSessionHandle> startVoiceSession({
+    VoiceSessionConfig? config,
+  }) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    await _ensureServicesReady();
+
+    final session = VoiceSessionHandle(
+      config: config,
+      processAudioCallback: (audioData) async {
+        final result = await processVoiceTurn(audioData);
+        return VoiceAgentProcessResult(
+          speechDetected: result.speechDetected,
+          transcription: result.transcription,
+          response: result.response,
+          synthesizedAudio: result.synthesizedAudio,
+        );
+      },
+      isVoiceAgentReadyCallback: () async => isVoiceAgentReady,
+      initializeVoiceAgentCallback: () async =>
+          await initializeVoiceAgentWithLoadedModels(),
+    );
+
+    await session.start();
+    return session;
+  }
+
+  /// Start a voice session with callback-based event handling
+  ///
+  /// Alternative API using callbacks instead of async stream.
+  ///
+  /// Matches iOS RunAnywhere.startVoiceSession(config:onEvent:)
+  ///
+  /// Example:
+  /// ```dart
+  /// final session = await RunAnywhere.startVoiceSessionWithCallback(
+  ///   onEvent: (event) {
+  ///     // Handle event
+  ///   },
+  /// );
+  ///
+  /// // Later...
+  /// session.stop();
+  /// ```
+  static Future<VoiceSessionHandle> startVoiceSessionWithCallback({
+    VoiceSessionConfig? config,
+    required void Function(VoiceSessionEvent) onEvent,
+  }) async {
+    final session = await startVoiceSession(config: config);
+
+    // Forward events to callback
+    session.events.listen(onEvent);
+
+    return session;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Structured Output Streaming API
+  // Matches iOS RunAnywhere+StructuredOutput.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Generate structured output with streaming support
+  /// Returns both a stream of tokens and a Future of the final parsed result
+  ///
+  /// Matches iOS RunAnywhere.generateStructuredStream(_:content:options:)
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = RunAnywhere.generateStructuredStream<MyType>(
+  ///   schema: MyType.jsonSchema,
+  ///   fromJson: MyType.fromJson,
+  ///   content: 'Generate a response...',
+  /// );
+  ///
+  /// // Listen to streaming tokens
+  /// result.stream.listen((token) => print(token));
+  ///
+  /// // Get final parsed result
+  /// final myObject = await result.result;
+  /// ```
+  static StructuredOutputStreamResult<T>
+      generateStructuredStream<T extends Generatable>({
+    required String schema,
+    required T Function(Map<String, dynamic>) fromJson,
+    required String content,
+    RunAnywhereGenerationOptions? options,
+  }) {
+    if (!_isInitialized) {
+      final errorController = StreamController<String>();
+      errorController.addError(SDKError.notInitialized());
+      errorController.close();
+      return StructuredOutputStreamResult<T>(
+        stream: errorController.stream,
+        result: Future.error(SDKError.notInitialized()),
+      );
+    }
+
+    // Import structured output handler
+    final handler = StructuredOutputHandler();
+
+    // Create config for structured output
+    final config = StructuredOutputConfig(
+      type: T,
+      schema: schema,
+      includeSchemaInPrompt: true,
+    );
+
+    // Build prompt with schema
+    final enhancedPrompt = handler.preparePrompt(
+      originalPrompt: content,
+      config: config,
+    );
+
+    // Create a stream controller for tokens
+    final tokenController = StreamController<String>.broadcast();
+    final accumulatedText = StringBuffer();
+
+    // Generate streaming text
+    final tokenStream = generateStream(
+      enhancedPrompt,
+      options: options ?? RunAnywhereGenerationOptions(),
+    );
+
+    // Forward tokens and accumulate
+    final subscription = tokenStream.listen(
+      (token) {
+        accumulatedText.write(token);
+        tokenController.add(token);
+      },
+      onError: (e) => tokenController.addError(e),
+      onDone: () => tokenController.close(),
+    );
+
+    // Create the result future
+    final resultFuture = subscription.asFuture<void>().then((_) {
+      return handler.parseStructuredOutput<T>(
+        accumulatedText.toString(),
+        fromJson,
+      );
+    });
+
+    return StructuredOutputStreamResult<T>(
+      stream: tokenController.stream,
+      result: resultFuture,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - LLM Streaming Control API
+  // Matches iOS RunAnywhere+ModelManagement.swift
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Check if the currently loaded LLM model supports streaming generation
+  ///
+  /// Some models don't support streaming and require non-streaming generation
+  /// via `generate()` instead of `generateStream()`.
+  ///
+  /// Matches iOS RunAnywhere.supportsLLMStreaming
+  ///
+  /// Returns `true` if streaming is supported, `false` if you should use `generate()` instead
+  /// Returns `false` if no model is loaded
+  static bool get supportsLLMStreaming {
+    if (!_isInitialized) return false;
+
+    // Query the LLM capability for streaming support
+    final llmService = serviceContainer.generationService.llmService;
+    return llmService?.supportsStreaming ?? false;
+  }
+
+  /// Cancel the current text generation
+  ///
+  /// Use this to stop an ongoing generation when the user navigates away
+  /// or explicitly requests cancellation.
+  ///
+  /// Matches iOS RunAnywhere.cancelGeneration()
+  static Future<void> cancelGeneration() async {
+    if (!_isInitialized) return;
+
+    // Cancel via generation service
+    serviceContainer.generationService.cancel();
   }
 }
 

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import '../../../foundation/logging/sdk_logger.dart';
-import 'generatable.dart';
 
 /// Handles structured output generation and validation
 /// Matches iOS StructuredOutputHandler from Features/LLM/StructuredOutput/StructuredOutputHandler.swift
@@ -282,4 +281,46 @@ class StructuredOutputError implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// Configuration for structured output generation
+/// Matches iOS StructuredOutputConfig from Features/LLM/StructuredOutput/
+class StructuredOutputConfig {
+  /// The type being generated
+  final Type type;
+
+  /// JSON schema describing the expected output
+  final String schema;
+
+  /// Whether to include schema instructions in the prompt
+  final bool includeSchemaInPrompt;
+
+  /// Name for the structured output (optional)
+  final String? name;
+
+  /// Whether to enforce strict schema validation
+  final bool strict;
+
+  const StructuredOutputConfig({
+    required this.type,
+    required this.schema,
+    this.includeSchemaInPrompt = true,
+    this.name,
+    this.strict = false,
+  });
+}
+
+/// Result container for streaming structured output
+/// Matches iOS StructuredOutputStreamResult from Features/LLM/StructuredOutput/
+class StructuredOutputStreamResult<T> {
+  /// Stream of individual tokens as they are generated
+  final Stream<String> stream;
+
+  /// Future that resolves to the final parsed object
+  final Future<T> result;
+
+  const StructuredOutputStreamResult({
+    required this.stream,
+    required this.result,
+  });
 }

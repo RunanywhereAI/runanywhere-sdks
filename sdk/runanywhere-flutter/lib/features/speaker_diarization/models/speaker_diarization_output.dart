@@ -1,26 +1,33 @@
 import 'speaker_diarization_segment.dart';
-import 'speaker_diarization_speaker_info.dart';
+import 'speaker_diarization_profile.dart';
+import 'speaker_diarization_labeled_transcription.dart';
+import 'speaker_diarization_metadata.dart';
 
-/// Output from speaker diarization processing
+/// Output from speaker diarization processing (conforms to ComponentOutput protocol)
 /// Matches iOS SpeakerDiarizationOutput from Features/SpeakerDiarization/Models/SpeakerDiarizationOutput.swift
 class SpeakerDiarizationOutput {
-  /// All detected segments with speaker assignments
+  /// Speaker segments with timing information
   final List<SpeakerDiarizationSegment> segments;
 
-  /// All unique speakers detected
-  final List<SpeakerDiarizationSpeakerInfo> speakers;
+  /// Speaker profiles with statistics
+  final List<SpeakerDiarizationProfile> speakers;
 
-  /// Total audio duration processed
-  final double totalDuration;
+  /// Labeled transcription (if STT output was provided)
+  final SpeakerDiarizationLabeledTranscription? labeledTranscription;
 
-  const SpeakerDiarizationOutput({
+  /// Processing metadata
+  final SpeakerDiarizationMetadata metadata;
+
+  /// Timestamp (required by ComponentOutput)
+  final DateTime timestamp;
+
+  SpeakerDiarizationOutput({
     required this.segments,
     required this.speakers,
-    required this.totalDuration,
-  });
-
-  /// Number of unique speakers detected
-  int get speakerCount => speakers.length;
+    this.labeledTranscription,
+    required this.metadata,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
 
   /// Create from map
   factory SpeakerDiarizationOutput.fromJson(Map<String, dynamic> json) {
@@ -31,9 +38,17 @@ class SpeakerDiarizationOutput {
           .toList(),
       speakers: (json['speakers'] as List)
           .map((e) =>
-              SpeakerDiarizationSpeakerInfo.fromJson(e as Map<String, dynamic>))
+              SpeakerDiarizationProfile.fromJson(e as Map<String, dynamic>))
           .toList(),
-      totalDuration: (json['totalDuration'] as num).toDouble(),
+      labeledTranscription: json['labeledTranscription'] != null
+          ? SpeakerDiarizationLabeledTranscription.fromJson(
+              json['labeledTranscription'] as Map<String, dynamic>)
+          : null,
+      metadata: SpeakerDiarizationMetadata.fromJson(
+          json['metadata'] as Map<String, dynamic>),
+      timestamp: json['timestamp'] != null
+          ? DateTime.parse(json['timestamp'] as String)
+          : null,
     );
   }
 
@@ -41,6 +56,9 @@ class SpeakerDiarizationOutput {
   Map<String, dynamic> toJson() => {
         'segments': segments.map((e) => e.toJson()).toList(),
         'speakers': speakers.map((e) => e.toJson()).toList(),
-        'totalDuration': totalDuration,
+        if (labeledTranscription != null)
+          'labeledTranscription': labeledTranscription!.toJson(),
+        'metadata': metadata.toJson(),
+        'timestamp': timestamp.toIso8601String(),
       };
 }

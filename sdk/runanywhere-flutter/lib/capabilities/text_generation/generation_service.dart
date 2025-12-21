@@ -31,6 +31,25 @@ class GenerationService {
     return _currentLoadedModel;
   }
 
+  /// Get the LLM service from the current loaded model
+  /// Matches iOS pattern for accessing llmCapability.supportsStreaming
+  LLMService? get llmService {
+    return _currentLoadedModel?.service;
+  }
+
+  // Cancel flag for ongoing generation
+  bool _isCancelled = false;
+
+  /// Whether generation was cancelled
+  bool get isCancelled => _isCancelled;
+
+  /// Cancel the current text generation
+  /// Matches iOS RunAnywhere.cancelGeneration()
+  void cancel() {
+    _isCancelled = true;
+    logger.info('⏹️ Generation cancelled');
+  }
+
   /// Generate text using the loaded model
   Future<GenerationResult> generate({
     required String prompt,

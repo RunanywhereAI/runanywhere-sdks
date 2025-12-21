@@ -4,3 +4,4 @@ library tts_models;
 
 export 'tts_configuration.dart';
 export 'tts_input.dart';
+export 'tts_options.dart';

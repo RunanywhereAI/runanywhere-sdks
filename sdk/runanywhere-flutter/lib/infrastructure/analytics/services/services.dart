@@ -4,3 +4,4 @@
 export 'generation_analytics_service.dart';
 export 'stt_analytics_service.dart';
 export 'tts_analytics_service.dart';
+export 'vad_analytics_service.dart';
