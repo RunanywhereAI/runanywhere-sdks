@@ -11,8 +11,10 @@ import kotlinx.coroutines.flow.Flow
  * STT Capability - Public API wrapper for Speech-to-Text operations
  *
  * Aligned with iOS STTCapability pattern:
- * - Model lifecycle management (loadModel, unload, isModelLoaded)
+ * - Model lifecycle management (loadModel, unload, isModelLoaded, cleanup)
  * - Transcription API (transcribe, streamTranscribe)
+ * - Analytics API (getAnalyticsMetrics)
+ * - Streaming support detection (supportsStreaming)
  * - Event tracking (handled automatically by underlying component)
  *
  * This capability wraps STTComponent and provides the interface expected by
@@ -37,6 +39,17 @@ class STTCapability internal constructor(
      */
     val currentModelId: String?
         get() = _currentModelId
+
+    /**
+     * Whether the underlying STT service supports live/streaming transcription.
+     * Matches iOS STTCapability.supportsStreaming property.
+     */
+    val supportsStreaming: Boolean
+        get() = try {
+            getComponent().supportsStreaming
+        } catch (_: Exception) {
+            false
+        }
 
     // ============================================================================
     // MARK: - Model Lifecycle (iOS ModelLoadableCapability pattern)
@@ -89,6 +102,41 @@ class STTCapability internal constructor(
         } catch (e: Exception) {
             logger.error("Failed to unload STT model", e)
             throw e
+        }
+    }
+
+    /**
+     * Clean up resources used by the STT capability.
+     * Matches iOS STTCapability.cleanup() method.
+     */
+    suspend fun cleanup() {
+        logger.info("Cleaning up STT capability")
+        try {
+            getComponent().cleanup()
+            _isModelLoaded = false
+            _currentModelId = null
+            logger.info("✅ STT capability cleaned up")
+        } catch (e: Exception) {
+            logger.error("Failed to cleanup STT capability", e)
+            // Don't throw - cleanup should be best-effort
+        }
+    }
+
+    // ============================================================================
+    // MARK: - Analytics API (iOS STTCapability.getAnalyticsMetrics pattern)
+    // ============================================================================
+
+    /**
+     * Get current STT analytics metrics.
+     * Matches iOS STTCapability.getAnalyticsMetrics().
+     *
+     * @return STTMetrics with transcription statistics
+     */
+    fun getAnalyticsMetrics(): STTMetrics {
+        return try {
+            getComponent().getAnalyticsMetrics()
+        } catch (_: Exception) {
+            STTMetrics()
         }
     }
 

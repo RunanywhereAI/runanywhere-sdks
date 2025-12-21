@@ -8,7 +8,7 @@ import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 /**
  * Configuration for VAD component - simplified to match iOS SimpleEnergyVAD
- * Based on iOS VADConfiguration: energyThreshold: 0.022, sampleRate: 16000, frameLength: 0.1
+ * Based on iOS VADConfiguration: energyThreshold: 0.015, sampleRate: 16000, frameLength: 0.1
  */
 data class VADConfiguration(
     // Component type
@@ -16,9 +16,12 @@ data class VADConfiguration(
     // Model ID (optional for VAD)
     override val modelId: String? = null,
     // Core VAD parameters matching iOS SimpleEnergyVAD
-    val energyThreshold: Float = 0.022f, // Default matches iOS exactly
+    val energyThreshold: Float = 0.015f, // Default aligned with iOS (more sensitive)
     val sampleRate: Int = 16000, // Default matches iOS exactly
     val frameLength: Float = 0.1f, // Default matches iOS exactly (100ms)
+    // Calibration parameters (matching iOS VADConfiguration)
+    val enableAutoCalibration: Boolean = false, // Matching iOS default
+    val calibrationMultiplier: Float = 2.0f, // Matching iOS default
 ) : ComponentConfiguration,
     ComponentInitParameters {
     // Computed properties for compatibility and internal use
@@ -150,6 +153,69 @@ interface VADService {
 
     // Cleanup resources
     suspend fun cleanup()
+
+    // =========================================================================
+    // MARK: - TTS Integration (matching iOS VADService protocol)
+    // =========================================================================
+
+    /**
+     * Notify VAD that TTS is about to start playing
+     * This prevents TTS audio from triggering VAD (feedback prevention)
+     *
+     * Implementation should:
+     * 1. Block all VAD processing during TTS
+     * 2. Increase energy threshold to prevent false triggers
+     * 3. End any current speech detection
+     * 4. Reset detection counters
+     */
+    fun notifyTTSWillStart()
+
+    /**
+     * Notify VAD that TTS has finished playing
+     * This restores VAD to normal operation
+     *
+     * Implementation should:
+     * 1. Restore original energy threshold
+     * 2. Reset state for immediate readiness
+     * 3. Resume VAD processing
+     */
+    fun notifyTTSDidFinish()
+
+    /**
+     * Check if TTS is currently active (VAD processing blocked)
+     */
+    val isTTSActive: Boolean
+
+    /**
+     * Set the TTS threshold multiplier for feedback prevention
+     * Default is 3.0x (threshold is multiplied during TTS)
+     */
+    fun setTTSThresholdMultiplier(multiplier: Float)
+
+    // =========================================================================
+    // MARK: - Calibration (matching iOS SimpleEnergyVADService)
+    // =========================================================================
+
+    /**
+     * Start automatic calibration to determine ambient noise level.
+     * Matching iOS SimpleEnergyVADService.startCalibration() exactly.
+     *
+     * Calibration samples ambient noise for a few seconds and dynamically
+     * adjusts the energy threshold based on the detected noise floor.
+     *
+     * @return true if calibration started successfully, false if already calibrating
+     */
+    suspend fun startCalibration(): Boolean
+
+    // =========================================================================
+    // MARK: - Debug Statistics (matching iOS getStatistics)
+    // =========================================================================
+
+    /**
+     * Get current VAD statistics for debugging
+     * Returns null if statistics are not available
+     */
+    fun getStatistics(): VADStatistics?
 }
 
 // MARK: - VAD Result (for compatibility)

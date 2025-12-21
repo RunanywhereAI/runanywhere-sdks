@@ -26,7 +26,17 @@ class WebRTCVADService : VADService {
     private var currentSpeechState = false
 
     // Properties matching iOS VADService protocol
-    override var energyThreshold: Float = 0.022f // Not used by WebRTC but required by interface
+    override var energyThreshold: Float = 0.015f // Aligned with iOS default
+
+    // TTS feedback prevention (matching iOS)
+    override var isTTSActive: Boolean = false
+        private set
+    private var baseEnergyThreshold: Float = 0.0f
+    private var ttsThresholdMultiplier: Float = 3.0f
+
+    // Debug statistics tracking
+    private val recentConfidenceValues = mutableListOf<Float>()
+    private val maxRecentValues = 20
 
     override val sampleRate: Int
         get() = config?.sampleRate ?: 16000
@@ -94,6 +104,12 @@ class WebRTCVADService : VADService {
             return VADResult(isSpeechDetected = false, confidence = 0.0f)
         }
 
+        // Block all processing during TTS (matching iOS TTS feedback prevention)
+        if (isTTSActive) {
+            logger.debug("VAD blocked during TTS playback")
+            return VADResult(isSpeechDetected = false, confidence = 0.0f)
+        }
+
         return try {
             // WebRTC VAD expects different audio formats, it can handle FloatArray directly
             val isSpeech = vadInstance!!.isSpeech(audioSamples)
@@ -111,6 +127,12 @@ class WebRTCVADService : VADService {
                 } else {
                     0.15f // Low confidence for non-speech
                 }
+
+            // Track for statistics
+            recentConfidenceValues.add(confidence)
+            if (recentConfidenceValues.size > maxRecentValues) {
+                recentConfidenceValues.removeAt(0)
+            }
 
             VADResult(
                 isSpeechDetected = isSpeech,
@@ -254,5 +276,73 @@ class WebRTCVADService : VADService {
         return byteArray
     }
 
-    // Aggressiveness mapping removed - using default Mode.AGGRESSIVE
+    // =========================================================================
+    // MARK: - TTS Feedback Prevention (matching iOS VADService protocol)
+    // =========================================================================
+
+    override fun notifyTTSWillStart() {
+        isTTSActive = true
+        baseEnergyThreshold = energyThreshold
+
+        logger.info("TTS starting - VAD blocked")
+
+        // End any current speech detection
+        if (currentSpeechState) {
+            currentSpeechState = false
+            onSpeechActivity?.invoke(SpeechActivityEvent.ENDED)
+        }
+    }
+
+    override fun notifyTTSDidFinish() {
+        isTTSActive = false
+        energyThreshold = baseEnergyThreshold
+
+        logger.info("TTS finished - VAD restored")
+
+        // Reset state for immediate readiness
+        recentConfidenceValues.clear()
+        currentSpeechState = false
+    }
+
+    override fun setTTSThresholdMultiplier(multiplier: Float) {
+        ttsThresholdMultiplier = multiplier.coerceIn(2.0f, 5.0f)
+        logger.info("TTS threshold multiplier set to ${ttsThresholdMultiplier}x")
+    }
+
+    // =========================================================================
+    // MARK: - Calibration (matching iOS VADService protocol)
+    // =========================================================================
+
+    /**
+     * Calibration is not supported by WebRTC VAD.
+     * WebRTC VAD uses GMM-based algorithm that doesn't require calibration.
+     * Returns false to indicate calibration is not available.
+     */
+    override suspend fun startCalibration(): Boolean {
+        logger.info("Calibration not supported by WebRTC VAD (GMM-based algorithm)")
+        return false
+    }
+
+    // =========================================================================
+    // MARK: - Debug Statistics (matching iOS getStatistics)
+    // =========================================================================
+
+    override fun getStatistics(): VADStatistics {
+        val recent =
+            if (recentConfidenceValues.isEmpty()) {
+                0.0f
+            } else {
+                recentConfidenceValues.sum() / recentConfidenceValues.size
+            }
+
+        val maxValue = recentConfidenceValues.maxOrNull() ?: 0.0f
+
+        return VADStatistics(
+            current = recentConfidenceValues.lastOrNull() ?: 0.0f,
+            threshold = energyThreshold,
+            ambient = 0.0f, // WebRTC VAD doesn't track ambient
+            recentAvg = recent,
+            recentMax = maxValue,
+        )
+    }
 }

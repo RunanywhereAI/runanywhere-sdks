@@ -394,29 +394,4 @@ data class VoiceAgentComponentStates(
             }
 }
 
-/**
- * Audio pipeline state machine
- * Matches iOS AudioPipelineState
- */
-enum class AudioPipelineState {
-    /** Ready to start */
-    IDLE,
-
-    /** Listening for speech */
-    LISTENING,
-
-    /** Processing STT */
-    PROCESSING_SPEECH,
-
-    /** Running LLM */
-    GENERATING_RESPONSE,
-
-    /** Playing TTS output */
-    PLAYING_TTS,
-
-    /** Cooldown after TTS (feedback prevention) */
-    COOLDOWN,
-
-    /** Error state */
-    ERROR,
-}
+// Note: AudioPipelineState is defined in AudioPipelineStateManager.kt

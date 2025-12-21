@@ -10,6 +10,7 @@ import com.runanywhere.sdk.features.stt.STTTranscriptionResult
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.vad.VADResult
 import com.runanywhere.sdk.features.vad.VADService
+import com.runanywhere.sdk.features.vad.VADStatistics
 import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
@@ -631,6 +632,16 @@ private class ONNXVADServiceWrapper(
     override val configuration: VADConfiguration
         get() = initialConfiguration
 
+    // TTS feedback prevention (matching iOS)
+    override var isTTSActive: Boolean = false
+        private set
+    private var baseEnergyThreshold: Float = 0.0f
+    private var ttsThresholdMultiplier: Float = 3.0f
+
+    // Debug statistics tracking
+    private val recentConfidenceValues = mutableListOf<Float>()
+    private val maxRecentValues = 20
+
     override suspend fun initialize(configuration: VADConfiguration) {
         energyThreshold = configuration.energyThreshold
         // Load VAD model if path provided through model ID
@@ -652,10 +663,21 @@ private class ONNXVADServiceWrapper(
     }
 
     override fun processAudioChunk(audioSamples: FloatArray): VADResult {
+        // Block all processing during TTS (matching iOS TTS feedback prevention)
+        if (isTTSActive) {
+            return VADResult(isSpeechDetected = false, confidence = 0.0f)
+        }
+
         // Use runBlocking since processVAD is suspend but this isn't
         val result = runBlocking(kotlinx.coroutines.Dispatchers.Default) { coreService.processVAD(audioSamples, sampleRate) }
         val wasActive = isSpeechActive
         isSpeechActive = result.isSpeech
+
+        // Track for statistics
+        recentConfidenceValues.add(result.probability)
+        if (recentConfidenceValues.size > maxRecentValues) {
+            recentConfidenceValues.removeAt(0)
+        }
 
         // Fire callbacks on state change
         if (isSpeechActive && !wasActive) {
@@ -676,6 +698,64 @@ private class ONNXVADServiceWrapper(
 
     override suspend fun cleanup() {
         coreService.unloadVADModel()
+    }
+
+    // =========================================================================
+    // MARK: - TTS Feedback Prevention (matching iOS VADService protocol)
+    // =========================================================================
+
+    override fun notifyTTSWillStart() {
+        isTTSActive = true
+        baseEnergyThreshold = energyThreshold
+
+        // End any current speech detection
+        if (isSpeechActive) {
+            isSpeechActive = false
+            onSpeechActivity?.invoke(SpeechActivityEvent.ENDED)
+        }
+    }
+
+    override fun notifyTTSDidFinish() {
+        isTTSActive = false
+        energyThreshold = baseEnergyThreshold
+        recentConfidenceValues.clear()
+        isSpeechActive = false
+    }
+
+    override fun setTTSThresholdMultiplier(multiplier: Float) {
+        ttsThresholdMultiplier = multiplier.coerceIn(2.0f, 5.0f)
+    }
+
+    // =========================================================================
+    // MARK: - Calibration (matching iOS VADService protocol)
+    // =========================================================================
+
+    /**
+     * Calibration is not supported by ONNX VAD.
+     * ONNX VAD uses pre-trained models that don't require calibration.
+     * Returns false to indicate calibration is not available.
+     */
+    override suspend fun startCalibration(): Boolean {
+        // ONNX VAD uses pre-trained models and doesn't support runtime calibration
+        return false
+    }
+
+    // =========================================================================
+    // MARK: - Debug Statistics (matching iOS getStatistics)
+    // =========================================================================
+
+    override fun getStatistics(): VADStatistics {
+        val recent = if (recentConfidenceValues.isEmpty()) 0.0f
+                     else recentConfidenceValues.sum() / recentConfidenceValues.size
+        val maxValue = recentConfidenceValues.maxOrNull() ?: 0.0f
+
+        return VADStatistics(
+            current = recentConfidenceValues.lastOrNull() ?: 0.0f,
+            threshold = energyThreshold,
+            ambient = 0.0f, // ONNX VAD doesn't track ambient
+            recentAvg = recent,
+            recentMax = maxValue
+        )
     }
 }
 

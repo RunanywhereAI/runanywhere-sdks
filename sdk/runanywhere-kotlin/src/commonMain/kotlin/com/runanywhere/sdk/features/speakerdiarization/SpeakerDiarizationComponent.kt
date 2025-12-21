@@ -1,7 +1,9 @@
 package com.runanywhere.sdk.features.speakerdiarization
 
+import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.core.capabilities.*
 import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.infrastructure.events.EventBus
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
@@ -35,14 +37,24 @@ class SpeakerDiarizationComponent(
     private var onProcessingCompleted: ((SpeakerDiarizationOutput) -> Unit)? = null
     private var onError: ((SpeakerDiarizationError) -> Unit)? = null
 
+    private val logger = SDKLogger("SpeakerDiarizationComponent")
+
     // MARK: - Service Creation
 
     override suspend fun createService(): SpeakerDiarizationService {
-        // Create the default speaker diarization service directly
-        // Simplified implementation without provider pattern
-        val database = InMemorySpeakerDatabase()
-        val audioProcessor = PlatformAudioProcessor()
-        return DefaultSpeakerDiarizationService(diarizationConfiguration, database, audioProcessor)
+        // Try to get a provider from the registry (matches iOS ServiceRegistry pattern)
+        val provider = ModuleRegistry.speakerDiarizationProvider(diarizationConfiguration.modelId)
+
+        return if (provider != null) {
+            logger.info("Creating Speaker Diarization service from provider: ${provider.name}")
+            provider.createSpeakerDiarizationService(diarizationConfiguration)
+        } else {
+            // Fall back to default implementation
+            logger.info("No provider found, using default Speaker Diarization service")
+            val database = InMemorySpeakerDatabase()
+            val audioProcessor = PlatformAudioProcessor()
+            DefaultSpeakerDiarizationService(diarizationConfiguration, database, audioProcessor)
+        }
     }
 
     override suspend fun initializeService() {
