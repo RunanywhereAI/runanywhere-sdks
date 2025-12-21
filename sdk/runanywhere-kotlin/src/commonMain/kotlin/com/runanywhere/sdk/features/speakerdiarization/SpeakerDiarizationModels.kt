@@ -73,7 +73,9 @@ data class SpeakerDiarizationConfiguration(
      *
      * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/SpeakerDiarization/Models/SpeakerDiarizationConfiguration.swift
      */
-    class Builder(private val modelId: String?) {
+    class Builder(
+        private val modelId: String?,
+    ) {
         private var maxSpeakers: Int = 10
         private var minSpeechDuration: Double = 0.5
         private var speakerChangeThreshold: Float = 0.7f
@@ -89,35 +91,48 @@ data class SpeakerDiarizationConfiguration(
         private var batchProcessingMode: Boolean = false
 
         fun maxSpeakers(value: Int) = apply { this.maxSpeakers = value }
+
         fun minSpeechDuration(value: Double) = apply { this.minSpeechDuration = value }
+
         fun speakerChangeThreshold(value: Float) = apply { this.speakerChangeThreshold = value }
+
         fun enableVoiceIdentification(enabled: Boolean) = apply { this.enableVoiceIdentification = enabled }
+
         fun windowSize(value: Double) = apply { this.windowSize = value }
+
         fun stepSize(value: Double) = apply { this.stepSize = value }
+
         fun sampleRate(value: Int) = apply { this.sampleRate = value }
+
         fun embeddingSize(value: Int) = apply { this.embeddingSize = value }
+
         fun energyThreshold(value: Float) = apply { this.energyThreshold = value }
+
         fun silenceThreshold(value: Float) = apply { this.silenceThreshold = value }
+
         fun useGPUIfAvailable(enabled: Boolean) = apply { this.useGPUIfAvailable = enabled }
+
         fun enableRealTimeProcessing(enabled: Boolean) = apply { this.enableRealTimeProcessing = enabled }
+
         fun batchProcessingMode(enabled: Boolean) = apply { this.batchProcessingMode = enabled }
 
-        fun build(): SpeakerDiarizationConfiguration = SpeakerDiarizationConfiguration(
-            modelId = modelId,
-            maxSpeakers = maxSpeakers,
-            minSpeechDuration = minSpeechDuration,
-            speakerChangeThreshold = speakerChangeThreshold,
-            enableVoiceIdentification = enableVoiceIdentification,
-            windowSize = windowSize,
-            stepSize = stepSize,
-            sampleRate = sampleRate,
-            embeddingSize = embeddingSize,
-            energyThreshold = energyThreshold,
-            silenceThreshold = silenceThreshold,
-            useGPUIfAvailable = useGPUIfAvailable,
-            enableRealTimeProcessing = enableRealTimeProcessing,
-            batchProcessingMode = batchProcessingMode
-        )
+        fun build(): SpeakerDiarizationConfiguration =
+            SpeakerDiarizationConfiguration(
+                modelId = modelId,
+                maxSpeakers = maxSpeakers,
+                minSpeechDuration = minSpeechDuration,
+                speakerChangeThreshold = speakerChangeThreshold,
+                enableVoiceIdentification = enableVoiceIdentification,
+                windowSize = windowSize,
+                stepSize = stepSize,
+                sampleRate = sampleRate,
+                embeddingSize = embeddingSize,
+                energyThreshold = energyThreshold,
+                silenceThreshold = silenceThreshold,
+                useGPUIfAvailable = useGPUIfAvailable,
+                enableRealTimeProcessing = enableRealTimeProcessing,
+                batchProcessingMode = batchProcessingMode,
+            )
     }
 }
 

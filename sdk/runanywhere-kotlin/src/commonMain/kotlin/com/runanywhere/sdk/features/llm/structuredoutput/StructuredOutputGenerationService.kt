@@ -7,14 +7,10 @@ import com.runanywhere.sdk.models.Generatable
 import com.runanywhere.sdk.models.LLMGenerationOptions
 import com.runanywhere.sdk.models.StructuredOutputConfig
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.launch
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.serializer
 
 /**
  * Service for generating structured output from LLMs

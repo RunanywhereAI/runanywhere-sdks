@@ -36,6 +36,7 @@ interface Generatable {
               "additionalProperties": false
             }
         """
+
         /**
          * Generate comprehensive JSON schema from the type
          * Enhanced with proper Kotlin serialization support

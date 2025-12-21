@@ -19,8 +19,8 @@ private val logger = SDKLogger("ArchiveUtilityImpl")
 internal actual suspend fun extractTarBz2Impl(
     sourcePath: String,
     destinationPath: String,
-    progressHandler: ((Double) -> Unit)?
-): Unit = withContext(Dispatchers.IO) {
+    progressHandler: ((Double) -> Unit)?,
+) = withContext(Dispatchers.IO) {
     logger.info("Extracting tar.bz2 archive")
     progressHandler?.invoke(0.05)
 
@@ -54,9 +54,10 @@ internal actual suspend fun extractTarBz2Impl(
         }
 
         try {
-            val process = ProcessBuilder("tar", "-xjf", sourcePath, "-C", destinationPath)
-                .redirectErrorStream(true)
-                .start()
+            val process =
+                ProcessBuilder("tar", "-xjf", sourcePath, "-C", destinationPath)
+                    .redirectErrorStream(true)
+                    .start()
             val exitCode = process.waitFor()
             if (exitCode == 0) {
                 logger.info("tar.bz2 extraction completed using system tar")
@@ -69,8 +70,8 @@ internal actual suspend fun extractTarBz2Impl(
 
         throw ArchiveExtractionException(
             "BZip2 extraction requires Apache Commons Compress library. " +
-            "Add 'org.apache.commons:commons-compress:1.26.0' to your dependencies, " +
-            "or use tar.gz format instead."
+                "Add 'org.apache.commons:commons-compress:1.26.0' to your dependencies, " +
+                "or use tar.gz format instead.",
         )
     }
 }
@@ -81,8 +82,8 @@ internal actual suspend fun extractTarBz2Impl(
 internal actual suspend fun extractTarGzImpl(
     sourcePath: String,
     destinationPath: String,
-    progressHandler: ((Double) -> Unit)?
-): Unit = withContext(Dispatchers.IO) {
+    progressHandler: ((Double) -> Unit)?,
+) = withContext(Dispatchers.IO) {
     logger.info("Extracting tar.gz using Java GZIPInputStream")
     progressHandler?.invoke(0.05)
 
@@ -137,8 +138,8 @@ internal actual suspend fun extractTarGzImpl(
 internal actual suspend fun extractTarXzImpl(
     sourcePath: String,
     destinationPath: String,
-    progressHandler: ((Double) -> Unit)?
-): Unit = withContext(Dispatchers.IO) {
+    progressHandler: ((Double) -> Unit)?,
+) = withContext(Dispatchers.IO) {
     logger.info("Extracting tar.xz archive")
     progressHandler?.invoke(0.05)
 
@@ -172,9 +173,10 @@ internal actual suspend fun extractTarXzImpl(
         }
 
         try {
-            val process = ProcessBuilder("tar", "-xJf", sourcePath, "-C", destinationPath)
-                .redirectErrorStream(true)
-                .start()
+            val process =
+                ProcessBuilder("tar", "-xJf", sourcePath, "-C", destinationPath)
+                    .redirectErrorStream(true)
+                    .start()
             val exitCode = process.waitFor()
             if (exitCode == 0) {
                 logger.info("tar.xz extraction completed using system tar")
@@ -187,8 +189,8 @@ internal actual suspend fun extractTarXzImpl(
 
         throw ArchiveExtractionException(
             "XZ extraction requires Apache Commons Compress library. " +
-            "Add 'org.apache.commons:commons-compress:1.26.0' to your dependencies, " +
-            "or use tar.gz format instead."
+                "Add 'org.apache.commons:commons-compress:1.26.0' to your dependencies, " +
+                "or use tar.gz format instead.",
         )
     }
 }
@@ -199,8 +201,8 @@ internal actual suspend fun extractTarXzImpl(
 internal actual suspend fun extractZipImpl(
     sourcePath: String,
     destinationPath: String,
-    progressHandler: ((Double) -> Unit)?
-): Unit = withContext(Dispatchers.IO) {
+    progressHandler: ((Double) -> Unit)?,
+) = withContext(Dispatchers.IO) {
     logger.info("Extracting zip archive")
     progressHandler?.invoke(0.05)
 
@@ -280,7 +282,7 @@ private fun extractTarEntriesViaReflection(
     tarIn: Any,
     tarClass: Class<*>,
     destDir: File,
-    progressHandler: ((Double) -> Unit)?
+    progressHandler: ((Double) -> Unit)?,
 ) {
     val getNextEntry = tarClass.getMethod("getNextTarEntry")
     val canReadEntryData = tarClass.getMethod("canReadEntryData", Class.forName("org.apache.commons.compress.archivers.tar.TarArchiveEntry"))
@@ -297,11 +299,12 @@ private fun extractTarEntriesViaReflection(
 
     var entry = getNextEntry.invoke(tarIn)
     while (entry != null) {
-        val data = if (!(isDirectory.invoke(entry) as Boolean) && (canReadEntryData.invoke(tarIn, entry) as Boolean)) {
-            (tarIn as InputStream).readBytes()
-        } else {
-            null
-        }
+        val data =
+            if (!(isDirectory.invoke(entry) as Boolean) && (canReadEntryData.invoke(tarIn, entry) as Boolean)) {
+                (tarIn as InputStream).readBytes()
+            } else {
+                null
+            }
         entries.add(entry to data)
         entry = getNextEntry.invoke(tarIn)
     }
@@ -349,8 +352,11 @@ private fun extractTarEntriesViaReflection(
                     val linkName = getLinkName.invoke(tarEntry) as String
                     if (linkName.isNotEmpty()) {
                         val linkPath = outputFile.toPath()
-                        val targetPath = java.nio.file.Paths.get(linkName)
-                        java.nio.file.Files.createSymbolicLink(linkPath, targetPath)
+                        val targetPath =
+                            java.nio.file.Paths
+                                .get(linkName)
+                        java.nio.file.Files
+                            .createSymbolicLink(linkPath, targetPath)
                     }
                 } catch (e: Exception) {
                     logger.debug("Could not create symbolic link: ${e.message}")
@@ -373,7 +379,7 @@ private fun extractTarEntriesViaReflection(
 private fun extractSimpleTar(
     inputStream: InputStream,
     destDir: File,
-    progressHandler: ((Double) -> Unit)?
+    progressHandler: ((Double) -> Unit)?,
 ) {
     val buffer = ByteArray(512)
     var extractedCount = 0
@@ -398,11 +404,12 @@ private fun extractSimpleTar(
 
         // Parse size (octal string at offset 124, 12 bytes)
         val sizeStr = String(buffer, 124, 12).trim('\u0000', ' ')
-        val size = try {
-            if (sizeStr.isEmpty()) 0L else sizeStr.toLong(8)
-        } catch (e: NumberFormatException) {
-            0L
-        }
+        val size =
+            try {
+                if (sizeStr.isEmpty()) 0L else sizeStr.toLong(8)
+            } catch (e: NumberFormatException) {
+                0L
+            }
 
         // Parse type flag (offset 156)
         val typeFlag = buffer[156].toInt().toChar()
@@ -422,7 +429,8 @@ private fun extractSimpleTar(
         try {
             val outputFileCanonical = outputFile.canonicalPath
             if (!outputFileCanonical.startsWith(destDirCanonical + File.separator) &&
-                outputFileCanonical != destDirCanonical) {
+                outputFileCanonical != destDirCanonical
+            ) {
                 logger.warning("Skipping tar entry outside destination: $name")
                 val blocks = (size + 511) / 512
                 inputStream.skip(blocks * 512)

@@ -15,7 +15,9 @@ package com.runanywhere.sdk.foundation
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/ErrorTypes/ErrorCodes.swift
  */
-enum class ErrorCode(val code: Int) {
+enum class ErrorCode(
+    val code: Int,
+) {
     // General errors (1000-1099)
     UNKNOWN(1000),
     INVALID_INPUT(1001),
@@ -68,46 +70,47 @@ enum class ErrorCode(val code: Int) {
      * Matches iOS ErrorCode.message exactly.
      */
     val message: String
-        get() = when (this) {
-            UNKNOWN -> "An unknown error occurred"
-            INVALID_INPUT -> "Invalid input provided"
-            NOT_INITIALIZED -> "SDK not initialized"
-            ALREADY_INITIALIZED -> "SDK already initialized"
-            OPERATION_CANCELLED -> "Operation was cancelled"
+        get() =
+            when (this) {
+                UNKNOWN -> "An unknown error occurred"
+                INVALID_INPUT -> "Invalid input provided"
+                NOT_INITIALIZED -> "SDK not initialized"
+                ALREADY_INITIALIZED -> "SDK already initialized"
+                OPERATION_CANCELLED -> "Operation was cancelled"
 
-            MODEL_NOT_FOUND -> "Model not found"
-            MODEL_LOAD_FAILED -> "Failed to load model"
-            MODEL_VALIDATION_FAILED -> "Model validation failed"
-            MODEL_FORMAT_UNSUPPORTED -> "Model format not supported"
-            MODEL_CORRUPTED -> "Model file is corrupted"
-            MODEL_INCOMPATIBLE -> "Model incompatible with device"
+                MODEL_NOT_FOUND -> "Model not found"
+                MODEL_LOAD_FAILED -> "Failed to load model"
+                MODEL_VALIDATION_FAILED -> "Model validation failed"
+                MODEL_FORMAT_UNSUPPORTED -> "Model format not supported"
+                MODEL_CORRUPTED -> "Model file is corrupted"
+                MODEL_INCOMPATIBLE -> "Model incompatible with device"
 
-            NETWORK_UNAVAILABLE -> "Network unavailable"
-            NETWORK_TIMEOUT -> "Network request timed out"
-            DOWNLOAD_FAILED -> "Download failed"
-            UPLOAD_FAILED -> "Upload failed"
-            API_ERROR -> "API request failed"
+                NETWORK_UNAVAILABLE -> "Network unavailable"
+                NETWORK_TIMEOUT -> "Network request timed out"
+                DOWNLOAD_FAILED -> "Download failed"
+                UPLOAD_FAILED -> "Upload failed"
+                API_ERROR -> "API request failed"
 
-            INSUFFICIENT_STORAGE -> "Insufficient storage space"
-            STORAGE_FULL -> "Storage is full"
-            FILE_NOT_FOUND -> "File not found"
-            FILE_ACCESS_DENIED -> "File access denied"
-            FILE_CORRUPTED -> "File is corrupted"
+                INSUFFICIENT_STORAGE -> "Insufficient storage space"
+                STORAGE_FULL -> "Storage is full"
+                FILE_NOT_FOUND -> "File not found"
+                FILE_ACCESS_DENIED -> "File access denied"
+                FILE_CORRUPTED -> "File is corrupted"
 
-            HARDWARE_UNSUPPORTED -> "Hardware not supported"
-            HARDWARE_UNAVAILABLE -> "Hardware unavailable"
+                HARDWARE_UNSUPPORTED -> "Hardware not supported"
+                HARDWARE_UNAVAILABLE -> "Hardware unavailable"
 
-            AUTHENTICATION_FAILED -> "Authentication failed"
-            AUTHENTICATION_EXPIRED -> "Authentication expired"
-            AUTHORIZATION_DENIED -> "Authorization denied"
-            API_KEY_INVALID -> "Invalid API key"
+                AUTHENTICATION_FAILED -> "Authentication failed"
+                AUTHENTICATION_EXPIRED -> "Authentication expired"
+                AUTHORIZATION_DENIED -> "Authorization denied"
+                API_KEY_INVALID -> "Invalid API key"
 
-            GENERATION_FAILED -> "Text generation failed"
-            GENERATION_TIMEOUT -> "Generation timed out"
-            TOKEN_LIMIT_EXCEEDED -> "Token limit exceeded"
-            COST_LIMIT_EXCEEDED -> "Cost limit exceeded"
-            CONTEXT_TOO_LONG -> "Context too long"
-        }
+                GENERATION_FAILED -> "Text generation failed"
+                GENERATION_TIMEOUT -> "Generation timed out"
+                TOKEN_LIMIT_EXCEEDED -> "Token limit exceeded"
+                COST_LIMIT_EXCEEDED -> "Cost limit exceeded"
+                CONTEXT_TOO_LONG -> "Context too long"
+            }
 
     companion object {
         /**
@@ -140,55 +143,56 @@ enum class ErrorCategory {
         /**
          * Get error category from an ErrorCode
          */
-        fun from(errorCode: ErrorCode): ErrorCategory = when (errorCode) {
-            ErrorCode.NOT_INITIALIZED,
-            ErrorCode.ALREADY_INITIALIZED,
-            -> INITIALIZATION
+        fun from(errorCode: ErrorCode): ErrorCategory =
+            when (errorCode) {
+                ErrorCode.NOT_INITIALIZED,
+                ErrorCode.ALREADY_INITIALIZED,
+                -> INITIALIZATION
 
-            ErrorCode.MODEL_NOT_FOUND,
-            ErrorCode.MODEL_LOAD_FAILED,
-            ErrorCode.MODEL_VALIDATION_FAILED,
-            ErrorCode.MODEL_FORMAT_UNSUPPORTED,
-            ErrorCode.MODEL_CORRUPTED,
-            ErrorCode.MODEL_INCOMPATIBLE,
-            -> MODEL
+                ErrorCode.MODEL_NOT_FOUND,
+                ErrorCode.MODEL_LOAD_FAILED,
+                ErrorCode.MODEL_VALIDATION_FAILED,
+                ErrorCode.MODEL_FORMAT_UNSUPPORTED,
+                ErrorCode.MODEL_CORRUPTED,
+                ErrorCode.MODEL_INCOMPATIBLE,
+                -> MODEL
 
-            ErrorCode.GENERATION_FAILED,
-            ErrorCode.GENERATION_TIMEOUT,
-            ErrorCode.TOKEN_LIMIT_EXCEEDED,
-            ErrorCode.COST_LIMIT_EXCEEDED,
-            ErrorCode.CONTEXT_TOO_LONG,
-            -> GENERATION
+                ErrorCode.GENERATION_FAILED,
+                ErrorCode.GENERATION_TIMEOUT,
+                ErrorCode.TOKEN_LIMIT_EXCEEDED,
+                ErrorCode.COST_LIMIT_EXCEEDED,
+                ErrorCode.CONTEXT_TOO_LONG,
+                -> GENERATION
 
-            ErrorCode.NETWORK_UNAVAILABLE,
-            ErrorCode.NETWORK_TIMEOUT,
-            ErrorCode.DOWNLOAD_FAILED,
-            ErrorCode.UPLOAD_FAILED,
-            ErrorCode.API_ERROR,
-            -> NETWORK
+                ErrorCode.NETWORK_UNAVAILABLE,
+                ErrorCode.NETWORK_TIMEOUT,
+                ErrorCode.DOWNLOAD_FAILED,
+                ErrorCode.UPLOAD_FAILED,
+                ErrorCode.API_ERROR,
+                -> NETWORK
 
-            ErrorCode.INSUFFICIENT_STORAGE,
-            ErrorCode.STORAGE_FULL,
-            ErrorCode.FILE_NOT_FOUND,
-            ErrorCode.FILE_ACCESS_DENIED,
-            ErrorCode.FILE_CORRUPTED,
-            -> STORAGE
+                ErrorCode.INSUFFICIENT_STORAGE,
+                ErrorCode.STORAGE_FULL,
+                ErrorCode.FILE_NOT_FOUND,
+                ErrorCode.FILE_ACCESS_DENIED,
+                ErrorCode.FILE_CORRUPTED,
+                -> STORAGE
 
-            ErrorCode.HARDWARE_UNSUPPORTED,
-            ErrorCode.HARDWARE_UNAVAILABLE,
-            -> HARDWARE
+                ErrorCode.HARDWARE_UNSUPPORTED,
+                ErrorCode.HARDWARE_UNAVAILABLE,
+                -> HARDWARE
 
-            ErrorCode.AUTHENTICATION_FAILED,
-            ErrorCode.AUTHENTICATION_EXPIRED,
-            ErrorCode.AUTHORIZATION_DENIED,
-            ErrorCode.API_KEY_INVALID,
-            -> AUTHENTICATION
+                ErrorCode.AUTHENTICATION_FAILED,
+                ErrorCode.AUTHENTICATION_EXPIRED,
+                ErrorCode.AUTHORIZATION_DENIED,
+                ErrorCode.API_KEY_INVALID,
+                -> AUTHENTICATION
 
-            ErrorCode.INVALID_INPUT -> VALIDATION
+                ErrorCode.INVALID_INPUT -> VALIDATION
 
-            ErrorCode.UNKNOWN,
-            ErrorCode.OPERATION_CANCELLED,
-            -> UNKNOWN
-        }
+                ErrorCode.UNKNOWN,
+                ErrorCode.OPERATION_CANCELLED,
+                -> UNKNOWN
+            }
     }
 }

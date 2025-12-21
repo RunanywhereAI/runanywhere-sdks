@@ -31,32 +31,26 @@ data class DownloadProgress(
      * Matches iOS DownloadProgress.stage
      */
     val stage: DownloadStage = DownloadStage.DOWNLOADING,
-
     /**
      * Bytes downloaded (for download stage)
      */
     val bytesDownloaded: Long,
-
     /**
      * Total bytes to download
      */
     val totalBytes: Long,
-
     /**
      * Current download state (downloading, extracting, failed, etc.)
      */
     val state: DownloadState,
-
     /**
      * Estimated time remaining in seconds
      */
     val estimatedTimeRemaining: Double? = null,
-
     /**
      * Download speed in bytes per second
      */
     val speed: Double? = null,
-
     /**
      * Progress within current stage (0.0 to 1.0)
      * Matches iOS DownloadProgress.stageProgress
@@ -75,53 +69,58 @@ data class DownloadProgress(
      * Matches iOS DownloadProgress.percentage computed property
      */
     val percentage: Double
-        get() = when (stage) {
-            DownloadStage.DOWNLOADING -> stageProgress
-            else -> overallProgress
-        }
+        get() =
+            when (stage) {
+                DownloadStage.DOWNLOADING -> stageProgress
+                else -> overallProgress
+            }
 
     companion object {
         /**
          * Create progress for extraction stage
          * Matches iOS DownloadProgress.extraction(modelId:progress:totalBytes:)
          */
+        @Suppress("UNUSED_PARAMETER")
         fun extraction(
             modelId: String,
             progress: Double,
-            totalBytes: Long = 0
-        ): DownloadProgress = DownloadProgress(
-            stage = DownloadStage.EXTRACTING,
-            bytesDownloaded = (progress * totalBytes).toLong(),
-            totalBytes = totalBytes,
-            stageProgress = progress,
-            state = DownloadState.Extracting
-        )
+            totalBytes: Long = 0,
+        ): DownloadProgress =
+            DownloadProgress(
+                stage = DownloadStage.EXTRACTING,
+                bytesDownloaded = (progress * totalBytes).toLong(),
+                totalBytes = totalBytes,
+                stageProgress = progress,
+                state = DownloadState.Extracting,
+            )
 
         /**
          * Create progress for validation stage
          */
         fun validating(
             progress: Double,
-            totalBytes: Long = 0
-        ): DownloadProgress = DownloadProgress(
-            stage = DownloadStage.VALIDATING,
-            bytesDownloaded = totalBytes,
-            totalBytes = totalBytes,
-            stageProgress = progress,
-            state = DownloadState.Downloading // No specific validation state
-        )
+            totalBytes: Long = 0,
+        ): DownloadProgress =
+            DownloadProgress(
+                stage = DownloadStage.VALIDATING,
+                bytesDownloaded = totalBytes,
+                totalBytes = totalBytes,
+                stageProgress = progress,
+                state = DownloadState.Downloading, // No specific validation state
+            )
 
         /**
          * Create completed progress
          * Matches iOS DownloadProgress.completed(totalBytes:)
          */
-        fun completed(totalBytes: Long): DownloadProgress = DownloadProgress(
-            stage = DownloadStage.COMPLETED,
-            bytesDownloaded = totalBytes,
-            totalBytes = totalBytes,
-            stageProgress = 1.0,
-            state = DownloadState.Completed
-        )
+        fun completed(totalBytes: Long): DownloadProgress =
+            DownloadProgress(
+                stage = DownloadStage.COMPLETED,
+                bytesDownloaded = totalBytes,
+                totalBytes = totalBytes,
+                stageProgress = 1.0,
+                state = DownloadState.Completed,
+            )
 
         /**
          * Create failed progress
@@ -130,14 +129,15 @@ data class DownloadProgress(
         fun failed(
             error: Throwable,
             bytesDownloaded: Long = 0,
-            totalBytes: Long = 0
-        ): DownloadProgress = DownloadProgress(
-            stage = DownloadStage.DOWNLOADING,
-            bytesDownloaded = bytesDownloaded,
-            totalBytes = totalBytes,
-            stageProgress = if (totalBytes > 0) bytesDownloaded.toDouble() / totalBytes else 0.0,
-            state = DownloadState.Failed(error)
-        )
+            totalBytes: Long = 0,
+        ): DownloadProgress =
+            DownloadProgress(
+                stage = DownloadStage.DOWNLOADING,
+                bytesDownloaded = bytesDownloaded,
+                totalBytes = totalBytes,
+                stageProgress = if (totalBytes > 0) bytesDownloaded.toDouble() / totalBytes else 0.0,
+                state = DownloadState.Failed(error),
+            )
     }
 }
 
@@ -181,19 +181,22 @@ enum class DownloadStage {
     VALIDATING,
 
     /** Download complete - 100% */
-    COMPLETED;
+    COMPLETED,
+
+    ;
 
     /**
      * Display name for UI
      * Matches iOS DownloadStage.displayName
      */
     val displayName: String
-        get() = when (this) {
-            DOWNLOADING -> "Downloading"
-            EXTRACTING -> "Extracting"
-            VALIDATING -> "Validating"
-            COMPLETED -> "Completed"
-        }
+        get() =
+            when (this) {
+                DOWNLOADING -> "Downloading"
+                EXTRACTING -> "Extracting"
+                VALIDATING -> "Validating"
+                COMPLETED -> "Completed"
+            }
 
     /**
      * Weight of this stage for overall progress calculation
@@ -201,12 +204,13 @@ enum class DownloadStage {
      * Matches iOS DownloadStage.progressRange
      */
     val progressRange: Pair<Double, Double>
-        get() = when (this) {
-            DOWNLOADING -> 0.0 to 0.80
-            EXTRACTING -> 0.80 to 0.95
-            VALIDATING -> 0.95 to 0.99
-            COMPLETED -> 1.0 to 1.0
-        }
+        get() =
+            when (this) {
+                DOWNLOADING -> 0.0 to 0.80
+                EXTRACTING -> 0.80 to 0.95
+                VALIDATING -> 0.95 to 0.99
+                COMPLETED -> 1.0 to 1.0
+            }
 
     /**
      * Weight for this stage in overall progress calculation.
@@ -309,7 +313,9 @@ sealed class DownloadError : Exception() {
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Download/Models/Configuration/DownloadConfiguration.swift
  */
-enum class DownloadPolicy(val value: String) {
+enum class DownloadPolicy(
+    val value: String,
+) {
     /**
      * Download automatically if needed
      */
@@ -328,7 +334,7 @@ enum class DownloadPolicy(val value: String) {
     /**
      * Don't download, fail if not available
      */
-    NEVER("never")
+    NEVER("never"),
 }
 
 /**
@@ -341,7 +347,6 @@ data class DownloadConfiguration(
      * Download policy
      */
     val policy: DownloadPolicy = DownloadPolicy.AUTOMATIC,
-
     val maxConcurrentDownloads: Int = 3,
     val retryCount: Int = 3,
     val retryDelay: Double = 2.0, // TimeInterval equivalent
@@ -349,7 +354,6 @@ data class DownloadConfiguration(
     val chunkSize: Int = 1024 * 1024, // 1MB chunks
     val resumeOnFailure: Boolean = true,
     val verifyChecksum: Boolean = true,
-
     /**
      * Enable background downloads
      */

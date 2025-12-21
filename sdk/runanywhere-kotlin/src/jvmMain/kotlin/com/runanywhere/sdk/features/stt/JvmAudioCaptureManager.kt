@@ -44,13 +44,14 @@ class JvmAudioCaptureManager : AudioCaptureManager {
     override val targetSampleRate: Int = 16000
 
     // Audio format: 16kHz, 16-bit, mono, signed, little-endian
-    private val audioFormat = AudioFormat(
-        targetSampleRate.toFloat(),
-        16,    // sample size in bits
-        1,     // mono
-        true,  // signed
-        false, // little-endian
-    )
+    private val audioFormat =
+        AudioFormat(
+            targetSampleRate.toFloat(),
+            16, // sample size in bits
+            1, // mono
+            true, // signed
+            false, // little-endian
+        )
 
     // Buffer size for ~100ms of audio at 16kHz (1600 samples * 2 bytes)
     private val bufferSize = 3200
@@ -75,57 +76,58 @@ class JvmAudioCaptureManager : AudioCaptureManager {
         }
     }
 
-    override suspend fun startRecording(): Flow<AudioChunk> = flow {
-        if (_isRecording.value) {
-            logger.warning("Already recording")
-            return@flow
-        }
-
-        try {
-            val info = DataLine.Info(TargetDataLine::class.java, audioFormat)
-
-            if (!AudioSystem.isLineSupported(info)) {
-                throw AudioCaptureError.DeviceNotAvailable
+    override suspend fun startRecording(): Flow<AudioChunk> =
+        flow {
+            if (_isRecording.value) {
+                logger.warning("Already recording")
+                return@flow
             }
 
-            val line = AudioSystem.getLine(info) as TargetDataLine
-            line.open(audioFormat, bufferSize)
-            line.start()
+            try {
+                val info = DataLine.Info(TargetDataLine::class.java, audioFormat)
 
-            targetLine = line
-            _isRecording.value = true
-
-            logger.info("Recording started - sampleRate: $targetSampleRate, bufferSize: $bufferSize")
-
-            // Audio capture loop
-            val buffer = ByteArray(bufferSize)
-
-            while (coroutineContext.isActive && _isRecording.value) {
-                val bytesRead = line.read(buffer, 0, buffer.size)
-
-                if (bytesRead > 0) {
-                    // Copy the data to a new array
-                    val audioData = buffer.copyOf(bytesRead)
-
-                    // Update audio level for visualization
-                    updateAudioLevel(audioData, bytesRead)
-
-                    // Emit audio chunk
-                    emit(AudioChunk(audioData, currentTimeMillis()))
+                if (!AudioSystem.isLineSupported(info)) {
+                    throw AudioCaptureError.DeviceNotAvailable
                 }
+
+                val line = AudioSystem.getLine(info) as TargetDataLine
+                line.open(audioFormat, bufferSize)
+                line.start()
+
+                targetLine = line
+                _isRecording.value = true
+
+                logger.info("Recording started - sampleRate: $targetSampleRate, bufferSize: $bufferSize")
+
+                // Audio capture loop
+                val buffer = ByteArray(bufferSize)
+
+                while (coroutineContext.isActive && _isRecording.value) {
+                    val bytesRead = line.read(buffer, 0, buffer.size)
+
+                    if (bytesRead > 0) {
+                        // Copy the data to a new array
+                        val audioData = buffer.copyOf(bytesRead)
+
+                        // Update audio level for visualization
+                        updateAudioLevel(audioData, bytesRead)
+
+                        // Emit audio chunk
+                        emit(AudioChunk(audioData, currentTimeMillis()))
+                    }
+                }
+            } catch (e: LineUnavailableException) {
+                logger.error("Audio line unavailable: ${e.message}")
+                throw AudioCaptureError.DeviceNotAvailable
+            } catch (e: AudioCaptureError) {
+                throw e
+            } catch (e: Exception) {
+                logger.error("Recording error: ${e.message}", e)
+                throw AudioCaptureError.RecordingFailed(e.message ?: "Unknown error")
+            } finally {
+                stopRecordingInternal()
             }
-        } catch (e: LineUnavailableException) {
-            logger.error("Audio line unavailable: ${e.message}")
-            throw AudioCaptureError.DeviceNotAvailable
-        } catch (e: AudioCaptureError) {
-            throw e
-        } catch (e: Exception) {
-            logger.error("Recording error: ${e.message}", e)
-            throw AudioCaptureError.RecordingFailed(e.message ?: "Unknown error")
-        } finally {
-            stopRecordingInternal()
-        }
-    }.flowOn(Dispatchers.IO)
+        }.flowOn(Dispatchers.IO)
 
     override fun stopRecording() {
         if (!_isRecording.value) return

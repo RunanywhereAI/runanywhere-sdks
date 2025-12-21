@@ -5,8 +5,6 @@ import com.runanywhere.sdk.models.Generatable
 import com.runanywhere.sdk.models.StructuredOutputConfig
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
-import kotlin.reflect.KClass
 
 /**
  * Handles structured output generation and validation
@@ -16,11 +14,12 @@ class StructuredOutputHandler {
     private val logger = SDKLogger("StructuredOutputHandler")
 
     @PublishedApi
-    internal val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-    }
+    internal val json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            coerceInputValues = true
+        }
 
     /**
      * Get system prompt for structured output generation
@@ -43,7 +42,7 @@ class StructuredOutputHandler {
             |$schema
             |
             |Remember: Output ONLY the JSON object, nothing else.
-        """.trimMargin()
+            """.trimMargin()
     }
 
     /**
@@ -71,7 +70,8 @@ class StructuredOutputHandler {
         val schema = config.jsonSchema ?: return originalPrompt
 
         // Build structured output instructions with stronger emphasis
-        val instructions = """
+        val instructions =
+            """
             |CRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No other text is allowed.
             |
             |JSON Schema:
@@ -87,7 +87,7 @@ class StructuredOutputHandler {
             |7. Ensure proper JSON syntax (quotes, commas, etc.)
             |
             |IMPORTANT: Your entire response must be valid JSON that can be parsed. Do not include any explanations, comments, or additional text.
-        """.trimMargin()
+            """.trimMargin()
 
         // Combine with system-like instruction at the beginning
         return """
@@ -98,7 +98,7 @@ class StructuredOutputHandler {
             |$instructions
             |
             |Remember: Output ONLY the JSON object, nothing else.
-        """.trimMargin()
+            """.trimMargin()
     }
 
     /**
@@ -318,6 +318,7 @@ class StructuredOutputHandler {
      * Validate that generated text contains valid structured output
      * Matches iOS validateStructuredOutput(text:config:) method
      */
+    @Suppress("UNUSED_PARAMETER")
     fun validateStructuredOutput(
         text: String,
         config: StructuredOutputConfig,

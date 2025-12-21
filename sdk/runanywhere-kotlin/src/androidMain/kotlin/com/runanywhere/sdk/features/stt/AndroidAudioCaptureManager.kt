@@ -46,11 +46,12 @@ class AndroidAudioCaptureManager : AudioCaptureManager {
 
     // Buffer size for ~100ms of audio at 16kHz (1600 samples * 2 bytes)
     private val bufferSize: Int by lazy {
-        val minBufferSize = AudioRecord.getMinBufferSize(
-            targetSampleRate,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-        )
+        val minBufferSize =
+            AudioRecord.getMinBufferSize(
+                targetSampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+            )
         maxOf(minBufferSize, 3200) // At least 100ms of audio
     }
 
@@ -84,74 +85,76 @@ class AndroidAudioCaptureManager : AudioCaptureManager {
         }
     }
 
-    override suspend fun startRecording(): Flow<AudioChunk> = flow {
-        if (_isRecording.value) {
-            logger.warning("Already recording")
-            return@flow
-        }
-
-        if (!hasPermission()) {
-            throw AudioCaptureError.PermissionDenied
-        }
-
-        try {
-            // Create AudioRecord
-            val record = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                targetSampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize,
-            )
-
-            if (record.state != AudioRecord.STATE_INITIALIZED) {
-                record.release()
-                throw AudioCaptureError.InitializationFailed("AudioRecord failed to initialize")
+    override suspend fun startRecording(): Flow<AudioChunk> =
+        flow {
+            if (_isRecording.value) {
+                logger.warning("Already recording")
+                return@flow
             }
 
-            audioRecord = record
-            record.startRecording()
-            _isRecording.value = true
+            if (!hasPermission()) {
+                throw AudioCaptureError.PermissionDenied
+            }
 
-            logger.info("Recording started - sampleRate: $targetSampleRate, bufferSize: $bufferSize")
+            try {
+                // Create AudioRecord
+                val record =
+                    AudioRecord(
+                        MediaRecorder.AudioSource.MIC,
+                        targetSampleRate,
+                        AudioFormat.CHANNEL_IN_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                        bufferSize,
+                    )
 
-            // Audio capture loop
-            val buffer = ShortArray(bufferSize / 2) // 16-bit samples
-
-            while (coroutineContext.isActive && _isRecording.value) {
-                val readCount = record.read(buffer, 0, buffer.size)
-
-                if (readCount > 0) {
-                    // Convert shorts to bytes
-                    val byteData = ByteArray(readCount * 2)
-                    for (i in 0 until readCount) {
-                        val sample = buffer[i].toInt()
-                        byteData[i * 2] = (sample and 0xFF).toByte()
-                        byteData[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
-                    }
-
-                    // Update audio level for visualization
-                    updateAudioLevel(buffer, readCount)
-
-                    // Emit audio chunk
-                    emit(AudioChunk(byteData, currentTimeMillis()))
-                } else if (readCount < 0) {
-                    logger.error("AudioRecord.read error: $readCount")
-                    break
+                if (record.state != AudioRecord.STATE_INITIALIZED) {
+                    record.release()
+                    throw AudioCaptureError.InitializationFailed("AudioRecord failed to initialize")
                 }
+
+                audioRecord = record
+                record.startRecording()
+                _isRecording.value = true
+
+                logger.info("Recording started - sampleRate: $targetSampleRate, bufferSize: $bufferSize")
+
+                // Audio capture loop
+                val buffer = ShortArray(bufferSize / 2) // 16-bit samples
+
+                while (coroutineContext.isActive && _isRecording.value) {
+                    val readCount = record.read(buffer, 0, buffer.size)
+
+                    if (readCount > 0) {
+                        // Convert shorts to bytes
+                        val byteData = ByteArray(readCount * 2)
+                        for (i in 0 until readCount) {
+                            val sample = buffer[i].toInt()
+                            byteData[i * 2] = (sample and 0xFF).toByte()
+                            byteData[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
+                        }
+
+                        // Update audio level for visualization
+                        updateAudioLevel(buffer, readCount)
+
+                        // Emit audio chunk
+                        emit(AudioChunk(byteData, currentTimeMillis()))
+                    } else if (readCount < 0) {
+                        logger.error("AudioRecord.read error: $readCount")
+                        break
+                    }
+                }
+            } catch (e: SecurityException) {
+                logger.error("Security exception: ${e.message}")
+                throw AudioCaptureError.PermissionDenied
+            } catch (e: AudioCaptureError) {
+                throw e
+            } catch (e: Exception) {
+                logger.error("Recording error: ${e.message}", e)
+                throw AudioCaptureError.RecordingFailed(e.message ?: "Unknown error")
+            } finally {
+                stopRecordingInternal()
             }
-        } catch (e: SecurityException) {
-            logger.error("Security exception: ${e.message}")
-            throw AudioCaptureError.PermissionDenied
-        } catch (e: AudioCaptureError) {
-            throw e
-        } catch (e: Exception) {
-            logger.error("Recording error: ${e.message}", e)
-            throw AudioCaptureError.RecordingFailed(e.message ?: "Unknown error")
-        } finally {
-            stopRecordingInternal()
-        }
-    }.flowOn(Dispatchers.IO)
+        }.flowOn(Dispatchers.IO)
 
     override fun stopRecording() {
         if (!_isRecording.value) return

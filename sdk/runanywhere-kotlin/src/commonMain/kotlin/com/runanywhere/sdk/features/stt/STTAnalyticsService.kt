@@ -50,11 +50,12 @@ class STTAnalyticsService {
      * Start tracking a transcription.
      * @param audioLengthMs Duration of audio in milliseconds
      * @param audioSizeBytes Size of audio data in bytes
-     * @param language Language code for transcription
+     * @param language Language code for transcription (reserved for future analytics)
      * @param framework The inference framework being used
      * @return A unique transcription ID for tracking
      */
     @OptIn(ExperimentalUuidApi::class)
+    @Suppress("UNUSED_PARAMETER")
     fun startTranscription(
         audioLengthMs: Double,
         audioSizeBytes: Int,
@@ -64,12 +65,13 @@ class STTAnalyticsService {
         val id = Uuid.random().toString()
 
         synchronized(activeTranscriptions) {
-            activeTranscriptions[id] = TranscriptionTracker(
-                startTime = currentTimeMillis(),
-                audioLengthMs = audioLengthMs,
-                audioSizeBytes = audioSizeBytes,
-                framework = framework,
-            )
+            activeTranscriptions[id] =
+                TranscriptionTracker(
+                    startTime = currentTimeMillis(),
+                    audioLengthMs = audioLengthMs,
+                    audioSizeBytes = audioSizeBytes,
+                    framework = framework,
+                )
         }
 
         logger.debug("Transcription started: $id, audio: ${String.format("%.1f", audioLengthMs)}ms, $audioSizeBytes bytes")
@@ -102,9 +104,10 @@ class STTAnalyticsService {
         text: String,
         confidence: Float,
     ) {
-        val tracker = synchronized(activeTranscriptions) {
-            activeTranscriptions.remove(transcriptionId)
-        } ?: return
+        val tracker =
+            synchronized(activeTranscriptions) {
+                activeTranscriptions.remove(transcriptionId)
+            } ?: return
 
         val endTime = currentTimeMillis()
         val processingTimeMs = (endTime - tracker.startTime).toDouble()
@@ -112,11 +115,12 @@ class STTAnalyticsService {
 
         // Calculate real-time factor (RTF): processing time / audio length
         // RTF < 1.0 means faster than real-time
-        val realTimeFactor = if (tracker.audioLengthMs > 0) {
-            processingTimeMs / tracker.audioLengthMs
-        } else {
-            0.0
-        }
+        val realTimeFactor =
+            if (tracker.audioLengthMs > 0) {
+                processingTimeMs / tracker.audioLengthMs
+            } else {
+                0.0
+            }
 
         // Update metrics
         synchronized(this) {
@@ -167,33 +171,37 @@ class STTAnalyticsService {
      * Get current STT metrics.
      * Matches iOS STTAnalyticsService.getMetrics()
      */
-    fun getMetrics(): STTMetrics = synchronized(this) {
-        // Average RTF only if we have transcriptions
-        val avgRTF = if (transcriptionCount > 0) {
-            totalRealTimeFactor / transcriptionCount
-        } else {
-            0.0
-        }
+    fun getMetrics(): STTMetrics =
+        synchronized(this) {
+            // Average RTF only if we have transcriptions
+            val avgRTF =
+                if (transcriptionCount > 0) {
+                    totalRealTimeFactor / transcriptionCount
+                } else {
+                    0.0
+                }
 
-        STTMetrics(
-            totalEvents = transcriptionCount,
-            startTime = startTime,
-            lastEventTime = lastEventTime,
-            totalTranscriptions = transcriptionCount,
-            averageConfidence = if (transcriptionCount > 0) {
-                totalConfidence / transcriptionCount
-            } else {
-                0f
-            },
-            averageLatency = if (transcriptionCount > 0) {
-                totalLatency / transcriptionCount
-            } else {
-                0.0
-            },
-            averageRealTimeFactor = avgRTF,
-            totalAudioProcessedMs = totalAudioProcessed,
-        )
-    }
+            STTMetrics(
+                totalEvents = transcriptionCount,
+                startTime = startTime,
+                lastEventTime = lastEventTime,
+                totalTranscriptions = transcriptionCount,
+                averageConfidence =
+                    if (transcriptionCount > 0) {
+                        totalConfidence / transcriptionCount
+                    } else {
+                        0f
+                    },
+                averageLatency =
+                    if (transcriptionCount > 0) {
+                        totalLatency / transcriptionCount
+                    } else {
+                        0.0
+                    },
+                averageRealTimeFactor = avgRTF,
+                totalAudioProcessedMs = totalAudioProcessed,
+            )
+        }
 }
 
 // MARK: - STT Metrics

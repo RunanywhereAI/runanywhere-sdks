@@ -461,11 +461,12 @@ class STTComponent(
         text: String,
         confidence: Float,
     ) {
-        val transcriptionId = analyticsService.startTranscription(
-            audioLengthMs = audioLengthMs,
-            audioSizeBytes = audioSizeBytes,
-            language = language,
-        )
+        val transcriptionId =
+            analyticsService.startTranscription(
+                audioLengthMs = audioLengthMs,
+                audioSizeBytes = audioSizeBytes,
+                language = language,
+            )
         analyticsService.completeTranscription(
             transcriptionId = transcriptionId,
             text = text,

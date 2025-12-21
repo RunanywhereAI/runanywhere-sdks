@@ -534,7 +534,9 @@ data class TTSConfiguration(
      *
      * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/TTS/Models/TTSConfiguration.swift
      */
-    class Builder(private var voice: String) {
+    class Builder(
+        private var voice: String,
+    ) {
         private var modelId: String? = null
         private var language: String = "en-US"
         private var speakingRate: Float = 1.0f
@@ -545,26 +547,35 @@ data class TTSConfiguration(
         private var enableSSML: Boolean = false
 
         fun modelId(modelId: String?) = apply { this.modelId = modelId }
+
         fun voice(voice: String) = apply { this.voice = voice }
+
         fun language(language: String) = apply { this.language = language }
+
         fun speakingRate(rate: Float) = apply { this.speakingRate = rate }
+
         fun pitch(pitch: Float) = apply { this.pitch = pitch }
+
         fun volume(volume: Float) = apply { this.volume = volume }
+
         fun audioFormat(format: AudioFormat) = apply { this.audioFormat = format }
+
         fun useNeuralVoice(enabled: Boolean) = apply { this.useNeuralVoice = enabled }
+
         fun enableSSML(enabled: Boolean) = apply { this.enableSSML = enabled }
 
-        fun build(): TTSConfiguration = TTSConfiguration(
-            modelId = modelId,
-            voice = voice,
-            language = language,
-            speakingRate = speakingRate,
-            pitch = pitch,
-            volume = volume,
-            audioFormat = audioFormat,
-            useNeuralVoice = useNeuralVoice,
-            enableSSML = enableSSML
-        )
+        fun build(): TTSConfiguration =
+            TTSConfiguration(
+                modelId = modelId,
+                voice = voice,
+                language = language,
+                speakingRate = speakingRate,
+                pitch = pitch,
+                volume = volume,
+                audioFormat = audioFormat,
+                useNeuralVoice = useNeuralVoice,
+                enableSSML = enableSSML,
+            )
     }
 }
 
