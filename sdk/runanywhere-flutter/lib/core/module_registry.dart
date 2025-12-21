@@ -8,7 +8,6 @@ import '../features/stt/stt_types.dart';
 // SpeakerInfo types for diarization service return type
 import '../features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
 // TTS types imported from canonical locations
-import '../features/tts/models/tts_options.dart';
 import '../features/tts/protocol/tts_service.dart';
 // Export all VAD types for external consumers
 export '../features/vad/vad_service.dart'
@@ -432,6 +431,12 @@ abstract class STTService {
   bool get isReady;
   String? get currentModel;
   bool get supportsStreaming;
+
+  /// The inference framework used by this service.
+  /// Required for analytics and performance tracking.
+  /// Matches iOS STTService.inferenceFramework property.
+  String? get inferenceFramework;
+
   Future<void> cleanup();
 }
 
@@ -570,10 +575,6 @@ class LLMGenerationResult {
   bool get hasThinkingContent =>
       thinkingContent != null && thinkingContent!.isNotEmpty;
 }
-
-// TTSOptions is imported from features/tts/models/tts_options.dart (see top of file)
-
-// VADResult is exported from features/vad/vad_service.dart (see top of file)
 
 class SpeakerDiarizationResult {}
 

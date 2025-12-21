@@ -7,6 +7,7 @@ import '../../core/protocols/component/component_configuration.dart';
 import '../../core/models/audio_format.dart';
 import '../../core/module_registry.dart';
 import '../../foundation/dependency_injection/service_container.dart';
+import '../../infrastructure/analytics/services/stt_analytics_service.dart';
 import '../vad/vad_output.dart' show VADOutput;
 
 // Re-export STT types for external consumers
@@ -306,10 +307,16 @@ class STTCapability extends BaseCapability<STTService> {
   bool _isModelLoaded = false;
   String? _modelPath;
 
+  /// Analytics service for tracking transcription operations.
+  /// Matches iOS STTCapability.analyticsService
+  final STTAnalyticsService _analyticsService;
+
   STTCapability({
     required this.sttConfig,
     super.serviceContainer,
-  }) : super(configuration: sttConfig);
+    STTAnalyticsService? analyticsService,
+  })  : _analyticsService = analyticsService ?? STTAnalyticsService(),
+        super(configuration: sttConfig);
 
   /// Currently loaded model ID.
   /// Matches iOS STTCapability.currentModelId property.
@@ -465,17 +472,57 @@ class STTCapability extends BaseCapability<STTService> {
           sampleRate: sttConfig.sampleRate,
         );
 
+    // Estimate audio length for analytics
+    final audioLength = _estimateAudioLength(
+      input.audioData.length,
+      input.format,
+      sttConfig.sampleRate,
+    );
+    final audioLengthMs = audioLength * 1000;
+
+    // Start transcription tracking (matches iOS pattern)
+    final transcriptionId = _analyticsService.startTranscription(
+      audioLengthMs: audioLengthMs,
+      audioSizeBytes: input.audioData.length,
+      language: options.language,
+      framework: sttService.inferenceFramework,
+    );
+
     // Track processing time
     final startTime = DateTime.now();
 
     // Perform transcription
-    final result = await sttService.transcribe(
-      audioData: input.audioData,
-      options: options,
-    );
+    final STTTranscriptionResult result;
+    try {
+      result = await sttService.transcribe(
+        audioData: input.audioData,
+        options: options,
+      );
+    } catch (e) {
+      _analyticsService.trackTranscriptionFailed(
+        transcriptionId: transcriptionId,
+        errorMessage: e.toString(),
+      );
+      rethrow;
+    }
 
     final processingTime =
         DateTime.now().difference(startTime).inMilliseconds / 1000.0;
+
+    // Complete transcription tracking (matches iOS pattern)
+    _analyticsService.completeTranscription(
+      transcriptionId: transcriptionId,
+      text: result.transcript,
+      confidence: result.confidence ?? 0.9,
+    );
+
+    // Track language detection if detected
+    if (result.language != null) {
+      _analyticsService.trackLanguageDetection(
+        language: result.language!,
+        confidence: result.confidence ?? 0.9,
+      );
+    }
 
     // Convert timestamps
     final wordTimestamps = result.timestamps
@@ -494,13 +541,6 @@ class STTCapability extends BaseCapability<STTService> {
               confidence: a.confidence,
             ))
         .toList();
-
-    // Estimate audio length
-    final audioLength = _estimateAudioLength(
-      input.audioData.length,
-      input.format,
-      sttConfig.sampleRate,
-    );
 
     final metadata = TranscriptionMetadata(
       modelId: sttService.currentModel ?? 'unknown',
@@ -577,6 +617,14 @@ class STTCapability extends BaseCapability<STTService> {
   /// Get service for compatibility
   STTService? getService() {
     return service;
+  }
+
+  // MARK: - Analytics
+
+  /// Get current STT analytics metrics.
+  /// Matches iOS STTCapability.getAnalyticsMetrics().
+  STTMetrics getAnalyticsMetrics() {
+    return _analyticsService.getMetrics();
   }
 
   // MARK: - Private Helpers

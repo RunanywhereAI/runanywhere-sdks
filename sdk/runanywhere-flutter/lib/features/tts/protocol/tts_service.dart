@@ -8,11 +8,21 @@ import '../tts_output.dart';
 /// Defines the contract for text-to-speech synthesis
 /// Matches iOS TTSService from Features/TTS/Protocol/TTSService.swift
 abstract class TTSService {
-  /// The inference framework used by this service
+  /// The inference framework used by this service.
+  /// Required for analytics and performance tracking.
+  /// Matches iOS TTSService.inferenceFramework property.
   String get inferenceFramework;
 
   /// Check if service is ready for synthesis
   bool get isReady;
+
+  /// Whether currently synthesizing.
+  /// Matches iOS TTSService.isSynthesizing property.
+  bool get isSynthesizing;
+
+  /// List of available voices.
+  /// Matches iOS TTSService.availableVoices property.
+  List<String> get availableVoices;
 
   /// Initialize the service with configuration
   Future<void> initialize(TTSConfiguration configuration);
@@ -27,7 +37,11 @@ abstract class TTSService {
   /// Returns stream of audio chunks
   Stream<Uint8List> synthesizeStream(TTSInput input);
 
-  /// Get available voices
+  /// Stop current synthesis.
+  /// Matches iOS TTSService.stop() method.
+  Future<void> stop();
+
+  /// Get available voices with detailed information
   Future<List<TTSVoice>> getAvailableVoices();
 
   /// Cleanup resources

@@ -7,6 +7,7 @@ import '../../core/capabilities_base/base_capability.dart';
 import '../../core/types/sdk_component.dart';
 import '../../core/module_registry.dart' hide TTSService;
 import '../../foundation/dependency_injection/service_container.dart';
+import '../../infrastructure/analytics/services/tts_analytics_service.dart';
 import 'protocol/tts_service.dart';
 import 'models/tts_configuration.dart';
 import 'models/tts_input.dart';
@@ -26,10 +27,16 @@ class TTSCapability extends BaseCapability<TTSService> {
   /// Whether a voice/model is currently loaded
   bool _isVoiceLoaded = false;
 
+  /// Analytics service for tracking synthesis operations.
+  /// Matches iOS TTSCapability.analyticsService
+  final TTSAnalyticsService _analyticsService;
+
   TTSCapability({
     required this.ttsConfiguration,
     super.serviceContainer,
+    TTSAnalyticsService? analyticsService,
   })  : currentVoice = ttsConfiguration.voice,
+        _analyticsService = analyticsService ?? TTSAnalyticsService(),
         super(configuration: ttsConfiguration);
 
   /// Whether a voice/model is currently loaded.
@@ -139,9 +146,6 @@ class TTSCapability extends BaseCapability<TTSService> {
       // Use registered provider (e.g., ONNX TTS or other providers)
       debugPrint('[TTSComponent] Creating TTS service from provider...');
       final service = await provider.createTTSService(ttsConfiguration);
-      if (service is! TTSService) {
-        throw StateError('Provider returned invalid service type');
-      }
       // Initialize with configuration
       debugPrint(
           '[TTSComponent] Initializing service with modelPath: $_modelPath');
@@ -215,9 +219,34 @@ class TTSCapability extends BaseCapability<TTSService> {
     // Validate input
     input.validate();
 
+    final text = input.text ?? input.ssml ?? '';
+    final voiceId = input.voiceId ?? currentVoice ?? 'default';
+
+    // Start synthesis tracking (matches iOS pattern)
+    final synthesisId = _analyticsService.startSynthesis(
+      text: text,
+      voice: voiceId,
+      framework: ttsService.inferenceFramework,
+    );
+
     // Perform synthesis using the service protocol
-    // The service will handle the input and return a TTSOutput
-    final output = await ttsService.synthesize(input);
+    final TTSOutput output;
+    try {
+      output = await ttsService.synthesize(input);
+    } catch (e) {
+      _analyticsService.trackSynthesisFailed(
+        synthesisId: synthesisId,
+        errorMessage: e.toString(),
+      );
+      rethrow;
+    }
+
+    // Complete synthesis tracking (matches iOS pattern)
+    _analyticsService.completeSynthesis(
+      synthesisId: synthesisId,
+      audioDurationMs: output.duration * 1000,
+      audioSizeBytes: output.audioData.length,
+    );
 
     return output;
   }
@@ -259,6 +288,24 @@ class TTSCapability extends BaseCapability<TTSService> {
   /// Get service for compatibility
   TTSService? getService() {
     return service;
+  }
+
+  /// Stop current synthesis.
+  /// Matches iOS TTSCapability.stop() method.
+  Future<void> stop() async {
+    await service?.stop();
+  }
+
+  /// Whether currently synthesizing.
+  /// Matches iOS TTSCapability.isSynthesizing property.
+  bool get isSynthesizing => service?.isSynthesizing ?? false;
+
+  // MARK: - Analytics
+
+  /// Get current TTS analytics metrics.
+  /// Matches iOS TTSCapability.getAnalyticsMetrics().
+  TTSMetrics getAnalyticsMetrics() {
+    return _analyticsService.getMetrics();
   }
 
   // MARK: - Cleanup
