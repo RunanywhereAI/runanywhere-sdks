@@ -227,7 +227,8 @@ export {
 } from './Data/Protocols';
 
 // Data/Repositories (matching iOS Data/Repositories/)
-export { ModelInfoRepository } from './Data/Repositories';
+export type { ModelInfoRepository } from './Data/Repositories';
+export { ModelInfoRepositoryImpl } from './Data/Repositories';
 
 // Data/Services (matching iOS Data/Services/)
 export { ModelInfoService } from './Data/Services';

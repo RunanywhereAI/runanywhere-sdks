@@ -8,14 +8,18 @@
  * Matches iOS: Public/Extensions/RunAnywhere+VoiceSession.swift
  */
 
+// Type exports
+export type { VoiceSessionEvent } from './VoiceSessionEvent';
+export type { VoiceSessionConfig } from './VoiceSessionConfig';
+export type { VoiceSessionEventListener } from './VoiceSessionHandle';
+
+// Value exports
 export {
-  VoiceSessionEvent,
   VoiceSessionEventType,
   VoiceSessionEventFactory,
 } from './VoiceSessionEvent';
 
 export {
-  VoiceSessionConfig,
   DEFAULT_VOICE_SESSION_CONFIG,
   createVoiceSessionConfig,
   VoiceSessionConfigPresets,
@@ -27,7 +31,4 @@ export {
   isVoiceSessionError,
 } from './VoiceSessionError';
 
-export {
-  VoiceSessionHandle,
-  type VoiceSessionEventListener,
-} from './VoiceSessionHandle';
+export { VoiceSessionHandle } from './VoiceSessionHandle';

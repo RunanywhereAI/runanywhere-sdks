@@ -7,6 +7,8 @@
  * Pattern matches Swift SDK's AlamofireDownloadService.swift
  */
 
+/// <reference path="../types/react-native-fs.d.ts" />
+
 import { EventBus } from '../Public/Events';
 import { ModelRegistry } from './ModelRegistry';
 import type { ModelInfo } from '../types';

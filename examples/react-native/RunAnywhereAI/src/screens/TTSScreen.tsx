@@ -97,7 +97,7 @@ export const TTSScreen: React.FC = () => {
   const [showModelSelection, setShowModelSelection] = useState(false);
 
   // Audio player refs - using react-native-sound directly
-  const soundRef = useRef<Sound | null>(null);
+  const soundRef = useRef<typeof Sound | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Character count
@@ -265,7 +265,7 @@ export const TTSScreen: React.FC = () => {
 
       // Pass the path directly - C++ extractArchiveIfNeeded handles archive extraction
       // and finding the correct nested model folder
-      const modelType = model.modelType || 'piper';
+      const modelType = model.category || 'piper';
       console.log(`[TTSScreen] Calling loadTTSModel with path: ${model.localPath}, type: ${modelType}`);
 
       const success = await RunAnywhere.loadTTSModel(model.localPath, modelType);
@@ -677,7 +677,7 @@ export const TTSScreen: React.FC = () => {
           // Resume existing sound
           console.log('[TTSScreen] Resuming playback from:', currentTime);
           soundRef.current.setVolume(volume);
-          soundRef.current.play((success) => {
+          soundRef.current.play((success: boolean) => {
             if (success) {
               console.log('[TTSScreen] Playback finished');
             }
@@ -689,7 +689,7 @@ export const TTSScreen: React.FC = () => {
 
           // Start progress updates
           progressIntervalRef.current = setInterval(() => {
-            soundRef.current?.getCurrentTime((seconds) => {
+            soundRef.current?.getCurrentTime((seconds: number) => {
               const totalDuration = soundRef.current?.getDuration() || duration;
               setCurrentTime(seconds);
               if (totalDuration > 0) {
@@ -749,7 +749,7 @@ export const TTSScreen: React.FC = () => {
             Alert.alert('Playback Error', 'Sound player not available');
             return;
           }
-          const sound = new SoundClass(audioFilePath, '', (error) => {
+          const sound = new SoundClass(audioFilePath, '', (error: Error | null) => {
             if (error) {
               console.error('[TTSScreen] Failed to load sound:', error);
               Alert.alert('Playback Error', `Failed to load audio: ${error.message}`);
@@ -760,7 +760,7 @@ export const TTSScreen: React.FC = () => {
             soundRef.current = sound;
             sound.setVolume(volume);
 
-            sound.play((success) => {
+            sound.play((success: boolean) => {
               if (success) {
                 console.log('[TTSScreen] Playback finished successfully');
               } else {
@@ -774,7 +774,7 @@ export const TTSScreen: React.FC = () => {
 
             // Start progress updates
             progressIntervalRef.current = setInterval(() => {
-              sound.getCurrentTime((seconds) => {
+              sound.getCurrentTime((seconds: number) => {
                 const totalDuration = sound.getDuration();
                 setCurrentTime(seconds);
                 if (totalDuration > 0) {

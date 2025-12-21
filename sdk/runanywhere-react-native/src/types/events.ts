@@ -118,6 +118,7 @@ export type SDKModelEvent =
       localPath?: string;
     }
   | { type: 'downloadFailed'; modelId: string; taskId?: string; error: string }
+  | { type: 'downloadCancelled'; modelId: string; taskId?: string }
   | { type: 'listRequested' }
   | { type: 'listCompleted'; models: ModelInfo[] }
   | { type: 'listFailed'; error: string }

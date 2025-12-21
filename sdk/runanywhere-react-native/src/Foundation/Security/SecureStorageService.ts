@@ -85,7 +85,7 @@ class SecureStorageServiceImpl {
       this.cache.set(key, value);
       this.logger.debug(`Stored value for key: ${key}`);
     } catch (error) {
-      this.logger.error(`Failed to store value for key: ${key}`, error);
+      this.logger.error(`Failed to store value for key: ${key}`, { error });
       throw SecureStorageError.storageError(
         error instanceof Error ? error : undefined
       );
@@ -124,7 +124,7 @@ class SecureStorageServiceImpl {
         return null;
       }
 
-      this.logger.error(`Failed to retrieve value for key: ${key}`, error);
+      this.logger.error(`Failed to retrieve value for key: ${key}`, { error });
       throw SecureStorageError.retrievalError(
         error instanceof Error ? error : undefined
       );
@@ -150,7 +150,7 @@ class SecureStorageServiceImpl {
     } catch (error) {
       // Ignore "not found" errors on delete
       if (!isItemNotFoundError(error)) {
-        this.logger.error(`Failed to delete value for key: ${key}`, error);
+        this.logger.error(`Failed to delete value for key: ${key}`, { error });
         throw SecureStorageError.deletionError(
           error instanceof Error ? error : undefined
         );
@@ -195,11 +195,17 @@ class SecureStorageServiceImpl {
    * @param params - SDK init params
    */
   async storeSDKParams(params: SDKInitParams): Promise<void> {
-    await Promise.all([
-      this.store(params.apiKey, SecureStorageKeys.apiKey),
-      this.store(params.baseURL, SecureStorageKeys.baseURL),
-      this.store(params.environment, SecureStorageKeys.environment),
-    ]);
+    const promises: Promise<void>[] = [];
+
+    if (params.apiKey) {
+      promises.push(this.store(params.apiKey, SecureStorageKeys.apiKey));
+    }
+    if (params.baseURL) {
+      promises.push(this.store(params.baseURL, SecureStorageKeys.baseURL));
+    }
+    promises.push(this.store(params.environment, SecureStorageKeys.environment));
+
+    await Promise.all(promises);
     this.logger.info('SDK parameters stored securely');
   }
 

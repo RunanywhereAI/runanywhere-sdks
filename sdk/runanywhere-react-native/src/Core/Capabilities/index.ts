@@ -6,10 +6,19 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Capabilities/
  */
 
-// Capability Protocols and Types
-export {
-  // Loading State
+// Capability Protocols and Types - Type exports
+export type {
   CapabilityLoadingState,
+  CapabilityOperationResult,
+  ComponentConfiguration,
+  Capability,
+  ModelLoadableCapability,
+  ServiceBasedCapability,
+  CompositeCapability,
+} from './CapabilityProtocols';
+
+// Capability Protocols and Types - Value exports
+export {
   idleState,
   loadingState,
   loadedState,
@@ -19,19 +28,8 @@ export {
   isLoaded,
   isFailed,
   getResourceId,
-  // Operation Result
-  CapabilityOperationResult,
   createOperationResult,
-  // Configuration
-  ComponentConfiguration,
-  // Capability Protocols
-  Capability,
-  ModelLoadableCapability,
-  ServiceBasedCapability,
-  CompositeCapability,
-  // Metrics
   CapabilityMetrics,
-  // Errors
   CapabilityError,
   CapabilityErrorCode,
 } from './CapabilityProtocols';
@@ -42,58 +40,67 @@ export {
   getResourceTypeDisplayName,
 } from './ResourceTypes';
 
-// Model Lifecycle Manager
-export {
-  ModelLifecycleManager,
+// Model Lifecycle Manager - Type exports
+export type {
   LoadResourceFn,
   UnloadResourceFn,
   ModelLifecycleManagerOptions,
 } from './ModelLifecycleManager';
 
-// Managed Lifecycle
-export { ManagedLifecycle, ManagedLifecycleOptions } from './ManagedLifecycle';
+// Model Lifecycle Manager - Value exports
+export { ModelLifecycleManager } from './ModelLifecycleManager';
 
-// Analytics Types
+// Managed Lifecycle - Type exports
+export type { ManagedLifecycleOptions } from './ManagedLifecycle';
+
+// Managed Lifecycle - Value exports
+export { ManagedLifecycle } from './ManagedLifecycle';
+
+// Analytics Types - Type exports
+export type { AnalyticsMetrics, ModelLifecycleMetrics } from './Analytics';
+
+// Analytics Types - Value exports
 export {
-  AnalyticsMetrics,
   InferenceFrameworkType,
   ModelLifecycleEventType,
-  ModelLifecycleMetrics,
   createModelLifecycleMetrics,
 } from './Analytics';
 
-// Lifecycle Events
+// Lifecycle Events - Type exports
+export type {
+  LLMLifecycleEventType,
+  STTLifecycleEventType,
+  TTSLifecycleEventType,
+  VADLifecycleEventType,
+  SpeakerDiarizationLifecycleEventType,
+  LifecycleEventType,
+} from './LifecycleEvents';
+
+// Lifecycle Events - Value exports
 export {
   // LLM Events
-  LLMLifecycleEventType,
   createLLMModelLoadStartedEvent,
   createLLMModelLoadCompletedEvent,
   createLLMModelLoadFailedEvent,
   createLLMModelUnloadedEvent,
   // STT Events
-  STTLifecycleEventType,
   createSTTModelLoadStartedEvent,
   createSTTModelLoadCompletedEvent,
   createSTTModelLoadFailedEvent,
   createSTTModelUnloadedEvent,
   // TTS Events
-  TTSLifecycleEventType,
   createTTSModelLoadStartedEvent,
   createTTSModelLoadCompletedEvent,
   createTTSModelLoadFailedEvent,
   createTTSModelUnloadedEvent,
   // VAD Events
-  VADLifecycleEventType,
   createVADModelLoadStartedEvent,
   createVADModelLoadCompletedEvent,
   createVADModelLoadFailedEvent,
   createVADModelUnloadedEvent,
   // SpeakerDiarization Events
-  SpeakerDiarizationLifecycleEventType,
   createSpeakerDiarizationModelLoadStartedEvent,
   createSpeakerDiarizationModelLoadCompletedEvent,
   createSpeakerDiarizationModelLoadFailedEvent,
   createSpeakerDiarizationModelUnloadedEvent,
-  // Combined
-  LifecycleEventType,
 } from './LifecycleEvents';
