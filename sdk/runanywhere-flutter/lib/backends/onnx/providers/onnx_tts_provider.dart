@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import '../../../core/module_registry.dart';
-import '../../../native/native_backend.dart';
-import '../services/onnx_tts_service.dart';
+import 'package:runanywhere/backends/onnx/services/onnx_tts_service.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// Provider for ONNX-based TTS service.
 ///
@@ -49,7 +49,7 @@ class OnnxTTSServiceProvider implements TTSServiceProvider {
   }
 
   @override
-  Future<dynamic> createTTSService(dynamic configuration) async {
+  Future<TTSService> createTTSService(dynamic configuration) async {
     // Create service but don't initialize yet
     // Component will call initialize() with the model path separately
     final service = OnnxTTSService(_backend);

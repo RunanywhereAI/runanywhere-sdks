@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
-import '../../public/models/models.dart';
+import 'package:runanywhere/public/models/models.dart';
 
 /// Centralized utility for calculating model paths and directories.
 /// Follows the structure: `Documents/RunAnywhere/Models/{framework.rawValue}/{modelId}/`
@@ -272,7 +272,7 @@ class ModelPathUtils {
     } else {
       final file = File(path);
       if (!await file.exists()) return 0;
-      return await file.length();
+      return file.length();
     }
   }
 

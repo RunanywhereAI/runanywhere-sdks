@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import '../../core/module_registry.dart';
-import '../../features/tts/models/tts_options.dart';
-import '../native_backend.dart';
+import 'package:runanywhere/core/models/audio_format.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/features/tts/models/tts_configuration.dart';
+import 'package:runanywhere/features/tts/models/tts_input.dart';
+import 'package:runanywhere/features/tts/tts_output.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// Native TTS service using ONNX/Sherpa-ONNX backend via FFI (Piper/VITS models).
 ///
@@ -13,9 +16,26 @@ class NativeTTSService implements TTSService {
   String? _modelPath;
   bool _isInitialized = false;
   bool _isSynthesizing = false;
+  TTSConfiguration? _configuration;
+  List<TTSVoice> _voices = [];
 
   NativeTTSService(this._backend);
 
+  /// ONNX Runtime inference framework
+  /// Matches iOS ONNXTTSService.inferenceFramework
+  @override
+  String get inferenceFramework => 'onnx';
+
+  @override
+  bool get isReady => _isInitialized && _backend.isTtsModelLoaded;
+
+  @override
+  bool get isSynthesizing => _isSynthesizing;
+
+  @override
+  List<String> get availableVoices => _voices.map((v) => v.id).toList();
+
+  /// Initialize with a model path (convenience method)
   Future<void> initializeWithPath(String modelPath) async {
     _modelPath = modelPath;
 
@@ -31,73 +51,96 @@ class NativeTTSService implements TTSService {
       throw Exception('TTS model failed to load - model not marked as loaded');
     }
 
+    // Get available voices
+    final voiceStrings = _backend.getTtsVoices();
+    _voices = voiceStrings
+        .map((voiceId) => TTSVoice(
+              id: voiceId,
+              name: voiceId,
+              language: 'en-US',
+            ))
+        .toList();
+
     _isInitialized = true;
   }
 
   @override
-  Future<void> initialize() async {
-    if (_modelPath != null) {
+  Future<void> initialize(TTSConfiguration configuration) async {
+    _configuration = configuration;
+
+    if (configuration.modelId != null && configuration.modelId!.isNotEmpty) {
+      await initializeWithPath(configuration.modelId!);
+    } else if (_modelPath != null) {
       await initializeWithPath(_modelPath!);
     }
+
     _isInitialized = true;
   }
 
-  bool get isReady => _isInitialized && _backend.isTtsModelLoaded;
-
   @override
-  bool get isSynthesizing => _isSynthesizing;
-
-  @override
-  List<String> get availableVoices {
-    if (!isReady) return [];
-    return _backend.getTtsVoices();
-  }
-
-  @override
-  Future<List<int>> synthesize({
-    required String text,
-    required TTSOptions options,
-  }) async {
+  Future<TTSOutput> synthesize(TTSInput input) async {
     if (!isReady) {
       throw Exception('TTS service not initialized');
     }
 
     _isSynthesizing = true;
+    final startTime = DateTime.now();
+    final text = input.ssml ?? input.text ?? '';
+    final voice = input.voiceId ?? _configuration?.voice ?? 'default';
+    final rate = _configuration?.speakingRate ?? 1.0;
+    final pitch = _configuration?.pitch ?? 1.0;
 
     try {
       final result = _backend.synthesize(
         text,
-        voiceId: options.voice,
-        speed: options.rate,
-        pitch: options.pitch - 1.0, // Convert 0-2 range to semitones
+        voiceId: voice,
+        speed: rate,
+        pitch: pitch - 1.0, // Convert 0-2 range to semitones
       );
 
       final samples = result['samples'] as Float32List;
       final sampleRate = result['sampleRate'] as int;
 
-      // Convert Float32 to PCM16 WAV bytes
-      return _convertToWav(samples, sampleRate);
+      // Convert Float32 to PCM16 bytes
+      final audioData =
+          Uint8List.fromList(_convertToPCM16(samples, sampleRate));
+      final processingTime =
+          DateTime.now().difference(startTime).inMilliseconds / 1000.0;
+      final duration = samples.length / sampleRate;
+
+      return TTSOutput(
+        audioData: audioData,
+        format: _configuration?.audioFormat ?? AudioFormat.pcm,
+        duration: duration,
+        metadata: SynthesisMetadata(
+          voice: voice,
+          language: input.language ?? _configuration?.language ?? 'en-US',
+          processingTime: processingTime,
+          characterCount: text.length,
+        ),
+      );
     } finally {
       _isSynthesizing = false;
     }
   }
 
   @override
-  Future<void> synthesizeStream({
-    required String text,
-    required TTSOptions options,
-    required void Function(List<int>) onChunk,
-  }) async {
+  Stream<Uint8List> synthesizeStream(TTSInput input) async* {
     // For now, synthesize full and emit as single chunk
     // VITS/Piper doesn't natively support streaming
-    final audio = await synthesize(text: text, options: options);
-    onChunk(audio);
+    final output = await synthesize(input);
+    yield output.audioData;
   }
 
   @override
-  void stop() {
+  Future<void> stop() async {
     _isSynthesizing = false;
     _backend.cancelTts();
+  }
+
+  @override
+  Future<List<TTSVoice>> getAvailableVoices() async {
+    return _voices;
   }
 
   @override
@@ -109,57 +152,20 @@ class NativeTTSService implements TTSService {
     _isSynthesizing = false;
   }
 
-  List<int> _convertToWav(Float32List samples, int sampleRate) {
-    // Convert Float32 to PCM16 WAV bytes
-    const bytesPerSample = 2;
-    const numChannels = 1;
-    final dataSize = samples.length * bytesPerSample;
-    final fileSize = 44 + dataSize; // WAV header is 44 bytes
+  List<int> _convertToPCM16(Float32List samples, int sampleRate) {
+    final pcm16 = Uint8List(samples.length * 2);
 
-    final buffer = ByteData(fileSize);
-
-    // RIFF header
-    buffer.setUint8(0, 0x52); // R
-    buffer.setUint8(1, 0x49); // I
-    buffer.setUint8(2, 0x46); // F
-    buffer.setUint8(3, 0x46); // F
-    buffer.setUint32(4, fileSize - 8, Endian.little);
-    buffer.setUint8(8, 0x57); // W
-    buffer.setUint8(9, 0x41); // A
-    buffer.setUint8(10, 0x56); // V
-    buffer.setUint8(11, 0x45); // E
-
-    // fmt chunk
-    buffer.setUint8(12, 0x66); // f
-    buffer.setUint8(13, 0x6D); // m
-    buffer.setUint8(14, 0x74); // t
-    buffer.setUint8(15, 0x20); // (space)
-    buffer.setUint32(16, 16, Endian.little); // Chunk size
-    buffer.setUint16(20, 1, Endian.little); // Audio format (PCM)
-    buffer.setUint16(22, numChannels, Endian.little); // Channels
-    buffer.setUint32(24, sampleRate, Endian.little); // Sample rate
-    buffer.setUint32(28, sampleRate * numChannels * bytesPerSample,
-        Endian.little); // Byte rate
-    buffer.setUint16(
-        32, numChannels * bytesPerSample, Endian.little); // Block align
-    buffer.setUint16(34, bytesPerSample * 8, Endian.little); // Bits per sample
-
-    // data chunk
-    buffer.setUint8(36, 0x64); // d
-    buffer.setUint8(37, 0x61); // a
-    buffer.setUint8(38, 0x74); // t
-    buffer.setUint8(39, 0x61); // a
-    buffer.setUint32(40, dataSize, Endian.little);
-
-    // PCM data
     for (var i = 0; i < samples.length; i++) {
-      final sample = samples[i];
-      final clampedSample = sample.clamp(-1.0, 1.0);
-      final int16Sample = (clampedSample * 32767).round().clamp(-32768, 32767);
-      buffer.setInt16(44 + i * 2, int16Sample, Endian.little);
+      // Clamp to -1.0 to 1.0
+      final clamped = samples[i].clamp(-1.0, 1.0);
+      // Convert to 16-bit signed integer
+      final sample = (clamped * 32767).round();
+      // Store as little-endian
+      pcm16[i * 2] = sample & 0xFF;
+      pcm16[i * 2 + 1] = (sample >> 8) & 0xFF;
     }
 
-    return buffer.buffer.asUint8List();
+    return pcm16;
   }
 }
 
@@ -189,7 +195,7 @@ class NativeTTSServiceProvider implements TTSServiceProvider {
   }
 
   @override
-  Future<dynamic> createTTSService(dynamic configuration) async {
+  Future<TTSService> createTTSService(dynamic configuration) async {
     final service = NativeTTSService(_backend);
 
     String? modelPath;

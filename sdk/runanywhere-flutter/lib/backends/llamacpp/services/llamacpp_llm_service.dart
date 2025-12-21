@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import '../../../core/module_registry.dart';
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../native/native_backend.dart';
-import '../llamacpp_error.dart';
-import '../llamacpp_template_resolver.dart';
+import 'package:runanywhere/backends/llamacpp/llamacpp_error.dart';
+import 'package:runanywhere/backends/llamacpp/llamacpp_template_resolver.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// LlamaCpp-based Language Model service.
 ///
@@ -168,7 +168,7 @@ class LlamaCppLLMService implements LLMService {
       for (final word in words) {
         yield '$word ';
         // Small delay to simulate streaming
-        await Future.delayed(const Duration(milliseconds: 10));
+        await Future<void>.delayed(const Duration(milliseconds: 10));
       }
     } catch (e) {
       throw LlamaCppError.generationFailed(e.toString());

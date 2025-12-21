@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import '../../../core/module_registry.dart';
-import '../../../native/native_backend.dart';
-import '../services/onnx_stt_service.dart';
+import 'package:runanywhere/backends/onnx/services/onnx_stt_service.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// Provider for ONNX-based STT service.
 ///

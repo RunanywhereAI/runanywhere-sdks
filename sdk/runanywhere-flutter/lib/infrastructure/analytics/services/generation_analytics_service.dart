@@ -7,8 +7,8 @@
 
 import 'dart:async';
 
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../core/module_registry.dart' show LLMGenerationResult;
+import 'package:runanywhere/core/module_registry.dart' show LLMGenerationResult;
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// LLM analytics service for tracking generation operations.
 /// Model lifecycle events (load/unload) are handled by ManagedLifecycle.

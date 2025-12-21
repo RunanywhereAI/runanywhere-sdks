@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
-import '../../../foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Manages audio capture from microphone for STT services.
 ///

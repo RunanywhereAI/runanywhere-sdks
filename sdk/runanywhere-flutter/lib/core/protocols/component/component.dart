@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import '../../types/component_state.dart';
-import '../../types/sdk_component.dart';
-import 'component_configuration.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/core/types/component_state.dart';
+import 'package:runanywhere/core/types/sdk_component.dart';
 
 /// Base protocol that all SDK components must implement
 abstract class Component {

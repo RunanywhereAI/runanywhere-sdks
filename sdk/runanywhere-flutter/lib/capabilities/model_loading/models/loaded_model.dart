@@ -1,5 +1,5 @@
-import '../../../core/models/common.dart';
-import '../../../core/module_registry.dart';
+import 'package:runanywhere/core/models/common.dart';
+import 'package:runanywhere/core/module_registry.dart';
 
 /// Represents a model that has been loaded and is ready for use
 class LoadedModel {

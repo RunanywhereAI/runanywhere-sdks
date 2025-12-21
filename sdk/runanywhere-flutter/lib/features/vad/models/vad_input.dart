@@ -13,16 +13,14 @@ class VADInput {
   final double? energyThresholdOverride;
 
   /// Initialize with audio buffer
-  VADInput.fromBuffer(Uint8List buffer)
-      : buffer = buffer,
-        audioSamples = null,
+  VADInput.fromBuffer(this.buffer)
+      : audioSamples = null,
         energyThresholdOverride = null;
 
   /// Initialize with audio samples
-  VADInput.fromSamples(List<double> samples, {double? energyThresholdOverride})
+  VADInput.fromSamples(List<double> samples, {this.energyThresholdOverride})
       : buffer = null,
-        audioSamples = samples,
-        energyThresholdOverride = energyThresholdOverride;
+        audioSamples = samples;
 
   /// Validate the input
   void validate() {

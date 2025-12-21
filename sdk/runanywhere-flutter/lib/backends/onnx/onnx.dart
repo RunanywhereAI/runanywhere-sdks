@@ -33,20 +33,17 @@
 /// ```
 library runanywhere_onnx;
 
-// Backend entry point
-export 'onnx_backend.dart';
-
 // Adapter
 export 'onnx_adapter.dart';
-
-// Services
-export 'services/onnx_stt_service.dart';
-export 'services/onnx_tts_service.dart';
-export 'services/onnx_vad_service.dart';
-export 'services/onnx_llm_service.dart';
-
+// Backend entry point
+export 'onnx_backend.dart';
+export 'providers/onnx_llm_provider.dart';
 // Providers
 export 'providers/onnx_stt_provider.dart';
 export 'providers/onnx_tts_provider.dart';
 export 'providers/onnx_vad_provider.dart';
-export 'providers/onnx_llm_provider.dart';
+export 'services/onnx_llm_service.dart';
+// Services
+export 'services/onnx_stt_service.dart';
+export 'services/onnx_tts_service.dart';
+export 'services/onnx_vad_service.dart';

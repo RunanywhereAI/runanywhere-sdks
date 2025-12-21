@@ -3,12 +3,11 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
-
-import '../../foundation/configuration/sdk_constants.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../errors/repository_error.dart';
-import 'api_endpoint.dart';
-import 'network_service.dart';
+import 'package:runanywhere/data/errors/repository_error.dart';
+import 'package:runanywhere/data/network/api_endpoint.dart';
+import 'package:runanywhere/data/network/network_service.dart';
+import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Production API client for backend operations.
 ///
@@ -190,7 +189,7 @@ class APIClient implements NetworkService {
 
   Future<String> _getToken(bool requiresAuth) async {
     if (requiresAuth && _authTokenProvider != null) {
-      return await _authTokenProvider!.getAccessToken();
+      return _authTokenProvider!.getAccessToken();
     }
     // No auth service or not required - use API key as bearer token (Supabase dev mode)
     return apiKey;

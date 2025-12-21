@@ -4,10 +4,9 @@
 library voice_session_manager;
 import 'dart:async';
 
-
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../features/stt/stt_capability.dart' show STTOutput;
-import '../models/voice_session.dart';
+import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
+import 'package:runanywhere/features/stt/stt_capability.dart' show STTOutput;
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Manages voice session lifecycle
 /// Matches iOS VoiceSessionManager from VoiceSessionManager.swift

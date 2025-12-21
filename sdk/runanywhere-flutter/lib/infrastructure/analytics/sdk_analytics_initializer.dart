@@ -10,15 +10,15 @@
 
 import 'dart:async';
 
-import '../../data/network/api_client.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../../public/configuration/sdk_environment.dart';
-import '../events/event_publisher.dart';
-import 'analytics_queue_manager.dart';
-import 'data_sources/local_telemetry_data_source.dart';
-import 'data_sources/remote_telemetry_data_source.dart';
-import 'repositories/telemetry_repository.dart';
-import 'services/telemetry_sync_service.dart';
+import 'package:runanywhere/data/network/api_client.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/infrastructure/analytics/analytics_queue_manager.dart';
+import 'package:runanywhere/infrastructure/analytics/data_sources/local_telemetry_data_source.dart';
+import 'package:runanywhere/infrastructure/analytics/data_sources/remote_telemetry_data_source.dart';
+import 'package:runanywhere/infrastructure/analytics/repositories/telemetry_repository.dart';
+import 'package:runanywhere/infrastructure/analytics/services/telemetry_sync_service.dart';
+import 'package:runanywhere/infrastructure/events/event_publisher.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// Initializes the analytics pipeline for the SDK.
 ///

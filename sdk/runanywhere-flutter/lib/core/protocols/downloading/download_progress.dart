@@ -1,4 +1,4 @@
-import 'download_state.dart';
+import 'package:runanywhere/core/protocols/downloading/download_state.dart';
 
 /// Download progress information
 /// Matches iOS DownloadProgress from Data/Models/Downloading/DownloadProgress.swift

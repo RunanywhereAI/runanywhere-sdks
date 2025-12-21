@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import '../../models/model/model_info.dart';
+import 'package:runanywhere/core/models/model/model_info.dart';
 
 /// Protocol for custom download strategies provided by host app
 /// Allows extending download behavior without modifying core SDK logic

@@ -6,7 +6,7 @@
 //  Matches iOS DataSource.swift
 //
 
-import 'repository_entity.dart';
+import 'package:runanywhere/data/protocols/repository_entity.dart';
 
 /// Information about local storage status
 class DataSourceStorageInfo {

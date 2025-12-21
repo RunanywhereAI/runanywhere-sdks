@@ -7,8 +7,8 @@ library voice_session_handle;
 import 'dart:async';
 import 'dart:typed_data';
 
-import '../../../foundation/logging/sdk_logger.dart';
-import 'voice_session.dart';
+import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Handle to control an active voice session
 /// Matches iOS VoiceSessionHandle from RunAnywhere+VoiceSession.swift
@@ -99,7 +99,7 @@ class VoiceSessionHandle {
     _lastSpeechTime = null;
 
     _emit(const VoiceSessionStopped());
-    _eventController.close();
+    unawaited(_eventController.close());
 
     _logger.info('Voice session stopped');
   }
@@ -152,7 +152,7 @@ class VoiceSessionHandle {
 
           // Only process if we have enough audio (~0.5s at 16kHz = 16000 samples)
           if (_audioBuffer.length > 16000) {
-            _processCurrentAudio();
+            unawaited(_processCurrentAudio());
           } else {
             _audioBuffer = Uint8List(0);
           }

@@ -1,8 +1,3 @@
-/// LLM Generation Result.
-///
-/// Contains the result of text generation including metrics.
-/// Matches iOS `LLMGenerationResult` from RunAnywhere SDK.
-
 /// Result of LLM text generation with metrics.
 ///
 /// Matches iOS `LLMGenerationResult` struct from LLMGenerationResult.swift

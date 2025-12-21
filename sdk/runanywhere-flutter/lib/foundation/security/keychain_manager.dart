@@ -24,7 +24,7 @@ class KeychainManager {
 
   /// Retrieve a value
   Future<String?> retrieve(String key) async {
-    return await _storage.read(key: key);
+    return _storage.read(key: key);
   }
 
   /// Delete a value
@@ -39,7 +39,7 @@ class KeychainManager {
 
   /// Retrieve device UUID
   Future<String?> retrieveDeviceUUID() async {
-    return await retrieve('com.runanywhere.sdk.device.uuid');
+    return retrieve('com.runanywhere.sdk.device.uuid');
   }
 
   /// Store SDK initialization parameters

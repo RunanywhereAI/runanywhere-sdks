@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:flutter_tts/flutter_tts.dart';
-import 'protocol/tts_service.dart';
-import 'models/tts_configuration.dart';
-import 'models/tts_input.dart';
-import 'tts_output.dart';
+import 'package:runanywhere/features/tts/models/tts_configuration.dart';
+import 'package:runanywhere/features/tts/models/tts_input.dart';
+import 'package:runanywhere/features/tts/protocol/tts_service.dart';
+import 'package:runanywhere/features/tts/tts_output.dart';
 
 /// System TTS Service implementation using flutter_tts
 /// Matches iOS SystemTTSService from TTSComponent.swift

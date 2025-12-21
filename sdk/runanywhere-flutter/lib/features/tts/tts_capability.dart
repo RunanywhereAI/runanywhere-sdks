@@ -2,17 +2,16 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-
-import '../../core/capabilities_base/base_capability.dart';
-import '../../core/types/sdk_component.dart';
-import '../../core/module_registry.dart' hide TTSService;
-import '../../foundation/dependency_injection/service_container.dart';
-import '../../infrastructure/analytics/services/tts_analytics_service.dart';
-import 'protocol/tts_service.dart';
-import 'models/tts_configuration.dart';
-import 'models/tts_input.dart';
-import 'tts_output.dart';
-import 'system_tts_service.dart';
+import 'package:runanywhere/core/capabilities_base/base_capability.dart';
+import 'package:runanywhere/core/module_registry.dart' hide TTSService;
+import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/features/tts/models/tts_configuration.dart';
+import 'package:runanywhere/features/tts/models/tts_input.dart';
+import 'package:runanywhere/features/tts/protocol/tts_service.dart';
+import 'package:runanywhere/features/tts/system_tts_service.dart';
+import 'package:runanywhere/features/tts/tts_output.dart';
+import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
+import 'package:runanywhere/infrastructure/analytics/services/tts_analytics_service.dart';
 
 /// TTS Capability
 /// Matches iOS TTSCapability from TTSCapability.swift
@@ -188,7 +187,7 @@ class TTSCapability extends BaseCapability<TTSService> {
       voiceId: voice,
       language: language,
     );
-    return await process(input);
+    return process(input);
   }
 
   /// Synthesize with SSML markup
@@ -204,7 +203,7 @@ class TTSCapability extends BaseCapability<TTSService> {
       voiceId: voice,
       language: language,
     );
-    return await process(input);
+    return process(input);
   }
 
   /// Process TTS input
@@ -282,7 +281,7 @@ class TTSCapability extends BaseCapability<TTSService> {
     if (ttsService == null) {
       return [];
     }
-    return await ttsService.getAvailableVoices();
+    return ttsService.getAvailableVoices();
   }
 
   /// Get service for compatibility

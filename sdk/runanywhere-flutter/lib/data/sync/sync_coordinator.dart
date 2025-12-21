@@ -8,11 +8,11 @@
 
 import 'dart:async';
 
-import '../../foundation/logging/sdk_logger.dart';
-import '../protocols/remote_data_source.dart';
-import '../protocols/repository.dart';
-import '../protocols/repository_entity.dart';
-import 'models/sync_progress.dart';
+import 'package:runanywhere/data/protocols/remote_data_source.dart';
+import 'package:runanywhere/data/protocols/repository.dart';
+import 'package:runanywhere/data/protocols/repository_entity.dart';
+import 'package:runanywhere/data/sync/models/sync_progress.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Centralized coordinator for syncing data between local storage and remote API
 ///
@@ -44,7 +44,7 @@ class SyncCoordinator {
     if (enableAutoSync) {
       // Start auto-sync in the background (fire and forget)
       // ignore: discarded_futures
-      Future.microtask(() => startAutoSync());
+      Future.microtask(startAutoSync);
     }
     _logger.debug('SyncCoordinator initialized');
   }

@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import '../core/module_registry.dart';
-import 'native_backend.dart';
-import 'platform_loader.dart';
-import 'providers/native_stt_provider.dart';
-import 'providers/native_tts_provider.dart';
-import 'providers/native_vad_provider.dart';
-import 'providers/native_llm_provider.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/native/native_backend.dart';
+import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/providers/native_llm_provider.dart';
+import 'package:runanywhere/native/providers/native_stt_provider.dart';
+import 'package:runanywhere/native/providers/native_tts_provider.dart';
+import 'package:runanywhere/native/providers/native_vad_provider.dart';
 
 /// Helper class to register native providers with the SDK.
 ///

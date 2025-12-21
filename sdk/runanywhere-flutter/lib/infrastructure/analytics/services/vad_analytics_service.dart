@@ -2,9 +2,9 @@
 // Tracks VAD operations and metrics.
 // Matches iOS VADAnalyticsService.
 
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../infrastructure/events/event_publisher.dart';
-import '../../../public/events/sdk_event.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/infrastructure/events/event_publisher.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// VAD analytics service for tracking voice activity detection.
 /// Model lifecycle events (load/unload) are handled by ManagedLifecycle when applicable.

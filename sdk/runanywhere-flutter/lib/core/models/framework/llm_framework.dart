@@ -1,4 +1,4 @@
-import 'framework_modality.dart';
+import 'package:runanywhere/core/models/framework/framework_modality.dart';
 
 /// Supported LLM frameworks
 ///

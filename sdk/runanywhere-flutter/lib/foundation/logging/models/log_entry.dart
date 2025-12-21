@@ -1,4 +1,4 @@
-import 'log_level.dart';
+import 'package:runanywhere/foundation/logging/models/log_level.dart';
 
 /// Device information for logging
 ///

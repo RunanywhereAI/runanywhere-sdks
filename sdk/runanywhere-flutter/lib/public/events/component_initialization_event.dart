@@ -1,6 +1,6 @@
-import '../../core/types/sdk_component.dart';
-import '../../core/types/component_state.dart';
-import 'sdk_event.dart';
+import 'package:runanywhere/core/types/component_state.dart';
+import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// Component initialization events
 abstract class ComponentInitializationEvent with SDKEventDefaults {

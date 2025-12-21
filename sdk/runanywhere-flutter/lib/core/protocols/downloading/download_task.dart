@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'download_progress.dart';
+import 'package:runanywhere/core/protocols/downloading/download_progress.dart';
 
 /// Download task information
 /// Matches iOS DownloadTask from Data/Models/Downloading/DownloadTask.swift

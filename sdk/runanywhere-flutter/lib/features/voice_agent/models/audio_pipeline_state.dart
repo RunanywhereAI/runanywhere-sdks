@@ -1,5 +1,5 @@
 import 'dart:async';
-import '../../../foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Represents the current state of the audio pipeline to prevent feedback loops
 /// Matches iOS AudioPipelineState from Features/VoiceAgent/Models/AudioPipelineState.swift

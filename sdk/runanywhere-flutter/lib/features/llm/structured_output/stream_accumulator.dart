@@ -1,4 +1,4 @@
-import 'stream_token.dart';
+import 'package:runanywhere/features/llm/structured_output/stream_token.dart';
 
 /// Accumulates tokens from a stream into a complete response
 /// Matches iOS StreamAccumulator from Features/LLM/StructuredOutput/StreamAccumulator.swift

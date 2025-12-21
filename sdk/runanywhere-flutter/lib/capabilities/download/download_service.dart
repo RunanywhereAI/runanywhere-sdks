@@ -1,18 +1,17 @@
 import 'dart:async';
 
 import 'package:http/http.dart' as http;
-
-import '../../core/models/model/model_info.dart';
-import '../../core/protocols/registry/model_registry.dart';
-import '../../core/protocols/downloading/download_manager.dart';
-import '../../core/protocols/downloading/download_progress.dart' as proto;
-import '../../core/protocols/downloading/download_state.dart';
-import '../../core/protocols/downloading/download_task.dart' as proto;
-import '../../core/protocols/downloading/download_strategy.dart';
-import '../../foundation/file_operations/model_path_utils.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../../foundation/error_types/sdk_error.dart';
-import '../registry/registry_service.dart' hide ModelRegistry;
+import 'package:runanywhere/capabilities/registry/registry_service.dart' hide ModelRegistry;
+import 'package:runanywhere/core/models/model/model_info.dart';
+import 'package:runanywhere/core/protocols/downloading/download_manager.dart';
+import 'package:runanywhere/core/protocols/downloading/download_progress.dart' as proto;
+import 'package:runanywhere/core/protocols/downloading/download_state.dart';
+import 'package:runanywhere/core/protocols/downloading/download_strategy.dart';
+import 'package:runanywhere/core/protocols/downloading/download_task.dart' as proto;
+import 'package:runanywhere/core/protocols/registry/model_registry.dart';
+import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/file_operations/model_path_utils.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Service for downloading models with progress tracking
 /// Matches iOS AlamofireDownloadService pattern
@@ -152,7 +151,7 @@ class DownloadService implements DownloadManager {
       progressController: controller,
       resultCompleter: completer,
       onCancel: () {
-        controller.close();
+        unawaited(controller.close());
         _activeDownloads.remove(model.id);
       },
     );
@@ -164,7 +163,7 @@ class DownloadService implements DownloadManager {
     final localPath = model.localPath ?? Uri.file('');
 
     controller.add(proto.DownloadProgress.completed(totalBytes: 0));
-    controller.close();
+    unawaited(controller.close());
 
     return proto.DownloadTask(
       id: model.id,

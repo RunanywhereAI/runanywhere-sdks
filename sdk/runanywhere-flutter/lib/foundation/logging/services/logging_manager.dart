@@ -1,11 +1,11 @@
 import 'dart:developer' as developer;
 
-import '../models/log_entry.dart';
-import '../models/log_level.dart';
-import '../models/logging_configuration.dart';
-import '../models/sensitive_data_policy.dart';
-import '../../../public/configuration/sdk_environment.dart';
-import 'log_batcher.dart';
+import 'package:runanywhere/foundation/logging/models/log_entry.dart';
+import 'package:runanywhere/foundation/logging/models/log_level.dart';
+import 'package:runanywhere/foundation/logging/models/logging_configuration.dart';
+import 'package:runanywhere/foundation/logging/models/sensitive_data_policy.dart';
+import 'package:runanywhere/foundation/logging/services/log_batcher.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// Centralized logging manager for the SDK
 ///

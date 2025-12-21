@@ -8,15 +8,15 @@
 
 import 'dart:async';
 
-import '../../../data/network/api_endpoint.dart';
-import '../../../data/network/network_service.dart';
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../public/configuration/sdk_environment.dart';
-import '../../device/services/device_identity.dart';
-import '../models/domain/telemetry_data.dart';
-import '../models/output/telemetry_batch_models.dart';
-import '../models/output/telemetry_event_payload.dart';
-import 'local_telemetry_data_source.dart';
+import 'package:runanywhere/data/network/api_endpoint.dart';
+import 'package:runanywhere/data/network/network_service.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/infrastructure/analytics/data_sources/local_telemetry_data_source.dart';
+import 'package:runanywhere/infrastructure/analytics/models/domain/telemetry_data.dart';
+import 'package:runanywhere/infrastructure/analytics/models/output/telemetry_batch_models.dart';
+import 'package:runanywhere/infrastructure/analytics/models/output/telemetry_event_payload.dart';
+import 'package:runanywhere/infrastructure/device/services/device_identity.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// Remote data source for sending telemetry data to API server.
 /// Routes to correct analytics endpoint based on environment.
@@ -69,7 +69,7 @@ class RemoteTelemetryDataSource {
 
     // Convert TelemetryData to typed TelemetryEventPayload for API transmission
     final typedEvents =
-        batch.map((e) => TelemetryEventPayload.fromTelemetryData(e)).toList();
+        batch.map(TelemetryEventPayload.fromTelemetryData).toList();
 
     final deviceId = await DeviceIdentity.persistentUUID;
     final batchRequest = TelemetryBatchRequest(
@@ -133,7 +133,7 @@ class RemoteTelemetryDataSource {
 
     // Convert to typed payloads
     final typedEvents =
-        events.map((e) => TelemetryEventPayload.fromTelemetryData(e)).toList();
+        events.map(TelemetryEventPayload.fromTelemetryData).toList();
 
     final deviceId = await DeviceIdentity.persistentUUID;
     final batchRequest = TelemetryBatchRequest(

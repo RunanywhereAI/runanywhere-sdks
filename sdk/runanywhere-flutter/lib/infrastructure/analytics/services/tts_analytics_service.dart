@@ -6,7 +6,7 @@
 // Formula: audioDurationMs = (bytes / 2) / 22050 * 1000
 // Actual sample rates may vary depending on the TTS model/voice configuration.
 
-import '../../../foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// TTS analytics service for tracking synthesis operations.
 /// Model lifecycle events (load/unload) are handled by ManagedLifecycle.

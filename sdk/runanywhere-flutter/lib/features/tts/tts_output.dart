@@ -1,6 +1,6 @@
 import 'dart:typed_data';
-import '../../core/models/audio_format.dart';
-import '../../core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/core/models/audio_format.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
 
 /// Output from Text-to-Speech (conforms to ComponentOutput protocol)
 /// Matches iOS TTSOutput struct from TTSComponent.swift

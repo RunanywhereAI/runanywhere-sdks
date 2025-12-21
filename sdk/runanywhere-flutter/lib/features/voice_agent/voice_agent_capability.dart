@@ -1,19 +1,21 @@
 import 'dart:async';
 import 'dart:typed_data';
-import '../../core/capabilities_base/base_capability.dart';
-import '../../core/types/sdk_component.dart';
-import '../../core/types/component_state.dart';
-import '../../core/protocols/component/component_configuration.dart';
-import '../../public/events/sdk_event.dart';
-import '../vad/vad_capability.dart';
-import '../vad/vad_configuration.dart';
-import '../stt/stt_capability.dart';
-import '../llm/llm_capability.dart';
-import '../tts/tts_capability.dart';
-import '../tts/models/tts_configuration.dart';
-import 'models/voice_agent_result.dart';
-export 'models/voice_agent_result.dart';
+
+import 'package:runanywhere/core/capabilities_base/base_capability.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/core/types/component_state.dart';
+import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/features/llm/llm_capability.dart';
+import 'package:runanywhere/features/stt/stt_capability.dart';
+import 'package:runanywhere/features/tts/models/tts_configuration.dart';
+import 'package:runanywhere/features/tts/tts_capability.dart';
+import 'package:runanywhere/features/vad/vad_capability.dart';
+import 'package:runanywhere/features/vad/vad_configuration.dart';
+import 'package:runanywhere/features/voice_agent/models/voice_agent_result.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
+
 export 'models/voice_agent_component_state.dart';
+export 'models/voice_agent_result.dart';
 
 /// Voice Agent Component Configuration
 /// Matches iOS VoiceAgentConfiguration from VoiceAgentComponent.swift

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import '../../../core/models/storage/device_storage_info.dart';
+import 'package:runanywhere/core/models/storage/device_storage_info.dart';
 
 /// Protocol defining file management capabilities
 /// Matches iOS FileManagementService from Infrastructure/FileManagement/Protocol/FileManagementService.swift

@@ -1,6 +1,6 @@
-import 'models/log_level.dart';
-import 'models/sensitive_data_policy.dart';
-import 'services/logging_manager.dart';
+import 'package:runanywhere/foundation/logging/models/log_level.dart';
+import 'package:runanywhere/foundation/logging/models/sensitive_data_policy.dart';
+import 'package:runanywhere/foundation/logging/services/logging_manager.dart';
 
 /// Centralized logging utility with sensitive data protection
 ///

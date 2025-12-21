@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'hardware_acceleration.dart';
+import 'package:runanywhere/core/models/hardware/hardware_acceleration.dart';
 
 /// Memory management mode for framework adapters
 /// Matches iOS HardwareConfiguration.MemoryMode

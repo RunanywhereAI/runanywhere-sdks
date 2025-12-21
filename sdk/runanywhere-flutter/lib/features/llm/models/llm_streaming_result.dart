@@ -1,13 +1,6 @@
-/// LLM Streaming Result.
-///
-/// Container for streaming generation with metrics.
-/// Provides both the token stream and a future that resolves to final metrics.
-///
-/// Matches iOS `LLMStreamingResult` from RunAnywhere SDK.
-
 import 'dart:async';
 
-import '../../../core/module_registry.dart' show LLMGenerationResult;
+import 'package:runanywhere/core/module_registry.dart' show LLMGenerationResult;
 
 /// Container for streaming generation with metrics.
 /// Provides both the token stream and a future that resolves to final metrics.
@@ -63,7 +56,7 @@ class LLMStreamingResult {
   factory LLMStreamingResult.error(Object error) {
     final controller = StreamController<String>();
     controller.addError(error);
-    controller.close();
+    unawaited(controller.close());
     return LLMStreamingResult(
       stream: controller.stream,
       result: Future.error(error),

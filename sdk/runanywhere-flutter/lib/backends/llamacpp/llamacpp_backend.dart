@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import '../../native/native_backend.dart';
-import '../../native/platform_loader.dart';
-import 'llamacpp_adapter.dart';
+import 'package:runanywhere/backends/llamacpp/llamacpp_adapter.dart';
+import 'package:runanywhere/native/native_backend.dart';
+import 'package:runanywhere/native/platform_loader.dart';
 
 /// Main entry point for the LlamaCpp (llama.cpp) backend.
 ///
@@ -105,7 +105,7 @@ class LlamaCppBackend {
   /// LlamaCpp-based AI capabilities.
   static void dispose() {
     if (_adapter != null) {
-      _adapter!.dispose();
+      unawaited(_adapter!.dispose());
       _adapter = null;
     }
     _initialized = false;

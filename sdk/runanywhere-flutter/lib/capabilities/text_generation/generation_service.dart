@@ -1,12 +1,13 @@
 import 'dart:async';
-import '../model_loading/models/loaded_model.dart';
-import '../model_loading/model_loading_service.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../../foundation/error_types/sdk_error.dart';
-import '../../core/module_registry.dart';
-import '../../public/runanywhere.dart';
-import '../analytics/analytics_service.dart';
-import '../../foundation/dependency_injection/service_container.dart';
+
+import 'package:runanywhere/capabilities/analytics/analytics_service.dart';
+import 'package:runanywhere/capabilities/model_loading/model_loading_service.dart';
+import 'package:runanywhere/capabilities/model_loading/models/loaded_model.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
+import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/public/runanywhere.dart';
 
 /// Main service for text generation
 /// Matches iOS GenerationService (routing handled internally, not as external service)

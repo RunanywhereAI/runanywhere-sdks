@@ -1,6 +1,6 @@
-import '../framework/framework_modality.dart';
-import '../framework/llm_framework.dart';
-import '../framework/model_format.dart';
+import 'package:runanywhere/core/models/framework/framework_modality.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/framework/model_format.dart';
 
 /// Defines the category/type of a model based on its input/output modality
 /// Matches iOS ModelCategory from Core/Models/Model/ModelCategory.swift

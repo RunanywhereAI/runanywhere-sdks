@@ -1,4 +1,4 @@
-import '../common/quantization_level.dart';
+import 'package:runanywhere/core/models/common/quantization_level.dart';
 
 /// Model information metadata
 /// Matches iOS ModelInfoMetadata from Core/Models/Model/ModelInfoMetadata.swift

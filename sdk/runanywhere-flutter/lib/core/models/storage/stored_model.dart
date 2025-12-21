@@ -1,6 +1,6 @@
-import '../framework/llm_framework.dart';
-import '../framework/model_format.dart';
-import '../model/model_info_metadata.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/framework/model_format.dart';
+import 'package:runanywhere/core/models/model/model_info_metadata.dart';
 
 /// Stored model information.
 /// Matches iOS StoredModel from Data/Models/Storage/StoredModel.swift

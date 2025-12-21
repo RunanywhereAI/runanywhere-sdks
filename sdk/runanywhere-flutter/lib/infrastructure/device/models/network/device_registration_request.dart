@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import '../device_info.dart';
-import '../../../../foundation/configuration/sdk_constants.dart';
+import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
+import 'package:runanywhere/infrastructure/device/models/device_info.dart';
 
 /// Request payload for device registration with backend.
 ///

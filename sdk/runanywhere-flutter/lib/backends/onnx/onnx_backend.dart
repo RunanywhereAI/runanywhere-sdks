@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import '../../native/native_backend.dart';
-import '../../native/platform_loader.dart';
-import 'onnx_adapter.dart';
+import 'package:runanywhere/backends/onnx/onnx_adapter.dart';
+import 'package:runanywhere/native/native_backend.dart';
+import 'package:runanywhere/native/platform_loader.dart';
 
 /// Main entry point for the ONNX Runtime backend.
 ///

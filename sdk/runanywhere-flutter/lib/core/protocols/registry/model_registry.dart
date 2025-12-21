@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import '../../models/model/model_criteria.dart';
-import '../../models/model/model_info.dart';
+import 'package:runanywhere/core/models/model/model_criteria.dart';
+import 'package:runanywhere/core/models/model/model_info.dart';
 
 /// Model registry protocol
 /// Matches iOS ModelRegistry from Core/Protocols/Registry/ModelRegistry.swift

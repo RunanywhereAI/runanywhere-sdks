@@ -1,5 +1,5 @@
-import '../../../core/protocols/component/component_configuration.dart';
-import '../../../core/models/audio_format.dart';
+import 'package:runanywhere/core/models/audio_format.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
 
 /// Configuration for TTS component
 /// Matches iOS TTSConfiguration from Features/TTS/Models/TTSConfiguration.swift

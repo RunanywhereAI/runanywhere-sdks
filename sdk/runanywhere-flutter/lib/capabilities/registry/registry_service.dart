@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import '../../foundation/logging/sdk_logger.dart';
-import '../../core/models/common.dart';
-import '../../core/protocols/registry/model_registry.dart';
-import '../../foundation/file_operations/model_path_utils.dart';
+import 'package:runanywhere/core/models/common.dart';
+import 'package:runanywhere/core/protocols/registry/model_registry.dart';
+import 'package:runanywhere/foundation/file_operations/model_path_utils.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 // Re-export for backward compatibility
 export '../../core/protocols/registry/model_registry.dart';
@@ -66,7 +66,7 @@ class RegistryService implements ModelRegistry {
 
     // Check if model file exists locally and update localPath
     // Matches iOS RegistryService.registerModel pattern
-    _checkAndUpdateLocalPath(model).then((updatedModel) {
+    unawaited(_checkAndUpdateLocalPath(model).then((updatedModel) {
       logger.debug(
           'Registering model: ${updatedModel.id} - ${updatedModel.name}');
       _models[updatedModel.id] = updatedModel;
@@ -75,7 +75,7 @@ class RegistryService implements ModelRegistry {
         logger.info(
             'Found local file for model ${updatedModel.id}: ${updatedModel.localPath}');
       }
-    });
+    }));
   }
 
   /// Check if model file exists locally and update localPath
@@ -132,14 +132,14 @@ class RegistryService implements ModelRegistry {
   void updateModel(ModelInfo model) {
     if (_models.containsKey(model.id)) {
       // Check and update localPath when updating model
-      _checkAndUpdateLocalPath(model).then((updatedModel) {
+      unawaited(_checkAndUpdateLocalPath(model).then((updatedModel) {
         _models[updatedModel.id] = updatedModel;
         logger.info('Updated model: ${updatedModel.id}');
         if (updatedModel.localPath != null) {
           logger.debug(
               'Model ${updatedModel.id} has localPath: ${updatedModel.localPath}');
         }
-      });
+      }));
     }
   }
 

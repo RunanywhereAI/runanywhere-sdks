@@ -1,4 +1,4 @@
-import '../../core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
 
 /// Output from Voice Activity Detection
 class VADOutput implements ComponentOutput {

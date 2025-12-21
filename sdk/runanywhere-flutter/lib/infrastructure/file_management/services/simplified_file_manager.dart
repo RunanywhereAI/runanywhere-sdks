@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import '../../../foundation/logging/sdk_logger.dart';
-import '../../../core/models/storage/device_storage_info.dart';
-import '../protocol/file_management_error.dart';
-import '../protocol/file_management_service.dart';
+import 'package:runanywhere/core/models/storage/device_storage_info.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/infrastructure/file_management/protocol/file_management_error.dart';
+import 'package:runanywhere/infrastructure/file_management/protocol/file_management_service.dart';
 
 /// File manager for RunAnywhere SDK
 /// Matches iOS SimplifiedFileManager from Infrastructure/FileManagement/Services/SimplifiedFileManager.swift
@@ -168,7 +169,7 @@ class SimplifiedFileManager implements FileManagementService {
     final cacheDir = Directory(path.join(_baseDirectory!.path, 'Cache'));
     final cacheFile = File(path.join(cacheDir.path, '$key.cache'));
     if (await cacheFile.exists()) {
-      return await cacheFile.readAsBytes();
+      return cacheFile.readAsBytes();
     }
     return null;
   }

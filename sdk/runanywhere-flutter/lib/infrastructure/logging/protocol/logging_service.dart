@@ -1,7 +1,7 @@
-import '../../../foundation/logging/models/log_entry.dart';
-import '../../../foundation/logging/models/log_level.dart';
-import '../../../foundation/logging/models/logging_configuration.dart';
-import 'log_destination.dart';
+import 'package:runanywhere/foundation/logging/models/log_entry.dart';
+import 'package:runanywhere/foundation/logging/models/log_level.dart';
+import 'package:runanywhere/foundation/logging/models/logging_configuration.dart';
+import 'package:runanywhere/infrastructure/logging/protocol/log_destination.dart';
 
 /// Protocol defining logging service capabilities
 /// Implementations provide log routing, filtering, and destination management

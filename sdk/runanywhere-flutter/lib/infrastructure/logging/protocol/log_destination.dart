@@ -1,5 +1,5 @@
-import '../../../foundation/logging/models/log_entry.dart';
-import '../../../foundation/logging/models/log_level.dart';
+import 'package:runanywhere/foundation/logging/models/log_entry.dart';
+import 'package:runanywhere/foundation/logging/models/log_level.dart';
 
 /// Protocol for log output destinations
 /// Implementations handle writing logs to specific backends (Console, File, etc.)

@@ -7,7 +7,7 @@
 //
 
 import 'dart:io';
-import '../models/framework/model_format.dart';
+import 'package:runanywhere/core/models/framework/model_format.dart';
 
 /// Information about model storage details.
 class ModelStorageDetails {
@@ -91,7 +91,9 @@ mixin DefaultModelStorageStrategy implements ModelStorageStrategy {
   }
 
   @override
-  (ModelFormat format, int size)? detectModel(Directory modelFolder) {
+  (ModelFormat format, int size)? ModelFormat@override
+  ? @override
+  dynamic detectModel(Directory modelFolder) {
     if (!modelFolder.existsSync()) return null;
 
     try {

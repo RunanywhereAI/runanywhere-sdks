@@ -1,23 +1,23 @@
 import 'dart:async';
 
-import '../../core/models/framework/framework_modality.dart';
-import '../../core/models/framework/llm_framework.dart';
-import '../../core/models/framework/model_format.dart';
-import '../../core/models/hardware/hardware_configuration.dart';
-import '../../core/models/model/model_info.dart';
-import '../../core/module_registry.dart';
-import '../../core/protocols/frameworks/unified_framework_adapter.dart';
-import '../../native/native_backend.dart';
-import 'onnx_download_strategy.dart';
-import 'providers/onnx_stt_provider.dart';
-import 'providers/onnx_tts_provider.dart';
-import 'providers/onnx_vad_provider.dart';
-import 'providers/onnx_llm_provider.dart';
-import 'services/onnx_stt_service.dart';
-import 'services/onnx_tts_service.dart';
-import 'services/onnx_vad_service.dart';
-import 'services/onnx_llm_service.dart';
-import '../../features/tts/models/tts_configuration.dart';
+import 'package:runanywhere/backends/onnx/onnx_download_strategy.dart';
+import 'package:runanywhere/backends/onnx/providers/onnx_llm_provider.dart';
+import 'package:runanywhere/backends/onnx/providers/onnx_stt_provider.dart';
+import 'package:runanywhere/backends/onnx/providers/onnx_tts_provider.dart';
+import 'package:runanywhere/backends/onnx/providers/onnx_vad_provider.dart';
+import 'package:runanywhere/backends/onnx/services/onnx_llm_service.dart';
+import 'package:runanywhere/backends/onnx/services/onnx_stt_service.dart';
+import 'package:runanywhere/backends/onnx/services/onnx_tts_service.dart';
+import 'package:runanywhere/backends/onnx/services/onnx_vad_service.dart';
+import 'package:runanywhere/core/models/framework/framework_modality.dart';
+import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/framework/model_format.dart';
+import 'package:runanywhere/core/models/hardware/hardware_configuration.dart';
+import 'package:runanywhere/core/models/model/model_info.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/core/protocols/frameworks/unified_framework_adapter.dart';
+import 'package:runanywhere/features/tts/models/tts_configuration.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// ONNX Runtime adapter for multi-modal inference.
 ///
@@ -239,7 +239,16 @@ class OnnxAdapter
 
     final service = createService(modality);
     if (service != null && parameters.modelId != null) {
-      await service.initialize(modelPath: parameters.modelId);
+      // Call initialize with explicit type checks to avoid dynamic calls
+      if (service is OnnxSTTService) {
+        await service.initialize(modelPath: parameters.modelId);
+      } else if (service is OnnxTTSService) {
+        await service.initialize(TTSConfiguration(modelId: parameters.modelId));
+      } else if (service is OnnxVADService) {
+        await service.initialize(modelPath: parameters.modelId);
+      } else if (service is OnnxLLMService) {
+        await service.initialize(modelPath: parameters.modelId);
+      }
     }
     return service;
   }
@@ -278,10 +287,10 @@ class OnnxAdapter
   /// Dispose of resources
   void dispose() {
     // Cleanup cached services before nulling them to release backend resources
-    _cachedSTTService?.cleanup();
-    _cachedTTSService?.cleanup();
-    _cachedVADService?.cleanup();
-    _cachedLLMService?.cleanup();
+    unawaited(_cachedSTTService?.cleanup());
+    unawaited(_cachedTTSService?.cleanup());
+    unawaited(_cachedVADService?.cleanup());
+    unawaited(_cachedLLMService?.cleanup());
 
     _cachedSTTService = null;
     _cachedTTSService = null;

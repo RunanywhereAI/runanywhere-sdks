@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'analytics_event.dart';
-import 'analytics_metrics.dart';
-import 'session_metadata.dart';
+import 'package:runanywhere/core/protocols/analytics/analytics_event.dart';
+import 'package:runanywhere/core/protocols/analytics/analytics_metrics.dart';
+import 'package:runanywhere/core/protocols/analytics/session_metadata.dart';
 
 /// Base protocol for all analytics services in the SDK
 ///
@@ -152,7 +152,7 @@ class DefaultAnalyticsService
         if (attempt < _maxRetries) {
           // Exponential backoff matching iOS
           final delay = Duration(seconds: (1 << attempt));
-          await Future.delayed(delay);
+          await Future<void>.delayed(delay);
         } else {
           // Remove events after max retries to prevent queue growth
           _eventQueue.removeRange(0, batch.length.clamp(0, _eventQueue.length));

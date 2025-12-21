@@ -6,8 +6,8 @@
 //  Matches iOS Repository.swift
 //
 
-import 'data_source.dart';
-import 'repository_entity.dart';
+import 'package:runanywhere/data/protocols/data_source.dart';
+import 'package:runanywhere/data/protocols/repository_entity.dart';
 
 /// Base repository protocol for data persistence
 ///

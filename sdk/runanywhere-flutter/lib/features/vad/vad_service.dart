@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'models/speech_activity_event.dart';
+import 'package:runanywhere/features/vad/models/speech_activity_event.dart';
 export 'models/speech_activity_event.dart';
 
 /// VAD detection result

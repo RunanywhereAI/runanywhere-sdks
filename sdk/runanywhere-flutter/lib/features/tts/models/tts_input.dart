@@ -1,5 +1,5 @@
-import '../../../core/protocols/component/component_configuration.dart';
-import 'tts_options.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/features/tts/models/tts_options.dart';
 
 /// Input for TTS synthesis
 /// Matches iOS TTSInput from Features/TTS/Models/TTSInput.swift

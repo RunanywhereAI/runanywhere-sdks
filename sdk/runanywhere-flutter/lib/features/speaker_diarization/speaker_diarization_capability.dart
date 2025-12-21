@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import '../../core/capabilities_base/base_capability.dart';
-import '../../core/types/sdk_component.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import 'models/speaker_diarization_configuration.dart';
-import 'models/speaker_diarization_speaker_info.dart';
-import 'protocol/speaker_diarization_error.dart';
-import 'protocol/speaker_diarization_service.dart';
+import 'package:runanywhere/core/capabilities_base/base_capability.dart';
+import 'package:runanywhere/core/types/sdk_component.dart';
+import 'package:runanywhere/features/speaker_diarization/models/speaker_diarization_configuration.dart';
+import 'package:runanywhere/features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
+import 'package:runanywhere/features/speaker_diarization/protocol/speaker_diarization_error.dart';
+import 'package:runanywhere/features/speaker_diarization/protocol/speaker_diarization_service.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Speaker Diarization capability for identifying and tracking speakers
 /// Matches iOS SpeakerDiarizationCapability from Features/SpeakerDiarization/SpeakerDiarizationCapability.swift

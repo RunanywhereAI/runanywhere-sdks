@@ -4,8 +4,8 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-import 'ffi_types.dart';
-import 'platform_loader.dart';
+import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/platform_loader.dart';
 
 /// Wrapper around the RunAnywhere native C API.
 ///

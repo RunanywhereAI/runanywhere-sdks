@@ -8,11 +8,11 @@
 
 import 'dart:async';
 
-import '../../foundation/logging/sdk_logger.dart';
-import '../../infrastructure/events/event_publisher.dart';
-import '../../public/events/sdk_event.dart';
-import '../protocols/component/component_configuration.dart';
-import 'capability_protocols.dart';
+import 'package:runanywhere/core/capabilities/capability_protocols.dart';
+import 'package:runanywhere/core/protocols/component/component_configuration.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/infrastructure/events/event_publisher.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
 
 // Re-export for convenience
 export 'capability_protocols.dart';

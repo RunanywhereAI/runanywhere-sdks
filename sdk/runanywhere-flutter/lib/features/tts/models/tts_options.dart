@@ -1,5 +1,5 @@
-import '../../../core/models/audio_format.dart';
-import 'tts_configuration.dart';
+import 'package:runanywhere/core/models/audio_format.dart';
+import 'package:runanywhere/features/tts/models/tts_configuration.dart';
 
 /// Options for text-to-speech synthesis
 /// These options can be passed to individual synthesis calls to override

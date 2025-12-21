@@ -1,5 +1,5 @@
+import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:uuid/uuid.dart';
-import '../../../public/events/sdk_event.dart';
 
 /// Represents the loading state of a single model/voice component
 /// Matches iOS ComponentLoadState from Features/VoiceAgent/Models/VoiceAgentComponentState.swift

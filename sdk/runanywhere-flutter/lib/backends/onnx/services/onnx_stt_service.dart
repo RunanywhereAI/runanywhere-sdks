@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import '../../../core/module_registry.dart';
-import '../../../native/native_backend.dart';
+import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/native/ffi_types.dart' show RaStreamHandle;
+import 'package:runanywhere/native/native_backend.dart';
 
 /// ONNX-based Speech-to-Text service.
 ///
@@ -28,6 +29,11 @@ class OnnxSTTService implements STTService {
   final NativeBackend _backend;
   String? _modelPath;
   bool _isInitialized = false;
+
+  /// ONNX Runtime inference framework
+  /// Matches iOS ONNXSTTService.inferenceFramework
+  @override
+  String? get inferenceFramework => 'onnx';
 
   /// Create a new ONNX STT service.
   OnnxSTTService(this._backend);
@@ -99,37 +105,37 @@ class OnnxSTTService implements STTService {
 
   /// Feed audio to a streaming session.
   void feedAudio(Object stream, Float32List samples, {int sampleRate = 16000}) {
-    _backend.feedSttAudio(stream as dynamic, samples, sampleRate: sampleRate);
+    _backend.feedSttAudio(stream as RaStreamHandle, samples, sampleRate: sampleRate);
   }
 
   /// Check if decoder is ready.
   bool isStreamReady(Object stream) {
-    return _backend.isSttReady(stream as dynamic);
+    return _backend.isSttReady(stream as RaStreamHandle);
   }
 
   /// Decode and get current result.
   Map<String, dynamic>? decodeStream(Object stream) {
-    return _backend.decodeStt(stream as dynamic);
+    return _backend.decodeStt(stream as RaStreamHandle);
   }
 
   /// Check for end-of-speech.
   bool isEndpoint(Object stream) {
-    return _backend.isSttEndpoint(stream as dynamic);
+    return _backend.isSttEndpoint(stream as RaStreamHandle);
   }
 
   /// Signal end of audio input.
   void inputFinished(Object stream) {
-    _backend.sttInputFinished(stream as dynamic);
+    _backend.sttInputFinished(stream as RaStreamHandle);
   }
 
   /// Reset stream for new utterance.
   void resetStream(Object stream) {
-    _backend.resetSttStream(stream as dynamic);
+    _backend.resetSttStream(stream as RaStreamHandle);
   }
 
   /// Destroy streaming session.
   void destroyStream(Object stream) {
-    _backend.destroySttStream(stream as dynamic);
+    _backend.destroySttStream(stream as RaStreamHandle);
   }
 
   /// Cancel ongoing transcription.
