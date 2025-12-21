@@ -3,26 +3,35 @@
  *
  * Handles structured output generation and validation
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/StructuredOutput/Services/StructuredOutputHandler.swift
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/LLM/StructuredOutput/Generatable.swift
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/LLM/StructuredOutput/StructuredOutputHandler.swift
  */
 
 /**
- * Type that can generate JSON schema for structured output
+ * Protocol for types that can be generated as structured output from LLMs
+ * Matches iOS Generatable protocol
  */
 export interface GeneratableType {
+  /**
+   * The JSON schema for this type
+   */
   readonly jsonSchema: string;
 }
 
 /**
  * Structured output configuration
+ * Matches iOS StructuredOutputConfig
  */
 export interface StructuredOutputConfig {
+  /** The type to generate */
   readonly type: GeneratableType;
+  /** Whether to include schema in prompt */
   readonly includeSchemaInPrompt: boolean;
 }
 
 /**
  * Structured output validation result
+ * Matches iOS StructuredOutputValidation
  */
 export interface StructuredOutputValidation {
   readonly isValid: boolean;
@@ -32,6 +41,7 @@ export interface StructuredOutputValidation {
 
 /**
  * Structured output errors
+ * Matches iOS StructuredOutputError enum
  */
 export enum StructuredOutputError {
   InvalidJSON = 'invalidJSON',
@@ -291,7 +301,34 @@ Remember: Output ONLY the JSON object, nothing else.`;
   }
 
   /**
+   * Parse and validate structured output from generated text
+   * Matches iOS: parseStructuredOutput(from:type:)
+   *
+   * @param text - The generated text containing JSON
+   * @param schema - The schema type to validate against
+   * @returns The parsed and validated object
+   * @throws Error if extraction or parsing fails
+   */
+  public parseStructuredOutput<T>(text: string, schema: GeneratableType): T {
+    // Extract JSON from the response
+    const jsonString = this.extractJSON(text);
+
+    // Parse the JSON
+    try {
+      const parsed = JSON.parse(jsonString) as T;
+      return parsed;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `${StructuredOutputError.InvalidJSON}: Failed to parse JSON - ${message}`
+      );
+    }
+  }
+
+  /**
    * Validate that generated text contains valid structured output
+   * Matches iOS: validateStructuredOutput(text:config:)
    */
   public validateStructuredOutput(
     text: string,

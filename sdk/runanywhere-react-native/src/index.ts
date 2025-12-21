@@ -20,7 +20,14 @@ export default _RunAnywhere;
 // Types
 export * from './types';
 // Export commonly used enums for easy access
-export { LLMFramework, ModelCategory, ModelFormat } from './types/enums';
+export {
+  LLMFramework,
+  ModelCategory,
+  ModelFormat,
+  AudioFormat,
+  getAudioFormatMimeType,
+  getAudioFormatFileExtension,
+} from './types/enums';
 
 // Foundation (Core infrastructure matching iOS SDK)
 export {
@@ -82,6 +89,15 @@ export {
   createSDKEvent,
   isSDKEvent,
   EventPublisher,
+  // Analytics & Telemetry
+  TelemetryEventType,
+  TelemetryRepository,
+  type TelemetryDataEntity,
+  type TelemetryStorage,
+  AnalyticsQueueManager,
+  LLMAnalyticsService,
+  STTAnalyticsService,
+  TTSAnalyticsService,
 } from './Infrastructure';
 
 // Services
@@ -125,6 +141,22 @@ export {
   type STTConfiguration,
   type STTInput,
   type STTOutput,
+  STTError,
+  STTErrorType,
+  isSTTError,
+  isSTTErrorType,
+  asSTTError,
+  serviceNotInitializedError,
+  transcriptionFailedError,
+  streamingNotSupportedError,
+  languageNotSupportedError,
+  audioFormatNotSupportedError,
+  insufficientAudioDataError,
+  insufficientMemoryError,
+  noVoiceServiceAvailableError,
+  audioSessionNotConfiguredError,
+  audioSessionActivationFailedError,
+  microphonePermissionDeniedError,
   // TTS Capability
   TTSCapability,
   TTSServiceWrapper,
@@ -182,6 +214,49 @@ export {
   createAuthRequest,
   createRefreshRequest,
 } from './Data/Network';
+
+// Data/Protocols (matching iOS Data/Protocols/)
+export {
+  // Repository Protocol
+  type Repository,
+  type SyncableRepository,
+  RepositoryHelpers,
+  // Repository Entity
+  type RepositoryEntity,
+  RepositoryEntityHelpers,
+  // Data Source
+  type DataSource,
+  type RemoteDataSource,
+  type LocalDataSource,
+  type DataSourceStorageInfo,
+  DataSourceError,
+  DataSourceErrorCode,
+  RemoteOperationHelper,
+  // Repository Errors
+  type RepositoryError,
+  RepositoryError as RepositoryErrorFactory,
+  isRepositoryError,
+  isSaveFailure,
+  isFetchFailure,
+  isDeleteFailure,
+  isSyncFailure,
+  isDatabaseNotInitialized,
+  isEntityNotFound,
+  isNetworkUnavailable,
+  isNetworkNotAvailable,
+  isNetworkError as isRepositoryNetworkError,
+  isNetworkTimeout,
+  toError as repositoryToError,
+} from './Data/Protocols';
+
+// Data/Repositories (matching iOS Data/Repositories/)
+export { ModelInfoRepository } from './Data/Repositories';
+
+// Data/Services (matching iOS Data/Services/)
+export { ModelInfoService } from './Data/Services';
+
+// Data/Sync (matching iOS Data/Sync/)
+export { SyncCoordinator } from './Data/Sync';
 
 // Core/Capabilities (matching iOS Core/Capabilities/)
 export {

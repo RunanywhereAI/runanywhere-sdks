@@ -7,30 +7,8 @@
  */
 
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-
-/**
- * Syncable item with required id field
- */
-export interface SyncableItem {
-  id: string;
-  [key: string]: unknown;
-}
-
-/**
- * Remote data source interface for sync operations
- */
-export interface RemoteDataSource {
-  syncBatch(items: SyncableItem[]): Promise<string[]>;
-}
-
-/**
- * Repository interface for sync
- */
-export interface Repository {
-  fetchPendingSync(): Promise<SyncableItem[]>;
-  markSynced(ids: string[]): Promise<void>;
-  remoteDataSource?: RemoteDataSource;
-}
+import type { RepositoryEntity } from '../Protocols/RepositoryEntity';
+import type { SyncableRepository } from '../Protocols/Repository';
 
 /**
  * Centralized coordinator for syncing data between local storage and remote API
@@ -52,7 +30,9 @@ export class SyncCoordinator {
   /**
    * Sync any repository
    */
-  public async sync(repository: Repository): Promise<void> {
+  public async sync<T extends RepositoryEntity>(
+    repository: SyncableRepository<T>
+  ): Promise<void> {
     const typeName = 'Repository'; // Would get from repository type
 
     if (this.activeSyncs.has(typeName)) {
@@ -85,7 +65,8 @@ export class SyncCoordinator {
       for (const batch of batches) {
         try {
           // Use the remote data source to sync
-          const syncedIds = await repository.remoteDataSource.syncBatch(batch);
+          const syncedIds =
+            await repository.remoteDataSource!.syncBatch(batch);
 
           // Mark successfully synced items
           if (syncedIds.length > 0) {

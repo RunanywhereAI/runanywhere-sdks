@@ -35,6 +35,28 @@ export {
 // Export STTService from Core protocols
 export type { STTService } from '../../Core/Protocols/Voice/STTService';
 
+// Export errors
+export {
+  STTError,
+  STTErrorType,
+  isSTTError,
+  isSTTErrorType,
+  asSTTError,
+  // Error factory functions
+  serviceNotInitializedError,
+  transcriptionFailedError,
+  streamingNotSupportedError,
+  languageNotSupportedError,
+  modelNotFoundError,
+  audioFormatNotSupportedError,
+  insufficientAudioDataError,
+  insufficientMemoryError,
+  noVoiceServiceAvailableError,
+  audioSessionNotConfiguredError,
+  audioSessionActivationFailedError,
+  microphonePermissionDeniedError,
+} from './Errors/STTError';
+
 /**
  * STT transcription mode
  */

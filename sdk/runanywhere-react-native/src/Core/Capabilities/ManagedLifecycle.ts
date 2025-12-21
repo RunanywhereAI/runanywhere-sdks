@@ -46,28 +46,8 @@ import {
 import { EventPublisher } from '../../Infrastructure/Events/EventPublisher';
 import type { SDKEvent } from '../../Infrastructure/Events/SDKEvent';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-
-// ============================================================================
-// Lifecycle Metrics
-// ============================================================================
-
-/**
- * Metrics tracked by ManagedLifecycle
- */
-export interface ModelLifecycleMetrics {
-  readonly totalEvents: number;
-  readonly startTime: number;
-  readonly lastEventTime: number | null;
-  readonly totalLoads: number;
-  readonly successfulLoads: number;
-  readonly failedLoads: number;
-  readonly averageLoadTimeMs: number;
-  readonly totalUnloads: number;
-  readonly totalDownloads: number;
-  readonly successfulDownloads: number;
-  readonly failedDownloads: number;
-  readonly totalBytesDownloaded: number;
-}
+import type { ModelLifecycleMetrics } from './Analytics/CoreAnalyticsTypes';
+import { InferenceFrameworkType } from './Analytics/CoreAnalyticsTypes';
 
 // ============================================================================
 // ManagedLifecycle Options
@@ -136,7 +116,14 @@ export class ManagedLifecycle<TService> {
   private loadCount = 0;
   private totalLoadTime = 0;
   private failedLoadCount = 0;
-  private readonly startTime = Date.now();
+  private unloadCount = 0;
+  private downloadCount = 0;
+  private successfulDownloadCount = 0;
+  private failedDownloadCount = 0;
+  private totalBytesDownloaded = 0;
+  private lastEventTime: Date | null = null;
+  private readonly startTime = new Date();
+  private framework: InferenceFrameworkType = InferenceFrameworkType.UNKNOWN;
 
   // MARK: - Initialization
 
@@ -285,21 +272,60 @@ export class ManagedLifecycle<TService> {
    * Get lifecycle metrics
    */
   getLifecycleMetrics(): ModelLifecycleMetrics {
+    const successfulLoads = this.loadCount - this.failedLoadCount;
+    const totalEvents =
+      this.loadCount +
+      this.unloadCount +
+      this.downloadCount;
+
     return {
-      totalEvents: this.loadCount,
+      totalEvents,
       startTime: this.startTime,
-      lastEventTime: null,
+      lastEventTime: this.lastEventTime,
       totalLoads: this.loadCount,
-      successfulLoads: this.loadCount,
+      successfulLoads,
       failedLoads: this.failedLoadCount,
       averageLoadTimeMs:
-        this.loadCount > 0 ? this.totalLoadTime / this.loadCount : 0,
-      totalUnloads: 0,
-      totalDownloads: 0,
-      successfulDownloads: 0,
-      failedDownloads: 0,
-      totalBytesDownloaded: 0,
+        successfulLoads > 0 ? this.totalLoadTime / successfulLoads : -1,
+      totalUnloads: this.unloadCount,
+      totalDownloads: this.downloadCount,
+      successfulDownloads: this.successfulDownloadCount,
+      failedDownloads: this.failedDownloadCount,
+      totalBytesDownloaded: this.totalBytesDownloaded,
+      framework: this.framework,
     };
+  }
+
+  /**
+   * Set the inference framework type for metrics tracking
+   */
+  setFramework(framework: InferenceFrameworkType): void {
+    this.framework = framework;
+  }
+
+  /**
+   * Track a download started event
+   */
+  trackDownloadStarted(): void {
+    this.lastEventTime = new Date();
+    this.downloadCount += 1;
+  }
+
+  /**
+   * Track a download completed event
+   */
+  trackDownloadCompleted(bytesDownloaded: number): void {
+    this.lastEventTime = new Date();
+    this.successfulDownloadCount += 1;
+    this.totalBytesDownloaded += bytesDownloaded;
+  }
+
+  /**
+   * Track a download failed event
+   */
+  trackDownloadFailed(): void {
+    this.lastEventTime = new Date();
+    this.failedDownloadCount += 1;
   }
 
   // MARK: - Private Event Tracking
@@ -310,6 +336,14 @@ export class ManagedLifecycle<TService> {
     durationMs?: number,
     error?: Error
   ): void {
+    // Update last event time
+    this.lastEventTime = new Date();
+
+    // Update metrics based on event type
+    if (type === 'unloaded') {
+      this.unloadCount += 1;
+    }
+
     const event = this.createEvent(type, resourceId, durationMs, error);
     EventPublisher.shared.track(event);
   }
