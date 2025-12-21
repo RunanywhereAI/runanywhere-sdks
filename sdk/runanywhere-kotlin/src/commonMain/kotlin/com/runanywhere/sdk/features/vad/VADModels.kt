@@ -240,25 +240,81 @@ class VADServiceWrapper(
     override var wrappedService: VADService? = service
 }
 
-// MARK: - VAD Errors
+// MARK: - VAD Errors (matches iOS VADError exactly)
 
 sealed class VADError : Exception() {
-    object ServiceNotInitialized : VADError()
+    // Initialization Errors
+    /** VAD service is not initialized */
+    object NotInitialized : VADError()
 
-    data class ProcessingFailed(
-        override val cause: Throwable,
+    /** Initialization failed with specific reason (matches iOS) */
+    data class InitializationFailed(
+        val reason: String,
     ) : VADError()
 
-    object InvalidAudioFormat : VADError()
+    /** Invalid configuration with specific reason (matches iOS) */
+    data class InvalidConfiguration(
+        val reason: String,
+    ) : VADError()
 
-    object ConfigurationError : VADError()
+    // Runtime Errors
+    /** Service is not available (matches iOS) */
+    object ServiceNotAvailable : VADError()
+
+    /** Processing failed with cause (matches iOS) */
+    data class ProcessingFailed(
+        val reason: String,
+        override val cause: Throwable? = null,
+    ) : VADError()
+
+    /** Invalid audio format with expected/received info (matches iOS) */
+    data class InvalidAudioFormat(
+        val expected: String,
+        val received: String,
+    ) : VADError()
+
+    /** Empty audio buffer (matches iOS) */
+    object EmptyAudioBuffer : VADError()
+
+    /** Invalid input with reason (matches iOS) */
+    data class InvalidInput(
+        val reason: String,
+    ) : VADError()
+
+    // Calibration Errors (matches iOS)
+    /** Calibration failed with specific reason (matches iOS) */
+    data class CalibrationFailed(
+        val reason: String,
+    ) : VADError()
+
+    /** Calibration timed out (matches iOS) */
+    object CalibrationTimeout : VADError()
+
+    // Resource Errors
+    /** Operation was cancelled (matches iOS) */
+    object Cancelled : VADError()
+
+    // Legacy compatibility - maps to NotInitialized
+    @Deprecated("Use NotInitialized instead", ReplaceWith("NotInitialized"))
+    val ServiceNotInitialized: VADError get() = NotInitialized
+
+    // Legacy compatibility - maps to InvalidConfiguration
+    @Deprecated("Use InvalidConfiguration instead")
+    val ConfigurationError: VADError get() = InvalidConfiguration("Unknown configuration error")
 
     override val message: String
         get() =
             when (this) {
-                is ServiceNotInitialized -> "VAD service is not initialized"
-                is ProcessingFailed -> "VAD processing failed: $cause"
-                is InvalidAudioFormat -> "Invalid audio format for VAD"
-                is ConfigurationError -> "VAD configuration error"
+                is NotInitialized -> "VAD service is not initialized"
+                is InitializationFailed -> "VAD initialization failed: $reason"
+                is InvalidConfiguration -> "VAD configuration invalid: $reason"
+                is ServiceNotAvailable -> "VAD service is not available"
+                is ProcessingFailed -> "VAD processing failed: $reason"
+                is InvalidAudioFormat -> "Invalid audio format: expected $expected, received $received"
+                is EmptyAudioBuffer -> "Audio buffer is empty"
+                is InvalidInput -> "Invalid input: $reason"
+                is CalibrationFailed -> "Calibration failed: $reason"
+                is CalibrationTimeout -> "Calibration timed out"
+                is Cancelled -> "VAD operation was cancelled"
             }
 }

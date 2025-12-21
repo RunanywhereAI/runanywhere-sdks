@@ -141,7 +141,7 @@ internal class AnalyticsNetworkService(
             runCatching {
                 logger.debug("Registering device for analytics tracking")
 
-                val url = buildFullUrl(APIEndpoint.registerDevice)
+                val url = buildFullUrl(APIEndpoint.deviceRegistration)
 
                 val response: DeviceRegistrationResponse =
                     httpClient

@@ -117,7 +117,7 @@ class DeviceRegistrationService(
 
                 val responseBytes =
                     networkService.postRaw(
-                        endpoint = APIEndpoint.registerDevice,
+                        endpoint = APIEndpoint.deviceRegistration,
                         payload = jsonPayload.encodeToByteArray(),
                         requiresAuth = true,
                     )
