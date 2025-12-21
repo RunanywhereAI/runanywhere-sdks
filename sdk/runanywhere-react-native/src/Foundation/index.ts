@@ -40,3 +40,6 @@ export type {
 export { SDKLogger } from './Logging/Logger/SDKLogger';
 export { LogLevel } from './Logging/Models/LogLevel';
 export { LoggingManager } from './Logging/Services/LoggingManager';
+
+// Utilities
+export * from './Utilities';

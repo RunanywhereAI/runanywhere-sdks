@@ -186,6 +186,7 @@ export enum HardwareAcceleration {
 
 /**
  * Audio format for STT/TTS
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Types/AudioTypes.swift
  */
 export enum AudioFormat {
   PCM = 'pcm',
@@ -194,6 +195,40 @@ export enum AudioFormat {
   M4A = 'm4a',
   FLAC = 'flac',
   OPUS = 'opus',
+  AAC = 'aac',
+}
+
+/**
+ * Get MIME type for audio format
+ * @param format Audio format
+ * @returns MIME type string
+ */
+export function getAudioFormatMimeType(format: AudioFormat): string {
+  switch (format) {
+    case AudioFormat.PCM:
+      return 'audio/pcm';
+    case AudioFormat.WAV:
+      return 'audio/wav';
+    case AudioFormat.MP3:
+      return 'audio/mpeg';
+    case AudioFormat.OPUS:
+      return 'audio/opus';
+    case AudioFormat.AAC:
+      return 'audio/aac';
+    case AudioFormat.FLAC:
+      return 'audio/flac';
+    case AudioFormat.M4A:
+      return 'audio/mp4';
+  }
+}
+
+/**
+ * Get file extension for audio format
+ * @param format Audio format
+ * @returns File extension string (matches enum value)
+ */
+export function getAudioFormatFileExtension(format: AudioFormat): string {
+  return format;
 }
 
 /**

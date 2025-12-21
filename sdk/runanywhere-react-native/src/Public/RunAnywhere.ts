@@ -1124,15 +1124,8 @@ export const RunAnywhere = {
     // Generate using the standard generate method
     const result = await this.generate(userPrompt, effectiveOptions);
 
-    // Extract and parse JSON from the response
-    const extractedJson = this._extractJSON(result.text);
-    try {
-      return JSON.parse(extractedJson) as T;
-    } catch {
-      throw new Error(
-        `Failed to parse structured output as JSON: ${result.text.substring(0, 200)}`
-      );
-    }
+    // Parse structured output using the handler (matches iOS)
+    return handler.parseStructuredOutput<T>(result.text, schema);
   },
 
   /**

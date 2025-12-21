@@ -30,6 +30,7 @@ export type {
   DefaultGenerationSettings,
   DeviceInfoData,
   FrameworkAvailability,
+  GeneratableType,
   GenerationOptions,
   GenerationResult,
   InitializationResult,
@@ -52,9 +53,6 @@ export type {
   VADConfiguration,
   VoiceAudioChunk,
 } from './models';
-
-// Structured Output Types (exported for generateStructured)
-export type { GeneratableType } from '../Capabilities/StructuredOutput/Services/StructuredOutputHandler';
 
 // Events
 export type {

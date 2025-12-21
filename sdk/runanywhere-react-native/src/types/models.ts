@@ -14,6 +14,11 @@ import type {
   ModelFormat,
   SDKEnvironment,
 } from './enums';
+import type {
+  GeneratableType,
+  StructuredOutputConfig,
+  StructuredOutputValidation,
+} from '../Capabilities/StructuredOutput/Services/StructuredOutputHandler';
 
 // ============================================================================
 // Model Information
@@ -129,33 +134,9 @@ export interface PerformanceMetrics {
   inferenceTimeMs: number;
 }
 
-/**
- * Structured output validation result
- */
-export interface StructuredOutputValidation {
-  /** Whether the output is valid */
-  isValid: boolean;
-
-  /** Validation errors */
-  errors: string[];
-
-  /** Corrected output if applicable */
-  corrected?: string;
-}
-
-/**
- * Structured output configuration
- */
-export interface StructuredOutputConfig {
-  /** JSON schema for validation */
-  schema: string;
-
-  /** Output format (json, xml, etc.) */
-  format: string;
-
-  /** Whether to enforce strict validation */
-  strict: boolean;
-}
+// Re-export structured output types from StructuredOutputHandler for convenience
+// These match iOS Generatable protocol and StructuredOutputConfig
+export type { GeneratableType, StructuredOutputConfig, StructuredOutputValidation };
 
 /**
  * Result of a text generation request

@@ -54,8 +54,16 @@ export {
 export {
   ManagedLifecycle,
   ManagedLifecycleOptions,
-  ModelLifecycleMetrics,
 } from './ManagedLifecycle';
+
+// Analytics Types
+export {
+  AnalyticsMetrics,
+  InferenceFrameworkType,
+  ModelLifecycleEventType,
+  ModelLifecycleMetrics,
+  createModelLifecycleMetrics,
+} from './Analytics';
 
 // Lifecycle Events
 export {

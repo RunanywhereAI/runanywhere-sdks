@@ -8,24 +8,14 @@
 
 import type { LLMFramework } from '../../../Core/Models/Framework/LLMFramework';
 import { ExecutionTarget, HardwareAcceleration } from '../../../types/enums';
+import type {
+  GeneratableType,
+  StructuredOutputConfig,
+} from '../../StructuredOutput/Services/StructuredOutputHandler';
 
 // Re-export for consumers who import from this module
 export { ExecutionTarget, HardwareAcceleration };
-
-/**
- * Type that can generate JSON schema for structured output
- */
-export interface GeneratableType {
-  readonly jsonSchema: string;
-}
-
-/**
- * Structured output configuration
- */
-export interface StructuredOutputConfig {
-  readonly type: GeneratableType;
-  readonly includeSchemaInPrompt: boolean;
-}
+export type { GeneratableType, StructuredOutputConfig };
 
 /**
  * Options for text generation

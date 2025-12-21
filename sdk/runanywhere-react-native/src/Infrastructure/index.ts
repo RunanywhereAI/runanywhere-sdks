@@ -13,8 +13,14 @@ export * from './Analytics';
 // Device subsystem
 export * from './Device';
 
+// Download subsystem
+export * from './Download';
+
 // Events subsystem
 export * from './Events';
+
+// File Management subsystem
+export * from './FileManagement';
 
 // Model Management subsystem
 export * from './ModelManagement';

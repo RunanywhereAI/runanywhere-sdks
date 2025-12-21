@@ -15,22 +15,43 @@ const logger = new SDKLogger('TelemetryRepository');
 /**
  * Telemetry event types
  * Matches iOS: TelemetryEventType
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Analytics/Models/Domain/TelemetryEventType.swift
  */
 export enum TelemetryEventType {
+  // MARK: - Model Events
   ModelLoaded = 'model_loaded',
+  ModelLoadFailed = 'model_load_failed',
   ModelUnloaded = 'model_unloaded',
+
+  // MARK: - LLM Generation Events
   GenerationStarted = 'generation_started',
   GenerationCompleted = 'generation_completed',
   GenerationFailed = 'generation_failed',
-  TranscriptionStarted = 'transcription_started',
-  TranscriptionCompleted = 'transcription_completed',
-  TranscriptionFailed = 'transcription_failed',
-  SynthesisStarted = 'synthesis_started',
-  SynthesisCompleted = 'synthesis_completed',
-  SynthesisFailed = 'synthesis_failed',
-  VADStarted = 'vad_started',
-  VADStopped = 'vad_stopped',
+
+  // MARK: - STT (Speech-to-Text) Events
+  STTModelLoaded = 'stt_model_loaded',
+  STTModelLoadFailed = 'stt_model_load_failed',
+  STTTranscriptionStarted = 'stt_transcription_started',
+  STTTranscriptionCompleted = 'stt_transcription_completed',
+  STTTranscriptionFailed = 'stt_transcription_failed',
+  STTStreamingUpdate = 'stt_streaming_update',
+
+  // MARK: - TTS (Text-to-Speech) Events
+  TTSModelLoaded = 'tts_model_loaded',
+  TTSModelLoadFailed = 'tts_model_load_failed',
+  TTSSynthesisStarted = 'tts_synthesis_started',
+  TTSSynthesisCompleted = 'tts_synthesis_completed',
+  TTSSynthesisFailed = 'tts_synthesis_failed',
+
+  // MARK: - Speaker Diarization Events
+  SpeakerDiarizationStarted = 'speaker_diarization_started',
+  SpeakerDiarizationCompleted = 'speaker_diarization_completed',
+  SpeakerDiarizationFailed = 'speaker_diarization_failed',
+
+  // MARK: - System Events
   Error = 'error',
+  Performance = 'performance',
+  Memory = 'memory',
   Custom = 'custom',
 }
 
