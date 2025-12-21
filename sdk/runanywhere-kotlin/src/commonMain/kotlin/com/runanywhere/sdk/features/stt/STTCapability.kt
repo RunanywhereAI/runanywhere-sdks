@@ -45,11 +45,12 @@ class STTCapability internal constructor(
      * Matches iOS STTCapability.supportsStreaming property.
      */
     val supportsStreaming: Boolean
-        get() = try {
-            getComponent().supportsStreaming
-        } catch (_: Exception) {
-            false
-        }
+        get() =
+            try {
+                getComponent().supportsStreaming
+            } catch (_: Exception) {
+                false
+            }
 
     // ============================================================================
     // MARK: - Model Lifecycle (iOS ModelLoadableCapability pattern)

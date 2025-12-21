@@ -4,11 +4,11 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.infrastructure.download.DownloadStrategy
+import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelArtifactType
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.storage.ModelStorageStrategy
-import com.runanywhere.sdk.models.ModelInfo
 
 /**
  * Types of capabilities that modules can provide
@@ -16,12 +16,15 @@ import com.runanywhere.sdk.models.ModelInfo
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Module/RunAnywhereModule.swift
  */
-enum class CapabilityType(val value: String) {
+enum class CapabilityType(
+    val value: String,
+) {
     STT("STT"),
     TTS("TTS"),
     LLM("LLM"),
     VAD("VAD"),
-    SPEAKER_DIARIZATION("SpeakerDiarization");
+    SPEAKER_DIARIZATION("SpeakerDiarization"),
+    ;
 
     companion object {
         fun fromValue(value: String): CapabilityType? {
@@ -140,7 +143,7 @@ fun RunAnywhereModule.addModel(
     modality: ModelCategory? = null,
     artifactType: ModelArtifactType? = null,
     memoryRequirement: Long? = null,
-    supportsThinking: Boolean = false
+    supportsThinking: Boolean = false,
 ): ModelInfo? {
     val logger = SDKLogger("Module.${this.moduleId}")
 
@@ -157,16 +160,17 @@ fun RunAnywhereModule.addModel(
     val modelId = id ?: url.substringAfterLast('/').substringBeforeLast('.')
 
     // Register the model with this module's framework
-    val modelInfo = ServiceContainer.shared.modelRegistry.addModelFromURL(
-        id = modelId,
-        name = name,
-        url = url,
-        framework = inferenceFramework,
-        category = category,
-        artifactType = artifactType,
-        estimatedSize = memoryRequirement,
-        supportsThinking = supportsThinking
-    )
+    val modelInfo =
+        ServiceContainer.shared.modelRegistry.addModelFromURL(
+            id = modelId,
+            name = name,
+            url = url,
+            framework = inferenceFramework,
+            category = category,
+            artifactType = artifactType,
+            estimatedSize = memoryRequirement,
+            supportsThinking = supportsThinking,
+        )
 
     return modelInfo
 }
@@ -194,26 +198,22 @@ data class ModuleMetadata(
      * Module identifier
      */
     val moduleId: String,
-
     /**
      * Display name
      */
     val moduleName: String,
-
     /**
      * Capabilities provided
      */
     val capabilities: Set<CapabilityType>,
-
     /**
      * Registration priority used
      */
     val priority: Int,
-
     /**
      * When the module was registered (timestamp in milliseconds)
      */
-    val registeredAt: Long = currentTimeMillis()
+    val registeredAt: Long = currentTimeMillis(),
 )
 
 /**
@@ -331,7 +331,7 @@ object ModuleRegistryMetadata {
      */
     fun registerModule(
         module: RunAnywhereModule,
-        priority: Int? = null
+        priority: Int? = null,
     ) {
         val effectivePriority = priority ?: module.defaultPriority
 
@@ -343,12 +343,13 @@ object ModuleRegistryMetadata {
             }
 
             // Store metadata
-            val metadata = ModuleMetadata(
-                moduleId = module.moduleId,
-                moduleName = module.moduleName,
-                capabilities = module.capabilities,
-                priority = effectivePriority
-            )
+            val metadata =
+                ModuleMetadata(
+                    moduleId = module.moduleId,
+                    moduleName = module.moduleName,
+                    capabilities = module.capabilities,
+                    priority = effectivePriority,
+                )
             _registeredModules[module.moduleId] = metadata
             _moduleTypes[module.moduleId] = module
 
@@ -366,7 +367,7 @@ object ModuleRegistryMetadata {
 
             logger.info(
                 "Module registered: ${module.moduleName} [${module.moduleId}] " +
-                "with capabilities: ${module.capabilities.map { it.value }.joinToString(", ")}"
+                    "with capabilities: ${module.capabilities.map { it.value }.joinToString(", ")}",
             )
         }
     }
@@ -393,9 +394,10 @@ object ModuleRegistryMetadata {
      * Get all registered module metadata
      */
     val allModules: List<ModuleMetadata>
-        get() = synchronized(lock) {
-            _registeredModules.values.sortedBy { it.moduleId }
-        }
+        get() =
+            synchronized(lock) {
+                _registeredModules.values.sortedBy { it.moduleId }
+            }
 
     /**
      * Get modules that provide a specific capability

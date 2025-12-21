@@ -92,7 +92,7 @@ object ModuleRegistry {
             // Sort by priority descending, then registration time ascending
             _sttProviders.sortWith(
                 compareByDescending<PrioritizedProvider<STTServiceProvider>> { it.priority }
-                    .thenBy { it.registrationTime }
+                    .thenBy { it.registrationTime },
             )
         }
         logger.info("Registered STT provider: ${provider.name} with priority $priority")
@@ -110,7 +110,7 @@ object ModuleRegistry {
             _vadProviders.add(PrioritizedProvider(provider, priority))
             _vadProviders.sortWith(
                 compareByDescending<PrioritizedProvider<VADServiceProvider>> { it.priority }
-                    .thenBy { it.registrationTime }
+                    .thenBy { it.registrationTime },
             )
         }
         logger.info("Registered VAD provider: ${provider.name} with priority $priority")
@@ -128,7 +128,7 @@ object ModuleRegistry {
             _llmProviders.add(PrioritizedProvider(provider, priority))
             _llmProviders.sortWith(
                 compareByDescending<PrioritizedProvider<LLMServiceProvider>> { it.priority }
-                    .thenBy { it.registrationTime }
+                    .thenBy { it.registrationTime },
             )
         }
         logger.info("Registered LLM provider: ${provider.name} with priority $priority")
@@ -146,7 +146,7 @@ object ModuleRegistry {
             _ttsProviders.add(PrioritizedProvider(provider, priority))
             _ttsProviders.sortWith(
                 compareByDescending<PrioritizedProvider<TTSServiceProvider>> { it.priority }
-                    .thenBy { it.registrationTime }
+                    .thenBy { it.registrationTime },
             )
         }
         logger.info("Registered TTS provider: ${provider.name} with priority $priority")
@@ -164,7 +164,7 @@ object ModuleRegistry {
             _speakerDiarizationProviders.add(PrioritizedProvider(provider, priority))
             _speakerDiarizationProviders.sortWith(
                 compareByDescending<PrioritizedProvider<SpeakerDiarizationServiceProvider>> { it.priority }
-                    .thenBy { it.registrationTime }
+                    .thenBy { it.registrationTime },
             )
         }
         logger.info("Registered Speaker Diarization provider: ${provider.name} with priority $priority")
@@ -499,13 +499,14 @@ object ModuleRegistry {
      * Returns a summary of all registered providers with their counts
      */
     val providerSummary: Map<String, Int>
-        get() = mapOf(
-            "STT" to synchronized(_sttProviders) { _sttProviders.size },
-            "VAD" to synchronized(_vadProviders) { _vadProviders.size },
-            "LLM" to synchronized(_llmProviders) { _llmProviders.size },
-            "TTS" to synchronized(_ttsProviders) { _ttsProviders.size },
-            "SpeakerDiarization" to synchronized(_speakerDiarizationProviders) { _speakerDiarizationProviders.size }
-        )
+        get() =
+            mapOf(
+                "STT" to synchronized(_sttProviders) { _sttProviders.size },
+                "VAD" to synchronized(_vadProviders) { _vadProviders.size },
+                "LLM" to synchronized(_llmProviders) { _llmProviders.size },
+                "TTS" to synchronized(_ttsProviders) { _ttsProviders.size },
+                "SpeakerDiarization" to synchronized(_speakerDiarizationProviders) { _speakerDiarizationProviders.size },
+            )
 
     /**
      * Singleton instance for convenience

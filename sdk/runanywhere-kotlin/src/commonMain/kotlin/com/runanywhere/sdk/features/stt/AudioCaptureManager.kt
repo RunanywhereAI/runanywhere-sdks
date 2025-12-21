@@ -41,8 +41,13 @@ sealed class AudioCaptureError : Exception() {
         override val message = "Audio input device not available"
     }
 
-    data class InitializationFailed(override val message: String) : AudioCaptureError()
-    data class RecordingFailed(override val message: String) : AudioCaptureError()
+    data class InitializationFailed(
+        override val message: String,
+    ) : AudioCaptureError()
+
+    data class RecordingFailed(
+        override val message: String,
+    ) : AudioCaptureError()
 }
 
 /**

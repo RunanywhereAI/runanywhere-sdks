@@ -16,21 +16,18 @@ data class ExtractionResult(
      * Path to the extracted model (could be file or directory)
      */
     val modelPath: String,
-
     /**
      * Total extracted size in bytes
      */
     val extractedSize: Long,
-
     /**
      * Number of files extracted
      */
     val fileCount: Int,
-
     /**
      * Duration of extraction in seconds
      */
-    val durationSeconds: Double
+    val durationSeconds: Double,
 )
 
 /**
@@ -52,7 +49,7 @@ interface ModelExtractionServiceProtocol {
         archivePath: String,
         destinationPath: String,
         artifactType: ModelArtifactType,
-        progressHandler: ((Double) -> Unit)? = null
+        progressHandler: ((Double) -> Unit)? = null,
     ): ExtractionResult
 }
 
@@ -62,20 +59,20 @@ interface ModelExtractionServiceProtocol {
  * Matches iOS DefaultModelExtractionService exactly
  */
 class DefaultModelExtractionService : ModelExtractionServiceProtocol {
-
     private val logger = SDKLogger("ModelExtractionService")
 
     override suspend fun extract(
         archivePath: String,
         destinationPath: String,
         artifactType: ModelArtifactType,
-        progressHandler: ((Double) -> Unit)?
+        progressHandler: ((Double) -> Unit)?,
     ): ExtractionResult {
         val startTime = currentTimeMillis()
 
         // Verify this is an archive type
-        val archive = artifactType as? ModelArtifactType.Archive
-            ?: throw ArchiveExtractionException("Artifact type does not require extraction: $artifactType")
+        val archive =
+            artifactType as? ModelArtifactType.Archive
+                ?: throw ArchiveExtractionException("Artifact type does not require extraction: $artifactType")
 
         val archiveType = archive.archiveType
         val structure = archive.structure
@@ -112,7 +109,7 @@ class DefaultModelExtractionService : ModelExtractionServiceProtocol {
             modelPath = modelPath,
             extractedSize = stats.first,
             fileCount = stats.second,
-            durationSeconds = duration
+            durationSeconds = duration,
         )
     }
 
@@ -147,9 +144,10 @@ class DefaultModelExtractionService : ModelExtractionServiceProtocol {
         val contents = listDirectoryContents(extractedDir) ?: return extractedDir
 
         // Filter out hidden files and macOS resource forks
-        val visibleContents = contents.filter { name ->
-            !name.startsWith(".") && !name.startsWith("._")
-        }
+        val visibleContents =
+            contents.filter { name ->
+                !name.startsWith(".") && !name.startsWith("._")
+            }
 
         // If there's a single visible subdirectory, return it
         if (visibleContents.size == 1) {

@@ -151,15 +151,17 @@ class InMemoryTelemetryDao : TelemetryDao {
             }
         }
 
-    override suspend fun deleteEvent(event: TelemetryEventEntity) =
+    override suspend fun deleteEvent(event: TelemetryEventEntity) {
         mutex.withLock {
             events.remove(event.id)
         }
+    }
 
-    override suspend fun deleteEventById(eventId: String) =
+    override suspend fun deleteEventById(eventId: String) {
         mutex.withLock {
             events.remove(eventId)
         }
+    }
 
     override suspend fun deleteEventsByIds(eventIds: List<String>) =
         mutex.withLock {
@@ -177,10 +179,11 @@ class InMemoryTelemetryDao : TelemetryDao {
             toRemove.forEach { events.remove(it) }
         }
 
-    override suspend fun deleteOldSentEvents(timestamp: Long) =
+    override suspend fun deleteOldSentEvents(timestamp: Long) {
         mutex.withLock {
             events.entries.removeIf { it.value.isSent && (it.value.sentAt ?: 0) < timestamp }
         }
+    }
 
     override suspend fun getEventCount(): Int =
         mutex.withLock {

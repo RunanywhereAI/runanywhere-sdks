@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.infrastructure.download
 
-import com.runanywhere.sdk.models.enums.ArchiveType
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.models.enums.ArchiveType
 
 /**
  * Utility for handling archive operations
@@ -16,7 +16,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * @see com.runanywhere.sdk.models.enums.ArchiveType
  */
 object ArchiveUtility {
-
     private val logger = SDKLogger("ArchiveUtility")
 
     /**
@@ -28,7 +27,7 @@ object ArchiveUtility {
         TAR_GZ,
         TAR_XZ,
         ZIP,
-        UNKNOWN
+        UNKNOWN,
     }
 
     /**
@@ -43,7 +42,7 @@ object ArchiveUtility {
     suspend fun extractArchive(
         sourcePath: String,
         destinationPath: String,
-        progressHandler: ((Double) -> Unit)? = null
+        progressHandler: ((Double) -> Unit)? = null,
     ) {
         val archiveType = detectArchiveType(sourcePath)
 
@@ -68,7 +67,7 @@ object ArchiveUtility {
     suspend fun extractTarBz2Archive(
         sourcePath: String,
         destinationPath: String,
-        progressHandler: ((Double) -> Unit)? = null
+        progressHandler: ((Double) -> Unit)? = null,
     ) {
         logger.info("Extracting tar.bz2 archive: $sourcePath")
         progressHandler?.invoke(0.0)
@@ -95,7 +94,7 @@ object ArchiveUtility {
     suspend fun extractTarGzArchive(
         sourcePath: String,
         destinationPath: String,
-        progressHandler: ((Double) -> Unit)? = null
+        progressHandler: ((Double) -> Unit)? = null,
     ) {
         logger.info("Extracting tar.gz archive: $sourcePath")
         progressHandler?.invoke(0.0)
@@ -122,7 +121,7 @@ object ArchiveUtility {
     suspend fun extractTarXzArchive(
         sourcePath: String,
         destinationPath: String,
-        progressHandler: ((Double) -> Unit)? = null
+        progressHandler: ((Double) -> Unit)? = null,
     ) {
         logger.info("Extracting tar.xz archive: $sourcePath")
         progressHandler?.invoke(0.0)
@@ -149,7 +148,7 @@ object ArchiveUtility {
     suspend fun extractZipArchive(
         sourcePath: String,
         destinationPath: String,
-        progressHandler: ((Double) -> Unit)? = null
+        progressHandler: ((Double) -> Unit)? = null,
     ) {
         logger.info("Extracting zip archive: $sourcePath")
         progressHandler?.invoke(0.0)
@@ -176,14 +175,14 @@ object ArchiveUtility {
 
         return when {
             lowercasedPath.endsWith(".tar.bz2") ||
-            lowercasedPath.endsWith(".tbz2") ||
-            lowercasedPath.endsWith(".tbz") -> ArchiveFormat.TAR_BZ2
+                lowercasedPath.endsWith(".tbz2") ||
+                lowercasedPath.endsWith(".tbz") -> ArchiveFormat.TAR_BZ2
 
             lowercasedPath.endsWith(".tar.gz") ||
-            lowercasedPath.endsWith(".tgz") -> ArchiveFormat.TAR_GZ
+                lowercasedPath.endsWith(".tgz") -> ArchiveFormat.TAR_GZ
 
             lowercasedPath.endsWith(".tar.xz") ||
-            lowercasedPath.endsWith(".txz") -> ArchiveFormat.TAR_XZ
+                lowercasedPath.endsWith(".txz") -> ArchiveFormat.TAR_XZ
 
             lowercasedPath.endsWith(".zip") -> ArchiveFormat.ZIP
 
@@ -252,30 +251,30 @@ object ArchiveUtility {
  */
 class ArchiveExtractionException(
     message: String,
-    cause: Throwable? = null
+    cause: Throwable? = null,
 ) : Exception(message, cause)
 
 // Platform-specific extraction implementations
 internal expect suspend fun extractTarBz2Impl(
     sourcePath: String,
     destinationPath: String,
-    progressHandler: ((Double) -> Unit)?
+    progressHandler: ((Double) -> Unit)?,
 )
 
 internal expect suspend fun extractTarGzImpl(
     sourcePath: String,
     destinationPath: String,
-    progressHandler: ((Double) -> Unit)?
+    progressHandler: ((Double) -> Unit)?,
 )
 
 internal expect suspend fun extractTarXzImpl(
     sourcePath: String,
     destinationPath: String,
-    progressHandler: ((Double) -> Unit)?
+    progressHandler: ((Double) -> Unit)?,
 )
 
 internal expect suspend fun extractZipImpl(
     sourcePath: String,
     destinationPath: String,
-    progressHandler: ((Double) -> Unit)?
+    progressHandler: ((Double) -> Unit)?,
 )

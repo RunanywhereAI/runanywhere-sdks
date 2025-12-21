@@ -26,6 +26,7 @@ sealed class SDKError : Exception() {
      */
     val category: ErrorCategory
         get() = ErrorCategory.from(errorCode)
+
     // Initialization errors
     object NotInitialized : SDKError() {
         override val message = "SDK not initialized. Call RunAnywhere.initialize() first"

@@ -294,7 +294,7 @@ class SimpleEnergyVAD(
         }
 
         val durationSeconds = calibrationFramesNeeded * frameLength
-        logger.info("Starting VAD calibration - measuring ambient noise for ${durationSeconds} seconds...")
+        logger.info("Starting VAD calibration - measuring ambient noise for $durationSeconds seconds...")
 
         isCalibrating = true
         calibrationSamples.clear()

@@ -11,7 +11,6 @@ import android.telephony.TelephonyManager
 import com.runanywhere.sdk.data.models.BatteryState
 import com.runanywhere.sdk.data.models.GPUType
 import com.runanywhere.sdk.data.models.ThermalState
-import com.runanywhere.sdk.foundation.AndroidDeviceInfoCollector
 import com.runanywhere.sdk.storage.AndroidPlatformContext
 
 /**

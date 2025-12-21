@@ -8,7 +8,9 @@ import kotlinx.serialization.Serializable
  * Matches iOS ArchiveType exactly
  */
 @Serializable
-enum class ArchiveType(val fileExtension: String) {
+enum class ArchiveType(
+    val fileExtension: String,
+) {
     @SerialName("zip")
     ZIP("zip"),
 
@@ -19,7 +21,8 @@ enum class ArchiveType(val fileExtension: String) {
     TAR_GZ("tar.gz"),
 
     @SerialName("tar.xz")
-    TAR_XZ("tar.xz");
+    TAR_XZ("tar.xz"),
+    ;
 
     companion object {
         /**
@@ -219,6 +222,7 @@ sealed class ModelArtifactType {
          * Infer artifact type from download URL
          * Matches iOS ModelArtifactType.infer(from:format:)
          */
+        @Suppress("UNUSED_PARAMETER")
         fun infer(url: String?, format: ModelFormat): ModelArtifactType {
             if (url == null) {
                 return SingleFile()
