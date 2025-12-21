@@ -1,5 +1,13 @@
+import 'error_category.dart';
+import 'error_code.dart';
+import 'error_context.dart';
+
+export 'error_category.dart';
+export 'error_code.dart';
+export 'error_context.dart';
+
 /// Main SDK error type
-/// Matches iOS RunAnywhereError from Foundation/Errors/RunAnywhereError.swift
+/// Matches iOS RunAnywhereError from Public/Errors/RunAnywhereError.swift
 ///
 /// Note: Also exported as [RunAnywhereError] for iOS parity
 class SDKError implements Exception {
@@ -10,10 +18,169 @@ class SDKError implements Exception {
   /// Matches iOS RunAnywhereError.underlyingError
   final Object? underlyingError;
 
-  SDKError(this.message, this.type, {this.underlyingError});
+  /// Error context with stack trace and location info
+  final ErrorContext? context;
+
+  SDKError(
+    this.message,
+    this.type, {
+    this.underlyingError,
+    this.context,
+  });
 
   @override
   String toString() => 'SDKError($type): $message';
+
+  /// The error code for machine-readable identification
+  /// Matches iOS SDKErrorProtocol.code
+  ErrorCode get code {
+    switch (type) {
+      case SDKErrorType.notInitialized:
+        return ErrorCode.notInitialized;
+      case SDKErrorType.alreadyInitialized:
+        return ErrorCode.alreadyInitialized;
+      case SDKErrorType.invalidAPIKey:
+        return ErrorCode.apiKeyInvalid;
+      case SDKErrorType.invalidConfiguration:
+        return ErrorCode.invalidInput;
+      case SDKErrorType.environmentMismatch:
+        return ErrorCode.invalidInput;
+      case SDKErrorType.modelNotFound:
+        return ErrorCode.modelNotFound;
+      case SDKErrorType.modelLoadFailed:
+        return ErrorCode.modelLoadFailed;
+      case SDKErrorType.loadingFailed:
+        return ErrorCode.modelLoadFailed;
+      case SDKErrorType.modelValidationFailed:
+        return ErrorCode.modelValidationFailed;
+      case SDKErrorType.modelIncompatible:
+        return ErrorCode.modelIncompatible;
+      case SDKErrorType.frameworkNotAvailable:
+        return ErrorCode.hardwareUnavailable;
+      case SDKErrorType.generationFailed:
+        return ErrorCode.generationFailed;
+      case SDKErrorType.generationTimeout:
+        return ErrorCode.generationTimeout;
+      case SDKErrorType.contextTooLong:
+        return ErrorCode.contextTooLong;
+      case SDKErrorType.tokenLimitExceeded:
+        return ErrorCode.tokenLimitExceeded;
+      case SDKErrorType.costLimitExceeded:
+        return ErrorCode.costLimitExceeded;
+      case SDKErrorType.networkError:
+        return ErrorCode.apiError;
+      case SDKErrorType.networkUnavailable:
+        return ErrorCode.networkUnavailable;
+      case SDKErrorType.requestFailed:
+        return ErrorCode.apiError;
+      case SDKErrorType.downloadFailed:
+        return ErrorCode.downloadFailed;
+      case SDKErrorType.timeout:
+        return ErrorCode.networkTimeout;
+      case SDKErrorType.storageError:
+        return ErrorCode.fileAccessDenied;
+      case SDKErrorType.insufficientStorage:
+        return ErrorCode.insufficientStorage;
+      case SDKErrorType.storageFull:
+        return ErrorCode.storageFull;
+      case SDKErrorType.hardwareUnsupported:
+        return ErrorCode.hardwareUnsupported;
+      case SDKErrorType.memoryPressure:
+        return ErrorCode.hardwareUnavailable;
+      case SDKErrorType.thermalStateExceeded:
+        return ErrorCode.hardwareUnavailable;
+      case SDKErrorType.componentNotReady:
+        return ErrorCode.notInitialized;
+      case SDKErrorType.componentNotInitialized:
+        return ErrorCode.notInitialized;
+      case SDKErrorType.authenticationFailed:
+        return ErrorCode.authenticationFailed;
+      case SDKErrorType.databaseInitializationFailed:
+        return ErrorCode.unknown;
+      case SDKErrorType.featureNotAvailable:
+        return ErrorCode.unknown;
+      case SDKErrorType.notImplemented:
+        return ErrorCode.unknown;
+      case SDKErrorType.validationFailed:
+        return ErrorCode.invalidInput;
+      case SDKErrorType.unsupportedModality:
+        return ErrorCode.invalidInput;
+      case SDKErrorType.invalidState:
+        return ErrorCode.invalidInput;
+      case SDKErrorType.serverError:
+        return ErrorCode.apiError;
+      case SDKErrorType.rateLimitExceeded:
+        return ErrorCode.apiError;
+      case SDKErrorType.serviceUnavailable:
+        return ErrorCode.apiError;
+      case SDKErrorType.invalidInput:
+        return ErrorCode.invalidInput;
+      case SDKErrorType.resourceExhausted:
+        return ErrorCode.insufficientStorage;
+      case SDKErrorType.internalError:
+        return ErrorCode.unknown;
+    }
+  }
+
+  /// The category of this error for grouping/filtering
+  /// Matches iOS SDKErrorProtocol.category
+  ErrorCategory get category {
+    switch (type) {
+      case SDKErrorType.notInitialized:
+      case SDKErrorType.alreadyInitialized:
+      case SDKErrorType.invalidAPIKey:
+      case SDKErrorType.invalidConfiguration:
+      case SDKErrorType.environmentMismatch:
+        return ErrorCategory.initialization;
+      case SDKErrorType.modelNotFound:
+      case SDKErrorType.modelLoadFailed:
+      case SDKErrorType.loadingFailed:
+      case SDKErrorType.modelValidationFailed:
+      case SDKErrorType.modelIncompatible:
+        return ErrorCategory.model;
+      case SDKErrorType.generationFailed:
+      case SDKErrorType.generationTimeout:
+      case SDKErrorType.contextTooLong:
+      case SDKErrorType.tokenLimitExceeded:
+      case SDKErrorType.costLimitExceeded:
+        return ErrorCategory.generation;
+      case SDKErrorType.networkError:
+      case SDKErrorType.networkUnavailable:
+      case SDKErrorType.requestFailed:
+      case SDKErrorType.downloadFailed:
+      case SDKErrorType.timeout:
+      case SDKErrorType.serverError:
+      case SDKErrorType.rateLimitExceeded:
+      case SDKErrorType.serviceUnavailable:
+        return ErrorCategory.network;
+      case SDKErrorType.storageError:
+      case SDKErrorType.insufficientStorage:
+      case SDKErrorType.storageFull:
+      case SDKErrorType.resourceExhausted:
+        return ErrorCategory.storage;
+      case SDKErrorType.hardwareUnsupported:
+      case SDKErrorType.memoryPressure:
+      case SDKErrorType.thermalStateExceeded:
+        return ErrorCategory.hardware;
+      case SDKErrorType.componentNotReady:
+      case SDKErrorType.componentNotInitialized:
+      case SDKErrorType.invalidState:
+        return ErrorCategory.component;
+      case SDKErrorType.authenticationFailed:
+        return ErrorCategory.authentication;
+      case SDKErrorType.frameworkNotAvailable:
+      case SDKErrorType.databaseInitializationFailed:
+        return ErrorCategory.framework;
+      case SDKErrorType.validationFailed:
+      case SDKErrorType.unsupportedModality:
+      case SDKErrorType.invalidInput:
+        return ErrorCategory.validation;
+      case SDKErrorType.featureNotAvailable:
+      case SDKErrorType.notImplemented:
+      case SDKErrorType.internalError:
+        return ErrorCategory.unknown;
+    }
+  }
 
   /// Recovery suggestion for the error
   /// Matches iOS RunAnywhereError.recoverySuggestion
@@ -63,9 +230,14 @@ class SDKError implements Exception {
         return 'Check your internet connection and available storage space.';
       case SDKErrorType.timeout:
         return 'The operation timed out. Try again or check your network connection.';
+      case SDKErrorType.rateLimitExceeded:
+        return 'You have exceeded the rate limit. Please wait before trying again.';
+      case SDKErrorType.serviceUnavailable:
+        return 'The service is temporarily unavailable. Please try again later.';
 
       case SDKErrorType.storageError:
       case SDKErrorType.insufficientStorage:
+      case SDKErrorType.resourceExhausted:
         return 'Free up storage space on your device.';
       case SDKErrorType.storageFull:
         return 'Delete unnecessary files to free up space.';
@@ -90,140 +262,105 @@ class SDKError implements Exception {
         return 'Try reinstalling the app or clearing app data.';
 
       case SDKErrorType.validationFailed:
-        return 'Check your input parameters and ensure they are valid.';
       case SDKErrorType.unsupportedModality:
+      case SDKErrorType.invalidInput:
         return 'Check your input parameters and ensure they are valid.';
 
       case SDKErrorType.featureNotAvailable:
       case SDKErrorType.notImplemented:
         return 'This feature may be available in a future update.';
+
+      case SDKErrorType.internalError:
+        return 'An internal error occurred. Please report this issue.';
     }
   }
 
   // Factory constructors for common errors
   static SDKError notInitialized([String? message]) {
     return SDKError(
-      message ?? 'SDK has not been initialized',
+      message ?? 'RunAnywhere SDK is not initialized. Call initialize() first.',
       SDKErrorType.notInitialized,
     );
   }
 
   static SDKError alreadyInitialized([String? message]) {
     return SDKError(
-      message ?? 'SDK is already initialized',
+      message ?? 'RunAnywhere SDK is already initialized.',
       SDKErrorType.alreadyInitialized,
     );
   }
 
   static SDKError invalidAPIKey([String? message]) {
     return SDKError(
-      message ?? 'Invalid API key',
+      message ?? 'Invalid or missing API key.',
       SDKErrorType.invalidAPIKey,
     );
   }
 
-  static SDKError invalidConfiguration([String? message]) {
+  static SDKError invalidConfiguration(String detail) {
     return SDKError(
-      message ?? 'Invalid configuration',
+      'Invalid configuration: $detail',
       SDKErrorType.invalidConfiguration,
     );
   }
 
-  static SDKError environmentMismatch([String? message]) {
+  static SDKError environmentMismatch(String reason) {
     return SDKError(
-      message ?? 'Environment configuration mismatch',
+      'Environment configuration mismatch: $reason',
       SDKErrorType.environmentMismatch,
     );
   }
 
   static SDKError modelNotFound(String modelId) {
     return SDKError(
-      'Model not found: $modelId',
+      'Model \'$modelId\' not found.',
       SDKErrorType.modelNotFound,
     );
   }
 
-  static SDKError modelLoadFailed(String modelId, Object error) {
+  static SDKError modelLoadFailed(String modelId, Object? error) {
     return SDKError(
-      'Model load failed: $modelId - $error',
+      error != null
+          ? 'Failed to load model \'$modelId\': $error'
+          : 'Failed to load model \'$modelId\'',
       SDKErrorType.modelLoadFailed,
       underlyingError: error,
     );
   }
 
-  static SDKError loadingFailed([String? message]) {
+  static SDKError loadingFailed(String reason) {
     return SDKError(
-      message ?? 'Loading failed',
+      'Failed to load: $reason',
       SDKErrorType.loadingFailed,
     );
   }
 
-  static SDKError featureNotAvailable([String? message]) {
+  static SDKError modelValidationFailed(String modelId, List<String> errors) {
     return SDKError(
-      message ?? 'Feature not available',
-      SDKErrorType.featureNotAvailable,
+      'Model \'$modelId\' validation failed: ${errors.join(', ')}',
+      SDKErrorType.modelValidationFailed,
     );
   }
 
-  static SDKError componentNotReady(String component) {
+  static SDKError modelIncompatible(String modelId, String reason) {
     return SDKError(
-      'Component not ready: $component',
-      SDKErrorType.componentNotReady,
+      'Model \'$modelId\' is incompatible: $reason',
+      SDKErrorType.modelIncompatible,
     );
   }
 
-  static SDKError networkError([String? message]) {
+  static SDKError generationFailed(String reason) {
     return SDKError(
-      message ?? 'Network error occurred',
-      SDKErrorType.networkError,
-    );
-  }
-
-  static SDKError storageError([String? message]) {
-    return SDKError(
-      message ?? 'Storage error occurred',
-      SDKErrorType.storageError,
-    );
-  }
-
-  static SDKError validationFailed([String? message]) {
-    return SDKError(
-      message ?? 'Validation failed',
-      SDKErrorType.validationFailed,
-    );
-  }
-
-  static SDKError invalidState([String? message]) {
-    return SDKError(
-      message ?? 'Invalid state',
-      SDKErrorType.invalidState,
-    );
-  }
-
-  static SDKError timeout([String? message]) {
-    return SDKError(
-      message ?? 'Operation timed out',
-      SDKErrorType.timeout,
-    );
-  }
-
-  static SDKError downloadFailed([String? message]) {
-    return SDKError(
-      message ?? 'Download failed',
-      SDKErrorType.downloadFailed,
-    );
-  }
-
-  static SDKError generationFailed([String? message]) {
-    return SDKError(
-      message ?? 'Generation failed',
+      'Text generation failed: $reason',
       SDKErrorType.generationFailed,
     );
   }
 
-  static SDKError generationTimeout([String? message]) {
+  static SDKError generationTimeout([String? reason]) {
     return SDKError(
-      message ?? 'Generation timed out',
+      reason != null
+          ? 'Generation timed out: $reason'
+          : 'Text generation timed out.',
       SDKErrorType.generationTimeout,
     );
   }
@@ -249,46 +386,17 @@ class SDKError implements Exception {
     );
   }
 
-  static SDKError authenticationFailed([String? message]) {
+  static SDKError networkUnavailable([String? message]) {
     return SDKError(
-      message ?? 'Authentication failed',
-      SDKErrorType.authenticationFailed,
+      message ?? 'Network connection unavailable.',
+      SDKErrorType.networkUnavailable,
     );
   }
 
-  static SDKError databaseInitializationFailed(Object error) {
+  static SDKError networkError(String reason) {
     return SDKError(
-      'Database initialization failed: $error',
-      SDKErrorType.databaseInitializationFailed,
-      underlyingError: error,
-    );
-  }
-
-  static SDKError unsupportedModality([String? message]) {
-    return SDKError(
-      message ?? 'Unsupported modality',
-      SDKErrorType.unsupportedModality,
-    );
-  }
-
-  static SDKError insufficientStorage(int required, int available) {
-    return SDKError(
-      'Insufficient storage: $required bytes required, $available bytes available',
-      SDKErrorType.insufficientStorage,
-    );
-  }
-
-  static SDKError hardwareUnsupported([String? message]) {
-    return SDKError(
-      message ?? 'Hardware not supported',
-      SDKErrorType.hardwareUnsupported,
-    );
-  }
-
-  static SDKError serverError([String? message]) {
-    return SDKError(
-      message ?? 'Server error occurred',
-      SDKErrorType.serverError,
+      'Network error: $reason',
+      SDKErrorType.networkError,
     );
   }
 
@@ -300,32 +408,171 @@ class SDKError implements Exception {
     );
   }
 
-  static SDKError networkUnavailable([String? message]) {
+  static SDKError downloadFailed(String url, Object? error) {
     return SDKError(
-      message ?? 'Network connection unavailable',
-      SDKErrorType.networkUnavailable,
+      error != null
+          ? 'Failed to download from \'$url\': $error'
+          : 'Failed to download from \'$url\'',
+      SDKErrorType.downloadFailed,
+      underlyingError: error,
     );
   }
 
-  static SDKError modelValidationFailed(String modelId, List<String> errors) {
+  static SDKError serverError(String reason) {
     return SDKError(
-      'Model \'$modelId\' validation failed: ${errors.join(', ')}',
-      SDKErrorType.modelValidationFailed,
+      'Server error: $reason',
+      SDKErrorType.serverError,
     );
   }
 
-  static SDKError modelIncompatible(String modelId, String reason) {
+  static SDKError timeout(String reason) {
     return SDKError(
-      'Model \'$modelId\' is incompatible: $reason',
-      SDKErrorType.modelIncompatible,
+      'Operation timed out: $reason',
+      SDKErrorType.timeout,
     );
   }
 
-  static SDKError frameworkNotAvailable([String? message]) {
+  static SDKError insufficientStorage(int required, int available) {
     return SDKError(
-      message ?? 'Required framework not available',
+      'Insufficient storage: ${_formatBytes(required)} required, ${_formatBytes(available)} available',
+      SDKErrorType.insufficientStorage,
+    );
+  }
+
+  static SDKError storageFull([String? message]) {
+    return SDKError(
+      message ?? 'Device storage is full.',
+      SDKErrorType.storageFull,
+    );
+  }
+
+  static SDKError storageError(String reason) {
+    return SDKError(
+      'Storage error: $reason',
+      SDKErrorType.storageError,
+    );
+  }
+
+  static SDKError hardwareUnsupported(String feature) {
+    return SDKError(
+      'Hardware does not support $feature.',
+      SDKErrorType.hardwareUnsupported,
+    );
+  }
+
+  static SDKError componentNotInitialized(String component) {
+    return SDKError(
+      'Component not initialized: $component',
+      SDKErrorType.componentNotInitialized,
+    );
+  }
+
+  static SDKError componentNotReady(String component) {
+    return SDKError(
+      'Component not ready: $component',
+      SDKErrorType.componentNotReady,
+    );
+  }
+
+  static SDKError invalidState(String reason) {
+    return SDKError(
+      'Invalid state: $reason',
+      SDKErrorType.invalidState,
+    );
+  }
+
+  static SDKError validationFailed(String reason) {
+    return SDKError(
+      'Validation failed: $reason',
+      SDKErrorType.validationFailed,
+    );
+  }
+
+  static SDKError unsupportedModality(String modality) {
+    return SDKError(
+      'Unsupported modality: $modality',
+      SDKErrorType.unsupportedModality,
+    );
+  }
+
+  static SDKError authenticationFailed(String reason) {
+    return SDKError(
+      'Authentication failed: $reason',
+      SDKErrorType.authenticationFailed,
+    );
+  }
+
+  static SDKError frameworkNotAvailable(String framework) {
+    return SDKError(
+      'Framework $framework not available',
       SDKErrorType.frameworkNotAvailable,
     );
+  }
+
+  static SDKError databaseInitializationFailed(Object error) {
+    return SDKError(
+      'Database initialization failed: $error',
+      SDKErrorType.databaseInitializationFailed,
+      underlyingError: error,
+    );
+  }
+
+  static SDKError featureNotAvailable(String feature) {
+    return SDKError(
+      'Feature \'$feature\' is not available.',
+      SDKErrorType.featureNotAvailable,
+    );
+  }
+
+  static SDKError notImplemented(String feature) {
+    return SDKError(
+      'Feature \'$feature\' is not yet implemented.',
+      SDKErrorType.notImplemented,
+    );
+  }
+
+  static SDKError rateLimitExceeded([String? message]) {
+    return SDKError(
+      message ?? 'Rate limit exceeded.',
+      SDKErrorType.rateLimitExceeded,
+    );
+  }
+
+  static SDKError serviceUnavailable([String? message]) {
+    return SDKError(
+      message ?? 'Service is currently unavailable.',
+      SDKErrorType.serviceUnavailable,
+    );
+  }
+
+  static SDKError invalidInput(String reason) {
+    return SDKError(
+      'Invalid input: $reason',
+      SDKErrorType.invalidInput,
+    );
+  }
+
+  static SDKError resourceExhausted([String? message]) {
+    return SDKError(
+      message ?? 'Resource exhausted.',
+      SDKErrorType.resourceExhausted,
+    );
+  }
+
+  static SDKError internalError([String? message]) {
+    return SDKError(
+      message ?? 'An internal error occurred.',
+      SDKErrorType.internalError,
+    );
+  }
+
+  /// Helper to format bytes
+  static String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024)
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }
 
@@ -342,7 +589,7 @@ enum SDKErrorType {
   // Model errors
   modelNotFound,
   modelLoadFailed,
-  loadingFailed, // Separate from modelLoadFailed for iOS parity
+  loadingFailed,
   modelValidationFailed,
   modelIncompatible,
   frameworkNotAvailable,
@@ -359,11 +606,16 @@ enum SDKErrorType {
   networkUnavailable,
   requestFailed,
   downloadFailed,
+  timeout,
+  serverError,
+  rateLimitExceeded,
+  serviceUnavailable,
 
   // Storage errors
   storageError,
   insufficientStorage,
   storageFull,
+  resourceExhausted,
 
   // Hardware errors
   hardwareUnsupported,
@@ -373,6 +625,12 @@ enum SDKErrorType {
   // Component errors
   componentNotReady,
   componentNotInitialized,
+  invalidState,
+
+  // Validation errors
+  validationFailed,
+  unsupportedModality,
+  invalidInput,
 
   // Authentication errors
   authenticationFailed,
@@ -384,20 +642,10 @@ enum SDKErrorType {
   featureNotAvailable,
   notImplemented,
 
-  // Validation errors
-  validationFailed,
-  unsupportedModality,
-
   // General errors
-  invalidState,
-  timeout,
-  serverError,
+  internalError,
 }
 
 /// Type alias for iOS parity
 /// iOS uses RunAnywhereError; this alias provides compatibility
 typedef RunAnywhereError = SDKError;
-
-/// Type alias for iOS parity
-/// iOS uses ErrorCategory; this alias provides compatibility
-typedef ErrorCategory = SDKErrorType;

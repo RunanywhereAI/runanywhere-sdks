@@ -1,5 +1,5 @@
-import '../native/native_backend.dart';
-import '../native/platform_loader.dart';
+import '../../native/native_backend.dart';
+import '../../native/platform_loader.dart';
 import 'onnx_adapter.dart';
 
 /// Main entry point for the ONNX Runtime backend.

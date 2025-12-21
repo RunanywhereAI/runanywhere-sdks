@@ -6,7 +6,7 @@ import '../../core/models/model/model_info.dart';
 import '../../core/module_registry.dart';
 import '../../core/protocols/frameworks/unified_framework_adapter.dart';
 import '../../foundation/logging/sdk_logger.dart';
-import '../native/native_backend.dart';
+import '../../native/native_backend.dart';
 import 'providers/llamacpp_llm_provider.dart';
 import 'services/llamacpp_llm_service.dart';
 

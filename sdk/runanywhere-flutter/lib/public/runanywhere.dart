@@ -20,10 +20,10 @@ import 'events/event_bus.dart';
 import 'events/sdk_event.dart';
 import 'models/models.dart';
 import '../capabilities/text_generation/generation_service.dart';
-import '../capabilities/structured_output/structured_output_handler.dart';
+import '../features/llm/structured_output/structured_output_handler.dart';
 import '../features/stt/stt_capability.dart';
 import '../features/tts/tts_capability.dart';
-import '../features/tts/tts_options.dart';
+import '../core/module_registry.dart' show TTSOptions;
 import '../features/tts/tts_output.dart';
 import '../features/vad/vad_capability.dart';
 import '../features/vad/vad_configuration.dart';
@@ -63,7 +63,7 @@ export '../core/models/framework/model_artifact_type.dart';
 export '../core/models/model/model_category.dart';
 
 // Export speaker diarization types
-export '../features/speaker_diarization/speaker_info.dart';
+export '../features/speaker_diarization/models/speaker_diarization_speaker_info.dart';
 
 // Export capability type for framework queries
 export '../core/module/capability_type.dart';
@@ -75,7 +75,7 @@ export '../features/vad/vad_service.dart'
 export '../features/vad/vad_configuration.dart' show VADConfiguration;
 
 // Export TTS options for top-level synthesize
-export '../features/tts/tts_options.dart' show TTSOptions;
+export '../core/module_registry.dart' show TTSOptions;
 
 // Export VoiceAgent types
 export '../features/voice_agent/voice_agent_capability.dart'

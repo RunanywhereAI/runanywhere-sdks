@@ -2,7 +2,7 @@ import 'dart:async';
 
 import '../../../core/module_registry.dart';
 import '../../../foundation/logging/sdk_logger.dart';
-import '../../native/native_backend.dart';
+import '../../../native/native_backend.dart';
 import '../llamacpp_error.dart';
 import '../llamacpp_template_resolver.dart';
 
