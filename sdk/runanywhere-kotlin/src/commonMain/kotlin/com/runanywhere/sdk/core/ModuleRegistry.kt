@@ -344,9 +344,10 @@ object ModuleRegistry {
         modelId: String? = null,
         config: STTConfiguration,
     ): STTService {
-        val registration = synchronized(_sttRegistrations) {
-            _sttRegistrations.firstOrNull { it.canHandle(modelId) }
-        } ?: throw SDKError.ProviderNotFound("STT provider for model: ${modelId ?: "default"}")
+        val registration =
+            synchronized(_sttRegistrations) {
+                _sttRegistrations.firstOrNull { it.canHandle(modelId) }
+            } ?: throw SDKError.ProviderNotFound("STT provider for model: ${modelId ?: "default"}")
 
         logger.info("Creating STT service: ${registration.name} for model: ${modelId ?: "default"}")
         return registration.factory(config)
@@ -360,9 +361,10 @@ object ModuleRegistry {
         modelId: String? = null,
         config: LLMConfiguration,
     ): LLMService {
-        val registration = synchronized(_llmRegistrations) {
-            _llmRegistrations.firstOrNull { it.canHandle(modelId) }
-        } ?: throw SDKError.ProviderNotFound("LLM provider for model: ${modelId ?: "default"}")
+        val registration =
+            synchronized(_llmRegistrations) {
+                _llmRegistrations.firstOrNull { it.canHandle(modelId) }
+            } ?: throw SDKError.ProviderNotFound("LLM provider for model: ${modelId ?: "default"}")
 
         logger.info("Creating LLM service: ${registration.name} for model: ${modelId ?: "default"}")
         return registration.factory(config)
@@ -376,9 +378,10 @@ object ModuleRegistry {
         modelId: String? = null,
         config: TTSConfiguration,
     ): TTSService {
-        val registration = synchronized(_ttsRegistrations) {
-            _ttsRegistrations.firstOrNull { it.canHandle(modelId) }
-        } ?: throw SDKError.ProviderNotFound("TTS provider for model: ${modelId ?: "default"}")
+        val registration =
+            synchronized(_ttsRegistrations) {
+                _ttsRegistrations.firstOrNull { it.canHandle(modelId) }
+            } ?: throw SDKError.ProviderNotFound("TTS provider for model: ${modelId ?: "default"}")
 
         logger.info("Creating TTS service: ${registration.name} for model: ${modelId ?: "default"}")
         return registration.factory(config)
@@ -392,9 +395,10 @@ object ModuleRegistry {
         modelId: String? = null,
         config: VADConfiguration,
     ): VADService {
-        val registration = synchronized(_vadRegistrations) {
-            _vadRegistrations.firstOrNull { it.canHandle(modelId) }
-        } ?: throw SDKError.ProviderNotFound("VAD provider for model: ${modelId ?: "default"}")
+        val registration =
+            synchronized(_vadRegistrations) {
+                _vadRegistrations.firstOrNull { it.canHandle(modelId) }
+            } ?: throw SDKError.ProviderNotFound("VAD provider for model: ${modelId ?: "default"}")
 
         logger.info("Creating VAD service: ${registration.name} for model: ${modelId ?: "default"}")
         return registration.factory(config)
@@ -407,9 +411,10 @@ object ModuleRegistry {
         modelId: String? = null,
         config: SpeakerDiarizationConfiguration,
     ): SpeakerDiarizationService {
-        val registration = synchronized(_speakerDiarizationRegistrations) {
-            _speakerDiarizationRegistrations.firstOrNull { it.canHandle(modelId) }
-        } ?: throw SDKError.ProviderNotFound("Speaker Diarization provider for model: ${modelId ?: "default"}")
+        val registration =
+            synchronized(_speakerDiarizationRegistrations) {
+                _speakerDiarizationRegistrations.firstOrNull { it.canHandle(modelId) }
+            } ?: throw SDKError.ProviderNotFound("Speaker Diarization provider for model: ${modelId ?: "default"}")
 
         logger.info("Creating Speaker Diarization service: ${registration.name} for model: ${modelId ?: "default"}")
         return registration.factory(config)

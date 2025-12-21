@@ -46,7 +46,6 @@ internal actual suspend fun extractTarBz2Impl(
 
     logger.info("tar.bz2 extraction completed")
     progressHandler?.invoke(1.0)
-    Unit
 }
 
 /**
@@ -77,7 +76,6 @@ internal actual suspend fun extractTarGzImpl(
 
     logger.info("tar.gz extraction completed")
     progressHandler?.invoke(1.0)
-    Unit
 }
 
 /**
@@ -108,7 +106,6 @@ internal actual suspend fun extractTarXzImpl(
 
     logger.info("tar.xz extraction completed")
     progressHandler?.invoke(1.0)
-    Unit
 }
 
 /**
@@ -193,7 +190,6 @@ internal actual suspend fun extractZipImpl(
 
     logger.info("Extracted $extractedCount files from zip archive")
     progressHandler?.invoke(1.0)
-    Unit
 }
 
 /**

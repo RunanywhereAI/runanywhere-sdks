@@ -258,6 +258,7 @@ sealed class VADError : Exception() {
     ) : VADError()
 
     // Runtime Errors
+
     /** Service is not available (matches iOS) */
     object ServiceNotAvailable : VADError()
 
@@ -282,6 +283,7 @@ sealed class VADError : Exception() {
     ) : VADError()
 
     // Calibration Errors (matches iOS)
+
     /** Calibration failed with specific reason (matches iOS) */
     data class CalibrationFailed(
         val reason: String,
@@ -291,6 +293,7 @@ sealed class VADError : Exception() {
     object CalibrationTimeout : VADError()
 
     // Resource Errors
+
     /** Operation was cancelled (matches iOS) */
     object Cancelled : VADError()
 

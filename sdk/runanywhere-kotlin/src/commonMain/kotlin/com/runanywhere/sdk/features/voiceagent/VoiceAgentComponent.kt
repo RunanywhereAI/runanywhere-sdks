@@ -417,9 +417,10 @@ class VoiceAgentComponent(
                 audioStream.collect { audioData ->
                     try {
                         // Process with granular events at each stage
-                        val result = processAudioWithEvents(audioData) { event ->
-                            emit(event)
-                        }
+                        val result =
+                            processAudioWithEvents(audioData) { event ->
+                                emit(event)
+                            }
                         emit(VoiceAgentEvent.Processed(result))
                     } catch (e: Exception) {
                         emit(VoiceAgentEvent.Error(e))
