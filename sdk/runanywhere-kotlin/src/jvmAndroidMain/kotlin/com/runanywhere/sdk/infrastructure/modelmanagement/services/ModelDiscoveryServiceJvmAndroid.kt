@@ -24,11 +24,12 @@ actual suspend fun discoverBundleModelsPlatform(): List<ModelInfo> {
 
     try {
         // Try to find models in common resource locations
-        val resourcePaths = listOf(
-            "models/",
-            "assets/models/",
-            "raw/",
-        )
+        val resourcePaths =
+            listOf(
+                "models/",
+                "assets/models/",
+                "raw/",
+            )
 
         for (resourcePath in resourcePaths) {
             for (extension in modelExtensions) {
@@ -99,6 +100,7 @@ private fun scanClasspathForModels(
 /**
  * Scan inside a JAR file for model resources
  */
+@Suppress("UNUSED_PARAMETER")
 private fun scanJarForModels(
     jarUrl: String,
     extension: String,
@@ -132,10 +134,11 @@ private fun createBundledModelInfo(
         compatibleFrameworks = listOf(framework),
         preferredFramework = framework,
         source = ConfigurationSource.LOCAL,
-        metadata = ModelInfoMetadata(
-            description = "Bundled model",
-            version = "1.0.0",
-        ),
+        metadata =
+            ModelInfoMetadata(
+                description = "Bundled model",
+                version = "1.0.0",
+            ),
     )
 }
 

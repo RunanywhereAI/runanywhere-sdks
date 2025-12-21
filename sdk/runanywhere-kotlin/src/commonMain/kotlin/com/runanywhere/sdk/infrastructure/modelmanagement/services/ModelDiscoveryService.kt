@@ -29,41 +29,31 @@ class ModelDiscoveryService(
          * Known model file extensions mapped to their formats
          * Matches iOS modelExtensions in RegistryService
          */
-        private val EXTENSION_TO_FORMAT = mapOf(
-            "gguf" to ModelFormat.GGUF,
-            "ggml" to ModelFormat.GGUF,
-            "bin" to ModelFormat.BIN,
-            "onnx" to ModelFormat.ONNX,
-            "mlmodel" to ModelFormat.MLMODEL,
-            "mlmodelc" to ModelFormat.MLMODEL, // Compiled CoreML model
-            "mlpackage" to ModelFormat.MLMODEL,
-            "tflite" to ModelFormat.TFLITE,
-            "safetensors" to ModelFormat.SAFETENSORS,
-            "pte" to ModelFormat.PTE, // ExecuTorch
-        )
-
-        /**
-         * Framework-to-format mapping for default format inference
-         */
-        private val FRAMEWORK_DEFAULT_FORMAT = mapOf(
-            InferenceFramework.LLAMA_CPP to ModelFormat.GGUF,
-            InferenceFramework.ONNX to ModelFormat.ONNX,
-            InferenceFramework.WHISPER_KIT to ModelFormat.MLMODEL,
-            InferenceFramework.CORE_ML to ModelFormat.MLMODEL,
-            InferenceFramework.TENSORFLOW_LITE to ModelFormat.TFLITE,
-            InferenceFramework.MLC to ModelFormat.SAFETENSORS,
-        )
+        private val EXTENSION_TO_FORMAT =
+            mapOf(
+                "gguf" to ModelFormat.GGUF,
+                "ggml" to ModelFormat.GGUF,
+                "bin" to ModelFormat.BIN,
+                "onnx" to ModelFormat.ONNX,
+                "mlmodel" to ModelFormat.MLMODEL,
+                "mlmodelc" to ModelFormat.MLMODEL, // Compiled CoreML model
+                "mlpackage" to ModelFormat.MLMODEL,
+                "tflite" to ModelFormat.TFLITE,
+                "safetensors" to ModelFormat.SAFETENSORS,
+                "pte" to ModelFormat.PTE, // ExecuTorch
+            )
 
         /**
          * Framework-to-category mapping for inferring model category
          */
-        private val FRAMEWORK_DEFAULT_CATEGORY = mapOf(
-            InferenceFramework.LLAMA_CPP to ModelCategory.LANGUAGE,
-            InferenceFramework.WHISPER_KIT to ModelCategory.SPEECH_RECOGNITION,
-            InferenceFramework.WHISPER_CPP to ModelCategory.SPEECH_RECOGNITION,
-            InferenceFramework.ONNX to ModelCategory.OTHER, // Could be any
-            InferenceFramework.CORE_ML to ModelCategory.OTHER,
-        )
+        private val FRAMEWORK_DEFAULT_CATEGORY =
+            mapOf(
+                InferenceFramework.LLAMA_CPP to ModelCategory.LANGUAGE,
+                InferenceFramework.WHISPER_KIT to ModelCategory.SPEECH_RECOGNITION,
+                InferenceFramework.WHISPER_CPP to ModelCategory.SPEECH_RECOGNITION,
+                InferenceFramework.ONNX to ModelCategory.OTHER, // Could be any
+                InferenceFramework.CORE_ML to ModelCategory.OTHER,
+            )
     }
 
     // MARK: - Discovery Methods
@@ -128,11 +118,12 @@ class ModelDiscoveryService(
                     }
 
                     // Try to discover model in this folder
-                    val modelInfo = discoverModelInFolder(
-                        modelId = modelId,
-                        modelFolder = modelFolder,
-                        framework = framework,
-                    )
+                    val modelInfo =
+                        discoverModelInFolder(
+                            modelId = modelId,
+                            modelFolder = modelFolder,
+                            framework = framework,
+                        )
 
                     if (modelInfo != null) {
                         discoveredModels.add(modelInfo)
@@ -172,11 +163,12 @@ class ModelDiscoveryService(
                 }
 
                 // Try to discover model in this folder (no specific framework)
-                val modelInfo = discoverModelInFolder(
-                    modelId = entry,
-                    modelFolder = modelFolder,
-                    framework = null,
-                )
+                val modelInfo =
+                    discoverModelInFolder(
+                        modelId = entry,
+                        modelFolder = modelFolder,
+                        framework = null,
+                    )
 
                 if (modelInfo != null) {
                     discoveredModels.add(modelInfo)
@@ -253,23 +245,25 @@ class ModelDiscoveryService(
 
                 // Skip directories (e.g., .mlmodelc is a directory)
                 // For .mlmodelc and .mlpackage, we check if they exist
-                val isModelFile = if (extension in listOf("mlmodelc", "mlpackage")) {
-                    fileSystem.exists(filePath)
-                } else {
-                    !fileSystem.isDirectory(filePath)
-                }
+                val isModelFile =
+                    if (extension in listOf("mlmodelc", "mlpackage")) {
+                        fileSystem.exists(filePath)
+                    } else {
+                        !fileSystem.isDirectory(filePath)
+                    }
 
                 if (!isModelFile) continue
 
-                val size = try {
-                    if (fileSystem.isDirectory(filePath)) {
-                        calculateDirectorySize(filePath)
-                    } else {
-                        fileSystem.fileSize(filePath)
+                val size =
+                    try {
+                        if (fileSystem.isDirectory(filePath)) {
+                            calculateDirectorySize(filePath)
+                        } else {
+                            fileSystem.fileSize(filePath)
+                        }
+                    } catch (e: Exception) {
+                        0L
                     }
-                } catch (e: Exception) {
-                    0L
-                }
 
                 return createModelInfo(
                     modelId = modelId,
@@ -352,10 +346,11 @@ class ModelDiscoveryService(
             compatibleFrameworks = listOf(framework),
             preferredFramework = framework,
             source = ConfigurationSource.LOCAL,
-            metadata = ModelInfoMetadata(
-                description = "Locally discovered model",
-                version = "1.0.0",
-            ),
+            metadata =
+                ModelInfoMetadata(
+                    description = "Locally discovered model",
+                    version = "1.0.0",
+                ),
         )
     }
 
@@ -416,14 +411,15 @@ class ModelDiscoveryService(
         // - CoreML: ~1.5x download size
         // - SafeTensors: ~2x download size
 
-        val multiplier = when (format) {
-            ModelFormat.GGUF -> 1.5
-            ModelFormat.ONNX -> 2.0
-            ModelFormat.MLMODEL -> 1.5
-            ModelFormat.SAFETENSORS -> 2.0
-            ModelFormat.TFLITE -> 1.5
-            else -> 2.0
-        }
+        val multiplier =
+            when (format) {
+                ModelFormat.GGUF -> 1.5
+                ModelFormat.ONNX -> 2.0
+                ModelFormat.MLMODEL -> 1.5
+                ModelFormat.SAFETENSORS -> 2.0
+                ModelFormat.TFLITE -> 1.5
+                else -> 2.0
+            }
 
         return (downloadSize * multiplier).toLong()
     }

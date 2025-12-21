@@ -62,7 +62,8 @@ enum class APIEndpoint(
             when (environment) {
                 SDKConstants.Environment.DEVELOPMENT -> devDeviceRegistration
                 SDKConstants.Environment.STAGING,
-                SDKConstants.Environment.PRODUCTION -> deviceRegistration
+                SDKConstants.Environment.PRODUCTION,
+                -> deviceRegistration
             }
 
         /**
@@ -73,7 +74,8 @@ enum class APIEndpoint(
             when (environment) {
                 SDKConstants.Environment.DEVELOPMENT -> devAnalytics
                 SDKConstants.Environment.STAGING,
-                SDKConstants.Environment.PRODUCTION -> analytics
+                SDKConstants.Environment.PRODUCTION,
+                -> analytics
             }
 
         /**

@@ -54,15 +54,16 @@ data class ErrorContext(
      * Full formatted context for logging
      */
     val formattedContext: String
-        get() = buildString {
-            appendLine("Location: $locationString")
-            appendLine("Thread: $threadInfo")
-            appendLine("Timestamp: $timestamp")
-            if (stackTrace.isNotEmpty()) {
-                appendLine("Stack trace:")
-                appendLine(formattedStackTrace)
+        get() =
+            buildString {
+                appendLine("Location: $locationString")
+                appendLine("Thread: $threadInfo")
+                appendLine("Timestamp: $timestamp")
+                if (stackTrace.isNotEmpty()) {
+                    appendLine("Stack trace:")
+                    appendLine(formattedStackTrace)
+                }
             }
-        }
 
     companion object {
         /**
@@ -100,11 +101,12 @@ class ContextualError(
     override val message: String
         get() = "${error.message ?: error::class.simpleName} at ${context.locationString}"
 
-    override fun toString(): String = buildString {
-        appendLine("ContextualError: ${error::class.simpleName}")
-        appendLine(context.formattedContext)
-        appendLine("Underlying error: $error")
-    }
+    override fun toString(): String =
+        buildString {
+            appendLine("ContextualError: ${error::class.simpleName}")
+            appendLine(context.formattedContext)
+            appendLine("Underlying error: $error")
+        }
 }
 
 /**
@@ -164,20 +166,21 @@ fun logError(
     val context = error.errorContext ?: ErrorContext.capture(skipFrames = 3)
     val underlying = error.underlyingError
 
-    val logMessage = buildString {
-        appendLine("ERROR: ${underlying::class.simpleName}")
-        appendLine("Message: ${underlying.message}")
-        appendLine("Location: ${context.locationString}")
-        appendLine("Thread: ${context.threadInfo}")
-        if (additionalInfo.isNotEmpty()) {
-            appendLine("Additional Info:")
-            additionalInfo.forEach { (key, value) ->
-                appendLine("  $key: $value")
+    val logMessage =
+        buildString {
+            appendLine("ERROR: ${underlying::class.simpleName}")
+            appendLine("Message: ${underlying.message}")
+            appendLine("Location: ${context.locationString}")
+            appendLine("Thread: ${context.threadInfo}")
+            if (additionalInfo.isNotEmpty()) {
+                appendLine("Additional Info:")
+                additionalInfo.forEach { (key, value) ->
+                    appendLine("  $key: $value")
+                }
             }
+            appendLine("Stack trace:")
+            appendLine(context.formattedStackTrace)
         }
-        appendLine("Stack trace:")
-        appendLine(context.formattedStackTrace)
-    }
 
     // Log using SDK logger
     SDKLogger("ErrorContext").error(logMessage)
