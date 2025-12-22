@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
-import 'package:runanywhere/runanywhere.dart' hide LLMFramework;
+import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
@@ -33,8 +33,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   // Messages
   final List<ChatMessage> _messages = [];
   String _currentStreamingContent = '';
-  // TODO: Use when SDK supports thinking content in streaming
-  // ignore:unused_field
   String _currentThinkingContent = '';
 
   // State
@@ -104,7 +102,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
       final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
 
-      final options = RunAnywhereGenerationOptions(
+      final options = sdk.RunAnywhereGenerationOptions(
         maxTokens: maxTokens,
         temperature: temperature,
       );
@@ -124,7 +122,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   Future<void> _generateStreaming(
     String prompt,
-    RunAnywhereGenerationOptions options,
+    sdk.RunAnywhereGenerationOptions options,
   ) async {
     // Capture model name before async gap to avoid context issues
     final modelName = context.read<ModelManager>().loadedModelName;
@@ -144,12 +142,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final messageIndex = _messages.length - 1;
 
     try {
-      // TODO: Use RunAnywhere.generateStream with thinking support
-      // final stream = RunAnywhere.generateStream(prompt, options: options);
-      // await for (final token in stream) { ... }
-
-      // Placeholder streaming simulation
-      final stream = RunAnywhere.generateStream(prompt, options: options);
+      final stream = sdk.RunAnywhere.generateStream(prompt, options: options);
 
       await for (final token in stream) {
         if (_timeToFirstToken == null && _generationStartTime != null) {
@@ -159,7 +152,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         }
 
         _tokenCount++;
-        // ignore: use_string_buffers, simpler for streaming UI updates
         _currentStreamingContent += token;
 
         setState(() {
@@ -189,6 +181,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       if (!mounted) return;
       setState(() {
         _messages[messageIndex] = _messages[messageIndex].copyWith(
+          thinkingContent: _currentThinkingContent.isNotEmpty
+              ? _currentThinkingContent
+              : null,
           analytics: analytics,
         );
         _isGenerating = false;
@@ -205,24 +200,29 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   Future<void> _generateNonStreaming(
     String prompt,
-    RunAnywhereGenerationOptions options,
+    sdk.RunAnywhereGenerationOptions options,
   ) async {
     // Capture model name before async gap to avoid context issues
     final modelName = context.read<ModelManager>().loadedModelName;
 
     try {
-      final result = await RunAnywhere.generate(prompt, options: options);
+      final result = await sdk.RunAnywhere.generate(prompt, options: options);
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
               1000.0
           : 0.0;
 
+      // Extract token counts from SDK result
+      final outputTokens = result.tokensUsed;
+      final tokensPerSecond = result.performanceMetrics.tokensPerSecond;
+
       final analytics = MessageAnalytics(
         messageId: DateTime.now().millisecondsSinceEpoch.toString(),
         modelName: modelName,
         totalGenerationTime: totalTime,
-        // TODO: Extract token counts from result
+        outputTokens: outputTokens,
+        tokensPerSecond: tokensPerSecond,
       );
 
       setState(() {
@@ -230,6 +230,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           role: MessageRole.assistant,
           content: result.text,
+          thinkingContent: result.thinkingContent,
           timestamp: DateTime.now(),
           analytics: analytics,
         ));
@@ -280,13 +281,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
               onPressed: _clearChat,
               tooltip: 'Clear chat',
             ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              // TODO: Show chat settings
-            },
-            tooltip: 'Settings',
-          ),
         ],
       ),
       body: Column(
@@ -331,12 +325,34 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     ));
   }
 
+  /// Map SDK framework enum to app framework enum
+  LLMFramework _mapSdkFramework(sdk.LLMFramework? sdkFramework) {
+    if (sdkFramework == null) return LLMFramework.llamaCpp;
+    switch (sdkFramework) {
+      case sdk.LLMFramework.llamaCpp:
+        return LLMFramework.llamaCpp;
+      case sdk.LLMFramework.foundationModels:
+        return LLMFramework.foundationModels;
+      case sdk.LLMFramework.mediaPipe:
+        return LLMFramework.mediaPipe;
+      case sdk.LLMFramework.onnx:
+        return LLMFramework.onnxRuntime;
+      case sdk.LLMFramework.systemTTS:
+        return LLMFramework.systemTTS;
+      case sdk.LLMFramework.whisperKit:
+        return LLMFramework.whisperKit;
+      default:
+        return LLMFramework.llamaCpp;
+    }
+  }
+
   Widget _buildModelStatusBanner(ModelManager modelManager) {
     // Map ModelManager state to LLMFramework for the shared component
     LLMFramework? framework;
-    if (modelManager.isModelLoaded) {
-      // TODO: Get actual framework from ModelManager when SDK provides it
-      framework = LLMFramework.llamaCpp;
+    if (modelManager.isModelLoaded && modelManager.currentModel != null) {
+      // Get framework from the current model's preferred framework
+      framework =
+          _mapSdkFramework(modelManager.currentModel!.preferredFramework);
     }
 
     return Padding(
@@ -484,6 +500,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     );
   }
 }
+
+/// Message role enum
+enum MessageRole { system, user, assistant }
 
 /// Chat message model
 class ChatMessage {

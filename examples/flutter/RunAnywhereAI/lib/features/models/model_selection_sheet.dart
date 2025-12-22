@@ -8,14 +8,14 @@ import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/core/services/device_info_service.dart';
-import 'package:runanywhere_ai/features/models/add_model_from_url_view.dart';
-import 'package:runanywhere_ai/features/models/model_components.dart';
 import 'package:runanywhere_ai/features/models/model_list_view_model.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// ModelSelectionSheet (mirroring iOS ModelSelectionSheet.swift)
 ///
-/// Reusable model selection sheet that can be used across the app.
+/// Reusable model selection sheet with flat list of models (no framework expansion).
+/// Models are filtered by context and sorted by availability (built-in first,
+/// then downloaded, then available for download).
 class ModelSelectionSheet extends StatefulWidget {
   final ModelSelectionContext context;
   final Future<void> Function(ModelInfo) onModelSelected;
@@ -35,9 +35,31 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
   final DeviceInfoService _deviceInfo = DeviceInfoService.shared;
 
   ModelInfo? _selectedModel;
-  LLMFramework? _expandedFramework;
   bool _isLoadingModel = false;
   String _loadingProgress = '';
+
+  /// Get all models relevant to this context, sorted by availability
+  List<ModelInfo> get _availableModels {
+    final models = _viewModel.availableModels.where((model) {
+      return widget.context.relevantCategories.contains(model.category);
+    }).toList();
+
+    // Sort: Foundation Models first (built-in), then downloaded, then not downloaded
+    models.sort((a, b) {
+      final aPriority = a.preferredFramework == LLMFramework.foundationModels
+          ? 0
+          : (a.localPath != null ? 1 : 2);
+      final bPriority = b.preferredFramework == LLMFramework.foundationModels
+          ? 0
+          : (b.localPath != null ? 1 : 2);
+      if (aPriority != bPriority) {
+        return aPriority.compareTo(bPriority);
+      }
+      return a.name.compareTo(b.name);
+    });
+
+    return models;
+  }
 
   @override
   void initState() {
@@ -76,9 +98,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
                     return ListView(
                       children: [
                         _buildDeviceStatusSection(context),
-                        _buildFrameworksSection(context),
-                        if (_expandedFramework != null)
-                          _buildModelsSection(context),
+                        _buildModelsListSection(context),
                       ],
                     );
                   },
@@ -115,10 +135,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
               textAlign: TextAlign.center,
             ),
           ),
-          TextButton(
-            onPressed: _isLoadingModel ? null : _showAddModelSheet,
-            child: const Text('Add'),
-          ),
+          // Spacer to balance the Cancel button
+          const SizedBox(width: 70),
         ],
       ),
     );
@@ -138,22 +156,36 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
             }
             return Column(
               children: [
-                DeviceInfoRow(
+                _buildDeviceInfoRow(
+                  context,
                   label: 'Model',
                   icon: Icons.phone_iphone,
                   value: device.modelName,
                 ),
-                DeviceInfoRow(
+                _buildDeviceInfoRow(
+                  context,
                   label: 'Chip',
                   icon: Icons.memory,
                   value: device.chipName,
                 ),
-                DeviceInfoRow(
+                _buildDeviceInfoRow(
+                  context,
                   label: 'Memory',
                   icon: Icons.storage,
                   value: device.totalMemory.formattedFileSize,
                 ),
-                if (device.neuralEngineAvailable) const NeuralEngineRow(),
+                if (device.neuralEngineAvailable)
+                  _buildDeviceInfoRow(
+                    context,
+                    label: 'Neural Engine',
+                    icon: Icons.psychology,
+                    value: '',
+                    trailing: const Icon(
+                      Icons.check_circle,
+                      color: AppColors.statusGreen,
+                      size: 18,
+                    ),
+                  ),
               ],
             );
           },
@@ -163,77 +195,55 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     );
   }
 
-  Widget _buildFrameworksSection(BuildContext context) {
-    // Filter frameworks based on context
-    final relevantFrameworks =
-        _viewModel.availableFrameworks.where(_shouldShowFramework).toList();
-
-    // Add system TTS for TTS context
-    if (widget.context == ModelSelectionContext.tts &&
-        !relevantFrameworks.contains(LLMFramework.systemTTS)) {
-      relevantFrameworks.insert(0, LLMFramework.systemTTS);
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader(context, 'Available Frameworks'),
-        if (relevantFrameworks.isEmpty)
-          _buildLoadingRow(context, 'Loading frameworks...')
-        else
-          ...relevantFrameworks.map((framework) {
-            return FrameworkRow(
-              framework: framework,
-              isExpanded: _expandedFramework == framework,
-              onTap: () => _toggleFramework(framework),
-            );
-          }),
-        const Divider(),
-      ],
+  Widget _buildDeviceInfoRow(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required String value,
+    Widget? trailing,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.large,
+        vertical: AppSpacing.smallMedium,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.textSecondary(context)),
+          const SizedBox(width: AppSpacing.smallMedium),
+          Text(label, style: AppTypography.body(context)),
+          const Spacer(),
+          if (trailing != null)
+            trailing
+          else
+            Text(
+              value,
+              style: AppTypography.body(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _buildModelsSection(BuildContext context) {
-    final framework = _expandedFramework;
-    if (framework == null) return const SizedBox.shrink();
-
-    // Special handling for System TTS
-    if (framework == LLMFramework.systemTTS) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionHeader(context, 'System TTS'),
-          _buildSystemTTSRow(context),
-        ],
-      );
-    }
-
-    // Filter models based on framework AND context
-    final filteredModels = _viewModel.availableModels.where((model) {
-      final frameworkMatch = framework == LLMFramework.foundationModels
-          ? model.preferredFramework == LLMFramework.foundationModels
-          : model.compatibleFrameworks.contains(framework);
-
-      final categoryMatch =
-          widget.context.relevantCategories.contains(model.category);
-
-      return frameworkMatch && categoryMatch;
-    }).toList();
-
+  /// Flat list of all available models with framework badges (matches iOS)
+  Widget _buildModelsListSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(context, 'Models for ${framework.displayName}'),
+        _buildSectionHeader(context, 'Choose a Model'),
 
-        // Foundation Models notice
-        if (framework == LLMFramework.foundationModels)
-          _buildFoundationModelsNotice(context),
-
-        if (filteredModels.isEmpty)
+        if (_availableModels.isEmpty)
           _buildEmptyModelsMessage(context)
-        else
-          ...filteredModels.map((model) {
-            return _SelectableModelRow(
+        else ...[
+          // System TTS option for TTS context
+          if (widget.context == ModelSelectionContext.tts)
+            _buildSystemTTSRow(context),
+
+          // All models in a flat list
+          ..._availableModels.map((model) {
+            return _FlatModelRow(
               model: model,
               isSelected: _selectedModel?.id == model.id,
               isLoading: _isLoadingModel,
@@ -248,36 +258,42 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
               },
             );
           }),
+        ],
+
+        // Footer text
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.large),
+          child: Text(
+            'All models run privately on your device. Larger models may '
+            'provide better quality but use more memory.',
+            style: AppTypography.caption(context).copyWith(
+              color: AppColors.textSecondary(context),
+            ),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildSystemTTSRow(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.large),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.large,
+        vertical: AppSpacing.smallMedium,
+      ),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Default System Voice',
-                  style: AppTypography.subheadline(context),
-                ),
-                const SizedBox(height: AppSpacing.xSmall),
+                // Name with badge
                 Row(
                   children: [
-                    Icon(
-                      Icons.volume_up,
-                      size: 12,
-                      color: AppColors.textSecondary(context),
-                    ),
-                    const SizedBox(width: 4),
                     Text(
-                      'Built-in',
-                      style: AppTypography.caption2(context).copyWith(
-                        color: AppColors.textSecondary(context),
+                      'System Voice',
+                      style: AppTypography.subheadline(context).copyWith(
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(width: AppSpacing.smallMedium),
@@ -287,18 +303,21 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
                         vertical: AppSpacing.xxSmall,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.badgeGray,
+                        color: AppColors.textPrimary(context).withOpacity(0.1),
                         borderRadius:
                             BorderRadius.circular(AppSpacing.cornerRadiusSmall),
                       ),
                       child: Text(
-                        'TTS',
-                        style: AppTypography.caption2(context),
+                        'System',
+                        style: AppTypography.caption2(context).copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xSmall),
+                // Status
                 Row(
                   children: [
                     const Icon(
@@ -306,9 +325,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
                       size: 12,
                       color: AppColors.statusGreen,
                     ),
-                    const SizedBox(width: AppSpacing.xSmall),
+                    const SizedBox(width: AppSpacing.xxSmall),
                     Text(
-                      'Always available',
+                      'Built-in • Always available',
                       style: AppTypography.caption2(context).copyWith(
                         color: AppColors.statusGreen,
                       ),
@@ -320,34 +339,13 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
           ),
           ElevatedButton(
             onPressed: _isLoadingModel ? null : _selectSystemTTS,
-            child: const Text('Select'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFoundationModelsNotice(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.large,
-        vertical: AppSpacing.smallMedium,
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.info,
-            size: 14,
-            color: AppColors.statusBlue,
-          ),
-          const SizedBox(width: AppSpacing.smallMedium),
-          Expanded(
-            child: Text(
-              'iOS 26+ with Apple Intelligence',
-              style: AppTypography.caption(context).copyWith(
-                color: AppColors.textSecondary(context),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.mediumLarge,
+                vertical: AppSpacing.small,
               ),
             ),
+            child: const Text('Use'),
           ),
         ],
       ),
@@ -436,50 +434,22 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
 
   Widget _buildEmptyModelsMessage(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.large),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'No models available for this framework',
-            style: AppTypography.caption(context).copyWith(
-              color: AppColors.textSecondary(context),
-            ),
-          ),
-          if (_expandedFramework != LLMFramework.foundationModels) ...[
-            const SizedBox(height: AppSpacing.smallMedium),
+      padding: const EdgeInsets.all(AppSpacing.xLarge),
+      child: Center(
+        child: Column(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: AppSpacing.mediumLarge),
             Text(
-              "Tap 'Add' to add a model from URL",
-              style: AppTypography.caption2(context).copyWith(
-                color: AppColors.statusBlue,
+              'Loading available models...',
+              style: AppTypography.subheadline(context).copyWith(
+                color: AppColors.textSecondary(context),
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
-  }
-
-  bool _shouldShowFramework(LLMFramework framework) {
-    final modelsForFramework = _viewModel.availableModels.where((model) {
-      if (framework == LLMFramework.foundationModels) {
-        return model.preferredFramework == LLMFramework.foundationModels;
-      }
-      return model.compatibleFrameworks.contains(framework);
-    });
-
-    return modelsForFramework.any(
-        (model) => widget.context.relevantCategories.contains(model.category));
-  }
-
-  void _toggleFramework(LLMFramework framework) {
-    setState(() {
-      if (_expandedFramework == framework) {
-        _expandedFramework = null;
-      } else {
-        _expandedFramework = framework;
-      }
-    });
   }
 
   Future<void> _selectSystemTTS() async {
@@ -536,11 +506,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       });
 
       // Load model based on context/modality using real SDK
-      // ModelManager will automatically update via SDK events (observer pattern)
       switch (widget.context) {
         case ModelSelectionContext.llm:
           debugPrint('🎯 Loading LLM model: ${model.id}');
-          // SDK will publish events, ModelManager listens and updates automatically
           await sdk.RunAnywhere.loadModel(model.id);
           break;
         case ModelSelectionContext.stt:
@@ -594,26 +562,10 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       }
     }
   }
-
-  void _showAddModelSheet() {
-    unawaited(showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => AddModelFromURLView(
-        onModelAdded: (model) async {
-          // Capture navigator before async gap
-          final navigator = Navigator.of(sheetContext);
-          await _viewModel.addImportedModel(model);
-          if (mounted) navigator.pop();
-        },
-      ),
-    ));
-  }
 }
 
-/// Selectable model row for the selection sheet
-class _SelectableModelRow extends StatefulWidget {
+/// Flat model row for the selection sheet (matches iOS FlatModelRow)
+class _FlatModelRow extends StatefulWidget {
   final ModelInfo model;
   final bool isSelected;
   final bool isLoading;
@@ -621,7 +573,7 @@ class _SelectableModelRow extends StatefulWidget {
   final VoidCallback onSelectModel;
   final VoidCallback? onModelUpdated;
 
-  const _SelectableModelRow({
+  const _FlatModelRow({
     required this.model,
     required this.isSelected,
     required this.isLoading,
@@ -631,12 +583,75 @@ class _SelectableModelRow extends StatefulWidget {
   });
 
   @override
-  State<_SelectableModelRow> createState() => _SelectableModelRowState();
+  State<_FlatModelRow> createState() => _FlatModelRowState();
 }
 
-class _SelectableModelRowState extends State<_SelectableModelRow> {
+class _FlatModelRowState extends State<_FlatModelRow> {
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
+
+  Color get _frameworkColor {
+    final framework = widget.model.preferredFramework;
+    if (framework == null) return Colors.grey;
+    switch (framework) {
+      case LLMFramework.llamaCpp:
+        return AppColors.primaryBlue;
+      case LLMFramework.onnxRuntime:
+        return Colors.purple;
+      case LLMFramework.foundationModels:
+        return Colors.grey;
+      case LLMFramework.whisperKit:
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String get _frameworkName {
+    final framework = widget.model.preferredFramework;
+    if (framework == null) return 'Unknown';
+    switch (framework) {
+      case LLMFramework.llamaCpp:
+        return 'Fast';
+      case LLMFramework.onnxRuntime:
+        return 'ONNX';
+      case LLMFramework.foundationModels:
+        return 'Apple';
+      case LLMFramework.whisperKit:
+        return 'Whisper';
+      default:
+        return framework.displayName;
+    }
+  }
+
+  IconData get _statusIcon {
+    if (widget.model.preferredFramework == LLMFramework.foundationModels) {
+      return Icons.check_circle;
+    } else if (widget.model.localPath != null) {
+      return Icons.check_circle;
+    } else {
+      return Icons.download;
+    }
+  }
+
+  Color get _statusColor {
+    if (widget.model.preferredFramework == LLMFramework.foundationModels ||
+        widget.model.localPath != null) {
+      return AppColors.statusGreen;
+    } else {
+      return AppColors.primaryBlue;
+    }
+  }
+
+  String get _statusText {
+    if (widget.model.preferredFramework == LLMFramework.foundationModels) {
+      return 'Built-in';
+    } else if (widget.model.localPath != null) {
+      return 'Ready';
+    } else {
+      return 'Download';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -653,21 +668,131 @@ class _SelectableModelRowState extends State<_SelectableModelRow> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.model.name,
-                    style: AppTypography.subheadline(context).copyWith(
-                      fontWeight: widget.isSelected
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                    ),
+                  // Model name with framework badge inline
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.model.name,
+                          style: AppTypography.subheadline(context).copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.smallMedium),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.small,
+                          vertical: AppSpacing.xxSmall,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _frameworkColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(
+                              AppSpacing.cornerRadiusSmall),
+                        ),
+                        child: Text(
+                          _frameworkName,
+                          style: AppTypography.caption2(context).copyWith(
+                            fontWeight: FontWeight.w500,
+                            color: _frameworkColor,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.xSmall),
-                  _buildModelInfo(context),
-                  const SizedBox(height: AppSpacing.xSmall),
-                  _buildStatus(context),
+                  // Size and status row
+                  Row(
+                    children: [
+                      // Size badge
+                      if (widget.model.memoryRequired != null &&
+                          widget.model.memoryRequired! > 0) ...[
+                        Icon(
+                          Icons.memory,
+                          size: 12,
+                          color: AppColors.textSecondary(context),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          widget.model.memoryRequired!.formattedFileSize,
+                          style: AppTypography.caption2(context).copyWith(
+                            color: AppColors.textSecondary(context),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.smallMedium),
+                      ],
+                      // Status indicator
+                      if (_isDownloading) ...[
+                        SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            value: _downloadProgress > 0
+                                ? _downloadProgress
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xSmall),
+                        Text(
+                          '${(_downloadProgress * 100).toInt()}%',
+                          style: AppTypography.caption2(context).copyWith(
+                            color: AppColors.textSecondary(context),
+                          ),
+                        ),
+                      ] else ...[
+                        Icon(
+                          _statusIcon,
+                          size: 12,
+                          color: _statusColor,
+                        ),
+                        const SizedBox(width: AppSpacing.xxSmall),
+                        Text(
+                          _statusText,
+                          style: AppTypography.caption2(context).copyWith(
+                            color: _statusColor,
+                          ),
+                        ),
+                      ],
+                      // Thinking support indicator
+                      if (widget.model.supportsThinking) ...[
+                        const SizedBox(width: AppSpacing.smallMedium),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.small,
+                            vertical: AppSpacing.xxSmall,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.badgePurple,
+                            borderRadius: BorderRadius.circular(
+                                AppSpacing.cornerRadiusSmall),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.psychology,
+                                size: 10,
+                                color: AppColors.primaryPurple,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                'Smart',
+                                style: AppTypography.caption2(context).copyWith(
+                                  color: AppColors.primaryPurple,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
+            const SizedBox(width: AppSpacing.mediumLarge),
             _buildActionButton(context),
           ],
         ),
@@ -675,183 +800,56 @@ class _SelectableModelRowState extends State<_SelectableModelRow> {
     );
   }
 
-  Widget _buildModelInfo(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.smallMedium,
-      runSpacing: AppSpacing.xSmall,
-      children: [
-        if (widget.model.memoryRequired != null &&
-            widget.model.memoryRequired! > 0)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.memory,
-                size: 12,
-                color: AppColors.textSecondary(context),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                widget.model.memoryRequired!.formattedFileSize,
-                style: AppTypography.caption2(context).copyWith(
-                  color: AppColors.textSecondary(context),
-                ),
-              ),
-            ],
-          ),
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.small,
-            vertical: AppSpacing.xxSmall,
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.badgeGray,
-            borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusSmall),
-          ),
-          child: Text(
-            widget.model.format.rawValue.toUpperCase(),
-            style: AppTypography.caption2(context),
-          ),
-        ),
-        if (widget.model.supportsThinking)
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.small,
-              vertical: AppSpacing.xxSmall,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.badgePurple,
-              borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusSmall),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.psychology,
-                    size: 10, color: AppColors.primaryPurple),
-                const SizedBox(width: 2),
-                Text(
-                  'THINKING',
-                  style: AppTypography.caption2(context).copyWith(
-                    color: AppColors.primaryPurple,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildStatus(BuildContext context) {
-    if (widget.model.preferredFramework == LLMFramework.foundationModels) {
-      return Row(
-        children: [
-          const Icon(
-            Icons.check_circle,
-            size: 12,
-            color: AppColors.statusGreen,
-          ),
-          const SizedBox(width: AppSpacing.xSmall),
-          Text(
-            'Built-in',
-            style: AppTypography.caption2(context).copyWith(
-              color: AppColors.statusGreen,
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (widget.model.downloadURL != null) {
-      if (widget.model.localPath == null) {
-        if (_isDownloading) {
-          return Row(
-            children: [
-              Expanded(
-                child: LinearProgressIndicator(value: _downloadProgress),
-              ),
-              const SizedBox(width: AppSpacing.smallMedium),
-              Text(
-                '${(_downloadProgress * 100).toInt()}%',
-                style: AppTypography.caption2(context).copyWith(
-                  color: AppColors.textSecondary(context),
-                ),
-              ),
-            ],
-          );
-        }
-        return Text(
-          'Available for download',
-          style: AppTypography.caption2(context).copyWith(
-            color: AppColors.statusBlue,
-          ),
-        );
-      }
-      return Row(
-        children: [
-          const Icon(
-            Icons.check_circle,
-            size: 12,
-            color: AppColors.statusGreen,
-          ),
-          const SizedBox(width: AppSpacing.xSmall),
-          Text(
-            'Downloaded',
-            style: AppTypography.caption2(context).copyWith(
-              color: AppColors.statusGreen,
-            ),
-          ),
-        ],
-      );
-    }
-    return const SizedBox.shrink();
-  }
-
   Widget _buildActionButton(BuildContext context) {
     if (widget.model.preferredFramework == LLMFramework.foundationModels) {
+      // Foundation Models are built-in
       return ElevatedButton(
         onPressed:
             widget.isLoading || widget.isSelected ? null : widget.onSelectModel,
-        child: const Text('Select'),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.mediumLarge,
+            vertical: AppSpacing.small,
+          ),
+        ),
+        child: const Text('Use'),
       );
     }
 
-    if (widget.model.downloadURL != null && widget.model.localPath == null) {
+    if (widget.model.localPath == null) {
+      // Model needs to be downloaded
       if (_isDownloading) {
-        return Column(
-          children: [
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            if (_downloadProgress > 0) ...[
-              const SizedBox(height: AppSpacing.xSmall),
-              Text(
-                '${(_downloadProgress * 100).toInt()}%',
-                style: AppTypography.caption2(context).copyWith(
-                  color: AppColors.textSecondary(context),
-                ),
-              ),
-            ],
-          ],
+        return const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
         );
       }
-      return ElevatedButton(
+      return OutlinedButton.icon(
         onPressed: widget.isLoading ? null : _downloadModel,
-        child: const Text('Download'),
+        icon: const Icon(Icons.download, size: 16),
+        label: const Text('Get'),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.mediumLarge,
+            vertical: AppSpacing.small,
+          ),
+        ),
       );
     }
 
-    if (widget.model.localPath != null) {
-      return ElevatedButton(
-        onPressed:
-            widget.isLoading || widget.isSelected ? null : widget.onSelectModel,
-        child: const Text('Select'),
-      );
-    }
-
-    return const SizedBox.shrink();
+    // Model is downloaded - ready to use
+    return ElevatedButton(
+      onPressed:
+          widget.isLoading || widget.isSelected ? null : widget.onSelectModel,
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.mediumLarge,
+          vertical: AppSpacing.small,
+        ),
+      ),
+      child: const Text('Use'),
+    );
   }
 
   Future<void> _downloadModel() async {
