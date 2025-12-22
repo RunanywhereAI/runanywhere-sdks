@@ -14,7 +14,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
-import { RootTabParamList } from '../types';
+import type { RootTabParamList } from '../types';
 
 // Screens
 import ChatScreen from '../screens/ChatScreen';
@@ -28,21 +28,25 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 /**
  * Tab icon mapping - matching Swift sample app (ContentView.swift)
  */
-const tabIcons: Record<keyof RootTabParamList, { focused: string; unfocused: string }> = {
+const tabIcons: Record<
+  keyof RootTabParamList,
+  { focused: string; unfocused: string }
+> = {
   Chat: { focused: 'chatbubble', unfocused: 'chatbubble-outline' },
-  STT: { focused: 'pulse', unfocused: 'pulse-outline' },  // waveform equivalent
-  TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' },  // speaker.wave.2
-  Voice: { focused: 'mic', unfocused: 'mic-outline' },  // mic for voice assistant
+  STT: { focused: 'pulse', unfocused: 'pulse-outline' }, // waveform equivalent
+  TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' }, // speaker.wave.2
+  Voice: { focused: 'mic', unfocused: 'mic-outline' }, // mic for voice assistant
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
 
 /**
- * Tab display names - matching Swift sample app
+ * Tab display names - matching iOS Swift sample app (ContentView.swift)
+ * iOS uses: Chat, Transcribe, Speak, Voice, Settings
  */
 const tabLabels: Record<keyof RootTabParamList, string> = {
   Chat: 'Chat',
-  STT: 'STT',
-  TTS: 'TTS',
+  STT: 'Transcribe',
+  TTS: 'Speak',
   Voice: 'Voice',
   Settings: 'Settings',
 };

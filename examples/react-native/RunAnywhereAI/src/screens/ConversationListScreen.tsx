@@ -25,7 +25,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius, IconSize } from '../theme/spacing';
-import { Conversation } from '../types/chat';
+import type { Conversation } from '../types/chat';
 import {
   useConversationStore,
   getConversationSummary,

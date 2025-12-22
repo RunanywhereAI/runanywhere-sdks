@@ -7,16 +7,17 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
-import { Spacing, BorderRadius, Padding, IconSize, ButtonHeight } from '../../theme/spacing';
+import {
+  Spacing,
+  BorderRadius,
+  Padding,
+  IconSize,
+  ButtonHeight,
+} from '../../theme/spacing';
 import { ModelModality } from '../../types/model';
 
 interface ModelRequiredOverlayProps {
@@ -99,7 +100,11 @@ export const ModelRequiredOverlay: React.FC<ModelRequiredOverlayProps> = ({
       <View style={styles.content}>
         {/* Icon */}
         <View style={styles.iconContainer}>
-          <Icon name={iconName} size={IconSize.xLarge} color={Colors.textSecondary} />
+          <Icon
+            name={iconName}
+            size={IconSize.xLarge}
+            color={Colors.textSecondary}
+          />
         </View>
 
         {/* Title */}

@@ -14,7 +14,6 @@
  * - Real-time conversation display
  * - Model status indicators for each stage
  * - Audio level visualization
- * - Experimental/demo mode support
  *
  * Architecture:
  * - Orchestrates STT, LLM, and TTS capabilities
@@ -39,12 +38,20 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
-import { ModelSelectionSheet, ModelSelectionContext } from '../components/model';
-import { ModelInfo, LLMFramework } from '../types/model';
-import { VoicePipelineStatus, VoiceConversationEntry } from '../types/voice';
+import {
+  ModelSelectionSheet,
+  ModelSelectionContext,
+} from '../components/model';
+import type { ModelInfo } from '../types/model';
+import { LLMFramework } from '../types/model';
+import type { VoiceConversationEntry } from '../types/voice';
+import { VoicePipelineStatus } from '../types/voice';
 
 // Import actual RunAnywhere SDK
-import { RunAnywhere, type ModelInfo as SDKModelInfo } from 'runanywhere-react-native';
+import {
+  RunAnywhere,
+  type ModelInfo as SDKModelInfo,
+} from 'runanywhere-react-native';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -54,21 +61,26 @@ export const VoiceAssistantScreen: React.FC = () => {
   const [sttModel, setSTTModel] = useState<ModelInfo | null>(null);
   const [llmModel, setLLMModel] = useState<ModelInfo | null>(null);
   const [ttsModel, setTTSModel] = useState<ModelInfo | null>(null);
-  const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
-  const [demoMode, setDemoMode] = useState(false);
+  const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
 
   // Pipeline state
-  const [status, setStatus] = useState<VoicePipelineStatus>(VoicePipelineStatus.Idle);
-  const [conversation, setConversation] = useState<VoiceConversationEntry[]>([]);
+  const [status, setStatus] = useState<VoicePipelineStatus>(
+    VoicePipelineStatus.Idle
+  );
+  const [conversation, setConversation] = useState<VoiceConversationEntry[]>(
+    []
+  );
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [showModelInfo, setShowModelInfo] = useState(true);
   const [showModelSelection, setShowModelSelection] = useState(false);
-  const [modelSelectionType, setModelSelectionType] = useState<'stt' | 'llm' | 'tts'>('stt');
+  const [modelSelectionType, setModelSelectionType] = useState<
+    'stt' | 'llm' | 'tts'
+  >('stt');
 
-  // Check if all models are loaded (or demo mode is enabled)
-  const allModelsLoaded = demoMode || (sttModel && llmModel && ttsModel);
+  // Check if all models are loaded
+  const allModelsLoaded = sttModel && llmModel && ttsModel;
 
   // Check model status on mount
   useEffect(() => {
@@ -83,7 +95,12 @@ export const VoiceAssistantScreen: React.FC = () => {
     try {
       const models = await RunAnywhere.getAvailableModels();
       setAvailableModels(models);
-      console.log('[VoiceAssistant] Available models:', models.map(m => `${m.id}(${m.isDownloaded ? 'downloaded' : 'not downloaded'})`));
+      console.log(
+        '[VoiceAssistant] Available models:',
+        models.map(
+          (m) => `${m.id}(${m.isDownloaded ? 'downloaded' : 'not downloaded'})`
+        )
+      );
     } catch (error) {
       console.log('[VoiceAssistant] Error loading models:', error);
     }
@@ -98,30 +115,36 @@ export const VoiceAssistantScreen: React.FC = () => {
       const llmLoaded = await RunAnywhere.isTextModelLoaded();
       const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
 
-      console.log('[VoiceAssistant] Model status - STT:', sttLoaded, 'LLM:', llmLoaded, 'TTS:', ttsLoaded);
+      console.log(
+        '[VoiceAssistant] Model status - STT:',
+        sttLoaded,
+        'LLM:',
+        llmLoaded,
+        'TTS:',
+        ttsLoaded
+      );
 
       if (sttLoaded) {
-        setSTTModel({ id: 'stt-loaded', name: 'STT Model (Loaded)' } as ModelInfo);
+        setSTTModel({
+          id: 'stt-loaded',
+          name: 'STT Model (Loaded)',
+        } as ModelInfo);
       }
       if (llmLoaded) {
-        setLLMModel({ id: 'llm-loaded', name: 'LLM Model (Loaded)' } as ModelInfo);
+        setLLMModel({
+          id: 'llm-loaded',
+          name: 'LLM Model (Loaded)',
+        } as ModelInfo);
       }
       if (ttsLoaded) {
-        setTTSModel({ id: 'tts-loaded', name: 'TTS Model (Loaded)' } as ModelInfo);
+        setTTSModel({
+          id: 'tts-loaded',
+          name: 'TTS Model (Loaded)',
+        } as ModelInfo);
       }
     } catch (error) {
       console.log('[VoiceAssistant] Error checking model status:', error);
     }
-  };
-
-  /**
-   * Enable demo mode for testing the UI
-   */
-  const enableDemoMode = () => {
-    setDemoMode(true);
-    setSTTModel({ id: 'demo-stt', name: 'Demo STT' } as ModelInfo);
-    setLLMModel({ id: 'demo-llm', name: 'Demo LLM' } as ModelInfo);
-    setTTSModel({ id: 'demo-tts', name: 'Demo TTS' } as ModelInfo);
   };
 
   /**
@@ -135,7 +158,9 @@ export const VoiceAssistantScreen: React.FC = () => {
   /**
    * Get context for model selection
    */
-  const getSelectionContext = (type: 'stt' | 'llm' | 'tts'): ModelSelectionContext => {
+  const getSelectionContext = (
+    type: 'stt' | 'llm' | 'tts'
+  ): ModelSelectionContext => {
     switch (type) {
       case 'stt':
         return ModelSelectionContext.STT;
@@ -149,55 +174,70 @@ export const VoiceAssistantScreen: React.FC = () => {
   /**
    * Handle model selected from the sheet
    */
-  const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
-    // Close the modal first to prevent UI issues
-    setShowModelSelection(false);
+  const handleModelSelected = useCallback(
+    async (model: SDKModelInfo) => {
+      // Close the modal first to prevent UI issues
+      setShowModelSelection(false);
 
-    try {
-      console.log(`[VoiceAssistant] Loading ${modelSelectionType} model:`, model.id, model.localPath);
+      try {
+        console.log(
+          `[VoiceAssistant] Loading ${modelSelectionType} model:`,
+          model.id,
+          model.localPath
+        );
 
-      switch (modelSelectionType) {
-        case 'stt':
-          if (model.localPath) {
-            const sttSuccess = await RunAnywhere.loadSTTModel(model.localPath, model.category || 'whisper');
-            if (sttSuccess) {
-              setSTTModel({
-                id: model.id,
-                name: model.name,
-                preferredFramework: LLMFramework.ONNX,
-              } as ModelInfo);
+        switch (modelSelectionType) {
+          case 'stt':
+            if (model.localPath) {
+              const sttSuccess = await RunAnywhere.loadSTTModel(
+                model.localPath,
+                model.category || 'whisper'
+              );
+              if (sttSuccess) {
+                setSTTModel({
+                  id: model.id,
+                  name: model.name,
+                  preferredFramework: LLMFramework.ONNX,
+                } as ModelInfo);
+              }
             }
-          }
-          break;
-        case 'llm':
-          if (model.localPath) {
-            const llmSuccess = await RunAnywhere.loadTextModel(model.localPath);
-            if (llmSuccess) {
-              setLLMModel({
-                id: model.id,
-                name: model.name,
-                preferredFramework: LLMFramework.LlamaCpp,
-              } as ModelInfo);
+            break;
+          case 'llm':
+            if (model.localPath) {
+              const llmSuccess = await RunAnywhere.loadTextModel(
+                model.localPath
+              );
+              if (llmSuccess) {
+                setLLMModel({
+                  id: model.id,
+                  name: model.name,
+                  preferredFramework: LLMFramework.LlamaCpp,
+                } as ModelInfo);
+              }
             }
-          }
-          break;
-        case 'tts':
-          if (model.localPath) {
-            const ttsSuccess = await RunAnywhere.loadTTSModel(model.localPath, model.category || 'piper');
-            if (ttsSuccess) {
-              setTTSModel({
-                id: model.id,
-                name: model.name,
-                preferredFramework: LLMFramework.PiperTTS,
-              } as ModelInfo);
+            break;
+          case 'tts':
+            if (model.localPath) {
+              const ttsSuccess = await RunAnywhere.loadTTSModel(
+                model.localPath,
+                model.category || 'piper'
+              );
+              if (ttsSuccess) {
+                setTTSModel({
+                  id: model.id,
+                  name: model.name,
+                  preferredFramework: LLMFramework.PiperTTS,
+                } as ModelInfo);
+              }
             }
-          }
-          break;
+            break;
+        }
+      } catch (error) {
+        Alert.alert('Error', `Failed to load model: ${error}`);
       }
-    } catch (error) {
-      Alert.alert('Error', `Failed to load model: ${error}`);
-    }
-  }, [modelSelectionType]);
+    },
+    [modelSelectionType]
+  );
 
   /**
    * Start/stop recording
@@ -230,27 +270,16 @@ export const VoiceAssistantScreen: React.FC = () => {
 
         let responseText: string;
 
-        if (demoMode) {
-          // Simulate LLM response in demo mode
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          const demoResponses = [
-            "Hello! I'm the demo voice assistant. The full pipeline requires STT, LLM, and TTS models to be downloaded and loaded.",
-            "In demo mode, I provide simulated responses. Download models from the Settings tab for real AI responses!",
-            "The RunAnywhere SDK supports on-device STT, LLM, and TTS. This demo shows the pipeline flow.",
-          ];
-          responseText = demoResponses[conversation.length % demoResponses.length] || demoResponses[0]!;
-        } else {
-          // Try real LLM generation
-          try {
-            const result = await RunAnywhere.generate(mockUserText, {
-              maxTokens: 500,
-              temperature: 0.7,
-            });
-            responseText = result.text || '(No response generated)';
-          } catch (err) {
-            console.error('[VoiceAssistant] LLM error:', err);
-            responseText = `Error generating response: ${err}`;
-          }
+        // Use SDK for LLM generation
+        try {
+          const result = await RunAnywhere.generate(mockUserText, {
+            maxTokens: 500,
+            temperature: 0.7,
+          });
+          responseText = result.text || '(No response generated)';
+        } catch (err) {
+          console.error('[VoiceAssistant] LLM error:', err);
+          responseText = `Error generating response: ${err}`;
         }
 
         const assistantEntry: VoiceConversationEntry = {
@@ -284,20 +313,16 @@ export const VoiceAssistantScreen: React.FC = () => {
       if (!allModelsLoaded) {
         Alert.alert(
           'Models Required',
-          'Please load all required models first, or enable Demo Mode.',
-          [
-            { text: 'Enable Demo Mode', onPress: enableDemoMode },
-            { text: 'Cancel', style: 'cancel' },
-          ]
+          'Please load all required models (STT, LLM, TTS) to use the voice assistant.'
         );
         return;
       }
       setIsRecording(true);
       setStatus(VoicePipelineStatus.Listening);
 
-      // In demo mode, use placeholder transcript
-      // In real mode, audio recording would populate this
-      setCurrentTranscript('Hello, how can you help me today?');
+      // TODO: Implement actual audio recording using react-native-audio-recorder-player
+      // For now, this is a placeholder that would be populated by real STT transcription
+      setCurrentTranscript('');
 
       // Start duration timer
       let duration = 0;
@@ -306,15 +331,12 @@ export const VoiceAssistantScreen: React.FC = () => {
         setRecordingDuration(duration);
       }, 1000);
 
-      // Auto-stop after 10 seconds in demo mode
+      // Auto-stop after 30 seconds
       setTimeout(() => {
         clearInterval(timerRef);
-        if (demoMode) {
-          // Will trigger processing in demo mode
-        }
-      }, 10000);
+      }, 30000);
     }
-  }, [isRecording, allModelsLoaded, currentTranscript, demoMode, conversation.length]);
+  }, [isRecording, allModelsLoaded, currentTranscript]);
 
   /**
    * Clear conversation
@@ -334,7 +356,10 @@ export const VoiceAssistantScreen: React.FC = () => {
     onPress: () => void
   ) => (
     <TouchableOpacity
-      style={[styles.modelBadge, { borderColor: model ? color : Colors.borderLight }]}
+      style={[
+        styles.modelBadge,
+        { borderColor: model ? color : Colors.borderLight },
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -361,10 +386,22 @@ export const VoiceAssistantScreen: React.FC = () => {
   const renderStatusIndicator = () => {
     const statusConfig = {
       [VoicePipelineStatus.Idle]: { color: Colors.statusGray, text: 'Ready' },
-      [VoicePipelineStatus.Listening]: { color: Colors.statusGreen, text: 'Listening...' },
-      [VoicePipelineStatus.Processing]: { color: Colors.statusOrange, text: 'Processing...' },
-      [VoicePipelineStatus.Thinking]: { color: Colors.primaryBlue, text: 'Thinking...' },
-      [VoicePipelineStatus.Speaking]: { color: Colors.primaryPurple, text: 'Speaking...' },
+      [VoicePipelineStatus.Listening]: {
+        color: Colors.statusGreen,
+        text: 'Listening...',
+      },
+      [VoicePipelineStatus.Processing]: {
+        color: Colors.statusOrange,
+        text: 'Processing...',
+      },
+      [VoicePipelineStatus.Thinking]: {
+        color: Colors.primaryBlue,
+        text: 'Thinking...',
+      },
+      [VoicePipelineStatus.Speaking]: {
+        color: Colors.primaryPurple,
+        text: 'Speaking...',
+      },
       [VoicePipelineStatus.Error]: { color: Colors.statusRed, text: 'Error' },
     };
 
@@ -373,7 +410,9 @@ export const VoiceAssistantScreen: React.FC = () => {
     return (
       <View style={styles.statusContainer}>
         <View style={[styles.statusDot, { backgroundColor: config.color }]} />
-        <Text style={[styles.statusText, { color: config.color }]}>{config.text}</Text>
+        <Text style={[styles.statusText, { color: config.color }]}>
+          {config.text}
+        </Text>
       </View>
     );
   };
@@ -453,7 +492,11 @@ export const VoiceAssistantScreen: React.FC = () => {
               onPress={() => setShowModelInfo(!showModelInfo)}
             >
               <Icon
-                name={showModelInfo ? 'information-circle' : 'information-circle-outline'}
+                name={
+                  showModelInfo
+                    ? 'information-circle'
+                    : 'information-circle-outline'
+                }
                 size={24}
                 color={Colors.primaryBlue}
               />
@@ -509,7 +552,11 @@ export const VoiceAssistantScreen: React.FC = () => {
           >
             {conversation.length === 0 ? (
               <View style={styles.emptyConversation}>
-                <Icon name="mic-outline" size={40} color={Colors.textTertiary} />
+                <Icon
+                  name="mic-outline"
+                  size={40}
+                  color={Colors.textTertiary}
+                />
                 <Text style={styles.emptyText}>
                   Tap the microphone to start a conversation
                 </Text>
@@ -520,7 +567,13 @@ export const VoiceAssistantScreen: React.FC = () => {
 
             {/* Current transcript (while recording) */}
             {isRecording && currentTranscript && (
-              <View style={[styles.conversationBubble, styles.userBubble, styles.transcriptBubble]}>
+              <View
+                style={[
+                  styles.conversationBubble,
+                  styles.userBubble,
+                  styles.transcriptBubble,
+                ]}
+              >
                 <Text style={styles.speakerLabel}>You</Text>
                 <Text style={styles.bubbleText}>{currentTranscript}</Text>
               </View>
@@ -531,7 +584,8 @@ export const VoiceAssistantScreen: React.FC = () => {
           <View style={styles.controlsContainer}>
             {isRecording && (
               <Text style={styles.recordingTime}>
-                {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                {Math.floor(recordingDuration / 60)}:
+                {(recordingDuration % 60).toString().padStart(2, '0')}
               </Text>
             )}
             <TouchableOpacity
