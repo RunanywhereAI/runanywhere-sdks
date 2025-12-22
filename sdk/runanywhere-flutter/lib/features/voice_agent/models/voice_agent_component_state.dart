@@ -87,6 +87,17 @@ class VoiceAgentComponentStates {
     return missing;
   }
 
+  // MARK: - Convenience Getters for Model Names
+
+  /// Get the STT model name if loaded, null otherwise
+  String? get sttModelName => stt.modelId;
+
+  /// Get the LLM model name if loaded, null otherwise
+  String? get llmModelName => llm.modelId;
+
+  /// Get the TTS voice/model name if loaded, null otherwise
+  String? get ttsModelName => tts.modelId;
+
   /// Create a copy with modified states
   VoiceAgentComponentStates copyWith({
     ComponentLoadState? stt,

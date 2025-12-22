@@ -110,10 +110,10 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         _llmModelState = _mapComponentLoadState(states.llm);
         _ttsModelState = _mapComponentLoadState(states.tts);
 
-        // Get model names from ComponentLoadState
-        _currentSTTModel = states.stt.modelId ?? 'Not loaded';
-        _currentLLMModel = states.llm.modelId ?? 'Not loaded';
-        _currentTTSModel = states.tts.modelId ?? 'Not loaded';
+        // Use convenience getters for model names
+        _currentSTTModel = states.sttModelName ?? 'Not loaded';
+        _currentLLMModel = states.llmModelName ?? 'Not loaded';
+        _currentTTSModel = states.ttsModelName ?? 'Not loaded';
       });
     } catch (e) {
       debugPrint('Failed to get component states: $e');
