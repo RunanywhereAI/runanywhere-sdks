@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/models/app_types.dart';
-import 'model_types.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// FrameworkRow (mirroring iOS FrameworkRow)
 ///

@@ -30,6 +30,33 @@ sealed class ModelArtifactType {
   /// Built-in model that doesn't require download
   const factory ModelArtifactType.builtIn() = BuiltInArtifact;
 
+  // ============================================================================
+  // Convenience Static Getters (match iOS pattern)
+  // ============================================================================
+
+  /// Convenience for tar.gz archive with nested directory structure.
+  /// Matches iOS `.tarGzArchive(structure: .nestedDirectory)`.
+  static const ModelArtifactType tarGzArchive = ArchiveArtifact(
+    ArchiveType.tarGz,
+    structure: ArchiveStructure.nested,
+  );
+
+  /// Convenience for tar.bz2 archive with nested directory structure.
+  /// Matches iOS `.tarBz2Archive(structure: .nestedDirectory)`.
+  static const ModelArtifactType tarBz2Archive = ArchiveArtifact(
+    ArchiveType.tarBz2,
+    structure: ArchiveStructure.nested,
+  );
+
+  /// Convenience for zip archive with nested directory structure.
+  static const ModelArtifactType zipArchive = ArchiveArtifact(
+    ArchiveType.zip,
+    structure: ArchiveStructure.nested,
+  );
+
+  /// Convenience for single file artifact.
+  static const ModelArtifactType singleFileType = SingleFileArtifact();
+
   /// JSON serialization
   Map<String, dynamic> toJson();
 

@@ -91,9 +91,7 @@ mixin DefaultModelStorageStrategy implements ModelStorageStrategy {
   }
 
   @override
-  (ModelFormat format, int size)? ModelFormat@override
-  ? @override
-  dynamic detectModel(Directory modelFolder) {
+  (ModelFormat, int)? detectModel(Directory modelFolder) {
     if (!modelFolder.existsSync()) return null;
 
     try {

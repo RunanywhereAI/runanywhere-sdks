@@ -1,14 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere/backends/llamacpp/llamacpp.dart';
 import 'package:runanywhere/backends/onnx/onnx.dart';
-
-import '../core/design_system/app_colors.dart';
-import '../core/design_system/app_spacing.dart';
-import '../core/services/model_manager.dart';
-import 'content_view.dart';
+import 'package:runanywhere/runanywhere.dart';
+import 'package:runanywhere_ai/app/content_view.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/services/model_manager.dart';
 
 /// RunAnywhereAIApp (mirroring iOS RunAnywhereAIApp.swift)
 ///
@@ -28,7 +29,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   @override
   void initState() {
     super.initState();
-    _initializeSDK();
+    unawaited(_initializeSDK());
   }
 
   Future<void> _initializeSDK() async {
@@ -41,48 +42,37 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
       debugPrint('🎯 Initializing SDK...');
 
-      // Determine environment based on build configuration
-      const environment =
-          kDebugMode ? SDKEnvironment.development : SDKEnvironment.production;
-
+      // Initialize SDK based on build configuration
+      // Matches iOS pattern exactly
       if (kDebugMode) {
-        debugPrint('🛠️ Using DEVELOPMENT mode - No API key required!');
-
-        // Development mode initialization
-        await RunAnywhere.initialize(
-          apiKey: 'dev',
-          baseURL: 'http://localhost',
-          environment: environment,
-        );
-
+        // Development mode - uses Supabase, no API key needed
+        await RunAnywhere.initialize();
         debugPrint('✅ SDK initialized in DEVELOPMENT mode');
-
-        // Register adapters with models for development
-        await _registerAdaptersForDevelopment();
       } else {
-        debugPrint('🚀 Using PRODUCTION mode');
-
-        // Production mode initialization
+        // Production mode - requires API key and backend URL
         // TODO: Load actual API key from secure storage
+        const apiKey = 'prod_api_key';
+        const baseURL = 'https://api.runanywhere.ai';
+
         await RunAnywhere.initialize(
-          apiKey: 'production_key',
-          baseURL: 'https://api.runanywhere.ai',
-          environment: environment,
+          apiKey: apiKey,
+          baseURL: baseURL,
+          environment: SDKEnvironment.production,
         );
-
         debugPrint('✅ SDK initialized in PRODUCTION mode');
-
-        // Register adapters with models for production
-        await _registerAdaptersForProduction();
       }
+
+      // Register modules and models (matching iOS pattern)
+      await _registerModulesAndModels();
 
       stopwatch.stop();
       debugPrint(
           '⚡ SDK initialization completed in ${stopwatch.elapsedMilliseconds}ms');
       debugPrint(
-          '🎯 SDK Status: ${RunAnywhere.isActive() ? "Active" : "Inactive"}');
+          '🎯 SDK Status: ${RunAnywhere.isActive ? "Active" : "Inactive"}');
       debugPrint(
           '🔧 Environment: ${RunAnywhere.getCurrentEnvironment()?.description ?? "Unknown"}');
+      debugPrint('📱 Services will initialize on first API call');
 
       // Refresh model manager state
       await ModelManager.shared.refresh();
@@ -90,6 +80,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       setState(() {
         _isSDKInitialized = true;
       });
+
+      debugPrint('💡 Models registered, user can now download and select models');
     } catch (e) {
       stopwatch.stop();
       debugPrint(
@@ -100,260 +92,106 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
   }
 
-  /// Register adapters with custom models for development mode
-  /// Matches iOS registerAdaptersForDevelopment pattern exactly
-  Future<void> _registerAdaptersForDevelopment() async {
-    debugPrint(
-        '📦 Registering adapters with custom models for DEVELOPMENT mode');
+  /// Register modules with their associated models
+  /// Each module explicitly owns its models - the framework is determined by the module
+  /// Matches iOS registerModulesAndModels pattern exactly
+  Future<void> _registerModulesAndModels() async {
+    debugPrint('📦 Registering modules with their models...');
 
-    // Register LlamaCPP adapter with LLM models
-    // Matches iOS registerAdaptersForDevelopment pattern
-    await RunAnywhere.registerFramework(
-      LlamaCppAdapter(),
-      models: [
-        // LLM Models (matching iOS exactly)
-        ModelRegistration(
-          url:
-              'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'smollm2-360m-q8-0',
-          name: 'SmolLM2 360M Q8_0',
-          memoryRequirement: 500000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'llama2-7b-q4-k-m',
-          name: 'Llama 2 7B Chat Q4_K_M',
-          memoryRequirement: 4000000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'mistral-7b-q4-k-m',
-          name: 'Mistral 7B Instruct Q4_K_M',
-          memoryRequirement: 4000000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'qwen-2.5-0.5b-instruct-q6-k',
-          name: 'Qwen 2.5 0.5B Instruct Q6_K',
-          memoryRequirement: 600000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'lfm2-350m-q4-k-m',
-          name: 'LiquidAI LFM2 350M Q4_K_M',
-          memoryRequirement: 250000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'lfm2-350m-q8-0',
-          name: 'LiquidAI LFM2 350M Q8_0',
-          memoryRequirement: 400000000,
-        ),
-      ],
+    // LlamaCPP module with LLM models
+    // Using explicit IDs ensures models are recognized after download across app restarts
+    await LlamaCpp.register();
+    LlamaCpp.addModel(
+      id: 'smollm2-360m-q8_0',
+      name: 'SmolLM2 360M Q8_0',
+      url:
+          'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+      memoryRequirement: 500000000,
     );
-    debugPrint('✅ LlamaCPP adapter registered with LLM models');
-
-    // Register ONNX Runtime adapter with STT and TTS models
-    // Matches iOS registerAdaptersForDevelopment pattern
-    await RunAnywhere.registerFramework(
-      OnnxAdapter(),
-      models: [
-        // STT Models (matching iOS exactly)
-        ModelRegistration(
-          url:
-              'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2',
-          framework: LLMFramework.onnx,
-          modality: FrameworkModality.voiceToText,
-          id: 'sherpa-whisper-tiny-onnx',
-          name: 'Sherpa Whisper Tiny (ONNX)',
-          format: ModelFormat.onnx,
-          memoryRequirement: 75000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2',
-          framework: LLMFramework.onnx,
-          modality: FrameworkModality.voiceToText,
-          id: 'sherpa-whisper-small-onnx',
-          name: 'Sherpa Whisper Small (ONNX)',
-          format: ModelFormat.onnx,
-          memoryRequirement: 250000000,
-        ),
-        // TTS Models (matching iOS exactly)
-        ModelRegistration(
-          url:
-              'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2',
-          framework: LLMFramework.onnx,
-          modality: FrameworkModality.textToVoice,
-          id: 'piper-en-us-lessac-medium',
-          name: 'Piper TTS (US English - Medium)',
-          format: ModelFormat.onnx,
-          memoryRequirement: 65000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2',
-          framework: LLMFramework.onnx,
-          modality: FrameworkModality.textToVoice,
-          id: 'piper-en-gb-alba-medium',
-          name: 'Piper TTS (British English)',
-          format: ModelFormat.onnx,
-          memoryRequirement: 65000000,
-        ),
-      ],
+    LlamaCpp.addModel(
+      id: 'llama-2-7b-chat-q4_k_m',
+      name: 'Llama 2 7B Chat Q4_K_M',
+      url:
+          'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
+      memoryRequirement: 4000000000,
     );
-    debugPrint('✅ ONNX Runtime adapter registered with STT and TTS models');
-
-    debugPrint('🎉 All adapters registered for development');
-
-    // Refresh all models to detect downloaded files from previous sessions
-    await RunAnywhere.serviceContainer.modelRegistry.refreshDownloadedModels();
-    debugPrint('✅ Refreshed model download status');
-  }
-
-  /// Register adapters with custom models for production mode
-  /// Matches iOS registerAdaptersForProduction pattern exactly
-  Future<void> _registerAdaptersForProduction() async {
-    debugPrint(
-        '📦 Registering adapters with custom models for PRODUCTION mode');
-    debugPrint(
-        '💡 Hardcoded models provide immediate user access, backend can add more dynamically');
-
-    // Register LlamaCPP adapter with LLM models (same as development)
-    await RunAnywhere.registerFramework(
-      LlamaCppAdapter(),
-      models: [
-        ModelRegistration(
-          url:
-              'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'smollm2-360m-q8-0',
-          name: 'SmolLM2 360M Q8_0',
-          memoryRequirement: 500000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'llama2-7b-q4-k-m',
-          name: 'Llama 2 7B Chat Q4_K_M',
-          memoryRequirement: 4000000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'mistral-7b-q4-k-m',
-          name: 'Mistral 7B Instruct Q4_K_M',
-          memoryRequirement: 4000000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'qwen-2.5-0.5b-instruct-q6-k',
-          name: 'Qwen 2.5 0.5B Instruct Q6_K',
-          memoryRequirement: 600000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'lfm2-350m-q4-k-m',
-          name: 'LiquidAI LFM2 350M Q4_K_M',
-          memoryRequirement: 250000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
-          framework: LLMFramework.llamaCpp,
-          modality: FrameworkModality.textToText,
-          id: 'lfm2-350m-q8-0',
-          name: 'LiquidAI LFM2 350M Q8_0',
-          memoryRequirement: 400000000,
-        ),
-      ],
+    LlamaCpp.addModel(
+      id: 'mistral-7b-instruct-q4_k_m',
+      name: 'Mistral 7B Instruct Q4_K_M',
+      url:
+          'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
+      memoryRequirement: 4000000000,
     );
-    debugPrint('✅ LlamaCPP adapter registered with hardcoded LLM models');
-
-    // Register ONNX Runtime adapter with STT and TTS models
-    await RunAnywhere.registerFramework(
-      OnnxAdapter(),
-      models: [
-        ModelRegistration(
-          url:
-              'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2',
-          framework: LLMFramework.onnx,
-          modality: FrameworkModality.voiceToText,
-          id: 'sherpa-whisper-tiny-onnx',
-          name: 'Sherpa Whisper Tiny (ONNX)',
-          format: ModelFormat.onnx,
-          memoryRequirement: 75000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2',
-          framework: LLMFramework.onnx,
-          modality: FrameworkModality.voiceToText,
-          id: 'sherpa-whisper-small-onnx',
-          name: 'Sherpa Whisper Small (ONNX)',
-          format: ModelFormat.onnx,
-          memoryRequirement: 250000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2',
-          framework: LLMFramework.onnx,
-          modality: FrameworkModality.textToVoice,
-          id: 'piper-en-us-lessac-medium',
-          name: 'Piper TTS (US English - Medium)',
-          format: ModelFormat.onnx,
-          memoryRequirement: 65000000,
-        ),
-        ModelRegistration(
-          url:
-              'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2',
-          framework: LLMFramework.onnx,
-          modality: FrameworkModality.textToVoice,
-          id: 'piper-en-gb-alba-medium',
-          name: 'Piper TTS (British English)',
-          format: ModelFormat.onnx,
-          memoryRequirement: 65000000,
-        ),
-      ],
+    LlamaCpp.addModel(
+      id: 'qwen2.5-0.5b-instruct-q6_k',
+      name: 'Qwen 2.5 0.5B Instruct Q6_K',
+      url:
+          'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
+      memoryRequirement: 600000000,
     );
-    debugPrint(
-        '✅ ONNX Runtime adapter registered with hardcoded STT and TTS models');
+    LlamaCpp.addModel(
+      id: 'lfm2-350m-q4_k_m',
+      name: 'LiquidAI LFM2 350M Q4_K_M',
+      url:
+          'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
+      memoryRequirement: 250000000,
+    );
+    LlamaCpp.addModel(
+      id: 'lfm2-350m-q8_0',
+      name: 'LiquidAI LFM2 350M Q8_0',
+      url:
+          'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
+      memoryRequirement: 400000000,
+    );
+    debugPrint('✅ LlamaCPP module registered with LLM models');
 
-    debugPrint(
-        '🎉 All adapters registered for production with hardcoded models');
-    debugPrint('📡 Backend can dynamically add more models via console API');
+    // ONNX module with STT and TTS models
+    // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
+    // Using explicit IDs ensures models are recognized after download across app restarts
+    await Onnx.register();
 
-    // Refresh all models to detect downloaded files from previous sessions
-    await RunAnywhere.serviceContainer.modelRegistry.refreshDownloadedModels();
-    debugPrint('✅ Refreshed model download status');
+    // STT Models (Sherpa-ONNX Whisper)
+    Onnx.addModel(
+      id: 'sherpa-onnx-whisper-tiny.en',
+      name: 'Sherpa Whisper Tiny (ONNX)',
+      url:
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+      modality: ModelCategory.speechRecognition,
+      artifactType: ModelArtifactType.tarGzArchive,
+      memoryRequirement: 75000000,
+    );
+    Onnx.addModel(
+      id: 'sherpa-onnx-whisper-small.en',
+      name: 'Sherpa Whisper Small (ONNX)',
+      url:
+          'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2',
+      modality: ModelCategory.speechRecognition,
+      artifactType: ModelArtifactType.tarBz2Archive,
+      memoryRequirement: 250000000,
+    );
+
+    // TTS Models (Piper VITS)
+    Onnx.addModel(
+      id: 'vits-piper-en_US-lessac-medium',
+      name: 'Piper TTS (US English - Medium)',
+      url:
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+      modality: ModelCategory.speechSynthesis,
+      artifactType: ModelArtifactType.tarGzArchive,
+      memoryRequirement: 65000000,
+    );
+    Onnx.addModel(
+      id: 'vits-piper-en_GB-alba-medium',
+      name: 'Piper TTS (British English)',
+      url:
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
+      modality: ModelCategory.speechSynthesis,
+      artifactType: ModelArtifactType.tarGzArchive,
+      memoryRequirement: 65000000,
+    );
+    debugPrint('✅ ONNX module registered with STT/TTS models');
+
+    debugPrint('🎉 All modules and models registered');
   }
 
   @override
@@ -404,13 +242,16 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     } else if (_initializationError != null) {
       return _InitializationErrorView(
         error: _initializationError!,
-        onRetry: _initializeSDK,
+        onRetry: () => unawaited(_initializeSDK()),
       );
     } else {
       return _InitializationLoadingView(status: _initializationStatus);
     }
   }
 }
+
+/// Helper to explicitly ignore a Future (avoid discarded_futures warning)
+void unawaited(Future<void>? future) {}
 
 /// Loading view shown during SDK initialization
 class _InitializationLoadingView extends StatefulWidget {
@@ -434,7 +275,8 @@ class _InitializationLoadingViewState extends State<_InitializationLoadingView>
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
-    )..repeat(reverse: true);
+    );
+    unawaited(_controller.repeat(reverse: true));
 
     _scaleAnimation = Tween<double>(begin: 0.9, end: 1.1).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),

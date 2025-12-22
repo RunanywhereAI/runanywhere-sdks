@@ -1,18 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import 'package:runanywhere/runanywhere.dart' hide LLMFramework;
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/services/conversation_store.dart';
+import 'package:runanywhere_ai/core/services/model_manager.dart';
+import 'package:runanywhere_ai/core/utilities/constants.dart';
+import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
+import 'package:runanywhere_ai/features/models/model_status_components.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/services/conversation_store.dart';
-import '../../core/services/model_manager.dart';
-import '../../core/utilities/constants.dart';
-import '../models/model_selection_sheet.dart';
-import '../models/model_status_components.dart';
-import '../models/model_types.dart';
 
 /// ChatInterfaceView (mirroring iOS ChatInterfaceView.swift)
 ///
@@ -49,7 +50,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    unawaited(_loadSettings());
   }
 
   @override
@@ -101,8 +102,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       final prefs = await SharedPreferences.getInstance();
       final temperature =
           prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
-      final maxTokens =
-          prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
+      final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
 
       final options = RunAnywhereGenerationOptions(
         maxTokens: maxTokens,
@@ -153,13 +153,13 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
       await for (final token in stream) {
         if (_timeToFirstToken == null && _generationStartTime != null) {
-          _timeToFirstToken = DateTime.now()
-                  .difference(_generationStartTime!)
-                  .inMilliseconds /
-              1000.0;
+          _timeToFirstToken =
+              DateTime.now().difference(_generationStartTime!).inMilliseconds /
+                  1000.0;
         }
 
         _tokenCount++;
+        // ignore: use_string_buffers, simpler for streaming UI updates
         _currentStreamingContent += token;
 
         setState(() {
@@ -248,11 +248,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
+        unawaited(_scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: AppLayout.animationFast,
           curve: Curves.easeOut,
-        );
+        ));
       }
     });
   }
@@ -317,18 +317,18 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   }
 
   void _showModelSelectionSheet() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (sheetContext) => ModelSelectionSheet(
         context: ModelSelectionContext.llm,
         onModelSelected: (model) async {
-          // TODO: Load model via RunAnywhere SDK
-          // await context.read<ModelManager>().loadModel(model.id);
+          // Model is loaded by ModelSelectionSheet via SDK
+          // UI will update via ModelManager listener
         },
       ),
-    );
+    ));
   }
 
   Widget _buildModelStatusBanner(ModelManager modelManager) {
@@ -570,7 +570,8 @@ class _MessageBubbleState extends State<_MessageBubble> {
                       )
                     : null,
                 color: isUser ? null : AppColors.backgroundGray5(context),
-                borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+                borderRadius:
+                    BorderRadius.circular(AppSpacing.cornerRadiusBubble),
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.shadowLight,
@@ -649,7 +650,8 @@ class _MessageBubbleState extends State<_MessageBubble> {
               padding: const EdgeInsets.all(AppSpacing.mediumLarge),
               decoration: BoxDecoration(
                 color: AppColors.modelThinkingBg,
-                borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+                borderRadius:
+                    BorderRadius.circular(AppSpacing.cornerRadiusRegular),
               ),
               child: Text(
                 widget.message.thinkingContent!,
