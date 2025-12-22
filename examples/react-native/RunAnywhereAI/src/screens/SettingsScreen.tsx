@@ -35,13 +35,14 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import type { StorageInfo } from '../types/settings';
 import {
   RoutingPolicy,
   RoutingPolicyDisplayNames,
-  StorageInfo,
   SETTINGS_CONSTRAINTS,
 } from '../types/settings';
-import { StoredModel, LLMFramework, FrameworkDisplayNames } from '../types/model';
+import type { StoredModel } from '../types/model';
+import { FrameworkDisplayNames } from '../types/model';
 
 // Import actual RunAnywhere SDK
 import { RunAnywhere, type ModelInfo } from 'runanywhere-react-native';
@@ -68,29 +69,36 @@ const formatBytes = (bytes: number): string => {
 
 export const SettingsScreen: React.FC = () => {
   // Settings state
-  const [routingPolicy, setRoutingPolicy] = useState<RoutingPolicy>(RoutingPolicy.Automatic);
+  const [routingPolicy, setRoutingPolicy] = useState<RoutingPolicy>(
+    RoutingPolicy.Automatic
+  );
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(10000);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
 
   // Storage state
-  const [storageInfo, setStorageInfo] = useState<StorageInfo>(DEFAULT_STORAGE_INFO);
+  const [storageInfo, _setStorageInfo] =
+    useState<StorageInfo>(DEFAULT_STORAGE_INFO);
   const [storedModels, setStoredModels] = useState<StoredModel[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [_isRefreshing, setIsRefreshing] = useState(false);
   const [sdkVersion, setSdkVersion] = useState('0.1.0');
 
   // SDK State
   const [capabilities, setCapabilities] = useState<number[]>([]);
-  const [backendInfoData, setBackendInfoData] = useState<Record<string, unknown>>({});
+  const [backendInfoData, setBackendInfoData] = useState<
+    Record<string, unknown>
+  >({});
   const [isSTTLoaded, setIsSTTLoaded] = useState(false);
   const [isTTSLoaded, setIsTTSLoaded] = useState(false);
   const [isTextLoaded, setIsTextLoaded] = useState(false);
   const [isVADLoaded, setIsVADLoaded] = useState(false);
-  const [memoryUsage, setMemoryUsage] = useState(0);
+  const [_memoryUsage, _setMemoryUsage] = useState(0);
 
   // Model catalog state
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
-  const [downloadingModels, setDownloadingModels] = useState<Record<string, number>>({});
+  const [downloadingModels, setDownloadingModels] = useState<
+    Record<string, number>
+  >({});
   const [downloadedModels, setDownloadedModels] = useState<ModelInfo[]>([]);
 
   // Capability names mapping
@@ -138,7 +146,16 @@ export const SettingsScreen: React.FC = () => {
       setIsTextLoaded(textLoaded);
       setIsVADLoaded(vadLoaded);
 
-      console.log('[Settings] Models loaded - STT:', sttLoaded, 'TTS:', ttsLoaded, 'Text:', textLoaded, 'VAD:', vadLoaded);
+      console.log(
+        '[Settings] Models loaded - STT:',
+        sttLoaded,
+        'TTS:',
+        ttsLoaded,
+        'Text:',
+        textLoaded,
+        'VAD:',
+        vadLoaded
+      );
 
       // Get available models from catalog
       try {
@@ -157,7 +174,6 @@ export const SettingsScreen: React.FC = () => {
       } catch (err) {
         console.warn('[Settings] Failed to get downloaded models:', err);
       }
-
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -258,52 +274,60 @@ export const SettingsScreen: React.FC = () => {
   /**
    * Handle model download
    */
-  const handleDownloadModel = useCallback(async (model: ModelInfo) => {
-    if (downloadingModels[model.id] !== undefined) {
-      // Already downloading, cancel it
+  const handleDownloadModel = useCallback(
+    async (model: ModelInfo) => {
+      if (downloadingModels[model.id] !== undefined) {
+        // Already downloading, cancel it
+        try {
+          await RunAnywhere.cancelDownload(model.id);
+          setDownloadingModels((prev) => {
+            const updated = { ...prev };
+            delete updated[model.id];
+            return updated;
+          });
+        } catch (err) {
+          console.error('Failed to cancel download:', err);
+        }
+        return;
+      }
+
+      // Start download with progress tracking
+      setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
+
       try {
-        await RunAnywhere.cancelDownload(model.id);
+        await RunAnywhere.downloadModel(model.id, (progress) => {
+          console.log(
+            `[Settings] Download progress for ${model.id}: ${(progress.progress * 100).toFixed(1)}%`
+          );
+          setDownloadingModels((prev) => ({
+            ...prev,
+            [model.id]: progress.progress,
+          }));
+        });
+
+        // Download complete
         setDownloadingModels((prev) => {
           const updated = { ...prev };
           delete updated[model.id];
           return updated;
         });
+
+        Alert.alert('Success', `${model.name} downloaded successfully!`);
+        loadData(); // Refresh to show downloaded model
       } catch (err) {
-        console.error('Failed to cancel download:', err);
+        setDownloadingModels((prev) => {
+          const updated = { ...prev };
+          delete updated[model.id];
+          return updated;
+        });
+        Alert.alert(
+          'Download Failed',
+          `Failed to download ${model.name}: ${err}`
+        );
       }
-      return;
-    }
-
-    // Start download with progress tracking
-    setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
-
-    try {
-      await RunAnywhere.downloadModel(model.id, (progress) => {
-        console.log(`[Settings] Download progress for ${model.id}: ${(progress.progress * 100).toFixed(1)}%`);
-        setDownloadingModels((prev) => ({
-          ...prev,
-          [model.id]: progress.progress,
-        }));
-      });
-
-      // Download complete
-      setDownloadingModels((prev) => {
-        const updated = { ...prev };
-        delete updated[model.id];
-        return updated;
-      });
-
-      Alert.alert('Success', `${model.name} downloaded successfully!`);
-      loadData(); // Refresh to show downloaded model
-    } catch (err) {
-      setDownloadingModels((prev) => {
-        const updated = { ...prev };
-        delete updated[model.id];
-        return updated;
-      });
-      Alert.alert('Download Failed', `Failed to download ${model.name}: ${err}`);
-    }
-  }, [downloadingModels]);
+    },
+    [downloadingModels]
+  );
 
   /**
    * Handle delete downloaded model
@@ -445,16 +469,21 @@ export const SettingsScreen: React.FC = () => {
    * Render storage bar
    */
   const renderStorageBar = () => {
-    const usedPercent = (storageInfo.appStorage / storageInfo.totalStorage) * 100;
+    const usedPercent =
+      (storageInfo.appStorage / storageInfo.totalStorage) * 100;
     return (
       <View style={styles.storageBar}>
         <View style={styles.storageBarTrack}>
           <View
-            style={[styles.storageBarFill, { width: `${Math.min(usedPercent, 100)}%` }]}
+            style={[
+              styles.storageBarFill,
+              { width: `${Math.min(usedPercent, 100)}%` },
+            ]}
           />
         </View>
         <Text style={styles.storageText}>
-          {formatBytes(storageInfo.appStorage)} of {formatBytes(storageInfo.totalStorage)} used
+          {formatBytes(storageInfo.appStorage)} of{' '}
+          {formatBytes(storageInfo.totalStorage)} used
         </Text>
       </View>
     );
@@ -508,7 +537,9 @@ export const SettingsScreen: React.FC = () => {
             </Text>
           )}
           <View style={styles.catalogModelMeta}>
-            <Text style={styles.catalogModelSize}>{formatBytes(model.downloadSize || 0)}</Text>
+            <Text style={styles.catalogModelSize}>
+              {formatBytes(model.downloadSize || 0)}
+            </Text>
             <Text style={styles.catalogModelFormat}>{model.format}</Text>
           </View>
           {isDownloading && (
@@ -534,7 +565,9 @@ export const SettingsScreen: React.FC = () => {
             isDownloading && styles.catalogModelButtonDownloading,
           ]}
           onPress={() =>
-            isDownloaded ? handleDeleteDownloadedModel(model) : handleDownloadModel(model)
+            isDownloaded
+              ? handleDeleteDownloadedModel(model)
+              : handleDownloadModel(model)
           }
         >
           <Icon
@@ -589,12 +622,18 @@ export const SettingsScreen: React.FC = () => {
 
           {/* Capabilities */}
           <View style={styles.capabilitiesContainer}>
-            <Text style={styles.capabilitiesLabel}>Supported Capabilities:</Text>
+            <Text style={styles.capabilitiesLabel}>
+              Supported Capabilities:
+            </Text>
             {capabilities.length > 0 ? (
               <View style={styles.capabilitiesList}>
                 {capabilities.map((cap) => (
                   <View key={cap} style={styles.capabilityBadge}>
-                    <Icon name="checkmark-circle" size={14} color={Colors.primaryGreen} />
+                    <Icon
+                      name="checkmark-circle"
+                      size={14}
+                      color={Colors.primaryGreen}
+                    />
                     <Text style={styles.capabilityText}>
                       {capabilityNames[cap] || `Capability ${cap}`}
                     </Text>
@@ -602,7 +641,9 @@ export const SettingsScreen: React.FC = () => {
                 ))}
               </View>
             ) : (
-              <Text style={styles.noCapabilities}>No capabilities reported</Text>
+              <Text style={styles.noCapabilities}>
+                No capabilities reported
+              </Text>
             )}
           </View>
 
@@ -610,35 +651,63 @@ export const SettingsScreen: React.FC = () => {
           <View style={styles.modelStatusContainer}>
             <Text style={styles.capabilitiesLabel}>Loaded Models:</Text>
             <View style={styles.modelStatusGrid}>
-              <View style={[styles.modelStatusItem, isSTTLoaded && styles.modelStatusItemLoaded]}>
+              <View
+                style={[
+                  styles.modelStatusItem,
+                  isSTTLoaded && styles.modelStatusItemLoaded,
+                ]}
+              >
                 <Icon
                   name={isSTTLoaded ? 'checkmark-circle' : 'close-circle'}
                   size={16}
-                  color={isSTTLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                  color={
+                    isSTTLoaded ? Colors.primaryGreen : Colors.textTertiary
+                  }
                 />
                 <Text style={styles.modelStatusText}>STT</Text>
               </View>
-              <View style={[styles.modelStatusItem, isTTSLoaded && styles.modelStatusItemLoaded]}>
+              <View
+                style={[
+                  styles.modelStatusItem,
+                  isTTSLoaded && styles.modelStatusItemLoaded,
+                ]}
+              >
                 <Icon
                   name={isTTSLoaded ? 'checkmark-circle' : 'close-circle'}
                   size={16}
-                  color={isTTSLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                  color={
+                    isTTSLoaded ? Colors.primaryGreen : Colors.textTertiary
+                  }
                 />
                 <Text style={styles.modelStatusText}>TTS</Text>
               </View>
-              <View style={[styles.modelStatusItem, isTextLoaded && styles.modelStatusItemLoaded]}>
+              <View
+                style={[
+                  styles.modelStatusItem,
+                  isTextLoaded && styles.modelStatusItemLoaded,
+                ]}
+              >
                 <Icon
                   name={isTextLoaded ? 'checkmark-circle' : 'close-circle'}
                   size={16}
-                  color={isTextLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                  color={
+                    isTextLoaded ? Colors.primaryGreen : Colors.textTertiary
+                  }
                 />
                 <Text style={styles.modelStatusText}>LLM</Text>
               </View>
-              <View style={[styles.modelStatusItem, isVADLoaded && styles.modelStatusItemLoaded]}>
+              <View
+                style={[
+                  styles.modelStatusItem,
+                  isVADLoaded && styles.modelStatusItemLoaded,
+                ]}
+              >
                 <Icon
                   name={isVADLoaded ? 'checkmark-circle' : 'close-circle'}
                   size={16}
-                  color={isVADLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                  color={
+                    isVADLoaded ? Colors.primaryGreen : Colors.textTertiary
+                  }
                 />
                 <Text style={styles.modelStatusText}>VAD</Text>
               </View>
@@ -740,7 +809,10 @@ export const SettingsScreen: React.FC = () => {
         {/* Storage Management */}
         {renderSectionHeader('Storage Management')}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.dangerButton} onPress={handleClearCache}>
+          <TouchableOpacity
+            style={styles.dangerButton}
+            onPress={handleClearCache}
+          >
             <Icon name="trash-outline" size={20} color={Colors.primaryOrange} />
             <Text style={styles.dangerButtonText}>Clear Cache</Text>
           </TouchableOpacity>
@@ -757,8 +829,8 @@ export const SettingsScreen: React.FC = () => {
 
         {/* Version Info */}
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>RunAnywhere AI Demo v1.0.0</Text>
-          <Text style={styles.versionSubtext}>SDK v{sdkVersion} (React Native)</Text>
+          <Text style={styles.versionText}>RunAnywhere AI</Text>
+          <Text style={styles.versionSubtext}>SDK v{sdkVersion}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

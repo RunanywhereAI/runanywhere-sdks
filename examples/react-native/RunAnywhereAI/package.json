@@ -7,7 +7,12 @@
     "ios": "react-native run-ios",
     "start": "react-native start",
     "test": "jest",
-    "lint": "eslint .",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"App.tsx\"",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"App.tsx\" --fix",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --check",
+    "format:fix": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --write",
+    "unused": "knip",
     "pod-install": "cd ios && pod install",
     "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && npm install && cd ios && pod install"
   },
@@ -15,7 +20,6 @@
     "@react-navigation/bottom-tabs": "^7.8.11",
     "@react-navigation/native": "^7.1.24",
     "@react-navigation/native-stack": "^7.8.5",
-    "prop-types": "^15.8.1",
     "react": "19.1.0",
     "react-native": "0.81.1",
     "react-native-audio-recorder-player": "^3.6.14",
@@ -34,7 +38,6 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-    "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
     "@react-native-community/cli": "latest",
     "@react-native-community/cli-platform-android": "latest",
@@ -45,12 +48,92 @@
     "@react-native/typescript-config": "0.81.1",
     "@types/react": "^19.1.0",
     "@types/react-native-vector-icons": "^6.4.18",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
     "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "eslint-plugin-unused-imports": "^4.3.0",
+    "knip": "^5.76.0",
     "prettier": "^3.3.2",
     "react-native-monorepo-config": "^0.3.0",
     "typescript": "^5.5.3"
   },
   "engines": {
     "node": ">=18"
+  },
+  "eslintConfig": {
+    "root": true,
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaVersion": 2020,
+      "sourceType": "module",
+      "project": "./tsconfig.json",
+      "ecmaFeatures": {
+        "jsx": true
+      }
+    },
+    "plugins": [
+      "@typescript-eslint",
+      "unused-imports"
+    ],
+    "extends": [
+      "@react-native",
+      "plugin:@typescript-eslint/recommended",
+      "plugin:prettier/recommended"
+    ],
+    "rules": {
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
+        "warn",
+        {
+          "vars": "all",
+          "varsIgnorePattern": "^_",
+          "args": "after-used",
+          "argsIgnorePattern": "^_"
+        }
+      ],
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/consistent-type-imports": [
+        "warn",
+        {
+          "prefer": "type-imports",
+          "disallowTypeAnnotations": false
+        }
+      ],
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-this-alias": "warn",
+      "@typescript-eslint/no-empty-object-type": "off",
+      "@typescript-eslint/no-non-null-assertion": "warn",
+      "no-console": [
+        "warn",
+        {
+          "allow": [
+            "warn",
+            "error"
+          ]
+        }
+      ],
+      "react/react-in-jsx-scope": "off",
+      "react-native/no-inline-styles": "warn"
+    }
+  },
+  "eslintIgnore": [
+    "node_modules/",
+    "android/",
+    "ios/",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "babel.config.js",
+    "metro.config.js"
+  ],
+  "prettier": {
+    "quoteProps": "consistent",
+    "singleQuote": true,
+    "tabWidth": 2,
+    "trailingComma": "es5",
+    "useTabs": false
   }
 }

@@ -11,7 +11,7 @@
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/App/RunAnywhereAIApp.swift
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import TabNavigator from './src/navigation/TabNavigator';
 import { Colors } from './src/theme/colors';
 import { Typography } from './src/theme/typography';
-import { Spacing, Padding, BorderRadius, IconSize, ButtonHeight } from './src/theme/spacing';
+import {
+  Spacing,
+  Padding,
+  BorderRadius,
+  IconSize,
+  ButtonHeight,
+} from './src/theme/spacing';
 
 // Import RunAnywhere SDK
 import {
@@ -49,7 +55,11 @@ const InitializationLoadingView: React.FC = () => (
   <View style={styles.loadingContainer}>
     <View style={styles.loadingContent}>
       <View style={styles.iconContainer}>
-        <Icon name="hardware-chip-outline" size={48} color={Colors.primaryBlue} />
+        <Icon
+          name="hardware-chip-outline"
+          size={48}
+          color={Colors.primaryBlue}
+        />
       </View>
       <Text style={styles.loadingTitle}>RunAnywhere AI</Text>
       <Text style={styles.loadingSubtitle}>Initializing SDK...</Text>
@@ -65,10 +75,10 @@ const InitializationLoadingView: React.FC = () => (
 /**
  * Initialization Error View
  */
-const InitializationErrorView: React.FC<{ error: string; onRetry: () => void }> = ({
-  error,
-  onRetry,
-}) => (
+const InitializationErrorView: React.FC<{
+  error: string;
+  onRetry: () => void;
+}> = ({ error, onRetry }) => (
   <View style={styles.errorContainer}>
     <View style={styles.errorContent}>
       <View style={styles.errorIconContainer}>
@@ -95,9 +105,7 @@ const App: React.FC = () => {
    * Register modules and their models
    * Matches iOS registerModulesAndModels() in RunAnywhereAIApp.swift
    */
-  const registerModulesAndModels = async () => {
-    console.log('[App] 📦 Registering modules with their models...');
-
+  const registerModulesAndModels = () => {
     // LlamaCPP module with LLM models
     // Using explicit IDs ensures models are recognized after download across app restarts
     LlamaCPP.register();
@@ -137,7 +145,6 @@ const App: React.FC = () => {
       url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
       memoryRequirement: 400_000_000,
     });
-    console.log('[App] ✅ LlamaCPP module registered with LLM models');
 
     // ONNX module with STT and TTS models
     // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
@@ -177,21 +184,17 @@ const App: React.FC = () => {
       artifactType: ModelArtifactType.TarGzArchive,
       memoryRequirement: 65_000_000,
     });
-    console.log('[App] ✅ ONNX module registered with STT/TTS models');
-
-    console.log('[App] 🎉 All modules and models registered');
   };
 
   /**
    * Initialize the SDK
    * Matches iOS initializeSDK() in RunAnywhereAIApp.swift
    */
-  const initializeSDK = async () => {
+  const initializeSDK = useCallback(async () => {
     setInitState('loading');
     setError(null);
 
     try {
-      console.log('[App] 🎯 Initializing SDK...');
       const startTime = Date.now();
 
       // Initialize SDK based on build configuration
@@ -201,40 +204,36 @@ const App: React.FC = () => {
         baseURL: 'https://api.runanywhere.com',
         environment: SDKEnvironment.Development,
       });
-      console.log('[App] ✅ SDK initialized in DEVELOPMENT mode');
 
       // Register modules and models
-      await registerModulesAndModels();
+      registerModulesAndModels();
 
       const initTime = Date.now() - startTime;
-      console.log('[App] ✅ SDK successfully initialized!');
-      console.log(`[App] ⚡ Initialization time: ${initTime}ms`);
 
-      // Get SDK info
+      // Get SDK info for debugging
       const isInit = await RunAnywhere.isInitialized();
-      console.log('[App] 🎯 SDK Status:', isInit ? 'Active' : 'Inactive');
-
       const version = await RunAnywhere.getVersion();
-      console.log('[App] 🔧 SDK Version:', version);
-
       const backendInfo = await RunAnywhere.getBackendInfo();
-      console.log('[App] 🔧 Environment:', JSON.stringify(backendInfo));
-      console.log('[App] 📱 Services will initialize on first API call');
 
-      console.log('[App] 💡 Models registered, user can now download and select models');
+      // Log initialization summary
+      // eslint-disable-next-line no-console
+      console.log(
+        `[App] SDK initialized: v${version}, ${isInit ? 'Active' : 'Inactive'}, ${initTime}ms, env: ${JSON.stringify(backendInfo)}`
+      );
 
       setInitState('ready');
     } catch (err) {
-      console.error('[App] ❌ SDK initialization failed:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      console.error('[App] SDK initialization failed:', err);
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
       setInitState('error');
     }
-  };
+  }, []);
 
   useEffect(() => {
     initializeSDK();
-  }, []);
+  }, [initializeSDK]);
 
   // Render based on state
   if (initState === 'loading') {
