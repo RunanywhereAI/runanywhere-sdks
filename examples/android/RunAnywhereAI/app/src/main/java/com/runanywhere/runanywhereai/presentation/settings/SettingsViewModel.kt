@@ -8,7 +8,11 @@ import com.runanywhere.runanywhereai.data.SecureStorage
 import com.runanywhere.runanywhereai.data.SettingsDataStore
 import com.runanywhere.sdk.infrastructure.events.EventBus
 import com.runanywhere.sdk.infrastructure.events.SDKModelEvent
-import com.runanywhere.sdk.public.extensions.deleteModel
+import com.runanywhere.sdk.`public`.RunAnywhere
+import com.runanywhere.sdk.`public`.extensions.clearCache
+import com.runanywhere.sdk.`public`.extensions.cleanTempFiles
+import com.runanywhere.sdk.`public`.extensions.deleteModel
+import com.runanywhere.sdk.`public`.extensions.getStorageInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -182,59 +186,43 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Load storage data
+     * Load storage data using SDK's getStorageInfo() API
      *
-     * TODO: Integrate with SDK storage APIs when available
      * iOS equivalent: StorageViewModel.loadData() which calls:
      *   let storageInfo = await RunAnywhere.getStorageInfo()
+     *
+     * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RunAnywhere+Storage.swift
      */
     private fun loadStorageData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                Log.d(TAG, "Loading storage info...")
+                Log.d(TAG, "Loading storage info via RunAnywhere.getStorageInfo()...")
 
-                // TODO: Use SDK's getStorageInfo() when available
-                // For now, get basic device storage info
-                val context = getApplication<Application>()
-                val filesDir = context.filesDir
-                val modelsDir = java.io.File(filesDir, "models")
+                // Use SDK's getStorageInfo() - matches iOS exactly
+                val storageInfo = RunAnywhere.getStorageInfo()
 
-                val totalSpace = filesDir.totalSpace
-                val freeSpace = filesDir.freeSpace
-                val modelSize =
-                    if (modelsDir.exists()) {
-                        modelsDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
-                    } else {
-                        0L
-                    }
-
-                // Get list of model files
-                val storedModels =
-                    if (modelsDir.exists()) {
-                        modelsDir.listFiles()?.filter { it.isFile }?.map { file ->
-                            StoredModelInfo(
-                                id = file.nameWithoutExtension,
-                                name = file.nameWithoutExtension,
-                                size = file.length(),
-                            )
-                        } ?: emptyList()
-                    } else {
-                        emptyList()
-                    }
+                // Map stored models to UI model
+                val storedModels = storageInfo.storedModels.map { model ->
+                    StoredModelInfo(
+                        id = model.id,
+                        name = model.name,
+                        size = model.size,
+                    )
+                }
 
                 Log.d(TAG, "Storage info received:")
-                Log.d(TAG, "  - Total space: $totalSpace")
-                Log.d(TAG, "  - Free space: $freeSpace")
-                Log.d(TAG, "  - Model storage size: $modelSize")
+                Log.d(TAG, "  - Total space: ${storageInfo.deviceStorage.totalSpace}")
+                Log.d(TAG, "  - Free space: ${storageInfo.deviceStorage.freeSpace}")
+                Log.d(TAG, "  - Model storage size: ${storageInfo.modelStorage.totalSize}")
                 Log.d(TAG, "  - Stored models count: ${storedModels.size}")
 
                 _uiState.update {
                     it.copy(
-                        totalStorageSize = totalSpace,
-                        availableSpace = freeSpace,
-                        modelStorageSize = modelSize,
+                        totalStorageSize = storageInfo.deviceStorage.totalSpace,
+                        availableSpace = storageInfo.deviceStorage.freeSpace,
+                        modelStorageSize = storageInfo.modelStorage.totalSize,
                         downloadedModels = storedModels,
                         isLoading = false,
                     )
@@ -333,7 +321,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     /**
      * Refresh storage data
      *
-     * TODO: Integrate with RunAnywhere SDK
      * iOS equivalent: storageViewModel.refreshData()
      */
     fun refreshStorage() {
@@ -369,18 +356,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Clear cache
+     * Clear cache using SDK's clearCache() API
      *
-     * TODO: Integrate with SDK clearCache() when available
+     * iOS equivalent: await RunAnywhere.clearCache()
+     * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RunAnywhere+Storage.swift
      */
     fun clearCache() {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Clearing cache...")
-                // Clear app cache directory
-                val context = getApplication<Application>()
-                context.cacheDir.deleteRecursively()
-                context.cacheDir.mkdirs()
+                Log.d(TAG, "Clearing cache via RunAnywhere.clearCache()...")
+                RunAnywhere.clearCache()
                 Log.d(TAG, "Cache cleared successfully")
 
                 // Refresh storage data after clearing cache
@@ -395,21 +380,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Clean temporary files
+     * Clean temporary files using SDK's cleanTempFiles() API
      *
-     * TODO: Integrate with SDK cleanTempFiles() when available
+     * iOS equivalent: await RunAnywhere.cleanTempFiles()
+     * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RunAnywhere+Storage.swift
      */
     fun cleanTempFiles() {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Cleaning temp files...")
-                // Clean temp directory
-                val context = getApplication<Application>()
-                val tempDir = java.io.File(context.filesDir, "temp")
-                if (tempDir.exists()) {
-                    tempDir.deleteRecursively()
-                    tempDir.mkdirs()
-                }
+                Log.d(TAG, "Cleaning temp files via RunAnywhere.cleanTempFiles()...")
+                RunAnywhere.cleanTempFiles()
                 Log.d(TAG, "Temp files cleaned successfully")
 
                 // Refresh storage data after cleaning
