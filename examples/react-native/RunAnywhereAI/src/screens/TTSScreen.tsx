@@ -1,7 +1,23 @@
 /**
  * TTSScreen - Tab 2: Text-to-Speech
  *
- * Reference: iOS Features/Voice/TextToSpeechView.swift
+ * Provides on-device text-to-speech synthesis with voice selection.
+ * Matches iOS TextToSpeechView architecture and patterns.
+ *
+ * Features:
+ * - Text input for synthesis
+ * - Voice/model selection
+ * - Audio playback controls
+ * - Model status banner
+ * - System TTS fallback
+ *
+ * Architecture:
+ * - Model loading via RunAnywhere.loadTTSModel()
+ * - Speech synthesis via RunAnywhere.synthesizeSpeech()
+ * - Audio playback via native audio player
+ * - Supports ONNX-based Piper TTS models
+ *
+ * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/TextToSpeechView.swift
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';

@@ -17,6 +17,15 @@ export {
 } from './Public/RunAnywhere';
 export default _RunAnywhere;
 
+// Modules (matching iOS SDK module registration pattern)
+export {
+  LlamaCPP,
+  type LlamaCPPModelOptions,
+  ONNX,
+  type ONNXModelOptions,
+  ModelArtifactType,
+} from './Modules';
+
 // Types
 export * from './types';
 // Export commonly used enums for easy access

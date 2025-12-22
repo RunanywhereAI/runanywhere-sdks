@@ -1,7 +1,24 @@
 /**
  * SettingsScreen - Tab 4: Settings & Storage
  *
- * Reference: iOS Features/Settings/CombinedSettingsView.swift
+ * Provides SDK configuration, model management, and storage overview.
+ * Matches iOS CombinedSettingsView architecture and patterns.
+ *
+ * Features:
+ * - Generation settings (temperature, max tokens)
+ * - API configuration
+ * - Storage overview (total usage, available space, models storage)
+ * - Downloaded models list with delete functionality
+ * - Storage management (clear cache, clean temp files)
+ * - SDK info (version, capabilities, loaded models)
+ *
+ * Architecture:
+ * - Fetches SDK state via RunAnywhere methods
+ * - Shows available vs downloaded models
+ * - Manages model downloads and deletions
+ * - Displays backend info and capabilities
+ *
+ * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Settings/CombinedSettingsView.swift
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
