@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.data.database
 
+import android.annotation.SuppressLint
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
@@ -85,6 +86,7 @@ abstract class RunAnywhereDatabase : RoomDatabase() {
  * Database Manager for Android
  * Provides database access
  */
+@SuppressLint("StaticFieldLeak") // Using applicationContext which is safe (doesn't leak Activity)
 class DatabaseManager {
     private lateinit var context: Context
     private var database: RunAnywhereDatabase? = null

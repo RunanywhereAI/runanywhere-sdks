@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.security
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -19,6 +20,8 @@ class KeychainManager private constructor(
     private val context: Context,
 ) {
     companion object {
+        // Suppress: Using applicationContext which is safe (doesn't leak Activity)
+        @SuppressLint("StaticFieldLeak")
         @Volatile
         private var instance: KeychainManager? = null
 

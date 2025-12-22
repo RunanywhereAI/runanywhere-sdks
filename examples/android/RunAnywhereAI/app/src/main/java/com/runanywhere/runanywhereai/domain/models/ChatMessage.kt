@@ -1,17 +1,16 @@
 package com.runanywhere.runanywhereai.domain.models
 
 import com.runanywhere.sdk.models.Message
-import com.runanywhere.sdk.models.MessageRole as SDKMessageRole
-import com.runanywhere.sdk.models.MessageAnalytics as SDKMessageAnalytics
-import com.runanywhere.sdk.models.MessageModelInfo as SDKMessageModelInfo
-import com.runanywhere.sdk.models.CompletionStatus as SDKCompletionStatus
-import com.runanywhere.sdk.models.GenerationMode as SDKGenerationMode
-import com.runanywhere.sdk.models.GenerationParameters as SDKGenerationParameters
-import com.runanywhere.sdk.models.ConversationAnalytics as SDKConversationAnalytics
-import com.runanywhere.sdk.models.PerformanceSummary as SDKPerformanceSummary
-import com.runanywhere.sdk.models.Conversation as SDKConversation
 import kotlinx.serialization.Serializable
 import java.util.UUID
+import com.runanywhere.sdk.models.CompletionStatus as SDKCompletionStatus
+import com.runanywhere.sdk.models.ConversationAnalytics as SDKConversationAnalytics
+import com.runanywhere.sdk.models.GenerationMode as SDKGenerationMode
+import com.runanywhere.sdk.models.GenerationParameters as SDKGenerationParameters
+import com.runanywhere.sdk.models.MessageAnalytics as SDKMessageAnalytics
+import com.runanywhere.sdk.models.MessageModelInfo as SDKMessageModelInfo
+import com.runanywhere.sdk.models.MessageRole as SDKMessageRole
+import com.runanywhere.sdk.models.PerformanceSummary as SDKPerformanceSummary
 
 // Re-export SDK types for use throughout the app
 typealias MessageRole = SDKMessageRole
@@ -35,34 +34,36 @@ data class ChatMessage(
     val timestamp: Long = System.currentTimeMillis(),
     val analytics: MessageAnalytics? = null,
     val modelInfo: MessageModelInfo? = null,
-    val metadata: Map<String, String>? = null
+    val metadata: Map<String, String>? = null,
 ) {
     val isFromUser: Boolean get() = role == MessageRole.USER
 
-    fun toSDKMessage(): Message = Message(
-        role = role,
-        content = content,
-        thinkingContent = thinkingContent,
-        metadata = metadata,
-        timestamp = timestamp,
-        analytics = analytics,
-        modelInfo = modelInfo
-    )
+    fun toSDKMessage(): Message =
+        Message(
+            role = role,
+            content = content,
+            thinkingContent = thinkingContent,
+            metadata = metadata,
+            timestamp = timestamp,
+            analytics = analytics,
+            modelInfo = modelInfo,
+        )
 
     companion object {
         fun fromSDKMessage(
             message: Message,
-            id: String = UUID.randomUUID().toString()
-        ): ChatMessage = ChatMessage(
-            id = id,
-            role = message.role,
-            content = message.content,
-            thinkingContent = message.thinkingContent,
-            timestamp = message.timestamp,
-            analytics = message.analytics,
-            modelInfo = message.modelInfo,
-            metadata = message.metadata
-        )
+            id: String = UUID.randomUUID().toString(),
+        ): ChatMessage =
+            ChatMessage(
+                id = id,
+                role = message.role,
+                content = message.content,
+                thinkingContent = message.thinkingContent,
+                timestamp = message.timestamp,
+                analytics = message.analytics,
+                modelInfo = message.modelInfo,
+                metadata = message.metadata,
+            )
     }
 }
 
@@ -78,7 +79,7 @@ data class Conversation(
     val updatedAt: Long = System.currentTimeMillis(),
     val modelName: String? = null,
     val analytics: ConversationAnalytics? = null,
-    val performanceSummary: PerformanceSummary? = null
+    val performanceSummary: PerformanceSummary? = null,
 )
 
 /**
@@ -89,19 +90,31 @@ fun createPerformanceSummary(messages: List<ChatMessage>): PerformanceSummary {
 
     return SDKPerformanceSummary(
         totalMessages = messages.size,
-        averageResponseTime = if (analyticsMessages.isNotEmpty()) {
-            analyticsMessages.map { it.totalGenerationTime }.average() / 1000.0
-        } else 0.0,
-        averageTokensPerSecond = if (analyticsMessages.isNotEmpty()) {
-            analyticsMessages.map { it.averageTokensPerSecond }.average()
-        } else 0.0,
+        averageResponseTime =
+            if (analyticsMessages.isNotEmpty()) {
+                analyticsMessages.map { it.totalGenerationTime }.average() / 1000.0
+            } else {
+                0.0
+            },
+        averageTokensPerSecond =
+            if (analyticsMessages.isNotEmpty()) {
+                analyticsMessages.map { it.averageTokensPerSecond }.average()
+            } else {
+                0.0
+            },
         totalTokensProcessed = analyticsMessages.sumOf { it.inputTokens + it.outputTokens },
-        thinkingModeUsage = if (analyticsMessages.isNotEmpty()) {
-            analyticsMessages.count { it.wasThinkingMode }.toDouble() / analyticsMessages.size
-        } else 0.0,
-        successRate = if (analyticsMessages.isNotEmpty()) {
-            analyticsMessages.count { it.completionStatus == CompletionStatus.COMPLETE }
-                .toDouble() / analyticsMessages.size
-        } else 0.0
+        thinkingModeUsage =
+            if (analyticsMessages.isNotEmpty()) {
+                analyticsMessages.count { it.wasThinkingMode }.toDouble() / analyticsMessages.size
+            } else {
+                0.0
+            },
+        successRate =
+            if (analyticsMessages.isNotEmpty()) {
+                analyticsMessages.count { it.completionStatus == CompletionStatus.COMPLETE }
+                    .toDouble() / analyticsMessages.size
+            } else {
+                0.0
+            },
     )
 }

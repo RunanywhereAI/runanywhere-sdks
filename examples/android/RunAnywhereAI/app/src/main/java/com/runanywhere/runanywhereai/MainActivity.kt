@@ -27,7 +27,6 @@ import kotlinx.coroutines.launch
  * - Shows ContentView (AppNavigation) when SDK is ready
  */
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -56,7 +55,7 @@ class MainActivity : ComponentActivity() {
 
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
+            color = MaterialTheme.colorScheme.background,
         ) {
             when (initState) {
                 is SDKInitializationState.Loading -> {
@@ -71,7 +70,7 @@ class MainActivity : ComponentActivity() {
                             scope.launch {
                                 app.retryInitialization()
                             }
-                        }
+                        },
                     )
                 }
 

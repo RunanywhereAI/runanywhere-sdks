@@ -221,14 +221,18 @@ private fun getBatteryInfo(context: Context): Map<String, Any?> {
         val level = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
         batteryInfo["level"] = if (level >= 0) level / 100.0f else null
 
-        // Battery state
-        val status = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS)
+        // Battery state (BATTERY_PROPERTY_STATUS requires API 26+)
         batteryInfo["state"] =
-            when (status) {
-                BatteryManager.BATTERY_STATUS_CHARGING -> BatteryState.CHARGING
-                BatteryManager.BATTERY_STATUS_FULL -> BatteryState.FULL
-                BatteryManager.BATTERY_STATUS_NOT_CHARGING -> BatteryState.UNPLUGGED
-                else -> BatteryState.UNKNOWN
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val status = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS)
+                when (status) {
+                    BatteryManager.BATTERY_STATUS_CHARGING -> BatteryState.CHARGING
+                    BatteryManager.BATTERY_STATUS_FULL -> BatteryState.FULL
+                    BatteryManager.BATTERY_STATUS_NOT_CHARGING -> BatteryState.UNPLUGGED
+                    else -> BatteryState.UNKNOWN
+                }
+            } else {
+                BatteryState.UNKNOWN
             }
 
         // Low power mode (Power Saver)

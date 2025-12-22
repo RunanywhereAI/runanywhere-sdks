@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.security
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -20,7 +21,11 @@ class AndroidSecureStorage private constructor(
     private val logger = SDKLogger("AndroidSecureStorage")
 
     companion object {
+        // Suppress: Using applicationContext which is safe (doesn't leak Activity)
+        @SuppressLint("StaticFieldLeak")
         private var cachedStorage: AndroidSecureStorage? = null
+
+        @SuppressLint("StaticFieldLeak")
         private var context: Context? = null
 
         /**

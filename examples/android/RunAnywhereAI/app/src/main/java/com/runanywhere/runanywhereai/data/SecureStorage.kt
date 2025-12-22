@@ -16,7 +16,6 @@ import com.runanywhere.runanywhereai.BuildConfig
  * - KeychainService.shared.delete(key: "runanywhere_api_key")
  */
 class SecureStorage(context: Context) {
-
     companion object {
         private const val TAG = "SecureStorage"
         private const val PREFS_NAME = "runanywhere_secure_prefs"
@@ -28,34 +27,36 @@ class SecureStorage(context: Context) {
     // Fallback to regular SharedPreferences if encryption fails
     private var isEncryptionAvailable = true
 
-    private val masterKey: MasterKey? = try {
-        MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-    } catch (e: Exception) {
-        Log.e(TAG, "Failed to create MasterKey, falling back to unencrypted storage: ${e.message}")
-        isEncryptionAvailable = false
-        null
-    }
+    private val masterKey: MasterKey? =
+        try {
+            MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create MasterKey, falling back to unencrypted storage: ${e.message}")
+            isEncryptionAvailable = false
+            null
+        }
 
-    private val securePrefs: SharedPreferences = try {
-        if (masterKey != null) {
-            EncryptedSharedPreferences.create(
-                context,
-                PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } else {
-            // Fallback to regular SharedPreferences
+    private val securePrefs: SharedPreferences =
+        try {
+            if (masterKey != null) {
+                EncryptedSharedPreferences.create(
+                    context,
+                    PREFS_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+                )
+            } else {
+                // Fallback to regular SharedPreferences
+                context.getSharedPreferences(PREFS_NAME + "_fallback", Context.MODE_PRIVATE)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create EncryptedSharedPreferences, falling back: ${e.message}")
+            isEncryptionAvailable = false
             context.getSharedPreferences(PREFS_NAME + "_fallback", Context.MODE_PRIVATE)
         }
-    } catch (e: Exception) {
-        Log.e(TAG, "Failed to create EncryptedSharedPreferences, falling back: ${e.message}")
-        isEncryptionAvailable = false
-        context.getSharedPreferences(PREFS_NAME + "_fallback", Context.MODE_PRIVATE)
-    }
 
     /**
      * Check if encrypted storage is being used
@@ -103,7 +104,10 @@ class SecureStorage(context: Context) {
     /**
      * Generic secure save for any string value
      */
-    fun saveSecureString(key: String, value: String) {
+    fun saveSecureString(
+        key: String,
+        value: String,
+    ) {
         securePrefs.edit().putString(key, value).apply()
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Secure string saved")

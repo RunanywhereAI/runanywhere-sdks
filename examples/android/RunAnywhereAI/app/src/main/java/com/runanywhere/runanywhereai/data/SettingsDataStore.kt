@@ -30,7 +30,7 @@ data class SettingsData(
     val routingPolicy: RoutingPolicy = RoutingPolicy.AUTOMATIC,
     val temperature: Float = 0.7f,
     val maxTokens: Int = 10000,
-    val analyticsLogToLocal: Boolean = false
+    val analyticsLogToLocal: Boolean = false,
 )
 
 /**
@@ -42,7 +42,6 @@ data class SettingsData(
  * - UserDefaults.standard.set(defaultMaxTokens, forKey: "defaultMaxTokens")
  */
 class SettingsDataStore(private val context: Context) {
-
     companion object {
         private const val TAG = "SettingsDataStore"
 
@@ -57,29 +56,31 @@ class SettingsDataStore(private val context: Context) {
      * Flow of settings data - automatically updates when any value changes
      * iOS equivalent: Using @Published properties that auto-update UI
      */
-    val settingsFlow: Flow<SettingsData> = context.settingsDataStore.data
-        .catch { exception ->
-            if (exception is IOException) {
-                Log.e(TAG, "Error reading settings", exception)
-                emit(androidx.datastore.preferences.core.emptyPreferences())
-            } else {
-                throw exception
+    val settingsFlow: Flow<SettingsData> =
+        context.settingsDataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    Log.e(TAG, "Error reading settings", exception)
+                    emit(androidx.datastore.preferences.core.emptyPreferences())
+                } else {
+                    throw exception
+                }
             }
-        }
-        .map { preferences ->
-            mapPreferencesToSettings(preferences)
-        }
+            .map { preferences ->
+                mapPreferencesToSettings(preferences)
+            }
 
     private fun mapPreferencesToSettings(preferences: Preferences): SettingsData {
         val routingPolicyRaw = preferences[ROUTING_POLICY] ?: RoutingPolicy.AUTOMATIC.rawValue
-        val routingPolicy = RoutingPolicy.entries.find { it.rawValue == routingPolicyRaw }
-            ?: RoutingPolicy.AUTOMATIC
+        val routingPolicy =
+            RoutingPolicy.entries.find { it.rawValue == routingPolicyRaw }
+                ?: RoutingPolicy.AUTOMATIC
 
         return SettingsData(
             routingPolicy = routingPolicy,
             temperature = preferences[TEMPERATURE] ?: 0.7f,
             maxTokens = preferences[MAX_TOKENS] ?: 10000,
-            analyticsLogToLocal = preferences[ANALYTICS_LOG_TO_LOCAL] ?: false
+            analyticsLogToLocal = preferences[ANALYTICS_LOG_TO_LOCAL] ?: false,
         )
     }
 
