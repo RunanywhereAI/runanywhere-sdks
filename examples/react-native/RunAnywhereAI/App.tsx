@@ -3,7 +3,12 @@
  *
  * React Native demonstration app for the RunAnywhere on-device AI SDK.
  *
- * Reference: iOS RunAnywhereAIApp.swift
+ * Architecture Pattern:
+ * - Two-phase SDK initialization (matching iOS pattern)
+ * - Module registration with models (LlamaCPP, ONNX, FluidAudio)
+ * - Tab-based navigation with 5 tabs (Chat, STT, TTS, Voice, Settings)
+ *
+ * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/App/RunAnywhereAIApp.swift
  */
 
 import React, { useEffect, useState } from 'react';
@@ -23,7 +28,14 @@ import { Typography } from './src/theme/typography';
 import { Spacing, Padding, BorderRadius, IconSize, ButtonHeight } from './src/theme/spacing';
 
 // Import RunAnywhere SDK
-import { RunAnywhere, SDKEnvironment } from 'runanywhere-react-native';
+import {
+  RunAnywhere,
+  SDKEnvironment,
+  LlamaCPP,
+  ONNX,
+  ModelCategory,
+  ModelArtifactType,
+} from 'runanywhere-react-native';
 
 /**
  * App initialization state
@@ -80,36 +92,140 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   /**
+   * Register modules and their models
+   * Matches iOS registerModulesAndModels() in RunAnywhereAIApp.swift
+   */
+  const registerModulesAndModels = async () => {
+    console.log('[App] 📦 Registering modules with their models...');
+
+    // LlamaCPP module with LLM models
+    // Using explicit IDs ensures models are recognized after download across app restarts
+    LlamaCPP.register();
+    LlamaCPP.addModel({
+      id: 'smollm2-360m-q8_0',
+      name: 'SmolLM2 360M Q8_0',
+      url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+      memoryRequirement: 500_000_000,
+    });
+    LlamaCPP.addModel({
+      id: 'llama-2-7b-chat-q4_k_m',
+      name: 'Llama 2 7B Chat Q4_K_M',
+      url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
+      memoryRequirement: 4_000_000_000,
+    });
+    LlamaCPP.addModel({
+      id: 'mistral-7b-instruct-q4_k_m',
+      name: 'Mistral 7B Instruct Q4_K_M',
+      url: 'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
+      memoryRequirement: 4_000_000_000,
+    });
+    LlamaCPP.addModel({
+      id: 'qwen2.5-0.5b-instruct-q6_k',
+      name: 'Qwen 2.5 0.5B Instruct Q6_K',
+      url: 'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
+      memoryRequirement: 600_000_000,
+    });
+    LlamaCPP.addModel({
+      id: 'lfm2-350m-q4_k_m',
+      name: 'LiquidAI LFM2 350M Q4_K_M',
+      url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
+      memoryRequirement: 250_000_000,
+    });
+    LlamaCPP.addModel({
+      id: 'lfm2-350m-q8_0',
+      name: 'LiquidAI LFM2 350M Q8_0',
+      url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
+      memoryRequirement: 400_000_000,
+    });
+    console.log('[App] ✅ LlamaCPP module registered with LLM models');
+
+    // ONNX module with STT and TTS models
+    // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
+    // Using explicit IDs ensures models are recognized after download across app restarts
+    ONNX.register();
+    // STT Models (Sherpa-ONNX Whisper)
+    ONNX.addModel({
+      id: 'sherpa-onnx-whisper-tiny.en',
+      name: 'Sherpa Whisper Tiny (ONNX)',
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+      modality: ModelCategory.SpeechRecognition,
+      artifactType: ModelArtifactType.TarGzArchive,
+      memoryRequirement: 75_000_000,
+    });
+    ONNX.addModel({
+      id: 'sherpa-onnx-whisper-small.en',
+      name: 'Sherpa Whisper Small (ONNX)',
+      url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2',
+      modality: ModelCategory.SpeechRecognition,
+      artifactType: ModelArtifactType.TarBz2Archive,
+      memoryRequirement: 250_000_000,
+    });
+    // TTS Models (Piper VITS)
+    ONNX.addModel({
+      id: 'vits-piper-en_US-lessac-medium',
+      name: 'Piper TTS (US English - Medium)',
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+      modality: ModelCategory.SpeechSynthesis,
+      artifactType: ModelArtifactType.TarGzArchive,
+      memoryRequirement: 65_000_000,
+    });
+    ONNX.addModel({
+      id: 'vits-piper-en_GB-alba-medium',
+      name: 'Piper TTS (British English)',
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
+      modality: ModelCategory.SpeechSynthesis,
+      artifactType: ModelArtifactType.TarGzArchive,
+      memoryRequirement: 65_000_000,
+    });
+    console.log('[App] ✅ ONNX module registered with STT/TTS models');
+
+    console.log('[App] 🎉 All modules and models registered');
+  };
+
+  /**
    * Initialize the SDK
+   * Matches iOS initializeSDK() in RunAnywhereAIApp.swift
    */
   const initializeSDK = async () => {
     setInitState('loading');
     setError(null);
 
     try {
-      console.log('[App] Initializing RunAnywhere SDK...');
-      // Initialize RunAnywhere SDK
-      // In development mode, authentication is bypassed
+      console.log('[App] 🎯 Initializing SDK...');
+      const startTime = Date.now();
+
+      // Initialize SDK based on build configuration
+      // Development mode - uses Supabase, no API key needed
       await RunAnywhere.initialize({
         apiKey: '', // Empty in development mode
         baseURL: 'https://api.runanywhere.com',
         environment: SDKEnvironment.Development,
       });
-      console.log('[App] SDK initialized successfully');
+      console.log('[App] ✅ SDK initialized in DEVELOPMENT mode');
 
-      // Check if really initialized
+      // Register modules and models
+      await registerModulesAndModels();
+
+      const initTime = Date.now() - startTime;
+      console.log('[App] ✅ SDK successfully initialized!');
+      console.log(`[App] ⚡ Initialization time: ${initTime}ms`);
+
+      // Get SDK info
       const isInit = await RunAnywhere.isInitialized();
-      console.log('[App] isInitialized:', isInit);
+      console.log('[App] 🎯 SDK Status:', isInit ? 'Active' : 'Inactive');
 
       const version = await RunAnywhere.getVersion();
-      console.log('[App] SDK version:', version);
+      console.log('[App] 🔧 SDK Version:', version);
 
       const backendInfo = await RunAnywhere.getBackendInfo();
-      console.log('[App] Backend info:', JSON.stringify(backendInfo));
+      console.log('[App] 🔧 Environment:', JSON.stringify(backendInfo));
+      console.log('[App] 📱 Services will initialize on first API call');
+
+      console.log('[App] 💡 Models registered, user can now download and select models');
 
       setInitState('ready');
     } catch (err) {
-      console.error('[App] SDK initialization error:', err);
+      console.error('[App] ❌ SDK initialization failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
       setInitState('error');

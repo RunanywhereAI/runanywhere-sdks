@@ -1,0 +1,184 @@
+/**
+ * LlamaCPP.ts
+ *
+ * LlamaCPP module wrapper for RunAnywhere React Native SDK.
+ * Provides public API for module registration and model declaration.
+ *
+ * This mirrors the Swift SDK's LlamaCPP module pattern:
+ * - LlamaCPP.register() - Register the module with ServiceRegistry
+ * - LlamaCPP.addModel() - Declare a model for this module
+ *
+ * Reference: sdk/runanywhere-swift/Sources/LlamaCPPRuntime/LlamaCPPServiceProvider.swift
+ *           sdk/runanywhere-swift/Sources/RunAnywhere/Core/Module/RunAnywhereModule.swift
+ */
+
+import { LlamaCppProvider } from '../Providers/LlamaCppProvider';
+import { ModelRegistry } from '../services/ModelRegistry';
+import {
+  LLMFramework,
+  ModelCategory,
+  ModelFormat,
+  ConfigurationSource,
+} from '../types/enums';
+import type { ModelInfo } from '../types/models';
+import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+
+const logger = new SDKLogger('LlamaCPP');
+
+/**
+ * Model registration options for LlamaCPP models
+ *
+ * Matches iOS: LlamaCPP.addModel() parameter structure
+ */
+export interface LlamaCPPModelOptions {
+  /** Unique model ID. If not provided, generated from URL filename */
+  id?: string;
+  /** Display name for the model */
+  name: string;
+  /** Download URL for the model */
+  url: string;
+  /** Model category (defaults to Language for LLM models) */
+  modality?: ModelCategory;
+  /** Memory requirement in bytes */
+  memoryRequirement?: number;
+  /** Whether model supports reasoning/thinking tokens */
+  supportsThinking?: boolean;
+}
+
+/**
+ * LlamaCPP Module
+ *
+ * Public API for registering LlamaCPP module and declaring GGUF models.
+ * This provides the same developer experience as the iOS SDK.
+ *
+ * ## Usage
+ *
+ * ```typescript
+ * import { LlamaCPP } from 'runanywhere-react-native';
+ *
+ * // Register module
+ * LlamaCPP.register();
+ *
+ * // Add models
+ * LlamaCPP.addModel({
+ *   id: 'smollm2-360m-q8_0',
+ *   name: 'SmolLM2 360M Q8_0',
+ *   url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+ *   memoryRequirement: 500_000_000
+ * });
+ * ```
+ *
+ * Matches iOS: public enum LlamaCPP: RunAnywhereModule
+ */
+export const LlamaCPP = {
+  /**
+   * Module metadata
+   * Matches iOS: static let moduleId, moduleName, inferenceFramework
+   */
+  moduleId: 'llamacpp',
+  moduleName: 'LlamaCPP',
+  inferenceFramework: LLMFramework.LlamaCpp,
+  capabilities: ['llm'] as const,
+  defaultPriority: 100,
+
+  /**
+   * Register LlamaCPP module with the SDK
+   *
+   * This registers the LlamaCPP provider with ServiceRegistry,
+   * enabling it to handle GGUF models.
+   *
+   * Matches iOS: static func register(priority: Int = defaultPriority)
+   *
+   * @example
+   * ```typescript
+   * LlamaCPP.register();
+   * ```
+   */
+  register(): void {
+    logger.info('Registering LlamaCPP module');
+    LlamaCppProvider.register();
+    logger.info('✅ LlamaCPP module registered');
+  },
+
+  /**
+   * Add a model to this module
+   *
+   * Registers a GGUF model with the ModelRegistry.
+   * The model will use LlamaCPP framework automatically.
+   *
+   * Matches iOS: static func addModel(id:name:url:modality:memoryRequirement:supportsThinking:)
+   *
+   * @param options - Model registration options
+   * @returns The created ModelInfo
+   *
+   * @example
+   * ```typescript
+   * LlamaCPP.addModel({
+   *   id: 'llama-2-7b-chat-q4_k_m',
+   *   name: 'Llama 2 7B Chat Q4_K_M',
+   *   url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
+   *   memoryRequirement: 4_000_000_000
+   * });
+   * ```
+   */
+  addModel(options: LlamaCPPModelOptions): ModelInfo {
+    // Generate stable ID from URL if not provided
+    const modelId = options.id ?? this._generateModelId(options.url);
+
+    // Determine modality (default to Language for LLM)
+    const category = options.modality ?? ModelCategory.Language;
+
+    // Infer format from URL
+    const format = options.url.toLowerCase().includes('.gguf')
+      ? ModelFormat.GGUF
+      : ModelFormat.GGML;
+
+    const now = new Date().toISOString();
+
+    const modelInfo: ModelInfo = {
+      id: modelId,
+      name: options.name,
+      category,
+      format,
+      downloadURL: options.url,
+      localPath: undefined,
+      downloadSize: undefined,
+      memoryRequired: options.memoryRequirement,
+      compatibleFrameworks: [LLMFramework.LlamaCpp],
+      preferredFramework: LLMFramework.LlamaCpp,
+      supportsThinking: options.supportsThinking ?? false,
+      metadata: { tags: [] },
+      source: ConfigurationSource.Local,
+      createdAt: now,
+      updatedAt: now,
+      syncPending: false,
+      usageCount: 0,
+      isDownloaded: false,
+      isAvailable: true,
+    };
+
+    // Register with ModelRegistry (synchronous - queues async registration)
+    ModelRegistry.registerModel(modelInfo);
+
+    logger.info(`Added model: ${modelId} (${options.name})`);
+
+    return modelInfo;
+  },
+
+  /**
+   * Generate a stable model ID from URL
+   * @internal
+   */
+  _generateModelId(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname;
+      const filename = pathname.split('/').pop() ?? 'model';
+      // Remove common extensions
+      return filename.replace(/\.(gguf|ggml|bin)$/i, '');
+    } catch {
+      // Fallback for invalid URLs
+      return `model-${Date.now()}`;
+    }
+  },
+};

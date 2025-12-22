@@ -1,12 +1,28 @@
 /**
  * VoiceAssistantScreen - Tab 3: Voice Assistant
  *
- * Multi-modal pipeline: STT + LLM + TTS
+ * Complete voice AI pipeline combining speech recognition, language model, and synthesis.
+ * Matches iOS VoiceAssistantView architecture and patterns.
  *
- * Reference: iOS Features/Voice/VoiceAssistantView.swift
+ * Pipeline:
+ * 1. STT: Voice → Text (Whisper model)
+ * 2. LLM: Text → Response (LlamaCPP model)
+ * 3. TTS: Response → Speech (Piper model)
  *
- * Note: This is an experimental feature that demonstrates the pipeline.
- * Full functionality requires downloaded STT, LLM, and TTS models.
+ * Features:
+ * - Push-to-talk voice interaction
+ * - Real-time conversation display
+ * - Model status indicators for each stage
+ * - Audio level visualization
+ * - Experimental/demo mode support
+ *
+ * Architecture:
+ * - Orchestrates STT, LLM, and TTS capabilities
+ * - Sequential pipeline execution
+ * - Error handling at each stage
+ * - Requires all three models to be loaded
+ *
+ * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/VoiceAssistantView.swift
  */
 
 import React, { useState, useCallback, useEffect } from 'react';

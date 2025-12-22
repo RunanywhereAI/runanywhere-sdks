@@ -1,13 +1,24 @@
 /**
  * ChatScreen - Tab 0: Language Model Chat
  *
- * Reference: iOS Features/Chat/ChatInterfaceView.swift
+ * Provides LLM-powered chat interface with conversation management.
+ * Matches iOS ChatInterfaceView architecture and patterns.
  *
  * Features:
  * - Conversation management (create, switch, delete)
  * - Streaming LLM text generation
- * - Message analytics
- * - Model selection
+ * - Message analytics (tokens/sec, generation time)
+ * - Model selection sheet
+ * - Model status banner (shows loaded model)
+ * - Demo mode for testing without models
+ *
+ * Architecture:
+ * - Uses ConversationStore for state management (matches iOS)
+ * - Separates UI from business logic (View + ViewModel pattern)
+ * - Model loading via RunAnywhere.loadTextModel()
+ * - Text generation via RunAnywhere.generateText()
+ *
+ * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Views/ChatInterfaceView.swift
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';

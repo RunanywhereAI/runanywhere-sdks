@@ -1,10 +1,23 @@
 /**
  * STTScreen - Tab 1: Speech-to-Text
  *
- * Reference: iOS Features/Voice/SpeechToTextView.swift
+ * Provides on-device speech recognition with real-time transcription.
+ * Matches iOS SpeechToTextView architecture and patterns.
  *
- * Uses RunAnywhere SDK for on-device speech recognition.
- * Native module handles audio decoding via iOS AudioToolbox.
+ * Features:
+ * - Batch mode: Record first, then transcribe
+ * - Live mode: Real-time transcription (streaming)
+ * - Model selection sheet
+ * - Audio level visualization
+ * - Model status banner
+ *
+ * Architecture:
+ * - Uses native audio recording (AudioService)
+ * - Model loading via RunAnywhere.loadSTTModel()
+ * - Transcription via RunAnywhere.transcribeAudio()
+ * - Supports ONNX-based Whisper models
+ *
+ * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/SpeechToTextView.swift
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
