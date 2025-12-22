@@ -8,24 +8,28 @@
 /// - **ONNX Runtime**: STT, TTS, VAD capabilities via Sherpa-ONNX
 /// - **LlamaCpp**: LLM capabilities via llama.cpp
 ///
-/// ## Usage
+/// ## Usage (iOS-style API)
 ///
-/// Import the specific backend you need:
+/// Import and register the specific backend you need:
 ///
 /// ```dart
 /// // For ONNX capabilities (STT, TTS, VAD)
 /// import 'package:runanywhere/backends/onnx/onnx.dart';
-/// await OnnxBackend.initialize();
+/// await Onnx.register();
 ///
 /// // For LLM capabilities
 /// import 'package:runanywhere/backends/llamacpp/llamacpp.dart';
-/// await LlamaCppBackend.initialize();
+/// await LlamaCpp.register();
 /// ```
 ///
 /// Or import all backends:
 ///
 /// ```dart
 /// import 'package:runanywhere/backends/backends.dart';
+///
+/// // Register all backends
+/// await Onnx.register(priority: 100);  // STT, TTS, VAD
+/// await LlamaCpp.register(priority: 100);  // LLM
 /// ```
 library runanywhere_backends;
 

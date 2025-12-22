@@ -1,15 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/models/app_types.dart';
-import '../../core/services/device_info_service.dart';
-import 'add_model_from_url_view.dart';
-import 'model_components.dart';
-import 'model_list_view_model.dart';
-import 'model_types.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/core/services/device_info_service.dart';
+import 'package:runanywhere_ai/features/models/add_model_from_url_view.dart';
+import 'package:runanywhere_ai/features/models/model_components.dart';
+import 'package:runanywhere_ai/features/models/model_list_view_model.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// ModelSelectionSheet (mirroring iOS ModelSelectionSheet.swift)
 ///
@@ -40,7 +42,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+    unawaited(_loadInitialData());
   }
 
   Future<void> _loadInitialData() async {
@@ -164,9 +166,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
   Widget _buildFrameworksSection(BuildContext context) {
     // Filter frameworks based on context
     final relevantFrameworks =
-        _viewModel.availableFrameworks.where((framework) {
-      return _shouldShowFramework(framework);
-    }).toList();
+        _viewModel.availableFrameworks.where(_shouldShowFramework).toList();
 
     // Add system TTS for TTS context
     if (widget.context == ModelSelectionContext.tts &&
@@ -498,13 +498,13 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       preferredFramework: LLMFramework.systemTTS,
     );
 
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future<void>.delayed(const Duration(milliseconds: 300));
 
     setState(() {
       _loadingProgress = 'System TTS ready!';
     });
 
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
 
     await widget.onModelSelected(systemTTSModel);
 
@@ -548,8 +548,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
           await sdk.RunAnywhere.loadSTTModel(model.id);
           break;
         case ModelSelectionContext.tts:
-          debugPrint('🎯 Loading TTS model: ${model.id}');
-          await sdk.RunAnywhere.loadTTSModel(model.id);
+          debugPrint('🎯 Loading TTS voice: ${model.id}');
+          await sdk.RunAnywhere.loadTTSVoice(model.id);
           break;
         case ModelSelectionContext.voice:
           // Determine based on model category
@@ -557,8 +557,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
             debugPrint('🎯 Loading Voice STT model: ${model.id}');
             await sdk.RunAnywhere.loadSTTModel(model.id);
           } else if (model.category == ModelCategory.speechSynthesis) {
-            debugPrint('🎯 Loading Voice TTS model: ${model.id}');
-            await sdk.RunAnywhere.loadTTSModel(model.id);
+            debugPrint('🎯 Loading Voice TTS voice: ${model.id}');
+            await sdk.RunAnywhere.loadTTSVoice(model.id);
           } else {
             debugPrint('🎯 Loading Voice LLM model: ${model.id}');
             await sdk.RunAnywhere.loadModel(model.id);
@@ -570,7 +570,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
         _loadingProgress = 'Model loaded successfully!';
       });
 
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
 
       await _viewModel.selectModel(model);
       await widget.onModelSelected(model);
@@ -596,7 +596,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
   }
 
   void _showAddModelSheet() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -608,7 +608,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
           if (mounted) navigator.pop();
         },
       ),
-    );
+    ));
   }
 }
 
@@ -927,7 +927,7 @@ Future<ModelInfo?> showModelSelectionSheet(
 }) async {
   ModelInfo? selectedModel;
 
-  await showModalBottomSheet(
+  await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

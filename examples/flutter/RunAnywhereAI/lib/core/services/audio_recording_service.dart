@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 /// Audio Recording Service
 ///
@@ -31,8 +30,8 @@ class AudioRecordingService {
   Stream<double>? get audioLevelStream => _audioLevelController?.stream;
 
   /// Check if microphone permission is granted
-  Future<bool> hasPermission() async {
-    return await _recorder.hasPermission();
+  Future<bool> hasPermission() {
+    return _recorder.hasPermission();
   }
 
   /// Start recording audio
@@ -207,7 +206,10 @@ class AudioRecordingService {
   void _stopAudioLevelMonitoring() {
     _audioLevelTimer?.cancel();
     _audioLevelTimer = null;
-    _audioLevelController?.close();
+    final controller = _audioLevelController;
+    if (controller != null) {
+      unawaited(controller.close());
+    }
     _audioLevelController = null;
   }
 

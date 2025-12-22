@@ -1,12 +1,13 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/models/app_types.dart';
-import '../../core/utilities/constants.dart';
-import '../../core/utilities/keychain_helper.dart';
+import 'package:flutter/material.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/core/utilities/constants.dart';
+import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// CombinedSettingsView (mirroring iOS CombinedSettingsView.swift)
 ///
@@ -37,8 +38,8 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
-    _loadStorageInfo();
+    unawaited(_loadSettings());
+    unawaited(_loadStorageInfo());
   }
 
   Future<void> _loadSettings() async {
@@ -223,7 +224,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
                 setState(() {
                   _routingPolicy = selection.first;
                 });
-                _saveSettings();
+                unawaited(_saveSettings());
               },
             ),
           ],

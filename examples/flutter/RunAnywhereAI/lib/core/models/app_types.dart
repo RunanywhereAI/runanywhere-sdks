@@ -109,18 +109,3 @@ enum VoiceSessionState {
   speaking,
   error,
 }
-
-/// Quiz view state for quiz flow
-enum QuizViewState {
-  input,
-  generating,
-  quiz,
-  results,
-}
-
-/// Swipe direction for quiz cards
-enum SwipeDirection {
-  left,
-  right,
-  none,
-}

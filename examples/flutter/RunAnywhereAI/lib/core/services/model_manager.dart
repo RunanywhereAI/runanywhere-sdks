@@ -20,6 +20,7 @@ class ModelManager extends ChangeNotifier {
   String? _currentModelId;
   ModelInfo? _currentModel;
   List<ModelInfo> _availableModels = [];
+  // ignore: cancel_subscriptions, cancelled in dispose()
   StreamSubscription<SDKModelEvent>? _modelEventsSubscription;
 
   bool get isLoading => _isLoading;
@@ -36,7 +37,7 @@ class ModelManager extends ChangeNotifier {
       if (event is SDKModelLoadStarted) {
         _handleModelLoadStarted(event.modelId);
       } else if (event is SDKModelLoadCompleted) {
-        _handleModelLoadCompleted(event.modelId);
+        unawaited(_handleModelLoadCompleted(event.modelId));
       } else if (event is SDKModelLoadFailed) {
         _handleModelLoadFailed(event.modelId, event.error);
       } else if (event is SDKModelUnloadStarted) {
@@ -56,7 +57,7 @@ class ModelManager extends ChangeNotifier {
   }
 
   /// Handle model load completed event from SDK
-  void _handleModelLoadCompleted(String modelId) async {
+  Future<void> _handleModelLoadCompleted(String modelId) async {
     debugPrint('📡 SDK Event: Model load completed: $modelId');
     // Refresh current model from SDK
     _currentModel = RunAnywhere.currentModel;
@@ -96,7 +97,10 @@ class ModelManager extends ChangeNotifier {
 
   @override
   void dispose() {
-    _modelEventsSubscription?.cancel();
+    final subscription = _modelEventsSubscription;
+    if (subscription != null) {
+      unawaited(subscription.cancel());
+    }
     super.dispose();
   }
 
@@ -159,22 +163,22 @@ class ModelManager extends ChangeNotifier {
     }
   }
 
-  /// Load a TTS model by ID using SDK
+  /// Load a TTS voice by ID using SDK
   /// Matches iOS ModelManager pattern for TTS models
-  Future<void> loadTTSModel(String modelId) async {
+  Future<void> loadTTSVoice(String voiceId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      debugPrint('⏳ Loading TTS model: $modelId');
+      debugPrint('⏳ Loading TTS voice: $voiceId');
 
-      // Use SDK's TTS model loading
-      await RunAnywhere.loadTTSModel(modelId);
+      // Use SDK's TTS voice loading
+      await RunAnywhere.loadTTSVoice(voiceId);
 
-      debugPrint('✅ TTS model loaded successfully: $modelId');
+      debugPrint('✅ TTS voice loaded successfully: $voiceId');
     } catch (e) {
-      debugPrint('❌ Failed to load TTS model: $e');
+      debugPrint('❌ Failed to load TTS voice: $e');
       _error = e;
       rethrow;
     } finally {
@@ -322,15 +326,15 @@ class ModelManager extends ChangeNotifier {
     return _availableModels.where((m) => m.isDownloaded).toList();
   }
 
-  /// Get loaded STT component from SDK
-  STTComponent? get loadedSTTComponent => RunAnywhere.loadedSTTComponent;
+  /// Get loaded STT capability from SDK
+  STTCapability? get loadedSTTCapability => RunAnywhere.loadedSTTCapability;
 
-  /// Get loaded TTS component from SDK
-  TTSComponent? get loadedTTSComponent => RunAnywhere.loadedTTSComponent;
+  /// Get loaded TTS capability from SDK
+  TTSCapability? get loadedTTSCapability => RunAnywhere.loadedTTSCapability;
 
   /// Check if an STT model is loaded
-  bool get isSTTModelLoaded => RunAnywhere.loadedSTTComponent != null;
+  bool get isSTTModelLoaded => RunAnywhere.loadedSTTCapability != null;
 
   /// Check if a TTS model is loaded
-  bool get isTTSModelLoaded => RunAnywhere.loadedTTSComponent != null;
+  bool get isTTSModelLoaded => RunAnywhere.loadedTTSCapability != null;
 }
