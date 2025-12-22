@@ -3,13 +3,17 @@ package com.runanywhere.runanywhereai.presentation.models
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.DeviceInfo
+import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.collectDeviceInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelSelectionContext
-import com.runanywhere.sdk.models.enums.supportedModalities
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.listAvailableModels
+import com.runanywhere.sdk.public.extensions.loadModel
+import com.runanywhere.sdk.public.extensions.loadSTTModel
+import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,9 +27,8 @@ import kotlinx.coroutines.launch
  * Reference: iOS ModelSelectionSheet.swift
  */
 class ModelSelectionViewModel(
-    private val context: ModelSelectionContext = ModelSelectionContext.LLM
+    private val context: ModelSelectionContext = ModelSelectionContext.LLM,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ModelSelectionUiState(context = context))
     val uiState: StateFlow<ModelSelectionUiState> = _uiState.asStateFlow()
 
@@ -51,13 +54,14 @@ class ModelSelectionViewModel(
                 android.util.Log.d("ModelSelectionVM", "🔄 Loading models and frameworks for context: $context")
 
                 // Call SDK to get available models
-                val allModels = RunAnywhere.availableModels()
+                val allModels = listAvailableModels()
                 android.util.Log.d("ModelSelectionVM", "📦 Fetched ${allModels.size} total models from SDK")
 
                 // Filter models by context - matches iOS relevantCategories filtering
-                val filteredModels = allModels.filter { model ->
-                    context.isCategoryRelevant(model.category)
-                }
+                val filteredModels =
+                    allModels.filter { model ->
+                        context.isCategoryRelevant(model.category)
+                    }
                 android.util.Log.d("ModelSelectionVM", "📦 Filtered to ${filteredModels.size} models for context $context")
 
                 // Get registered framework providers from ModuleRegistry
@@ -65,10 +69,13 @@ class ModelSelectionViewModel(
                 val sttProviders = com.runanywhere.sdk.core.ModuleRegistry.allSTTProviders
                 val ttsProviders = com.runanywhere.sdk.core.ModuleRegistry.allTTSProviders
 
-                android.util.Log.d("ModelSelectionVM", "🔍 LLM Providers: ${llmProviders.size}, STT Providers: ${sttProviders.size}, TTS Providers: ${ttsProviders.size}")
+                android.util.Log.d(
+                    "ModelSelectionVM",
+                    "🔍 LLM Providers: ${llmProviders.size}, STT Providers: ${sttProviders.size}, TTS Providers: ${ttsProviders.size}",
+                )
 
                 // Build framework list from registered providers - filtered by context
-                val allRegisteredFrameworks = mutableSetOf<LLMFramework>()
+                val allRegisteredFrameworks = mutableSetOf<InferenceFramework>()
 
                 // Add LLM frameworks
                 llmProviders.forEach { provider ->
@@ -84,25 +91,29 @@ class ModelSelectionViewModel(
                 }
 
                 // Filter frameworks by context - matches iOS shouldShowFramework logic
-                var relevantFrameworks = allRegisteredFrameworks.filter { framework ->
-                    context.isFrameworkRelevant(framework)
-                }.sortedBy { it.displayName }.toMutableList()
+                var relevantFrameworks =
+                    allRegisteredFrameworks.filter { framework ->
+                        context.isFrameworkRelevant(framework)
+                    }.sortedBy { it.displayName }.toMutableList()
 
                 // For TTS context, ensure System TTS is included (matches iOS behavior)
                 // iOS Reference: ModelSelectionSheet.swift line 167
                 // Only add if not already present from registered TTS providers
-                if (context == ModelSelectionContext.TTS && !relevantFrameworks.contains(LLMFramework.SYSTEM_TTS)) {
+                if (context == ModelSelectionContext.TTS && !relevantFrameworks.contains(InferenceFramework.SYSTEM_TTS)) {
                     // Add System TTS at the beginning of the list
-                    relevantFrameworks.add(0, LLMFramework.SYSTEM_TTS)
+                    relevantFrameworks.add(0, InferenceFramework.SYSTEM_TTS)
                     android.util.Log.d("ModelSelectionVM", "📱 Added System TTS for TTS context (not from provider)")
-                } else if (context == ModelSelectionContext.TTS && relevantFrameworks.contains(LLMFramework.SYSTEM_TTS)) {
+                } else if (context == ModelSelectionContext.TTS && relevantFrameworks.contains(InferenceFramework.SYSTEM_TTS)) {
                     // Move System TTS to the beginning if already present
-                    relevantFrameworks.remove(LLMFramework.SYSTEM_TTS)
-                    relevantFrameworks.add(0, LLMFramework.SYSTEM_TTS)
+                    relevantFrameworks.remove(InferenceFramework.SYSTEM_TTS)
+                    relevantFrameworks.add(0, InferenceFramework.SYSTEM_TTS)
                     android.util.Log.d("ModelSelectionVM", "📱 System TTS already registered, moved to top")
                 }
 
-                android.util.Log.d("ModelSelectionVM", "✅ Loaded ${filteredModels.size} models and ${relevantFrameworks.size} frameworks for context $context")
+                android.util.Log.d(
+                    "ModelSelectionVM",
+                    "✅ Loaded ${filteredModels.size} models and ${relevantFrameworks.size} frameworks for context $context",
+                )
                 relevantFrameworks.forEach { fw ->
                     android.util.Log.d("ModelSelectionVM", "   Framework: ${fw.displayName} (${fw.name})")
                 }
@@ -119,18 +130,17 @@ class ModelSelectionViewModel(
                         models = filteredModels,
                         frameworks = relevantFrameworks,
                         isLoading = false,
-                        error = null
+                        error = null,
                     )
                 }
 
                 android.util.Log.d("ModelSelectionVM", "🎉 UI state updated successfully")
-
             } catch (e: Exception) {
                 android.util.Log.e("ModelSelectionVM", "❌ Failed to load models: ${e.message}", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = e.message ?: "Failed to load models"
+                        error = e.message ?: "Failed to load models",
                     )
                 }
             }
@@ -138,13 +148,13 @@ class ModelSelectionViewModel(
     }
 
     /**
-     * Toggle framework expansion - now uses LLMFramework enum
+     * Toggle framework expansion - now uses InferenceFramework enum
      */
-    fun toggleFramework(framework: LLMFramework) {
+    fun toggleFramework(framework: InferenceFramework) {
         android.util.Log.d("ModelSelectionVM", "🔀 Toggling framework: ${framework.displayName}")
         _uiState.update {
             it.copy(
-                expandedFramework = if (it.expandedFramework == framework) null else framework
+                expandedFramework = if (it.expandedFramework == framework) null else framework,
             )
         }
         android.util.Log.d("ModelSelectionVM", "   Expanded framework now: ${_uiState.value.expandedFramework?.displayName}")
@@ -154,10 +164,10 @@ class ModelSelectionViewModel(
      * Get models for a specific framework
      * Matches iOS filtering logic
      */
-    fun getModelsForFramework(framework: LLMFramework): List<ModelInfo> {
+    fun getModelsForFramework(framework: InferenceFramework): List<ModelInfo> {
         return _uiState.value.models.filter { model ->
             model.compatibleFrameworks.contains(framework) ||
-                    model.preferredFramework == framework
+                model.preferredFramework == framework
         }
     }
 
@@ -173,21 +183,13 @@ class ModelSelectionViewModel(
                     it.copy(
                         selectedModelId = modelId,
                         isLoadingModel = true,
-                        loadingProgress = "Starting download..."
+                        loadingProgress = "Starting download...",
                     )
                 }
 
-                // Call SDK download API with progress
-                RunAnywhere.downloadModel(modelId).collect { progress ->
-                    val progressPercent = (progress * 100).toInt()
-                    android.util.Log.d("ModelSelectionVM", "📊 Download progress: $progressPercent%")
-
-                    _uiState.update {
-                        it.copy(
-                            loadingProgress = "Downloading: $progressPercent%"
-                        )
-                    }
-                }
+                // Call SDK download API (suspend function - no progress available)
+                _uiState.update { it.copy(loadingProgress = "Downloading...") }
+                downloadModel(modelId)
 
                 android.util.Log.d("ModelSelectionVM", "✅ Download complete for $modelId")
 
@@ -201,7 +203,7 @@ class ModelSelectionViewModel(
                     it.copy(
                         isLoadingModel = false,
                         selectedModelId = null,
-                        loadingProgress = ""
+                        loadingProgress = "",
                     )
                 }
             } catch (e: Exception) {
@@ -211,7 +213,7 @@ class ModelSelectionViewModel(
                         isLoadingModel = false,
                         selectedModelId = null,
                         loadingProgress = "",
-                        error = e.message ?: "Download failed"
+                        error = e.message ?: "Download failed",
                     )
                 }
             }
@@ -230,7 +232,7 @@ class ModelSelectionViewModel(
                 it.copy(
                     selectedModelId = modelId,
                     isLoadingModel = true,
-                    loadingProgress = "Loading model into memory..."
+                    loadingProgress = "Loading model into memory...",
                 )
             }
 
@@ -243,14 +245,14 @@ class ModelSelectionViewModel(
                     RunAnywhere.loadSTTModel(modelId)
                 }
                 ModelSelectionContext.TTS -> {
-                    RunAnywhere.loadTTSModel(modelId)
+                    RunAnywhere.loadTTSVoice(modelId)
                 }
                 ModelSelectionContext.VOICE -> {
                     // For voice context, determine from model category
                     val model = _uiState.value.models.find { it.id == modelId }
                     when (model?.category) {
                         com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_RECOGNITION -> RunAnywhere.loadSTTModel(modelId)
-                        com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_SYNTHESIS -> RunAnywhere.loadTTSModel(modelId)
+                        com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
                         else -> RunAnywhere.loadModel(modelId)
                     }
                 }
@@ -266,7 +268,7 @@ class ModelSelectionViewModel(
                     loadingProgress = "Model loaded successfully!",
                     isLoadingModel = false,
                     selectedModelId = null,
-                    currentModel = loadedModel
+                    currentModel = loadedModel,
                 )
             }
         } catch (e: Exception) {
@@ -276,7 +278,7 @@ class ModelSelectionViewModel(
                     isLoadingModel = false,
                     selectedModelId = null,
                     loadingProgress = "",
-                    error = e.message ?: "Failed to load model"
+                    error = e.message ?: "Failed to load model",
                 )
             }
         }
@@ -315,18 +317,18 @@ class ModelSelectionViewModel(
 
 /**
  * UI State for Model Selection Bottom Sheet
- * Now uses LLMFramework enum instead of strings
+ * Now uses InferenceFramework enum instead of strings
  */
 data class ModelSelectionUiState(
     val context: ModelSelectionContext = ModelSelectionContext.LLM,
     val deviceInfo: DeviceInfo? = null,
     val models: List<ModelInfo> = emptyList(),
-    val frameworks: List<LLMFramework> = emptyList(),
-    val expandedFramework: LLMFramework? = null,
+    val frameworks: List<InferenceFramework> = emptyList(),
+    val expandedFramework: InferenceFramework? = null,
     val selectedModelId: String? = null,
     val currentModel: ModelInfo? = null,
     val isLoading: Boolean = true,
     val isLoadingModel: Boolean = false,
     val loadingProgress: String = "",
-    val error: String? = null
+    val error: String? = null,
 )

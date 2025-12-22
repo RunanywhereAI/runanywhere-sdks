@@ -5,14 +5,12 @@ import android.content.Context
 import android.util.Log
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
-import com.runanywhere.runanywhereai.domain.models.ConversationAnalytics
 import com.runanywhere.runanywhereai.domain.models.MessageRole
-import com.runanywhere.runanywhereai.domain.models.PerformanceSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.*
@@ -22,7 +20,6 @@ import java.util.*
  * Handles conversation persistence, management, and search
  */
 class ConversationStore private constructor(context: Context) {
-
     companion object {
         @SuppressLint("StaticFieldLeak")
         @Volatile
@@ -45,10 +42,11 @@ class ConversationStore private constructor(context: Context) {
     val currentConversation: StateFlow<Conversation?> = _currentConversation.asStateFlow()
 
     private val conversationsDirectory: File
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
 
     init {
         conversationsDirectory = File(context.filesDir, "Conversations")
@@ -64,16 +62,17 @@ class ConversationStore private constructor(context: Context) {
      * Create a new conversation
      */
     fun createConversation(title: String? = null): Conversation {
-        val conversation = Conversation(
-            id = UUID.randomUUID().toString(),
-            title = title ?: "New Chat",
-            messages = emptyList(),
-            createdAt = System.currentTimeMillis(),
-            updatedAt = System.currentTimeMillis(),
-            modelName = null,
-            analytics = null,
-            performanceSummary = null
-        )
+        val conversation =
+            Conversation(
+                id = UUID.randomUUID().toString(),
+                title = title ?: "New Chat",
+                messages = emptyList(),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                modelName = null,
+                analytics = null,
+                performanceSummary = null,
+            )
 
         val updated = _conversations.value.toMutableList()
         updated.add(0, conversation)
@@ -124,14 +123,18 @@ class ConversationStore private constructor(context: Context) {
     /**
      * Add a message to a conversation
      */
-    fun addMessage(message: ChatMessage, conversation: Conversation) {
+    fun addMessage(
+        message: ChatMessage,
+        conversation: Conversation,
+    ) {
         val updatedMessages = conversation.messages.toMutableList()
         updatedMessages.add(message)
 
-        var updated = conversation.copy(
-            messages = updatedMessages,
-            updatedAt = System.currentTimeMillis()
-        )
+        var updated =
+            conversation.copy(
+                messages = updatedMessages,
+                updatedAt = System.currentTimeMillis(),
+            )
 
         // Auto-generate title from first user message if needed
         if (updated.title == "New Chat" && message.role == MessageRole.USER && message.content.isNotEmpty()) {
@@ -198,19 +201,21 @@ class ConversationStore private constructor(context: Context) {
      */
     private fun loadConversations() {
         try {
-            val files = conversationsDirectory.listFiles { file ->
-                file.extension == "json"
-            } ?: emptyArray()
+            val files =
+                conversationsDirectory.listFiles { file ->
+                    file.extension == "json"
+                } ?: emptyArray()
 
-            val loaded = files.mapNotNull { file ->
-                try {
-                    val jsonString = file.readText()
-                    json.decodeFromString<Conversation>(jsonString)
-                } catch (e: Exception) {
-                    Log.e("ConversationStore", "Failed to load conversation: ${file.name}", e)
-                    null
+            val loaded =
+                files.mapNotNull { file ->
+                    try {
+                        val jsonString = file.readText()
+                        json.decodeFromString<Conversation>(jsonString)
+                    } catch (e: Exception) {
+                        Log.e("ConversationStore", "Failed to load conversation: ${file.name}", e)
+                        null
+                    }
                 }
-            }
 
             // Sort by update date, newest first
             _conversations.value = loaded.sortedByDescending { it.updatedAt }

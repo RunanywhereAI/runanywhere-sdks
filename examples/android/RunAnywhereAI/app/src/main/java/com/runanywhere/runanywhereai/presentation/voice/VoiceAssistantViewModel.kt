@@ -7,53 +7,66 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.domain.models.SessionState
 import com.runanywhere.runanywhereai.domain.services.AudioCaptureService
-import com.runanywhere.sdk.audio.AudioCaptureOptions
-import com.runanywhere.sdk.audio.VoiceAudioChunk
-import com.runanywhere.sdk.components.base.SDKComponent
-import com.runanywhere.sdk.events.ModularPipelineEvent
-import com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker
-import com.runanywhere.sdk.models.lifecycle.Modality
-import com.runanywhere.sdk.public.ModularPipelineConfig
+import com.runanywhere.sdk.features.llm.LLMEvent
+import com.runanywhere.sdk.features.stt.STTEvent
+import com.runanywhere.sdk.features.tts.TTSEvent
+import com.runanywhere.sdk.features.voiceagent.ComponentLoadState
+import com.runanywhere.sdk.features.voiceagent.VoiceAgentEvent
+import com.runanywhere.sdk.infrastructure.events.EventBus
+import com.runanywhere.sdk.infrastructure.events.ModularPipelineEvent
+import com.runanywhere.sdk.infrastructure.events.SDKEvent
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.VoiceLLMConfig
-import com.runanywhere.sdk.public.VoiceSTTConfig
-import com.runanywhere.sdk.public.VoiceTTSConfig
-import com.runanywhere.sdk.public.createVoicePipeline
-import com.runanywhere.sdk.voice.ModularVoicePipeline
+import com.runanywhere.sdk.public.extensions.cleanupVoiceAgent
+import com.runanywhere.sdk.public.extensions.getVoiceAgentComponentStates
+import com.runanywhere.sdk.public.extensions.initializeVoiceAgentWithLoadedModels
+import com.runanywhere.sdk.public.extensions.processVoiceStream
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val TAG = "VoiceAssistantVM"
 
 /**
- * Model Load State
- * iOS Reference: ModelLoadState enum in ModelStatusComponents.swift
+ * Model Load State matching iOS ModelLoadState
  */
 enum class ModelLoadState {
     NOT_LOADED,
     LOADING,
     LOADED,
-    ERROR;
+    ERROR,
+    ;
 
     val isLoaded: Boolean get() = this == LOADED
     val isLoading: Boolean get() = this == LOADING
+
+    companion object {
+        fun fromSDK(state: ComponentLoadState): ModelLoadState =
+            when (state) {
+                is ComponentLoadState.NotLoaded -> NOT_LOADED
+                is ComponentLoadState.Loading -> LOADING
+                is ComponentLoadState.Loaded -> LOADED
+                is ComponentLoadState.Error -> ERROR
+            }
+    }
 }
 
 /**
- * Selected Model Info
- * iOS Reference: (framework: LLMFramework, name: String) tuple in VoiceAssistantViewModel.swift
+ * Selected Model Info matching iOS pattern
  */
 data class SelectedModel(
     val framework: String,
     val name: String,
-    val modelId: String
+    val modelId: String,
 )
 
 /**
- * Voice Assistant UI State
- * iOS Reference: VoiceAssistantViewModel in VoiceAssistantView.swift
+ * Voice Assistant UI State matching iOS VoiceAgentViewModel
  */
 data class VoiceUiState(
     val sessionState: SessionState = SessionState.DISCONNECTED,
@@ -66,26 +79,15 @@ data class VoiceUiState(
     val currentLLMModel: String = "No model loaded",
     val whisperModel: String = "Whisper Base",
     val ttsVoice: String = "System",
-
-    // Model Selection State (for Voice Pipeline Setup)
-    // iOS Reference: sttModel, llmModel, ttsModel in VoiceAssistantViewModel.swift
+    // Model Selection State matching iOS
     val sttModel: SelectedModel? = null,
     val llmModel: SelectedModel? = null,
     val ttsModel: SelectedModel? = null,
-
-    // Model Loading States (from SDK lifecycle tracker)
-    // iOS Reference: sttModelState, llmModelState, ttsModelState
+    // Model Loading States matching iOS
     val sttLoadState: ModelLoadState = ModelLoadState.NOT_LOADED,
     val llmLoadState: ModelLoadState = ModelLoadState.NOT_LOADED,
-    val ttsLoadState: ModelLoadState = ModelLoadState.NOT_LOADED
+    val ttsLoadState: ModelLoadState = ModelLoadState.NOT_LOADED,
 ) {
-    /**
-     * Check if all required models are selected for the voice pipeline
-     * iOS Reference: allModelsReady computed property
-     */
-    val allModelsReady: Boolean
-        get() = sttModel != null && llmModel != null && ttsModel != null
-
     /**
      * Check if all models are actually loaded in memory
      * iOS Reference: allModelsLoaded computed property
@@ -97,255 +99,243 @@ data class VoiceUiState(
 /**
  * ViewModel for Voice Assistant screen
  *
- * iOS Reference: VoiceAssistantViewModel in VoiceAssistantView.swift
+ * iOS Reference: VoiceAgentViewModel
  *
  * This ViewModel manages:
  * - Model selection for 3-model voice pipeline (STT, LLM, TTS)
- * - Model loading states from SDK lifecycle tracker
+ * - Model loading states from SDK events
  * - Voice conversation flow with audio capture
  * - Pipeline event handling
  *
- * Uses RunAnywhere SDK ModularVoicePipeline for STT → LLM → TTS flow
+ * Uses RunAnywhere SDK VoiceAgent capability for STT → LLM → TTS flow
  */
 class VoiceAssistantViewModel(
-    application: Application
+    application: Application,
 ) : AndroidViewModel(application) {
-
     private val context: Context = application.applicationContext
-
-    // Pipeline state
-    private var voicePipeline: ModularVoicePipeline? = null
-    private var pipelineJob: Job? = null
-    private var lifecycleJob: Job? = null
 
     // Audio capture
     private val audioCapture: AudioCaptureService by lazy {
-        AudioCaptureService(context, AudioCaptureOptions.SPEECH_RECOGNITION)
+        AudioCaptureService(context)
     }
+
+    // Jobs for coroutine management
+    private var pipelineJob: Job? = null
+    private var eventSubscriptionJob: Job? = null
 
     private val _uiState = MutableStateFlow(VoiceUiState())
     val uiState: StateFlow<VoiceUiState> = _uiState.asStateFlow()
 
     // Convenience accessors for backward compatibility
-    val sessionState: StateFlow<SessionState> = _uiState.map { it.sessionState }.stateIn(
-        viewModelScope, SharingStarted.Eagerly, SessionState.DISCONNECTED
-    )
-    val isListening: StateFlow<Boolean> = _uiState.map { it.isListening }.stateIn(
-        viewModelScope, SharingStarted.Eagerly, false
-    )
-    val error: StateFlow<String?> = _uiState.map { it.errorMessage }.stateIn(
-        viewModelScope, SharingStarted.Eagerly, null
-    )
-    val currentTranscript: StateFlow<String> = _uiState.map { it.currentTranscript }.stateIn(
-        viewModelScope, SharingStarted.Eagerly, ""
-    )
-    val assistantResponse: StateFlow<String> = _uiState.map { it.assistantResponse }.stateIn(
-        viewModelScope, SharingStarted.Eagerly, ""
-    )
-    val audioLevel: StateFlow<Float> = _uiState.map { it.audioLevel }.stateIn(
-        viewModelScope, SharingStarted.Eagerly, 0f
-    )
+    val sessionState: StateFlow<SessionState> =
+        _uiState.map { it.sessionState }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            SessionState.DISCONNECTED,
+        )
+    val isListening: StateFlow<Boolean> =
+        _uiState.map { it.isListening }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            false,
+        )
+    val error: StateFlow<String?> =
+        _uiState.map { it.errorMessage }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            null,
+        )
+    val currentTranscript: StateFlow<String> =
+        _uiState.map { it.currentTranscript }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            "",
+        )
+    val assistantResponse: StateFlow<String> =
+        _uiState.map { it.assistantResponse }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            "",
+        )
+    val audioLevel: StateFlow<Float> =
+        _uiState.map { it.audioLevel }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            0f,
+        )
 
     init {
-        // Subscribe to SDK's ModelLifecycleTracker for real-time model state updates
-        // iOS equivalent: subscribeToModelLifecycle() in VoiceAssistantViewModel
-        subscribeToModelLifecycle()
+        // Subscribe to SDK events for model state tracking
+        // iOS equivalent: subscribeToSDKEvents() in VoiceAgentViewModel
+        subscribeToSDKEvents()
+        // Sync initial model states
+        syncModelStates()
     }
 
     /**
-     * Subscribe to SDK's model lifecycle tracker for real-time model state updates
-     * iOS equivalent: subscribeToModelLifecycle() in VoiceAssistantViewModel.swift
+     * Subscribe to SDK events for model state tracking
+     * iOS Reference: subscribeToSDKEvents() in VoiceAgentViewModel.swift
      */
-    private fun subscribeToModelLifecycle() {
-        lifecycleJob?.cancel()
-        lifecycleJob = viewModelScope.launch {
-            // Observe changes to loaded models via the SDK's lifecycle tracker
-            ModelLifecycleTracker.modelsByModality.collect { modelsByModality ->
-                Log.d(TAG, "Model lifecycle update: ${modelsByModality.keys}")
-
-                // Update STT model state
-                val sttState = modelsByModality[Modality.STT]
-                if (sttState != null) {
-                    val loadState = when {
-                        sttState.state.isLoaded -> ModelLoadState.LOADED
-                        sttState.state.isLoading -> ModelLoadState.LOADING
-                        sttState.state.isError -> ModelLoadState.ERROR
-                        else -> ModelLoadState.NOT_LOADED
-                    }
-                    _uiState.update {
-                        it.copy(
-                            sttLoadState = loadState,
-                            sttModel = if (sttState.state.isLoaded) {
-                                SelectedModel(sttState.framework.name, sttState.modelName, sttState.modelId)
-                            } else it.sttModel,
-                            whisperModel = if (sttState.state.isLoaded) sttState.modelName else it.whisperModel
-                        )
-                    }
-                    if (sttState.state.isLoaded) {
-                        Log.i(TAG, "✅ STT model loaded: ${sttState.modelName}")
-                    }
-                } else {
-                    _uiState.update { it.copy(sttLoadState = ModelLoadState.NOT_LOADED) }
+    private fun subscribeToSDKEvents() {
+        eventSubscriptionJob?.cancel()
+        eventSubscriptionJob =
+            viewModelScope.launch {
+                EventBus.shared.allEvents.collect { event ->
+                    handleSDKEvent(event)
                 }
-
-                // Update LLM model state
-                val llmState = modelsByModality[Modality.LLM]
-                if (llmState != null) {
-                    val loadState = when {
-                        llmState.state.isLoaded -> ModelLoadState.LOADED
-                        llmState.state.isLoading -> ModelLoadState.LOADING
-                        llmState.state.isError -> ModelLoadState.ERROR
-                        else -> ModelLoadState.NOT_LOADED
-                    }
-                    _uiState.update {
-                        it.copy(
-                            llmLoadState = loadState,
-                            llmModel = if (llmState.state.isLoaded) {
-                                SelectedModel(llmState.framework.name, llmState.modelName, llmState.modelId)
-                            } else it.llmModel,
-                            currentLLMModel = if (llmState.state.isLoaded) llmState.modelName else it.currentLLMModel
-                        )
-                    }
-                    if (llmState.state.isLoaded) {
-                        Log.i(TAG, "✅ LLM model loaded: ${llmState.modelName}")
-                    }
-                } else {
-                    _uiState.update { it.copy(llmLoadState = ModelLoadState.NOT_LOADED) }
-                }
-
-                // Update TTS model state
-                val ttsState = modelsByModality[Modality.TTS]
-                if (ttsState != null) {
-                    val loadState = when {
-                        ttsState.state.isLoaded -> ModelLoadState.LOADED
-                        ttsState.state.isLoading -> ModelLoadState.LOADING
-                        ttsState.state.isError -> ModelLoadState.ERROR
-                        else -> ModelLoadState.NOT_LOADED
-                    }
-                    _uiState.update {
-                        it.copy(
-                            ttsLoadState = loadState,
-                            ttsModel = if (ttsState.state.isLoaded) {
-                                SelectedModel(ttsState.framework.name, ttsState.modelName, ttsState.modelId)
-                            } else it.ttsModel,
-                            ttsVoice = if (ttsState.state.isLoaded) ttsState.modelName else it.ttsVoice
-                        )
-                    }
-                    if (ttsState.state.isLoaded) {
-                        Log.i(TAG, "✅ TTS model loaded: ${ttsState.modelName}")
-                    }
-                } else {
-                    _uiState.update { it.copy(ttsLoadState = ModelLoadState.NOT_LOADED) }
-                }
-
-                // Log overall state
-                val uiStateValue = _uiState.value
-                Log.i(TAG, "📊 Voice pipeline state - STT: ${uiStateValue.sttLoadState.isLoaded}, LLM: ${uiStateValue.llmLoadState.isLoaded}, TTS: ${uiStateValue.ttsLoadState.isLoaded}")
             }
+    }
+
+    /**
+     * Handle SDK events for model state updates
+     * iOS Reference: handleSDKEvent(_:) in VoiceAgentViewModel.swift
+     */
+    private fun handleSDKEvent(event: SDKEvent) {
+        when (event) {
+            // Handle LLM events
+            is LLMEvent.ModelLoadStarted -> {
+                _uiState.update { it.copy(llmLoadState = ModelLoadState.LOADING) }
+            }
+            is LLMEvent.ModelLoadCompleted -> {
+                _uiState.update {
+                    it.copy(
+                        llmLoadState = ModelLoadState.LOADED,
+                        llmModel = SelectedModel("llamacpp", event.modelId, event.modelId),
+                        currentLLMModel = event.modelId,
+                    )
+                }
+                Log.i(TAG, "✅ LLM model loaded: ${event.modelId}")
+            }
+            is LLMEvent.ModelLoadFailed -> {
+                _uiState.update { it.copy(llmLoadState = ModelLoadState.ERROR) }
+            }
+            is LLMEvent.ModelUnloaded -> {
+                _uiState.update {
+                    it.copy(
+                        llmLoadState = ModelLoadState.NOT_LOADED,
+                        llmModel = null,
+                    )
+                }
+            }
+
+            // Handle STT events
+            is STTEvent.ModelLoadStarted -> {
+                _uiState.update { it.copy(sttLoadState = ModelLoadState.LOADING) }
+            }
+            is STTEvent.ModelLoadCompleted -> {
+                _uiState.update {
+                    it.copy(
+                        sttLoadState = ModelLoadState.LOADED,
+                        sttModel = SelectedModel("whisper", event.modelId, event.modelId),
+                        whisperModel = event.modelId,
+                    )
+                }
+                Log.i(TAG, "✅ STT model loaded: ${event.modelId}")
+            }
+            is STTEvent.ModelLoadFailed -> {
+                _uiState.update { it.copy(sttLoadState = ModelLoadState.ERROR) }
+            }
+            is STTEvent.ModelUnloaded -> {
+                _uiState.update {
+                    it.copy(
+                        sttLoadState = ModelLoadState.NOT_LOADED,
+                        sttModel = null,
+                    )
+                }
+            }
+
+            // Handle TTS events
+            is TTSEvent.ModelLoadStarted -> {
+                _uiState.update { it.copy(ttsLoadState = ModelLoadState.LOADING) }
+            }
+            is TTSEvent.ModelLoadCompleted -> {
+                _uiState.update {
+                    it.copy(
+                        ttsLoadState = ModelLoadState.LOADED,
+                        ttsModel = SelectedModel("tts", event.voiceId, event.voiceId),
+                        ttsVoice = event.voiceId,
+                    )
+                }
+                Log.i(TAG, "✅ TTS model loaded: ${event.voiceId}")
+            }
+            is TTSEvent.ModelLoadFailed -> {
+                _uiState.update { it.copy(ttsLoadState = ModelLoadState.ERROR) }
+            }
+            is TTSEvent.ModelUnloaded -> {
+                _uiState.update {
+                    it.copy(
+                        ttsLoadState = ModelLoadState.NOT_LOADED,
+                        ttsModel = null,
+                    )
+                }
+            }
+
+            else -> { /* Ignore other events */ }
         }
     }
 
     /**
-     * Set the STT model for voice pipeline
-     *
-     * TODO: Integrate with SDK model loading
-     * iOS equivalent: setSTTModel(_ model: ModelInfo)
+     * Sync model states from SDK
+     * iOS Reference: syncModelStates() in VoiceAgentViewModel.swift
      */
-    fun setSTTModel(framework: String, name: String, modelId: String) {
-        viewModelScope.launch {
-            val model = SelectedModel(framework, name, modelId)
+    private fun syncModelStates() {
+        try {
+            val states = RunAnywhere.getVoiceAgentComponentStates()
+
+            // Extract model IDs with explicit casting to avoid smart cast issues
+            val sttModelId = (states.stt as? ComponentLoadState.Loaded)?.modelId
+            val llmModelId = (states.llm as? ComponentLoadState.Loaded)?.modelId
+            val ttsModelId = (states.tts as? ComponentLoadState.Loaded)?.modelId
+
             _uiState.update {
                 it.copy(
-                    sttModel = model,
-                    whisperModel = name,
-                    sttLoadState = ModelLoadState.LOADING
+                    sttLoadState = ModelLoadState.fromSDK(states.stt),
+                    llmLoadState = ModelLoadState.fromSDK(states.llm),
+                    ttsLoadState = ModelLoadState.fromSDK(states.tts),
+                    sttModel =
+                        sttModelId?.let { id ->
+                            SelectedModel("whisper", id, id)
+                        },
+                    llmModel =
+                        llmModelId?.let { id ->
+                            SelectedModel("llamacpp", id, id)
+                        },
+                    ttsModel =
+                        ttsModelId?.let { id ->
+                            SelectedModel("tts", id, id)
+                        },
                 )
             }
 
-            // TODO: Load the model using SDK
-            // iOS equivalent:
-            // sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name)
-            // whisperModel = model.name
-
-            // Mock loading for now
-            delay(1500)
-
-            _uiState.update { it.copy(sttLoadState = ModelLoadState.LOADED) }
+            Log.i(TAG, "📊 Model states synced - STT: ${states.stt.isLoaded}, LLM: ${states.llm.isLoaded}, TTS: ${states.tts.isLoaded}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not sync model states: ${e.message}")
         }
     }
 
     /**
-     * Set the LLM model for voice pipeline
-     *
-     * TODO: Integrate with SDK model loading
-     * iOS equivalent: setLLMModel(_ model: ModelInfo)
+     * Refresh component states from SDK
+     * iOS Reference: refreshComponentStatesFromSDK() in VoiceAgentViewModel.swift
      */
-    fun setLLMModel(framework: String, name: String, modelId: String) {
-        viewModelScope.launch {
-            val model = SelectedModel(framework, name, modelId)
-            _uiState.update {
-                it.copy(
-                    llmModel = model,
-                    currentLLMModel = name,
-                    llmLoadState = ModelLoadState.LOADING
-                )
-            }
-
-            // TODO: Load the model using SDK
-            // iOS equivalent:
-            // llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
-            // currentLLMModel = model.name
-
-            // Mock loading for now
-            delay(2000)
-
-            _uiState.update { it.copy(llmLoadState = ModelLoadState.LOADED) }
-        }
+    fun refreshComponentStatesFromSDK() {
+        syncModelStates()
     }
 
     /**
-     * Set the TTS model for voice pipeline
-     *
-     * TODO: Integrate with SDK model loading
-     * iOS equivalent: setTTSModel(_ model: ModelInfo)
-     */
-    fun setTTSModel(framework: String, name: String, modelId: String) {
-        viewModelScope.launch {
-            val model = SelectedModel(framework, name, modelId)
-            _uiState.update {
-                it.copy(
-                    ttsModel = model,
-                    ttsVoice = name,
-                    ttsLoadState = ModelLoadState.LOADING
-                )
-            }
-
-            // TODO: Load the model using SDK
-            // iOS equivalent:
-            // ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
-
-            // Mock loading for now
-            delay(1000)
-
-            _uiState.update { it.copy(ttsLoadState = ModelLoadState.LOADED) }
-        }
-    }
-
-    /**
-     * Start real-time conversation using modular pipeline
-     * iOS equivalent: startConversation() in VoiceAssistantViewModel.swift
+     * Start voice conversation session
+     * iOS Reference: startConversation() in VoiceAgentViewModel.swift
      */
     fun startSession() {
         viewModelScope.launch {
             try {
-                Log.i(TAG, "Starting conversation with modular pipeline...")
+                Log.i(TAG, "Starting conversation...")
 
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.CONNECTING,
                         errorMessage = null,
                         currentTranscript = "",
-                        assistantResponse = ""
+                        assistantResponse = "",
                     )
                 }
 
@@ -356,7 +346,7 @@ class VoiceAssistantViewModel(
                     _uiState.update {
                         it.copy(
                             sessionState = SessionState.ERROR,
-                            errorMessage = "Please load all required models (STT, LLM, TTS) before starting"
+                            errorMessage = "Please load all required models (STT, LLM, TTS) before starting",
                         )
                     }
                     return@launch
@@ -368,110 +358,52 @@ class VoiceAssistantViewModel(
                     _uiState.update {
                         it.copy(
                             sessionState = SessionState.ERROR,
-                            errorMessage = "Microphone permission required"
+                            errorMessage = "Microphone permission required",
                         )
                     }
                     return@launch
                 }
 
-                // Get model IDs from lifecycle tracker
-                val sttModelId = ModelLifecycleTracker.loadedModel(Modality.STT)?.modelId
-                val llmModelId = ModelLifecycleTracker.loadedModel(Modality.LLM)?.modelId
-                val ttsModelId = ModelLifecycleTracker.loadedModel(Modality.TTS)?.modelId ?: "system"
+                // Initialize voice agent with loaded models
+                RunAnywhere.initializeVoiceAgentWithLoadedModels()
 
-                if (sttModelId == null) {
-                    _uiState.update {
-                        it.copy(
-                            sessionState = SessionState.ERROR,
-                            errorMessage = "No STT model loaded"
-                        )
-                    }
-                    return@launch
-                }
-
-                if (llmModelId == null) {
-                    _uiState.update {
-                        it.copy(
-                            sessionState = SessionState.ERROR,
-                            errorMessage = "No LLM model loaded"
-                        )
-                    }
-                    return@launch
-                }
-
-                Log.i(TAG, "Starting voice pipeline with STT: $sttModelId, LLM: $llmModelId, TTS: $ttsModelId")
-
-                // Create pipeline configuration
-                val config = ModularPipelineConfig.create(
-                    components = listOf(
-                        com.runanywhere.sdk.public.PipelineComponent.STT,
-                        com.runanywhere.sdk.public.PipelineComponent.LLM,
-                        com.runanywhere.sdk.public.PipelineComponent.TTS
-                    ),
-                    stt = VoiceSTTConfig(modelId = sttModelId, language = "en"),
-                    llm = VoiceLLMConfig(
-                        modelId = llmModelId,
-                        systemPrompt = "You are a helpful voice assistant. Keep responses concise and conversational.",
-                        maxTokens = 100
-                    ),
-                    tts = VoiceTTSConfig(voice = ttsModelId)
-                )
-
-                // Create the voice pipeline
-                voicePipeline = RunAnywhere.createVoicePipeline(config)
-                val pipeline = voicePipeline ?: run {
-                    _uiState.update {
-                        it.copy(
-                            sessionState = SessionState.ERROR,
-                            errorMessage = "Failed to create voice pipeline"
-                        )
-                    }
-                    return@launch
-                }
-
-                // Initialize components
-                pipeline.initializeComponents().collect { event ->
-                    handleInitializationEvent(event)
-                }
-
-                // Start audio capture and get audio stream as Flow<VoiceAudioChunk>
-                // Note: We need a Flow<VoiceAudioChunk> for the pipeline
-                val audioFlow = audioCapture.startCaptureChunks()
+                // Start audio capture and process through voice pipeline
+                val audioFlow = audioCapture.startCapture()
 
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.LISTENING,
-                        isListening = true
+                        isListening = true,
                     )
                 }
 
-                Log.i(TAG, "Conversation pipeline started, listening...")
+                Log.i(TAG, "Conversation started, listening...")
 
-                // Process audio through pipeline
-                pipelineJob = viewModelScope.launch {
-                    try {
-                        pipeline.process(audioFlow).collect { event ->
-                            handlePipelineEvent(event)
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Pipeline error", e)
-                        _uiState.update {
-                            it.copy(
-                                sessionState = SessionState.ERROR,
-                                errorMessage = "Pipeline error: ${e.message}",
-                                isListening = false
-                            )
+                // Process audio through voice pipeline
+                pipelineJob =
+                    viewModelScope.launch {
+                        try {
+                            RunAnywhere.processVoiceStream(audioFlow).collect { event ->
+                                handleVoiceAgentEvent(event)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Pipeline error", e)
+                            _uiState.update {
+                                it.copy(
+                                    sessionState = SessionState.ERROR,
+                                    errorMessage = "Pipeline error: ${e.message}",
+                                    isListening = false,
+                                )
+                            }
                         }
                     }
-                }
-
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start session", e)
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.ERROR,
                         errorMessage = "Failed to start: ${e.message}",
-                        isListening = false
+                        isListening = false,
                     )
                 }
             }
@@ -479,82 +411,98 @@ class VoiceAssistantViewModel(
     }
 
     /**
-     * Handle initialization events from the pipeline
-     * iOS equivalent: handleInitializationEvent() in VoiceAssistantViewModel.swift
+     * Handle VoiceAgent events
+     * iOS Reference: handleSessionEvent(_:) in VoiceAgentViewModel.swift
      */
-    private fun handleInitializationEvent(event: ModularPipelineEvent) {
+    private fun handleVoiceAgentEvent(event: VoiceAgentEvent) {
         when (event) {
-            is ModularPipelineEvent.componentInitializing -> {
-                Log.i(TAG, "Initializing component: ${event.componentName}")
-                _uiState.update { it.copy(errorMessage = "Initializing ${event.componentName}...") }
-            }
-            is ModularPipelineEvent.componentInitialized -> {
-                Log.i(TAG, "Component initialized: ${event.componentName}")
-            }
-            is ModularPipelineEvent.componentInitializationFailed -> {
-                Log.e(TAG, "Component initialization failed: ${event.componentName} - ${event.error}")
+            is VoiceAgentEvent.VadTriggered -> {
+                Log.d(TAG, "VAD triggered: speech=${event.speechDetected}")
                 _uiState.update {
                     it.copy(
-                        sessionState = SessionState.ERROR,
-                        errorMessage = "Failed to initialize ${event.componentName}: ${event.error.message}"
+                        isSpeechDetected = event.speechDetected,
+                        sessionState = if (event.speechDetected) SessionState.LISTENING else it.sessionState,
                     )
                 }
             }
-            ModularPipelineEvent.allComponentsInitialized -> {
-                Log.i(TAG, "All components initialized")
-                _uiState.update { it.copy(errorMessage = null) }
-            }
-            else -> {}
-        }
-    }
 
-    /**
-     * Handle events from the voice pipeline
-     * iOS equivalent: handlePipelineEvent() in VoiceAssistantViewModel.swift
-     */
-    private fun handlePipelineEvent(event: ModularPipelineEvent) {
-        when (event) {
-            // VAD Audio Level - iOS Reference: case .vadAudioLevel(let level):
-            is ModularPipelineEvent.vadAudioLevel -> {
-                Log.d(TAG, "Audio level: ${event.level}")
-                _uiState.update { it.copy(audioLevel = event.level) }
+            is VoiceAgentEvent.TranscriptionAvailable -> {
+                Log.i(TAG, "Transcription: ${event.text}")
+                _uiState.update {
+                    it.copy(
+                        currentTranscript = event.text,
+                        sessionState = SessionState.PROCESSING,
+                    )
+                }
             }
-            ModularPipelineEvent.vadSpeechStart -> {
-                Log.i(TAG, "Speech started")
+
+            is VoiceAgentEvent.ResponseGenerated -> {
+                Log.i(TAG, "Response: ${event.text.take(50)}...")
+                _uiState.update { it.copy(assistantResponse = event.text) }
+            }
+
+            is VoiceAgentEvent.AudioSynthesized -> {
+                Log.d(TAG, "Audio synthesized: ${event.data.size} bytes")
+                // Audio playback would be handled here
+                // Clear for next interaction
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.LISTENING,
-                        isSpeechDetected = true,
-                        isListening = true
+                        isListening = true,
+                        currentTranscript = "",
                     )
                 }
             }
+
+            is VoiceAgentEvent.Processed -> {
+                Log.i(TAG, "Turn completed")
+                _uiState.update {
+                    it.copy(
+                        currentTranscript = event.result.transcription ?: "",
+                        assistantResponse = event.result.response ?: "",
+                        sessionState = SessionState.LISTENING,
+                        isListening = true,
+                    )
+                }
+            }
+
+            is VoiceAgentEvent.Error -> {
+                Log.e(TAG, "Voice agent error: ${event.error}")
+                _uiState.update {
+                    it.copy(
+                        errorMessage = event.error.message,
+                        sessionState = SessionState.ERROR,
+                        isListening = false,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle ModularPipeline events (for compatibility)
+     * iOS Reference: handlePipelineEvent() in VoiceAssistantViewModel.swift
+     */
+    @Suppress("unused")
+    private fun handlePipelineEvent(event: ModularPipelineEvent) {
+        when (event) {
+            is ModularPipelineEvent.vadAudioLevel -> {
+                _uiState.update { it.copy(audioLevel = event.level) }
+            }
+            ModularPipelineEvent.vadSpeechStart -> {
+                _uiState.update { it.copy(isSpeechDetected = true) }
+            }
             ModularPipelineEvent.vadSpeechEnd -> {
-                Log.i(TAG, "Speech ended")
                 _uiState.update { it.copy(isSpeechDetected = false) }
             }
-            // TODO: Audio Control Events - not yet implemented in Kotlin SDK
-            // iOS Reference: case .audioControlPauseRecording / .audioControlResumeRecording
-            // When SDK adds these events, add handlers to pause/resume microphone during TTS
             is ModularPipelineEvent.sttPartialTranscript -> {
-                Log.d(TAG, "Partial transcript: ${event.partial}")
                 _uiState.update { it.copy(currentTranscript = event.partial) }
             }
             is ModularPipelineEvent.sttFinalTranscript -> {
-                Log.i(TAG, "Final transcript: ${event.transcript}")
                 _uiState.update {
                     it.copy(
                         currentTranscript = event.transcript,
-                        sessionState = SessionState.PROCESSING
-                    )
-                }
-            }
-            ModularPipelineEvent.llmThinking -> {
-                Log.d(TAG, "LLM thinking...")
-                _uiState.update {
-                    it.copy(
                         sessionState = SessionState.PROCESSING,
-                        assistantResponse = ""
                     )
                 }
             }
@@ -562,71 +510,51 @@ class VoiceAssistantViewModel(
                 _uiState.update { it.copy(assistantResponse = event.text) }
             }
             is ModularPipelineEvent.llmFinalResponse -> {
-                Log.i(TAG, "LLM response: ${event.text.take(50)}...")
                 _uiState.update { it.copy(assistantResponse = event.text) }
             }
-            ModularPipelineEvent.ttsStarted -> {
-                Log.d(TAG, "TTS started")
-                // Pause listening while speaking to avoid feedback
-                _uiState.update {
-                    it.copy(
-                        isListening = false,
-                        audioLevel = 0f
-                    )
-                }
-            }
             ModularPipelineEvent.ttsCompleted -> {
-                Log.d(TAG, "TTS completed")
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.LISTENING,
                         isListening = true,
-                        currentTranscript = "" // Clear for next interaction
+                        currentTranscript = "",
                     )
                 }
             }
             is ModularPipelineEvent.pipelineError -> {
-                Log.e(TAG, "Pipeline error: ${event.error}")
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.ERROR,
                         errorMessage = event.error.message,
-                        isListening = false
+                        isListening = false,
                     )
                 }
             }
-            ModularPipelineEvent.pipelineStarted -> {
-                Log.i(TAG, "Pipeline started")
-            }
-            ModularPipelineEvent.pipelineCompleted -> {
-                Log.i(TAG, "Pipeline completed")
-            }
-            else -> {}
+            else -> { /* Ignore other events */ }
         }
     }
 
     /**
      * Stop conversation
-     * iOS equivalent: stopConversation() in VoiceAssistantViewModel.swift
+     * iOS Reference: stopConversation() in VoiceAgentViewModel.swift
      */
     fun stopSession() {
         viewModelScope.launch {
             Log.i(TAG, "Stopping conversation...")
 
-            // Cancel pipeline task
+            // Cancel pipeline job
             pipelineJob?.cancel()
             pipelineJob = null
 
             // Stop audio capture
             audioCapture.stopCapture()
 
-            // Clean up pipeline
+            // Clean up voice agent
             try {
-                voicePipeline?.cleanup()
+                RunAnywhere.cleanupVoiceAgent()
             } catch (e: Exception) {
-                Log.e(TAG, "Error during pipeline cleanup", e)
+                Log.e(TAG, "Error during cleanup", e)
             }
-            voicePipeline = null
 
             // Reset UI state
             _uiState.update {
@@ -634,7 +562,7 @@ class VoiceAssistantViewModel(
                     sessionState = SessionState.DISCONNECTED,
                     isListening = false,
                     isSpeechDetected = false,
-                    audioLevel = 0f
+                    audioLevel = 0f,
                 )
             }
 
@@ -650,16 +578,67 @@ class VoiceAssistantViewModel(
         _uiState.update {
             it.copy(
                 currentTranscript = "",
-                assistantResponse = ""
+                assistantResponse = "",
             )
         }
     }
 
+    /**
+     * Set the STT model for the voice pipeline
+     */
+    fun setSTTModel(
+        framework: String,
+        name: String,
+        modelId: String,
+    ) {
+        _uiState.update {
+            it.copy(
+                sttModel = SelectedModel(framework, name, modelId),
+                sttLoadState = ModelLoadState.NOT_LOADED,
+            )
+        }
+        Log.i(TAG, "STT model selected: $name ($modelId)")
+    }
+
+    /**
+     * Set the LLM model for the voice pipeline
+     */
+    fun setLLMModel(
+        framework: String,
+        name: String,
+        modelId: String,
+    ) {
+        _uiState.update {
+            it.copy(
+                llmModel = SelectedModel(framework, name, modelId),
+                llmLoadState = ModelLoadState.NOT_LOADED,
+            )
+        }
+        Log.i(TAG, "LLM model selected: $name ($modelId)")
+    }
+
+    /**
+     * Set the TTS model for the voice pipeline
+     */
+    fun setTTSModel(
+        framework: String,
+        name: String,
+        modelId: String,
+    ) {
+        _uiState.update {
+            it.copy(
+                ttsModel = SelectedModel(framework, name, modelId),
+                ttsLoadState = ModelLoadState.NOT_LOADED,
+                ttsVoice = modelId,
+            )
+        }
+        Log.i(TAG, "TTS model selected: $name ($modelId)")
+    }
+
     override fun onCleared() {
         super.onCleared()
-        lifecycleJob?.cancel()
+        eventSubscriptionJob?.cancel()
         pipelineJob?.cancel()
-        voicePipeline = null
         audioCapture.release()
     }
 }
