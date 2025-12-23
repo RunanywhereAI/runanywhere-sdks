@@ -243,20 +243,54 @@ export class VoiceSessionHandle {
     this.audioBuffer = [];
     this.emit(VoiceSessionEventFactory.processing());
 
-    // Note: The actual processing is delegated to VoiceAgentCapability
-    // This would be wired up when integrating with RunAnywhere.processVoiceTurn()
-    // For now, emit a placeholder event
-    this.logger.info('Processing audio... (wire to VoiceAgentCapability)');
+    try {
+      // Use dynamic import to avoid circular dependency
+      const { RunAnywhere } = await import('../../Public/RunAnywhere');
+      const result = await RunAnywhere.processVoiceTurn(combinedAudio);
 
-    // In a full implementation, this would call:
-    // const result = await VoiceAgentCapability.processVoiceTurn(combinedAudio);
-    // this.emit(VoiceSessionEventFactory.transcribed(result.transcription));
-    // this.emit(VoiceSessionEventFactory.responded(result.response));
-    // if (this.config.autoPlayTTS && result.synthesizedAudio) {
-    //   this.emit(VoiceSessionEventFactory.speaking());
-    //   // Play audio...
-    // }
-    // this.emit(VoiceSessionEventFactory.turnCompleted(...));
+      if (!result.speechDetected) {
+        this.logger.info('No speech detected in audio');
+        // Resume listening in continuous mode
+        if (this.config.continuousMode && this._isRunning) {
+          this.lastSpeechTime = null;
+        }
+        return;
+      }
+
+      // Emit transcription event
+      if (result.transcription) {
+        this.emit(VoiceSessionEventFactory.transcribed(result.transcription));
+      }
+
+      // Emit response event
+      if (result.response) {
+        this.emit(VoiceSessionEventFactory.responded(result.response));
+      }
+
+      // Handle TTS playback if enabled and audio available
+      if (this.config.autoPlayTTS && result.synthesizedAudio) {
+        this.emit(VoiceSessionEventFactory.speaking());
+        // Note: Actual audio playback should be handled by the app
+        // The synthesizedAudio is included in the turnCompleted event
+        this.logger.info(
+          'TTS audio available - app should handle playback via turnCompleted event'
+        );
+      }
+
+      // Emit complete turn result
+      this.emit(
+        VoiceSessionEventFactory.turnCompleted(
+          result.transcription || '',
+          result.response || '',
+          result.synthesizedAudio
+            ? new Uint8Array(result.synthesizedAudio).buffer
+            : undefined
+        )
+      );
+    } catch (error) {
+      this.logger.error(`Voice processing failed: ${error}`);
+      this.emit(VoiceSessionEventFactory.error(String(error)));
+    }
 
     // Resume listening in continuous mode
     if (this.config.continuousMode && this._isRunning) {
