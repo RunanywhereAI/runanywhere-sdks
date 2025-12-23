@@ -77,7 +77,7 @@ export const SettingsScreen: React.FC = () => {
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
 
   // Storage state
-  const [storageInfo, _setStorageInfo] =
+  const [storageInfo, setStorageInfo] =
     useState<StorageInfo>(DEFAULT_STORAGE_INFO);
   const [storedModels, setStoredModels] = useState<StoredModel[]>([]);
   const [_isRefreshing, setIsRefreshing] = useState(false);
@@ -173,6 +173,31 @@ export const SettingsScreen: React.FC = () => {
         setDownloadedModels(downloaded);
       } catch (err) {
         console.warn('[Settings] Failed to get downloaded models:', err);
+      }
+
+      // Get storage info using new SDK API
+      try {
+        const storage = await RunAnywhere.getStorageInfo();
+        console.log('[Settings] Storage info:', storage);
+        setStorageInfo({
+          totalStorage: storage.deviceStorage.totalSpace,
+          usedStorage: storage.deviceStorage.usedSpace,
+          freeStorage: storage.deviceStorage.freeSpace,
+          modelStorage: storage.modelStorage.totalSize || 0,
+          cacheStorage: storage.cacheSize || 0,
+        });
+        // Update storedModels from SDK storage info
+        const modelList = storage.storedModels || [];
+        setStoredModels(
+          modelList.map((m: { modelId?: string; id?: string; sizeBytes?: number; size?: number; localPath?: string; path?: string }) => ({
+            id: m.modelId || m.id || '',
+            name: m.modelId || m.id || '',
+            size: m.sizeBytes || m.size || 0,
+            path: m.localPath || m.path || '',
+          }))
+        );
+      } catch (err) {
+        console.warn('[Settings] Failed to get storage info:', err);
       }
     } catch (error) {
       console.error('Failed to load data:', error);

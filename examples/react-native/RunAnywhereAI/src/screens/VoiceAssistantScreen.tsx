@@ -24,7 +24,7 @@
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/VoiceAssistantView.swift
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -46,6 +46,7 @@ import type { ModelInfo } from '../types/model';
 import { LLMFramework } from '../types/model';
 import type { VoiceConversationEntry } from '../types/voice';
 import { VoicePipelineStatus } from '../types/voice';
+import * as AudioService from '../utils/AudioService';
 
 // Import actual RunAnywhere SDK
 import {
@@ -87,6 +88,21 @@ export const VoiceAssistantScreen: React.FC = () => {
     checkModelStatus();
     loadAvailableModels();
   }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Stop recording if still in progress
+      if (isRecording) {
+        AudioService.stopRecording().catch(() => {});
+      }
+      // Clear any timers
+      if (timerRef.current) {
+        clearTimeout(timerRef.current as unknown as number);
+        timerRef.current = null;
+      }
+    };
+  }, [isRecording]);
 
   /**
    * Load available models from catalog
@@ -239,49 +255,76 @@ export const VoiceAssistantScreen: React.FC = () => {
     [modelSelectionType]
   );
 
+  // Timer ref for recording duration
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   /**
-   * Start/stop recording
-   * Note: In a real implementation, you would use react-native-audio-recorder-player
-   * or similar library to capture actual audio and pass it to the SDK.
+   * Start/stop recording using AudioService
+   * Implements the full voice pipeline: Record → STT → LLM → TTS
    */
   const handleToggleRecording = useCallback(async () => {
     if (isRecording) {
-      // Stop recording
+      // Stop recording and process pipeline
       setIsRecording(false);
       setStatus(VoicePipelineStatus.Processing);
+
+      // Clear duration timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       setRecordingDuration(0);
 
       try {
-        // In demo mode or when audio recording is not available,
-        // we simulate the pipeline
-        const mockUserText = currentTranscript || 'Hello, how are you?';
+        // Step 1: Stop recording and get audio file
+        console.log('[VoiceAssistant] Stopping recording...');
+        const { uri: audioPath } = await AudioService.stopRecording();
+        console.log('[VoiceAssistant] Recording stopped:', audioPath);
 
-        // Add user message
+        // Step 2: Transcribe audio using STT
+        setStatus(VoicePipelineStatus.Processing);
+        console.log('[VoiceAssistant] Transcribing audio...');
+
+        const sttResult = await RunAnywhere.transcribeFile(audioPath, {
+          language: 'en',
+        });
+        const userText = sttResult.text?.trim() || '';
+
+        if (!userText) {
+          console.log('[VoiceAssistant] No speech detected');
+          Alert.alert('No Speech', 'No speech was detected. Please try again.');
+          setStatus(VoicePipelineStatus.Idle);
+          return;
+        }
+
+        // Add user message to conversation
         const userEntry: VoiceConversationEntry = {
           id: generateId(),
           speaker: 'user',
-          text: mockUserText,
+          text: userText,
           timestamp: new Date(),
         };
         setConversation((prev) => [...prev, userEntry]);
         setCurrentTranscript('');
+        console.log('[VoiceAssistant] User said:', userText);
 
+        // Step 3: Generate LLM response
         setStatus(VoicePipelineStatus.Thinking);
+        console.log('[VoiceAssistant] Generating response...');
 
         let responseText: string;
-
-        // Use SDK for LLM generation
         try {
-          const result = await RunAnywhere.generate(mockUserText, {
+          const result = await RunAnywhere.generate(userText, {
             maxTokens: 500,
             temperature: 0.7,
           });
           responseText = result.text || '(No response generated)';
         } catch (err) {
           console.error('[VoiceAssistant] LLM error:', err);
-          responseText = `Error generating response: ${err}`;
+          responseText = `I apologize, but I encountered an error: ${err}`;
         }
 
+        // Add assistant message to conversation
         const assistantEntry: VoiceConversationEntry = {
           id: generateId(),
           speaker: 'assistant',
@@ -289,19 +332,33 @@ export const VoiceAssistantScreen: React.FC = () => {
           timestamp: new Date(),
         };
         setConversation((prev) => [...prev, assistantEntry]);
+        console.log('[VoiceAssistant] Assistant:', responseText);
 
+        // Step 4: Synthesize TTS and play audio
         setStatus(VoicePipelineStatus.Speaking);
+        console.log('[VoiceAssistant] Synthesizing speech...');
 
-        // In a real implementation with actual TTS:
-        // 1. Call RunAnywhere.synthesize(responseText)
-        // 2. Play the resulting audio
-        // 3. Set status to Idle when playback completes
+        try {
+          const ttsResult = await RunAnywhere.synthesize(responseText);
 
-        // For now, simulate TTS playback duration
-        const estimatedDuration = Math.min(responseText.length * 50, 3000);
-        setTimeout(() => {
-          setStatus(VoicePipelineStatus.Idle);
-        }, estimatedDuration);
+          if (ttsResult.audio) {
+            // Play the synthesized audio
+            // The audio is base64 encoded, need to save to file and play
+            console.log('[VoiceAssistant] Playing TTS audio...');
+            // For now, estimate duration based on text length
+            // TODO: Play actual audio using AudioService
+            const estimatedDuration = Math.min(responseText.length * 50, 5000);
+            await new Promise((resolve) =>
+              setTimeout(resolve, estimatedDuration)
+            );
+          }
+        } catch (ttsErr) {
+          console.warn('[VoiceAssistant] TTS failed, skipping audio:', ttsErr);
+          // TTS failure is non-fatal, just log and continue
+        }
+
+        setStatus(VoicePipelineStatus.Idle);
+        console.log('[VoiceAssistant] Pipeline complete');
       } catch (error) {
         console.error('[VoiceAssistant] Pipeline error:', error);
         Alert.alert('Error', `Pipeline failed: ${error}`);
@@ -317,26 +374,50 @@ export const VoiceAssistantScreen: React.FC = () => {
         );
         return;
       }
-      setIsRecording(true);
-      setStatus(VoicePipelineStatus.Listening);
 
-      // TODO: Implement actual audio recording using react-native-audio-recorder-player
-      // For now, this is a placeholder that would be populated by real STT transcription
-      setCurrentTranscript('');
+      try {
+        // Request microphone permission
+        const hasPermission = await AudioService.requestAudioPermission();
+        if (!hasPermission) {
+          Alert.alert(
+            'Permission Required',
+            'Microphone permission is required to record audio.'
+          );
+          return;
+        }
 
-      // Start duration timer
-      let duration = 0;
-      const timerRef = setInterval(() => {
-        duration += 1;
-        setRecordingDuration(duration);
-      }, 1000);
+        // Start recording
+        console.log('[VoiceAssistant] Starting recording...');
+        await AudioService.startRecording({
+          onProgress: (currentPositionMs, metering) => {
+            setRecordingDuration(Math.floor(currentPositionMs / 1000));
+            // metering is in dB, normalize to 0-1 for display
+            if (metering !== undefined) {
+              const normalizedLevel = Math.max(0, Math.min(1, (metering + 60) / 60));
+              // Could use this for audio level visualization
+              console.log('[VoiceAssistant] Audio level:', normalizedLevel.toFixed(2));
+            }
+          },
+        });
 
-      // Auto-stop after 30 seconds
-      setTimeout(() => {
-        clearInterval(timerRef);
-      }, 30000);
+        setIsRecording(true);
+        setStatus(VoicePipelineStatus.Listening);
+        setCurrentTranscript('');
+        console.log('[VoiceAssistant] Recording started');
+
+        // Auto-stop after 30 seconds
+        timerRef.current = setTimeout(async () => {
+          if (isRecording) {
+            console.log('[VoiceAssistant] Auto-stopping after 30 seconds');
+            await handleToggleRecording();
+          }
+        }, 30000) as unknown as ReturnType<typeof setInterval>;
+      } catch (error) {
+        console.error('[VoiceAssistant] Failed to start recording:', error);
+        Alert.alert('Error', `Failed to start recording: ${error}`);
+      }
     }
-  }, [isRecording, allModelsLoaded, currentTranscript]);
+  }, [isRecording, allModelsLoaded]);
 
   /**
    * Clear conversation

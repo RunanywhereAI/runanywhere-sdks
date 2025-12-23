@@ -174,6 +174,49 @@ export {
   VADError,
 } from './Features';
 
+// Voice Session (High-level Voice Assistant API)
+export {
+  VoiceSessionHandle,
+  VoiceSessionEventType,
+  VoiceSessionEventFactory,
+  VoiceSessionError,
+  VoiceSessionErrorCode,
+  isVoiceSessionError,
+  DEFAULT_VOICE_SESSION_CONFIG,
+  createVoiceSessionConfig,
+  VoiceSessionConfigPresets,
+  type VoiceSessionEvent,
+  type VoiceSessionConfig,
+  type VoiceSessionEventListener,
+} from './Features/VoiceSession';
+
+// Voice Agent (Pipeline orchestration)
+export {
+  type VoiceAgentResult,
+  type VoiceAgentStreamEvent,
+  type VoiceAgentComponentStates,
+  type ComponentLoadState,
+  VoiceAgentError,
+  VoiceAgentErrorCode,
+  isVoiceAgentFullyReady,
+  getMissingComponents,
+} from './Features/VoiceAgent/VoiceAgentModels';
+
+// Storage Management
+export {
+  type StorageInfo,
+  createStorageInfo,
+  createEmptyStorageInfo,
+} from './Infrastructure/FileManagement/Models';
+export {
+  type AppStorageInfo,
+  createAppStorageInfo,
+} from './Infrastructure/FileManagement/Models/AppStorageInfo';
+export {
+  type DeviceStorageInfo,
+  createDeviceStorageInfo,
+} from './Infrastructure/FileManagement/Models/DeviceStorageInfo';
+
 // Core Registry & Providers
 export { ServiceRegistry } from './Foundation/DependencyInjection/ServiceRegistry';
 export { ServiceContainer } from './Foundation/DependencyInjection/ServiceContainer';
