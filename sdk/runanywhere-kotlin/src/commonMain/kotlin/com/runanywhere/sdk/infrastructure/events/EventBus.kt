@@ -27,7 +27,8 @@ import kotlinx.coroutines.launch
  */
 object EventBus {
     // Main events publisher - only events with PUBLIC_ONLY or ALL destination
-    private val _events = MutableSharedFlow<SDKEvent>()
+    // Buffer capacity ensures events aren't dropped when emitted faster than consumed
+    private val _events = MutableSharedFlow<SDKEvent>(extraBufferCapacity = 64)
 
     /**
      * All public events stream.
@@ -51,7 +52,7 @@ object EventBus {
     private val _generationEvents = MutableSharedFlow<SDKGenerationEvent>()
     val generationEvents: SharedFlow<SDKGenerationEvent> = _generationEvents.asSharedFlow()
 
-    private val _modelEvents = MutableSharedFlow<SDKModelEvent>()
+    private val _modelEvents = MutableSharedFlow<SDKModelEvent>(extraBufferCapacity = 64)
     val modelEvents: SharedFlow<SDKModelEvent> = _modelEvents.asSharedFlow()
 
     private val _voiceEvents = MutableSharedFlow<SDKVoiceEvent>()

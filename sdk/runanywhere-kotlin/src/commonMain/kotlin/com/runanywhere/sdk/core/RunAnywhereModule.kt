@@ -367,7 +367,7 @@ object ModuleRegistryMetadata {
 
             logger.info(
                 "Module registered: ${module.moduleName} [${module.moduleId}] " +
-                    "with capabilities: ${module.capabilities.map { it.value }.joinToString(", ")}",
+                    "with capabilities: ${module.capabilities.joinToString(", ") { it.value }}",
             )
         }
     }

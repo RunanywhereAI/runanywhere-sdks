@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.core.llamacpp
 
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.native.bridge.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -49,6 +50,7 @@ class LlamaCppCoreService {
      */
     private val backendHandle = AtomicLong(0L)
     private val mutex = Mutex()
+    private val logger = SDKLogger("LlamaCppCoreService")
 
     init {
         // Load unified JNI bridge on construction
@@ -189,13 +191,16 @@ class LlamaCppCoreService {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
+                logger.info("📂 Loading model from path: $modelPath")
                 val handle = backendHandle.get()
                 val result = NativeResultCode.fromValue(
                     RunAnywhereBridge.nativeTextLoadModel(handle, modelPath, configJson)
                 )
                 if (!result.isSuccess) {
+                    logger.error("❌ Failed to load model from path: $modelPath")
                     throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
                 }
+                logger.info("✅ Model loaded successfully from: $modelPath")
             }
         }
     }

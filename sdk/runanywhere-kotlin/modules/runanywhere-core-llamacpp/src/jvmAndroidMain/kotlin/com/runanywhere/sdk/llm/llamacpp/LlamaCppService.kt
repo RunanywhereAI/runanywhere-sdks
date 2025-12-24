@@ -44,8 +44,13 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
     private val telemetryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     actual override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
+        logger.info("📌 initialize() called with modelPath: $modelPath")
+        logger.info("📌 configuration.modelId: ${configuration.modelId}")
+
         val actualModelPath = modelPath ?: configuration.modelId
             ?: throw IllegalArgumentException("No model path provided")
+
+        logger.info("📌 actualModelPath resolved to: $actualModelPath")
 
         if (isServiceInitialized) {
             logger.info("Already initialized, unloading previous model")
@@ -59,6 +64,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             coreService.initialize()
 
             // Load the model
+            logger.info("📌 Calling coreService.loadModel with: $actualModelPath")
             coreService.loadModel(actualModelPath)
 
             this@LlamaCppService.modelPath = actualModelPath

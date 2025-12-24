@@ -1,21 +1,12 @@
 package com.runanywhere.sdk.models
 
+import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.utils.ModelPathUtils
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelArtifactType
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-
-/**
- * Model criteria for filtering models - EXACT copy of iOS ModelCriteria
- */
-data class ModelCriteria(
-    val category: ModelCategory? = null,
-    val framework: InferenceFramework? = null,
-    val minMemoryRequired: Long? = null,
-    val maxMemoryRequired: Long? = null,
-    val format: String? = null,
-    val isDownloaded: Boolean? = null,
-)
+import com.runanywhere.sdk.storage.createFileSystem
 
 /**
  * Model registry protocol - EXACT copy of iOS ModelRegistry
@@ -39,13 +30,6 @@ interface ModelRegistry {
      * @return Model information if found
      */
     fun getModel(id: String): ModelInfo?
-
-    /**
-     * Filter models by criteria
-     * @param criteria Filter criteria
-     * @return Filtered models
-     */
-    fun filterModels(criteria: ModelCriteria): List<ModelInfo>
 
     /**
      * Update model information
@@ -135,58 +119,86 @@ interface ModelRegistry {
 class DefaultModelRegistry : ModelRegistry {
     private val models = mutableMapOf<String, ModelInfo>()
     private val lock = Any() // Lock object for synchronization (matches iOS concurrent queue)
+    private val logger = SDKLogger("DefaultModelRegistry")
+    private val fileSystem = createFileSystem()
 
     override suspend fun discoverModels(): List<ModelInfo> =
         synchronized(lock) {
             models.values.toList()
         }
 
+    /**
+     * Register a model - checks if already downloaded on disk and sets localPath
+     * Matches iOS RegistryService.registerModel() behavior
+     */
     override fun registerModel(model: ModelInfo) {
         synchronized(lock) {
-            models[model.id] = model
+            var updatedModel = model
+
+            // If model doesn't have localPath, check if it exists on disk (like iOS)
+            if (updatedModel.localPath == null) {
+                val framework = model.preferredFramework ?: model.compatibleFrameworks.firstOrNull()
+                if (framework != null) {
+                    val localPath = findDownloadedModelPath(model.id, framework)
+                    if (localPath != null) {
+                        updatedModel = model.copy(localPath = localPath)
+                        logger.info("Found downloaded model on disk: ${model.id} at $localPath")
+                    }
+                }
+            }
+
+            models[model.id] = updatedModel
         }
+    }
+
+    /**
+     * Check if a model exists on disk and return its path
+     * Matches iOS fileManager.modelFolderExists() + resolveModelPath()
+     *
+     * Directory structure follows iOS exactly:
+     * {baseDir}/Models/{framework.value}/{modelId}/{modelId}.{format}
+     * Example: Models/LlamaCpp/lfm2-350m-q4_k_m/lfm2-350m-q4_k_m.gguf
+     */
+    private fun findDownloadedModelPath(modelId: String, framework: InferenceFramework): String? {
+        // 1. Check if the model folder exists: Models/{framework}/{modelId}/
+        val modelFolder = ModelPathUtils.getModelFolder(modelId, framework)
+
+        if (!fileSystem.existsSync(modelFolder)) {
+            logger.debug("Model folder does not exist: $modelFolder")
+            return null
+        }
+
+        // 2. Check for the expected model file: {modelFolder}/{modelId}.{ext}
+        //    Common extensions: .gguf (LlamaCpp), .onnx (ONNX), .bin (general)
+        val extensions = when (framework) {
+            InferenceFramework.LLAMA_CPP -> listOf("gguf", "bin")
+            InferenceFramework.ONNX -> listOf("onnx", "bin")
+            InferenceFramework.WHISPER_KIT -> listOf("mlmodelc", "mlpackage")
+            InferenceFramework.CORE_ML -> listOf("mlmodelc", "mlpackage")
+            else -> listOf("bin", "gguf", "onnx")
+        }
+
+        for (ext in extensions) {
+            val filePath = "$modelFolder/$modelId.$ext"
+            if (fileSystem.existsSync(filePath)) {
+                logger.debug("Found model file: $filePath")
+                return filePath
+            }
+        }
+
+        // 3. If no specific file found but folder exists, check if folder has contents
+        //    Some models (like ONNX directories) are folder-based
+        if (fileSystem.existsSync(modelFolder)) {
+            logger.debug("Model folder exists but no specific file found, returning folder: $modelFolder")
+            return modelFolder
+        }
+
+        return null
     }
 
     override fun getModel(id: String): ModelInfo? =
         synchronized(lock) {
             models[id]
-        }
-
-    override fun filterModels(criteria: ModelCriteria): List<ModelInfo> =
-        synchronized(lock) {
-            models.values.filter { model ->
-                var matches = true
-
-                criteria.category?.let { category ->
-                    matches = matches && model.category == category
-                }
-
-                criteria.framework?.let { framework ->
-                    matches = matches &&
-                        (
-                            model.preferredFramework == framework ||
-                                model.compatibleFrameworks.contains(framework)
-                        )
-                }
-
-                criteria.minMemoryRequired?.let { minMemory ->
-                    matches = matches && (model.memoryRequired ?: 0L) >= minMemory
-                }
-
-                criteria.maxMemoryRequired?.let { maxMemory ->
-                    matches = matches && (model.memoryRequired ?: Long.MAX_VALUE) <= maxMemory
-                }
-
-                criteria.format?.let { format ->
-                    matches = matches && model.format.name.equals(format, ignoreCase = true)
-                }
-
-                criteria.isDownloaded?.let { downloaded ->
-                    matches = matches && (model.localPath != null) == downloaded
-                }
-
-                matches
-            }
         }
 
     override fun updateModel(model: ModelInfo) {

@@ -3,6 +3,8 @@ package com.runanywhere.runanywhereai.presentation.models
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.sdk.infrastructure.events.EventBus
+import com.runanywhere.sdk.infrastructure.events.SDKModelEvent
 import com.runanywhere.sdk.models.DeviceInfo
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.collectDeviceInfo
@@ -17,6 +19,7 @@ import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -35,6 +38,25 @@ class ModelSelectionViewModel(
     init {
         loadDeviceInfo()
         loadModelsAndFrameworks()
+        subscribeToDownloadEvents()
+    }
+
+    /**
+     * Subscribe to SDK download progress events to update UI
+     */
+    private fun subscribeToDownloadEvents() {
+        viewModelScope.launch {
+            android.util.Log.d("ModelSelectionVM", "📡 Subscribed to download progress events")
+            EventBus.events
+                .filterIsInstance<SDKModelEvent.DownloadProgress>()
+                .collect { event ->
+                    val progressPercent = (event.progress * 100).toInt()
+                    android.util.Log.d("ModelSelectionVM", "📊 Download progress event received: ${event.modelId} - $progressPercent%")
+                    _uiState.update {
+                        it.copy(loadingProgress = "Downloading... $progressPercent%")
+                    }
+                }
+        }
     }
 
     private fun loadDeviceInfo() {
@@ -173,8 +195,9 @@ class ModelSelectionViewModel(
 
     /**
      * Download model with progress
+     * NOTE: Named 'startDownload' to avoid shadowing the SDK's 'downloadModel' extension function
      */
-    fun downloadModel(modelId: String) {
+    fun startDownload(modelId: String) {
         viewModelScope.launch {
             try {
                 android.util.Log.d("ModelSelectionVM", "⬇️ Starting download for model: $modelId")
@@ -187,11 +210,11 @@ class ModelSelectionViewModel(
                     )
                 }
 
-                // Call SDK download API (suspend function - no progress available)
+                // Call SDK download API (suspend function)
                 _uiState.update { it.copy(loadingProgress = "Downloading...") }
-                downloadModel(modelId)
-
-                android.util.Log.d("ModelSelectionVM", "✅ Download complete for $modelId")
+                android.util.Log.d("ModelSelectionVM", "📥 Calling SDK downloadModel for $modelId")
+                downloadModel(modelId)  // This now correctly calls the SDK extension function
+                android.util.Log.d("ModelSelectionVM", "✅ SDK downloadModel returned for $modelId")
 
                 // Small delay to ensure registry update propagates
                 kotlinx.coroutines.delay(500)

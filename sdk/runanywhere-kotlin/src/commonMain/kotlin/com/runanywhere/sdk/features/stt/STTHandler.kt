@@ -227,7 +227,7 @@ class STTHandler(
     }
 
     private fun convertFloatArrayToBytes(samples: FloatArray): ByteArray {
-        // Convert float samples to 16-bit signed PCM (matches STTComponent pattern)
+        // Convert float samples to 16-bit signed PCM (matches STTCapability pattern)
         // This is what JvmWhisperSTTService.convertPCMBytesToFloat expects to decode
         val byteArray = ByteArray(samples.size * 2) // 2 bytes per sample (16-bit PCM)
         for (i in samples.indices) {

@@ -26,7 +26,6 @@ class ModelManager(
     private val downloadService: DownloadService,
 ) {
     private val logger = SDKLogger("ModelManager")
-    private val integrityVerifier = ModelIntegrityVerifier(fileSystem)
 
     /**
      * Ensure model is available locally, download if needed
@@ -58,6 +57,11 @@ class ModelManager(
                 // Use the real download service to download the model
                 val downloadedPath =
                     downloadService.downloadModel(modelInfo) { progress ->
+                        // Log progress at 10% intervals
+                        val progressInt = (progress.percentage * 100).toInt()
+                        if (progressInt % 10 == 0) {
+                            logger.debug("📊 Progress callback: ${modelInfo.id} - $progressInt%")
+                        }
                         // Emit progress events
                         EventPublisher.track(
                             SDKModelEvent.DownloadProgress(
@@ -68,24 +72,6 @@ class ModelManager(
                     }
 
                 logger.info("✅ Model downloaded successfully: ${modelInfo.id} -> $downloadedPath")
-
-                // Verify model integrity if checksums are available
-                logger.info("🔍 Verifying model integrity: ${modelInfo.id}")
-                when (val verificationResult = integrityVerifier.verifyModel(modelInfo, downloadedPath)) {
-                    is VerificationResult.Success -> {
-                        logger.info("✅ Model integrity verification passed: ${modelInfo.id}")
-                    }
-                    is VerificationResult.Failed -> {
-                        logger.error("❌ Model integrity verification failed: ${verificationResult.reason}")
-                        // Delete the corrupt file
-                        fileSystem.delete(downloadedPath)
-                        throw Exception("Model integrity verification failed: ${verificationResult.reason}")
-                    }
-                    is VerificationResult.Unsupported -> {
-                        logger.warn("⚠️ Model integrity verification not possible: ${verificationResult.reason}")
-                        // Continue anyway but log the warning
-                    }
-                }
 
                 // Emit download completed event
                 EventPublisher.track(SDKModelEvent.DownloadCompleted(modelInfo.id))

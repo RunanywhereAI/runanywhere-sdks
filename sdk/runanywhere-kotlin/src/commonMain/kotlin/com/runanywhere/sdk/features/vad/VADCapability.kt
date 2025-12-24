@@ -1,33 +1,38 @@
 package com.runanywhere.sdk.features.vad
 
-import com.runanywhere.sdk.core.capabilities.ComponentState
+import com.runanywhere.sdk.core.ModuleRegistry
+import com.runanywhere.sdk.core.capabilities.ServiceBasedCapability
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlinx.coroutines.flow.Flow
-
-// All VAD types (VADComponent, VADConfiguration, VADInput, VADOutput, SpeechActivityEvent)
-// are defined in this package's VADModels.kt - no explicit imports needed
+import kotlinx.coroutines.flow.flow
 
 /**
- * VAD Capability - Public API wrapper for Voice Activity Detection operations
+ * VAD Capability - Actor-like class for Voice Activity Detection operations
  *
- * Aligned with iOS VADCapability pattern:
+ * Aligned EXACTLY with iOS VADCapability pattern:
+ * - ServiceBasedCapability (not ModelLoadable) - no model loading, just service initialization
  * - Service lifecycle management (initialize, cleanup)
  * - Detection API (detectSpeech)
  * - Control API (start, stop, reset, pause, resume)
  * - Configuration updates (setEnergyThreshold, setSpeechActivityCallback)
- * - Event tracking (handled automatically by underlying component)
- *
- * This capability wraps VADComponent and provides the interface expected by
- * the public RunAnywhere+VAD.kt extension functions.
- *
- * Unlike STT/TTS/LLM, VAD is ServiceBasedCapability (not ModelLoadable) -
- * it doesn't require loading a model, just initializing the service.
+ * - Analytics tracking via VADAnalyticsService
+ * - TTS integration (notifyTTSWillStart, notifyTTSDidFinish)
  */
 class VADCapability internal constructor(
-    private val getComponent: () -> VADComponent,
-) {
+    private val analyticsService: VADAnalyticsService = VADAnalyticsService(),
+) : ServiceBasedCapability<VADConfiguration, VADService> {
     private val logger = SDKLogger("VADCapability")
+
+    // Current VAD service
+    private var service: VADService? = null
+
+    // Whether VAD is initialized
+    private var isConfigured = false
+
+    // Current configuration
+    private var config: VADConfiguration? = null
 
     // ============================================================================
     // MARK: - State Properties (iOS ServiceBasedCapability pattern)
@@ -36,23 +41,32 @@ class VADCapability internal constructor(
     /**
      * Whether VAD is ready for use
      */
-    val isReady: Boolean
-        get() = getComponent().state == ComponentState.READY
+    override val isReady: Boolean
+        get() = isConfigured && service != null
 
     /**
      * Whether speech is currently active
      */
     val isSpeechActive: Boolean
-        get() = getComponent().getService()?.isSpeechActive ?: false
+        get() = service?.isSpeechActive ?: false
 
     /**
      * Current energy threshold
      */
     val energyThreshold: Float
-        get() = getComponent().getService()?.energyThreshold ?: 0.0f
+        get() = service?.energyThreshold ?: 0.0f
 
     // ============================================================================
-    // MARK: - Service Lifecycle (iOS ServiceBasedCapability pattern)
+    // MARK: - Configuration (Capability Protocol)
+    // ============================================================================
+
+    override fun configure(config: VADConfiguration) {
+        this.config = config
+        // Configuration is passed during initialize
+    }
+
+    // ============================================================================
+    // MARK: - Service Lifecycle (ServiceBasedCapability Protocol)
     // ============================================================================
 
     /**
@@ -60,8 +74,8 @@ class VADCapability internal constructor(
      *
      * @throws SDKError if initialization fails
      */
-    suspend fun initialize() {
-        initialize(VADConfiguration())
+    override suspend fun initialize() {
+        initialize(config ?: VADConfiguration())
     }
 
     /**
@@ -70,17 +84,40 @@ class VADCapability internal constructor(
      * @param config VAD configuration
      * @throws SDKError if initialization fails
      */
-    suspend fun initialize(
-        @Suppress("UNUSED_PARAMETER") config: VADConfiguration,
-    ) {
+    override suspend fun initialize(config: VADConfiguration) {
         logger.info("Initializing VAD")
 
+        // Try to get service from ModuleRegistry, fallback to built-in
+        val vadService: VADService
+
         try {
-            val component = getComponent()
-            component.initialize()
+            val provider = ModuleRegistry.vadProvider(config.modelId)
+            if (provider != null) {
+                vadService = provider.createVADService(config)
+            } else {
+                // Fall back to built-in SimpleEnergyVAD
+                vadService = SimpleEnergyVAD(
+                    energyThreshold = config.energyThreshold,
+                    sampleRate = config.sampleRate,
+                    frameLength = config.frameLength,
+                )
+                vadService.initialize(config)
+            }
+
+            this.service = vadService
+            this.config = config
+            this.isConfigured = true
+
+            // Track initialization success
+            analyticsService.trackInitialized(framework = InferenceFramework.BUILT_IN)
 
             logger.info("VAD initialized successfully")
         } catch (e: Exception) {
+            // Track initialization failure
+            analyticsService.trackInitializationFailed(
+                error = e.message ?: e.toString(),
+                framework = InferenceFramework.BUILT_IN,
+            )
             logger.error("Failed to initialize VAD", e)
             throw SDKError.InitializationFailed("VAD initialization failed: ${e.message}")
         }
@@ -89,16 +126,16 @@ class VADCapability internal constructor(
     /**
      * Cleanup VAD resources
      */
-    suspend fun cleanup() {
+    override suspend fun cleanup() {
         logger.info("Cleaning up VAD")
 
-        try {
-            getComponent().cleanup()
-            logger.info("VAD cleaned up")
-        } catch (e: Exception) {
-            logger.error("Failed to cleanup VAD", e)
-            throw e
-        }
+        service?.stop()
+        service?.cleanup()
+        service = null
+        isConfigured = false
+
+        // Track cleanup
+        analyticsService.trackCleanedUp()
     }
 
     // ============================================================================
@@ -115,8 +152,17 @@ class VADCapability internal constructor(
     fun detectSpeech(samples: FloatArray): VADOutput {
         ensureReady()
 
-        val component = getComponent()
-        return component.detectSpeech(samples)
+        val vadService = service!!
+        val result = vadService.processAudioChunk(samples)
+
+        // Calculate energy level (simple RMS)
+        val energyLevel = calculateEnergyLevel(samples)
+
+        return VADOutput(
+            isSpeechDetected = result.isSpeechDetected,
+            energyLevel = energyLevel,
+            confidence = result.confidence,
+        )
     }
 
     /**
@@ -133,13 +179,29 @@ class VADCapability internal constructor(
     ): VADOutput {
         ensureReady()
 
-        val component = getComponent()
-        val input =
-            VADInput(
-                audioSamples = samples,
-                energyThresholdOverride = energyThresholdOverride,
+        val vadService = service!!
+
+        // Apply threshold override if provided
+        val originalThreshold = vadService.energyThreshold
+        energyThresholdOverride?.let { override ->
+            vadService.energyThreshold = override
+        }
+
+        try {
+            val result = vadService.processAudioChunk(samples)
+            val energyLevel = calculateEnergyLevel(samples)
+
+            return VADOutput(
+                isSpeechDetected = result.isSpeechDetected,
+                energyLevel = energyLevel,
+                confidence = result.confidence,
             )
-        return component.process(input)
+        } finally {
+            // Restore original threshold
+            if (energyThresholdOverride != null) {
+                vadService.energyThreshold = originalThreshold
+            }
+        }
     }
 
     /**
@@ -148,11 +210,13 @@ class VADCapability internal constructor(
      * @param audioStream Flow of audio samples
      * @return Flow of VADOutput with detection results
      */
-    fun streamDetectSpeech(audioStream: Flow<FloatArray>): Flow<VADOutput> {
+    fun streamDetectSpeech(audioStream: Flow<FloatArray>): Flow<VADOutput> = flow {
         ensureReady()
 
-        val component = getComponent()
-        return component.streamProcess(audioStream)
+        audioStream.collect { samples ->
+            val output = detectSpeech(samples)
+            emit(output)
+        }
     }
 
     /**
@@ -167,11 +231,41 @@ class VADCapability internal constructor(
         audioStream: Flow<FloatArray>,
         onSpeechStart: () -> Unit = {},
         onSpeechEnd: () -> Unit = {},
-    ): Flow<VADOutput> {
+    ): Flow<VADOutput> = flow {
         ensureReady()
 
-        val component = getComponent()
-        return component.detectSpeechSegments(audioStream, onSpeechStart, onSpeechEnd)
+        var isInSpeech = false
+        var silenceFrames = 0
+        // Use iOS-style hysteresis - 10 frames of silence to end speech
+        val silenceFramesThreshold = 10
+
+        audioStream.collect { samples ->
+            val output = detectSpeech(samples)
+
+            when {
+                output.isSpeechDetected && !isInSpeech -> {
+                    isInSpeech = true
+                    silenceFrames = 0
+                    analyticsService.trackSpeechStart()
+                    onSpeechStart()
+                }
+
+                !output.isSpeechDetected && isInSpeech -> {
+                    silenceFrames++
+                    if (silenceFrames >= silenceFramesThreshold) {
+                        isInSpeech = false
+                        analyticsService.trackSpeechEnd()
+                        onSpeechEnd()
+                    }
+                }
+
+                output.isSpeechDetected && isInSpeech -> {
+                    silenceFrames = 0
+                }
+            }
+
+            emit(output)
+        }
     }
 
     // ============================================================================
@@ -183,7 +277,8 @@ class VADCapability internal constructor(
      */
     fun start() {
         logger.info("Starting VAD")
-        getComponent().start()
+        analyticsService.trackStarted()
+        service?.start()
     }
 
     /**
@@ -191,7 +286,8 @@ class VADCapability internal constructor(
      */
     fun stop() {
         logger.info("Stopping VAD")
-        getComponent().stop()
+        analyticsService.trackStopped()
+        service?.stop()
     }
 
     /**
@@ -199,7 +295,25 @@ class VADCapability internal constructor(
      */
     fun reset() {
         logger.info("Resetting VAD")
-        getComponent().reset()
+        service?.reset()
+    }
+
+    /**
+     * Pause VAD processing
+     */
+    fun pause() {
+        logger.info("Pausing VAD")
+        analyticsService.trackPaused()
+        // VAD service may not have pause directly
+    }
+
+    /**
+     * Resume VAD processing
+     */
+    fun resume() {
+        logger.info("Resuming VAD")
+        analyticsService.trackResumed()
+        // VAD service may not have resume directly
     }
 
     // ============================================================================
@@ -212,7 +326,7 @@ class VADCapability internal constructor(
      * @param threshold New energy threshold (0.0 to 1.0)
      */
     fun setEnergyThreshold(threshold: Float) {
-        getComponent().getService()?.energyThreshold = threshold
+        service?.energyThreshold = threshold
     }
 
     /**
@@ -221,7 +335,7 @@ class VADCapability internal constructor(
      * @param callback Callback invoked when speech state changes
      */
     fun setSpeechActivityCallback(callback: (SpeechActivityEvent) -> Unit) {
-        getComponent().setSpeechActivityCallback(callback)
+        service?.onSpeechActivity = callback
     }
 
     /**
@@ -230,27 +344,25 @@ class VADCapability internal constructor(
      * @param callback Callback invoked for processed audio buffers
      */
     fun setAudioBufferCallback(callback: (ByteArray) -> Unit) {
-        getComponent().setAudioBufferCallback(callback)
+        service?.onAudioBuffer = callback
     }
 
     // ============================================================================
-    // MARK: - Control API (pause/resume - matching iOS pattern)
+    // MARK: - TTS Integration (iOS pattern)
     // ============================================================================
 
     /**
-     * Pause VAD processing
+     * Notify VAD that TTS is about to start (to adjust sensitivity)
      */
-    fun pause() {
-        logger.info("Pausing VAD")
-        getComponent().pause()
+    fun notifyTTSWillStart() {
+        service?.notifyTTSWillStart()
     }
 
     /**
-     * Resume VAD processing
+     * Notify VAD that TTS has finished
      */
-    fun resume() {
-        logger.info("Resuming VAD")
-        getComponent().resume()
+    fun notifyTTSDidFinish() {
+        service?.notifyTTSDidFinish()
     }
 
     // ============================================================================
@@ -263,7 +375,7 @@ class VADCapability internal constructor(
      *
      * @return VADMetrics with aggregated statistics
      */
-    suspend fun getAnalyticsMetrics(): VADMetrics = getComponent().getAnalyticsMetrics()
+    fun getAnalyticsMetrics(): VADMetrics = analyticsService.getMetrics()
 
     // ============================================================================
     // MARK: - Private Helpers
@@ -274,67 +386,15 @@ class VADCapability internal constructor(
             throw SDKError.ComponentNotReady("VAD not initialized. Call initializeVAD() first.")
         }
     }
-}
 
-// VADOutput is defined in VADModels.kt - no duplicate definition needed
+    private fun calculateEnergyLevel(audioSamples: FloatArray): Float {
+        if (audioSamples.isEmpty()) return 0f
 
-/**
- * VAD configuration for capability layer
- * Aligned with iOS VADConfiguration
- */
-data class VADCapabilityConfiguration(
-    /** Energy threshold for voice detection (0.0 to 1.0) */
-    val energyThreshold: Float = 0.015f,
-    /** Sample rate in Hz */
-    val sampleRate: Int = 16000,
-    /** Frame length in seconds */
-    val frameLength: Float = 0.1f,
-    /** Enable automatic calibration */
-    val enableAutoCalibration: Boolean = false,
-    /** Calibration multiplier */
-    val calibrationMultiplier: Float = 2.0f,
-) {
-    /**
-     * Convert to component configuration
-     */
-    fun toComponentConfiguration(): VADConfiguration =
-        VADConfiguration(
-            energyThreshold = energyThreshold,
-            sampleRate = sampleRate,
-            frameLength = frameLength,
-        )
+        var sum = 0.0
+        for (sample in audioSamples) {
+            sum += sample * sample
+        }
 
-    companion object {
-        /**
-         * Builder pattern support
-         */
-        fun builder() = Builder()
-    }
-
-    class Builder {
-        private var energyThreshold: Float = 0.015f
-        private var sampleRate: Int = 16000
-        private var frameLength: Float = 0.1f
-        private var enableAutoCalibration: Boolean = false
-        private var calibrationMultiplier: Float = 2.0f
-
-        fun energyThreshold(threshold: Float) = apply { this.energyThreshold = threshold }
-
-        fun sampleRate(rate: Int) = apply { this.sampleRate = rate }
-
-        fun frameLength(length: Float) = apply { this.frameLength = length }
-
-        fun enableAutoCalibration(enabled: Boolean) = apply { this.enableAutoCalibration = enabled }
-
-        fun calibrationMultiplier(multiplier: Float) = apply { this.calibrationMultiplier = multiplier }
-
-        fun build(): VADCapabilityConfiguration =
-            VADCapabilityConfiguration(
-                energyThreshold = energyThreshold,
-                sampleRate = sampleRate,
-                frameLength = frameLength,
-                enableAutoCalibration = enableAutoCalibration,
-                calibrationMultiplier = calibrationMultiplier,
-            )
+        return kotlin.math.sqrt(sum / audioSamples.size).toFloat()
     }
 }

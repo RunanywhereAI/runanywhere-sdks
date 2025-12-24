@@ -1,13 +1,14 @@
 package com.runanywhere.sdk.`public`.extensions
 
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.foundation.filemanager.SimplifiedFileManager
+import com.runanywhere.sdk.foundation.storage.DefaultStorageAnalyzer
 import com.runanywhere.sdk.infrastructure.events.EventPublisher
 import com.runanywhere.sdk.infrastructure.events.SDKModelEvent
 import com.runanywhere.sdk.infrastructure.events.SDKStorageEvent
-import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.storage.StorageInfo
-import com.runanywhere.sdk.`public`.RunAnywhere
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * RunAnywhere Storage Extensions
@@ -20,6 +21,12 @@ import com.runanywhere.sdk.`public`.RunAnywhere
 
 private val logger = SDKLogger("RunAnywhere+Storage")
 
+// Storage analyzer instance (lazy initialization like iOS)
+private val storageAnalyzer by lazy { DefaultStorageAnalyzer() }
+
+// File manager instance
+private val fileManager by lazy { SimplifiedFileManager.shared }
+
 // MARK: - Storage Extensions
 
 /**
@@ -28,16 +35,16 @@ private val logger = SDKLogger("RunAnywhere+Storage")
  *
  * Usage:
  * ```kotlin
- * val storageInfo = RunAnywhere.getStorageInfo()
+ * val storageInfo = getStorageInfo()
  * println("Total model size: ${storageInfo.modelStorage.totalSize}")
  * println("Device free space: ${storageInfo.deviceStorage.freeSpace}")
  * ```
  */
-suspend fun RunAnywhere.Companion.getStorageInfo(): StorageInfo {
-    logger.debug("Getting storage info")
-    val storageAnalyzer = ServiceContainer.shared.storageAnalyzer
-    return storageAnalyzer.analyzeStorage()
-}
+suspend fun getStorageInfo(): StorageInfo =
+    withContext(Dispatchers.IO) {
+        logger.debug("Getting storage info")
+        storageAnalyzer.analyzeStorage()
+    }
 
 /**
  * Clear cache
@@ -48,21 +55,21 @@ suspend fun RunAnywhere.Companion.getStorageInfo(): StorageInfo {
  *
  * Usage:
  * ```kotlin
- * RunAnywhere.clearCache()
+ * clearCache()
  * ```
  */
-suspend fun RunAnywhere.Companion.clearCache() {
-    logger.info("Clearing cache")
-    val fileManager = ServiceContainer.shared.fileManager
-    val result = fileManager.clearCache()
+suspend fun clearCache() =
+    withContext(Dispatchers.IO) {
+        logger.info("Clearing cache")
+        val result = fileManager.clearCache()
 
-    if (result) {
-        logger.info("Cache cleared successfully")
-        EventPublisher.track(SDKStorageEvent.ClearCacheCompleted)
-    } else {
-        logger.warning("Failed to clear cache")
+        if (result) {
+            logger.info("Cache cleared successfully")
+            EventPublisher.track(SDKStorageEvent.ClearCacheCompleted)
+        } else {
+            logger.warning("Failed to clear cache")
+        }
     }
-}
 
 /**
  * Clean temporary files
@@ -73,84 +80,50 @@ suspend fun RunAnywhere.Companion.clearCache() {
  *
  * Usage:
  * ```kotlin
- * RunAnywhere.cleanTempFiles()
+ * cleanTempFiles()
  * ```
  */
-suspend fun RunAnywhere.Companion.cleanTempFiles() {
-    logger.info("Cleaning temporary files")
-    val fileManager = ServiceContainer.shared.fileManager
-    val result = fileManager.cleanTempFiles()
+suspend fun cleanTempFiles() =
+    withContext(Dispatchers.IO) {
+        logger.info("Cleaning temporary files")
+        val result = fileManager.cleanTempFiles()
 
-    if (result) {
-        logger.info("Temporary files cleaned successfully")
-        EventPublisher.track(SDKStorageEvent.CleanTempCompleted)
-    } else {
-        logger.warning("Failed to clean temporary files")
+        if (result) {
+            logger.info("Temporary files cleaned successfully")
+            EventPublisher.track(SDKStorageEvent.CleanTempCompleted)
+        } else {
+            logger.warning("Failed to clean temporary files")
+        }
     }
-}
 
 /**
  * Delete a stored model
- * Matches iOS: static func deleteStoredModel(_ modelId: String, framework: InferenceFramework) async throws
+ * Matches iOS: static func deleteStoredModel(_ modelId: String) async throws
  *
  * @param modelId The model identifier
- * @param framework The framework the model belongs to
  *
  * Usage:
  * ```kotlin
- * RunAnywhere.deleteStoredModel("my-model-id", InferenceFramework.LLAMA_CPP)
+ * deleteStoredModel("my-model-id")
  * ```
  */
-suspend fun RunAnywhere.Companion.deleteStoredModel(
-    modelId: String,
-    framework: InferenceFramework,
-) {
-    logger.info("Deleting stored model: $modelId (framework: ${framework.displayName})")
-    val fileManager = ServiceContainer.shared.fileManager
-    val deleted = fileManager.deleteModel(modelId, framework)
+suspend fun deleteStoredModel(modelId: String) =
+    withContext(Dispatchers.IO) {
+        logger.info("Deleting stored model: $modelId")
+        val deleted = fileManager.deleteModel(modelId)
 
-    if (deleted) {
-        logger.info("Model deleted successfully: $modelId")
-        EventPublisher.track(SDKModelEvent.DeleteCompleted(modelId))
-    } else {
-        logger.warning("Failed to delete model: $modelId")
+        if (deleted) {
+            logger.info("Model deleted successfully: $modelId")
+            EventPublisher.track(SDKModelEvent.DeleteCompleted(modelId))
+        } else {
+            logger.warning("Failed to delete model: $modelId")
+        }
     }
-}
 
 /**
- * Get base directory URL
+ * Get base directory path
  * Matches iOS: static func getBaseDirectoryURL() -> URL
  *
  * @return The base directory path for the SDK
  */
-fun RunAnywhere.Companion.getBaseDirectoryPath(): String {
-    val fileManager = ServiceContainer.shared.fileManager
-    return fileManager.getBaseDirectory()
-}
-
-/**
- * Get all downloaded models grouped by framework
- * Matches iOS: static func getDownloadedModels() -> [InferenceFramework: [String]]
- *
- * @return Map of framework to list of model IDs
- */
-fun RunAnywhere.Companion.getDownloadedModels(): Map<InferenceFramework, List<String>> {
-    val fileManager = ServiceContainer.shared.fileManager
-    return fileManager.getAllStoredModels()
-}
-
-/**
- * Check if a model is downloaded
- * Matches iOS: static func isModelDownloaded(_ modelId: String, framework: InferenceFramework) -> Bool
- *
- * @param modelId The model identifier
- * @param framework The framework the model belongs to
- * @return True if the model is downloaded, false otherwise
- */
-fun RunAnywhere.Companion.isModelDownloaded(
-    modelId: String,
-    framework: InferenceFramework,
-): Boolean {
-    val fileManager = ServiceContainer.shared.fileManager
-    return fileManager.isModelDownloaded(modelId, framework)
-}
+fun getBaseDirectoryPath(): String = fileManager.getBaseDirectoryURL()

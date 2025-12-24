@@ -1,30 +1,5 @@
 import Foundation
 
-// MARK: - Model Criteria
-
-/// Model criteria for filtering
-public struct ModelCriteria: Sendable {
-    public let framework: InferenceFramework?
-    public let format: ModelFormat?
-    public let maxSize: Int64?
-    public let tags: [String]
-    public let search: String?
-
-    public init(
-        framework: InferenceFramework? = nil,
-        format: ModelFormat? = nil,
-        maxSize: Int64? = nil,
-        tags: [String] = [],
-        search: String? = nil
-    ) {
-        self.framework = framework
-        self.format = format
-        self.maxSize = maxSize
-        self.tags = tags
-        self.search = search
-    }
-}
-
 // MARK: - Model Registry Protocol
 
 /// Model registry protocol
@@ -42,10 +17,9 @@ public protocol ModelRegistry {
     /// - Returns: Model information if found
     func getModel(by id: String) -> ModelInfo?
 
-    /// Filter models by criteria
-    /// - Parameter criteria: Filter criteria
-    /// - Returns: Filtered models
-    func filterModels(by criteria: ModelCriteria) -> [ModelInfo]
+    /// Get all registered models
+    /// - Returns: All models in registry
+    func getAllModels() -> [ModelInfo]
 
     /// Update model information
     /// - Parameter model: Updated model information

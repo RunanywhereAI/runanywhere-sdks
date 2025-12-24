@@ -8,11 +8,11 @@ import com.runanywhere.sdk.models.enums.InferenceFramework
 /**
  * Protocol for Language Model services - matches iOS LLMService protocol exactly
  *
- * iOS Source: Components/LLM/LLMComponent.swift
+ * iOS Source: Features/LLM/LLMCapability.swift
  *
  * This interface defines the core LLM service operations. Utility methods like
  * process(), streamProcess(), cancelCurrent(), getTokenCount(), and fitsInContext()
- * are provided by LLMComponent, not the service interface, matching iOS architecture.
+ * are provided by LLMCapability, not the service interface, matching iOS architecture.
  */
 interface LLMService {
     /** Initialize the LLM service with optional model path */
