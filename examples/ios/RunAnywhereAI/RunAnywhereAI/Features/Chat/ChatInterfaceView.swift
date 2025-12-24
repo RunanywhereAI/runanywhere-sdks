@@ -864,31 +864,43 @@ struct MessageBubbleView: View {
     private var mainMessageBubble: some View {
         // Only show message bubble if there's content
         if !message.content.isEmpty {
-            Text(message.content)
-                .padding(.horizontal, AppSpacing.large)
-                .padding(.vertical, AppSpacing.mediumLarge)
-                .background(
-                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
-                        .fill(message.role == .user ?
-                              LinearGradient(colors: [AppColors.userBubbleGradientStart, AppColors.userBubbleGradientEnd],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing) :
-                              LinearGradient(colors: [AppColors.backgroundGray5, AppColors.backgroundGray6],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .shadow(color: AppColors.shadowMedium, radius: 4, x: 0, y: 2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
-                                .strokeBorder(
-                                    message.role == .user ?
-                                    AppColors.borderLight :
-                                    AppColors.borderMedium,
-                                    lineWidth: AppSpacing.strokeThin
-                                )
-                        )
-                )
-                .foregroundColor(message.role == .user ? AppColors.textWhite : AppColors.textPrimary)
-                .scaleEffect(isGenerating && message.role == .assistant && message.content.count < 50 ? 1.02 : 1.0)
-                .animation(.easeInOut(duration: AppLayout.animationLoopSlow).repeatForever(autoreverses: true), value: isGenerating)
+            // Intelligent adaptive rendering: Content analysis → Best renderer
+            Group {
+                if message.role == .assistant {
+                    AdaptiveMarkdownText(
+                        message.content,
+                        font: AppTypography.body,
+                        color: AppColors.textPrimary
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(message.content)
+                        .foregroundColor(AppColors.textWhite)
+                }
+            }
+            .padding(.horizontal, AppSpacing.large)
+            .padding(.vertical, AppSpacing.mediumLarge)
+            .background(
+                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
+                    .fill(message.role == .user ?
+                          LinearGradient(colors: [AppColors.userBubbleGradientStart, AppColors.userBubbleGradientEnd],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing) :
+                          LinearGradient(colors: [AppColors.backgroundGray5, AppColors.backgroundGray6],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+                    .shadow(color: AppColors.shadowMedium, radius: 4, x: 0, y: 2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
+                            .strokeBorder(
+                                message.role == .user ?
+                                AppColors.borderLight :
+                                AppColors.borderMedium,
+                                lineWidth: AppSpacing.strokeThin
+                            )
+                    )
+            )
+            .scaleEffect(isGenerating && message.role == .assistant && message.content.count < 50 ? 1.02 : 1.0)
+            .animation(.easeInOut(duration: AppLayout.animationLoopSlow).repeatForever(autoreverses: true), value: isGenerating)
         }
     }
 }
