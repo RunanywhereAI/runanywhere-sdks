@@ -31,7 +31,7 @@ class TTSCapability internal constructor(
     private val logger = SDKLogger("TTSCapability")
 
     // Managed lifecycle with integrated event tracking (matches iOS)
-    private val managedLifecycle: ManagedLifecycle<TTSService> = ManagedLifecycle.forTTS()
+    private val managedLifecycle: ManagedLifecycle<TTSService> = createTTSManagedLifecycle()
 
     // Current configuration
     private var config: TTSConfiguration? = null
@@ -230,17 +230,15 @@ class TTSCapability internal constructor(
         var totalBytes = 0
 
         try {
-            service.synthesizeStream(
-                text = text,
-                options = effectiveOptions,
-                onChunk = { chunk ->
-                    totalBytes += chunk.count()
-                    analyticsService.trackSynthesisChunk(
-                        synthesisId = synthesisId,
-                        chunkSize = chunk.count(),
-                    )
-                },
-            )
+            // Collect the flow and emit chunks
+            service.synthesizeStream(text = text, options = effectiveOptions).collect { chunk ->
+                totalBytes += chunk.size
+                analyticsService.trackSynthesisChunk(
+                    synthesisId = synthesisId,
+                    chunkSize = chunk.size,
+                )
+                emit(chunk)
+            }
 
             // Complete synthesis tracking
             val audioDuration = estimateAudioDuration(totalBytes, effectiveOptions.sampleRate)
@@ -338,24 +336,25 @@ data class TTSResult(
 }
 
 // ============================================================================
-// MARK: - ManagedLifecycle Factory Extension
+// MARK: - ManagedLifecycle Factory
 // ============================================================================
 
 /**
  * Factory method to create ManagedLifecycle for TTS
  */
-fun ManagedLifecycle.Companion.forTTS(): ManagedLifecycle<TTSService> {
+internal fun createTTSManagedLifecycle(): ManagedLifecycle<TTSService> {
     return ManagedLifecycle(
-        lifecycle = ModelLifecycleManager.forTTS(),
+        lifecycle = createTTSLifecycleManager(),
         resourceType = CapabilityResourceType.TTS_VOICE,
         loggerCategory = "TTS.Lifecycle",
     )
 }
 
 /**
- * Factory method to create ModelLifecycleManager for TTS
+ * Private helper to create ModelLifecycleManager for TTS
+ * Follows the same pattern as LLM and STT capabilities
  */
-fun ModelLifecycleManager.Companion.forTTS(): ModelLifecycleManager<TTSService> {
+private fun createTTSLifecycleManager(): ModelLifecycleManager<TTSService> {
     val logger = SDKLogger("TTS.Loader")
 
     return ModelLifecycleManager(
@@ -363,15 +362,21 @@ fun ModelLifecycleManager.Companion.forTTS(): ModelLifecycleManager<TTSService> 
         loadResource = { resourceId, config ->
             logger.info("Loading TTS voice: $resourceId")
 
-            // Get provider from registry
+            // Get provider from registry (same pattern as LLM/STT)
             val provider = ModuleRegistry.ttsProvider(resourceId)
+                ?: throw SDKError.ComponentNotInitialized(
+                    "No TTS service provider registered for voice: $resourceId. " +
+                        "Make sure a TTS module is registered."
+                )
 
-            val service: TTSService = if (provider != null) {
-                TTSServiceAdapter(provider)
-            } else {
-                // Fall back to default TTS service
-                DefaultTTSService()
-            }
+            logger.info("Found TTS provider: ${provider.name}")
+
+            // Create configuration
+            val ttsConfig = (config as? TTSConfiguration)
+                ?: TTSConfiguration(voice = resourceId)
+
+            // Create service through provider (same pattern as LLM/STT)
+            val service = provider.createTTSService(ttsConfig)
 
             // Initialize the service
             service.initialize()

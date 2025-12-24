@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.features.speakerdiarization
 
-import com.runanywhere.sdk.core.capabilities.*
+import com.runanywhere.sdk.core.capabilities.ComponentOutput
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.features.stt.STTOutput
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
@@ -8,34 +8,40 @@ import com.runanywhere.sdk.utils.getCurrentTimeMillis
 // MARK: - Speaker Diarization Configuration
 
 /**
- * Configuration for Speaker Diarization component (matches iOS SpeakerDiarizationConfiguration)
+ * Configuration for Speaker Diarization - matches iOS SpeakerDiarizationConfiguration
  */
 data class SpeakerDiarizationConfiguration(
-    // Component type
-    override val componentType: SDKComponent = SDKComponent.SPEAKER_DIARIZATION,
-    // Model ID
-    override val modelId: String? = null,
-    // Speaker detection parameters
+    /** Model ID for provider selection */
+    val modelId: String? = null,
+    /** Maximum number of speakers to detect */
     val maxSpeakers: Int = 10,
-    val minSpeechDuration: Double = 0.5, // seconds
-    val speakerChangeThreshold: Float = 0.7f, // cosine similarity threshold
-    /** Enable voice identification features (matches iOS) */
+    /** Minimum speech duration in seconds */
+    val minSpeechDuration: Double = 0.5,
+    /** Cosine similarity threshold for speaker change */
+    val speakerChangeThreshold: Float = 0.7f,
+    /** Enable voice identification features */
     val enableVoiceIdentification: Boolean = false,
-    val windowSize: Double = 2.0, // seconds
-    val stepSize: Double = 0.5, // seconds
-    // Audio processing parameters
+    /** Window size in seconds */
+    val windowSize: Double = 2.0,
+    /** Step size in seconds */
+    val stepSize: Double = 0.5,
+    /** Sample rate of the audio in Hz */
     val sampleRate: Int = 16000,
+    /** Embedding vector size */
     val embeddingSize: Int = 128,
-    // Energy-based detection settings
+    /** Energy threshold for voice detection */
     val energyThreshold: Float = 0.01f,
+    /** Silence threshold */
     val silenceThreshold: Float = 0.005f,
-    // Performance optimization
+    /** Use GPU for processing if available */
     val useGPUIfAvailable: Boolean = true,
+    /** Enable real-time processing */
     val enableRealTimeProcessing: Boolean = true,
+    /** Enable batch processing mode */
     val batchProcessingMode: Boolean = false,
-) : ComponentConfiguration,
-    ComponentInitParameters {
-    override fun validate() {
+) {
+    /** Validate configuration */
+    fun validate() {
         if (maxSpeakers <= 0 || maxSpeakers > 50) {
             throw SDKError.ValidationFailed("Max speakers must be between 1 and 50")
         }
@@ -281,14 +287,15 @@ data class SpeakerDiarizationInput(
     val audioData: ByteArray = byteArrayOf(),
     // Audio buffer (alternative to data)
     val audioBuffer: FloatArray? = null,
-    // Sample rate of audio
+    /** Sample rate of audio */
     val sampleRate: Int = 16000,
-    // Optional transcription for labeling
+    /** Optional transcription for labeling */
     val transcription: STTOutput? = null,
-    // Processing options
+    /** Processing options */
     val options: SpeakerDiarizationOptions? = null,
-) : ComponentInput {
-    override fun validate() {
+) {
+    /** Validate input parameters */
+    fun validate() {
         if (audioData.isEmpty() && audioBuffer == null) {
             throw SDKError.ValidationFailed("SpeakerDiarizationInput must contain either audioData or audioBuffer")
         }

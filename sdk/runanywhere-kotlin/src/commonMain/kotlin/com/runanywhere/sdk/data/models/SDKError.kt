@@ -65,6 +65,12 @@ sealed class SDKError : Exception() {
         override val errorCode = ErrorCode.MODEL_VALIDATION_FAILED
     }
 
+    data class ModelNotDownloaded(
+        override val message: String,
+    ) : SDKError() {
+        override val errorCode = ErrorCode.DOWNLOAD_FAILED
+    }
+
     // File system errors
     data class FileSystemError(
         override val message: String,

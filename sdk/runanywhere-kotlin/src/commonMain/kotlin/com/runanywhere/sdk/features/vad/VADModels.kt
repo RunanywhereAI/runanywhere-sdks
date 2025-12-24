@@ -1,34 +1,37 @@
 package com.runanywhere.sdk.features.vad
 
-import com.runanywhere.sdk.core.capabilities.*
+import com.runanywhere.sdk.core.capabilities.ComponentOutput
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 // MARK: - VAD Configuration
 
 /**
- * Configuration for VAD component - simplified to match iOS SimpleEnergyVAD
- * Based on iOS VADConfiguration: energyThreshold: 0.015, sampleRate: 16000, frameLength: 0.1
+ * Configuration for VAD - matches iOS VADConfiguration exactly
+ * Based on iOS SimpleEnergyVAD: energyThreshold: 0.015, sampleRate: 16000, frameLength: 0.1
  */
 data class VADConfiguration(
-    // Component type
-    override val componentType: SDKComponent = SDKComponent.VAD,
-    // Model ID (optional for VAD)
-    override val modelId: String? = null,
-    // Core VAD parameters matching iOS SimpleEnergyVAD
-    val energyThreshold: Float = 0.015f, // Default aligned with iOS (more sensitive)
-    val sampleRate: Int = 16000, // Default matches iOS exactly
-    val frameLength: Float = 0.1f, // Default matches iOS exactly (100ms)
-    // Calibration parameters (matching iOS VADConfiguration)
-    val enableAutoCalibration: Boolean = false, // Matching iOS default
-    val calibrationMultiplier: Float = 2.0f, // Matching iOS default
-) : ComponentConfiguration,
-    ComponentInitParameters {
-    // Computed properties for compatibility and internal use
+    /** Model ID for VAD provider selection (optional for built-in VAD) */
+    val modelId: String? = null,
+    /** Energy threshold for voice detection (0.0 to 1.0) */
+    val energyThreshold: Float = 0.015f,
+    /** Sample rate of the audio in Hz */
+    val sampleRate: Int = 16000,
+    /** Frame length in seconds */
+    val frameLength: Float = 0.1f,
+    /** Enable automatic calibration */
+    val enableAutoCalibration: Boolean = false,
+    /** Calibration multiplier */
+    val calibrationMultiplier: Float = 2.0f,
+) {
+    /** Frame duration in milliseconds */
     val frameDurationMs: Int get() = (frameLength * 1000).toInt()
+
+    /** Frame length in samples */
     val frameLengthSamples: Int get() = (frameLength * sampleRate).toInt()
 
-    override fun validate() {
+    /** Validate configuration */
+    fun validate() {
         if (energyThreshold < 0.0f || energyThreshold > 1.0f) {
             throw SDKError.ValidationFailed("Energy threshold must be between 0.0 and 1.0")
         }
@@ -39,6 +42,11 @@ data class VADConfiguration(
             throw SDKError.ValidationFailed("Frame length must be between 0.0 and 1.0 seconds")
         }
     }
+
+    companion object {
+        /** Default configuration */
+        val default = VADConfiguration()
+    }
 }
 
 // MARK: - VAD Input
@@ -47,16 +55,16 @@ data class VADConfiguration(
  * Input for Voice Activity Detection - matching iOS VADInput exactly
  */
 data class VADInput(
-    // Audio samples to process (primary input like iOS [Float] audio samples)
+    /** Audio samples to process */
     val audioSamples: FloatArray,
-    // Optional override for energy threshold (matching iOS)
+    /** Optional override for energy threshold */
     val energyThresholdOverride: Float? = null,
-) : ComponentInput {
-    override fun validate() {
+) {
+    /** Validate input parameters */
+    fun validate() {
         if (audioSamples.isEmpty()) {
             throw SDKError.ValidationFailed("Audio samples cannot be empty")
         }
-        // Validate threshold override if provided (matching iOS validation)
         energyThresholdOverride?.let { threshold ->
             if (threshold < 0.0f || threshold > 1.0f) {
                 throw SDKError.ValidationFailed("Energy threshold override must be between 0.0 and 1.0")
@@ -67,10 +75,15 @@ data class VADInput(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is VADInput) return false
-        return audioSamples.contentEquals(other.audioSamples)
+        return audioSamples.contentEquals(other.audioSamples) &&
+            energyThresholdOverride == other.energyThresholdOverride
     }
 
-    override fun hashCode(): Int = audioSamples.contentHashCode()
+    override fun hashCode(): Int {
+        var result = audioSamples.contentHashCode()
+        result = 31 * result + (energyThresholdOverride?.hashCode() ?: 0)
+        return result
+    }
 }
 
 // MARK: - VAD Output
@@ -138,6 +151,12 @@ interface VADService {
 
     // Reset VAD state
     fun reset()
+
+    // Pause VAD processing (optional - default no-op)
+    fun pause() {}
+
+    // Resume VAD processing (optional - default no-op)
+    fun resume() {}
 
     // Process audio chunk for voice activity (primary method)
     fun processAudioChunk(audioSamples: FloatArray): VADResult
@@ -228,17 +247,6 @@ data class VADResult(
     val confidence: Float = 0.0f,
     val timestamp: Long = getCurrentTimeMillis(),
 )
-
-// MARK: - VAD Service Wrapper
-
-/**
- * Wrapper class to allow protocol-based VAD service to work with BaseComponent
- */
-class VADServiceWrapper(
-    service: VADService? = null,
-) : ServiceWrapper<VADService> {
-    override var wrappedService: VADService? = service
-}
 
 // MARK: - VAD Errors (matches iOS VADError exactly)
 

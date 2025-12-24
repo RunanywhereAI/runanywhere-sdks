@@ -249,22 +249,22 @@ private fun DeviceStatusSection(deviceInfo: DeviceInfo?) {
                 DeviceInfoRowItem(
                     label = "Model",
                     icon = Icons.Default.PhoneAndroid,
-                    value = deviceInfo.deviceModel,
+                    value = deviceInfo.modelName,
                 )
                 DeviceInfoRowItem(
                     label = "Platform",
                     icon = Icons.Default.Memory,
-                    value = "${deviceInfo.platformName} ${deviceInfo.platformVersion}",
+                    value = "${deviceInfo.platform} ${deviceInfo.osVersion}",
                 )
                 DeviceInfoRowItem(
-                    label = "OS Version",
+                    label = "Architecture",
                     icon = Icons.Default.Android,
-                    value = deviceInfo.osVersion,
+                    value = deviceInfo.architecture,
                 )
                 DeviceInfoRowItem(
                     label = "CPU Cores",
                     icon = Icons.Default.Settings,
-                    value = deviceInfo.cpuCores.toString(),
+                    value = deviceInfo.processorCount.toString(),
                 )
                 DeviceInfoRowItem(
                     label = "Memory",

@@ -96,11 +96,7 @@ class VADCapability internal constructor(
                 vadService = provider.createVADService(config)
             } else {
                 // Fall back to built-in SimpleEnergyVAD
-                vadService = SimpleEnergyVAD(
-                    energyThreshold = config.energyThreshold,
-                    sampleRate = config.sampleRate,
-                    frameLength = config.frameLength,
-                )
+                vadService = SimpleEnergyVAD(vadConfig = config)
                 vadService.initialize(config)
             }
 
@@ -275,19 +271,19 @@ class VADCapability internal constructor(
     /**
      * Start VAD processing
      */
-    fun start() {
+    suspend fun start() {
         logger.info("Starting VAD")
-        analyticsService.trackStarted()
         service?.start()
+        analyticsService.trackStarted()
     }
 
     /**
      * Stop VAD processing
      */
-    fun stop() {
+    suspend fun stop() {
         logger.info("Stopping VAD")
-        analyticsService.trackStopped()
         service?.stop()
+        analyticsService.trackStopped()
     }
 
     /**
@@ -301,19 +297,19 @@ class VADCapability internal constructor(
     /**
      * Pause VAD processing
      */
-    fun pause() {
+    suspend fun pause() {
         logger.info("Pausing VAD")
+        service?.pause()
         analyticsService.trackPaused()
-        // VAD service may not have pause directly
     }
 
     /**
      * Resume VAD processing
      */
-    fun resume() {
+    suspend fun resume() {
         logger.info("Resuming VAD")
+        service?.resume()
         analyticsService.trackResumed()
-        // VAD service may not have resume directly
     }
 
     // ============================================================================
@@ -375,7 +371,7 @@ class VADCapability internal constructor(
      *
      * @return VADMetrics with aggregated statistics
      */
-    fun getAnalyticsMetrics(): VADMetrics = analyticsService.getMetrics()
+    suspend fun getAnalyticsMetrics(): VADMetrics = analyticsService.getMetrics()
 
     // ============================================================================
     // MARK: - Private Helpers

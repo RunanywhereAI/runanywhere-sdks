@@ -455,7 +455,7 @@ object RunAnywhere {
     /**
      * Create and initialize core services
      */
-    private fun setupCoreServices() {
+    private suspend fun setupCoreServices() {
         logger.debug("Creating core services...")
         serviceContainer.modelInfoService.initialize()
         logger.debug("Core services created")

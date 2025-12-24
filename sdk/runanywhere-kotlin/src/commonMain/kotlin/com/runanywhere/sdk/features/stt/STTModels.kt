@@ -152,31 +152,41 @@ data class STTOptions(
 // MARK: - STT Configuration
 
 /**
- * Configuration for STT component (matches iOS STTConfiguration exactly)
+ * Configuration for STT - matches iOS STTConfiguration exactly
  */
 data class STTConfiguration(
-    // Component type
-    override val componentType: SDKComponent = SDKComponent.STT,
-    // Model ID
-    override val modelId: String? = null,
-    // Model parameters
+    /** Model ID for STT provider selection */
+    val modelId: String? = null,
+    /** Language for transcription (BCP-47 format) */
     val language: String = "en-US",
+    /** Sample rate of the audio in Hz */
     val sampleRate: Int = 16000,
+    /** Enable punctuation in output */
     val enablePunctuation: Boolean = true,
+    /** Enable speaker diarization */
     val enableDiarization: Boolean = false,
+    /** Custom vocabulary list */
     val vocabularyList: List<String> = emptyList(),
+    /** Maximum number of alternative transcriptions */
     val maxAlternatives: Int = 1,
+    /** Enable word timestamps in output */
     val enableTimestamps: Boolean = true,
+    /** Use GPU for inference if available */
     val useGPUIfAvailable: Boolean = true,
-) : ComponentConfiguration,
-    ComponentInitParameters {
-    override fun validate() {
+) {
+    /** Validate configuration */
+    fun validate() {
         if (sampleRate <= 0 || sampleRate > 48000) {
             throw SDKError.ValidationFailed("Sample rate must be between 1 and 48000 Hz")
         }
         if (maxAlternatives <= 0 || maxAlternatives > 10) {
             throw SDKError.ValidationFailed("Max alternatives must be between 1 and 10")
         }
+    }
+
+    companion object {
+        /** Default configuration */
+        val default = STTConfiguration()
     }
 }
 
@@ -411,17 +421,6 @@ interface STTService {
 }
 
 // Note: STTServiceProvider is defined in core.ModuleRegistry to avoid duplication
-
-// MARK: - STT Service Wrapper
-
-/**
- * Wrapper class to allow protocol-based STT service to work with BaseComponent
- */
-class STTServiceWrapper(
-    service: STTService? = null,
-) : ServiceWrapper<STTService> {
-    override var wrappedService: STTService? = service
-}
 
 // MARK: - Streaming Events (Kotlin-specific typed events)
 // Note: iOS uses AsyncThrowingStream<String, Error> for streaming which only emits strings.
