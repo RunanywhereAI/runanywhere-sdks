@@ -1,6 +1,9 @@
 package com.runanywhere.sdk.infrastructure.events
 
+import com.runanywhere.sdk.data.repositories.TelemetryRepository
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.analytics.AnalyticsEvent
+import com.runanywhere.sdk.infrastructure.analytics.AnalyticsQueueManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -10,8 +13,12 @@ import kotlinx.coroutines.launch
  * Simple event router for the SDK.
  * Mirrors iOS EventPublisher.
  *
+ * SDKEvent is the single unified event type for the entire SDK.
  * Just call `track(event)` - the router decides where to send it
- * based on the event's `destination` property.
+ * based on the event's `destination` property:
+ * - PUBLIC_ONLY → EventBus only (app developers)
+ * - ANALYTICS_ONLY → AnalyticsQueueManager only (backend telemetry)
+ * - ALL → Both destinations (default)
  *
  * Usage:
  * ```kotlin
@@ -42,6 +49,30 @@ object EventPublisher {
     fun initialize(analyticsQueue: AnalyticsEnqueuer?) {
         analyticsEnqueuer = analyticsQueue
         logger.info("Initialized with analytics queue: ${analyticsQueue != null}")
+    }
+
+    /**
+     * Initialize with SDKEvent routing to AnalyticsQueueManager.
+     *
+     * This adapts SDKEvent to AnalyticsEvent and routes to the queue.
+     * SDKEvent is the single unified event type - no separate AnalyticsEvent needed.
+     *
+     * @param telemetryRepository The telemetry repository (used to confirm analytics is available)
+     */
+    fun initializeWithSDKEventRouting(telemetryRepository: TelemetryRepository?) {
+        if (telemetryRepository == null) {
+            logger.warn("No telemetry repository - analytics events will not be sent")
+            analyticsEnqueuer = null
+            return
+        }
+
+        // Create adapter that converts SDKEvent to AnalyticsEvent for the queue
+        analyticsEnqueuer = AnalyticsEnqueuer { sdkEvent ->
+            val analyticsEvent = SDKEventAnalyticsAdapter(sdkEvent)
+            AnalyticsQueueManager.enqueue(analyticsEvent)
+        }
+
+        logger.info("Initialized with SDKEvent routing to AnalyticsQueueManager")
     }
 
     /**
@@ -112,3 +143,15 @@ fun SDKEvent.track() = EventPublisher.track(this)
  * Convenience extension to track events asynchronously.
  */
 suspend fun SDKEvent.trackAsync() = EventPublisher.trackAsync(this)
+
+/**
+ * Internal adapter to wrap SDKEvent as AnalyticsEvent for the analytics queue.
+ * This is the bridge between the unified SDKEvent type and the AnalyticsQueueManager.
+ */
+internal class SDKEventAnalyticsAdapter(
+    private val sdkEvent: SDKEvent,
+) : AnalyticsEvent {
+    override val type: String = sdkEvent.type
+    override val eventData: Any = sdkEvent.properties
+    override val timestamp: Long = sdkEvent.timestamp
+}

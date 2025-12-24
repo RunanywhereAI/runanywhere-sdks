@@ -6,7 +6,7 @@ import kotlin.math.sqrt
 /**
  * Simple energy-based Voice Activity Detection
  * Simplified implementation exactly matching iOS SimpleEnergyVAD behavior
- * Based on iOS VADComponent with SimpleEnergyVAD service
+ * Based on iOS VADCapability with SimpleEnergyVAD service
  */
 class SimpleEnergyVAD(
     private var vadConfig: VADConfiguration = VADConfiguration(),

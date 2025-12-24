@@ -267,7 +267,7 @@ class RunAnywhereApplication : Application() {
             name = "Sherpa Whisper Tiny (ONNX)",
             url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
             modality = ModelCategory.SPEECH_RECOGNITION,
-            artifactType = ModelArtifactType.TarGzArchive(ModelArtifactType.ArchiveStructure.NESTED_DIRECTORY),
+            artifactType = ModelArtifactType.tarGzArchive(),
             memoryRequirement = 75_000_000L,
         )
         ONNX.addModel(
@@ -275,7 +275,7 @@ class RunAnywhereApplication : Application() {
             name = "Sherpa Whisper Small (ONNX)",
             url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
             modality = ModelCategory.SPEECH_RECOGNITION,
-            artifactType = ModelArtifactType.TarBz2Archive(ModelArtifactType.ArchiveStructure.NESTED_DIRECTORY),
+            artifactType = ModelArtifactType.tarBz2Archive(),
             memoryRequirement = 250_000_000L,
         )
 
@@ -285,7 +285,7 @@ class RunAnywhereApplication : Application() {
             name = "Piper TTS (US English - Medium)",
             url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
             modality = ModelCategory.SPEECH_SYNTHESIS,
-            artifactType = ModelArtifactType.TarGzArchive(ModelArtifactType.ArchiveStructure.NESTED_DIRECTORY),
+            artifactType = ModelArtifactType.tarGzArchive(),
             memoryRequirement = 65_000_000L,
         )
         ONNX.addModel(
@@ -293,7 +293,7 @@ class RunAnywhereApplication : Application() {
             name = "Piper TTS (British English)",
             url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
             modality = ModelCategory.SPEECH_SYNTHESIS,
-            artifactType = ModelArtifactType.TarGzArchive(ModelArtifactType.ArchiveStructure.NESTED_DIRECTORY),
+            artifactType = ModelArtifactType.tarGzArchive(),
             memoryRequirement = 65_000_000L,
         )
         Log.i("RunAnywhereApp", "✅ ONNX module registered with STT/TTS models")

@@ -1,6 +1,5 @@
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentComponentStates
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentConfiguration
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentEvent
@@ -26,19 +25,14 @@ import kotlinx.coroutines.flow.Flow
  */
 fun RunAnywhere.getVoiceAgentComponentStates(): VoiceAgentComponentStates {
     requireInitialized()
-
-    val capability =
-        voiceAgentCapability
-            ?: throw SDKError.ComponentNotInitialized("Voice Agent capability not available")
-
-    return capability.getComponentStates()
+    return voiceAgentCapability.getComponentStates()
 }
 
 /**
  * Check if all Voice Agent components (STT, LLM, TTS) are ready
  */
 val RunAnywhere.areAllVoiceComponentsReady: Boolean
-    get() = voiceAgentCapability?.areAllComponentsReady ?: false
+    get() = voiceAgentCapability.areAllComponentsReady
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARK: - Initialization
@@ -54,12 +48,7 @@ val RunAnywhere.areAllVoiceComponentsReady: Boolean
 suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfiguration) {
     requireInitialized()
     ensureServicesReady()
-
-    val capability =
-        voiceAgentCapability
-            ?: throw SDKError.ComponentNotInitialized("Voice Agent capability not available")
-
-    capability.initialize(config)
+    voiceAgentCapability.initialize(config)
 }
 
 /**
@@ -78,12 +67,7 @@ suspend fun RunAnywhere.initializeVoiceAgent(
 ) {
     requireInitialized()
     ensureServicesReady()
-
-    val capability =
-        voiceAgentCapability
-            ?: throw SDKError.ComponentNotInitialized("Voice Agent capability not available")
-
-    capability.initialize(sttModelId, llmModelId, ttsVoice)
+    voiceAgentCapability.initialize(sttModelId, llmModelId, ttsVoice)
 }
 
 /**
@@ -97,12 +81,7 @@ suspend fun RunAnywhere.initializeVoiceAgent(
 suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
     requireInitialized()
     ensureServicesReady()
-
-    val capability =
-        voiceAgentCapability
-            ?: throw SDKError.ComponentNotInitialized("Voice Agent capability not available")
-
-    capability.initializeWithLoadedModels()
+    voiceAgentCapability.initializeWithLoadedModels()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,19 +92,19 @@ suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
  * Check if Voice Agent is fully initialized and ready for use
  */
 val RunAnywhere.isVoiceAgentReady: Boolean
-    get() = voiceAgentCapability?.isReady ?: false
+    get() = voiceAgentCapability.isReady
 
 /**
  * Get current Voice Agent pipeline state
  */
 val RunAnywhere.voiceAgentPipelineState: VoiceAgentPipelineState
-    get() = voiceAgentCapability?.pipelineState ?: VoiceAgentPipelineState.IDLE
+    get() = voiceAgentCapability.currentPipelineState
 
 /**
  * Check if Voice Agent is currently processing audio
  */
 val RunAnywhere.isVoiceAgentProcessing: Boolean
-    get() = voiceAgentCapability?.isProcessing ?: false
+    get() = voiceAgentCapability.isProcessing
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARK: - Voice Processing
@@ -141,12 +120,7 @@ val RunAnywhere.isVoiceAgentProcessing: Boolean
  */
 suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult {
     requireInitialized()
-
-    val capability =
-        voiceAgentCapability
-            ?: throw SDKError.ComponentNotReady("Voice Agent not available. Call initializeVoiceAgent() first.")
-
-    return capability.processVoiceTurn(audioData)
+    return voiceAgentCapability.processVoiceTurn(audioData)
 }
 
 /**
@@ -158,12 +132,7 @@ suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult
  */
 fun RunAnywhere.processVoiceStream(audioStream: Flow<ByteArray>): Flow<VoiceAgentEvent> {
     requireInitialized()
-
-    val capability =
-        voiceAgentCapability
-            ?: throw SDKError.ComponentNotReady("Voice Agent not available. Call initializeVoiceAgent() first.")
-
-    return capability.processStream(audioStream)
+    return voiceAgentCapability.processStream(audioStream)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -179,12 +148,7 @@ fun RunAnywhere.processVoiceStream(audioStream: Flow<ByteArray>): Flow<VoiceAgen
  */
 suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): String {
     requireInitialized()
-
-    val capability =
-        voiceAgentCapability
-            ?: throw SDKError.ComponentNotReady("Voice Agent not available. Call initializeVoiceAgent() first.")
-
-    return capability.transcribe(audioData)
+    return voiceAgentCapability.transcribe(audioData)
 }
 
 /**
@@ -196,12 +160,7 @@ suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): String {
  */
 suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): String {
     requireInitialized()
-
-    val capability =
-        voiceAgentCapability
-            ?: throw SDKError.ComponentNotReady("Voice Agent not available. Call initializeVoiceAgent() first.")
-
-    return capability.generateResponse(prompt)
+    return voiceAgentCapability.generateResponse(prompt)
 }
 
 /**
@@ -213,12 +172,7 @@ suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): String {
  */
 suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): ByteArray {
     requireInitialized()
-
-    val capability =
-        voiceAgentCapability
-            ?: throw SDKError.ComponentNotReady("Voice Agent not available. Call initializeVoiceAgent() first.")
-
-    return capability.synthesizeSpeech(text)
+    return voiceAgentCapability.synthesizeSpeech(text)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -229,5 +183,5 @@ suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): ByteArray {
  * Cleanup Voice Agent and release all resources
  */
 suspend fun RunAnywhere.cleanupVoiceAgent() {
-    voiceAgentCapability?.cleanup()
+    voiceAgentCapability.cleanup()
 }

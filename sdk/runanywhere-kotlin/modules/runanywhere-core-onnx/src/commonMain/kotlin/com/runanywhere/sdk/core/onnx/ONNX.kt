@@ -6,7 +6,6 @@ import com.runanywhere.sdk.core.ModuleRegistryMetadata
 import com.runanywhere.sdk.core.RunAnywhereModule
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.enums.InferenceFramework
-import com.runanywhere.sdk.storage.ModelStorageStrategy
 
 /**
  * ONNX Runtime module for STT and TTS services.
@@ -82,11 +81,9 @@ object ONNX : RunAnywhereModule {
      */
     override val inferenceFramework: InferenceFramework = InferenceFramework.ONNX
 
-    /**
-     * Storage strategy for ONNX models (handles nested directory structures)
-     * Matches iOS: public static let storageStrategy: ModelStorageStrategy? = ONNXModelStorageStrategy()
-     */
-    override val storageStrategy: ModelStorageStrategy = ONNXModelStorageStrategy()
+    // Note: ONNX storage strategy is handled internally by ONNXModelStorageStrategy
+    // which implements a different ModelStorageStrategy interface (core.frameworks)
+    // The module uses the default null storageStrategy from RunAnywhereModule
 
     /**
      * Register all ONNX services with the SDK

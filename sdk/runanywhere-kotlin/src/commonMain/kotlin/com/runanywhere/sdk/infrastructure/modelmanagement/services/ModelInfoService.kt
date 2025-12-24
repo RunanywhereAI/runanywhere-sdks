@@ -59,34 +59,42 @@ class ModelInfoService(
      */
     suspend fun getModel(modelId: String): ModelInfo? =
         mutex.withLock {
-            logger.debug("Getting model: $modelId")
-
-            try {
-                // Check cache first
-                cachedModels[modelId]?.let { cachedModel ->
-                    if (isCacheValid()) {
-                        logger.debug("Returning cached model: $modelId")
-                        return cachedModel
-                    }
-                }
-
-                // Load from repository
-                val model = modelInfoRepository.fetch(modelId)
-
-                if (model != null) {
-                    // Update cache
-                    cachedModels[modelId] = model
-                    logger.debug("Model loaded from repository: $modelId")
-                } else {
-                    logger.debug("Model not found: $modelId")
-                }
-
-                return model
-            } catch (e: Exception) {
-                logger.error("Failed to get model: $modelId - ${e.message}")
-                throw SDKError.RuntimeError("Database operation failed: ${e.message}")
-            }
+            getModelInternal(modelId)
         }
+
+    /**
+     * Internal non-locking version for use within locked sections
+     * Prevents deadlock when called from other methods that already hold the mutex
+     */
+    private suspend fun getModelInternal(modelId: String): ModelInfo? {
+        logger.debug("Getting model: $modelId")
+
+        try {
+            // Check cache first
+            cachedModels[modelId]?.let { cachedModel ->
+                if (isCacheValid()) {
+                    logger.debug("Returning cached model: $modelId")
+                    return cachedModel
+                }
+            }
+
+            // Load from repository
+            val model = modelInfoRepository.fetch(modelId)
+
+            if (model != null) {
+                // Update cache
+                cachedModels[modelId] = model
+                logger.debug("Model loaded from repository: $modelId")
+            } else {
+                logger.debug("Model not found: $modelId")
+            }
+
+            return model
+        } catch (e: Exception) {
+            logger.error("Failed to get model: $modelId - ${e.message}")
+            throw SDKError.RuntimeError("Database operation failed: ${e.message}")
+        }
+    }
 
     /**
      * Load models for specific frameworks
@@ -128,9 +136,9 @@ class ModelInfoService(
         logger.debug("Updating download status for model: $modelId, isDownloaded: $isDownloaded, localPath: $localPath")
 
         try {
-            // Get current model
+            // Get current model (use internal non-locking version to avoid deadlock)
             val currentModel =
-                getModel(modelId)
+                getModelInternal(modelId)
                     ?: throw SDKError.ModelNotFound(modelId)
 
             // Update download status with provided local path

@@ -105,19 +105,11 @@ object LlamaCppServiceProvider : LLMServiceProvider {
     override suspend fun createLLMService(configuration: LLMConfiguration): LLMService {
         logger.info("Creating LlamaCpp service (RunAnywhere Core backend)")
 
-        // Create the service
+        // Create the service - model loading happens when initialize(modelPath) is called
+        // by the caller (LLMComponent) with the correct path
         val service = LlamaCppService(configuration)
 
-        // Initialize with model path if provided
-        val modelId = configuration.modelId
-        if (!modelId.isNullOrEmpty() && modelId != "default") {
-            logger.info("Initializing with model: $modelId")
-            service.initialize(modelId)
-        } else {
-            logger.info("Using default model - service will be initialized later")
-        }
-
-        logger.info("LlamaCpp service created successfully")
+        logger.info("LlamaCpp service created - waiting for initialize() with model path")
         return service
     }
 

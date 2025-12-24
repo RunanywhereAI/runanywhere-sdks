@@ -17,7 +17,8 @@ public extension RunAnywhere {
     static func getModelsForFramework(_ framework: InferenceFramework) -> [ModelInfo] {
         EventPublisher.shared.track(FrameworkEvent.modelsRequested(framework: framework.rawValue))
 
-        let models = RunAnywhere.serviceContainer.modelRegistry.filterModels(by: ModelCriteria(framework: framework))
+        let allModels = RunAnywhere.serviceContainer.modelRegistry.getAllModels()
+        let models = allModels.filter { $0.compatibleFrameworks.contains(framework) }
 
         EventPublisher.shared.track(FrameworkEvent.modelsRetrieved(
             framework: framework.rawValue,
@@ -32,7 +33,7 @@ public extension RunAnywhere {
     @MainActor
     static func getRegisteredFrameworks() -> [InferenceFramework] {
         // Derive frameworks from registered models - this is the source of truth
-        let allModels = serviceContainer.modelRegistry.filterModels(by: ModelCriteria())
+        let allModels = serviceContainer.modelRegistry.getAllModels()
         var frameworks: Set<InferenceFramework> = []
 
         for model in allModels {
@@ -54,7 +55,7 @@ public extension RunAnywhere {
     /// - Returns: Array of frameworks that provide the specified capability
     @MainActor
     static func getFrameworks(for capability: CapabilityType) -> [InferenceFramework] {
-        let allModels = serviceContainer.modelRegistry.filterModels(by: ModelCriteria())
+        let allModels = serviceContainer.modelRegistry.getAllModels()
         var frameworks: Set<InferenceFramework> = []
 
         // Map capability to model categories

@@ -25,6 +25,11 @@ class ManagedLifecycle<ServiceType : Any>(
     private val resourceType: CapabilityResourceType,
     loggerCategory: String,
 ) {
+    /**
+     * Companion object for factory methods.
+     * Extension functions (forLLM, forSTT, forTTS) are defined in respective capability files.
+     */
+    companion object
     private val logger = SDKLogger(loggerCategory)
     private val mutex = Mutex()
 

@@ -2,59 +2,76 @@ package com.runanywhere.sdk.features.stt
 
 import com.runanywhere.sdk.core.AudioFormat
 import com.runanywhere.sdk.core.ModuleRegistry
-import com.runanywhere.sdk.core.capabilities.ComponentState
+import com.runanywhere.sdk.core.capabilities.CapabilityError
+import com.runanywhere.sdk.core.capabilities.CapabilityResourceType
+import com.runanywhere.sdk.core.capabilities.ManagedLifecycle
+import com.runanywhere.sdk.core.capabilities.ModelLifecycleManager
+import com.runanywhere.sdk.core.capabilities.ModelLoadableCapability
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.models.enums.InferenceFramework
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 /**
- * STT Capability - Public API wrapper for Speech-to-Text operations
+ * STT Capability - Actor-like class for Speech-to-Text operations
  *
- * Aligned with iOS STTCapability pattern:
+ * Aligned EXACTLY with iOS STTCapability pattern:
+ * - Uses ManagedLifecycle<STTService> directly for model lifecycle
+ * - No intermediate Component layer
  * - Model lifecycle management (loadModel, unload, isModelLoaded, cleanup)
  * - Transcription API (transcribe, streamTranscribe)
  * - Analytics API (getAnalyticsMetrics)
  * - Streaming support detection (supportsStreaming)
- * - Event tracking (handled automatically by underlying component)
- *
- * This capability wraps STTComponent and provides the interface expected by
- * the public RunAnywhere+STT.kt extension functions.
+ * - Event tracking via STTAnalyticsService
  */
 class STTCapability internal constructor(
-    private val getComponent: () -> STTComponent,
-) {
+    private val analyticsService: STTAnalyticsService = STTAnalyticsService(),
+) : ModelLoadableCapability<STTConfiguration, STTService> {
     private val logger = SDKLogger("STTCapability")
 
-    private var _isModelLoaded: Boolean = false
-    private var _currentModelId: String? = null
+    // Managed lifecycle with integrated event tracking (matches iOS)
+    private val managedLifecycle: ManagedLifecycle<STTService> = ManagedLifecycle.forSTT()
+
+    // Current configuration
+    private var config: STTConfiguration? = null
+
+    // ============================================================================
+    // MARK: - Configuration (Capability Protocol)
+    // ============================================================================
+
+    override fun configure(config: STTConfiguration) {
+        this.config = config
+    }
+
+    // ============================================================================
+    // MARK: - Model Lifecycle (ModelLoadableCapability Protocol)
+    // ============================================================================
 
     /**
-     * Check if an STT model is currently loaded
+     * Whether a model is currently loaded
      */
-    val isModelLoaded: Boolean
-        get() = _isModelLoaded && getComponent().state == ComponentState.READY
+    override val isModelLoaded: Boolean
+        get() = runCatching { kotlinx.coroutines.runBlocking { managedLifecycle.isLoaded() } }.getOrElse { false }
 
     /**
      * Get the currently loaded model ID
      */
-    val currentModelId: String?
-        get() = _currentModelId
+    override val currentModelId: String?
+        get() = runCatching { kotlinx.coroutines.runBlocking { managedLifecycle.currentResourceId() } }.getOrNull()
 
     /**
      * Whether the underlying STT service supports live/streaming transcription.
      * Matches iOS STTCapability.supportsStreaming property.
      */
     val supportsStreaming: Boolean
-        get() =
-            try {
-                getComponent().supportsStreaming
-            } catch (_: Exception) {
-                false
+        get() = runCatching {
+            kotlinx.coroutines.runBlocking {
+                managedLifecycle.currentService()?.supportsStreaming ?: false
             }
-
-    // ============================================================================
-    // MARK: - Model Lifecycle (iOS ModelLoadableCapability pattern)
-    // ============================================================================
+        }.getOrElse { false }
 
     /**
      * Load an STT model by ID
@@ -62,29 +79,26 @@ class STTCapability internal constructor(
      * @param modelId The model identifier (e.g., "whisper-base", "whisper-small")
      * @throws SDKError if loading fails or no provider is available
      */
-    suspend fun loadModel(modelId: String) {
+    override suspend fun loadModel(modelId: String) {
         logger.info("Loading STT model: $modelId")
 
-        // Check if provider is available
-        if (!ModuleRegistry.hasSTT) {
+        // Check if provider is available for this specific model
+        val provider = ModuleRegistry.sttProvider(modelId)
+        if (provider == null) {
             throw SDKError.ComponentNotInitialized(
-                "No STT service provider registered. Add WhisperKit or another STT module as a dependency.",
+                "No STT service provider registered for model: $modelId. " +
+                    "Add ONNX or another STT module as a dependency.",
             )
         }
 
         try {
-            // Initialize the component (which handles model loading internally)
-            val component = getComponent()
-            component.initialize()
-
-            _currentModelId = modelId
-            _isModelLoaded = true
-
+            managedLifecycle.load(modelId)
             logger.info("✅ STT model loaded: $modelId")
+        } catch (e: CapabilityError) {
+            logger.error("Failed to load STT model: $modelId", e)
+            throw SDKError.ModelLoadingFailed("Failed to load STT model: ${e.message}")
         } catch (e: Exception) {
             logger.error("Failed to load STT model: $modelId", e)
-            _isModelLoaded = false
-            _currentModelId = null
             throw SDKError.ModelLoadingFailed("Failed to load STT model: ${e.message}")
         }
     }
@@ -92,13 +106,10 @@ class STTCapability internal constructor(
     /**
      * Unload the currently loaded STT model
      */
-    suspend fun unload() {
-        logger.info("Unloading STT model: $_currentModelId")
-
+    override suspend fun unload() {
+        logger.info("Unloading STT model: $currentModelId")
         try {
-            getComponent().cleanup()
-            _isModelLoaded = false
-            _currentModelId = null
+            managedLifecycle.unload()
             logger.info("✅ STT model unloaded")
         } catch (e: Exception) {
             logger.error("Failed to unload STT model", e)
@@ -110,34 +121,14 @@ class STTCapability internal constructor(
      * Clean up resources used by the STT capability.
      * Matches iOS STTCapability.cleanup() method.
      */
-    suspend fun cleanup() {
+    override suspend fun cleanup() {
         logger.info("Cleaning up STT capability")
         try {
-            getComponent().cleanup()
-            _isModelLoaded = false
-            _currentModelId = null
+            managedLifecycle.reset()
             logger.info("✅ STT capability cleaned up")
         } catch (e: Exception) {
             logger.error("Failed to cleanup STT capability", e)
             // Don't throw - cleanup should be best-effort
-        }
-    }
-
-    // ============================================================================
-    // MARK: - Analytics API (iOS STTCapability.getAnalyticsMetrics pattern)
-    // ============================================================================
-
-    /**
-     * Get current STT analytics metrics.
-     * Matches iOS STTCapability.getAnalyticsMetrics().
-     *
-     * @return STTMetrics with transcription statistics
-     */
-    fun getAnalyticsMetrics(): STTMetrics {
-        return try {
-            getComponent().getAnalyticsMetrics()
-        } catch (_: Exception) {
-            STTMetrics()
         }
     }
 
@@ -152,10 +143,7 @@ class STTCapability internal constructor(
      * @return STTOutput with transcribed text and metadata
      */
     suspend fun transcribe(audioData: ByteArray): STTOutput {
-        ensureModelLoaded()
-
-        val component = getComponent()
-        return component.transcribe(audioData, AudioFormat.WAV, null)
+        return transcribe(audioData, STTOptions.default())
     }
 
     /**
@@ -169,20 +157,92 @@ class STTCapability internal constructor(
         audioData: ByteArray,
         options: STTOptions,
     ): STTOutput {
-        ensureModelLoaded()
+        val service = managedLifecycle.requireService()
+        val modelId = managedLifecycle.resourceIdOrUnknown()
 
-        val component = getComponent()
+        logger.info("Transcribing audio with model: $modelId")
 
-        // Use process method with full options
-        val input =
-            STTInput(
-                audioData = audioData,
-                format = options.audioFormat,
-                language = options.language,
-                options = options,
+        // Merge options with config defaults
+        val effectiveOptions = mergeOptions(options)
+
+        // Calculate audio metrics
+        val audioSizeBytes = audioData.size
+        val audioLengthMs = estimateAudioLength(
+            dataSize = audioSizeBytes,
+            format = effectiveOptions.audioFormat,
+            sampleRate = effectiveOptions.sampleRate,
+        ) * 1000
+
+        val startTime = getCurrentTimeMillis()
+
+        // Start transcription tracking
+        val transcriptionId = analyticsService.startTranscription(
+            audioLengthMs = audioLengthMs,
+            audioSizeBytes = audioSizeBytes,
+            language = effectiveOptions.language,
+        )
+
+        // Perform transcription
+        val result: STTTranscriptionResult
+        try {
+            result = service.transcribe(audioData = audioData, options = effectiveOptions)
+        } catch (e: Exception) {
+            logger.error("Transcription failed: $e")
+            analyticsService.trackTranscriptionFailed(
+                transcriptionId = transcriptionId,
+                errorMessage = e.message ?: e.toString(),
             )
+            managedLifecycle.trackOperationError(e, "transcribe")
+            throw CapabilityError.OperationFailed("Transcription", e)
+        }
 
-        return component.process(input)
+        val processingTimeMs = (getCurrentTimeMillis() - startTime).toDouble()
+        val processingTime = processingTimeMs / 1000.0
+
+        // Complete transcription tracking
+        analyticsService.completeTranscription(
+            transcriptionId = transcriptionId,
+            text = result.transcript,
+            confidence = result.confidence ?: 0.9f,
+        )
+
+        logger.info("Transcription completed in ${processingTimeMs.toLong()}ms")
+
+        // Convert to STTOutput
+        val wordTimestamps = result.timestamps?.map { timestamp ->
+            WordTimestamp(
+                word = timestamp.word,
+                startTime = timestamp.startTime,
+                endTime = timestamp.endTime,
+                confidence = timestamp.confidence ?: 0.9f,
+            )
+        }
+
+        val alternatives = result.alternatives?.map { alt ->
+            TranscriptionAlternative(
+                text = alt.transcript,
+                confidence = alt.confidence,
+            )
+        }
+
+        val audioLength = estimateAudioLength(
+            dataSize = audioSizeBytes,
+            format = effectiveOptions.audioFormat,
+            sampleRate = effectiveOptions.sampleRate,
+        )
+
+        return STTOutput(
+            text = result.transcript,
+            confidence = result.confidence ?: 0.9f,
+            wordTimestamps = wordTimestamps,
+            detectedLanguage = result.language,
+            alternatives = alternatives,
+            metadata = TranscriptionMetadata(
+                modelId = modelId,
+                processingTime = processingTime,
+                audioLength = audioLength,
+            ),
+        )
     }
 
     /**
@@ -195,23 +255,167 @@ class STTCapability internal constructor(
     fun streamTranscribe(
         audioStream: Flow<ByteArray>,
         options: STTOptions,
-    ): Flow<String> {
-        ensureModelLoaded()
+    ): Flow<String> = flow {
+        val service = managedLifecycle.requireService()
+        val effectiveOptions = mergeOptions(options)
 
-        val component = getComponent()
-        return component.streamTranscribe(audioStream, options.language)
+        // Start transcription tracking (streaming mode - audio length unknown upfront)
+        val transcriptionId = analyticsService.startTranscription(
+            audioLengthMs = 0.0, // Unknown for streaming
+            audioSizeBytes = 0, // Unknown for streaming
+            language = effectiveOptions.language,
+        )
+
+        var lastPartialWordCount = 0
+
+        try {
+            val result = service.streamTranscribe(
+                audioStream = audioStream,
+                options = effectiveOptions,
+                onPartial = { partial ->
+                    // Track streaming update
+                    val wordCount = partial.split(" ").filter { it.isNotEmpty() }.size
+                    if (wordCount > lastPartialWordCount) {
+                        analyticsService.trackPartialTranscript(text = partial)
+                        lastPartialWordCount = wordCount
+                    }
+                    // Note: Can't yield from callback directly, partials are tracked but final result is emitted
+                },
+            )
+
+            // Complete transcription tracking
+            analyticsService.completeTranscription(
+                transcriptionId = transcriptionId,
+                text = result.transcript,
+                confidence = result.confidence ?: 0.9f,
+            )
+
+            // Emit final result
+            emit(result.transcript)
+        } catch (e: Exception) {
+            analyticsService.trackTranscriptionFailed(
+                transcriptionId = transcriptionId,
+                errorMessage = e.message ?: e.toString(),
+            )
+            throw e
+        }
     }
 
     // ============================================================================
-    // MARK: - Private Helpers
+    // MARK: - Analytics API (iOS STTCapability.getAnalyticsMetrics pattern)
     // ============================================================================
 
-    private fun ensureModelLoaded() {
-        if (!isModelLoaded) {
-            throw SDKError.ComponentNotReady("STT model not loaded. Call loadSTTModel() first.")
+    /**
+     * Get current STT analytics metrics.
+     * Matches iOS STTCapability.getAnalyticsMetrics().
+     *
+     * @return STTMetrics with transcription statistics
+     */
+    fun getAnalyticsMetrics(): STTMetrics = analyticsService.getMetrics()
+
+    // ============================================================================
+    // MARK: - Private Methods
+    // ============================================================================
+
+    private fun mergeOptions(options: STTOptions): STTOptions {
+        val cfg = config ?: return options
+
+        return STTOptions(
+            language = options.language.ifEmpty { cfg.language },
+            detectLanguage = options.detectLanguage,
+            enablePunctuation = options.enablePunctuation,
+            enableDiarization = options.enableDiarization,
+            maxSpeakers = options.maxSpeakers,
+            enableTimestamps = options.enableTimestamps,
+            vocabularyFilter = options.vocabularyFilter.ifEmpty { cfg.vocabularyList },
+            audioFormat = options.audioFormat,
+            sampleRate = if (options.sampleRate != 16000) options.sampleRate else cfg.sampleRate,
+            preferredFramework = options.preferredFramework,
+        )
+    }
+
+    private fun estimateAudioLength(
+        dataSize: Int,
+        format: AudioFormat,
+        sampleRate: Int,
+    ): Double {
+        // Rough estimation based on format and sample rate
+        val bytesPerSample = when (format) {
+            AudioFormat.PCM, AudioFormat.WAV -> 2 // 16-bit PCM
+            AudioFormat.MP3 -> 1 // Compressed
+            else -> 2
         }
+
+        val samples = dataSize / bytesPerSample
+        return samples.toDouble() / sampleRate.toDouble()
     }
 }
 
-// All STT types (STTOptions, STTResult, STTOutput, etc.) are defined in STTModels.kt
-// to avoid duplicate type definitions
+// ============================================================================
+// MARK: - ManagedLifecycle Factory Extension
+// ============================================================================
+
+/**
+ * Factory method to create ManagedLifecycle for STT
+ */
+fun ManagedLifecycle.Companion.forSTT(): ManagedLifecycle<STTService> {
+    return ManagedLifecycle(
+        lifecycle = ModelLifecycleManager.forSTT(),
+        resourceType = CapabilityResourceType.STT_MODEL,
+        loggerCategory = "STT.Lifecycle",
+    )
+}
+
+/**
+ * Factory method to create ModelLifecycleManager for STT
+ */
+fun ModelLifecycleManager.Companion.forSTT(): ModelLifecycleManager<STTService> {
+    val logger = SDKLogger("STT.Loader")
+
+    return ModelLifecycleManager(
+        category = "STT.Lifecycle",
+        loadResource = { resourceId, config ->
+            logger.info("Loading STT model: $resourceId")
+
+            // Get model info from registry
+            val modelInfo = ServiceContainer.shared.modelRegistry.getModel(resourceId)
+                ?: throw SDKError.ModelNotFound("STT model not found: $resourceId")
+
+            logger.info("Found model: ${modelInfo.name} (id: ${modelInfo.id})")
+
+            // Ensure model is downloaded
+            var modelPath = modelInfo.localPath
+            if (modelPath == null) {
+                logger.info("Model not downloaded, downloading first: $resourceId")
+                ServiceContainer.shared.modelManager.downloadModel(resourceId)
+                val updatedModelInfo = ServiceContainer.shared.modelRegistry.getModel(resourceId)
+                modelPath = updatedModelInfo?.localPath
+                    ?: throw SDKError.ModelNotFound("Model download failed: $resourceId")
+            }
+
+            logger.info("Using model path: $modelPath")
+
+            // Get provider for this specific model
+            val provider = ModuleRegistry.sttProvider(resourceId)
+                ?: throw SDKError.ComponentNotInitialized(
+                    "No STT service provider registered for model: $resourceId. " +
+                        "Make sure ONNX module is registered."
+                )
+
+            logger.info("Found provider: ${provider.name}")
+
+            // Create configuration
+            val sttConfig = (config as? STTConfiguration)?.copy(modelId = resourceId)
+                ?: STTConfiguration(modelId = resourceId)
+
+            // Create service through provider
+            val service = provider.createSTTService(sttConfig)
+
+            logger.info("STT model loaded successfully: $resourceId")
+            service
+        },
+        unloadResource = { service ->
+            service.cleanup()
+        },
+    )
+}

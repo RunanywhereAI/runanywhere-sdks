@@ -323,12 +323,12 @@ sealed class SDKModelEvent : BaseSDKEvent(EventCategory.MODEL) {
         val modelId: String,
     ) : SDKModelEvent()
 
-    // Progress events are analytics-only (too frequent for public)
+    // Progress events are public only (too frequent for analytics)
     data class DownloadProgress(
         val modelId: String,
         val progress: Double,
     ) : SDKModelEvent() {
-        override val destination: EventDestination = EventDestination.ANALYTICS_ONLY
+        override val destination: EventDestination = EventDestination.PUBLIC_ONLY
     }
 
     data class DownloadCompleted(

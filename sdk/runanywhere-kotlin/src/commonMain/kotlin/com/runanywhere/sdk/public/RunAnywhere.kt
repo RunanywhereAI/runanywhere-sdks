@@ -1,22 +1,41 @@
 package com.runanywhere.sdk.public
 
+import com.runanywhere.sdk.config.SDKConfig
+import com.runanywhere.sdk.core.ModuleRegistry
+import com.runanywhere.sdk.data.datasources.RemoteTelemetryDataSource
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.models.SDKInitParams
+import com.runanywhere.sdk.data.network.services.AnalyticsNetworkService
+import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
 import com.runanywhere.sdk.features.llm.LLMCapability
 import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationCapability
 import com.runanywhere.sdk.features.stt.STTCapability
 import com.runanywhere.sdk.features.tts.TTSCapability
+import com.runanywhere.sdk.features.vad.SimpleEnergyVAD
 import com.runanywhere.sdk.features.vad.VADCapability
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.features.vad.VADService
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentCapability
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.foundation.device.DeviceInfoService
+import com.runanywhere.sdk.foundation.utils.ModelPathUtils
+import com.runanywhere.sdk.infrastructure.analytics.AnalyticsQueueManager
+import com.runanywhere.sdk.infrastructure.analytics.AnalyticsService
+import com.runanywhere.sdk.infrastructure.analytics.TelemetryService
 import com.runanywhere.sdk.infrastructure.events.EventBus
 import com.runanywhere.sdk.infrastructure.events.EventPublisher
 import com.runanywhere.sdk.infrastructure.events.SDKInitializationEvent
+import com.runanywhere.sdk.models.DeviceInfo
 import com.runanywhere.sdk.utils.SDKConstants
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SDK INITIALIZATION FLOW
@@ -34,17 +53,15 @@ import kotlinx.coroutines.sync.withLock
 // PHASE 2: Services Init (Async, ~100-500ms, Network Required)
 // ────────────────────────────────────────────────────────────
 //   RunAnywhere.completeServicesInitialization()
+//     ├─ Collect device info (DeviceInfo.current)
 //     ├─ Setup API Client
-//     │    ├─ Development: Use Supabase
+//     │    ├─ Development: No auth needed
 //     │    └─ Production/Staging: Authenticate with backend
-//     ├─ Create Core Services
-//     │    ├─ SyncCoordinator
-//     │    ├─ TelemetryRepository
-//     │    ├─ ModelInfoService
-//     │    └─ ModelAssignmentService
-//     ├─ Load Models (sync from remote + load from DB)
+//     ├─ Create Core Services (telemetry, models, sync)
+//     ├─ Load Models (scan local storage)
 //     ├─ Initialize Analytics & EventPublisher
-//     └─ Register Device with Backend
+//     ├─ Register Default Modules (VAD, STT, TTS, LLM, Speaker Diarization)
+//     └─ Initialize Capabilities (VAD auto-init, others on-demand)
 //
 // USAGE:
 // ──────
@@ -95,7 +112,7 @@ object RunAnywhere {
     /** Phase 2 completion flag */
     private var _hasCompletedServicesInit = false
 
-    /** Access to service container */
+    /** Access to service container (thin wrapper) */
     internal val serviceContainer: ServiceContainer
         get() = ServiceContainer.shared
 
@@ -145,6 +162,10 @@ object RunAnywhere {
 
     /**
      * Access to all SDK events for subscription-based patterns
+     * Events are routed based on their destination property:
+     * - PUBLIC_ONLY → EventBus only (app developers)
+     * - ANALYTICS_ONLY → Backend only (telemetry)
+     * - ALL → Both destinations (default)
      */
     val events: EventBus
         get() = EventBus.shared
@@ -157,42 +178,42 @@ object RunAnywhere {
      * STT Capability for speech-to-text operations
      * Use via extension functions: RunAnywhere.transcribe(), RunAnywhere.loadSTTModel()
      */
-    val sttCapability: STTCapability?
+    val sttCapability: STTCapability
         get() = serviceContainer.sttCapability
 
     /**
      * TTS Capability for text-to-speech operations
      * Use via extension functions: RunAnywhere.synthesize(), RunAnywhere.loadTTSVoice()
      */
-    val ttsCapability: TTSCapability?
+    val ttsCapability: TTSCapability
         get() = serviceContainer.ttsCapability
 
     /**
      * LLM Capability for language model operations
      * Use via extension functions: RunAnywhere.chat(), RunAnywhere.generate()
      */
-    val llmCapability: LLMCapability?
+    val llmCapability: LLMCapability
         get() = serviceContainer.llmCapability
 
     /**
      * VAD Capability for voice activity detection operations
      * Use via extension functions: RunAnywhere.detectSpeech(), etc.
      */
-    val vadCapability: VADCapability?
+    val vadCapability: VADCapability
         get() = serviceContainer.vadCapability
 
     /**
      * Speaker Diarization Capability for speaker identification operations
      * Use via extension functions: RunAnywhere.identifySpeaker(), etc.
      */
-    val speakerDiarizationCapability: SpeakerDiarizationCapability?
+    val speakerDiarizationCapability: SpeakerDiarizationCapability
         get() = serviceContainer.speakerDiarizationCapability
 
     /**
      * VoiceAgent Capability for end-to-end voice AI pipeline
      * Use via extension functions: RunAnywhere.initializeVoiceAgent(), RunAnywhere.processVoiceTurn()
      */
-    val voiceAgentCapability: VoiceAgentCapability?
+    val voiceAgentCapability: VoiceAgentCapability
         get() = serviceContainer.voiceAgentCapability
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -236,12 +257,11 @@ object RunAnywhere {
 
         if (environment == SDKEnvironment.DEVELOPMENT) {
             // Development mode - no auth needed
-            params =
-                SDKInitParams(
-                    apiKey = apiKey ?: "",
-                    baseURL = baseURL,
-                    environment = environment,
-                )
+            params = SDKInitParams(
+                apiKey = apiKey ?: "",
+                baseURL = baseURL,
+                environment = environment,
+            )
         } else {
             // Production/Staging mode - require API key and URL
             if (apiKey.isNullOrEmpty()) {
@@ -283,21 +303,20 @@ object RunAnywhere {
 
         try {
             // Step 1: Initialize logging system
-            val logLevel =
-                when (params.environment) {
-                    SDKEnvironment.DEVELOPMENT -> SDKLogger.Companion.LogLevel.DEBUG
-                    SDKEnvironment.STAGING -> SDKLogger.Companion.LogLevel.INFO
-                    SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.WARNING
-                }
+            val logLevel = when (params.environment) {
+                SDKEnvironment.DEVELOPMENT -> SDKLogger.Companion.LogLevel.DEBUG
+                SDKEnvironment.STAGING -> SDKLogger.Companion.LogLevel.INFO
+                SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.WARNING
+            }
             SDKLogger.setLogLevel(logLevel)
 
             // Step 2: Store parameters
             initParams = params
             currentEnvironment = params.environment
+            serviceContainer.currentEnvironment = params.environment
 
             // Step 3: Persist to secure storage (production/staging only)
             if (params.environment != SDKEnvironment.DEVELOPMENT) {
-                // Note: Keychain storage handled by platform-specific code
                 logger.debug("Credentials will be stored securely")
             }
 
@@ -328,11 +347,13 @@ object RunAnywhere {
      * Safe to call multiple times - returns immediately if already done.
      *
      * This method:
-     * 1. Sets up API client (with authentication for production/staging)
-     * 2. Creates core services (telemetry, models, sync)
-     * 3. Loads model catalog from remote + local storage
-     * 4. Initializes analytics pipeline
-     * 5. Registers device with backend
+     * 1. Collects device info (DeviceInfo.current)
+     * 2. Sets up API client (with authentication for production/staging)
+     * 3. Creates core services (telemetry, models, sync)
+     * 4. Loads model catalog from local storage
+     * 5. Initializes analytics pipeline
+     * 6. Registers default modules for all capabilities
+     * 7. Initializes capabilities (VAD auto-init, others on-demand)
      */
     suspend fun completeServicesInitialization() {
         // Fast path: already completed
@@ -341,7 +362,6 @@ object RunAnywhere {
         }
 
         val params = initParams ?: throw SDKError.NotInitialized
-        val environment = currentEnvironment ?: throw SDKError.NotInitialized
 
         initMutex.withLock {
             // Double-check after acquiring lock
@@ -349,19 +369,36 @@ object RunAnywhere {
                 return
             }
 
+            val environment = params.environment
             logger.info("Initializing services for ${environment.name} mode...")
 
             try {
-                // Bootstrap based on environment
-                if (environment == SDKEnvironment.DEVELOPMENT) {
-                    serviceContainer.bootstrapDevelopmentMode(params)
-                } else {
-                    serviceContainer.bootstrap(params)
-                }
+                // Step 1: Collect device info (matches iOS DeviceInfo.current)
+                val deviceInfo = DeviceInfo.current
+                serviceContainer.setDeviceInfo(deviceInfo)
+                logger.debug("Device: ${deviceInfo.description}")
+
+                // Step 2: Setup API client based on environment
+                setupAPIClient(params, environment)
+
+                // Step 3: Create core services
+                setupCoreServices()
+
+                // Step 4: Load models from storage
+                loadModels()
+
+                // Step 5: Initialize analytics
+                initializeAnalytics(params, environment)
+
+                // Step 6: Register default modules for all capabilities
+                registerDefaultModules()
+
+                // Step 7: Initialize capabilities
+                initializeCapabilities()
 
                 // Mark Phase 2 complete
                 _hasCompletedServicesInit = true
-                logger.info("✅ Services initialized")
+                logger.info("✅ Services initialized for ${environment.name} mode")
             } catch (e: Exception) {
                 logger.error("Services initialization failed: ${e.message}")
                 throw e
@@ -390,6 +427,258 @@ object RunAnywhere {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // MARK: - Initialization Steps
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Setup API client based on environment
+     * - Development: No auth needed
+     * - Staging/Production: Authenticate with backend
+     */
+    private suspend fun setupAPIClient(params: SDKInitParams, environment: SDKEnvironment) {
+        when (environment) {
+            SDKEnvironment.DEVELOPMENT -> {
+                logger.debug("APIClient: Development mode (no auth)")
+            }
+
+            SDKEnvironment.STAGING, SDKEnvironment.PRODUCTION -> {
+                if (params.baseURL != null) {
+                    SDKConfig.baseURL = params.baseURL
+                    logger.debug("SDKConfig.baseURL set to: ${params.baseURL}")
+                }
+                serviceContainer.authenticationService.authenticate(params.apiKey)
+                logger.info("Authenticated for ${environment.name}")
+            }
+        }
+    }
+
+    /**
+     * Create and initialize core services
+     */
+    private fun setupCoreServices() {
+        logger.debug("Creating core services...")
+        serviceContainer.modelInfoService.initialize()
+        logger.debug("Core services created")
+    }
+
+    /**
+     * Load models from storage
+     */
+    private suspend fun loadModels() {
+        val modelsPath = ModelPathUtils.getModelsDirectory()
+        val repository = serviceContainer.modelInfoRepository
+        if (repository is ModelInfoRepositoryImpl) {
+            repository.scanAndUpdateDownloadedModels(modelsPath, serviceContainer.fileSystem)
+        }
+        logger.debug("Model catalog loaded from: $modelsPath")
+    }
+
+    /**
+     * Initialize analytics pipeline
+     */
+    private suspend fun initializeAnalytics(params: SDKInitParams, environment: SDKEnvironment) {
+        try {
+            // Create analytics network services for production/staging
+            if (environment != SDKEnvironment.DEVELOPMENT && params.baseURL != null) {
+                logger.debug("Creating production analytics network services...")
+
+                val analyticsKtorClient = HttpClient {
+                    install(ContentNegotiation) {
+                        json(Json {
+                            ignoreUnknownKeys = true
+                            prettyPrint = false
+                            isLenient = true
+                        })
+                    }
+                    install(HttpTimeout) {
+                        requestTimeoutMillis = 30000
+                        connectTimeoutMillis = 10000
+                    }
+                }
+
+                val analyticsNetworkService = AnalyticsNetworkService(
+                    httpClient = analyticsKtorClient,
+                    baseURL = params.baseURL,
+                    apiKey = params.apiKey,
+                    authenticationService = serviceContainer.authenticationService,
+                )
+                serviceContainer.setAnalyticsNetworkService(analyticsNetworkService)
+
+                val remoteTelemetryDataSource = RemoteTelemetryDataSource(
+                    analyticsNetworkService = analyticsNetworkService
+                )
+                serviceContainer.setRemoteTelemetryDataSource(remoteTelemetryDataSource)
+
+                logger.debug("Production analytics network services created")
+            }
+
+            // Initialize AnalyticsService
+            val analyticsService = AnalyticsService(
+                telemetryRepository = serviceContainer.telemetryRepository,
+                syncCoordinator = serviceContainer.syncCoordinator,
+                supabaseConfig = params.supabaseConfig,
+                environment = environment,
+            )
+            analyticsService.initialize()
+            serviceContainer.setAnalyticsService(analyticsService)
+
+            // Initialize TelemetryService
+            val telemetryService = TelemetryService(
+                telemetryRepository = serviceContainer.telemetryRepository,
+                syncCoordinator = serviceContainer.syncCoordinator,
+            )
+            telemetryService.initialize()
+            serviceContainer.setTelemetryService(telemetryService)
+
+            // Set telemetry context with device info
+            val deviceId = serviceContainer.deviceId
+            telemetryService.setContext(
+                deviceId = deviceId,
+                appVersion = null,
+                sdkVersion = SDKConstants.SDK_VERSION,
+            )
+
+            // Wire EventPublisher to AnalyticsQueueManager for dual-path routing
+            initializeEventPublisher()
+
+            logger.debug("Analytics initialized")
+        } catch (e: Exception) {
+            if (environment == SDKEnvironment.DEVELOPMENT) {
+                logger.warn("Analytics initialization failed (non-critical in dev mode): ${e.message}")
+            } else {
+                throw SDKError.InitializationFailed(
+                    "Analytics service initialization failed: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Initialize EventPublisher with AnalyticsQueueManager for dual-path event routing.
+     *
+     * SDKEvent is the single unified event type for the entire SDK.
+     * Events are routed based on their destination property:
+     * - PUBLIC_ONLY → EventBus only (app developers)
+     * - ANALYTICS_ONLY → AnalyticsQueueManager only (backend telemetry)
+     * - ALL → Both destinations (default)
+     */
+    private fun initializeEventPublisher() {
+        // Initialize AnalyticsQueueManager with telemetry repository and device info
+        val deviceInfoService = DeviceInfoService()
+        AnalyticsQueueManager.initialize(
+            telemetryRepository = serviceContainer.telemetryRepository,
+            deviceInfoService = deviceInfoService,
+        )
+
+        // Wire EventPublisher to route SDKEvents to analytics
+        // SDKEvent implements the required fields (type, properties, timestamp)
+        EventPublisher.initializeWithSDKEventRouting(serviceContainer.telemetryRepository)
+
+        logger.debug("EventPublisher initialized with dual-path routing")
+    }
+
+    /**
+     * Register default modules for all capabilities.
+     *
+     * Each capability type has providers that must be registered:
+     * - VAD: SimpleEnergyVAD (built-in), Silero VAD (external module)
+     * - STT: WhisperKit (external module - registered by consuming app)
+     * - TTS: Platform TTS (external module - registered by consuming app)
+     * - LLM: LlamaCpp (external module - auto-registers if on classpath)
+     * - Speaker Diarization: (external module - registered by consuming app)
+     *
+     * External modules register themselves via ModuleRegistry when imported.
+     */
+    private fun registerDefaultModules() {
+        logger.info("Registering default modules for all capabilities")
+
+        // VAD: Register built-in SimpleEnergyVAD provider
+        try {
+            registerBuiltInVADProvider()
+            logger.info("✅ VAD: SimpleEnergyVAD provider registered")
+        } catch (e: Exception) {
+            logger.warn("⚠️ VAD provider registration failed: ${e.message}")
+        }
+
+        // STT: WhisperKit and other STT providers are external modules
+        // They auto-register when the module is included in the app
+        if (ModuleRegistry.hasSTT) {
+            logger.info("✅ STT: Provider already registered by external module")
+        } else {
+            logger.info("ℹ️ STT: No provider registered - include an STT module (e.g., WhisperKit)")
+        }
+
+        // TTS: Platform TTS providers are external modules
+        if (ModuleRegistry.hasTTS) {
+            logger.info("✅ TTS: Provider already registered by external module")
+        } else {
+            logger.info("ℹ️ TTS: No provider registered - include a TTS module")
+        }
+
+        // LLM: LlamaCpp and other LLM providers are external modules
+        // LlamaCpp auto-registers via its object initializer when on classpath
+        if (ModuleRegistry.hasLLM) {
+            logger.info("✅ LLM: Provider already registered by external module")
+        } else {
+            logger.info("ℹ️ LLM: No provider registered - include an LLM module (e.g., LlamaCpp)")
+        }
+
+        // Speaker Diarization: External modules
+        if (ModuleRegistry.hasSpeakerDiarization) {
+            logger.info("✅ Speaker Diarization: Provider already registered by external module")
+        } else {
+            logger.info("ℹ️ Speaker Diarization: No provider registered - include a diarization module")
+        }
+
+        logger.info("Module registration completed. Registered: ${ModuleRegistry.registeredModules}")
+    }
+
+    /**
+     * Register the built-in SimpleEnergyVAD provider
+     */
+    private fun registerBuiltInVADProvider() {
+        val simpleVADProvider = object : com.runanywhere.sdk.core.VADServiceProvider {
+            override suspend fun createVADService(configuration: VADConfiguration): VADService =
+                SimpleEnergyVAD(vadConfig = configuration)
+
+            override fun canHandle(modelId: String): Boolean =
+                modelId.isEmpty() || // Default provider
+                    modelId.contains("simple", ignoreCase = true) ||
+                    modelId.contains("energy", ignoreCase = true)
+
+            override val name: String = "SimpleEnergyVAD"
+        }
+
+        ModuleRegistry.registerVAD(simpleVADProvider)
+    }
+
+    /**
+     * Initialize capabilities
+     *
+     * VAD is auto-initialized as it's a ServiceBasedCapability.
+     * STT, TTS, LLM require explicit model loading via their respective load methods.
+     */
+    private suspend fun initializeCapabilities() {
+        logger.debug("Initializing SDK capabilities")
+
+        // VAD: Auto-initialize (ServiceBasedCapability pattern)
+        try {
+            vadCapability.initialize()
+            logger.debug("✅ VAD capability initialized")
+        } catch (e: Exception) {
+            logger.warn("⚠️ VAD capability initialization failed: ${e.message}")
+        }
+
+        // STT, LLM, TTS: NOT initialized during bootstrap
+        // They require explicit model loading via:
+        // - sttCapability.loadModel(modelId)
+        // - llmCapability.loadModel(modelId)
+        // - ttsCapability.loadVoice(voiceId)
+
+        logger.debug("Capability initialization completed")
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // MARK: - SDK Reset (Testing)
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -406,6 +695,7 @@ object RunAnywhere {
         currentEnvironment = null
 
         serviceContainer.cleanup()
+        serviceContainer.reset()
 
         logger.info("SDK state reset completed")
     }

@@ -8,7 +8,6 @@ import com.runanywhere.runanywhereai.data.SecureStorage
 import com.runanywhere.runanywhereai.data.SettingsDataStore
 import com.runanywhere.sdk.infrastructure.events.EventBus
 import com.runanywhere.sdk.infrastructure.events.SDKModelEvent
-import com.runanywhere.sdk.`public`.RunAnywhere
 import com.runanywhere.sdk.`public`.extensions.clearCache
 import com.runanywhere.sdk.`public`.extensions.cleanTempFiles
 import com.runanywhere.sdk.`public`.extensions.deleteModel
@@ -198,10 +197,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                Log.d(TAG, "Loading storage info via RunAnywhere.getStorageInfo()...")
+                Log.d(TAG, "Loading storage info via getStorageInfo()...")
 
                 // Use SDK's getStorageInfo() - matches iOS exactly
-                val storageInfo = RunAnywhere.getStorageInfo()
+                val storageInfo = getStorageInfo()
 
                 // Map stored models to UI model
                 val storedModels = storageInfo.storedModels.map { model ->
@@ -364,8 +363,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun clearCache() {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Clearing cache via RunAnywhere.clearCache()...")
-                RunAnywhere.clearCache()
+                Log.d(TAG, "Clearing cache via clearCache()...")
+                clearCache()
                 Log.d(TAG, "Cache cleared successfully")
 
                 // Refresh storage data after clearing cache
@@ -388,8 +387,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun cleanTempFiles() {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Cleaning temp files via RunAnywhere.cleanTempFiles()...")
-                RunAnywhere.cleanTempFiles()
+                Log.d(TAG, "Cleaning temp files via cleanTempFiles()...")
+                cleanTempFiles()
                 Log.d(TAG, "Temp files cleaned successfully")
 
                 // Refresh storage data after cleaning

@@ -196,7 +196,7 @@ fun ModelSelectionBottomSheet(
                                     isSelected = uiState.currentModel?.id == model.id,
                                     isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
                                     onDownloadModel = {
-                                        viewModel.downloadModel(model.id)
+                                        viewModel.startDownload(model.id)
                                     },
                                     onSelectModel = {
                                         scope.launch {

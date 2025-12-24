@@ -18,6 +18,11 @@ class ModelLifecycleManager<ServiceType : Any>(
     private val loadResource: suspend (String, ComponentConfiguration?) -> ServiceType,
     private val unloadResource: suspend (ServiceType) -> Unit,
 ) {
+    /**
+     * Companion object for factory methods.
+     * Extension functions (forLLM, forSTT, forTTS) are defined in respective capability files.
+     */
+    companion object
     // MARK: - State
 
     private val mutex = Mutex()
