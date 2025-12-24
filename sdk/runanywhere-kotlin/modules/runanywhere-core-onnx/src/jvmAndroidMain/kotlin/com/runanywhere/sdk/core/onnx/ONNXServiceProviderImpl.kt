@@ -125,6 +125,131 @@ actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTSer
     return wrapper
 }
 
+/**
+ * JVM/Android implementation of ONNX TTS service creation
+ * Follows the same pattern as LLM/STT service providers
+ */
+actual suspend fun createONNXTTSService(
+    configuration: com.runanywhere.sdk.features.tts.TTSConfiguration
+): com.runanywhere.sdk.features.tts.TTSService {
+    logger.info("Creating ONNX TTS service with configuration: ${configuration.voice}")
+    return ONNXTTSServiceImpl(configuration)
+}
+
+/**
+ * ONNX TTS Service Implementation
+ * Implements TTSService interface following the same pattern as LLM/STT services
+ */
+private class ONNXTTSServiceImpl(
+    private val configuration: com.runanywhere.sdk.features.tts.TTSConfiguration
+) : com.runanywhere.sdk.features.tts.TTSService {
+    private val implLogger = SDKLogger("ONNXTTSServiceImpl")
+    private var coreService: ONNXCoreService? = null
+    private var _isInitialized = false
+    private var _isSynthesizing = false
+    private var loadedModelPath: String? = null
+
+    override val inferenceFramework: String = "ONNX Runtime"
+    override val isSynthesizing: Boolean get() = _isSynthesizing
+    override val availableVoices: List<String> = emptyList()
+
+    override suspend fun initialize() {
+        implLogger.info("Initializing ONNX TTS service")
+        val service = ONNXCoreService()
+        service.initialize()
+        coreService = service
+        _isInitialized = true
+        implLogger.info("✅ ONNX TTS service initialized")
+    }
+
+    override suspend fun synthesize(
+        text: String,
+        options: com.runanywhere.sdk.features.tts.TTSOptions
+    ): ByteArray {
+        if (!_isInitialized) {
+            initialize()
+        }
+
+        val service = coreService
+            ?: throw IllegalStateException("TTS service not initialized")
+
+        _isSynthesizing = true
+        try {
+            // Resolve model path from options.voice or configuration.voice
+            val voice = options.voice ?: configuration.voice
+            val modelPath = resolveModelPath(voice)
+
+            if (modelPath.isNullOrEmpty()) {
+                throw IllegalStateException("No TTS model path provided. Please select a TTS model first.")
+            }
+
+            // Load model if not already loaded or if path changed
+            if (loadedModelPath != modelPath) {
+                implLogger.info("Loading TTS model from: $modelPath")
+                service.loadTTSModel(modelPath, "vits")
+                loadedModelPath = modelPath
+            }
+
+            // Synthesize
+            val result = service.synthesize(
+                text = text,
+                voiceId = "0",
+                speedRate = options.rate,
+                pitchShift = options.pitch
+            )
+
+            implLogger.info("Synthesized ${result.samples.size} samples at ${result.sampleRate} Hz")
+
+            return convertToWav(result.samples, result.sampleRate)
+        } finally {
+            _isSynthesizing = false
+        }
+    }
+
+    override fun synthesizeStream(
+        text: String,
+        options: com.runanywhere.sdk.features.tts.TTSOptions
+    ): Flow<ByteArray> = flow {
+        val audio = synthesize(text, options)
+        // Split into chunks for streaming delivery
+        val chunkSize = options.sampleRate * 2
+        var offset = 0
+        while (offset < audio.size) {
+            val end = minOf(offset + chunkSize, audio.size)
+            emit(audio.copyOfRange(offset, end))
+            offset = end
+        }
+    }
+
+    override fun stop() {
+        _isSynthesizing = false
+    }
+
+    override suspend fun cleanup() {
+        coreService?.let { service ->
+            if (service.isTTSModelLoaded) {
+                service.unloadTTSModel()
+            }
+            service.destroy()
+        }
+        coreService = null
+        _isInitialized = false
+        loadedModelPath = null
+    }
+
+    private fun resolveModelPath(voice: String?): String? {
+        return when {
+            voice.isNullOrEmpty() -> null
+            voice.contains("/") -> voice // Already a full path
+            else -> {
+                // Model ID - look up the full path from the model registry
+                val modelInfo = ServiceContainer.shared.modelRegistry.getModel(voice)
+                modelInfo?.localPath ?: voice
+            }
+        }
+    }
+}
+
 // Cached ONNX TTS service for reuse (thread-safe access via Mutex)
 @Volatile
 private var cachedTTSCoreService: ONNXCoreService? = null
@@ -133,11 +258,11 @@ private var cachedTTSModelPath: String? = null
 private val ttsCacheMutex = Mutex()  // Mutex for thread-safe cache access with suspend support
 
 /**
- * JVM/Android implementation of ONNX TTS synthesis
- * Matches iOS ONNXTTSService.synthesize() behavior
+ * JVM/Android implementation of ONNX TTS synthesis (legacy support)
+ * Kept for backwards compatibility with direct synthesis calls
  */
 @OptIn(DelicateCoroutinesApi::class)
-actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteArray {
+private suspend fun synthesizeWithONNXInternal(text: String, options: com.runanywhere.sdk.features.tts.TTSOptions): ByteArray {
     logger.info("Synthesizing with ONNX: ${text.take(50)}...")
 
     // Resolve model path from options.voice
@@ -321,17 +446,6 @@ actual suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteAr
 
     // Convert samples to WAV format
     return convertToWav(result.samples, result.sampleRate)
-}
-
-/**
- * JVM/Android implementation of ONNX TTS streaming
- */
-actual fun synthesizeStreamWithONNX(text: String, options: TTSOptions): Flow<ByteArray> {
-    return flow {
-        // ONNX TTS doesn't support true streaming, so we return full audio as single chunk
-        val audio = synthesizeWithONNX(text, options)
-        emit(audio)
-    }
 }
 
 /**

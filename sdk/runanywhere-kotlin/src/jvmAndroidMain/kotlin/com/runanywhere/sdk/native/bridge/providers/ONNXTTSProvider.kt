@@ -2,7 +2,9 @@ package com.runanywhere.sdk.native.bridge.providers
 
 import com.runanywhere.sdk.core.AudioFormat
 import com.runanywhere.sdk.core.TTSServiceProvider
+import com.runanywhere.sdk.features.tts.TTSConfiguration
 import com.runanywhere.sdk.features.tts.TTSOptions
+import com.runanywhere.sdk.features.tts.TTSService
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.native.bridge.NativeBridgeException
@@ -26,14 +28,11 @@ import kotlinx.coroutines.withContext
  */
 class ONNXTTSProvider : TTSServiceProvider {
     private val logger = SDKLogger("ONNXTTSProvider")
-    private val coreService = ONNXCoreService()
-    private var isInitialized = false
-    private var currentModelPath: String? = null
 
     override val name: String = "ONNX TTS"
     override val framework: InferenceFramework = InferenceFramework.ONNX
 
-    override fun canHandle(modelId: String): Boolean {
+    override fun canHandle(voiceId: String): Boolean {
         // Handle models that are known to work with ONNX TTS
         val onnxTTSModels =
             listOf(
@@ -45,27 +44,56 @@ class ONNXTTSProvider : TTSServiceProvider {
                 "hifigan",
                 "onnx-tts",
             )
-        return onnxTTSModels.any { modelId.lowercase().contains(it) }
+        return onnxTTSModels.any { voiceId.lowercase().contains(it) }
     }
 
-    /**
-     * Initialize the TTS service with a model
-     */
-    suspend fun initialize(
-        modelPath: String,
-        modelType: String = "vits",
-    ) {
+    override suspend fun createTTSService(configuration: TTSConfiguration): TTSService {
+        val service = ONNXTTSService(configuration)
+        service.initialize()
+        return service
+    }
+}
+
+/**
+ * ONNX-based TTS Service Implementation
+ * Implements TTSService interface for proper model management
+ */
+class ONNXTTSService(
+    private val configuration: TTSConfiguration,
+) : TTSService {
+    private val logger = SDKLogger("ONNXTTSService")
+    private val coreService = ONNXCoreService()
+    private var _isInitialized = false
+    private var _isSynthesizing = false
+    private var currentModelPath: String? = null
+
+    override val inferenceFramework: String = "ONNX"
+    override val isSynthesizing: Boolean get() = _isSynthesizing
+    override val availableVoices: List<String> = emptyList() // Will be populated after init
+
+    override suspend fun initialize() {
         if (!coreService.isInitialized) {
             coreService.initialize()
         }
+        _isInitialized = true
+        logger.info("✅ ONNX TTS service initialized")
+    }
+
+    /**
+     * Initialize with a specific model path
+     */
+    suspend fun initializeWithModel(
+        modelPath: String,
+        modelType: String = "vits",
+    ) {
+        initialize()
 
         if (!coreService.isTTSModelLoaded || currentModelPath != modelPath) {
             coreService.loadTTSModel(modelPath, modelType)
             currentModelPath = modelPath
         }
 
-        isInitialized = true
-        logger.info("✅ ONNX TTS provider initialized with model: $modelPath")
+        logger.info("✅ ONNX TTS service initialized with model: $modelPath")
     }
 
     override suspend fun synthesize(
@@ -74,6 +102,7 @@ class ONNXTTSProvider : TTSServiceProvider {
     ): ByteArray =
         withContext(Dispatchers.IO) {
             ensureInitialized()
+            _isSynthesizing = true
 
             try {
                 val result =
@@ -89,6 +118,8 @@ class ONNXTTSProvider : TTSServiceProvider {
             } catch (e: NativeBridgeException) {
                 logger.error("TTS synthesis failed", e)
                 throw e
+            } finally {
+                _isSynthesizing = false
             }
         }
 
@@ -102,7 +133,7 @@ class ONNXTTSProvider : TTSServiceProvider {
             val audioData = synthesize(text, options)
 
             // Split into chunks for streaming delivery
-            val chunkSize = options.sampleRate * 2 // 1 second of audio at 16-bit (sampleRate is already in Hz)
+            val chunkSize = options.sampleRate * 2 // 1 second of audio at 16-bit
             var offset = 0
 
             while (offset < audioData.size) {
@@ -111,6 +142,20 @@ class ONNXTTSProvider : TTSServiceProvider {
                 offset = end
             }
         }
+
+    override fun stop() {
+        _isSynthesizing = false
+    }
+
+    override suspend fun cleanup() {
+        if (coreService.isTTSModelLoaded) {
+            coreService.unloadTTSModel()
+        }
+        coreService.destroy()
+        _isInitialized = false
+        _isSynthesizing = false
+        currentModelPath = null
+    }
 
     /**
      * Get available voices as JSON
@@ -124,27 +169,11 @@ class ONNXTTSProvider : TTSServiceProvider {
             }
         }
 
-    /**
-     * Cleanup resources
-     */
-    suspend fun cleanup() {
-        if (coreService.isTTSModelLoaded) {
-            coreService.unloadTTSModel()
-        }
-        coreService.destroy()
-        isInitialized = false
-        currentModelPath = null
-    }
-
-    // =============================================================================
-    // Private Helpers
-    // =============================================================================
-
     private fun ensureInitialized() {
-        if (!isInitialized || !coreService.isTTSModelLoaded) {
+        if (!_isInitialized) {
             throw NativeBridgeException(
                 com.runanywhere.sdk.native.bridge.NativeResultCode.ERROR_MODEL_LOAD_FAILED,
-                "TTS model not loaded. Call initialize() with a model path first.",
+                "TTS service not initialized. Call initialize() first.",
             )
         }
     }

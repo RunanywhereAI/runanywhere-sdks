@@ -40,6 +40,8 @@ class AndroidTTSService(
     private var isInitialized = false
     private var _isSynthesizing = false
     private val availableTTSVoices = mutableListOf<TTSVoice>()
+
+    override val inferenceFramework: String = "android-tts"
     private val synthesisLock = Mutex()
 
     /**
@@ -117,40 +119,7 @@ class AndroidTTSService(
     }
 
     /**
-     * iOS-style callback streaming
-     * Matches: func synthesizeStream(text: String, options: TTSOptions, onChunk: @escaping (Data) -> Void)
-     */
-    override suspend fun synthesizeStream(
-        text: String,
-        options: TTSOptions,
-        onChunk: suspend (ByteArray) -> Unit,
-    ) {
-        if (!isInitialized) {
-            throw SDKError.ComponentNotReady("TTS service not initialized")
-        }
-
-        _isSynthesizing = true
-        try {
-            logger.debug("Starting streaming synthesis")
-
-            // For streaming, split text into sentences and synthesize each
-            val sentences = text.split(Regex("[.!?]+")).filter { it.trim().isNotEmpty() }
-
-            for (sentence in sentences) {
-                val audioData = synthesize(sentence.trim(), options)
-                if (audioData.isNotEmpty()) {
-                    onChunk(audioData)
-                }
-                // Small delay between sentences for natural speech rhythm
-                delay(100)
-            }
-        } finally {
-            _isSynthesizing = false
-        }
-    }
-
-    /**
-     * KMP Flow-based streaming (Kotlin-native pattern)
+     * Streaming synthesis using Flow
      */
     override fun synthesizeStream(
         text: String,
@@ -196,9 +165,9 @@ class AndroidTTSService(
         get() = availableTTSVoices.map { it.id }
 
     /**
-     * Get rich voice objects (KMP enhancement)
+     * Get available voice IDs
      */
-    override fun getAllVoices(): List<TTSVoice> = availableTTSVoices.toList()
+    fun getAllVoices(): List<TTSVoice> = availableTTSVoices.toList()
 
     /**
      * Check if currently synthesizing
@@ -207,21 +176,7 @@ class AndroidTTSService(
         get() = _isSynthesizing
 
     /**
-     * Load model (not applicable for system TTS)
-     */
-    override suspend fun loadModel(modelInfo: ModelInfo) {
-        logger.info("Model loading not applicable for system TTS service")
-    }
-
-    /**
-     * Cancel current synthesis
-     */
-    override fun cancelCurrent() {
-        stop()
-    }
-
-    /**
-     * Cleanup resources (iOS equivalent)
+     * Cleanup resources
      */
     override suspend fun cleanup() {
         withContext(Dispatchers.Main) {
@@ -430,38 +385,20 @@ class AndroidTTSService(
 
 /**
  * Android TTS Service Provider for integration with ModuleRegistry
+ * Follows the same pattern as LLMServiceProvider and STTServiceProvider
  */
 class AndroidTTSServiceProvider(
     private val context: Context,
 ) : com.runanywhere.sdk.core.TTSServiceProvider {
-    private val service by lazy { AndroidTTSService(context) }
-
-    override suspend fun synthesize(
-        text: String,
-        options: TTSOptions,
-    ): ByteArray {
-        if (!service.isSynthesizing) {
-            service.initialize()
-        }
-        return service.synthesize(text = text, options = options)
+    override suspend fun createTTSService(configuration: TTSConfiguration): TTSService {
+        val service = AndroidTTSService(context)
+        service.initialize()
+        return service
     }
 
-    override fun synthesizeStream(
-        text: String,
-        options: TTSOptions,
-    ): Flow<ByteArray> =
-        flow {
-            if (!service.isSynthesizing) {
-                service.initialize()
-            }
-            service.synthesizeStream(text = text, options = options).collect { chunk ->
-                emit(chunk)
-            }
-        }
-
-    override fun canHandle(modelId: String): Boolean {
+    override fun canHandle(voiceId: String): Boolean {
         // Android TTS can handle system TTS requests
-        return modelId.startsWith("system") || modelId == "default" || modelId == "android-tts"
+        return voiceId.startsWith("system") || voiceId == "default" || voiceId == "android-tts"
     }
 
     override val name: String = "AndroidTTSProvider"

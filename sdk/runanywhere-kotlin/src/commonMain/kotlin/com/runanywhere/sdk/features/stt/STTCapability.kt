@@ -33,7 +33,7 @@ class STTCapability internal constructor(
     private val logger = SDKLogger("STTCapability")
 
     // Managed lifecycle with integrated event tracking (matches iOS)
-    private val managedLifecycle: ManagedLifecycle<STTService> = ManagedLifecycle.forSTT()
+    private val managedLifecycle: ManagedLifecycle<STTService> = createSTTManagedLifecycle()
 
     // Current configuration
     private var config: STTConfiguration? = null
@@ -352,24 +352,24 @@ class STTCapability internal constructor(
 }
 
 // ============================================================================
-// MARK: - ManagedLifecycle Factory Extension
+// MARK: - ManagedLifecycle Factory
 // ============================================================================
 
 /**
  * Factory method to create ManagedLifecycle for STT
  */
-fun ManagedLifecycle.Companion.forSTT(): ManagedLifecycle<STTService> {
+internal fun createSTTManagedLifecycle(): ManagedLifecycle<STTService> {
     return ManagedLifecycle(
-        lifecycle = ModelLifecycleManager.forSTT(),
+        lifecycle = createSTTLifecycleManager(),
         resourceType = CapabilityResourceType.STT_MODEL,
         loggerCategory = "STT.Lifecycle",
     )
 }
 
 /**
- * Factory method to create ModelLifecycleManager for STT
+ * Private helper to create ModelLifecycleManager for STT
  */
-fun ModelLifecycleManager.Companion.forSTT(): ModelLifecycleManager<STTService> {
+private fun createSTTLifecycleManager(): ModelLifecycleManager<STTService> {
     val logger = SDKLogger("STT.Loader")
 
     return ModelLifecycleManager(
@@ -384,14 +384,10 @@ fun ModelLifecycleManager.Companion.forSTT(): ModelLifecycleManager<STTService> 
             logger.info("Found model: ${modelInfo.name} (id: ${modelInfo.id})")
 
             // Ensure model is downloaded
-            var modelPath = modelInfo.localPath
-            if (modelPath == null) {
-                logger.info("Model not downloaded, downloading first: $resourceId")
-                ServiceContainer.shared.modelManager.downloadModel(resourceId)
-                val updatedModelInfo = ServiceContainer.shared.modelRegistry.getModel(resourceId)
-                modelPath = updatedModelInfo?.localPath
-                    ?: throw SDKError.ModelNotFound("Model download failed: $resourceId")
-            }
+            val modelPath = modelInfo.localPath
+                ?: throw SDKError.ModelNotDownloaded(
+                    "Model not downloaded: $resourceId. Please download the model first."
+                )
 
             logger.info("Using model path: $modelPath")
 

@@ -6,13 +6,16 @@ import com.runanywhere.sdk.features.llm.LLMCapability
 import com.runanywhere.sdk.features.llm.LLMConfiguration
 import com.runanywhere.sdk.features.stt.STTCapability
 import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.stt.STTOptions
 import com.runanywhere.sdk.features.tts.TTSCapability
 import com.runanywhere.sdk.features.tts.TTSConfiguration
+import com.runanywhere.sdk.features.tts.TTSOptions
 import com.runanywhere.sdk.features.vad.VADCapability
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.infrastructure.events.EventPublisher
 import com.runanywhere.sdk.infrastructure.events.SDKVoiceEvent
+import com.runanywhere.sdk.models.LLMGenerationOptions
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
@@ -301,7 +304,7 @@ class VoiceAgentCapability internal constructor(
     /** Initialize TTS voice with smart reuse logic */
     private suspend fun initializeTTSVoice(ttsConfig: TTSConfiguration) {
         val ttsVoice = ttsConfig.voice
-        if (ttsVoice.isEmpty()) {
+        if (ttsVoice.isNullOrEmpty()) {
             return handleMissingTTSVoice()
         }
 
@@ -391,14 +394,14 @@ class VoiceAgentCapability internal constructor(
 
         // Step 2: Generate LLM response
         logger.debug("Step 2: Generating LLM response")
-        val llmResult = llm.generate(transcription)
+        val llmResult = llm.generate(transcription, LLMGenerationOptions())
         val response = llmResult.text
 
         logger.info("LLM Response: ${response.take(100)}...")
 
         // Step 3: Synthesize speech
         logger.debug("Step 3: Synthesizing speech")
-        val ttsOutput = tts.synthesize(response)
+        val ttsOutput = tts.synthesize(response, TTSOptions.default)
 
         logger.info("Voice turn completed")
 
@@ -439,15 +442,15 @@ class VoiceAgentCapability internal constructor(
 
         try {
             // Transcribe
-            val transcription = stt.transcribe(combinedAudio)
+            val transcription = stt.transcribe(combinedAudio, STTOptions.default())
             emit(VoiceAgentEvent.TranscriptionAvailable(transcription.text))
 
             // Generate response
-            val llmResult = llm.generate(transcription.text)
+            val llmResult = llm.generate(transcription.text, LLMGenerationOptions())
             emit(VoiceAgentEvent.ResponseGenerated(llmResult.text))
 
             // Synthesize
-            val ttsOutput = tts.synthesize(llmResult.text)
+            val ttsOutput = tts.synthesize(llmResult.text, TTSOptions.default)
             emit(VoiceAgentEvent.AudioSynthesized(ttsOutput.audioData))
 
             // Yield final result
@@ -494,7 +497,7 @@ class VoiceAgentCapability internal constructor(
         if (!isConfigured) {
             throw CapabilityError.NotInitialized("Voice Agent")
         }
-        val result = llm.generate(prompt)
+        val result = llm.generate(prompt, LLMGenerationOptions())
         return result.text
     }
 
@@ -509,7 +512,7 @@ class VoiceAgentCapability internal constructor(
         if (!isConfigured) {
             throw CapabilityError.NotInitialized("Voice Agent")
         }
-        val output = tts.synthesize(text)
+        val output = tts.synthesize(text, TTSOptions.default)
         return output.audioData
     }
 
@@ -544,28 +547,6 @@ class VoiceAgentCapability internal constructor(
         pipelineState = VoiceAgentPipelineState.IDLE
 
         logger.info("Voice Agent cleaned up")
-    }
-}
-
-// ============================================================================
-// MARK: - Voice Agent Error
-// ============================================================================
-
-/**
- * Errors specific to voice agent operations
- */
-sealed class VoiceAgentError : Exception() {
-    object EmptyTranscription : VoiceAgentError() {
-        private fun readResolve(): Any = EmptyTranscription
-        override val message: String = "No speech detected in audio"
-    }
-
-    data class PipelineInterrupted(val reason: String) : VoiceAgentError() {
-        override val message: String = "Voice pipeline interrupted: $reason"
-    }
-
-    data class ComponentInitializationFailed(val component: String, val cause: Throwable) : VoiceAgentError() {
-        override val message: String = "$component initialization failed: ${cause.message}"
     }
 }
 

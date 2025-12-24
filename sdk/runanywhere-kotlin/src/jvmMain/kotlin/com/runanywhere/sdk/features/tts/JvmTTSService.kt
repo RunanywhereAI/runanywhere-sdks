@@ -35,6 +35,8 @@ class JvmTTSService : TTSService {
     private var _isInitialized = false
     private var availableTTSVoices = mutableListOf<TTSVoice>()
 
+    override val inferenceFramework: String = "SystemTTS"
+
     companion object {
         private val logger = SDKLogger("JvmTTSService")
 
@@ -138,18 +140,10 @@ class JvmTTSService : TTSService {
             }
         }
 
-    // iOS-style callback streaming
-    override suspend fun synthesizeStream(
-        text: String,
-        options: TTSOptions,
-        onChunk: suspend (ByteArray) -> Unit,
-    ) {
-        synthesizeStream(text, options).collect { chunk ->
-            onChunk(chunk)
-        }
-    }
-
-    override fun getAllVoices(): List<TTSVoice> = availableTTSVoices.toList()
+    /**
+     * Get all available voices with full info
+     */
+    fun getAllVoices(): List<TTSVoice> = availableTTSVoices.toList()
 
     override val availableVoices: List<String>
         get() = availableTTSVoices.map { it.id }
@@ -157,17 +151,10 @@ class JvmTTSService : TTSService {
     override val isSynthesizing: Boolean
         get() = _isSynthesizing
 
-    override suspend fun loadModel(modelInfo: ModelInfo) {
-        // For system TTS, we don't load external models
-        logger.info("Model loading not applicable for system TTS service")
-    }
-
-    override fun cancelCurrent() {
+    override fun stop() {
         _isSynthesizing = false
-        logger.debug("TTS synthesis cancelled")
+        logger.debug("TTS synthesis stopped")
     }
-
-    override fun stop() = cancelCurrent()
 
     override suspend fun cleanup() {
         _isSynthesizing = false
@@ -462,33 +449,18 @@ class JvmTTSService : TTSService {
 
 /**
  * JVM TTS Service Provider for integration with ModuleRegistry
+ * Follows the same pattern as LLMServiceProvider and STTServiceProvider
  */
 class JvmTTSServiceProvider : com.runanywhere.sdk.core.TTSServiceProvider {
-    override suspend fun synthesize(
-        text: String,
-        options: TTSOptions,
-    ): ByteArray {
+    override suspend fun createTTSService(configuration: TTSConfiguration): TTSService {
         val service = JvmTTSService()
         service.initialize()
-        return service.synthesize(text = text, options = options)
+        return service
     }
 
-    override fun synthesizeStream(
-        text: String,
-        options: TTSOptions,
-    ): Flow<ByteArray> {
-        val service = JvmTTSService()
-        return flow {
-            service.initialize()
-            service.synthesizeStream(text = text, options = options).collect { chunk ->
-                emit(chunk)
-            }
-        }
-    }
-
-    override fun canHandle(modelId: String): Boolean {
+    override fun canHandle(voiceId: String): Boolean {
         // JVM TTS can handle system TTS requests
-        return modelId.startsWith("system") || modelId == "default"
+        return voiceId.startsWith("system") || voiceId == "default"
     }
 
     override val name: String = "JvmTTSProvider"

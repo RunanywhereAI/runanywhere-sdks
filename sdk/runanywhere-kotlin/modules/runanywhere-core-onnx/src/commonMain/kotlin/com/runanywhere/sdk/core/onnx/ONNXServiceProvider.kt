@@ -2,7 +2,6 @@ package com.runanywhere.sdk.core.onnx
 
 import com.runanywhere.sdk.features.stt.STTConfiguration
 import com.runanywhere.sdk.features.stt.STTService
-import com.runanywhere.sdk.features.tts.TTSOptions
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.vad.VADService
 import com.runanywhere.sdk.core.ModuleRegistry
@@ -11,7 +10,6 @@ import com.runanywhere.sdk.core.TTSServiceProvider
 import com.runanywhere.sdk.core.VADServiceProvider
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.enums.InferenceFramework
-import kotlinx.coroutines.flow.Flow
 
 /**
  * ONNX STT Service Provider
@@ -96,11 +94,11 @@ class ONNXTTSServiceProvider : TTSServiceProvider {
     val version: String = "1.0.0"
 
     /**
-     * Check if this provider can handle a model
+     * Check if this provider can handle a voice/model
      * Matches iOS canHandle(modelId:) pattern matching
      */
-    override fun canHandle(modelId: String): Boolean {
-        val lowercased = modelId.lowercase()
+    override fun canHandle(voiceId: String): Boolean {
+        val lowercased = voiceId.lowercase()
 
         // Pattern matching for ONNX TTS models
         return lowercased.contains("piper") ||
@@ -110,19 +108,12 @@ class ONNXTTSServiceProvider : TTSServiceProvider {
     }
 
     /**
-     * Synthesize text to speech
+     * Create a TTS service with the given configuration
+     * Follows the same pattern as LLMServiceProvider and STTServiceProvider
      */
-    override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
-        logger.info("Synthesizing with ONNX TTS: ${text.take(50)}...")
-        return synthesizeWithONNX(text, options)
-    }
-
-    /**
-     * Stream synthesized audio
-     */
-    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> {
-        logger.info("Streaming synthesis with ONNX TTS: ${text.take(50)}...")
-        return synthesizeStreamWithONNX(text, options)
+    override suspend fun createTTSService(configuration: com.runanywhere.sdk.features.tts.TTSConfiguration): com.runanywhere.sdk.features.tts.TTSService {
+        logger.info("Creating ONNX TTS service")
+        return createONNXTTSService(configuration)
     }
 
     /**
@@ -200,14 +191,9 @@ class ONNXVADServiceProvider : VADServiceProvider {
 expect suspend fun createONNXSTTService(configuration: STTConfiguration): STTService
 
 /**
- * Synthesize text using ONNX TTS (platform-specific implementation)
+ * Create an ONNX TTS service (platform-specific implementation)
  */
-expect suspend fun synthesizeWithONNX(text: String, options: TTSOptions): ByteArray
-
-/**
- * Stream synthesize text using ONNX TTS (platform-specific implementation)
- */
-expect fun synthesizeStreamWithONNX(text: String, options: TTSOptions): Flow<ByteArray>
+expect suspend fun createONNXTTSService(configuration: com.runanywhere.sdk.features.tts.TTSConfiguration): com.runanywhere.sdk.features.tts.TTSService
 
 /**
  * Create an ONNX VAD service (platform-specific implementation)

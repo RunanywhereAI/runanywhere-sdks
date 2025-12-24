@@ -1,8 +1,6 @@
 package com.runanywhere.sdk.features.voiceagent
 
-import com.runanywhere.sdk.core.capabilities.ComponentConfiguration
 import com.runanywhere.sdk.core.capabilities.ComponentOutput
-import com.runanywhere.sdk.core.capabilities.SDKComponent
 import com.runanywhere.sdk.features.llm.LLMConfiguration
 import com.runanywhere.sdk.features.stt.STTConfiguration
 import com.runanywhere.sdk.features.tts.TTSConfiguration
@@ -80,27 +78,21 @@ data class VoiceAudioChunk(
 // MARK: - VoiceAgent Configuration
 
 /**
- * Configuration for the VoiceAgent component - aggregates all sub-component configurations
+ * Configuration for VoiceAgent - aggregates all sub-component configurations
  * Matches iOS VoiceAgentConfiguration exactly
- * Note: Not serializable because sub-component configurations are not serializable
  */
 data class VoiceAgentConfiguration(
-    // Sub-component configurations matching iOS structure
+    /** VAD configuration */
     val vadConfig: VADConfiguration = VADConfiguration(),
+    /** STT configuration */
     val sttConfig: STTConfiguration = STTConfiguration(),
+    /** LLM configuration */
     val llmConfig: LLMConfiguration = LLMConfiguration(),
+    /** TTS configuration */
     val ttsConfig: TTSConfiguration = TTSConfiguration(),
-) : ComponentConfiguration {
-    /** The component type for this configuration */
-    val componentType: SDKComponent
-        get() = SDKComponent.VOICE_AGENT
-
-    /** VoiceAgent doesn't have its own model - it orchestrates sub-components */
-    val modelId: String?
-        get() = null
-
-    override fun validate() {
-        // Validate all sub-component configurations
+) {
+    /** Validate all configurations */
+    fun validate() {
         vadConfig.validate()
         sttConfig.validate()
         llmConfig.validate()
@@ -222,43 +214,52 @@ class VoiceAgentService {
 sealed class VoiceAgentError : Exception() {
     /** Pipeline not initialized */
     object PipelineNotInitialized : VoiceAgentError() {
+        private fun readResolve(): Any = PipelineNotInitialized
         override val message: String = "VoiceAgent pipeline is not initialized"
     }
 
+    /** Empty transcription - no speech detected */
+    object EmptyTranscription : VoiceAgentError() {
+        private fun readResolve(): Any = EmptyTranscription
+        override val message: String = "No speech detected in audio"
+    }
+
+    /** Pipeline was interrupted */
+    data class PipelineInterrupted(val reason: String) : VoiceAgentError() {
+        override val message: String = "Voice pipeline interrupted: $reason"
+    }
+
     /** VAD component failed */
-    data class VADFailed(
-        override val cause: Throwable,
-    ) : VoiceAgentError() {
-        override val message: String = "VAD processing failed: ${cause.message}"
+    data class VADFailed(val error: Throwable) : VoiceAgentError() {
+        override val message: String = "VAD processing failed: ${error.message}"
+        override val cause: Throwable = error
     }
 
     /** STT component failed */
-    data class STTFailed(
-        override val cause: Throwable,
-    ) : VoiceAgentError() {
-        override val message: String = "STT transcription failed: ${cause.message}"
+    data class STTFailed(val error: Throwable) : VoiceAgentError() {
+        override val message: String = "STT transcription failed: ${error.message}"
+        override val cause: Throwable = error
     }
 
     /** LLM component failed */
-    data class LLMFailed(
-        override val cause: Throwable,
-    ) : VoiceAgentError() {
-        override val message: String = "LLM generation failed: ${cause.message}"
+    data class LLMFailed(val error: Throwable) : VoiceAgentError() {
+        override val message: String = "LLM generation failed: ${error.message}"
+        override val cause: Throwable = error
     }
 
     /** TTS component failed */
-    data class TTSFailed(
-        override val cause: Throwable,
-    ) : VoiceAgentError() {
-        override val message: String = "TTS synthesis failed: ${cause.message}"
+    data class TTSFailed(val error: Throwable) : VoiceAgentError() {
+        override val message: String = "TTS synthesis failed: ${error.message}"
+        override val cause: Throwable = error
     }
 
     /** Sub-component initialization failed */
     data class ComponentInitializationFailed(
-        val componentName: String,
-        override val cause: Throwable,
+        val component: String,
+        val error: Throwable,
     ) : VoiceAgentError() {
-        override val message: String = "Failed to initialize $componentName: ${cause.message}"
+        override val message: String = "$component initialization failed: ${error.message}"
+        override val cause: Throwable = error
     }
 }
 

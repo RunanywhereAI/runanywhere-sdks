@@ -1,8 +1,5 @@
 package com.runanywhere.sdk.features.llm
 
-import com.runanywhere.sdk.core.capabilities.ComponentConfiguration
-import com.runanywhere.sdk.core.capabilities.ComponentInitParameters
-import com.runanywhere.sdk.core.capabilities.SDKComponent
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.models.ExecutionTarget
 import com.runanywhere.sdk.models.enums.InferenceFramework
@@ -94,15 +91,12 @@ enum class QuantizationLevel(
 }
 
 /**
- * Enhanced LLM Configuration with rich hardware-specific optimizations
- * Exact match with iOS LLMConfiguration structure and capabilities
+ * LLM Configuration - matches iOS LLMConfiguration
  */
 @Serializable
 data class LLMConfiguration(
-    // MARK: - Component Identification
     /** Model ID to load */
-    override val modelId: String? = null,
-    // MARK: - Model Loading Parameters
+    val modelId: String? = null,
     /** Context length/window size */
     val contextLength: Int = 2048,
     /** Use GPU acceleration if available */
@@ -164,12 +158,9 @@ data class LLMConfiguration(
     val performanceMonitoring: Boolean = true,
     /** Enable memory usage tracking */
     val memoryTracking: Boolean = true,
-) : ComponentConfiguration,
-    ComponentInitParameters {
-    override val componentType: SDKComponent
-        get() = SDKComponent.LLM
-
-    override fun validate() {
+) {
+    /** Validate configuration */
+    fun validate() {
         // Context length validation
         if (contextLength <= 0 || contextLength > 32768) {
             throw SDKError.ValidationFailed("Context length must be between 1 and 32768, got $contextLength")

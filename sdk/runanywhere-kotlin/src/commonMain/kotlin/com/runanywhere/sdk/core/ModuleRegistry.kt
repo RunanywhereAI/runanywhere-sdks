@@ -825,23 +825,27 @@ interface VADServiceProvider {
 
 /**
  * Provider for Text-to-Speech services
+ * Matches the pattern of LLMServiceProvider and STTServiceProvider
  */
 interface TTSServiceProvider {
-    suspend fun synthesize(
-        text: String,
-        options: com.runanywhere.sdk.features.tts.TTSOptions,
-    ): ByteArray
+    /**
+     * Create a TTS service for the given configuration
+     */
+    suspend fun createTTSService(configuration: com.runanywhere.sdk.features.tts.TTSConfiguration): com.runanywhere.sdk.features.tts.TTSService
 
-    fun synthesizeStream(
-        text: String,
-        options: com.runanywhere.sdk.features.tts.TTSOptions,
-    ): kotlinx.coroutines.flow.Flow<ByteArray>
+    /**
+     * Check if this provider can handle the given voice/model ID
+     */
+    fun canHandle(voiceId: String): Boolean = true
 
-    fun canHandle(modelId: String): Boolean = true
-
+    /**
+     * Provider name for identification
+     */
     val name: String
 
-    /** Framework this provider supports */
+    /**
+     * Framework this provider supports
+     */
     val framework: InferenceFramework
 }
 

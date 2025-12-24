@@ -34,7 +34,7 @@ class LLMCapability internal constructor(
     private val logger = SDKLogger("LLMCapability")
 
     // Managed lifecycle with integrated event tracking (matches iOS)
-    private val managedLifecycle: ManagedLifecycle<LLMService> = ManagedLifecycle.forLLM()
+    private val managedLifecycle: ManagedLifecycle<LLMService> = createLLMManagedLifecycle()
 
     // Current configuration
     private var config: LLMConfiguration? = null
@@ -400,24 +400,24 @@ data class LLMStreamingResult(
 )
 
 // ============================================================================
-// MARK: - ManagedLifecycle Factory Extension
+// MARK: - ManagedLifecycle Factory
 // ============================================================================
 
 /**
  * Factory method to create ManagedLifecycle for LLM
  */
-fun ManagedLifecycle.Companion.forLLM(): ManagedLifecycle<LLMService> {
+internal fun createLLMManagedLifecycle(): ManagedLifecycle<LLMService> {
     return ManagedLifecycle(
-        lifecycle = ModelLifecycleManager.forLLM(),
+        lifecycle = createLLMLifecycleManager(),
         resourceType = CapabilityResourceType.LLM_MODEL,
         loggerCategory = "LLM.Lifecycle",
     )
 }
 
 /**
- * Factory method to create ModelLifecycleManager for LLM
+ * Private helper to create ModelLifecycleManager for LLM
  */
-fun ModelLifecycleManager.Companion.forLLM(): ModelLifecycleManager<LLMService> {
+private fun createLLMLifecycleManager(): ModelLifecycleManager<LLMService> {
     val logger = SDKLogger("LLM.Loader")
 
     return ModelLifecycleManager(
@@ -437,14 +437,10 @@ fun ModelLifecycleManager.Companion.forLLM(): ModelLifecycleManager<LLMService> 
             }
 
             // Ensure model is downloaded
-            var modelPath = modelInfo.localPath
-            if (modelPath == null) {
-                logger.info("Model not downloaded, downloading first: $resourceId")
-                ServiceContainer.shared.modelManager.downloadModel(resourceId)
-                val updatedModelInfo = ServiceContainer.shared.modelRegistry.getModel(resourceId)
-                modelPath = updatedModelInfo?.localPath
-                    ?: throw SDKError.ModelNotFound("Model download failed: $resourceId")
-            }
+            val modelPath = modelInfo.localPath
+                ?: throw SDKError.ModelNotDownloaded(
+                    "Model not downloaded: $resourceId. Please download the model first."
+                )
 
             // Get provider from registry
             val provider = ModuleRegistry.llmProvider(resourceId)
