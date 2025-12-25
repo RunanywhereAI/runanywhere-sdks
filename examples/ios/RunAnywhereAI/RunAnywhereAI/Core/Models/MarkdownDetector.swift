@@ -55,16 +55,20 @@ class MarkdownDetector {
         analysis.headingCount = headingCount
 
         // Detect bold (**text**)
-        let boldCount = content.components(separatedBy: "**").count / 2
-        analysis.boldCount = boldCount
+        let boldParts = content.components(separatedBy: "**")
+        analysis.boldCount = max(0, (boldParts.count - 1) / 2)
 
         // Detect inline code (`code`)
-        let inlineCodeCount = content.components(separatedBy: "`").count / 2
-        analysis.inlineCodeCount = inlineCodeCount
+        let codeParts = content.components(separatedBy: "`")
+        analysis.inlineCodeCount = max(0, (codeParts.count - 1) / 2)
 
-        // Detect lists
+        // Detect lists (only count lines that start with list markers after trimming leading spaces)
         let listCount = content.components(separatedBy: .newlines)
-            .filter { $0.hasPrefix("- ") || $0.hasPrefix("* ") || $0.range(of: "^\\d+\\. ", options: .regularExpression) != nil }.count
+            .filter { line in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                return trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") ||
+                       trimmed.range(of: "^\\d+\\.\\s", options: .regularExpression) != nil
+            }.count
         analysis.listCount = listCount
 
         // Calculate markdown richness
