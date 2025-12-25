@@ -11,15 +11,16 @@ import com.runanywhere.sdk.features.llm.LLMEvent
 import com.runanywhere.sdk.features.stt.STTEvent
 import com.runanywhere.sdk.features.tts.TTSEvent
 import com.runanywhere.sdk.features.voiceagent.ComponentLoadState
-import com.runanywhere.sdk.features.voiceagent.VoiceAgentEvent
 import com.runanywhere.sdk.infrastructure.events.EventBus
 import com.runanywhere.sdk.infrastructure.events.ModularPipelineEvent
 import com.runanywhere.sdk.infrastructure.events.SDKEvent
+import com.runanywhere.sdk.features.voiceagent.VoiceSessionConfig
+import com.runanywhere.sdk.features.voiceagent.VoiceSessionEvent
+import com.runanywhere.sdk.features.voiceagent.VoiceSessionHandle
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.cleanupVoiceAgent
 import com.runanywhere.sdk.public.extensions.getVoiceAgentComponentStates
-import com.runanywhere.sdk.public.extensions.initializeVoiceAgentWithLoadedModels
-import com.runanywhere.sdk.public.extensions.processVoiceStream
+import com.runanywhere.sdk.public.extensions.startVoiceSession
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -114,10 +115,8 @@ class VoiceAssistantViewModel(
 ) : AndroidViewModel(application) {
     private val context: Context = application.applicationContext
 
-    // Audio capture
-    private val audioCapture: AudioCaptureService by lazy {
-        AudioCaptureService(context)
-    }
+    // Voice session handle
+    private var voiceSession: VoiceSessionHandle? = null
 
     // Jobs for coroutine management
     private var pipelineJob: Job? = null
@@ -324,6 +323,11 @@ class VoiceAssistantViewModel(
     /**
      * Start voice conversation session
      * iOS Reference: startConversation() in VoiceAgentViewModel.swift
+     *
+     * Uses the new VoiceSession API which handles:
+     * - Audio capture internally
+     * - Real-time speech detection (VAD)
+     * - Automatic STT → LLM → TTS pipeline when speech ends
      */
     fun startSession() {
         viewModelScope.launch {
@@ -352,46 +356,26 @@ class VoiceAssistantViewModel(
                     return@launch
                 }
 
-                // Check microphone permission
-                if (!audioCapture.hasRecordPermission()) {
-                    Log.e(TAG, "Microphone permission not granted")
-                    _uiState.update {
-                        it.copy(
-                            sessionState = SessionState.ERROR,
-                            errorMessage = "Microphone permission required",
-                        )
-                    }
-                    return@launch
-                }
+                // Start voice session with sensitive config for whisper detection
+                // VoiceSession handles audio capture, VAD, and pipeline internally
+                val session = RunAnywhere.startVoiceSession(VoiceSessionConfig.sensitive())
+                voiceSession = session
 
-                // Initialize voice agent with loaded models
-                RunAnywhere.initializeVoiceAgentWithLoadedModels()
+                Log.i(TAG, "Voice session started, listening...")
 
-                // Start audio capture and process through voice pipeline
-                val audioFlow = audioCapture.startCapture()
-
-                _uiState.update {
-                    it.copy(
-                        sessionState = SessionState.LISTENING,
-                        isListening = true,
-                    )
-                }
-
-                Log.i(TAG, "Conversation started, listening...")
-
-                // Process audio through voice pipeline
+                // Consume voice session events
                 pipelineJob =
                     viewModelScope.launch {
                         try {
-                            RunAnywhere.processVoiceStream(audioFlow).collect { event ->
-                                handleVoiceAgentEvent(event)
+                            session.events.collect { event ->
+                                handleVoiceSessionEvent(event)
                             }
                         } catch (e: Exception) {
-                            Log.e(TAG, "Pipeline error", e)
+                            Log.e(TAG, "Session error", e)
                             _uiState.update {
                                 it.copy(
                                     sessionState = SessionState.ERROR,
-                                    errorMessage = "Pipeline error: ${e.message}",
+                                    errorMessage = "Session error: ${e.message}",
                                     isListening = false,
                                 )
                             }
@@ -411,68 +395,82 @@ class VoiceAssistantViewModel(
     }
 
     /**
-     * Handle VoiceAgent events
-     * iOS Reference: handleSessionEvent(_:) in VoiceAgentViewModel.swift
+     * Handle VoiceSession events (new API matching iOS)
      */
-    private fun handleVoiceAgentEvent(event: VoiceAgentEvent) {
+    private fun handleVoiceSessionEvent(event: VoiceSessionEvent) {
         when (event) {
-            is VoiceAgentEvent.VadTriggered -> {
-                Log.d(TAG, "VAD triggered: speech=${event.speechDetected}")
+            is VoiceSessionEvent.Started -> {
+                Log.i(TAG, "Voice session started")
                 _uiState.update {
                     it.copy(
-                        isSpeechDetected = event.speechDetected,
-                        sessionState = if (event.speechDetected) SessionState.LISTENING else it.sessionState,
+                        sessionState = SessionState.LISTENING,
+                        isListening = true,
                     )
                 }
             }
 
-            is VoiceAgentEvent.TranscriptionAvailable -> {
-                Log.i(TAG, "Transcription: ${event.text}")
+            is VoiceSessionEvent.Listening -> {
+                _uiState.update { it.copy(audioLevel = event.audioLevel) }
+            }
+
+            is VoiceSessionEvent.SpeechStarted -> {
+                Log.d(TAG, "Speech detected")
+                _uiState.update { it.copy(isSpeechDetected = true) }
+            }
+
+            is VoiceSessionEvent.Processing -> {
+                Log.i(TAG, "Processing speech...")
                 _uiState.update {
                     it.copy(
-                        currentTranscript = event.text,
                         sessionState = SessionState.PROCESSING,
+                        isSpeechDetected = false,
                     )
                 }
             }
 
-            is VoiceAgentEvent.ResponseGenerated -> {
+            is VoiceSessionEvent.Transcribed -> {
+                Log.i(TAG, "Transcription: ${event.text}")
+                _uiState.update { it.copy(currentTranscript = event.text) }
+            }
+
+            is VoiceSessionEvent.Responded -> {
                 Log.i(TAG, "Response: ${event.text.take(50)}...")
                 _uiState.update { it.copy(assistantResponse = event.text) }
             }
 
-            is VoiceAgentEvent.AudioSynthesized -> {
-                Log.d(TAG, "Audio synthesized: ${event.data.size} bytes")
-                // Audio playback would be handled here
-                // Clear for next interaction
-                _uiState.update {
-                    it.copy(
-                        sessionState = SessionState.LISTENING,
-                        isListening = true,
-                        currentTranscript = "",
-                    )
-                }
+            is VoiceSessionEvent.Speaking -> {
+                Log.d(TAG, "Playing TTS audio")
+                _uiState.update { it.copy(sessionState = SessionState.PROCESSING) }
             }
 
-            is VoiceAgentEvent.Processed -> {
+            is VoiceSessionEvent.TurnCompleted -> {
                 Log.i(TAG, "Turn completed")
                 _uiState.update {
                     it.copy(
-                        currentTranscript = event.result.transcription ?: "",
-                        assistantResponse = event.result.response ?: "",
+                        currentTranscript = event.transcript,
+                        assistantResponse = event.response,
                         sessionState = SessionState.LISTENING,
                         isListening = true,
                     )
                 }
             }
 
-            is VoiceAgentEvent.Error -> {
-                Log.e(TAG, "Voice agent error: ${event.error}")
+            is VoiceSessionEvent.Stopped -> {
+                Log.i(TAG, "Voice session stopped")
                 _uiState.update {
                     it.copy(
-                        errorMessage = event.error.message,
-                        sessionState = SessionState.ERROR,
+                        sessionState = SessionState.DISCONNECTED,
                         isListening = false,
+                    )
+                }
+            }
+
+            is VoiceSessionEvent.Error -> {
+                Log.e(TAG, "Voice session error: ${event.message}")
+                _uiState.update {
+                    it.copy(
+                        errorMessage = event.message,
+                        // Don't change state to error - session can continue
                     )
                 }
             }
@@ -546,8 +544,9 @@ class VoiceAssistantViewModel(
             pipelineJob?.cancel()
             pipelineJob = null
 
-            // Stop audio capture
-            audioCapture.stopCapture()
+            // Stop voice session (handles audio capture cleanup internally)
+            voiceSession?.stop()
+            voiceSession = null
 
             // Clean up voice agent
             try {
@@ -639,6 +638,6 @@ class VoiceAssistantViewModel(
         super.onCleared()
         eventSubscriptionJob?.cancel()
         pipelineJob?.cancel()
-        audioCapture.release()
+        voiceSession?.stop()
     }
 }

@@ -1,10 +1,13 @@
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentComponentStates
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentConfiguration
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentEvent
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentPipelineState
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentResult
+import com.runanywhere.sdk.features.voiceagent.VoiceSessionConfig
+import com.runanywhere.sdk.features.voiceagent.VoiceSessionHandle
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
@@ -76,12 +79,15 @@ suspend fun RunAnywhere.initializeVoiceAgent(
  *
  * Uses whatever models are already loaded in STT, LLM, and TTS capabilities
  *
+ * @param vadConfig Optional VAD configuration. Defaults to VADConfiguration() which uses a balanced threshold.
+ *                  Use VADConfiguration.sensitive() for whisper detection in quiet environments.
+ *                  Use VADConfiguration.conservative() for noisy environments.
  * @throws SDKError if initialization fails or required models not loaded
  */
-suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
+suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(vadConfig: VADConfiguration = VADConfiguration()) {
     requireInitialized()
     ensureServicesReady()
-    voiceAgentCapability.initializeWithLoadedModels()
+    voiceAgentCapability.initializeWithLoadedModels(vadConfig)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -184,4 +190,46 @@ suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): ByteArray {
  */
 suspend fun RunAnywhere.cleanupVoiceAgent() {
     voiceAgentCapability.cleanup()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MARK: - Voice Session (High-level API matching iOS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Start a voice session with real-time speech detection.
+ * Matches iOS startVoiceSession() exactly.
+ *
+ * This is the simplest way to integrate voice assistant.
+ * The session handles audio capture, VAD, and processing internally.
+ *
+ * Example:
+ * ```kotlin
+ * val session = RunAnywhere.startVoiceSession()
+ *
+ * // Consume events
+ * session.events.collect { event ->
+ *     when (event) {
+ *         is VoiceSessionEvent.Listening -> audioMeter = event.audioLevel
+ *         is VoiceSessionEvent.SpeechStarted -> showSpeechIndicator()
+ *         is VoiceSessionEvent.Processing -> status = "Processing..."
+ *         is VoiceSessionEvent.TurnCompleted -> {
+ *             userText = event.transcript
+ *             assistantText = event.response
+ *         }
+ *         is VoiceSessionEvent.Stopped -> break
+ *         else -> {}
+ *     }
+ * }
+ * ```
+ *
+ * @param config Session configuration (optional). Use VoiceSessionConfig.sensitive() for whisper detection.
+ * @return Session handle with events flow
+ */
+suspend fun RunAnywhere.startVoiceSession(config: VoiceSessionConfig = VoiceSessionConfig.default): VoiceSessionHandle {
+    requireInitialized()
+    ensureServicesReady()
+    val session = VoiceSessionHandle(config)
+    session.start()
+    return session
 }

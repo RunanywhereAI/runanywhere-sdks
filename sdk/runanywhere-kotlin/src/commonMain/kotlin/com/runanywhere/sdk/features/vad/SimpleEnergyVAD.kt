@@ -97,6 +97,11 @@ class SimpleEnergyVAD(
         // Determine if this frame contains voice (exactly matching iOS logic)
         val hasVoice = energy > vadConfig.energyThreshold
 
+        // Debug: Log energy levels periodically to help diagnose sensitivity issues
+        if (recentEnergyValues.size % 10 == 0) {
+            logger.debug("VAD energy: ${String.format("%.6f", energy)} (threshold: ${String.format("%.6f", vadConfig.energyThreshold)}, hasVoice: $hasVoice)")
+        }
+
         // Update state with hysteresis (exactly matching iOS updateSpeechState)
         updateSpeechState(hasVoice, energy)
 

@@ -1,5 +1,7 @@
 package com.runanywhere.sdk.core.onnx
 
+import com.runanywhere.sdk.core.AudioUtils
+import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.features.stt.STTConfiguration
 import com.runanywhere.sdk.features.stt.STTOptions
 import com.runanywhere.sdk.features.stt.STTService
@@ -14,6 +16,7 @@ import com.runanywhere.sdk.features.vad.VADService
 import com.runanywhere.sdk.features.vad.VADStatistics
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -50,28 +53,17 @@ internal actual suspend fun createONNXSTTService(configuration: STTConfiguration
     val service = ONNXCoreService()
     service.initialize()
 
-    // Resolve and load model
+    // Resolve and load model using storage strategy pattern
     configuration.modelId?.let { modelId ->
-        // Resolve the actual model path from registry or use as-is if it's already a path
-        val registryPath =
-            if (modelId.contains("/")) {
-                modelId // Already a path
-            } else {
-                // Look up model in registry to get the local path
-                ServiceContainer.shared.modelRegistry
-                    .getModel(modelId)
-                    ?.localPath ?: modelId
-            }
-
+        val registryPath = getRegistryPath(modelId)
         logger.info("Registry path for STT: $registryPath")
 
-        // Use findONNXModelPath to resolve the actual model directory (handles nested dirs)
-        val modelPath = findONNXModelPath(modelId, registryPath) ?: registryPath
+        // Use storage strategy to find actual model path (handles nested directories)
+        val modelPath = resolveModelPath(modelId, registryPath)
 
         logger.info("Resolved STT model path: $modelPath")
 
-        if (modelPath.isNotEmpty()) {
-            // Validate path before loading
+        if (!modelPath.isNullOrEmpty()) {
             validateModelPath(modelPath, "STT")
             val modelType = detectSTTModelType(modelPath)
             service.loadSTTModel(modelPath, modelType)
@@ -80,20 +72,10 @@ internal actual suspend fun createONNXSTTService(configuration: STTConfiguration
     }
 
     return ONNXSTTService(service).also { sttService ->
-        // Store the path for currentModel property
         configuration.modelId?.let { modelId ->
-            val registryPath =
-                if (modelId.contains("/")) {
-                    modelId
-                } else {
-                    ServiceContainer.shared.modelRegistry
-                        .getModel(modelId)
-                        ?.localPath
-                }
-            registryPath?.let { path ->
-                val resolvedPath = findONNXModelPath(modelId, path) ?: path
-                sttService.setModelPath(resolvedPath)
-            }
+            val registryPath = getRegistryPath(modelId)
+            val resolvedPath = resolveModelPath(modelId, registryPath)
+            resolvedPath?.let { sttService.setModelPath(it) }
         }
     }
 }
@@ -104,26 +86,17 @@ internal actual suspend fun createONNXTTSService(configuration: TTSConfiguration
     val service = ONNXCoreService()
     service.initialize()
 
-    // Resolve and load model (matching STT pattern)
+    // Resolve and load model using storage strategy pattern
     configuration.modelId?.let { modelId ->
-        val registryPath =
-            if (modelId.contains("/")) {
-                modelId // Already a path
-            } else {
-                ServiceContainer.shared.modelRegistry
-                    .getModel(modelId)
-                    ?.localPath ?: modelId
-            }
-
+        val registryPath = getRegistryPath(modelId)
         logger.info("Registry path for TTS: $registryPath")
 
-        // Use findONNXModelPath to resolve the actual model directory (handles nested dirs)
-        val modelPath = findONNXModelPath(modelId, registryPath) ?: registryPath
+        // Use storage strategy to find actual model path (handles nested directories)
+        val modelPath = resolveModelPath(modelId, registryPath)
 
         logger.info("Resolved TTS model path: $modelPath")
 
-        if (modelPath.isNotEmpty()) {
-            // Validate path before loading
+        if (!modelPath.isNullOrEmpty()) {
             validateModelPath(modelPath, "TTS")
             val modelType = detectTTSModelType(modelPath)
             service.loadTTSModel(modelPath, modelType)
@@ -180,7 +153,7 @@ internal class ONNXSTTService(
             throw IllegalStateException("STT service not ready - model not loaded")
         }
 
-        val samples = convertToFloat32Samples(audioData)
+        val samples = AudioUtils.pcmBytesToFloatSamples(audioData)
         val jsonResult = coreService.transcribe(samples, options.sampleRate, options.language)
         return parseSTTResult(jsonResult)
     }
@@ -238,7 +211,7 @@ internal class ONNXTTSService(
     init {
         // If service was pre-initialized with a model, track the loaded path
         if (coreService?.isTTSModelLoaded == true) {
-            loadedModelPath = resolveModelPath(configuration.modelId)
+            loadedModelPath = resolveModelPathForVoice(configuration.modelId)
         }
     }
 
@@ -268,7 +241,7 @@ internal class ONNXTTSService(
         _isSynthesizing = true
         try {
             val modelPath =
-                resolveModelPath(options.voice ?: configuration.modelId)
+                resolveModelPathForVoice(options.voice ?: configuration.modelId)
                     ?: throw IllegalStateException("No TTS model path provided")
 
             // Load model if needed (should already be loaded by createONNXTTSService)
@@ -289,7 +262,7 @@ internal class ONNXTTSService(
                 )
 
             ttsLogger.info("Synthesized ${result.samples.size} samples at ${result.sampleRate} Hz")
-            return convertToWav(result.samples, result.sampleRate)
+            return AudioUtils.floatSamplesToWav(result.samples, result.sampleRate)
         } finally {
             _isSynthesizing = false
         }
@@ -320,19 +293,10 @@ internal class ONNXTTSService(
         loadedModelPath = null
     }
 
-    private fun resolveModelPath(voice: String?): String? {
+    private fun resolveModelPathForVoice(voice: String?): String? {
         if (voice.isNullOrEmpty()) return null
-
-        val registryPath = when {
-            voice.contains("/") -> voice
-            else ->
-                ServiceContainer.shared.modelRegistry
-                    .getModel(voice)
-                    ?.localPath ?: voice
-        }
-
-        // Use findONNXModelPath to resolve nested directories
-        return findONNXModelPath(voice, registryPath) ?: registryPath
+        val registryPath = getRegistryPath(voice)
+        return resolveModelPath(voice, registryPath)
     }
 }
 
@@ -473,7 +437,51 @@ internal class ONNXVADService(
 }
 
 // =============================================================================
-// MARK: - Helper Functions
+// MARK: - Helper Functions (Path Resolution via Storage Strategy)
+// =============================================================================
+
+/**
+ * Get the registry path for a model ID.
+ * If modelId contains "/" it's already a path, otherwise look up in registry.
+ */
+private fun getRegistryPath(modelId: String): String? {
+    return if (modelId.contains("/")) {
+        modelId
+    } else {
+        ServiceContainer.shared.modelRegistry
+            .getModel(modelId)
+            ?.localPath
+    }
+}
+
+/**
+ * Resolve the actual model path using the ONNX storage strategy.
+ * This handles nested directories from archive extraction.
+ *
+ * Uses ModuleRegistry.storageStrategy(ONNX).findModelPath() which is implemented
+ * by ONNXDownloadStrategy and calls findONNXModelPath() for nested directory handling.
+ */
+private fun resolveModelPath(
+    modelId: String,
+    registryPath: String?,
+): String? {
+    if (registryPath.isNullOrEmpty()) return null
+
+    // Use the ONNX storage strategy to find the actual model path
+    val storageStrategy = ModuleRegistry.storageStrategy(InferenceFramework.ONNX)
+    if (storageStrategy != null) {
+        val resolved = storageStrategy.findModelPath(modelId, registryPath)
+        if (resolved != null) {
+            return resolved
+        }
+    }
+
+    // Fallback: use findONNXModelPath directly (for cases where module not yet registered)
+    return findONNXModelPath(modelId, registryPath) ?: registryPath
+}
+
+// =============================================================================
+// MARK: - ONNX-Specific Model Type Detection
 // =============================================================================
 
 private fun detectSTTModelType(modelPath: String): String {
@@ -482,7 +490,7 @@ private fun detectSTTModelType(modelPath: String): String {
         lowercased.contains("zipformer") -> "zipformer"
         lowercased.contains("whisper") -> "whisper"
         lowercased.contains("paraformer") -> "paraformer"
-        lowercased.contains("sherpa") -> "zipformer"
+        lowercased.contains("sherpa") && !lowercased.contains("whisper") -> "zipformer"
         else -> "zipformer"
     }
 }
@@ -497,11 +505,18 @@ private fun detectTTSModelType(modelPath: String): String {
     }
 }
 
+// =============================================================================
+// MARK: - ONNX-Specific Validation
+// =============================================================================
+
 /**
- * Validates that a model path exists and contains expected model files.
+ * Validates that a model path exists and contains expected ONNX model files.
  * Throws a detailed exception if validation fails.
  */
-private fun validateModelPath(modelPath: String, modelType: String) {
+private fun validateModelPath(
+    modelPath: String,
+    modelType: String,
+) {
     val file = java.io.File(modelPath)
     if (!file.exists()) {
         throw IllegalStateException(
@@ -518,7 +533,7 @@ private fun validateModelPath(modelPath: String, modelType: String) {
                     "The model may not have been extracted correctly.",
             )
         }
-        // Check for common model files
+        // Check for ONNX-specific model files
         val hasOnnxFiles = files.any { it.extension.lowercase() == "onnx" }
         val hasTokensFile = files.any { it.name.contains("tokens") }
         if (!hasOnnxFiles && !hasTokensFile) {
@@ -529,79 +544,4 @@ private fun validateModelPath(modelPath: String, modelType: String) {
             )
         }
     }
-}
-
-private fun convertToFloat32Samples(audioData: ByteArray): FloatArray {
-    val samples = FloatArray(audioData.size / 2)
-    for (i in samples.indices) {
-        val low = audioData[i * 2].toInt() and 0xFF
-        val high = audioData[i * 2 + 1].toInt()
-        val sample = (high shl 8) or low
-        samples[i] = sample / 32768.0f
-    }
-    return samples
-}
-
-private fun convertToWav(samples: FloatArray, sampleRate: Int): ByteArray {
-    val numSamples = samples.size
-    val bitsPerSample = 16
-    val byteRate = sampleRate * bitsPerSample / 8
-    val dataSize = numSamples * 2
-    val fileSize = 36 + dataSize
-
-    val buffer = ByteArray(44 + dataSize)
-    var offset = 0
-
-    // RIFF header
-    "RIFF".toByteArray().copyInto(buffer, offset)
-    offset += 4
-    writeInt32LE(buffer, offset, fileSize)
-    offset += 4
-    "WAVE".toByteArray().copyInto(buffer, offset)
-    offset += 4
-
-    // fmt chunk
-    "fmt ".toByteArray().copyInto(buffer, offset)
-    offset += 4
-    writeInt32LE(buffer, offset, 16)
-    offset += 4
-    writeInt16LE(buffer, offset, 1)
-    offset += 2
-    writeInt16LE(buffer, offset, 1)
-    offset += 2
-    writeInt32LE(buffer, offset, sampleRate)
-    offset += 4
-    writeInt32LE(buffer, offset, byteRate)
-    offset += 4
-    writeInt16LE(buffer, offset, 2)
-    offset += 2
-    writeInt16LE(buffer, offset, bitsPerSample)
-    offset += 2
-
-    // data chunk
-    "data".toByteArray().copyInto(buffer, offset)
-    offset += 4
-    writeInt32LE(buffer, offset, dataSize)
-    offset += 4
-
-    // Write samples
-    for (sample in samples) {
-        val intSample = (sample * 32767).toInt().coerceIn(-32768, 32767)
-        writeInt16LE(buffer, offset, intSample)
-        offset += 2
-    }
-
-    return buffer
-}
-
-private fun writeInt16LE(buffer: ByteArray, offset: Int, value: Int) {
-    buffer[offset] = (value and 0xFF).toByte()
-    buffer[offset + 1] = ((value shr 8) and 0xFF).toByte()
-}
-
-private fun writeInt32LE(buffer: ByteArray, offset: Int, value: Int) {
-    buffer[offset] = (value and 0xFF).toByte()
-    buffer[offset + 1] = ((value shr 8) and 0xFF).toByte()
-    buffer[offset + 2] = ((value shr 16) and 0xFF).toByte()
-    buffer[offset + 3] = ((value shr 24) and 0xFF).toByte()
 }
