@@ -228,7 +228,7 @@ final class LLMViewModel {
             if let currentModel = modelListViewModel.currentModel {
                 self.isModelLoaded = true
                 self.loadedModelName = currentModel.name
-                self.selectedFramework = currentModel.preferredFramework
+                self.selectedFramework = currentModel.framework
 
                 Task {
                     do {
@@ -316,7 +316,7 @@ final class LLMViewModel {
             if let id = modelId,
                let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == id }) {
                 self.loadedModelName = matchingModel.name
-                self.selectedFramework = matchingModel.preferredFramework
+                self.selectedFramework = matchingModel.framework
             }
         }
     }
@@ -331,7 +331,7 @@ final class LLMViewModel {
 
             if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
                 self.loadedModelName = matchingModel.name
-                self.selectedFramework = matchingModel.preferredFramework
+                self.selectedFramework = matchingModel.framework
             }
 
             if !wasLoaded {
@@ -706,7 +706,7 @@ final class LLMViewModel {
                 await MainActor.run {
                     self.isModelLoaded = true
                     self.loadedModelName = model.name
-                    self.selectedFramework = model.preferredFramework
+                    self.selectedFramework = model.framework
                     self.modelSupportsStreaming = supportsStreaming
 
                     if self.messages.first?.role == .system {

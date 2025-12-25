@@ -199,7 +199,7 @@ public actor ManagedLifecycle<ServiceType> {
         }
 
         // Get the framework from model info
-        let framework = modelInfo.preferredFramework ?? modelInfo.compatibleFrameworks.first
+        let framework = modelInfo.framework ?? modelInfo.compatibleFrameworks.first
         guard let framework = framework else {
             return .unknown
         }

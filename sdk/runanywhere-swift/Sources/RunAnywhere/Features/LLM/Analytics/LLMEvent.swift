@@ -5,6 +5,9 @@
 //  All LLM-related events in one place.
 //  Each event declares its destination (public, analytics, or both).
 //
+//  Note: LLMEvent conforms to TypedEventProperties for strongly typed analytics.
+//  This avoids string conversion/parsing and enables compile-time type checking.
+//
 
 import Foundation
 
@@ -16,7 +19,13 @@ import Foundation
 /// ```swift
 /// EventPublisher.shared.track(LLMEvent.generationCompleted(...))
 /// ```
-public enum LLMEvent: SDKEvent {
+///
+/// LLMEvent provides strongly typed properties via `typedProperties`.
+/// This enables:
+/// - Type safety at compile time
+/// - No string parsing for analytics
+/// - Validation guardrails (e.g., tokensPerSecond > 0)
+public enum LLMEvent: SDKEvent, TypedEventProperties {
 
     // MARK: - Model Lifecycle
 
@@ -205,6 +214,105 @@ public enum LLMEvent: SDKEvent {
                 "error_message": error,
                 "success": "false"
             ]
+        }
+    }
+
+    // MARK: - TypedEventProperties Conformance
+
+    /// Strongly typed event properties - no string conversion needed.
+    /// These values are used directly by TelemetryEventPayload.
+    public var typedProperties: EventProperties {
+        switch self {
+        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                processingTimeMs: durationMs,
+                success: true,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadFailed(let modelId, let error, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                success: false,
+                errorMessage: error
+            )
+
+        case .modelUnloaded(let modelId):
+            return EventProperties(modelId: modelId)
+
+        case .modelUnloadStarted(let modelId):
+            return EventProperties(modelId: modelId)
+
+        case .generationStarted(let generationId, let modelId, _, let isStreaming, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                isStreaming: isStreaming,
+                generationId: generationId
+            )
+
+        case .firstToken(let generationId, let modelId, let timeToFirstTokenMs, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                timeToFirstTokenMs: timeToFirstTokenMs,
+                generationId: generationId
+            )
+
+        case .streamingUpdate(let generationId, let tokensGenerated):
+            return EventProperties(
+                outputTokens: tokensGenerated,
+                generationId: generationId
+            )
+
+        case .generationCompleted(
+            let generationId,
+            let modelId,
+            let inputTokens,
+            let outputTokens,
+            let durationMs,
+            let tokensPerSecond,
+            let isStreaming,
+            let timeToFirstTokenMs,
+            let framework,
+            let temperature,
+            let maxTokens,
+            let contextLength
+        ):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                processingTimeMs: durationMs,
+                success: true,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                totalTokens: inputTokens + outputTokens,
+                tokensPerSecond: tokensPerSecond,
+                timeToFirstTokenMs: timeToFirstTokenMs,
+                generationTimeMs: durationMs,
+                contextLength: contextLength,
+                temperature: temperature != nil ? Double(temperature!) : nil,
+                maxTokens: maxTokens,
+                isStreaming: isStreaming,
+                generationId: generationId
+            )
+
+        case .generationFailed(let generationId, let error):
+            return EventProperties(
+                success: false,
+                errorMessage: error,
+                generationId: generationId
+            )
         }
     }
 }

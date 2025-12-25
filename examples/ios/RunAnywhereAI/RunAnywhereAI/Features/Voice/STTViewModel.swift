@@ -107,7 +107,7 @@ class STTViewModel: ObservableObject {
 
         do {
             try await RunAnywhere.loadSTTModel(model.id)
-            selectedFramework = model.preferredFramework
+            selectedFramework = model.framework
             selectedModelName = model.name
             selectedModelId = model.id
             logger.info("STT model loaded successfully: \(model.name)")
@@ -180,7 +180,7 @@ class STTViewModel: ObservableObject {
                 // Look up the model name from available models
                 if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
                     selectedModelName = matchingModel.name
-                    selectedFramework = matchingModel.preferredFramework
+                    selectedFramework = matchingModel.framework
                 } else {
                     selectedModelName = modelId // Fallback to ID if model not found
                 }
@@ -200,7 +200,7 @@ class STTViewModel: ObservableObject {
         if let model = await RunAnywhere.currentSTTModel {
             selectedModelId = model.id
             selectedModelName = model.name
-            selectedFramework = model.preferredFramework
+            selectedFramework = model.framework
             logger.info("STT model already loaded: \(model.name)")
         }
     }
@@ -284,45 +284,24 @@ class STTViewModel: ObservableObject {
         logger.info("Starting live transcription via SDK")
         isTranscribing = true
 
-        // Use SDK's high-level LiveTranscriptionSession
-        // It handles audio capture, streaming, and cleanup internally
-        let session = try await RunAnywhere.startLiveTranscription { [weak self] partialText in
-            Task { @MainActor in
-                self?.transcription = partialText
-            }
-        }
-
+        // Start session and consume transcription stream
+        let session = try await RunAnywhere.startLiveTranscription()
         self.liveSession = session
 
-        // Subscribe to audio level from the session
+        // Subscribe to audio level for visualization
         session.$audioLevel
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] level in
-                self?.audioLevel = level
-            }
-            .store(in: &cancellables)
+            .assign(to: &$audioLevel)
 
-        // Subscribe to error state
-        session.$error
-            .receive(on: DispatchQueue.main)
-            .compactMap { $0 }
-            .sink { [weak self] error in
-                self?.errorMessage = "Live transcription failed: \(error.localizedDescription)"
-                self?.isTranscribing = false
+        // Consume transcription updates
+        Task { @MainActor [weak self] in
+            for await text in session.transcriptions {
+                self?.transcription = text
             }
-            .store(in: &cancellables)
-
-        // Subscribe to active state
-        session.$isActive
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isActive in
-                if !isActive {
-                    self?.isTranscribing = false
-                }
-            }
-            .store(in: &cancellables)
-
-        logger.info("Live transcription session started")
+            // Stream ended
+            self?.isTranscribing = false
+            self?.logger.info("Live transcription completed")
+        }
     }
 
     /// Stop live streaming transcription

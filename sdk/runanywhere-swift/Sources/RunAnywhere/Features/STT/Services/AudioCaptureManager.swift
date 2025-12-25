@@ -37,7 +37,7 @@ public class AudioCaptureManager: ObservableObject {
     @Published public var isRecording = false
     @Published public var audioLevel: Float = 0.0
 
-    private let targetSampleRate: Double = 16000.0 // Whisper requirement
+    private let targetSampleRate: Double = Double(STTConstants.defaultSampleRate)
 
     public init() {
         logger.info("AudioCaptureManager initialized")

@@ -105,14 +105,13 @@ public actor AnalyticsQueueManager {
             "sdk_version": SDKConstants.version
         ]
 
-        // Convert SDKEvent to TelemetryData with device info
-        let telemetryEvents = batch.map { event in
-            let enrichedProperties = event.properties.merging(deviceMetadata) { eventValue, _ in eventValue }
-            return TelemetryData(
-                eventType: event.type,
-                properties: enrichedProperties,
-                timestamp: event.timestamp
-            )
+        // Create TelemetryEventPayload directly from SDKEvent (preserves category → modality!)
+        let payloads: [TelemetryEventPayload] = batch.map { event in
+            if let typedEvent = event as? (any TypedEventProperties) {
+                return TelemetryEventPayload(from: event, typedProperties: typedEvent.typedProperties)
+            } else {
+                return TelemetryEventPayload(from: event) // Uses event.category directly!
+            }
         }
 
         var success = false
@@ -122,14 +121,15 @@ public actor AnalyticsQueueManager {
             do {
                 // Try to store events locally (optional - skip if database not available)
                 do {
-                    for telemetryData in telemetryEvents {
-                        if let eventType = TelemetryEventType(rawValue: telemetryData.eventType) {
-                            try await telemetryRepository.trackEvent(eventType, properties: telemetryData.properties)
+                    for event in batch {
+                        let enrichedProperties = event.properties.merging(deviceMetadata) { eventValue, _ in eventValue }
+                        if let eventType = TelemetryEventType(rawValue: event.type) {
+                            try await telemetryRepository.trackEvent(eventType, properties: enrichedProperties)
                         } else {
                             try await telemetryRepository.trackEvent(
                                 .custom,
-                                properties: telemetryData.properties.merging(
-                                    ["event_type": telemetryData.eventType]
+                                properties: enrichedProperties.merging(
+                                    ["event_type": event.type]
                                 ) { _, new in new }
                             )
                         }
@@ -138,9 +138,9 @@ public actor AnalyticsQueueManager {
                     // Database not available - skip local storage, continue to remote
                 }
 
-                // Sync to backend
+                // Sync to backend using typed payloads (preserves category → modality)
                 if let remoteDataSource = telemetryRepository.remoteDataSource {
-                    try await remoteDataSource.sendBatch(telemetryEvents)
+                    try await remoteDataSource.sendPayloads(payloads)
                 }
 
                 success = true

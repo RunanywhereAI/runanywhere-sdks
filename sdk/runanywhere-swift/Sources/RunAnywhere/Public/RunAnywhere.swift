@@ -256,7 +256,7 @@ public enum RunAnywhere {
             // Mark Phase 1 complete
             isInitialized = true
 
-            // Register built-in modules (SystemTTS as fallback)
+            // Register built-in modules for discovery (actual ServiceRegistry registration in Phase 2)
             _ = SystemTTS.autoRegister
 
             let initDurationMs = (CFAbsoluteTimeGetCurrent() - initStartTime) * 1000
@@ -313,6 +313,12 @@ public enum RunAnywhere {
         }
 
         let logger = SDKLogger(category: "RunAnywhere.Services")
+
+        // Register all discovered modules with ServiceRegistry (SystemTTS, etc.)
+        // This must happen before any capability usage
+        await MainActor.run {
+            ModuleRegistry.shared.registerDiscoveredModules()
+        }
 
         // Check if services need initialization
         let needsInit = environment == .development

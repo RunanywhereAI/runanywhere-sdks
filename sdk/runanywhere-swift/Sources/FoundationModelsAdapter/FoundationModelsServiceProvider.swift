@@ -83,7 +83,7 @@ public enum AppleAI: RunAnywhereModule {
             downloadSize: nil,
             memoryRequired: nil,  // System managed
             compatibleFrameworks: [.foundationModels],
-            preferredFramework: .foundationModels,
+            framework: .foundationModels,
             contextLength: 4096,
             supportsThinking: false,
             tags: ["apple", "foundation-models", "built-in", "on-device"],

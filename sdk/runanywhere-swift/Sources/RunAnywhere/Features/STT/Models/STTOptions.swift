@@ -50,7 +50,7 @@ public struct STTOptions: Sendable {
         enableTimestamps: Bool = true,
         vocabularyFilter: [String] = [],
         audioFormat: AudioFormat = .pcm,
-        sampleRate: Int = 16000,
+        sampleRate: Int = STTConstants.defaultSampleRate,
         preferredFramework: InferenceFramework? = nil
     ) {
         self.language = language

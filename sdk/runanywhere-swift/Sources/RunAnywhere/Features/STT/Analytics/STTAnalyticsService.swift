@@ -63,7 +63,7 @@ public actor STTAnalyticsService {
     ///   - audioSizeBytes: Size of audio data in bytes
     ///   - language: Language code for transcription
     ///   - isStreaming: Whether this is a streaming transcription
-    ///   - sampleRate: Audio sample rate in Hz (default 16000)
+    ///   - sampleRate: Audio sample rate in Hz (default: STTConstants.defaultSampleRate)
     ///   - framework: The inference framework being used
     /// - Returns: A unique transcription ID for tracking
     public func startTranscription(
@@ -72,7 +72,7 @@ public actor STTAnalyticsService {
         audioSizeBytes: Int,
         language: String,
         isStreaming: Bool = false,
-        sampleRate: Int = 16000,
+        sampleRate: Int = STTConstants.defaultSampleRate,
         framework: InferenceFrameworkType = .unknown
     ) -> String {
         let id = UUID().uuidString

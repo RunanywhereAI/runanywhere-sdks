@@ -5,6 +5,9 @@
 //  All STT-related events in one place.
 //  Each event declares its destination (public, analytics, or both).
 //
+//  Note: STTEvent conforms to TypedEventProperties for strongly typed analytics.
+//  This avoids string conversion/parsing and enables compile-time type checking.
+//
 
 import Foundation
 
@@ -16,7 +19,13 @@ import Foundation
 /// ```swift
 /// EventPublisher.shared.track(STTEvent.transcriptionCompleted(...))
 /// ```
-public enum STTEvent: SDKEvent {
+///
+/// STTEvent provides strongly typed properties via `typedProperties`.
+/// This enables:
+/// - Type safety at compile time
+/// - No string parsing for analytics
+/// - Validation guardrails (e.g., confidence between 0-1)
+public enum STTEvent: SDKEvent, TypedEventProperties {
 
     // MARK: - Model Lifecycle
 
@@ -32,7 +41,7 @@ public enum STTEvent: SDKEvent {
     ///   - audioLengthMs: Duration of audio in milliseconds
     ///   - audioSizeBytes: Size of audio data in bytes
     ///   - isStreaming: Whether this is a streaming transcription
-    ///   - sampleRate: Audio sample rate in Hz (default 16000)
+    ///   - sampleRate: Audio sample rate in Hz (default: STTConstants.defaultSampleRate)
     case transcriptionStarted(
         transcriptionId: String,
         modelId: String,
@@ -40,7 +49,7 @@ public enum STTEvent: SDKEvent {
         audioSizeBytes: Int,
         language: String,
         isStreaming: Bool = false,
-        sampleRate: Int = 16000,
+        sampleRate: Int = STTConstants.defaultSampleRate,
         framework: InferenceFrameworkType = .unknown
     )
     case partialTranscript(text: String, wordCount: Int)
@@ -61,7 +70,7 @@ public enum STTEvent: SDKEvent {
         realTimeFactor: Double,
         language: String,
         isStreaming: Bool = false,
-        sampleRate: Int = 16000,
+        sampleRate: Int = STTConstants.defaultSampleRate,
         framework: InferenceFrameworkType = .unknown
     )
     case transcriptionFailed(transcriptionId: String, modelId: String, error: String)
@@ -202,6 +211,111 @@ public enum STTEvent: SDKEvent {
                 "language": language,
                 "confidence": String(format: "%.3f", confidence)
             ]
+        }
+    }
+
+    // MARK: - TypedEventProperties Conformance
+
+    /// Strongly typed event properties - no string conversion needed.
+    /// These values are used directly by TelemetryEventPayload.
+    public var typedProperties: EventProperties {
+        switch self {
+        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                processingTimeMs: durationMs,
+                success: true,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadFailed(let modelId, let error, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                success: false,
+                errorMessage: error
+            )
+
+        case .modelUnloaded(let modelId):
+            return EventProperties(modelId: modelId)
+
+        case .transcriptionStarted(let id, let modelId, let audioLengthMs, let audioSizeBytes, let language, let isStreaming, let sampleRate, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                isStreaming: isStreaming,
+                audioDurationMs: audioLengthMs,
+                language: language,
+                transcriptionId: id,
+                audioSizeBytes: audioSizeBytes,
+                sampleRate: sampleRate
+            )
+
+        case .partialTranscript(let text, let wordCount):
+            return EventProperties(
+                wordCount: wordCount,
+                characterCount: text.count
+            )
+
+        case .finalTranscript(let text, let confidence):
+            return EventProperties(
+                confidence: Double(confidence),
+                characterCount: text.count
+            )
+
+        case .transcriptionCompleted(
+            let id,
+            let modelId,
+            let text,
+            let confidence,
+            let durationMs,
+            let audioLengthMs,
+            let audioSizeBytes,
+            let wordCount,
+            let realTimeFactor,
+            let language,
+            let isStreaming,
+            let sampleRate,
+            let framework
+        ):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                processingTimeMs: durationMs,
+                success: true,
+                isStreaming: isStreaming,
+                audioDurationMs: audioLengthMs,
+                realTimeFactor: realTimeFactor,
+                wordCount: wordCount,
+                confidence: Double(confidence),
+                language: language,
+                transcriptionId: id,
+                characterCount: text.count,
+                audioSizeBytes: audioSizeBytes,
+                sampleRate: sampleRate
+            )
+
+        case .transcriptionFailed(let id, let modelId, let error):
+            return EventProperties(
+                modelId: modelId,
+                success: false,
+                errorMessage: error,
+                transcriptionId: id
+            )
+
+        case .languageDetected(let language, let confidence):
+            return EventProperties(
+                confidence: Double(confidence),
+                language: language
+            )
         }
     }
 }

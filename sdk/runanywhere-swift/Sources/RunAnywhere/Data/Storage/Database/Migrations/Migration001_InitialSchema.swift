@@ -25,7 +25,7 @@ struct Migration001_InitialSchema { // swiftlint:disable:this type_name
 
             // Framework compatibility (stored as JSON array)
             t.column("compatibleFrameworks", .blob).notNull() // JSON array of frameworks
-            t.column("preferredFramework", .text)
+            t.column("framework", .text)
 
             // Model-specific capabilities
             t.column("contextLength", .integer) // For language models

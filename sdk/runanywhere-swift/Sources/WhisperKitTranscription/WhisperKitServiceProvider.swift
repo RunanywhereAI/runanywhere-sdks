@@ -80,13 +80,13 @@ public enum WhisperKitBackend: RunAnywhereModule {
 
         // Check model info cache first
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.preferredFramework == .whisperKit && modelInfo.category == .speechRecognition {
+            if modelInfo.framework == .whisperKit && modelInfo.category == .speechRecognition {
                 return true
             }
             if modelInfo.compatibleFrameworks.contains(.whisperKit) && modelInfo.category == .speechRecognition {
                 return true
             }
-            if modelInfo.preferredFramework == .onnx || modelInfo.format == .onnx {
+            if modelInfo.framework == .onnx || modelInfo.format == .onnx {
                 return false
             }
             return false

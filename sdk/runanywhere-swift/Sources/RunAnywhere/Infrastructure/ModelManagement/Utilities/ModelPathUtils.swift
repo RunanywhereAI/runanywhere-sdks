@@ -98,7 +98,7 @@ public struct ModelPathUtils {
     /// - Throws: If model folder cannot be accessed
     public static func getModelPath(modelInfo: ModelInfo) throws -> URL {
         // Use preferred framework if available, otherwise use first compatible framework
-        if let framework = modelInfo.preferredFramework ?? modelInfo.compatibleFrameworks.first {
+        if let framework = modelInfo.framework ?? modelInfo.compatibleFrameworks.first {
             // For directory-based models (e.g., WhisperKit, CoreML packages), return the folder
             if modelInfo.format.isDirectoryBased {
                 return try getModelFolder(modelId: modelInfo.id, framework: framework)

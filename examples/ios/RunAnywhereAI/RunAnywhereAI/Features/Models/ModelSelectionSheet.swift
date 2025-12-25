@@ -69,8 +69,8 @@ struct ModelSelectionSheet: View {
             context.relevantCategories.contains(model.category)
         }.sorted { model1, model2 in
             // Foundation Models first (built-in), then downloaded, then not downloaded
-            let m1Priority = model1.preferredFramework == .foundationModels ? 0 : (model1.localPath != nil ? 1 : 2)
-            let m2Priority = model2.preferredFramework == .foundationModels ? 0 : (model2.localPath != nil ? 1 : 2)
+            let m1Priority = model1.framework == .foundationModels ? 0 : (model1.localPath != nil ? 1 : 2)
+            let m2Priority = model2.framework == .foundationModels ? 0 : (model2.localPath != nil ? 1 : 2)
             if m1Priority != m2Priority {
                 return m1Priority < m2Priority
             }
@@ -182,7 +182,7 @@ struct ModelSelectionSheet: View {
         // Get models for this framework
         let modelsForFramework = viewModel.availableModels.filter { model in
             if framework == .foundationModels {
-                return model.preferredFramework == .foundationModels
+                return model.framework == .foundationModels
             } else {
                 return model.compatibleFrameworks.contains(framework)
             }
@@ -361,7 +361,7 @@ struct ModelSelectionSheet: View {
             format: .unknown,
             downloadURL: nil,
             compatibleFrameworks: [.systemTTS],
-            preferredFramework: .systemTTS
+            framework: .systemTTS
         )
 
         // Brief delay to show loading state
@@ -394,7 +394,7 @@ struct ModelSelectionSheet: View {
 
     private func selectAndLoadModel(_ model: ModelInfo) async {
         // Foundation Models don't need local path check
-        if model.preferredFramework != .foundationModels {
+        if model.framework != .foundationModels {
             guard model.localPath != nil else {
                 return // Model not downloaded yet
             }
@@ -558,7 +558,7 @@ private struct SelectableModelRow: View {
                 }
 
                 // Show download status or built-in status
-                if model.preferredFramework == .foundationModels {
+                if model.framework == .foundationModels {
                     // Foundation Models are built-in
                     HStack(spacing: AppSpacing.xSmall) {
                         Image(systemName: "checkmark.circle.fill")
@@ -600,7 +600,7 @@ private struct SelectableModelRow: View {
 
             // Action buttons based on model state
             HStack(spacing: AppSpacing.smallMedium) {
-                if model.preferredFramework == .foundationModels {
+                if model.framework == .foundationModels {
                     // Foundation Models are built-in, always ready to select
                     Button("Select") {
                         onSelectModel()
@@ -712,7 +712,7 @@ private struct FlatModelRow: View {
     @State private var downloadProgress: Double = 0.0
 
     private var frameworkColor: Color {
-        guard let framework = model.preferredFramework else { return .gray }
+        guard let framework = model.framework else { return .gray }
         switch framework {
         case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
@@ -723,7 +723,7 @@ private struct FlatModelRow: View {
     }
 
     private var frameworkName: String {
-        guard let framework = model.preferredFramework else { return "Unknown" }
+        guard let framework = model.framework else { return "Unknown" }
         switch framework {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
@@ -734,7 +734,7 @@ private struct FlatModelRow: View {
     }
 
     private var statusIcon: String {
-        if model.preferredFramework == .foundationModels {
+        if model.framework == .foundationModels {
             return "checkmark.circle.fill"
         } else if model.localPath != nil {
             return "checkmark.circle.fill"
@@ -744,7 +744,7 @@ private struct FlatModelRow: View {
     }
 
     private var statusColor: Color {
-        if model.preferredFramework == .foundationModels || model.localPath != nil {
+        if model.framework == .foundationModels || model.localPath != nil {
             return AppColors.statusGreen
         } else {
             return AppColors.primaryAccent
@@ -799,7 +799,7 @@ private struct FlatModelRow: View {
                             Image(systemName: statusIcon)
                                 .foregroundColor(statusColor)
                                 .font(AppTypography.caption2)
-                            Text(model.preferredFramework == .foundationModels ? "Built-in" : (model.localPath != nil ? "Ready" : "Download"))
+                            Text(model.framework == .foundationModels ? "Built-in" : (model.localPath != nil ? "Ready" : "Download"))
                                 .font(AppTypography.caption2)
                                 .foregroundColor(statusColor)
                         }
@@ -832,7 +832,7 @@ private struct FlatModelRow: View {
 
     @ViewBuilder
     private var actionButton: some View {
-        if model.preferredFramework == .foundationModels {
+        if model.framework == .foundationModels {
             // Foundation Models are built-in
             Button("Use") {
                 onSelectModel()

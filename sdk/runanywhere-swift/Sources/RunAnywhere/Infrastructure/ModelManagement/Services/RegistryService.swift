@@ -53,7 +53,7 @@ public class RegistryService: ModelRegistry {
         }
 
         var updatedModel = model
-        if updatedModel.localPath == nil, let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
+        if updatedModel.localPath == nil, let framework = model.framework ?? model.compatibleFrameworks.first {
             let fileManager = ServiceContainer.shared.fileManager
             if fileManager.modelFolderExists(modelId: model.id, framework: framework) {
                 if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: framework) {
@@ -77,7 +77,7 @@ public class RegistryService: ModelRegistry {
         }
 
         var updatedModel = model
-        if let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
+        if let framework = model.framework ?? model.compatibleFrameworks.first {
             let fileManager = ServiceContainer.shared.fileManager
             if fileManager.modelFolderExists(modelId: model.id, framework: framework) {
                 if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: framework) {
@@ -163,7 +163,7 @@ public class RegistryService: ModelRegistry {
             downloadSize: nil,
             memoryRequired: estimatedSize ?? estimateMemoryFromURL(url),
             compatibleFrameworks: [framework],
-            preferredFramework: framework,
+            framework: framework,
             contextLength: resolvedCategory == .language ? 2048 : nil,
             supportsThinking: supportsThinking,
             tags: ["user-added", framework.rawValue.lowercased()],
@@ -239,7 +239,7 @@ public class RegistryService: ModelRegistry {
                         downloadSize: size,
                         memoryRequired: estimateMemoryUsage(fileSize: size, format: format),
                         compatibleFrameworks: [framework],
-                        preferredFramework: framework,
+                        framework: framework,
                         contextLength: category == .language ? 2048 : nil,
                         supportsThinking: false,
                         tags: [],
@@ -279,7 +279,7 @@ public class RegistryService: ModelRegistry {
                 downloadSize: fileSize,
                 memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
                 compatibleFrameworks: [framework],
-                preferredFramework: framework,
+                framework: framework,
                 contextLength: category == .language ? 2048 : nil,
                 supportsThinking: false,
                 tags: [],
@@ -313,7 +313,7 @@ public class RegistryService: ModelRegistry {
                     downloadSize: fileSize,
                     memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
                     compatibleFrameworks: frameworks,
-                    preferredFramework: frameworks.first,
+                    framework: frameworks.first,
                     contextLength: category == .language ? 2048 : nil,
                     supportsThinking: false,
                     tags: ["bundled"],

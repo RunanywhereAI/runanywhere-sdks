@@ -36,7 +36,7 @@ public enum SystemTTS: RunAnywhereModule {
     public static let defaultPriority: Int = 10  // Low priority - fallback only
 
     /// System TTS uses Apple's built-in speech synthesis
-    public static let inferenceFramework: InferenceFramework = .builtIn
+    public static let inferenceFramework: InferenceFramework = .systemTTS
 
     /// Register System TTS with the ServiceRegistry
     @MainActor

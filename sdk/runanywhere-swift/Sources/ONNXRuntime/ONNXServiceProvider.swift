@@ -103,7 +103,7 @@ public enum ONNX: RunAnywhereModule {
 
         // Check model info cache first
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.preferredFramework == .onnx && modelInfo.category == .speechRecognition {
+            if modelInfo.framework == .onnx && modelInfo.category == .speechRecognition {
                 return true
             }
             if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechRecognition {
@@ -158,7 +158,7 @@ public enum ONNX: RunAnywhereModule {
 
         // Check model info cache first
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.preferredFramework == .onnx && modelInfo.category == .speechSynthesis {
+            if modelInfo.framework == .onnx && modelInfo.category == .speechSynthesis {
                 return true
             }
             if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechSynthesis {

@@ -80,7 +80,7 @@ public class SimpleEnergyVADService: NSObject, VADService {
     ///   - frameLength: Frame length in seconds (default: 0.1 = 100ms)
     ///   - energyThreshold: Energy threshold for voice detection (default: 0.005)
     public init(
-        sampleRate: Int = 16000,
+        sampleRate: Int = VADConstants.defaultSampleRate,
         frameLength: Float = 0.1,
         energyThreshold: Float = 0.005
     ) {

@@ -269,7 +269,7 @@ public actor TTSCapability: ModelLoadableCapability {
         )
     }
 
-    private func estimateAudioDuration(dataSize: Int, sampleRate: Int = 22050) -> TimeInterval {
+    private func estimateAudioDuration(dataSize: Int, sampleRate: Int = TTSConstants.defaultSampleRate) -> TimeInterval {
         let bytesPerSample = 2 // 16-bit PCM
         let samples = dataSize / bytesPerSample
         return TimeInterval(samples) / TimeInterval(sampleRate)
