@@ -202,22 +202,6 @@ struct RunAnywhereAIApp: App {
         }
         #endif
 
-        // Register System TTS provider (for "system-tts" model ID)
-        ServiceRegistry.shared.registerTTS(
-            name: "System TTS",
-            priority: 50, // Lower priority than ONNX TTS (so ONNX takes precedence when model exists)
-            canHandle: { voiceId in
-                // Handle "system-tts" model ID
-                voiceId?.lowercased() == "system-tts" || voiceId?.lowercased() == "system_tts"
-            },
-            factory: { config in
-                let service = SystemTTSService()
-                try await service.initialize()
-                return service
-            }
-        )
-        logger.info("✅ System TTS provider registered")
-
         logger.info("🎉 All modules and models registered")
     }
 }

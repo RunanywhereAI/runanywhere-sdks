@@ -256,6 +256,9 @@ public enum RunAnywhere {
             // Mark Phase 1 complete
             isInitialized = true
 
+            // Register built-in modules (SystemTTS as fallback)
+            _ = SystemTTS.autoRegister
+
             let initDurationMs = (CFAbsoluteTimeGetCurrent() - initStartTime) * 1000
             logger.info("✅ Phase 1 complete in \(String(format: "%.1f", initDurationMs))ms (\(params.environment.description))")
 
