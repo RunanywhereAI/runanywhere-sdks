@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.core.onnx
 
-import com.runanywhere.sdk.core.frameworks.ModelStorageStrategy
+import com.runanywhere.sdk.storage.ModelStorageStrategy
 import com.runanywhere.sdk.models.enums.ModelFormat
 import java.io.File
 

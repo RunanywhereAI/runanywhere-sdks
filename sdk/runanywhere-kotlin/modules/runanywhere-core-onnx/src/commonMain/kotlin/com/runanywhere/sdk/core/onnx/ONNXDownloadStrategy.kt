@@ -1,11 +1,11 @@
 package com.runanywhere.sdk.core.onnx
 
-import com.runanywhere.sdk.core.frameworks.DownloadStrategy
-import com.runanywhere.sdk.core.frameworks.ModelStorageStrategy
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.download.DownloadStrategy
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
+import com.runanywhere.sdk.storage.ModelStorageStrategy
 
 /**
  * Download strategy for ONNX models
@@ -45,9 +45,10 @@ class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
      */
     override suspend fun download(
         model: ModelInfo,
-        destinationFolder: String,
-        progressHandler: ((Double) -> Unit)?
+        to: String,
+        progressHandler: ((Double) -> Unit)?,
     ): String {
+        val destinationFolder = to
         logger.info("Downloading ONNX model: ${model.id}")
 
         val downloadURL = model.downloadURL

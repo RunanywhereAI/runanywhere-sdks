@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.infrastructure.modelmanagement.services
 
-import com.runanywhere.sdk.core.ModuleRegistry
+import com.runanywhere.sdk.core.ModuleRegistryMetadata
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.utils.ModelPathUtils
 import com.runanywhere.sdk.models.ConfigurationSource
@@ -198,7 +198,7 @@ class ModelDiscoveryService(
     ): ModelInfo? {
         // Try framework-specific storage strategy first
         if (framework != null) {
-            val storageStrategy = ModuleRegistry.getStorageStrategy(framework)
+            val storageStrategy = ModuleRegistryMetadata.storageStrategy(framework)
 
             if (storageStrategy != null) {
                 try {

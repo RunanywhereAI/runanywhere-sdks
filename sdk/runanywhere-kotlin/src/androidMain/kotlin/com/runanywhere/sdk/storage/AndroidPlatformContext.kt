@@ -1,6 +1,7 @@
 package com.runanywhere.sdk.storage
 
 import android.content.Context
+import com.runanywhere.sdk.security.AndroidSecureStorage
 
 /**
  * Android-specific context holder - should be initialized by the app
@@ -17,6 +18,8 @@ object AndroidPlatformContext {
 
     fun initialize(context: Context) {
         _applicationContext = context.applicationContext
+        // Also initialize secure storage so DeviceIdentity can access it
+        AndroidSecureStorage.initialize(context.applicationContext)
     }
 
     fun isInitialized(): Boolean = _applicationContext != null

@@ -9,7 +9,6 @@ import com.runanywhere.sdk.core.capabilities.ModelLifecycleManager
 import com.runanywhere.sdk.core.capabilities.ModelLoadableCapability
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -155,9 +154,9 @@ class TTSCapability internal constructor(
         options: TTSOptions,
     ): TTSResult {
         val service = managedLifecycle.requireService()
-        val voiceId = managedLifecycle.resourceIdOrUnknown()
+        val modelId = managedLifecycle.resourceIdOrUnknown()
 
-        logger.info("Synthesizing text with voice: $voiceId")
+        logger.info("Synthesizing text with model: $modelId")
 
         // Merge options with config defaults
         val effectiveOptions = mergeOptions(options)
@@ -167,7 +166,7 @@ class TTSCapability internal constructor(
         // Start synthesis tracking
         val synthesisId = analyticsService.startSynthesis(
             text = text,
-            voice = effectiveOptions.voice ?: voiceId,
+            modelId = effectiveOptions.voice ?: modelId,
         )
 
         // Perform synthesis
@@ -218,13 +217,13 @@ class TTSCapability internal constructor(
         options: TTSOptions,
     ): Flow<ByteArray> = flow {
         val service = managedLifecycle.requireService()
-        val voiceId = managedLifecycle.resourceIdOrUnknown()
+        val modelId = managedLifecycle.resourceIdOrUnknown()
         val effectiveOptions = mergeOptions(options)
 
         // Start synthesis tracking
         val synthesisId = analyticsService.startSynthesis(
             text = text,
-            voice = effectiveOptions.voice ?: voiceId,
+            modelId = effectiveOptions.voice ?: modelId,
         )
 
         var totalBytes = 0
@@ -286,7 +285,7 @@ class TTSCapability internal constructor(
         val cfg = config ?: return options
 
         return TTSOptions(
-            voice = options.voice ?: cfg.voice,
+            voice = options.voice ?: cfg.modelId,
             language = options.language,
             rate = options.rate,
             pitch = options.pitch,
@@ -373,7 +372,7 @@ private fun createTTSLifecycleManager(): ModelLifecycleManager<TTSService> {
 
             // Create configuration
             val ttsConfig = (config as? TTSConfiguration)
-                ?: TTSConfiguration(voice = resourceId)
+                ?: TTSConfiguration(modelId = resourceId)
 
             // Create service through provider (same pattern as LLM/STT)
             val service = provider.createTTSService(ttsConfig)

@@ -1,6 +1,7 @@
 package com.runanywhere.sdk.core.capabilities
 
 import com.runanywhere.sdk.features.llm.LLMEvent
+import com.runanywhere.sdk.features.stt.STTEvent
 import com.runanywhere.sdk.features.tts.TTSEvent
 import com.runanywhere.sdk.features.vad.VADEvent
 import com.runanywhere.sdk.foundation.SDKLogger
@@ -234,11 +235,21 @@ class ManagedLifecycle<ServiceType : Any>(
         resourceId: String,
         durationMs: Double?,
         error: Throwable?,
-    ): SDKEvent {
-        // STTEvent would need model lifecycle events added to match iOS
-        // For now, use generic model event
-        return createModelEvent(type, resourceId, durationMs, error)
-    }
+    ): STTEvent =
+        when (type) {
+            LifecycleEventType.LOAD_STARTED -> STTEvent.ModelLoadStarted(modelId = resourceId)
+            LifecycleEventType.LOAD_COMPLETED ->
+                STTEvent.ModelLoadCompleted(
+                    modelId = resourceId,
+                    durationMs = durationMs ?: 0.0,
+                )
+            LifecycleEventType.LOAD_FAILED ->
+                STTEvent.ModelLoadFailed(
+                    modelId = resourceId,
+                    error = error?.message ?: "Unknown error",
+                )
+            LifecycleEventType.UNLOADED -> STTEvent.ModelUnloaded(modelId = resourceId)
+        }
 
     private fun createTTSEvent(
         type: LifecycleEventType,
@@ -247,18 +258,18 @@ class ManagedLifecycle<ServiceType : Any>(
         error: Throwable?,
     ): TTSEvent =
         when (type) {
-            LifecycleEventType.LOAD_STARTED -> TTSEvent.ModelLoadStarted(voiceId = resourceId)
+            LifecycleEventType.LOAD_STARTED -> TTSEvent.ModelLoadStarted(modelId = resourceId)
             LifecycleEventType.LOAD_COMPLETED ->
                 TTSEvent.ModelLoadCompleted(
-                    voiceId = resourceId,
+                    modelId = resourceId,
                     durationMs = durationMs ?: 0.0,
                 )
             LifecycleEventType.LOAD_FAILED ->
                 TTSEvent.ModelLoadFailed(
-                    voiceId = resourceId,
+                    modelId = resourceId,
                     error = error?.message ?: "Unknown error",
                 )
-            LifecycleEventType.UNLOADED -> TTSEvent.ModelUnloaded(voiceId = resourceId)
+            LifecycleEventType.UNLOADED -> TTSEvent.ModelUnloaded(modelId = resourceId)
         }
 
     private fun createVADEvent(

@@ -87,7 +87,7 @@ private fun parseSTTResult(jsonResult: String): STTTranscriptionResult {
  * - A full file path (e.g., /data/.../model.onnx)
  * - A model ID that requires the caller to load the model separately
  */
-actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTService {
+internal actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTService {
     logger.info("Creating ONNX STT service with configuration: ${configuration.modelId}")
 
     val service = ONNXCoreService()
@@ -129,10 +129,10 @@ actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTSer
  * JVM/Android implementation of ONNX TTS service creation
  * Follows the same pattern as LLM/STT service providers
  */
-actual suspend fun createONNXTTSService(
-    configuration: com.runanywhere.sdk.features.tts.TTSConfiguration
+internal actual suspend fun createONNXTTSService(
+    configuration: com.runanywhere.sdk.features.tts.TTSConfiguration,
 ): com.runanywhere.sdk.features.tts.TTSService {
-    logger.info("Creating ONNX TTS service with configuration: ${configuration.voice}")
+    logger.info("Creating ONNX TTS service with configuration: ${configuration.modelId}")
     return ONNXTTSServiceImpl(configuration)
 }
 
@@ -176,7 +176,7 @@ private class ONNXTTSServiceImpl(
         _isSynthesizing = true
         try {
             // Resolve model path from options.voice or configuration.voice
-            val voice = options.voice ?: configuration.voice
+            val voice = options.voice ?: configuration.modelId
             val modelPath = resolveModelPath(voice)
 
             if (modelPath.isNullOrEmpty()) {
@@ -451,7 +451,7 @@ private suspend fun synthesizeWithONNXInternal(text: String, options: com.runany
 /**
  * JVM/Android implementation of ONNX VAD service creation
  */
-actual suspend fun createONNXVADService(configuration: VADConfiguration): VADService {
+internal actual suspend fun createONNXVADService(configuration: VADConfiguration): VADService {
     logger.info("Creating ONNX VAD service")
 
     val service = ONNXCoreService()
@@ -463,38 +463,6 @@ actual suspend fun createONNXVADService(configuration: VADConfiguration): VADSer
     }
 
     return ONNXVADServiceWrapper(service, configuration)
-}
-
-/**
- * Create ONNX STT service from model path (for ONNXAdapter)
- */
-actual suspend fun createONNXSTTServiceFromPath(modelPath: String): Any {
-    logger.info("Creating ONNX STT service from path: $modelPath")
-
-    val service = ONNXCoreService()
-    service.initialize()
-
-    // Detect model type from path
-    val modelType = detectSTTModelType(modelPath)
-    service.loadSTTModel(modelPath, modelType)
-
-    // Create wrapper and set model path for telemetry
-    val wrapper = ONNXSTTServiceWrapper(service)
-    wrapper.setModelPath(modelPath)
-    return wrapper
-}
-
-/**
- * Create ONNX TTS service from model path (for ONNXAdapter)
- */
-actual suspend fun createONNXTTSServiceFromPath(modelPath: String): Any {
-    logger.info("Creating ONNX TTS service from path: $modelPath")
-
-    val service = ONNXCoreService()
-    service.initialize()
-    service.loadTTSModel(modelPath, "vits")
-
-    return ONNXTTSServiceWrapper(service)
 }
 
 // MARK: - Service Wrappers

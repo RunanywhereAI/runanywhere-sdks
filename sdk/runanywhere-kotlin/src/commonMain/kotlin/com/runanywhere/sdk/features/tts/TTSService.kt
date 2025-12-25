@@ -91,7 +91,7 @@ data class TTSOptions(
 
         /** Create options from TTSConfiguration */
         fun from(configuration: TTSConfiguration): TTSOptions = TTSOptions(
-            voice = configuration.voice,
+            voice = configuration.modelId,
             language = configuration.language,
             rate = configuration.speakingRate,
             pitch = configuration.pitch,
@@ -109,7 +109,7 @@ data class TTSOptions(
  */
 data class TTSConfiguration(
     /** Voice identifier to use */
-    val voice: String? = null,
+    val modelId: String? = null,
 
     /** Language for synthesis (BCP-47 format) */
     val language: String = "en-US",

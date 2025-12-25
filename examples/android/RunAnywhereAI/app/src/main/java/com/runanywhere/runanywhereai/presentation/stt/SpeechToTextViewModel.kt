@@ -199,6 +199,7 @@ class SpeechToTextViewModel : ViewModel() {
                     it.copy(
                         isModelLoaded = true,
                         selectedModelId = event.modelId,
+                        selectedModelName = it.selectedModelName ?: event.modelId,
                         selectedFramework = event.framework,
                         isProcessing = false,
                     )
@@ -254,6 +255,14 @@ class SpeechToTextViewModel : ViewModel() {
      */
     fun setMode(mode: STTMode) {
         _uiState.update { it.copy(mode = mode) }
+    }
+
+    /**
+     * Set the selected model name (for display purposes)
+     * Called when model is selected from UI before SDK events arrive
+     */
+    fun setSelectedModelName(name: String) {
+        _uiState.update { it.copy(selectedModelName = name) }
     }
 
     /**

@@ -411,3 +411,11 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         return Pair(prompt, extractedSystemPrompt)
     }
 }
+
+/**
+ * JVM/Android implementation of LlamaCpp service creation.
+ * Creates a new LlamaCppService instance with the given configuration.
+ */
+internal actual suspend fun createLlamaCppService(config: LLMConfiguration): LLMService {
+    return LlamaCppService(config)
+}

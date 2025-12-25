@@ -2,10 +2,21 @@ package com.runanywhere.sdk.core.onnx
 
 import com.runanywhere.sdk.core.CapabilityType
 import com.runanywhere.sdk.core.ModuleDiscovery
+import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.core.ModuleRegistryMetadata
 import com.runanywhere.sdk.core.RunAnywhereModule
+import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.stt.STTService
+import com.runanywhere.sdk.features.tts.TTSConfiguration
+import com.runanywhere.sdk.features.tts.TTSService
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.features.vad.VADService
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.infrastructure.download.DownloadStrategy
 import com.runanywhere.sdk.models.enums.InferenceFramework
+import com.runanywhere.sdk.models.enums.ModelCategory
+import com.runanywhere.sdk.storage.ModelStorageStrategy
 
 /**
  * ONNX Runtime module for STT and TTS services.
@@ -13,7 +24,8 @@ import com.runanywhere.sdk.models.enums.InferenceFramework
  * Provides speech-to-text and text-to-speech capabilities using
  * ONNX Runtime with models like Whisper and Piper.
  *
- * Matches iOS ONNX enum exactly.
+ * EXACTLY matches iOS ONNX enum implementation.
+ * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNXServiceProvider.swift
  *
  * ## Registration
  *
@@ -60,8 +72,6 @@ import com.runanywhere.sdk.models.enums.InferenceFramework
  * RunAnywhere.loadTTSModel("my-tts-model")
  * val audio = RunAnywhere.synthesize("Hello, world!")
  * ```
- *
- * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNXServiceProvider.swift
  */
 object ONNX : RunAnywhereModule {
     private val logger = SDKLogger("ONNX")
@@ -81,9 +91,22 @@ object ONNX : RunAnywhereModule {
      */
     override val inferenceFramework: InferenceFramework = InferenceFramework.ONNX
 
-    // Note: ONNX storage strategy is handled internally by ONNXModelStorageStrategy
-    // which implements a different ModelStorageStrategy interface (core.frameworks)
-    // The module uses the default null storageStrategy from RunAnywhereModule
+    /**
+     * Download strategy for ONNX models - handles .tar.gz/.tar.bz2 archive extraction
+     * Matches iOS ONNXModelStorageStrategy.downloadStrategy pattern
+     */
+    override val downloadStrategy: DownloadStrategy = ONNXDownloadStrategy.shared
+
+    /**
+     * Storage strategy for detecting ONNX models on disk
+     * Handles nested directory structures from sherpa-onnx archives
+     */
+    override val storageStrategy: ModelStorageStrategy = ONNXDownloadStrategy.shared
+
+    /**
+     * Version of ONNX Runtime used
+     */
+    const val VERSION: String = "1.23.2"
 
     /**
      * Register all ONNX services with the SDK
@@ -98,7 +121,7 @@ object ONNX : RunAnywhereModule {
             return
         }
 
-        // Register individual services
+        // Register services using factory closures (matching iOS exactly)
         registerSTT(priority)
         registerTTS(priority)
         registerVAD(priority)
@@ -109,15 +132,20 @@ object ONNX : RunAnywhereModule {
         logger.info("ONNX module registered (STT + TTS + VAD) with priority $priority")
     }
 
-    // MARK: - Individual Service Registration
+    // MARK: - Individual Service Registration (matching iOS exactly)
 
     /**
      * Register only ONNX STT service
      * Matches iOS: @MainActor public static func registerSTT(priority: Int = 100)
      */
     fun registerSTT(priority: Int = 100) {
-        ONNXSTTServiceProvider.register(priority)
-        logger.info("ONNX STT registered with priority $priority")
+        ModuleRegistry.shared.registerSTTFactory(
+            name = moduleName,
+            priority = priority,
+            canHandle = { modelId -> canHandleSTT(modelId) },
+            factory = { config -> createSTTService(config) },
+        )
+        logger.info("ONNX STT registered")
     }
 
     /**
@@ -125,17 +153,205 @@ object ONNX : RunAnywhereModule {
      * Matches iOS: @MainActor public static func registerTTS(priority: Int = 100)
      */
     fun registerTTS(priority: Int = 100) {
-        ONNXTTSServiceProvider.register(priority)
-        logger.info("ONNX TTS registered with priority $priority")
+        ModuleRegistry.shared.registerTTSFactory(
+            name = "ONNX TTS",
+            priority = priority,
+            canHandle = { modelId -> canHandleTTS(modelId) },
+            factory = { config -> createTTSService(config) },
+        )
+        logger.info("ONNX TTS registered")
     }
 
     /**
      * Register only ONNX VAD service
      */
     fun registerVAD(priority: Int = 100) {
-        ONNXVADServiceProvider.register(priority)
-        logger.info("ONNX VAD registered with priority $priority")
+        ModuleRegistry.shared.registerVADFactory(
+            name = "ONNX VAD",
+            priority = priority,
+            canHandle = { modelId -> canHandleVAD(modelId) },
+            factory = { config -> createVADService(config) },
+        )
+        logger.info("ONNX VAD registered")
     }
+
+    // MARK: - STT Helpers (matching iOS exactly)
+
+    /**
+     * Check if this module can handle the given STT model
+     * Matches iOS canHandleSTT(_:) implementation
+     */
+    private fun canHandleSTT(modelId: String?): Boolean {
+        if (modelId == null) return false
+
+        val lowercased = modelId.lowercase()
+
+        // Check model info cache first (matching iOS)
+        val modelInfo = ServiceContainer.shared.modelRegistry.getModel(modelId)
+        if (modelInfo != null) {
+            if (modelInfo.preferredFramework == InferenceFramework.ONNX &&
+                modelInfo.category == ModelCategory.SPEECH_RECOGNITION
+            ) {
+                return true
+            }
+            if (modelInfo.compatibleFrameworks.contains(InferenceFramework.ONNX) &&
+                modelInfo.category == ModelCategory.SPEECH_RECOGNITION
+            ) {
+                return true
+            }
+            return false
+        }
+
+        // Fallback: Pattern-based matching (matching iOS)
+        if (lowercased.contains("onnx") || lowercased.endsWith(".onnx")) {
+            return true
+        }
+        if (lowercased.contains("zipformer") || lowercased.contains("sherpa")) {
+            return true
+        }
+        if (lowercased.contains("whisper") && (lowercased.contains("onnx") || lowercased.contains("sherpa"))) {
+            return true
+        }
+        if (lowercased.contains("distil") || lowercased.contains("glados") || lowercased.contains("paraformer")) {
+            return true
+        }
+
+        return false
+    }
+
+    /**
+     * Create an STT service with the given configuration
+     * Matches iOS createSTTService(config:) implementation
+     */
+    private suspend fun createSTTService(config: STTConfiguration): STTService {
+        logger.info("Creating ONNX STT service for model: ${config.modelId ?: "unknown"}")
+
+        var modelPath: String? = null
+        if (config.modelId != null) {
+            val modelInfo = ServiceContainer.shared.modelRegistry.getModel(config.modelId!!)
+
+            if (modelInfo?.localPath != null) {
+                modelPath = modelInfo.localPath
+                logger.info("Found local model path: $modelPath")
+            } else {
+                logger.error("Model '${config.modelId}' is not downloaded")
+                throw ONNXError.ModelNotFound(config.modelId!!)
+            }
+        }
+
+        val service = createONNXSTTService(config)
+        logger.info("ONNX STT service created successfully")
+        return service
+    }
+
+    // MARK: - TTS Helpers (matching iOS exactly)
+
+    /**
+     * Check if this module can handle the given TTS model
+     * Matches iOS canHandleTTS(_:) implementation
+     */
+    private fun canHandleTTS(modelId: String?): Boolean {
+        if (modelId == null) return false
+
+        val lowercased = modelId.lowercase()
+
+        // Check model info cache first (matching iOS)
+        val modelInfo = ServiceContainer.shared.modelRegistry.getModel(modelId)
+        if (modelInfo != null) {
+            if (modelInfo.preferredFramework == InferenceFramework.ONNX &&
+                modelInfo.category == ModelCategory.SPEECH_SYNTHESIS
+            ) {
+                return true
+            }
+            if (modelInfo.compatibleFrameworks.contains(InferenceFramework.ONNX) &&
+                modelInfo.category == ModelCategory.SPEECH_SYNTHESIS
+            ) {
+                return true
+            }
+            return false
+        }
+
+        // Fallback: Pattern-based matching (matching iOS)
+        if (lowercased.contains("piper")) {
+            return true
+        }
+        if (lowercased.contains("vits")) {
+            return true
+        }
+        if (lowercased.contains("tts") && lowercased.contains("onnx")) {
+            return true
+        }
+        if (lowercased.contains("sherpa-onnx") && lowercased.contains("tts")) {
+            return true
+        }
+
+        return false
+    }
+
+    /**
+     * Create a TTS service with the given configuration
+     * Matches iOS createTTSService(config:) implementation
+     */
+    private suspend fun createTTSService(config: TTSConfiguration): TTSService {
+        val modelId = config.modelId ?: throw ONNXError.ModelNotFound("No model ID specified")
+        logger.info("Creating ONNX TTS service for voice: $modelId")
+
+        // Get the actual model file path from the model registry
+        val modelInfo = ServiceContainer.shared.modelRegistry.getModel(modelId)
+        val modelPath = modelInfo?.localPath
+
+        if (modelPath != null) {
+            logger.info("Found local model path: $modelPath")
+            logger.info("Creating ONNXTTSService with path: $modelPath")
+        } else {
+            logger.error("TTS Model '$modelId' is not downloaded")
+            throw ONNXError.ModelNotFound(modelId)
+        }
+
+        val service = createONNXTTSService(config)
+        logger.info("ONNX TTS service initialized successfully")
+        return service
+    }
+
+    // MARK: - VAD Helpers
+
+    /**
+     * Check if this module can handle the given VAD model
+     */
+    private fun canHandleVAD(modelId: String?): Boolean {
+        if (modelId == null) return false
+
+        val lowercased = modelId.lowercase()
+
+        // Check model info cache first
+        val modelInfo = ServiceContainer.shared.modelRegistry.getModel(modelId)
+        if (modelInfo != null) {
+            if (modelInfo.preferredFramework == InferenceFramework.ONNX &&
+                modelInfo.category == ModelCategory.AUDIO
+            ) {
+                return true
+            }
+            if (modelInfo.compatibleFrameworks.contains(InferenceFramework.ONNX) &&
+                modelInfo.category == ModelCategory.AUDIO
+            ) {
+                return true
+            }
+        }
+
+        // Pattern-based matching
+        return lowercased.contains("silero") ||
+            (lowercased.contains("vad") && lowercased.contains("onnx"))
+    }
+
+    /**
+     * Create a VAD service with the given configuration
+     */
+    private suspend fun createVADService(config: VADConfiguration): VADService {
+        logger.info("Creating ONNX VAD service")
+        return createONNXVADService(config)
+    }
+
+    // MARK: - Auto-Discovery Registration
 
     /**
      * Enable auto-discovery for this module.
@@ -151,3 +367,23 @@ object ONNX : RunAnywhereModule {
         ModuleDiscovery.register(this)
     }
 }
+
+// MARK: - Platform-specific service creation (expect declarations)
+
+/**
+ * Create an ONNX STT service with the given configuration.
+ * Platform-specific implementation in jvmAndroidMain.
+ */
+internal expect suspend fun createONNXSTTService(configuration: STTConfiguration): STTService
+
+/**
+ * Create an ONNX TTS service with the given configuration.
+ * Platform-specific implementation in jvmAndroidMain.
+ */
+internal expect suspend fun createONNXTTSService(configuration: TTSConfiguration): TTSService
+
+/**
+ * Create an ONNX VAD service with the given configuration.
+ * Platform-specific implementation in jvmAndroidMain.
+ */
+internal expect suspend fun createONNXVADService(configuration: VADConfiguration): VADService

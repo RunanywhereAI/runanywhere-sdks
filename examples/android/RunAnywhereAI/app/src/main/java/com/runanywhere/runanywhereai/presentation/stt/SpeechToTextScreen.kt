@@ -205,8 +205,8 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
                 onDismiss = { showModelPicker = false },
                 onModelSelected = { model ->
                     scope.launch {
-                        // Model loaded via ModelSelectionBottomSheet,
-                        // ViewModel will update via lifecycle tracker
+                        // Update ViewModel with model name - SDK events will set other properties
+                        viewModel.setSelectedModelName(model.name)
                         android.util.Log.d("SpeechToTextScreen", "STT model selected: ${model.name}")
                     }
                 },

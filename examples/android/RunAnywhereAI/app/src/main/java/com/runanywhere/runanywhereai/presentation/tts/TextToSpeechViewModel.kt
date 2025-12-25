@@ -159,15 +159,15 @@ class TextToSpeechViewModel : ViewModel() {
     private fun handleTTSEvent(event: TTSEvent) {
         when (event) {
             is TTSEvent.ModelLoadStarted -> {
-                Log.d(TAG, "TTS model loading started: ${event.voiceId}")
+                Log.d(TAG, "TTS model loading started: ${event.modelId}")
             }
             is TTSEvent.ModelLoadCompleted -> {
-                Log.i(TAG, "✅ TTS model loaded: ${event.voiceId} (${event.durationMs}ms)")
+                Log.i(TAG, "✅ TTS model loaded: ${event.modelId} (${event.durationMs}ms)")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = true,
-                        selectedModelId = event.voiceId,
-                        selectedModelName = event.voiceId,
+                        selectedModelId = event.modelId,
+                        selectedModelName = event.modelId,
                         selectedFramework = event.framework,
                         isSystemTTS = event.framework == InferenceFramework.SYSTEM_TTS,
                     )
@@ -176,7 +176,7 @@ class TextToSpeechViewModel : ViewModel() {
                 shuffleSampleText()
             }
             is TTSEvent.ModelLoadFailed -> {
-                Log.e(TAG, "TTS model load failed: ${event.voiceId} - ${event.error}")
+                Log.e(TAG, "TTS model load failed: ${event.modelId} - ${event.error}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = false,
@@ -185,7 +185,7 @@ class TextToSpeechViewModel : ViewModel() {
                 }
             }
             is TTSEvent.ModelUnloaded -> {
-                Log.d(TAG, "TTS model unloaded: ${event.voiceId}")
+                Log.d(TAG, "TTS model unloaded: ${event.modelId}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = false,

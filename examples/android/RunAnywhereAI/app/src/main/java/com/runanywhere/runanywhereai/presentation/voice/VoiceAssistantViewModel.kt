@@ -252,11 +252,11 @@ class VoiceAssistantViewModel(
                 _uiState.update {
                     it.copy(
                         ttsLoadState = ModelLoadState.LOADED,
-                        ttsModel = SelectedModel("tts", event.voiceId, event.voiceId),
-                        ttsVoice = event.voiceId,
+                        ttsModel = SelectedModel("tts", event.modelId, event.modelId),
+                        ttsVoice = event.modelId,
                     )
                 }
-                Log.i(TAG, "✅ TTS model loaded: ${event.voiceId}")
+                Log.i(TAG, "✅ TTS model loaded: ${event.modelId}")
             }
             is TTSEvent.ModelLoadFailed -> {
                 _uiState.update { it.copy(ttsLoadState = ModelLoadState.ERROR) }
