@@ -10,6 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Native binaries package (bundles .so and XCFramework)
+  runanywhere_native:
+    path: ../runanywhere_native
   # FFI (Foreign Function Interface)
   ffi: ^2.1.0
   # HTTP and networking

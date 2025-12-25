@@ -54,6 +54,12 @@
 @import record_ios;
 #endif
 
+#if __has_include(<runanywhere_native/RunanywhereNativePlugin.h>)
+#import <runanywhere_native/RunanywhereNativePlugin.h>
+#else
+@import runanywhere_native;
+#endif
+
 #if __has_include(<shared_preferences_foundation/SharedPreferencesPlugin.h>)
 #import <shared_preferences_foundation/SharedPreferencesPlugin.h>
 #else
@@ -77,6 +83,7 @@
   [PathProviderPlugin registerWithRegistrar:[registry registrarForPlugin:@"PathProviderPlugin"]];
   [PermissionHandlerPlugin registerWithRegistrar:[registry registrarForPlugin:@"PermissionHandlerPlugin"]];
   [RecordIosPlugin registerWithRegistrar:[registry registrarForPlugin:@"RecordIosPlugin"]];
+  [RunanywhereNativePlugin registerWithRegistrar:[registry registrarForPlugin:@"RunanywhereNativePlugin"]];
   [SharedPreferencesPlugin registerWithRegistrar:[registry registrarForPlugin:@"SharedPreferencesPlugin"]];
   [SqflitePlugin registerWithRegistrar:[registry registrarForPlugin:@"SqflitePlugin"]];
 }

@@ -10,11 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Core SDK dependency
+  # Core SDK dependency (includes runanywhere_native for native binaries)
   runanywhere:
     path: ../runanywhere
-  # FFI for native bindings
-  ffi: ^2.1.0
   # HTTP for download strategy
   http: ^1.2.1
 
@@ -25,11 +23,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
-  # Plugin configuration for native bindings
-  plugin:
-    platforms:
-      android:
-        ffiPlugin: true
-      ios:
-        ffiPlugin: true
