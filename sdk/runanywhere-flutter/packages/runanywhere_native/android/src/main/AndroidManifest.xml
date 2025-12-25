@@ -1,0 +1,17 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="ai.runanywhere.nativelibs">
+
+    <!-- Permissions that may be needed by consuming apps -->
+    <!-- Note: These are declared here but the app must also declare them -->
+
+    <!-- For audio recording (STT) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- For file access (model storage) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <!-- For network (model download) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+</manifest>
