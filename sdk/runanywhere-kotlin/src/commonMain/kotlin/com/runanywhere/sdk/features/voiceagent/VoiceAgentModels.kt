@@ -305,7 +305,9 @@ sealed class VoiceSessionEvent {
     data object Started : VoiceSessionEvent()
 
     /** Listening for speech with current audio level (0.0 - 1.0) */
-    data class Listening(val audioLevel: Float) : VoiceSessionEvent()
+    data class Listening(
+        val audioLevel: Float,
+    ) : VoiceSessionEvent()
 
     /** Speech detected, started accumulating audio */
     data object SpeechStarted : VoiceSessionEvent()
@@ -314,10 +316,14 @@ sealed class VoiceSessionEvent {
     data object Processing : VoiceSessionEvent()
 
     /** Got transcription from STT */
-    data class Transcribed(val text: String) : VoiceSessionEvent()
+    data class Transcribed(
+        val text: String,
+    ) : VoiceSessionEvent()
 
     /** Got response from LLM */
-    data class Responded(val text: String) : VoiceSessionEvent()
+    data class Responded(
+        val text: String,
+    ) : VoiceSessionEvent()
 
     /** Playing TTS audio */
     data object Speaking : VoiceSessionEvent()
@@ -348,7 +354,9 @@ sealed class VoiceSessionEvent {
     data object Stopped : VoiceSessionEvent()
 
     /** Error occurred */
-    data class Error(val message: String) : VoiceSessionEvent()
+    data class Error(
+        val message: String,
+    ) : VoiceSessionEvent()
 }
 
 /**
@@ -358,13 +366,10 @@ sealed class VoiceSessionEvent {
 data class VoiceSessionConfig(
     /** Silence duration (seconds) before processing speech */
     val silenceDuration: Float = 1.5f,
-
     /** Minimum audio level to detect speech (0.0 - 1.0). Lower = more sensitive. */
     val speechThreshold: Float = 0.02f,
-
     /** Whether to auto-play TTS response */
     val autoPlayTTS: Boolean = true,
-
     /** Whether to auto-resume listening after TTS playback */
     val continuousMode: Boolean = true,
 ) {

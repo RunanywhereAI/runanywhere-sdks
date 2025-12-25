@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asSharedFlow
  * JVM stub implementation of VoiceSessionHandle.
  * Voice sessions are primarily designed for mobile platforms with microphone access.
  */
+@Suppress("UnusedPrivateProperty")
 actual class VoiceSessionHandle actual constructor(
     private val config: VoiceSessionConfig,
 ) {

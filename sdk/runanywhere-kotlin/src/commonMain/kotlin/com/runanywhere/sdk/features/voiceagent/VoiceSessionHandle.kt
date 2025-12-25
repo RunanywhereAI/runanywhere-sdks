@@ -27,7 +27,9 @@ import kotlinx.coroutines.flow.Flow
  * }
  * ```
  */
-expect class VoiceSessionHandle(config: VoiceSessionConfig) {
+expect class VoiceSessionHandle(
+    config: VoiceSessionConfig,
+) {
     /** Stream of session events */
     val events: Flow<VoiceSessionEvent>
 
