@@ -15,6 +15,12 @@ import kotlinx.serialization.Serializable
 expect fun getPlatformAPILevel(): Int
 
 /**
+ * Platform-specific OS version string
+ * Returns the human-readable OS version (e.g., "14.0" for Android 14, "macOS 14.0" for JVM on macOS)
+ */
+expect fun getPlatformOSVersion(): String
+
+/**
  * GPU Type enumeration
  * Equivalent to iOS GPUType enum (adapted for Android)
  */
