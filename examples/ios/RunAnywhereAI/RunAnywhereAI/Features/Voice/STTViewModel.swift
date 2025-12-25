@@ -42,7 +42,7 @@ class STTViewModel: ObservableObject {
                     }
                     // Also clean up any lingering live transcription resources
                     if oldValue == .live {
-                        self.stopLiveTranscription()
+                        await self.stopLiveTranscription()
                     }
                 }
             }
@@ -52,8 +52,9 @@ class STTViewModel: ObservableObject {
     // MARK: - Private Properties
 
     private var audioBuffer = Data()
-    private var streamingTask: Task<Void, Never>?
-    private var audioContinuation: AsyncStream<Data>.Continuation?
+
+    /// SDK-managed live transcription session (handles audio capture + streaming internally)
+    private var liveSession: LiveTranscriptionSession?
 
     // MARK: - Initialization State (for idempotency)
 
@@ -88,7 +89,7 @@ class STTViewModel: ObservableObject {
             return
         }
 
-        // Subscribe to audio level updates
+        // Subscribe to audio level updates (for batch mode)
         subscribeToAudioLevelUpdates()
 
         // Subscribe to SDK events for STT model state
@@ -219,7 +220,7 @@ class STTViewModel: ObservableObject {
 
         do {
             if selectedMode == .live {
-                // Live mode: Start streaming transcription
+                // Live mode: Use SDK's LiveTranscriptionSession (handles audio capture internally)
                 try await startLiveTranscription()
             } else {
                 // Batch mode: Collect audio for later transcription
@@ -240,18 +241,17 @@ class STTViewModel: ObservableObject {
     private func stopRecording() async {
         logger.info("Stopping recording")
 
-        // Stop audio capture
-        audioCapture.stopRecording()
-        isRecording = false
-        audioLevel = 0.0
-
         if selectedMode == .live {
-            // Live mode: Stop streaming
-            stopLiveTranscription()
+            // Live mode: Stop SDK session (handles audio cleanup internally)
+            await stopLiveTranscription()
         } else {
-            // Batch mode: Perform transcription
+            // Batch mode: Stop audio capture and perform transcription
+            audioCapture.stopRecording()
             await performBatchTranscription()
         }
+
+        isRecording = false
+        audioLevel = 0.0
     }
 
     // MARK: - Private Methods - Transcription
@@ -279,59 +279,58 @@ class STTViewModel: ObservableObject {
         isTranscribing = false
     }
 
-    /// Start live streaming transcription
+    /// Start live streaming transcription using SDK's LiveTranscriptionSession
     private func startLiveTranscription() async throws {
-        logger.info("Starting live transcription")
+        logger.info("Starting live transcription via SDK")
         isTranscribing = true
 
-        // Create audio stream
-        let audioStream = AsyncStream<Data> { continuation in
-            self.audioContinuation = continuation
-        }
-
-        // Start audio capture with stream callback
-        try audioCapture.startRecording { [weak self] audioData in
+        // Use SDK's high-level LiveTranscriptionSession
+        // It handles audio capture, streaming, and cleanup internally
+        let session = try await RunAnywhere.startLiveTranscription { [weak self] partialText in
             Task { @MainActor in
-                guard let self = self else { return }
-                // Send audio chunk to stream
-                self.audioContinuation?.yield(audioData)
-                // Also buffer for fallback
-                self.audioBuffer.append(audioData)
+                self?.transcription = partialText
             }
         }
 
-        // Start streaming transcription task
-        streamingTask = Task { @MainActor in
-            do {
-                let transcriptionStream = try await RunAnywhere.transcribeStream(audioStream)
+        self.liveSession = session
 
-                for try await partialText in transcriptionStream {
-                    // Update UI with partial transcription
-                    self.transcription = partialText
-                    self.logger.debug("Live transcription update: \(partialText)")
+        // Subscribe to audio level from the session
+        session.$audioLevel
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] level in
+                self?.audioLevel = level
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to error state
+        session.$error
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0 }
+            .sink { [weak self] error in
+                self?.errorMessage = "Live transcription failed: \(error.localizedDescription)"
+                self?.isTranscribing = false
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to active state
+        session.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isActive in
+                if !isActive {
+                    self?.isTranscribing = false
                 }
-
-                self.logger.info("Live transcription stream completed")
-            } catch {
-                self.logger.error("Live transcription failed: \(error.localizedDescription)")
-                self.errorMessage = "Live transcription failed: \(error.localizedDescription)"
             }
+            .store(in: &cancellables)
 
-            self.isTranscribing = false
-        }
+        logger.info("Live transcription session started")
     }
 
     /// Stop live streaming transcription
-    private func stopLiveTranscription() {
+    private func stopLiveTranscription() async {
         logger.info("Stopping live transcription")
 
-        // Cancel streaming task first to stop consuming from stream
-        streamingTask?.cancel()
-        streamingTask = nil
-
-        // Finish audio stream (this will cause the transcription stream to complete)
-        audioContinuation?.finish()
-        audioContinuation = nil
+        await liveSession?.stop()
+        liveSession = nil
 
         isTranscribing = false
     }
@@ -343,8 +342,11 @@ class STTViewModel: ObservableObject {
     func cleanup() {
         audioCapture.stopRecording()
 
-        // Clean up streaming resources
-        stopLiveTranscription()
+        // Clean up live transcription session
+        Task { @MainActor in
+            await liveSession?.stop()
+            liveSession = nil
+        }
 
         cancellables.removeAll()
 
