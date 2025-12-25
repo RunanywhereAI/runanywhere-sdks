@@ -10,8 +10,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # RunAnywhere SDK - Core
   runanywhere:
-    path: ../../../sdk/runanywhere-flutter
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere
+  # RunAnywhere SDK - ONNX Backend (STT, TTS, VAD, LLM)
+  runanywhere_onnx:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
+  # RunAnywhere SDK - LlamaCpp Backend (LLM)
+  runanywhere_llamacpp:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
   provider: ^6.1.0
   flutter_markdown: ^0.6.18
   record: ^6.1.2

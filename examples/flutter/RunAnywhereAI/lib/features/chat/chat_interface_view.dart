@@ -140,6 +140,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     });
 
     final messageIndex = _messages.length - 1;
+    final contentBuffer = StringBuffer();
 
     try {
       final stream = sdk.RunAnywhere.generateStream(prompt, options: options);
@@ -152,7 +153,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         }
 
         _tokenCount++;
-        _currentStreamingContent += token;
+        contentBuffer.write(token);
+        _currentStreamingContent = contentBuffer.toString();
 
         setState(() {
           _messages[messageIndex] = _messages[messageIndex].copyWith(

@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:runanywhere/backends/llamacpp/llamacpp.dart';
-import 'package:runanywhere/backends/onnx/onnx.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/services/model_manager.dart';
+import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
+import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
 /// RunAnywhereAIApp (mirroring iOS RunAnywhereAIApp.swift)
 ///
@@ -81,7 +81,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         _isSDKInitialized = true;
       });
 
-      debugPrint('💡 Models registered, user can now download and select models');
+      debugPrint(
+          '💡 Models registered, user can now download and select models');
     } catch (e) {
       stopwatch.stop();
       debugPrint(
