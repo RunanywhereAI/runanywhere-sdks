@@ -442,18 +442,12 @@ private fun createLLMLifecycleManager(): ModelLifecycleManager<LLMService> {
                     "Model not downloaded: $resourceId. Please download the model first."
                 )
 
-            // Get provider from registry
-            val provider = ModuleRegistry.llmProvider(resourceId)
-                ?: throw SDKError.ComponentNotInitialized(
-                    "No LLM service provider registered for model: $resourceId"
-                )
-
             // Create configuration
             val llmConfig = (config as? LLMConfiguration)
                 ?: LLMConfiguration(modelId = resourceId)
 
-            // Create and initialize service
-            val service = provider.createLLMService(llmConfig)
+            // Create service using registry
+            val service = ModuleRegistry.createLLM(llmConfig)
             service.initialize(modelPath)
 
             logger.info("LLM model loaded successfully: $resourceId")

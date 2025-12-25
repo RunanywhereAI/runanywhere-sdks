@@ -87,18 +87,11 @@ class VADCapability internal constructor(
     override suspend fun initialize(config: VADConfiguration) {
         logger.info("Initializing VAD")
 
-        // Try to get service from ModuleRegistry, fallback to built-in
+        // Create VAD service from registry
         val vadService: VADService
 
         try {
-            val provider = ModuleRegistry.vadProvider(config.modelId)
-            if (provider != null) {
-                vadService = provider.createVADService(config)
-            } else {
-                // Fall back to built-in SimpleEnergyVAD
-                vadService = SimpleEnergyVAD(vadConfig = config)
-                vadService.initialize(config)
-            }
+            vadService = ModuleRegistry.createVAD(config)
 
             this.service = vadService
             this.config = config

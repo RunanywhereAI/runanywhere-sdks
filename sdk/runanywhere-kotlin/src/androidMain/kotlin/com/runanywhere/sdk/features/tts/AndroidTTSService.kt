@@ -384,25 +384,14 @@ class AndroidTTSService(
 }
 
 /**
- * Android TTS Service Provider for integration with ModuleRegistry
- * Follows the same pattern as LLMServiceProvider and STTServiceProvider
+ * Helper to register Android TTS with ModuleRegistry
  */
-class AndroidTTSServiceProvider(
-    private val context: Context,
-) : com.runanywhere.sdk.core.TTSServiceProvider {
-    override suspend fun createTTSService(configuration: TTSConfiguration): TTSService {
-        val service = AndroidTTSService(context)
-        service.initialize()
-        return service
+object AndroidTTSRegistration {
+    fun register(context: Context) {
+        com.runanywhere.sdk.core.ModuleRegistry.registerTTS("AndroidTTS") { config ->
+            val service = AndroidTTSService(context)
+            service.initialize()
+            service
+        }
     }
-
-    override fun canHandle(voiceId: String): Boolean {
-        // Android TTS can handle system TTS requests
-        return voiceId.startsWith("system") || voiceId == "default" || voiceId == "android-tts"
-    }
-
-    override val name: String = "AndroidTTSProvider"
-
-    override val framework: com.runanywhere.sdk.models.enums.InferenceFramework =
-        com.runanywhere.sdk.models.enums.InferenceFramework.SYSTEM_TTS
 }

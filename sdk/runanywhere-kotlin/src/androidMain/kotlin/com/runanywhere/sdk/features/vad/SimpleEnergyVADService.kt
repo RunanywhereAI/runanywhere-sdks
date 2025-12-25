@@ -4,12 +4,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import kotlin.math.sqrt
 
 /**
- * Platform-specific VAD service creation for Android
- * Creates a simple energy-based VAD service
- */
-actual fun createPlatformVADService(): VADService = SimpleEnergyVADService()
-
-/**
  * Simple Energy-based Voice Activity Detection implementation for Android
  * Based on iOS SimpleEnergyVADService - uses RMS energy threshold for detection
  */

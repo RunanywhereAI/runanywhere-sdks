@@ -77,12 +77,10 @@ class SpeakerDiarizationCapability internal constructor() {
         logger.info("Initializing Speaker Diarization")
 
         try {
-            // Create service through ModuleRegistry (matches iOS ServiceRegistry pattern)
-            val provider = ModuleRegistry.speakerDiarizationProvider(config.modelId)
-
-            val diarizationService = if (provider != null) {
-                logger.info("Creating Speaker Diarization service from provider: ${provider.name}")
-                provider.createSpeakerDiarizationService(config)
+            // Create service through ModuleRegistry or use default
+            val diarizationService = if (ModuleRegistry.hasSpeakerDiarization) {
+                logger.info("Creating Speaker Diarization service from registry")
+                ModuleRegistry.createSpeakerDiarization(config)
             } else {
                 // Fall back to default implementation
                 logger.info("No provider found, using default Speaker Diarization service")

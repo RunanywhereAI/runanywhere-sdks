@@ -82,11 +82,10 @@ class STTCapability internal constructor(
     override suspend fun loadModel(modelId: String) {
         logger.info("Loading STT model: $modelId")
 
-        // Check if provider is available for this specific model
-        val provider = ModuleRegistry.sttProvider(modelId)
-        if (provider == null) {
+        // Check if STT service is available
+        if (!ModuleRegistry.hasSTT) {
             throw SDKError.ComponentNotInitialized(
-                "No STT service provider registered for model: $modelId. " +
+                "No STT service registered for model: $modelId. " +
                     "Add ONNX or another STT module as a dependency.",
             )
         }
@@ -391,21 +390,12 @@ private fun createSTTLifecycleManager(): ModelLifecycleManager<STTService> {
 
             logger.info("Using model path: $modelPath")
 
-            // Get provider for this specific model
-            val provider = ModuleRegistry.sttProvider(resourceId)
-                ?: throw SDKError.ComponentNotInitialized(
-                    "No STT service provider registered for model: $resourceId. " +
-                        "Make sure ONNX module is registered."
-                )
-
-            logger.info("Found provider: ${provider.name}")
-
             // Create configuration
             val sttConfig = (config as? STTConfiguration)?.copy(modelId = resourceId)
                 ?: STTConfiguration(modelId = resourceId)
 
-            // Create service through provider
-            val service = provider.createSTTService(sttConfig)
+            // Create service using registry
+            val service = ModuleRegistry.createSTT(sttConfig)
 
             logger.info("STT model loaded successfully: $resourceId")
             service
