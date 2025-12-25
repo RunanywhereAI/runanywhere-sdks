@@ -3,6 +3,7 @@ package com.runanywhere.sdk.features.voiceagent
 import com.runanywhere.sdk.core.AudioUtils
 import com.runanywhere.sdk.features.stt.AudioChunk
 import com.runanywhere.sdk.features.stt.AndroidAudioCaptureManager
+import com.runanywhere.sdk.features.tts.AudioPlaybackManager
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.initializeVoiceAgentWithLoadedModels
@@ -18,7 +19,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlin.math.sqrt
 
 /**
@@ -52,8 +52,9 @@ actual class VoiceSessionHandle actual constructor(
     private val logger = SDKLogger("VoiceSession")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    // Audio capture
+    // Audio capture and playback
     private var audioCapture: AndroidAudioCaptureManager? = null
+    private val audioPlayback = AudioPlaybackManager()
 
     // State
     private var isRunning = false
@@ -126,9 +127,10 @@ actual class VoiceSessionHandle actual constructor(
         captureJob = null
         monitorJob = null
 
-        // Stop audio capture
+        // Stop audio capture and playback
         audioCapture?.stopRecording()
         audioCapture = null
+        audioPlayback.stop()
 
         // Clear state
         audioBuffer.clear()
@@ -307,10 +309,14 @@ actual class VoiceSessionHandle actual constructor(
             // Play TTS if enabled
             if (config.autoPlayTTS && result.synthesizedAudio != null && result.synthesizedAudio.isNotEmpty()) {
                 emit(VoiceSessionEvent.Speaking)
-                // TODO: Add audio playback when AudioPlaybackManager is implemented
-                // For now, just delay to simulate playback based on audio length
-                val durationMs = result.synthesizedAudio.size / 32 // Rough estimate
-                delay(durationMs.toLong().coerceIn(500, 5000))
+                try {
+                    logger.info("🔊 Playing TTS audio: ${result.synthesizedAudio.size} bytes")
+                    audioPlayback.play(result.synthesizedAudio)
+                    logger.info("🔊 TTS playback completed")
+                } catch (e: Exception) {
+                    logger.error("TTS playback failed: ${e.message}")
+                    // Continue even if playback fails
+                }
             }
 
             // Emit complete result
