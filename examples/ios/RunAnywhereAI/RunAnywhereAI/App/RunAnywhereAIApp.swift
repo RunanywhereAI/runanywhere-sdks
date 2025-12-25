@@ -89,8 +89,6 @@ struct RunAnywhereAIApp: App {
             logger.info("✅ SDK initialized in PRODUCTION mode")
             #endif
 
-            try RunAnywhere.initialize(environment: .development)
-
             // Register modules and models
             await registerModulesAndModels()
 
