@@ -1,0 +1,33 @@
+name: runanywhere_llamacpp
+description: LlamaCpp backend for RunAnywhere Flutter SDK. Provides LLM text generation capabilities.
+version: 0.15.8
+homepage: https://runanywhere.ai
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Core SDK dependency
+  runanywhere:
+    path: ../runanywhere
+  # FFI for native bindings
+  ffi: ^2.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Plugin configuration for native bindings
+  plugin:
+    platforms:
+      android:
+        ffiPlugin: true
+      ios:
+        ffiPlugin: true

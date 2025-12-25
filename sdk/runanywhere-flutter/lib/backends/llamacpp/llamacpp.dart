@@ -3,7 +3,7 @@
 /// This module provides LLM (Language Model) capabilities via llama.cpp
 /// through the native runanywhere-core library using Dart FFI.
 ///
-/// ## Quick Start (iOS-style API)
+/// ## Quick Start (matches iOS LlamaCPP API exactly)
 ///
 /// ```dart
 /// import 'package:runanywhere/backends/llamacpp/llamacpp.dart';
@@ -13,7 +13,6 @@
 ///
 /// // Add models (matches iOS LlamaCPP.addModel())
 /// LlamaCpp.addModel(
-///   id: 'smollm2-360m-q8_0',
 ///   name: 'SmolLM2 360M Q8_0',
 ///   url: 'https://huggingface.co/.../model.gguf',
 ///   memoryRequirement: 500000000,
@@ -25,38 +24,31 @@
 /// - **LLM (Language Model)**: Text generation using GGUF/GGML models
 /// - **Streaming**: Token-by-token streaming generation
 /// - **Template Support**: Auto-detection of model templates (ChatML, Llama, etc.)
-///
-/// ## Supported Model Formats
-///
-/// - `.gguf` - GGUF format (recommended)
-/// - `.ggml` - GGML format (legacy)
-/// - `.bin` - Binary format
-///
-/// ## Quantization Support
-///
-/// Supports all common quantization levels:
-/// - Q2_K, Q3_K_S/M/L, Q4_0/1, Q4_K_S/M
-/// - Q5_0/1, Q5_K_S/M, Q6_K, Q8_0
-/// - IQ2_XXS/XS, IQ3_S/XXS, IQ4_NL/XS
 library runanywhere_llamacpp;
 
 import 'package:runanywhere/backends/llamacpp/providers/llamacpp_llm_provider.dart';
-import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/framework/model_artifact_type.dart';
 import 'package:runanywhere/core/models/model/model_category.dart';
 import 'package:runanywhere/core/models/model/model_info.dart';
+import 'package:runanywhere/core/module/capability_type.dart';
+import 'package:runanywhere/core/module/inference_framework.dart';
+import 'package:runanywhere/core/module/model_storage_strategy.dart';
+import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/core/module_registry.dart';
-import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
+import 'package:runanywhere/core/protocols/downloading/download_strategy.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/native_backend.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
 export 'llamacpp_error.dart';
-// Utilities
 export 'llamacpp_template_resolver.dart';
-// Providers
 export 'providers/llamacpp_llm_provider.dart';
-// Services
 export 'services/llamacpp_llm_service.dart';
+
+// ============================================================================
+// LlamaCpp Module Implementation
+// Matches iOS LlamaCPP enum from LlamaCPPRuntime/LlamaCPPServiceProvider.swift
+// ============================================================================
 
 /// LlamaCpp module for LLM text generation.
 ///
@@ -68,50 +60,87 @@ export 'services/llamacpp_llm_service.dart';
 /// ## Registration (matches iOS LlamaCPP pattern exactly)
 ///
 /// ```dart
-/// import 'package:runanywhere/backends/llamacpp/llamacpp.dart';
-///
 /// // Register module (matches iOS: LlamaCPP.register())
 /// await LlamaCpp.register();
 ///
+/// // Or with custom priority
+/// await LlamaCpp.register(priority: 150);
+///
 /// // Add models (matches iOS: LlamaCPP.addModel())
 /// LlamaCpp.addModel(
-///   id: 'smollm2-360m-q8_0',
 ///   name: 'SmolLM2 360M Q8_0',
 ///   url: 'https://huggingface.co/.../model.gguf',
 ///   memoryRequirement: 500000000,
 /// );
 /// ```
-class LlamaCpp {
-  static final _logger = SDKLogger(category: 'LlamaCpp');
+class LlamaCpp extends RunAnywhereModule {
+  // ============================================================================
+  // Singleton Pattern (matches iOS enum pattern)
+  // ============================================================================
 
-  // Module state
+  /// Singleton instance for module metadata
+  static final LlamaCpp _instance = LlamaCpp._internal();
+
+  /// Get the module instance (for use with ModuleRegistry.registerModule)
+  static LlamaCpp get module => _instance;
+
+  LlamaCpp._internal();
+
+  // ============================================================================
+  // Module State
+  // ============================================================================
+
+  static final SDKLogger _logger = SDKLogger(category: 'LlamaCpp');
   static bool _isRegistered = false;
   static NativeBackend? _backend;
 
-  // Private constructor - use static methods only
-  LlamaCpp._();
-
   // ============================================================================
-  // RunAnywhereModule Properties (matches iOS LlamaCPP enum)
+  // RunAnywhereModule Implementation (matches iOS LlamaCPP enum)
   // ============================================================================
 
-  /// Module identifier (matches iOS LlamaCPP.moduleId)
-  static const String moduleId = 'llamacpp';
+  @override
+  String get moduleId => 'llamacpp';
 
-  /// Human-readable module name (matches iOS LlamaCPP.moduleName)
-  static const String moduleName = 'LlamaCpp';
+  @override
+  String get moduleName => 'LlamaCpp';
 
-  /// Inference framework for this module (matches iOS LlamaCPP.inferenceFramework)
-  static LLMFramework get inferenceFramework => LLMFramework.llamaCpp;
+  @override
+  InferenceFramework get inferenceFramework => InferenceFramework.llamaCpp;
 
-  /// Default registration priority (matches iOS LlamaCPP.defaultPriority)
-  static const int defaultPriority = 100;
+  @override
+  Set<CapabilityType> get capabilities => {CapabilityType.llm};
+
+  @override
+  int get defaultPriority => 100;
+
+  @override
+  ModelStorageStrategy? get storageStrategy => null;
+
+  @override
+  DownloadStrategy? get downloadStrategy => null;
+
+  // ============================================================================
+  // Static API (matches iOS LlamaCPP static methods exactly)
+  // ============================================================================
 
   /// Whether the module is registered
   static bool get isRegistered => _isRegistered;
 
   /// Get native backend (for advanced usage)
   static NativeBackend? get backend => _backend;
+
+  /// Check if the native backend is available on this platform.
+  static bool get isAvailable {
+    try {
+      PlatformLoader.load();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Get the native library version.
+  static String get version => _backend?.version ?? 'not initialized';
 
   /// Supported quantization levels for GGUF models.
   static const List<String> supportedQuantizations = [
@@ -137,22 +166,10 @@ class LlamaCpp {
     'IQ4_XS',
   ];
 
-  // ============================================================================
-  // Backend Info (for compatibility with legacy code)
-  // ============================================================================
-
-  /// Check if the native backend is available on this platform.
-  static bool get isAvailable {
-    try {
-      PlatformLoader.load();
-      return true;
-    } catch (_) {
-      return false;
-    }
+  /// Check if a quantization level is supported.
+  static bool isQuantizationSupported(String quantization) {
+    return supportedQuantizations.contains(quantization);
   }
-
-  /// Get the native library version.
-  static String get version => _backend?.version ?? 'not initialized';
 
   /// Get backend info as a map.
   static Map<String, dynamic> getBackendInfo() {
@@ -170,7 +187,6 @@ class LlamaCpp {
       }
     }
     if (!isAvailable) return [];
-    // Create temporary backend to check
     NativeBackend? tempBackend;
     try {
       tempBackend = NativeBackend();
@@ -182,22 +198,16 @@ class LlamaCpp {
     }
   }
 
-  /// Check if a quantization level is supported.
-  static bool isQuantizationSupported(String quantization) {
-    return supportedQuantizations.contains(quantization);
-  }
-
   // ============================================================================
   // Registration (matches iOS LlamaCPP.register() exactly)
   // ============================================================================
 
-  /// Register LlamaCpp LLM service with the SDK.
+  /// Register LlamaCpp module with the SDK.
   ///
   /// Matches iOS `LlamaCPP.register(priority:)` pattern exactly.
-  /// Registers LLM provider with ModuleRegistry directly.
   ///
   /// [priority] - Registration priority (higher = preferred). Default: 100.
-  static Future<void> register({int priority = defaultPriority}) async {
+  static Future<void> register({int priority = 100}) async {
     if (_isRegistered) {
       _logger.debug('LlamaCpp already registered');
       return;
@@ -209,19 +219,21 @@ class LlamaCpp {
       return;
     }
 
-    // Create native backend (matches iOS: backend is created in service)
+    // Create native backend
     _backend = NativeBackend();
     _backend!.create('llamacpp');
 
-    // Register LLM provider with ModuleRegistry
-    // Matches iOS: ServiceRegistry.shared.registerLLM(name:priority:canHandle:factory:)
+    // Register as a module with ModuleRegistry (matches iOS pattern)
+    ModuleRegistry.shared.registerModule(_instance, priority: priority);
+
+    // Register LLM provider
     ModuleRegistry.shared.registerLLM(
       LlamaCppLLMServiceProvider(_backend!),
       priority: priority,
     );
 
     _isRegistered = true;
-    _logger.info('LlamaCpp LLM registered');
+    _logger.info('LlamaCpp registered with capabilities: LLM');
   }
 
   // ============================================================================
@@ -233,10 +245,11 @@ class LlamaCpp {
   /// Matches iOS `LlamaCPP.addModel()` pattern exactly.
   /// Uses the module's inferenceFramework automatically.
   ///
-  /// [id] - Explicit model ID. If null, a stable ID is generated from the URL filename.
+  /// [id] - Explicit model ID. If null, generated from URL filename.
   /// [name] - Display name for the model.
   /// [url] - Download URL string for the model.
-  /// [modality] - Model category (defaults to .language for LLM).
+  /// [modality] - Model category (defaults to language for LLM).
+  /// [artifactType] - How the model is packaged.
   /// [memoryRequirement] - Estimated memory usage in bytes.
   /// [supportsThinking] - Whether the model supports reasoning/thinking.
   ///
@@ -245,29 +258,20 @@ class LlamaCpp {
     String? id,
     required String name,
     required String url,
-    ModelCategory modality = ModelCategory.language,
+    ModelCategory? modality,
+    ModelArtifactType? artifactType,
     int? memoryRequirement,
     bool supportsThinking = false,
   }) {
-    final downloadURL = Uri.tryParse(url);
-    if (downloadURL == null) {
-      _logger.error("Invalid URL for model '$name': $url");
-      return null;
-    }
-
-    // Register the model with this module's framework
-    final modelInfo = ServiceContainer.shared.modelRegistry.addModelFromURL(
+    return _instance.addModelInternal(
       id: id,
       name: name,
-      url: downloadURL,
-      framework: inferenceFramework,
-      category: modality,
-      estimatedSize: memoryRequirement,
+      url: url,
+      modality: modality,
+      artifactType: artifactType,
+      memoryRequirement: memoryRequirement,
       supportsThinking: supportsThinking,
     );
-
-    _logger.info("Added model '$name' (id: ${modelInfo.id})");
-    return modelInfo;
   }
 
   // ============================================================================

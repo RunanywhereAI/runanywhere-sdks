@@ -704,7 +704,7 @@ class _StoredModelRowState extends State<_StoredModelRow> {
   bool _isDeleting = false;
 
   void _confirmDelete() {
-    showDialog<void>(
+    unawaited(showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Model'),
@@ -727,7 +727,7 @@ class _StoredModelRowState extends State<_StoredModelRow> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   @override
