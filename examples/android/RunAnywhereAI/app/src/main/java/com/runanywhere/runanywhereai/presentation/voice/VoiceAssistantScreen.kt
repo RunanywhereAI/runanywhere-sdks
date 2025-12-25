@@ -32,7 +32,9 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.runanywhere.runanywhereai.domain.models.SessionState
+import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.sdk.models.enums.ModelSelectionContext
 
 /**
  * Voice Assistant screen matching iOS VoiceAssistantView
@@ -101,39 +103,39 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
         }
     }
 
-    // Model selection dialogs
-    // TODO: Replace with actual model selection sheets matching iOS ModelSelectionSheet
+    // Model selection bottom sheets - uses real SDK models
+    // iOS Reference: ModelSelectionSheet(context: .stt/.llm/.tts)
     if (showSTTModelSelection) {
-        MockModelSelectionDialog(
-            title = "Select Speech Recognition Model",
-            modelType = "STT",
+        ModelSelectionBottomSheet(
+            context = ModelSelectionContext.STT,
             onDismiss = { showSTTModelSelection = false },
-            onSelectModel = { framework, name, modelId ->
-                viewModel.setSTTModel(framework, name, modelId)
+            onModelSelected = { model ->
+                val framework = model.preferredFramework?.displayName ?: "Unknown"
+                viewModel.setSTTModel(framework, model.name, model.id)
                 showSTTModelSelection = false
             },
         )
     }
 
     if (showLLMModelSelection) {
-        MockModelSelectionDialog(
-            title = "Select Language Model",
-            modelType = "LLM",
+        ModelSelectionBottomSheet(
+            context = ModelSelectionContext.LLM,
             onDismiss = { showLLMModelSelection = false },
-            onSelectModel = { framework, name, modelId ->
-                viewModel.setLLMModel(framework, name, modelId)
+            onModelSelected = { model ->
+                val framework = model.preferredFramework?.displayName ?: "Unknown"
+                viewModel.setLLMModel(framework, model.name, model.id)
                 showLLMModelSelection = false
             },
         )
     }
 
     if (showTTSModelSelection) {
-        MockModelSelectionDialog(
-            title = "Select Text to Speech Model",
-            modelType = "TTS",
+        ModelSelectionBottomSheet(
+            context = ModelSelectionContext.TTS,
             onDismiss = { showTTSModelSelection = false },
-            onSelectModel = { framework, name, modelId ->
-                viewModel.setTTSModel(framework, name, modelId)
+            onModelSelected = { model ->
+                val framework = model.preferredFramework?.displayName ?: "Unknown"
+                viewModel.setTTSModel(framework, model.name, model.id)
                 showTTSModelSelection = false
             },
         )
@@ -1079,80 +1081,6 @@ private fun MicrophoneButton(
             }
         }
     }
-}
-
-/**
- * Mock Model Selection Dialog
- *
- * TODO: Replace with actual ModelSelectionSheet matching iOS
- * iOS equivalent: ModelSelectionSheet(context: .stt/.llm/.tts)
- */
-@Composable
-private fun MockModelSelectionDialog(
-    title: String,
-    modelType: String,
-    onDismiss: () -> Unit,
-    onSelectModel: (framework: String, name: String, modelId: String) -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column {
-                Text("Select a model for $modelType")
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Mock model options
-                val models =
-                    when (modelType) {
-                        "STT" ->
-                            listOf(
-                                Triple("WhisperKit", "Whisper Base", "whisper-base"),
-                                Triple("WhisperKit", "Whisper Small", "whisper-small"),
-                                Triple("ONNX", "Whisper Tiny", "whisper-tiny-onnx"),
-                            )
-                        "LLM" ->
-                            listOf(
-                                Triple("LlamaCpp", "SmolLM2 135M", "smollm2-135m"),
-                                Triple("LlamaCpp", "Llama 3.2 1B", "llama3.2-1b"),
-                                Triple("FoundationModels", "Apple FM", "apple-fm"),
-                            )
-                        "TTS" ->
-                            listOf(
-                                Triple("System", "System Voice", "system-tts"),
-                                Triple("Piper", "Jenny", "piper-jenny"),
-                                Triple("Piper", "Amy", "piper-amy"),
-                            )
-                        else -> emptyList()
-                    }
-
-                models.forEach { (framework, name, modelId) ->
-                    TextButton(
-                        onClick = { onSelectModel(framework, name, modelId) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(name)
-                            Text(
-                                framework,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-    )
 }
 
 private fun getStatusText(sessionState: SessionState): String {

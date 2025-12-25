@@ -10,7 +10,6 @@ import com.runanywhere.sdk.core.capabilities.ModelLoadableCapability
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
-import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -67,11 +66,12 @@ class STTCapability internal constructor(
      * Matches iOS STTCapability.supportsStreaming property.
      */
     val supportsStreaming: Boolean
-        get() = runCatching {
-            kotlinx.coroutines.runBlocking {
-                managedLifecycle.currentService()?.supportsStreaming ?: false
-            }
-        }.getOrElse { false }
+        get() =
+            runCatching {
+                kotlinx.coroutines.runBlocking {
+                    managedLifecycle.currentService()?.supportsStreaming ?: false
+                }
+            }.getOrElse { false }
 
     /**
      * Load an STT model by ID
@@ -166,20 +166,22 @@ class STTCapability internal constructor(
 
         // Calculate audio metrics
         val audioSizeBytes = audioData.size
-        val audioLengthMs = estimateAudioLength(
-            dataSize = audioSizeBytes,
-            format = effectiveOptions.audioFormat,
-            sampleRate = effectiveOptions.sampleRate,
-        ) * 1000
+        val audioLengthMs =
+            estimateAudioLength(
+                dataSize = audioSizeBytes,
+                format = effectiveOptions.audioFormat,
+                sampleRate = effectiveOptions.sampleRate,
+            ) * 1000
 
         val startTime = getCurrentTimeMillis()
 
         // Start transcription tracking
-        val transcriptionId = analyticsService.startTranscription(
-            audioLengthMs = audioLengthMs,
-            audioSizeBytes = audioSizeBytes,
-            language = effectiveOptions.language,
-        )
+        val transcriptionId =
+            analyticsService.startTranscription(
+                audioLengthMs = audioLengthMs,
+                audioSizeBytes = audioSizeBytes,
+                language = effectiveOptions.language,
+            )
 
         // Perform transcription
         val result: STTTranscriptionResult
@@ -208,27 +210,30 @@ class STTCapability internal constructor(
         logger.info("Transcription completed in ${processingTimeMs.toLong()}ms")
 
         // Convert to STTOutput
-        val wordTimestamps = result.timestamps?.map { timestamp ->
-            WordTimestamp(
-                word = timestamp.word,
-                startTime = timestamp.startTime,
-                endTime = timestamp.endTime,
-                confidence = timestamp.confidence ?: 0.9f,
-            )
-        }
+        val wordTimestamps =
+            result.timestamps?.map { timestamp ->
+                WordTimestamp(
+                    word = timestamp.word,
+                    startTime = timestamp.startTime,
+                    endTime = timestamp.endTime,
+                    confidence = timestamp.confidence ?: 0.9f,
+                )
+            }
 
-        val alternatives = result.alternatives?.map { alt ->
-            TranscriptionAlternative(
-                text = alt.transcript,
-                confidence = alt.confidence,
-            )
-        }
+        val alternatives =
+            result.alternatives?.map { alt ->
+                TranscriptionAlternative(
+                    text = alt.transcript,
+                    confidence = alt.confidence,
+                )
+            }
 
-        val audioLength = estimateAudioLength(
-            dataSize = audioSizeBytes,
-            format = effectiveOptions.audioFormat,
-            sampleRate = effectiveOptions.sampleRate,
-        )
+        val audioLength =
+            estimateAudioLength(
+                dataSize = audioSizeBytes,
+                format = effectiveOptions.audioFormat,
+                sampleRate = effectiveOptions.sampleRate,
+            )
 
         return STTOutput(
             text = result.transcript,
@@ -236,11 +241,12 @@ class STTCapability internal constructor(
             wordTimestamps = wordTimestamps,
             detectedLanguage = result.language,
             alternatives = alternatives,
-            metadata = TranscriptionMetadata(
-                modelId = modelId,
-                processingTime = processingTime,
-                audioLength = audioLength,
-            ),
+            metadata =
+                TranscriptionMetadata(
+                    modelId = modelId,
+                    processingTime = processingTime,
+                    audioLength = audioLength,
+                ),
         )
     }
 
@@ -254,51 +260,54 @@ class STTCapability internal constructor(
     fun streamTranscribe(
         audioStream: Flow<ByteArray>,
         options: STTOptions,
-    ): Flow<String> = flow {
-        val service = managedLifecycle.requireService()
-        val effectiveOptions = mergeOptions(options)
+    ): Flow<String> =
+        flow {
+            val service = managedLifecycle.requireService()
+            val effectiveOptions = mergeOptions(options)
 
-        // Start transcription tracking (streaming mode - audio length unknown upfront)
-        val transcriptionId = analyticsService.startTranscription(
-            audioLengthMs = 0.0, // Unknown for streaming
-            audioSizeBytes = 0, // Unknown for streaming
-            language = effectiveOptions.language,
-        )
+            // Start transcription tracking (streaming mode - audio length unknown upfront)
+            val transcriptionId =
+                analyticsService.startTranscription(
+                    audioLengthMs = 0.0, // Unknown for streaming
+                    audioSizeBytes = 0, // Unknown for streaming
+                    language = effectiveOptions.language,
+                )
 
-        var lastPartialWordCount = 0
+            var lastPartialWordCount = 0
 
-        try {
-            val result = service.streamTranscribe(
-                audioStream = audioStream,
-                options = effectiveOptions,
-                onPartial = { partial ->
-                    // Track streaming update
-                    val wordCount = partial.split(" ").filter { it.isNotEmpty() }.size
-                    if (wordCount > lastPartialWordCount) {
-                        analyticsService.trackPartialTranscript(text = partial)
-                        lastPartialWordCount = wordCount
-                    }
-                    // Note: Can't yield from callback directly, partials are tracked but final result is emitted
-                },
-            )
+            try {
+                val result =
+                    service.streamTranscribe(
+                        audioStream = audioStream,
+                        options = effectiveOptions,
+                        onPartial = { partial ->
+                            // Track streaming update
+                            val wordCount = partial.split(" ").filter { it.isNotEmpty() }.size
+                            if (wordCount > lastPartialWordCount) {
+                                analyticsService.trackPartialTranscript(text = partial)
+                                lastPartialWordCount = wordCount
+                            }
+                            // Note: Can't yield from callback directly, partials are tracked but final result is emitted
+                        },
+                    )
 
-            // Complete transcription tracking
-            analyticsService.completeTranscription(
-                transcriptionId = transcriptionId,
-                text = result.transcript,
-                confidence = result.confidence ?: 0.9f,
-            )
+                // Complete transcription tracking
+                analyticsService.completeTranscription(
+                    transcriptionId = transcriptionId,
+                    text = result.transcript,
+                    confidence = result.confidence ?: 0.9f,
+                )
 
-            // Emit final result
-            emit(result.transcript)
-        } catch (e: Exception) {
-            analyticsService.trackTranscriptionFailed(
-                transcriptionId = transcriptionId,
-                errorMessage = e.message ?: e.toString(),
-            )
-            throw e
+                // Emit final result
+                emit(result.transcript)
+            } catch (e: Exception) {
+                analyticsService.trackTranscriptionFailed(
+                    transcriptionId = transcriptionId,
+                    errorMessage = e.message ?: e.toString(),
+                )
+                throw e
+            }
         }
-    }
 
     // ============================================================================
     // MARK: - Analytics API (iOS STTCapability.getAnalyticsMetrics pattern)
@@ -339,11 +348,12 @@ class STTCapability internal constructor(
         sampleRate: Int,
     ): Double {
         // Rough estimation based on format and sample rate
-        val bytesPerSample = when (format) {
-            AudioFormat.PCM, AudioFormat.WAV -> 2 // 16-bit PCM
-            AudioFormat.MP3 -> 1 // Compressed
-            else -> 2
-        }
+        val bytesPerSample =
+            when (format) {
+                AudioFormat.PCM, AudioFormat.WAV -> 2 // 16-bit PCM
+                AudioFormat.MP3 -> 1 // Compressed
+                else -> 2
+            }
 
         val samples = dataSize / bytesPerSample
         return samples.toDouble() / sampleRate.toDouble()
@@ -377,22 +387,25 @@ private fun createSTTLifecycleManager(): ModelLifecycleManager<STTService> {
             logger.info("Loading STT model: $resourceId")
 
             // Get model info from registry
-            val modelInfo = ServiceContainer.shared.modelRegistry.getModel(resourceId)
-                ?: throw SDKError.ModelNotFound("STT model not found: $resourceId")
+            val modelInfo =
+                ServiceContainer.shared.modelRegistry.getModel(resourceId)
+                    ?: throw SDKError.ModelNotFound("STT model not found: $resourceId")
 
             logger.info("Found model: ${modelInfo.name} (id: ${modelInfo.id})")
 
             // Ensure model is downloaded
-            val modelPath = modelInfo.localPath
-                ?: throw SDKError.ModelNotDownloaded(
-                    "Model not downloaded: $resourceId. Please download the model first."
-                )
+            val modelPath =
+                modelInfo.localPath
+                    ?: throw SDKError.ModelNotDownloaded(
+                        "Model not downloaded: $resourceId. Please download the model first.",
+                    )
 
             logger.info("Using model path: $modelPath")
 
             // Create configuration
-            val sttConfig = (config as? STTConfiguration)?.copy(modelId = resourceId)
-                ?: STTConfiguration(modelId = resourceId)
+            val sttConfig =
+                (config as? STTConfiguration)?.copy(modelId = resourceId)
+                    ?: STTConfiguration(modelId = resourceId)
 
             // Create service using registry
             val service = ModuleRegistry.createSTT(sttConfig)

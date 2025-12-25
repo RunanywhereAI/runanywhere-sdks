@@ -12,51 +12,37 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class DeviceInfo(
     // MARK: - Device Identity
-
     /** Persistent device UUID (survives app reinstalls via Keychain/SharedPreferences) */
     @SerialName("device_id")
     val deviceId: String,
-
     // MARK: - Device Hardware
-
     /** Device model identifier (e.g., "iPhone16,2" for iPhone 15 Pro Max, "Pixel 8 Pro" for Android) */
     @SerialName("model_identifier")
     val modelIdentifier: String,
-
     /** User-friendly device name (e.g., "iPhone 15 Pro Max", "Google Pixel 8 Pro") */
     @SerialName("model_name")
     val modelName: String,
-
     /** CPU architecture (e.g., "arm64", "x86_64") */
     @SerialName("architecture")
     val architecture: String,
-
     // MARK: - Operating System
-
     /** Operating system version string (e.g., "17.2", "14") */
     @SerialName("os_version")
     val osVersion: String,
-
     /** Platform identifier (e.g., "iOS", "Android", "JVM", "macOS") */
     @SerialName("platform")
     val platform: String,
-
     // MARK: - Device Classification
-
     /** Device type for API requests (mobile, tablet, desktop, tv, watch, vr) */
     @SerialName("device_type")
     val deviceType: String,
-
     /** Form factor (phone, tablet, laptop, desktop, tv, watch, headset) */
     @SerialName("form_factor")
     val formFactor: String,
-
     // MARK: - Hardware Specs
-
     /** Total physical memory in bytes */
     @SerialName("total_memory")
     val totalMemory: Long,
-
     /** Number of processor cores */
     @SerialName("processor_count")
     val processorCount: Int,

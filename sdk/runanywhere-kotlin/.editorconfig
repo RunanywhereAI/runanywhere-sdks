@@ -22,3 +22,5 @@ ktlint_standard_function-signature = disabled
 max_line_length = 250
 # Disable function expression body - stylistic preference
 ktlint_standard_function-expression-body = disabled
+# Disable package-name rule - 'public' package matches iOS SDK structure and requires escaping
+ktlint_standard_package-name = disabled

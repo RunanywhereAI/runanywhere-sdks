@@ -67,10 +67,11 @@ object EventPublisher {
         }
 
         // Create adapter that converts SDKEvent to AnalyticsEvent for the queue
-        analyticsEnqueuer = AnalyticsEnqueuer { sdkEvent ->
-            val analyticsEvent = SDKEventAnalyticsAdapter(sdkEvent)
-            AnalyticsQueueManager.enqueue(analyticsEvent)
-        }
+        analyticsEnqueuer =
+            AnalyticsEnqueuer { sdkEvent ->
+                val analyticsEvent = SDKEventAnalyticsAdapter(sdkEvent)
+                AnalyticsQueueManager.enqueue(analyticsEvent)
+            }
 
         logger.info("Initialized with SDKEvent routing to AnalyticsQueueManager")
     }

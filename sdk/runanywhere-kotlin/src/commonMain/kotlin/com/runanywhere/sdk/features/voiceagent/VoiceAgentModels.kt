@@ -214,41 +214,55 @@ class VoiceAgentService {
 sealed class VoiceAgentError : Exception() {
     /** Pipeline not initialized */
     object PipelineNotInitialized : VoiceAgentError() {
+        @Suppress("UnusedPrivateMember")
         private fun readResolve(): Any = PipelineNotInitialized
+
         override val message: String = "VoiceAgent pipeline is not initialized"
     }
 
     /** Empty transcription - no speech detected */
     object EmptyTranscription : VoiceAgentError() {
+        @Suppress("UnusedPrivateMember")
         private fun readResolve(): Any = EmptyTranscription
+
         override val message: String = "No speech detected in audio"
     }
 
     /** Pipeline was interrupted */
-    data class PipelineInterrupted(val reason: String) : VoiceAgentError() {
+    data class PipelineInterrupted(
+        val reason: String,
+    ) : VoiceAgentError() {
         override val message: String = "Voice pipeline interrupted: $reason"
     }
 
     /** VAD component failed */
-    data class VADFailed(val error: Throwable) : VoiceAgentError() {
+    data class VADFailed(
+        val error: Throwable,
+    ) : VoiceAgentError() {
         override val message: String = "VAD processing failed: ${error.message}"
         override val cause: Throwable = error
     }
 
     /** STT component failed */
-    data class STTFailed(val error: Throwable) : VoiceAgentError() {
+    data class STTFailed(
+        val error: Throwable,
+    ) : VoiceAgentError() {
         override val message: String = "STT transcription failed: ${error.message}"
         override val cause: Throwable = error
     }
 
     /** LLM component failed */
-    data class LLMFailed(val error: Throwable) : VoiceAgentError() {
+    data class LLMFailed(
+        val error: Throwable,
+    ) : VoiceAgentError() {
         override val message: String = "LLM generation failed: ${error.message}"
         override val cause: Throwable = error
     }
 
     /** TTS component failed */
-    data class TTSFailed(val error: Throwable) : VoiceAgentError() {
+    data class TTSFailed(
+        val error: Throwable,
+    ) : VoiceAgentError() {
         override val message: String = "TTS synthesis failed: ${error.message}"
         override val cause: Throwable = error
     }

@@ -14,8 +14,6 @@ import com.runanywhere.sdk.features.stt.STTCapability
 import com.runanywhere.sdk.features.tts.TTSCapability
 import com.runanywhere.sdk.features.vad.SimpleEnergyVAD
 import com.runanywhere.sdk.features.vad.VADCapability
-import com.runanywhere.sdk.features.vad.VADConfiguration
-import com.runanywhere.sdk.features.vad.VADService
 import com.runanywhere.sdk.features.voiceagent.VoiceAgentCapability
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
@@ -257,11 +255,12 @@ object RunAnywhere {
 
         if (environment == SDKEnvironment.DEVELOPMENT) {
             // Development mode - no auth needed
-            params = SDKInitParams(
-                apiKey = apiKey ?: "",
-                baseURL = baseURL,
-                environment = environment,
-            )
+            params =
+                SDKInitParams(
+                    apiKey = apiKey ?: "",
+                    baseURL = baseURL,
+                    environment = environment,
+                )
         } else {
             // Production/Staging mode - require API key and URL
             if (apiKey.isNullOrEmpty()) {
@@ -303,11 +302,12 @@ object RunAnywhere {
 
         try {
             // Step 1: Initialize logging system
-            val logLevel = when (params.environment) {
-                SDKEnvironment.DEVELOPMENT -> SDKLogger.Companion.LogLevel.DEBUG
-                SDKEnvironment.STAGING -> SDKLogger.Companion.LogLevel.INFO
-                SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.WARNING
-            }
+            val logLevel =
+                when (params.environment) {
+                    SDKEnvironment.DEVELOPMENT -> SDKLogger.Companion.LogLevel.DEBUG
+                    SDKEnvironment.STAGING -> SDKLogger.Companion.LogLevel.INFO
+                    SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.WARNING
+                }
             SDKLogger.setLogLevel(logLevel)
 
             // Step 2: Store parameters
@@ -482,51 +482,58 @@ object RunAnywhere {
             if (environment != SDKEnvironment.DEVELOPMENT && params.baseURL != null) {
                 logger.debug("Creating production analytics network services...")
 
-                val analyticsKtorClient = HttpClient {
-                    install(ContentNegotiation) {
-                        json(Json {
-                            ignoreUnknownKeys = true
-                            prettyPrint = false
-                            isLenient = true
-                        })
+                val analyticsKtorClient =
+                    HttpClient {
+                        install(ContentNegotiation) {
+                            json(
+                                Json {
+                                    ignoreUnknownKeys = true
+                                    prettyPrint = false
+                                    isLenient = true
+                                },
+                            )
+                        }
+                        install(HttpTimeout) {
+                            requestTimeoutMillis = 30000
+                            connectTimeoutMillis = 10000
+                        }
                     }
-                    install(HttpTimeout) {
-                        requestTimeoutMillis = 30000
-                        connectTimeoutMillis = 10000
-                    }
-                }
 
-                val analyticsNetworkService = AnalyticsNetworkService(
-                    httpClient = analyticsKtorClient,
-                    baseURL = params.baseURL,
-                    apiKey = params.apiKey,
-                    authenticationService = serviceContainer.authenticationService,
-                )
+                val analyticsNetworkService =
+                    AnalyticsNetworkService(
+                        httpClient = analyticsKtorClient,
+                        baseURL = params.baseURL,
+                        apiKey = params.apiKey,
+                        authenticationService = serviceContainer.authenticationService,
+                    )
                 serviceContainer.setAnalyticsNetworkService(analyticsNetworkService)
 
-                val remoteTelemetryDataSource = RemoteTelemetryDataSource(
-                    analyticsNetworkService = analyticsNetworkService
-                )
+                val remoteTelemetryDataSource =
+                    RemoteTelemetryDataSource(
+                        analyticsNetworkService = analyticsNetworkService,
+                    )
                 serviceContainer.setRemoteTelemetryDataSource(remoteTelemetryDataSource)
 
                 logger.debug("Production analytics network services created")
             }
 
             // Initialize AnalyticsService
-            val analyticsService = AnalyticsService(
-                telemetryRepository = serviceContainer.telemetryRepository,
-                syncCoordinator = serviceContainer.syncCoordinator,
-                supabaseConfig = params.supabaseConfig,
-                environment = environment,
-            )
+            val analyticsService =
+                AnalyticsService(
+                    telemetryRepository = serviceContainer.telemetryRepository,
+                    syncCoordinator = serviceContainer.syncCoordinator,
+                    supabaseConfig = params.supabaseConfig,
+                    environment = environment,
+                )
             analyticsService.initialize()
             serviceContainer.setAnalyticsService(analyticsService)
 
             // Initialize TelemetryService
-            val telemetryService = TelemetryService(
-                telemetryRepository = serviceContainer.telemetryRepository,
-                syncCoordinator = serviceContainer.syncCoordinator,
-            )
+            val telemetryService =
+                TelemetryService(
+                    telemetryRepository = serviceContainer.telemetryRepository,
+                    syncCoordinator = serviceContainer.syncCoordinator,
+                )
             telemetryService.initialize()
             serviceContainer.setTelemetryService(telemetryService)
 
@@ -547,7 +554,7 @@ object RunAnywhere {
                 logger.warn("Analytics initialization failed (non-critical in dev mode): ${e.message}")
             } else {
                 throw SDKError.InitializationFailed(
-                    "Analytics service initialization failed: ${e.message}"
+                    "Analytics service initialization failed: ${e.message}",
                 )
             }
         }

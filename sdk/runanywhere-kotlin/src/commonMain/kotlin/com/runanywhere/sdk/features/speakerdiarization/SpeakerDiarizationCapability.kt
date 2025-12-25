@@ -73,65 +73,68 @@ class SpeakerDiarizationCapability internal constructor() {
      * @param config Speaker Diarization configuration
      * @throws SDKError if initialization fails
      */
-    suspend fun initialize(config: SpeakerDiarizationConfiguration) = processingMutex.withLock {
-        logger.info("Initializing Speaker Diarization")
+    suspend fun initialize(config: SpeakerDiarizationConfiguration) =
+        processingMutex.withLock {
+            logger.info("Initializing Speaker Diarization")
 
-        try {
-            // Create service through ModuleRegistry or use default
-            val diarizationService = if (ModuleRegistry.hasSpeakerDiarization) {
-                logger.info("Creating Speaker Diarization service from registry")
-                ModuleRegistry.createSpeakerDiarization(config)
-            } else {
-                // Fall back to default implementation
-                logger.info("No provider found, using default Speaker Diarization service")
-                val database = InMemorySpeakerDatabase()
-                val audioProcessor = PlatformAudioProcessor()
-                DefaultSpeakerDiarizationService(config, database, audioProcessor)
+            try {
+                // Create service through ModuleRegistry or use default
+                val diarizationService =
+                    if (ModuleRegistry.hasSpeakerDiarization) {
+                        logger.info("Creating Speaker Diarization service from registry")
+                        ModuleRegistry.createSpeakerDiarization(config)
+                    } else {
+                        // Fall back to default implementation
+                        logger.info("No provider found, using default Speaker Diarization service")
+                        val database = InMemorySpeakerDatabase()
+                        val audioProcessor = PlatformAudioProcessor()
+                        DefaultSpeakerDiarizationService(config, database, audioProcessor)
+                    }
+
+                // Initialize the service
+                diarizationService.initialize(config.modelId)
+
+                this.service = diarizationService
+                this.currentConfiguration = config
+                this.isConfigured = true
+
+                // Publish event
+                publishEvent(SpeakerDiarizationEvent.ProcessingStarted)
+
+                logger.info("Speaker Diarization initialized successfully")
+            } catch (e: Exception) {
+                logger.error("Failed to initialize Speaker Diarization", e)
+                isConfigured = false
+                service = null
+                throw SDKError.InitializationFailed("Speaker Diarization initialization failed: ${e.message}")
             }
-
-            // Initialize the service
-            diarizationService.initialize(config.modelId)
-
-            this.service = diarizationService
-            this.currentConfiguration = config
-            this.isConfigured = true
-
-            // Publish event
-            publishEvent(SpeakerDiarizationEvent.ProcessingStarted)
-
-            logger.info("Speaker Diarization initialized successfully")
-        } catch (e: Exception) {
-            logger.error("Failed to initialize Speaker Diarization", e)
-            isConfigured = false
-            service = null
-            throw SDKError.InitializationFailed("Speaker Diarization initialization failed: ${e.message}")
         }
-    }
 
     /**
      * Cleanup Speaker Diarization resources
      */
-    suspend fun cleanup() = processingMutex.withLock {
-        logger.info("Cleaning up Speaker Diarization")
+    suspend fun cleanup() =
+        processingMutex.withLock {
+            logger.info("Cleaning up Speaker Diarization")
 
-        try {
-            service?.cleanup()
-        } catch (e: Exception) {
-            logger.warn("Error during cleanup: ${e.message}")
+            try {
+                service?.cleanup()
+            } catch (e: Exception) {
+                logger.warn("Error during cleanup: ${e.message}")
+            }
+
+            service = null
+            isConfigured = false
+            currentConfiguration = null
+
+            // Clear callbacks
+            onSpeakerDetectedCallback = null
+            onSpeakerChangedCallback = null
+            onSegmentCompletedCallback = null
+            onProcessingCompletedCallback = null
+
+            logger.info("Speaker Diarization cleaned up")
         }
-
-        service = null
-        isConfigured = false
-        currentConfiguration = null
-
-        // Clear callbacks
-        onSpeakerDetectedCallback = null
-        onSpeakerChangedCallback = null
-        onSegmentCompletedCallback = null
-        onProcessingCompletedCallback = null
-
-        logger.info("Speaker Diarization cleaned up")
-    }
 
     // ============================================================================
     // MARK: - Core Operations (iOS pattern)
@@ -145,9 +148,10 @@ class SpeakerDiarizationCapability internal constructor() {
      * @throws SDKError if not ready
      */
     suspend fun processAudio(samples: FloatArray): SpeakerInfo {
-        val currentService = service ?: throw SDKError.ComponentNotReady(
-            "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first."
-        )
+        val currentService =
+            service ?: throw SDKError.ComponentNotReady(
+                "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first.",
+            )
 
         logger.debug("Processing audio for speaker identification")
         val speaker = currentService.processAudio(samples)
@@ -167,33 +171,35 @@ class SpeakerDiarizationCapability internal constructor() {
      * @param audioStream Flow of audio samples as ByteArray
      * @return Flow of speaker information
      */
-    fun processAudioStream(audioStream: Flow<ByteArray>): Flow<SpeakerInfo> = flow {
-        val currentService = service ?: throw SDKError.ComponentNotReady(
-            "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first."
-        )
+    fun processAudioStream(audioStream: Flow<ByteArray>): Flow<SpeakerInfo> =
+        flow {
+            val currentService =
+                service ?: throw SDKError.ComponentNotReady(
+                    "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first.",
+                )
 
-        audioStream.collect { audioData ->
-            try {
-                // Convert audio data to float array (assuming 16-bit PCM)
-                val samples = convertBytesToFloatArray(audioData)
+            audioStream.collect { audioData ->
+                try {
+                    // Convert audio data to float array (assuming 16-bit PCM)
+                    val samples = convertBytesToFloatArray(audioData)
 
-                // Process audio chunk
-                val speaker = currentService.processAudio(samples)
+                    // Process audio chunk
+                    val speaker = currentService.processAudio(samples)
 
-                // Emit speaker detection events
-                if (speaker.id != "SILENCE") {
-                    onSpeakerDetectedCallback?.invoke(speaker)
-                    publishEvent(SpeakerDiarizationEvent.SpeakerDetected(speaker))
+                    // Emit speaker detection events
+                    if (speaker.id != "SILENCE") {
+                        onSpeakerDetectedCallback?.invoke(speaker)
+                        publishEvent(SpeakerDiarizationEvent.SpeakerDetected(speaker))
+                    }
+
+                    emit(speaker)
+                } catch (e: Exception) {
+                    val error = SpeakerDiarizationError.ProcessingFailed(e.message ?: "Stream processing error")
+                    publishEvent(SpeakerDiarizationEvent.Error(error))
+                    throw error
                 }
-
-                emit(speaker)
-            } catch (e: Exception) {
-                val error = SpeakerDiarizationError.ProcessingFailed(e.message ?: "Stream processing error")
-                publishEvent(SpeakerDiarizationEvent.Error(error))
-                throw error
             }
         }
-    }
 
     /**
      * Perform full diarization on audio
@@ -206,45 +212,51 @@ class SpeakerDiarizationCapability internal constructor() {
         samples: FloatArray,
         sampleRate: Int = 16000,
     ): SpeakerDiarizationOutput {
-        val currentService = service ?: throw SDKError.ComponentNotReady(
-            "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first."
-        )
+        val currentService =
+            service ?: throw SDKError.ComponentNotReady(
+                "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first.",
+            )
 
         publishEvent(SpeakerDiarizationEvent.ProcessingStarted)
 
-        val result = currentService.performDetailedDiarization(samples, sampleRate)
-            ?: throw SpeakerDiarizationError.ProcessingFailed("Diarization returned no results")
+        val result =
+            currentService.performDetailedDiarization(samples, sampleRate)
+                ?: throw SpeakerDiarizationError.ProcessingFailed("Diarization returned no results")
 
         // Convert to SpeakerDiarizationOutput
-        val speakerProfiles = result.speakers.map { speaker ->
-            SpeakerProfile(
-                id = speaker.id,
-                embedding = speaker.embedding,
-                totalSpeakingTime = result.segments
-                    .filter { it.speakerId == speaker.id }
-                    .sumOf { it.speechDuration },
-                segmentCount = result.segments.count { it.speakerId == speaker.id },
-                name = speaker.name,
+        val speakerProfiles =
+            result.speakers.map { speaker ->
+                SpeakerProfile(
+                    id = speaker.id,
+                    embedding = speaker.embedding,
+                    totalSpeakingTime =
+                        result.segments
+                            .filter { it.speakerId == speaker.id }
+                            .sumOf { it.speechDuration },
+                    segmentCount = result.segments.count { it.speakerId == speaker.id },
+                    name = speaker.name,
+                    averageConfidence = result.confidence,
+                    lastUpdated = System.currentTimeMillis(),
+                )
+            }
+
+        val metadata =
+            DiarizationMetadata(
+                processingTime = result.processingTime,
+                audioLength = samples.size.toDouble() / sampleRate,
+                speakerCount = result.speakers.size,
+                method = "energy",
                 averageConfidence = result.confidence,
-                lastUpdated = System.currentTimeMillis(),
+                segmentCount = result.segments.size,
             )
-        }
 
-        val metadata = DiarizationMetadata(
-            processingTime = result.processingTime,
-            audioLength = samples.size.toDouble() / sampleRate,
-            speakerCount = result.speakers.size,
-            method = "energy",
-            averageConfidence = result.confidence,
-            segmentCount = result.segments.size,
-        )
-
-        val output = SpeakerDiarizationOutput(
-            segments = result.segments,
-            speakers = speakerProfiles,
-            labeledTranscription = null,
-            metadata = metadata,
-        )
+        val output =
+            SpeakerDiarizationOutput(
+                segments = result.segments,
+                speakers = speakerProfiles,
+                labeledTranscription = null,
+                metadata = metadata,
+            )
 
         publishEvent(SpeakerDiarizationEvent.ProcessingCompleted)
         onProcessingCompletedCallback?.invoke(output)
@@ -259,9 +271,10 @@ class SpeakerDiarizationCapability internal constructor() {
      * @throws SDKError if not ready
      */
     fun getAllSpeakers(): List<SpeakerInfo> {
-        val currentService = service ?: throw SDKError.ComponentNotReady(
-            "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first."
-        )
+        val currentService =
+            service ?: throw SDKError.ComponentNotReady(
+                "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first.",
+            )
 
         return currentService.getAllSpeakers()
     }
@@ -273,9 +286,10 @@ class SpeakerDiarizationCapability internal constructor() {
      * @return Speaker profile or null if not found
      */
     suspend fun getSpeakerProfile(speakerId: String): SpeakerProfile? {
-        val currentService = service ?: throw SDKError.ComponentNotReady(
-            "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first."
-        )
+        val currentService =
+            service ?: throw SDKError.ComponentNotReady(
+                "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first.",
+            )
 
         return currentService.getSpeakerProfile(speakerId)
     }
@@ -288,9 +302,10 @@ class SpeakerDiarizationCapability internal constructor() {
      * @throws SDKError if not ready
      */
     suspend fun updateSpeakerName(speakerId: String, name: String) {
-        val currentService = service ?: throw SDKError.ComponentNotReady(
-            "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first."
-        )
+        val currentService =
+            service ?: throw SDKError.ComponentNotReady(
+                "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first.",
+            )
 
         logger.info("Updating speaker name: $speakerId -> $name")
         currentService.updateSpeakerName(speakerId, name)
@@ -303,9 +318,10 @@ class SpeakerDiarizationCapability internal constructor() {
      * @throws SDKError if not ready
      */
     suspend fun reset() {
-        val currentService = service ?: throw SDKError.ComponentNotReady(
-            "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first."
-        )
+        val currentService =
+            service ?: throw SDKError.ComponentNotReady(
+                "Speaker Diarization not initialized. Call initializeSpeakerDiarization() first.",
+            )
 
         logger.info("Resetting speaker diarization state")
         currentService.reset()
@@ -354,8 +370,9 @@ class SpeakerDiarizationCapability internal constructor() {
         val samples = FloatArray(audioData.size / 2)
         for (i in samples.indices) {
             val index = i * 2
-            val sample = (audioData[index].toInt() and 0xFF) or
-                (audioData[index + 1].toInt() shl 8)
+            val sample =
+                (audioData[index].toInt() and 0xFF) or
+                    (audioData[index + 1].toInt() shl 8)
             samples[i] = sample.toShort() / 32768.0f
         }
         return samples

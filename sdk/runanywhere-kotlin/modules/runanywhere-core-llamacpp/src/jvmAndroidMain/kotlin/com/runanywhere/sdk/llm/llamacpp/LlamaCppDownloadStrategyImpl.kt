@@ -17,40 +17,41 @@ internal actual suspend fun downloadGGUFFile(
     url: String,
     modelId: String,
     destinationFolder: String,
-    progressHandler: ((Double) -> Unit)?
-): String = withContext(Dispatchers.IO) {
-    logger.info("Downloading GGUF file from: $url")
+    progressHandler: ((Double) -> Unit)?,
+): String =
+    withContext(Dispatchers.IO) {
+        logger.info("Downloading GGUF file from: $url")
 
-    val destDir = File(destinationFolder)
-    if (!destDir.exists()) {
-        destDir.mkdirs()
-    }
+        val destDir = File(destinationFolder)
+        if (!destDir.exists()) {
+            destDir.mkdirs()
+        }
 
-    // Use original filename from URL
-    val fileName = url.substringAfterLast("/")
-    val destFile = File(destDir, fileName)
+        // Use original filename from URL
+        val fileName = url.substringAfterLast("/")
+        val destFile = File(destDir, fileName)
 
-    val connection = URL(url).openConnection()
-    val totalSize = connection.contentLengthLong
-    var downloadedSize = 0L
+        val connection = URL(url).openConnection()
+        val totalSize = connection.contentLengthLong
+        var downloadedSize = 0L
 
-    connection.getInputStream().use { input ->
-        FileOutputStream(destFile).use { output ->
-            val buffer = ByteArray(8192)
-            var bytesRead: Int
-            while (input.read(buffer).also { bytesRead = it } != -1) {
-                output.write(buffer, 0, bytesRead)
-                downloadedSize += bytesRead
-                if (totalSize > 0) {
-                    progressHandler?.invoke(downloadedSize.toDouble() / totalSize)
+        connection.getInputStream().use { input ->
+            FileOutputStream(destFile).use { output ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                    downloadedSize += bytesRead
+                    if (totalSize > 0) {
+                        progressHandler?.invoke(downloadedSize.toDouble() / totalSize)
+                    }
                 }
             }
         }
-    }
 
-    logger.info("Downloaded GGUF file to: ${destFile.absolutePath}")
-    destFile.absolutePath
-}
+        logger.info("Downloaded GGUF file to: ${destFile.absolutePath}")
+        destFile.absolutePath
+    }
 
 /**
  * Create a directory

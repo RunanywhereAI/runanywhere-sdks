@@ -170,13 +170,14 @@ class DefaultModelRegistry : ModelRegistry {
 
         // 2. Check for the expected model file: {modelFolder}/{modelId}.{ext}
         //    Common extensions: .gguf (LlamaCpp), .onnx (ONNX), .bin (general)
-        val extensions = when (framework) {
-            InferenceFramework.LLAMA_CPP -> listOf("gguf", "bin")
-            InferenceFramework.ONNX -> listOf("onnx", "bin")
-            InferenceFramework.WHISPER_KIT -> listOf("mlmodelc", "mlpackage")
-            InferenceFramework.CORE_ML -> listOf("mlmodelc", "mlpackage")
-            else -> listOf("bin", "gguf", "onnx")
-        }
+        val extensions =
+            when (framework) {
+                InferenceFramework.LLAMA_CPP -> listOf("gguf", "bin")
+                InferenceFramework.ONNX -> listOf("onnx", "bin")
+                InferenceFramework.WHISPER_KIT -> listOf("mlmodelc", "mlpackage")
+                InferenceFramework.CORE_ML -> listOf("mlmodelc", "mlpackage")
+                else -> listOf("bin", "gguf", "onnx")
+            }
 
         for (ext in extensions) {
             val filePath = "$modelFolder/$modelId.$ext"

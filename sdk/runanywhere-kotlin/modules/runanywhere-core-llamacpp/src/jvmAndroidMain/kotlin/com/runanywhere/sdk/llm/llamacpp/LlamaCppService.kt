@@ -1,16 +1,16 @@
 package com.runanywhere.sdk.llm.llamacpp
 
+import com.runanywhere.sdk.core.llamacpp.LlamaCppCoreService
+import com.runanywhere.sdk.data.models.generateUUID
 import com.runanywhere.sdk.features.llm.LLMConfiguration
 import com.runanywhere.sdk.features.llm.LLMInput
 import com.runanywhere.sdk.features.llm.LLMOutput
 import com.runanywhere.sdk.features.llm.LLMService
-import com.runanywhere.sdk.core.llamacpp.LlamaCppCoreService
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.models.*
 import com.runanywhere.sdk.utils.PlatformUtils
-import com.runanywhere.sdk.data.models.generateUUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,8 +29,9 @@ import kotlinx.coroutines.withContext
  * The chat template application happens in the C++ layer via llama_chat_apply_template,
  * ensuring correct formatting for any model with an embedded template.
  */
-actual class LlamaCppService actual constructor(private val configuration: LLMConfiguration) :
-    LLMService {
+actual class LlamaCppService actual constructor(
+    private val configuration: LLMConfiguration,
+) : LLMService {
     private val logger = SDKLogger("LlamaCppService")
     private val coreService = LlamaCppCoreService()
     private var modelPath: String? = null
@@ -43,65 +44,68 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
      */
     private val telemetryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    actual override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
-        logger.info("📌 initialize() called with modelPath: $modelPath")
-        logger.info("📌 configuration.modelId: ${configuration.modelId}")
+    actual override suspend fun initialize(modelPath: String?) =
+        withContext(Dispatchers.IO) {
+            logger.info("📌 initialize() called with modelPath: $modelPath")
+            logger.info("📌 configuration.modelId: ${configuration.modelId}")
 
-        val providedPath = modelPath ?: configuration.modelId
-            ?: throw IllegalArgumentException("No model path provided")
+            val providedPath =
+                modelPath ?: configuration.modelId
+                    ?: throw IllegalArgumentException("No model path provided")
 
-        // Resolve actual file path - if providedPath is a directory, find the .gguf file inside
-        val actualModelPath = resolveGGUFFilePath(providedPath)
+            // Resolve actual file path - if providedPath is a directory, find the .gguf file inside
+            val actualModelPath = resolveGGUFFilePath(providedPath)
 
-        logger.info("📌 actualModelPath resolved to: $actualModelPath")
+            logger.info("📌 actualModelPath resolved to: $actualModelPath")
 
-        if (isServiceInitialized) {
-            logger.info("Already initialized, unloading previous model")
-            cleanup()
+            if (isServiceInitialized) {
+                logger.info("Already initialized, unloading previous model")
+                cleanup()
+            }
+
+            logger.info("Initializing LlamaCpp (RunAnywhere Core) with model: $actualModelPath")
+
+            try {
+                // Initialize the core service
+                coreService.initialize()
+
+                // Load the model
+                logger.info("📌 Calling coreService.loadModel with: $actualModelPath")
+                coreService.loadModel(actualModelPath)
+
+                this@LlamaCppService.modelPath = actualModelPath
+                isServiceInitialized = true
+                logger.info("Initialized LlamaCpp (RunAnywhere Core) successfully")
+            } catch (e: Exception) {
+                logger.error("Failed to initialize LlamaCpp (RunAnywhere Core)", e)
+                isServiceInitialized = false
+                this@LlamaCppService.modelPath = null
+                throw IllegalStateException("Failed to initialize: ${e.message}", e)
+            }
         }
-
-        logger.info("Initializing LlamaCpp (RunAnywhere Core) with model: $actualModelPath")
-
-        try {
-            // Initialize the core service
-            coreService.initialize()
-
-            // Load the model
-            logger.info("📌 Calling coreService.loadModel with: $actualModelPath")
-            coreService.loadModel(actualModelPath)
-
-            this@LlamaCppService.modelPath = actualModelPath
-            isServiceInitialized = true
-            logger.info("Initialized LlamaCpp (RunAnywhere Core) successfully")
-        } catch (e: Exception) {
-            logger.error("Failed to initialize LlamaCpp (RunAnywhere Core)", e)
-            isServiceInitialized = false
-            this@LlamaCppService.modelPath = null
-            throw IllegalStateException("Failed to initialize: ${e.message}", e)
-        }
-    }
 
     actual override suspend fun generate(
         prompt: String,
-        options: LLMGenerationOptions
-    ): String = withContext(Dispatchers.IO) {
-        if (!isServiceInitialized) {
-            throw IllegalStateException("LlamaCppService not initialized")
-        }
+        options: LLMGenerationOptions,
+    ): String =
+        withContext(Dispatchers.IO) {
+            if (!isServiceInitialized) {
+                throw IllegalStateException("LlamaCppService not initialized")
+            }
 
-        // C++ layer will apply chat template automatically
-        coreService.generate(
-            prompt = prompt,
-            systemPrompt = null,
-            maxTokens = options.maxTokens,
-            temperature = options.temperature
-        )
-    }
+            // C++ layer will apply chat template automatically
+            coreService.generate(
+                prompt = prompt,
+                systemPrompt = null,
+                maxTokens = options.maxTokens,
+                temperature = options.temperature,
+            )
+        }
 
     actual override suspend fun streamGenerate(
         prompt: String,
         options: LLMGenerationOptions,
-        onToken: (String) -> Unit
+        onToken: (String) -> Unit,
     ) = withContext(Dispatchers.IO) {
         if (!isServiceInitialized) {
             throw IllegalStateException("LlamaCppService not initialized")
@@ -137,7 +141,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
                     promptTokens = promptTokens,
                     maxTokens = options.maxTokens,
                     device = PlatformUtils.getDeviceModel(),
-                    osVersion = PlatformUtils.getOSVersion()
+                    osVersion = PlatformUtils.getOSVersion(),
                 )
             } catch (e: Exception) {
                 logger.debug("Failed to track generation started: ${e.message}")
@@ -151,7 +155,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
                 prompt = prompt,
                 systemPrompt = null,
                 maxTokens = options.maxTokens,
-                temperature = options.temperature
+                temperature = options.temperature,
             ) { token ->
                 generatedText.append(token)
                 onToken(token)
@@ -163,9 +167,12 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             // Estimate tokens from the actual generated text
             val outputTokens = estimateTokenCount(generatedText.toString())
 
-            val tokensPerSecond = if (generationTime > 0) {
-                (outputTokens.toDouble() * 1000.0) / generationTime
-            } else 0.0
+            val tokensPerSecond =
+                if (generationTime > 0) {
+                    (outputTokens.toDouble() * 1000.0) / generationTime
+                } else {
+                    0.0
+                }
 
             // Track generation completed - fire and forget
             telemetryScope.launch {
@@ -181,7 +188,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
                         timeToFirstTokenMs = 0.0,
                         tokensPerSecond = tokensPerSecond,
                         device = PlatformUtils.getDeviceModel(),
-                        osVersion = PlatformUtils.getOSVersion()
+                        osVersion = PlatformUtils.getOSVersion(),
                     )
                 } catch (e: Exception) {
                     logger.debug("Failed to track generation completed: ${e.message}")
@@ -205,7 +212,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
                         totalTimeMs = generationTime.toDouble(),
                         errorMessage = errorMsg,
                         device = PlatformUtils.getDeviceModel(),
-                        osVersion = PlatformUtils.getOSVersion()
+                        osVersion = PlatformUtils.getOSVersion(),
                     )
                 } catch (telemetryError: Exception) {
                     logger.debug("Failed to track generation failed: ${telemetryError.message}")
@@ -252,90 +259,98 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         }
 
         // Use provided options or defaults
-        val options = input.options ?: LLMGenerationOptions(
-            maxTokens = configuration.maxTokens,
-            temperature = configuration.temperature.toFloat(),
-            streamingEnabled = false
-        )
+        val options =
+            input.options ?: LLMGenerationOptions(
+                maxTokens = configuration.maxTokens,
+                temperature = configuration.temperature.toFloat(),
+                streamingEnabled = false,
+            )
 
         // Generate with C++ backend (chat template applied in C++)
-        val response = coreService.generate(
-            prompt = prompt,
-            systemPrompt = systemPrompt,
-            maxTokens = options.maxTokens,
-            temperature = options.temperature
-        )
+        val response =
+            coreService.generate(
+                prompt = prompt,
+                systemPrompt = systemPrompt,
+                maxTokens = options.maxTokens,
+                temperature = options.temperature,
+            )
 
         logger.info("Generated response: ${response.take(200)}...")
 
         val generationTime = currentTimeMillis() - startTime
         val promptTokens = estimateTokenCount(prompt)
         val completionTokens = estimateTokenCount(response)
-        val tokensPerSecond = if (generationTime > 0) {
-            (completionTokens.toDouble() * 1000.0) / generationTime
-        } else null
+        val tokensPerSecond =
+            if (generationTime > 0) {
+                (completionTokens.toDouble() * 1000.0) / generationTime
+            } else {
+                null
+            }
 
         logger.info("Stats: $completionTokens tokens in ${generationTime}ms (${tokensPerSecond?.toInt() ?: 0} tok/s)")
 
         return LLMOutput(
             text = response,
-            tokenUsage = TokenUsage(
-                promptTokens = promptTokens,
-                completionTokens = completionTokens
-            ),
-            metadata = GenerationMetadata(
-                modelId = currentModel ?: "unknown",
-                temperature = options.temperature,
-                generationTime = generationTime,
-                tokensPerSecond = tokensPerSecond
-            ),
+            tokenUsage =
+                TokenUsage(
+                    promptTokens = promptTokens,
+                    completionTokens = completionTokens,
+                ),
+            metadata =
+                GenerationMetadata(
+                    modelId = currentModel ?: "unknown",
+                    temperature = options.temperature,
+                    generationTime = generationTime,
+                    tokensPerSecond = tokensPerSecond,
+                ),
             finishReason = FinishReason.COMPLETED,
-            timestamp = startTime
+            timestamp = startTime,
         )
     }
 
-    actual fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
-        if (!isServiceInitialized) {
-            throw IllegalStateException("LlamaCppService not initialized")
+    actual fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> =
+        flow {
+            if (!isServiceInitialized) {
+                throw IllegalStateException("LlamaCppService not initialized")
+            }
+
+            logger.info("streamProcess() called with ${input.messages.size} messages")
+
+            // Extract prompt and system prompt from messages
+            val (prompt, systemPrompt) = extractPromptFromMessages(input.messages, input.systemPrompt)
+
+            logger.info("Stream prompt: ${prompt.take(100)}...")
+
+            val options =
+                input.options ?: LLMGenerationOptions(
+                    maxTokens = configuration.maxTokens,
+                    temperature = configuration.temperature.toFloat(),
+                    streamingEnabled = true,
+                )
+
+            var chunkIndex = 0
+            var tokenCount = 0
+            val maxTokens = options.maxTokens
+
+            logger.info("Starting stream with maxTokens=$maxTokens")
+
+            // Stream with C++ backend (chat template applied in C++)
+            coreService.generateStream(
+                prompt = prompt,
+                systemPrompt = systemPrompt,
+                maxTokens = maxTokens,
+                temperature = options.temperature,
+            ) { token ->
+                chunkIndex++
+                val currentTokens = tokenCount++
+
+                logger.info("Stream token #$currentTokens: '$token'")
+
+                // Note: We can't emit from inside a callback, so we collect tokens
+                // This is a limitation - for true streaming, use generateStream directly
+                true // continue
+            }
         }
-
-        logger.info("streamProcess() called with ${input.messages.size} messages")
-
-        // Extract prompt and system prompt from messages
-        val (prompt, systemPrompt) = extractPromptFromMessages(input.messages, input.systemPrompt)
-
-        logger.info("Stream prompt: ${prompt.take(100)}...")
-
-        val options = input.options ?: LLMGenerationOptions(
-            maxTokens = configuration.maxTokens,
-            temperature = configuration.temperature.toFloat(),
-            streamingEnabled = true
-        )
-
-        var chunkIndex = 0
-        var tokenCount = 0
-        val maxTokens = options.maxTokens
-
-        logger.info("Starting stream with maxTokens=$maxTokens")
-
-        // Stream with C++ backend (chat template applied in C++)
-        coreService.generateStream(
-            prompt = prompt,
-            systemPrompt = systemPrompt,
-            maxTokens = maxTokens,
-            temperature = options.temperature
-        ) { token ->
-            val currentChunk = chunkIndex++
-            val currentTokens = tokenCount++
-            val isComplete = currentTokens >= maxTokens
-
-            logger.info("Stream token #$currentTokens: '$token'")
-
-            // Note: We can't emit from inside a callback, so we collect tokens
-            // This is a limitation - for true streaming, use generateStream directly
-            true // continue
-        }
-    }
 
     actual suspend fun loadModel(modelInfo: ModelInfo) {
         val localPath = modelInfo.localPath ?: throw IllegalArgumentException("Model has no local path")
@@ -374,7 +389,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
      */
     private fun extractPromptFromMessages(
         messages: List<Message>,
-        systemPrompt: String?
+        systemPrompt: String?,
     ): Pair<String, String?> {
         var extractedSystemPrompt = systemPrompt
 
@@ -406,10 +421,11 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             }
         }
 
-        val prompt = promptBuilder.toString().ifEmpty {
-            // If no user message, use a default
-            messages.lastOrNull()?.content ?: ""
-        }
+        val prompt =
+            promptBuilder.toString().ifEmpty {
+                // If no user message, use a default
+                messages.lastOrNull()?.content ?: ""
+            }
 
         return Pair(prompt, extractedSystemPrompt)
     }

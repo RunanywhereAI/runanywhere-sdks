@@ -75,21 +75,23 @@ class TTSCapability internal constructor(
      * Get available TTS voices
      */
     val availableVoices: List<String>
-        get() = runCatching {
-            kotlinx.coroutines.runBlocking {
-                managedLifecycle.currentService()?.availableVoices ?: emptyList()
-            }
-        }.getOrElse { emptyList() }
+        get() =
+            runCatching {
+                kotlinx.coroutines.runBlocking {
+                    managedLifecycle.currentService()?.availableVoices ?: emptyList()
+                }
+            }.getOrElse { emptyList() }
 
     /**
      * Whether currently synthesizing
      */
     val isSynthesizing: Boolean
-        get() = runCatching {
-            kotlinx.coroutines.runBlocking {
-                managedLifecycle.currentService()?.isSynthesizing ?: false
-            }
-        }.getOrElse { false }
+        get() =
+            runCatching {
+                kotlinx.coroutines.runBlocking {
+                    managedLifecycle.currentService()?.isSynthesizing ?: false
+                }
+            }.getOrElse { false }
 
     /**
      * Load a TTS voice by ID
@@ -164,10 +166,11 @@ class TTSCapability internal constructor(
         val startTime = getCurrentTimeMillis()
 
         // Start synthesis tracking
-        val synthesisId = analyticsService.startSynthesis(
-            text = text,
-            modelId = effectiveOptions.voice ?: modelId,
-        )
+        val synthesisId =
+            analyticsService.startSynthesis(
+                text = text,
+                modelId = effectiveOptions.voice ?: modelId,
+            )
 
         // Perform synthesis
         val audioData: ByteArray
@@ -215,46 +218,48 @@ class TTSCapability internal constructor(
     fun synthesizeStream(
         text: String,
         options: TTSOptions,
-    ): Flow<ByteArray> = flow {
-        val service = managedLifecycle.requireService()
-        val modelId = managedLifecycle.resourceIdOrUnknown()
-        val effectiveOptions = mergeOptions(options)
+    ): Flow<ByteArray> =
+        flow {
+            val service = managedLifecycle.requireService()
+            val modelId = managedLifecycle.resourceIdOrUnknown()
+            val effectiveOptions = mergeOptions(options)
 
-        // Start synthesis tracking
-        val synthesisId = analyticsService.startSynthesis(
-            text = text,
-            modelId = effectiveOptions.voice ?: modelId,
-        )
-
-        var totalBytes = 0
-
-        try {
-            // Collect the flow and emit chunks
-            service.synthesizeStream(text = text, options = effectiveOptions).collect { chunk ->
-                totalBytes += chunk.size
-                analyticsService.trackSynthesisChunk(
-                    synthesisId = synthesisId,
-                    chunkSize = chunk.size,
+            // Start synthesis tracking
+            val synthesisId =
+                analyticsService.startSynthesis(
+                    text = text,
+                    modelId = effectiveOptions.voice ?: modelId,
                 )
-                emit(chunk)
-            }
 
-            // Complete synthesis tracking
-            val audioDuration = estimateAudioDuration(totalBytes, effectiveOptions.sampleRate)
-            val audioDurationMs = audioDuration * 1000.0
-            analyticsService.completeSynthesis(
-                synthesisId = synthesisId,
-                audioDurationMs = audioDurationMs,
-                audioSizeBytes = totalBytes,
-            )
-        } catch (e: Exception) {
-            analyticsService.trackSynthesisFailed(
-                synthesisId = synthesisId,
-                errorMessage = e.message ?: e.toString(),
-            )
-            throw e
+            var totalBytes = 0
+
+            try {
+                // Collect the flow and emit chunks
+                service.synthesizeStream(text = text, options = effectiveOptions).collect { chunk ->
+                    totalBytes += chunk.size
+                    analyticsService.trackSynthesisChunk(
+                        synthesisId = synthesisId,
+                        chunkSize = chunk.size,
+                    )
+                    emit(chunk)
+                }
+
+                // Complete synthesis tracking
+                val audioDuration = estimateAudioDuration(totalBytes, effectiveOptions.sampleRate)
+                val audioDurationMs = audioDuration * 1000.0
+                analyticsService.completeSynthesis(
+                    synthesisId = synthesisId,
+                    audioDurationMs = audioDurationMs,
+                    audioSizeBytes = totalBytes,
+                )
+            } catch (e: Exception) {
+                analyticsService.trackSynthesisFailed(
+                    synthesisId = synthesisId,
+                    errorMessage = e.message ?: e.toString(),
+                )
+                throw e
+            }
         }
-    }
 
     /**
      * Stop current synthesis
@@ -362,8 +367,9 @@ private fun createTTSLifecycleManager(): ModelLifecycleManager<TTSService> {
             logger.info("Loading TTS voice: $resourceId")
 
             // Create configuration
-            val ttsConfig = (config as? TTSConfiguration)
-                ?: TTSConfiguration(modelId = resourceId)
+            val ttsConfig =
+                (config as? TTSConfiguration)
+                    ?: TTSConfiguration(modelId = resourceId)
 
             // Create service using registry
             val service = ModuleRegistry.createTTS(ttsConfig)

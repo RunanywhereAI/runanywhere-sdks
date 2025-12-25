@@ -147,12 +147,13 @@ actual class PlatformAudioProcessor {
         val n = samples.size
 
         for (i in samples.indices) {
-            val windowValue = when (windowType) {
-                WindowType.RECTANGULAR -> 1.0f
-                WindowType.HANN -> (0.5 * (1 - cos(2 * PI * i / (n - 1)))).toFloat()
-                WindowType.HAMMING -> (0.54 - 0.46 * cos(2 * PI * i / (n - 1))).toFloat()
-                WindowType.BLACKMAN -> (0.42 - 0.5 * cos(2 * PI * i / (n - 1)) + 0.08 * cos(4 * PI * i / (n - 1))).toFloat()
-            }
+            val windowValue =
+                when (windowType) {
+                    WindowType.RECTANGULAR -> 1.0f
+                    WindowType.HANN -> (0.5 * (1 - cos(2 * PI * i / (n - 1)))).toFloat()
+                    WindowType.HAMMING -> (0.54 - 0.46 * cos(2 * PI * i / (n - 1))).toFloat()
+                    WindowType.BLACKMAN -> (0.42 - 0.5 * cos(2 * PI * i / (n - 1)) + 0.08 * cos(4 * PI * i / (n - 1))).toFloat()
+                }
             windowed[i] = samples[i] * windowValue
         }
 
