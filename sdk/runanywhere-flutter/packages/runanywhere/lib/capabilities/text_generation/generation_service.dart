@@ -7,7 +7,6 @@ import 'package:runanywhere/core/module_registry.dart';
 import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/public/runanywhere.dart';
 
 /// Main service for text generation
 /// Matches iOS GenerationService (routing handled internally, not as external service)

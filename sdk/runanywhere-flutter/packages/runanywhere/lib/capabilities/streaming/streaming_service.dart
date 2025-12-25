@@ -1,15 +1,14 @@
 import 'dart:async';
 
 import 'package:runanywhere/capabilities/model_loading/model_loading_service.dart';
-import 'package:runanywhere/capabilities/text_generation/generation_service.dart';
+import 'package:runanywhere/capabilities/text_generation/generation_service.dart'
+    show GenerationService, RunAnywhereGenerationOptions;
 import 'package:runanywhere/core/module_registry.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/features/llm/models/llm_streaming_result.dart';
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/analytics/services/generation_analytics_service.dart';
-import 'package:runanywhere/public/runanywhere.dart'
-    show unawaited, RunAnywhereGenerationOptions;
 
 /// Service for streaming text generation
 /// Matches iOS streaming pattern with TTFT tracking via StreamingMetricsCollector

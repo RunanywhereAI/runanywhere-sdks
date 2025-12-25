@@ -7,7 +7,6 @@ import 'package:runanywhere/foundation/device_identity/device_manager.dart';
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
-import 'package:runanywhere/public/runanywhere.dart' show unawaited;
 // Note: package_info_plus is optional - analytics will work without it
 // import 'package:package_info_plus/package_info_plus.dart' show PackageInfo;
 
