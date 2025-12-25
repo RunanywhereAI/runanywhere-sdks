@@ -37,7 +37,7 @@ class TTSAnalyticsService {
 
     private data class SynthesisTracker(
         val startTime: Long,
-        val voiceId: String,
+        val modelId: String,
         val characterCount: Int,
         val framework: InferenceFramework,
     )
@@ -47,14 +47,14 @@ class TTSAnalyticsService {
     /**
      * Start tracking a synthesis.
      * @param text The text to synthesize
-     * @param voice The voice ID being used
+     * @param modelId The model ID being used
      * @param framework The inference framework being used
      * @return A unique synthesis ID for tracking
      */
     @OptIn(ExperimentalUuidApi::class)
     fun startSynthesis(
         text: String,
-        voice: String,
+        modelId: String,
         framework: InferenceFramework = InferenceFramework.SYSTEM_TTS,
     ): String {
         val id = Uuid.random().toString()
@@ -64,7 +64,7 @@ class TTSAnalyticsService {
             activeSyntheses[id] =
                 SynthesisTracker(
                     startTime = currentTimeMillis(),
-                    voiceId = voice,
+                    modelId = modelId,
                     characterCount = characterCount,
                     framework = framework,
                 )
@@ -73,7 +73,7 @@ class TTSAnalyticsService {
         EventPublisher.track(
             TTSEvent.SynthesisStarted(
                 synthesisId = id,
-                voiceId = voice,
+                modelId = modelId,
                 characterCount = characterCount,
                 framework = framework,
             ),
@@ -140,7 +140,7 @@ class TTSAnalyticsService {
         EventPublisher.track(
             TTSEvent.SynthesisCompleted(
                 synthesisId = synthesisId,
-                voiceId = tracker.voiceId,
+                modelId = tracker.modelId,
                 characterCount = characterCount,
                 audioDurationMs = audioDurationMs,
                 audioSizeBytes = audioSizeBytes,

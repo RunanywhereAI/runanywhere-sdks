@@ -20,9 +20,9 @@ import com.runanywhere.sdk.models.enums.InferenceFramework
 sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
     // MARK: - Model Lifecycle
 
-    /** Voice/model load started */
+    /** Model load started */
     data class ModelLoadStarted(
-        val voiceId: String,
+        val modelId: String,
         val modelSizeBytes: Long = 0,
         val framework: InferenceFramework = InferenceFramework.SYSTEM_TTS,
     ) : TTSEvent() {
@@ -30,7 +30,7 @@ sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
         override val properties: Map<String, String>
             get() =
                 buildMap {
-                    put("voice_id", voiceId)
+                    put("model_id", modelId)
                     put("framework", framework.value)
                     if (modelSizeBytes > 0) {
                         put("model_size_bytes", modelSizeBytes.toString())
@@ -38,9 +38,9 @@ sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
                 }
     }
 
-    /** Voice/model load completed */
+    /** Model load completed */
     data class ModelLoadCompleted(
-        val voiceId: String,
+        val modelId: String,
         val durationMs: Double,
         val modelSizeBytes: Long = 0,
         val framework: InferenceFramework = InferenceFramework.SYSTEM_TTS,
@@ -49,7 +49,7 @@ sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
         override val properties: Map<String, String>
             get() =
                 buildMap {
-                    put("voice_id", voiceId)
+                    put("model_id", modelId)
                     put("duration_ms", String.format("%.1f", durationMs))
                     put("framework", framework.value)
                     if (modelSizeBytes > 0) {
@@ -58,9 +58,9 @@ sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
                 }
     }
 
-    /** Voice/model load failed */
+    /** Model load failed */
     data class ModelLoadFailed(
-        val voiceId: String,
+        val modelId: String,
         val error: String,
         val framework: InferenceFramework = InferenceFramework.SYSTEM_TTS,
     ) : TTSEvent() {
@@ -68,19 +68,19 @@ sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
         override val properties: Map<String, String>
             get() =
                 mapOf(
-                    "voice_id" to voiceId,
+                    "model_id" to modelId,
                     "error" to error,
                     "framework" to framework.value,
                 )
     }
 
-    /** Voice/model unloaded */
+    /** Model unloaded */
     data class ModelUnloaded(
-        val voiceId: String,
+        val modelId: String,
     ) : TTSEvent() {
         override val type: String = "tts_model_unloaded"
         override val properties: Map<String, String>
-            get() = mapOf("voice_id" to voiceId)
+            get() = mapOf("model_id" to modelId)
     }
 
     // MARK: - Synthesis
@@ -88,13 +88,13 @@ sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
     /**
      * Synthesis started event
      * @param synthesisId Unique identifier for this synthesis operation
-     * @param voiceId The voice being used
+     * @param modelId The model being used
      * @param characterCount Number of characters in the text to synthesize
      * @param framework The inference framework being used
      */
     data class SynthesisStarted(
         val synthesisId: String,
-        val voiceId: String,
+        val modelId: String,
         val characterCount: Int,
         val framework: InferenceFramework = InferenceFramework.SYSTEM_TTS,
     ) : TTSEvent() {
@@ -103,7 +103,7 @@ sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
             get() =
                 mapOf(
                     "synthesis_id" to synthesisId,
-                    "voice_id" to voiceId,
+                    "model_id" to modelId,
                     "character_count" to characterCount.toString(),
                     "framework" to framework.value,
                 )
@@ -130,7 +130,7 @@ sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
     /**
      * Synthesis completed event
      * @param synthesisId Unique identifier for this synthesis operation
-     * @param voiceId The voice that was used
+     * @param modelId The model that was used
      * @param characterCount Number of characters that were synthesized
      * @param audioDurationMs Duration of generated audio in milliseconds
      * @param audioSizeBytes Size of generated audio in bytes
@@ -140,7 +140,7 @@ sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
      */
     data class SynthesisCompleted(
         val synthesisId: String,
-        val voiceId: String,
+        val modelId: String,
         val characterCount: Int,
         val audioDurationMs: Double,
         val audioSizeBytes: Int,
@@ -153,7 +153,7 @@ sealed class TTSEvent : BaseSDKEvent(EventCategory.TTS) {
             get() =
                 mapOf(
                     "synthesis_id" to synthesisId,
-                    "voice_id" to voiceId,
+                    "model_id" to modelId,
                     "character_count" to characterCount.toString(),
                     "audio_duration_ms" to String.format("%.1f", audioDurationMs),
                     "audio_size_bytes" to audioSizeBytes.toString(),

@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.data.repositories
 
-import com.runanywhere.sdk.core.ModuleRegistry
+import com.runanywhere.sdk.core.ModuleRegistryMetadata
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
@@ -57,7 +57,7 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
                 val framework = model.preferredFramework ?: model.compatibleFrameworks.firstOrNull()
                 if (framework != null) {
                     // Try framework-specific storage strategy first (e.g., ONNX, LlamaCpp)
-                    val storageStrategy = ModuleRegistry.getStorageStrategy(framework)
+                    val storageStrategy = ModuleRegistryMetadata.storageStrategy(framework)
                     // Use framework.value (matches iOS rawValue) - e.g., "LlamaCpp", "ONNX"
                     val modelDir = "$baseModelsPath/${framework.value}/${model.id}"
 

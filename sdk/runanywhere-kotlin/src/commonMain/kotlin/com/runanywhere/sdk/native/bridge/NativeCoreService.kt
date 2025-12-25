@@ -6,7 +6,7 @@ package com.runanywhere.sdk.native.bridge
  * This is the generic interface that ALL native backends (ONNX, TFLite, CoreML, etc.)
  * must implement. It provides a unified API for ML capabilities across different runtimes.
  *
- * This is the Kotlin equivalent of UnifiedFrameworkAdapter in the Swift SDK.
+ * This is the Kotlin equivalent of NativeBackend protocols in the Swift SDK.
  *
  * Usage:
  * ```kotlin

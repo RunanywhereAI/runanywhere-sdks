@@ -453,25 +453,17 @@ class KtorDownloadService(
                 // Disable ALL automatic response handling to prevent buffering
                 expectSuccess = false
             }
-
-        // Auto-discover and register download strategies from adapters
-        autoRegisterStrategies()
     }
 
     // MARK: - DownloadManager Protocol (EXACT copy of iOS)
 
     override suspend fun downloadModel(model: ModelInfo): DownloadTask {
-        // Refresh strategies if none are registered (adapters might have been registered after init)
-        if (customStrategies.isEmpty()) {
-            refreshStrategies()
-        }
-
-        // Check if any custom strategy can handle this model
-        for (strategy in customStrategies) {
-            if (strategy.canHandle(model)) {
-                logger.info("Using custom strategy ${strategy::class.simpleName} for model: ${model.id}")
-                return downloadModelWithCustomStrategy(model, strategy)
-            }
+        // Find a download strategy that can handle this model
+        // This checks both host app custom strategies and module-provided strategies
+        val strategy = findStrategy(model)
+        if (strategy != null) {
+            logger.info("Using custom strategy for model: ${model.id}")
+            return downloadModelWithCustomStrategy(model, strategy)
         }
 
         // No custom strategy found, use default download
@@ -616,60 +608,39 @@ class KtorDownloadService(
         logger.info("Registered custom download strategy")
     }
 
-    // Track which frameworks have had their strategies registered to avoid duplicates
-    private val registeredFrameworks = mutableSetOf<com.runanywhere.sdk.models.enums.InferenceFramework>()
-
-    // / Auto-discover and register strategies from framework adapters
-    private fun autoRegisterStrategies() {
-        // Query ModuleRegistry for registered framework adapters and get their download strategies
-        var registeredCount = 0
-
-        try {
-            val adapters = com.runanywhere.sdk.core.ModuleRegistry.allFrameworkAdapters
-            for (adapter in adapters) {
-                // Skip if already registered
-                if (registeredFrameworks.contains(adapter.framework)) {
-                    continue
-                }
-
-                adapter.getDownloadStrategy()?.let { frameworkStrategy ->
-                    // Wrap framework strategy to match local DownloadStrategy interface
-                    val wrappedStrategy =
-                        object : DownloadStrategy {
-                            override fun canHandle(model: ModelInfo): Boolean = frameworkStrategy.canHandle(model)
-
-                            override suspend fun download(
-                                model: ModelInfo,
-                                to: String,
-                                progressHandler: ((Double) -> Unit)?,
-                            ): String = frameworkStrategy.download(model, to, progressHandler)
-                        }
-
-                    customStrategies.add(wrappedStrategy)
-                    registeredFrameworks.add(adapter.framework)
-                    registeredCount++
-                    logger.debug("Registered download strategy from ${adapter.framework} adapter")
-                }
-            }
-        } catch (e: Exception) {
-            logger.debug("Could not auto-register strategies: ${e.message}")
-        }
-
-        if (registeredCount > 0) {
-            logger.info("Auto-registered $registeredCount download strategies from adapters")
-        }
-    }
-
     /**
-     * Re-discover and register strategies (called when adapters are registered after init)
+     * Find a download strategy that can handle the given model.
+     * Uses ModuleRegistryMetadata to get strategies from registered modules.
+     * Matches iOS findCustomStrategy(for:) implementation.
+     *
+     * @param model The model to find a strategy for
+     * @return A download strategy that can handle the model, or null
      */
-    fun refreshStrategies() {
-        val previousCount = customStrategies.size
-        autoRegisterStrategies()
-        val newCount = customStrategies.size - previousCount
-        if (newCount > 0) {
-            logger.info("Refreshed strategies: $newCount new strategies registered")
+    private fun findStrategy(model: ModelInfo): DownloadStrategy? {
+        // First check manually registered custom strategies (host app priority)
+        for (strategy in customStrategies) {
+            if (strategy.canHandle(model)) {
+                return strategy
+            }
         }
+
+        // Then check ModuleRegistryMetadata for module-provided strategies
+        // First try the model's preferred framework
+        model.preferredFramework?.let { framework ->
+            val strategy = com.runanywhere.sdk.core.ModuleRegistryMetadata.downloadStrategy(framework)
+            if (strategy != null && strategy.canHandle(model)) {
+                return strategy
+            }
+        }
+
+        // Try all registered download strategies
+        for (strategy in com.runanywhere.sdk.core.ModuleRegistryMetadata.allDownloadStrategies) {
+            if (strategy.canHandle(model)) {
+                return strategy
+            }
+        }
+
+        return null
     }
 
     // / Helper to download using a custom strategy (EXACT copy of iOS)

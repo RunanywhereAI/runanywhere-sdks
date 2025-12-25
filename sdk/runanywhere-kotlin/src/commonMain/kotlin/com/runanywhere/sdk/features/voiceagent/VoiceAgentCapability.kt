@@ -165,7 +165,7 @@ class VoiceAgentCapability internal constructor(
             vadConfig = VADConfiguration(),
             sttConfig = STTConfiguration(modelId = sttModelId.ifEmpty { null }),
             llmConfig = LLMConfiguration(modelId = llmModelId.ifEmpty { null }),
-            ttsConfig = TTSConfiguration(voice = ttsVoice),
+            ttsConfig = TTSConfiguration(modelId = ttsVoice),
         )
         initialize(config)
     }
@@ -303,7 +303,7 @@ class VoiceAgentCapability internal constructor(
 
     /** Initialize TTS voice with smart reuse logic */
     private suspend fun initializeTTSVoice(ttsConfig: TTSConfiguration) {
-        val ttsVoice = ttsConfig.voice
+        val ttsVoice = ttsConfig.modelId
         if (ttsVoice.isNullOrEmpty()) {
             return handleMissingTTSVoice()
         }
