@@ -627,7 +627,9 @@ class KtorDownloadService(
         // Then check ModuleRegistry.shared for module-provided strategies
         // First try the model's preferred framework
         model.preferredFramework?.let { framework ->
-            val strategy = com.runanywhere.sdk.core.ModuleRegistry.shared.downloadStrategy(framework)
+            val strategy =
+                com.runanywhere.sdk.core.ModuleRegistry.shared
+                    .downloadStrategy(framework)
             if (strategy != null && strategy.canHandle(model)) {
                 return strategy
             }

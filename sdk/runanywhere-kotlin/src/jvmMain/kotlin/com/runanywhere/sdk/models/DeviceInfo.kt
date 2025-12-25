@@ -1,7 +1,6 @@
 package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.infrastructure.device.services.DeviceIdentity
-import java.lang.management.ManagementFactory
 
 /**
  * JVM implementation of device info collection.
@@ -14,31 +13,34 @@ actual fun collectDeviceInfo(): DeviceInfo {
     val osVersion = System.getProperty("os.version") ?: "Unknown"
 
     // Determine architecture
-    val architecture = when {
-        osArch.contains("aarch64", ignoreCase = true) -> "arm64"
-        osArch.contains("arm", ignoreCase = true) -> "arm"
-        osArch.contains("64", ignoreCase = true) -> "x86_64"
-        else -> osArch
-    }
+    val architecture =
+        when {
+            osArch.contains("aarch64", ignoreCase = true) -> "arm64"
+            osArch.contains("arm", ignoreCase = true) -> "arm"
+            osArch.contains("64", ignoreCase = true) -> "x86_64"
+            else -> osArch
+        }
 
     // Determine platform and form factor
-    val (platform, deviceType, formFactor) = when {
-        osName.contains("Mac", ignoreCase = true) -> Triple("macOS", "desktop", if (osArch.contains("arm")) "laptop" else "desktop")
-        osName.contains("Windows", ignoreCase = true) -> Triple("Windows", "desktop", "desktop")
-        osName.contains("Linux", ignoreCase = true) -> Triple("Linux", "desktop", "desktop")
-        else -> Triple("JVM", "desktop", "desktop")
-    }
+    val (platform, deviceType, formFactor) =
+        when {
+            osName.contains("Mac", ignoreCase = true) -> Triple("macOS", "desktop", if (osArch.contains("arm")) "laptop" else "desktop")
+            osName.contains("Windows", ignoreCase = true) -> Triple("Windows", "desktop", "desktop")
+            osName.contains("Linux", ignoreCase = true) -> Triple("Linux", "desktop", "desktop")
+            else -> Triple("JVM", "desktop", "desktop")
+        }
 
     // Model identifier (e.g., "x86_64 macOS" or "aarch64 Linux")
     val modelIdentifier = "$osArch $osName"
 
     // User-friendly model name
-    val modelName = when {
-        osName.contains("Mac", ignoreCase = true) -> "Mac ($architecture)"
-        osName.contains("Windows", ignoreCase = true) -> "Windows PC"
-        osName.contains("Linux", ignoreCase = true) -> "Linux ($architecture)"
-        else -> "JVM ($osArch)"
-    }
+    val modelName =
+        when {
+            osName.contains("Mac", ignoreCase = true) -> "Mac ($architecture)"
+            osName.contains("Windows", ignoreCase = true) -> "Windows PC"
+            osName.contains("Linux", ignoreCase = true) -> "Linux ($architecture)"
+            else -> "JVM ($osArch)"
+        }
 
     return DeviceInfo(
         deviceId = DeviceIdentity.persistentUUID,

@@ -14,8 +14,9 @@ import com.runanywhere.sdk.storage.ModelStorageStrategy
  * Matches iOS ONNXDownloadStrategy
  * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNXDownloadStrategy.swift
  */
-class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
-
+class ONNXDownloadStrategy :
+    DownloadStrategy,
+    ModelStorageStrategy {
     private val logger = SDKLogger("ONNXDownloadStrategy")
 
     // MARK: - DownloadStrategy Implementation
@@ -35,9 +36,9 @@ class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
         val lowercased = urlString.lowercase()
 
         return lowercased.endsWith(".onnx") ||
-                lowercased.endsWith(".tar.bz2") ||
-                lowercased.endsWith(".tar.gz") ||
-                lowercased.contains("onnx")
+            lowercased.endsWith(".tar.bz2") ||
+            lowercased.endsWith(".tar.gz") ||
+            lowercased.contains("onnx")
     }
 
     /**
@@ -51,8 +52,9 @@ class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
         val destinationFolder = to
         logger.info("Downloading ONNX model: ${model.id}")
 
-        val downloadURL = model.downloadURL
-            ?: throw ONNXError.ModelNotFound(model.id)
+        val downloadURL =
+            model.downloadURL
+                ?: throw ONNXError.ModelNotFound(model.id)
 
         val lowercased = downloadURL.lowercase()
 
@@ -108,7 +110,7 @@ class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
     private suspend fun downloadArchive(
         url: String,
         destinationFolder: String,
-        progressHandler: ((Double) -> Unit)?
+        progressHandler: ((Double) -> Unit)?,
     ): String {
         logger.info("Downloading archive from: $url to $destinationFolder")
 
@@ -117,10 +119,11 @@ class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
 
         // Download the archive to a temp file within the destination folder
         // This ensures we can extract to the same filesystem (avoid cross-device issues)
-        val archivePath = downloadFile(url, destinationFolder) { progress ->
-            // Scale progress: 0-50% for download
-            progressHandler?.invoke(progress * 0.5)
-        }
+        val archivePath =
+            downloadFile(url, destinationFolder) { progress ->
+                // Scale progress: 0-50% for download
+                progressHandler?.invoke(progress * 0.5)
+            }
         logger.info("Archive downloaded to: $archivePath")
 
         // Report extraction starting
@@ -136,8 +139,9 @@ class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
 
         // Find the model within extracted contents
         // For sherpa-onnx models, this returns the DIRECTORY containing encoder.onnx, decoder.onnx, tokens.txt
-        val modelPath = findONNXModelPath("", extractedPath)
-            ?: throw ONNXError.ModelLoadFailed("No ONNX model found in extracted archive at $extractedPath")
+        val modelPath =
+            findONNXModelPath("", extractedPath)
+                ?: throw ONNXError.ModelLoadFailed("No ONNX model found in extracted archive at $extractedPath")
 
         logger.info("Found model at: $modelPath")
         progressHandler?.invoke(1.0)
@@ -152,7 +156,7 @@ class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
         url: String,
         modelId: String,
         destinationFolder: String,
-        progressHandler: ((Double) -> Unit)?
+        progressHandler: ((Double) -> Unit)?,
     ): String {
         logger.info("Downloading ONNX file from: $url")
 
@@ -192,7 +196,7 @@ class ONNXDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
 expect suspend fun downloadFile(
     url: String,
     destinationFolder: String,
-    progressHandler: ((Double) -> Unit)?
+    progressHandler: ((Double) -> Unit)?,
 ): String
 
 /**

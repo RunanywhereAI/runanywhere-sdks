@@ -22,39 +22,40 @@ private val logger = SDKLogger("ONNXDownloadStrategyImpl")
 actual suspend fun downloadFile(
     url: String,
     destinationFolder: String,
-    progressHandler: ((Double) -> Unit)?
-): String = withContext(Dispatchers.IO) {
-    logger.info("Downloading file from: $url")
+    progressHandler: ((Double) -> Unit)?,
+): String =
+    withContext(Dispatchers.IO) {
+        logger.info("Downloading file from: $url")
 
-    val destDir = File(destinationFolder)
-    if (!destDir.exists()) {
-        destDir.mkdirs()
-    }
+        val destDir = File(destinationFolder)
+        if (!destDir.exists()) {
+            destDir.mkdirs()
+        }
 
-    val fileName = url.substringAfterLast("/")
-    val destFile = File(destDir, fileName)
+        val fileName = url.substringAfterLast("/")
+        val destFile = File(destDir, fileName)
 
-    val connection = URL(url).openConnection()
-    val totalSize = connection.contentLengthLong
-    var downloadedSize = 0L
+        val connection = URL(url).openConnection()
+        val totalSize = connection.contentLengthLong
+        var downloadedSize = 0L
 
-    connection.getInputStream().use { input ->
-        FileOutputStream(destFile).use { output ->
-            val buffer = ByteArray(8192)
-            var bytesRead: Int
-            while (input.read(buffer).also { bytesRead = it } != -1) {
-                output.write(buffer, 0, bytesRead)
-                downloadedSize += bytesRead
-                if (totalSize > 0) {
-                    progressHandler?.invoke(downloadedSize.toDouble() / totalSize)
+        connection.getInputStream().use { input ->
+            FileOutputStream(destFile).use { output ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                    downloadedSize += bytesRead
+                    if (totalSize > 0) {
+                        progressHandler?.invoke(downloadedSize.toDouble() / totalSize)
+                    }
                 }
             }
         }
-    }
 
-    logger.info("Downloaded file to: ${destFile.absolutePath}")
-    destFile.absolutePath
-}
+        logger.info("Downloaded file to: ${destFile.absolutePath}")
+        destFile.absolutePath
+    }
 
 /**
  * Extract an archive to destination folder
@@ -62,48 +63,48 @@ actual suspend fun downloadFile(
  */
 actual suspend fun extractArchive(
     archivePath: String,
-    destinationFolder: String
-): String = withContext(Dispatchers.IO) {
-    logger.info("Extracting archive: $archivePath to $destinationFolder")
+    destinationFolder: String,
+): String =
+    withContext(Dispatchers.IO) {
+        logger.info("Extracting archive: $archivePath to $destinationFolder")
 
-    val destDir = File(destinationFolder)
-    if (!destDir.exists()) {
-        destDir.mkdirs()
-    }
+        val destDir = File(destinationFolder)
+        if (!destDir.exists()) {
+            destDir.mkdirs()
+        }
 
-    // First try native extraction via RunAnywhereBridge (if libarchive is available)
-    try {
-        val result = ONNXCoreService.extractArchive(archivePath, destinationFolder)
-        if (result.isSuccess) {
-            logger.info("Extracted archive using native library")
+        // First try native extraction via RunAnywhereBridge (if libarchive is available)
+        try {
+            val result = ONNXCoreService.extractArchive(archivePath, destinationFolder)
+            if (result.isSuccess) {
+                logger.info("Extracted archive using native library")
+                cleanupArchiveFile(archivePath)
+                return@withContext destinationFolder
+            } else {
+                logger.debug("Native extraction returned: $result, falling back to Java extraction")
+            }
+        } catch (e: Exception) {
+            logger.debug("Native extraction not available: ${e.message}, using Java extraction")
+        }
+
+        // Fallback: Use Apache Commons Compress for tar.bz2/tar.gz
+        try {
+            when {
+                archivePath.endsWith(".tar.bz2") -> extractTarBz2(archivePath, destDir)
+                archivePath.endsWith(".tar.gz") || archivePath.endsWith(".tgz") -> extractTarGz(archivePath, destDir)
+                else -> throw ONNXError.ModelLoadFailed("Unsupported archive format: $archivePath")
+            }
+
+            logger.info("Extracted archive using Java/Kotlin (Commons Compress)")
             cleanupArchiveFile(archivePath)
             return@withContext destinationFolder
-        } else {
-            logger.debug("Native extraction returned: $result, falling back to Java extraction")
+        } catch (e: ONNXError) {
+            throw e
+        } catch (e: Exception) {
+            logger.error("Java extraction failed: ${e.message}")
+            throw ONNXError.ModelLoadFailed("Archive extraction failed: ${e.message}")
         }
-    } catch (e: Exception) {
-        logger.debug("Native extraction not available: ${e.message}, using Java extraction")
     }
-
-    // Fallback: Use Apache Commons Compress for tar.bz2/tar.gz
-    try {
-        when {
-            archivePath.endsWith(".tar.bz2") -> extractTarBz2(archivePath, destDir)
-            archivePath.endsWith(".tar.gz") || archivePath.endsWith(".tgz") -> extractTarGz(archivePath, destDir)
-            else -> throw ONNXError.ModelLoadFailed("Unsupported archive format: $archivePath")
-        }
-
-        logger.info("Extracted archive using Java/Kotlin (Commons Compress)")
-        cleanupArchiveFile(archivePath)
-        return@withContext destinationFolder
-
-    } catch (e: ONNXError) {
-        throw e
-    } catch (e: Exception) {
-        logger.error("Java extraction failed: ${e.message}")
-        throw ONNXError.ModelLoadFailed("Archive extraction failed: ${e.message}")
-    }
-}
 
 /**
  * Delete archive file after extraction

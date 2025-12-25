@@ -7,11 +7,11 @@ import com.runanywhere.sdk.features.stt.STTTranscriptionResult
 import com.runanywhere.sdk.features.tts.TTSConfiguration
 import com.runanywhere.sdk.features.tts.TTSOptions
 import com.runanywhere.sdk.features.tts.TTSService
+import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.vad.VADResult
 import com.runanywhere.sdk.features.vad.VADService
 import com.runanywhere.sdk.features.vad.VADStatistics
-import com.runanywhere.sdk.features.vad.SpeechActivityEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import kotlinx.coroutines.Dispatchers
@@ -24,10 +24,11 @@ import kotlinx.serialization.json.Json
 private val logger = SDKLogger("ONNXServices")
 
 // JSON parser for native results
-private val jsonParser = Json {
-    ignoreUnknownKeys = true
-    isLenient = true
-}
+private val jsonParser =
+    Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
 
 @Serializable
 private data class NativeSTTResult(
@@ -36,7 +37,7 @@ private data class NativeSTTResult(
     val detected_language: String = "",
     val audio_duration_ms: Double = 0.0,
     val inference_time_ms: Double = 0.0,
-    val is_final: Boolean = true
+    val is_final: Boolean = true,
 )
 
 // =============================================================================
@@ -52,16 +53,26 @@ internal actual suspend fun createONNXSTTService(configuration: STTConfiguration
     // Resolve and load model
     configuration.modelId?.let { modelId ->
         // Resolve the actual model path from registry or use as-is if it's already a path
-        val modelPath = if (modelId.contains("/")) {
-            modelId // Already a path
-        } else {
-            // Look up model in registry to get the local path
-            ServiceContainer.shared.modelRegistry.getModel(modelId)?.localPath ?: modelId
-        }
+        val registryPath =
+            if (modelId.contains("/")) {
+                modelId // Already a path
+            } else {
+                // Look up model in registry to get the local path
+                ServiceContainer.shared.modelRegistry
+                    .getModel(modelId)
+                    ?.localPath ?: modelId
+            }
 
-        logger.info("Resolved model path: $modelPath")
+        logger.info("Registry path for STT: $registryPath")
+
+        // Use findONNXModelPath to resolve the actual model directory (handles nested dirs)
+        val modelPath = findONNXModelPath(modelId, registryPath) ?: registryPath
+
+        logger.info("Resolved STT model path: $modelPath")
 
         if (modelPath.isNotEmpty()) {
+            // Validate path before loading
+            validateModelPath(modelPath, "STT")
             val modelType = detectSTTModelType(modelPath)
             service.loadSTTModel(modelPath, modelType)
             logger.info("STT model loaded: $modelPath (type: $modelType)")
@@ -71,16 +82,56 @@ internal actual suspend fun createONNXSTTService(configuration: STTConfiguration
     return ONNXSTTService(service).also { sttService ->
         // Store the path for currentModel property
         configuration.modelId?.let { modelId ->
-            val resolvedPath = if (modelId.contains("/")) modelId
-                else ServiceContainer.shared.modelRegistry.getModel(modelId)?.localPath
-            resolvedPath?.let { sttService.setModelPath(it) }
+            val registryPath =
+                if (modelId.contains("/")) {
+                    modelId
+                } else {
+                    ServiceContainer.shared.modelRegistry
+                        .getModel(modelId)
+                        ?.localPath
+                }
+            registryPath?.let { path ->
+                val resolvedPath = findONNXModelPath(modelId, path) ?: path
+                sttService.setModelPath(resolvedPath)
+            }
         }
     }
 }
 
 internal actual suspend fun createONNXTTSService(configuration: TTSConfiguration): TTSService {
     logger.info("Creating ONNX TTS service: ${configuration.modelId}")
-    return ONNXTTSService(configuration)
+
+    val service = ONNXCoreService()
+    service.initialize()
+
+    // Resolve and load model (matching STT pattern)
+    configuration.modelId?.let { modelId ->
+        val registryPath =
+            if (modelId.contains("/")) {
+                modelId // Already a path
+            } else {
+                ServiceContainer.shared.modelRegistry
+                    .getModel(modelId)
+                    ?.localPath ?: modelId
+            }
+
+        logger.info("Registry path for TTS: $registryPath")
+
+        // Use findONNXModelPath to resolve the actual model directory (handles nested dirs)
+        val modelPath = findONNXModelPath(modelId, registryPath) ?: registryPath
+
+        logger.info("Resolved TTS model path: $modelPath")
+
+        if (modelPath.isNotEmpty()) {
+            // Validate path before loading
+            validateModelPath(modelPath, "TTS")
+            val modelType = detectTTSModelType(modelPath)
+            service.loadTTSModel(modelPath, modelType)
+            logger.info("TTS model loaded: $modelPath (type: $modelType)")
+        }
+    }
+
+    return ONNXTTSService(configuration, service)
 }
 
 internal actual suspend fun createONNXVADService(configuration: VADConfiguration): VADService {
@@ -101,7 +152,7 @@ internal actual suspend fun createONNXVADService(configuration: VADConfiguration
 // =============================================================================
 
 internal class ONNXSTTService(
-    private val coreService: ONNXCoreService
+    private val coreService: ONNXCoreService,
 ) : STTService {
     private val sttLogger = SDKLogger("ONNXSTTService")
     private var modelPath: String? = null
@@ -137,7 +188,7 @@ internal class ONNXSTTService(
     override suspend fun streamTranscribe(
         audioStream: Flow<ByteArray>,
         options: STTOptions,
-        onPartial: (String) -> Unit
+        onPartial: (String) -> Unit,
     ): STTTranscriptionResult {
         // Collect all audio and transcribe in batch (streaming not fully implemented)
         val allAudio = mutableListOf<Byte>()
@@ -164,7 +215,7 @@ internal class ONNXSTTService(
             STTTranscriptionResult(
                 transcript = result.text.trim(),
                 confidence = result.confidence.toFloat(),
-                language = result.detected_language.ifEmpty { null }
+                language = result.detected_language.ifEmpty { null },
             )
         } catch (e: Exception) {
             STTTranscriptionResult(transcript = jsonResult.trim(), confidence = 1.0f, language = null)
@@ -177,18 +228,29 @@ internal class ONNXSTTService(
 // =============================================================================
 
 internal class ONNXTTSService(
-    private val configuration: TTSConfiguration
+    private val configuration: TTSConfiguration,
+    private var coreService: ONNXCoreService? = null,
 ) : TTSService {
     private val ttsLogger = SDKLogger("ONNXTTSService")
-    private var coreService: ONNXCoreService? = null
     private var loadedModelPath: String? = null
     private var _isSynthesizing = false
+
+    init {
+        // If service was pre-initialized with a model, track the loaded path
+        if (coreService?.isTTSModelLoaded == true) {
+            loadedModelPath = resolveModelPath(configuration.modelId)
+        }
+    }
 
     override val inferenceFramework: String = "ONNX Runtime"
     override val isSynthesizing: Boolean get() = _isSynthesizing
     override val availableVoices: List<String> = emptyList()
 
     override suspend fun initialize() {
+        if (coreService != null) {
+            ttsLogger.info("ONNX TTS service already initialized")
+            return
+        }
         ttsLogger.info("Initializing ONNX TTS service")
         val service = ONNXCoreService()
         service.initialize()
@@ -205,22 +267,26 @@ internal class ONNXTTSService(
 
         _isSynthesizing = true
         try {
-            val modelPath = resolveModelPath(options.voice ?: configuration.modelId)
-                ?: throw IllegalStateException("No TTS model path provided")
+            val modelPath =
+                resolveModelPath(options.voice ?: configuration.modelId)
+                    ?: throw IllegalStateException("No TTS model path provided")
 
-            // Load model if needed
-            if (loadedModelPath != modelPath) {
+            // Load model if needed (should already be loaded by createONNXTTSService)
+            if (loadedModelPath != modelPath || !service.isTTSModelLoaded) {
                 ttsLogger.info("Loading TTS model: $modelPath")
-                service.loadTTSModel(modelPath, "vits")
+                validateModelPath(modelPath, "TTS")
+                val modelType = detectTTSModelType(modelPath)
+                service.loadTTSModel(modelPath, modelType)
                 loadedModelPath = modelPath
             }
 
-            val result = service.synthesize(
-                text = text,
-                voiceId = "0",
-                speedRate = options.rate,
-                pitchShift = options.pitch
-            )
+            val result =
+                service.synthesize(
+                    text = text,
+                    voiceId = "0",
+                    speedRate = options.rate,
+                    pitchShift = options.pitch,
+                )
 
             ttsLogger.info("Synthesized ${result.samples.size} samples at ${result.sampleRate} Hz")
             return convertToWav(result.samples, result.sampleRate)
@@ -229,16 +295,17 @@ internal class ONNXTTSService(
         }
     }
 
-    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> = flow {
-        val audio = synthesize(text, options)
-        val chunkSize = options.sampleRate * 2
-        var offset = 0
-        while (offset < audio.size) {
-            val end = minOf(offset + chunkSize, audio.size)
-            emit(audio.copyOfRange(offset, end))
-            offset = end
+    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> =
+        flow {
+            val audio = synthesize(text, options)
+            val chunkSize = options.sampleRate * 2
+            var offset = 0
+            while (offset < audio.size) {
+                val end = minOf(offset + chunkSize, audio.size)
+                emit(audio.copyOfRange(offset, end))
+                offset = end
+            }
         }
-    }
 
     override fun stop() {
         _isSynthesizing = false
@@ -254,11 +321,18 @@ internal class ONNXTTSService(
     }
 
     private fun resolveModelPath(voice: String?): String? {
-        return when {
-            voice.isNullOrEmpty() -> null
+        if (voice.isNullOrEmpty()) return null
+
+        val registryPath = when {
             voice.contains("/") -> voice
-            else -> ServiceContainer.shared.modelRegistry.getModel(voice)?.localPath ?: voice
+            else ->
+                ServiceContainer.shared.modelRegistry
+                    .getModel(voice)
+                    ?.localPath ?: voice
         }
+
+        // Use findONNXModelPath to resolve nested directories
+        return findONNXModelPath(voice, registryPath) ?: registryPath
     }
 }
 
@@ -268,8 +342,9 @@ internal class ONNXTTSService(
 
 internal class ONNXVADService(
     private val coreService: ONNXCoreService,
-    private val initialConfiguration: VADConfiguration
+    private val initialConfiguration: VADConfiguration,
 ) : VADService {
+    @Suppress("UnusedPrivateProperty")
     private val vadLogger = SDKLogger("ONNXVADService")
 
     override var energyThreshold: Float = initialConfiguration.energyThreshold
@@ -322,9 +397,10 @@ internal class ONNXVADService(
             return VADResult(isSpeechDetected = false, confidence = 0.0f)
         }
 
-        val result = runBlocking(Dispatchers.Default) {
-            coreService.processVAD(audioSamples, sampleRate)
-        }
+        val result =
+            runBlocking(Dispatchers.Default) {
+                coreService.processVAD(audioSamples, sampleRate)
+            }
 
         val wasActive = isSpeechActive
         isSpeechActive = result.isSpeech
@@ -379,15 +455,19 @@ internal class ONNXVADService(
     }
 
     override fun getStatistics(): VADStatistics {
-        val recent = if (recentConfidenceValues.isEmpty()) 0.0f
-            else recentConfidenceValues.sum() / recentConfidenceValues.size
+        val recent =
+            if (recentConfidenceValues.isEmpty()) {
+                0.0f
+            } else {
+                recentConfidenceValues.sum() / recentConfidenceValues.size
+            }
 
         return VADStatistics(
             current = recentConfidenceValues.lastOrNull() ?: 0.0f,
             threshold = energyThreshold,
             ambient = 0.0f,
             recentAvg = recent,
-            recentMax = recentConfidenceValues.maxOrNull() ?: 0.0f
+            recentMax = recentConfidenceValues.maxOrNull() ?: 0.0f,
         )
     }
 }
@@ -404,6 +484,50 @@ private fun detectSTTModelType(modelPath: String): String {
         lowercased.contains("paraformer") -> "paraformer"
         lowercased.contains("sherpa") -> "zipformer"
         else -> "zipformer"
+    }
+}
+
+private fun detectTTSModelType(modelPath: String): String {
+    val lowercased = modelPath.lowercase()
+    return when {
+        lowercased.contains("vits") || lowercased.contains("piper") -> "vits"
+        lowercased.contains("matcha") -> "matcha"
+        lowercased.contains("kokoro") -> "kokoro"
+        else -> "vits"
+    }
+}
+
+/**
+ * Validates that a model path exists and contains expected model files.
+ * Throws a detailed exception if validation fails.
+ */
+private fun validateModelPath(modelPath: String, modelType: String) {
+    val file = java.io.File(modelPath)
+    if (!file.exists()) {
+        throw IllegalStateException(
+            "$modelType model path does not exist: $modelPath. " +
+                "Please ensure the model is downloaded and extracted correctly.",
+        )
+    }
+
+    if (file.isDirectory) {
+        val files = file.listFiles()
+        if (files.isNullOrEmpty()) {
+            throw IllegalStateException(
+                "$modelType model directory is empty: $modelPath. " +
+                    "The model may not have been extracted correctly.",
+            )
+        }
+        // Check for common model files
+        val hasOnnxFiles = files.any { it.extension.lowercase() == "onnx" }
+        val hasTokensFile = files.any { it.name.contains("tokens") }
+        if (!hasOnnxFiles && !hasTokensFile) {
+            val fileNames = files.take(10).joinToString(", ") { it.name }
+            logger.warning(
+                "$modelType model directory may be incomplete: $modelPath. " +
+                    "Found files: $fileNames",
+            )
+        }
     }
 }
 
@@ -429,23 +553,36 @@ private fun convertToWav(samples: FloatArray, sampleRate: Int): ByteArray {
     var offset = 0
 
     // RIFF header
-    "RIFF".toByteArray().copyInto(buffer, offset); offset += 4
-    writeInt32LE(buffer, offset, fileSize); offset += 4
-    "WAVE".toByteArray().copyInto(buffer, offset); offset += 4
+    "RIFF".toByteArray().copyInto(buffer, offset)
+    offset += 4
+    writeInt32LE(buffer, offset, fileSize)
+    offset += 4
+    "WAVE".toByteArray().copyInto(buffer, offset)
+    offset += 4
 
     // fmt chunk
-    "fmt ".toByteArray().copyInto(buffer, offset); offset += 4
-    writeInt32LE(buffer, offset, 16); offset += 4
-    writeInt16LE(buffer, offset, 1); offset += 2
-    writeInt16LE(buffer, offset, 1); offset += 2
-    writeInt32LE(buffer, offset, sampleRate); offset += 4
-    writeInt32LE(buffer, offset, byteRate); offset += 4
-    writeInt16LE(buffer, offset, 2); offset += 2
-    writeInt16LE(buffer, offset, bitsPerSample); offset += 2
+    "fmt ".toByteArray().copyInto(buffer, offset)
+    offset += 4
+    writeInt32LE(buffer, offset, 16)
+    offset += 4
+    writeInt16LE(buffer, offset, 1)
+    offset += 2
+    writeInt16LE(buffer, offset, 1)
+    offset += 2
+    writeInt32LE(buffer, offset, sampleRate)
+    offset += 4
+    writeInt32LE(buffer, offset, byteRate)
+    offset += 4
+    writeInt16LE(buffer, offset, 2)
+    offset += 2
+    writeInt16LE(buffer, offset, bitsPerSample)
+    offset += 2
 
     // data chunk
-    "data".toByteArray().copyInto(buffer, offset); offset += 4
-    writeInt32LE(buffer, offset, dataSize); offset += 4
+    "data".toByteArray().copyInto(buffer, offset)
+    offset += 4
+    writeInt32LE(buffer, offset, dataSize)
+    offset += 4
 
     // Write samples
     for (sample in samples) {

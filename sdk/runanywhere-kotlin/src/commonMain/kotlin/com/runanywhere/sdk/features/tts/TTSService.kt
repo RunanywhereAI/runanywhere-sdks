@@ -63,25 +63,18 @@ interface TTSService {
 data class TTSOptions(
     /** Voice to use for synthesis (null uses default) */
     val voice: String? = null,
-
     /** Language for synthesis (BCP-47 format, e.g., "en-US") */
     val language: String = "en-US",
-
     /** Speech rate (0.0 to 2.0, 1.0 is normal) */
     val rate: Float = 1.0f,
-
     /** Speech pitch (0.0 to 2.0, 1.0 is normal) */
     val pitch: Float = 1.0f,
-
     /** Speech volume (0.0 to 1.0) */
     val volume: Float = 1.0f,
-
     /** Audio format for output */
     val audioFormat: AudioFormat = AudioFormat.PCM,
-
     /** Sample rate for output audio in Hz */
     val sampleRate: Int = 16000,
-
     /** Whether to use SSML markup */
     val useSSML: Boolean = false,
 ) {
@@ -90,16 +83,17 @@ data class TTSOptions(
         val default = TTSOptions()
 
         /** Create options from TTSConfiguration */
-        fun from(configuration: TTSConfiguration): TTSOptions = TTSOptions(
-            voice = configuration.modelId,
-            language = configuration.language,
-            rate = configuration.speakingRate,
-            pitch = configuration.pitch,
-            volume = configuration.volume,
-            audioFormat = configuration.audioFormat,
-            sampleRate = if (configuration.audioFormat == AudioFormat.PCM) 16000 else 44100,
-            useSSML = configuration.enableSSML,
-        )
+        fun from(configuration: TTSConfiguration): TTSOptions =
+            TTSOptions(
+                voice = configuration.modelId,
+                language = configuration.language,
+                rate = configuration.speakingRate,
+                pitch = configuration.pitch,
+                volume = configuration.volume,
+                audioFormat = configuration.audioFormat,
+                sampleRate = if (configuration.audioFormat == AudioFormat.PCM) 16000 else 44100,
+                useSSML = configuration.enableSSML,
+            )
     }
 }
 
@@ -110,25 +104,18 @@ data class TTSOptions(
 data class TTSConfiguration(
     /** Voice identifier to use */
     val modelId: String? = null,
-
     /** Language for synthesis (BCP-47 format) */
     val language: String = "en-US",
-
     /** Speaking rate (0.0 to 2.0, 1.0 is normal) */
     val speakingRate: Float = 1.0f,
-
     /** Pitch adjustment (0.0 to 2.0, 1.0 is normal) */
     val pitch: Float = 1.0f,
-
     /** Volume (0.0 to 1.0) */
     val volume: Float = 1.0f,
-
     /** Output audio format */
     val audioFormat: AudioFormat = AudioFormat.PCM,
-
     /** Enable SSML processing */
     val enableSSML: Boolean = false,
-
     /** Framework preference for TTS */
     val preferredFramework: String? = null,
 ) {
@@ -152,27 +139,24 @@ data class TTSConfiguration(
 data class TTSVoice(
     /** Unique voice identifier */
     val id: String,
-
     /** Human-readable voice name */
     val name: String,
-
     /** Language code (BCP-47 format) */
     val language: String = "en-US",
-
     /** Voice gender */
     val gender: TTSGender = TTSGender.NEUTRAL,
-
     /** Voice quality indicator */
     val quality: TTSVoiceQuality = TTSVoiceQuality.STANDARD,
 ) {
     companion object {
         /** Default fallback voice */
-        val DEFAULT = TTSVoice(
-            id = "default",
-            name = "Default",
-            language = "en-US",
-            gender = TTSGender.NEUTRAL,
-        )
+        val DEFAULT =
+            TTSVoice(
+                id = "default",
+                name = "Default",
+                language = "en-US",
+                gender = TTSGender.NEUTRAL,
+            )
     }
 }
 
@@ -191,8 +175,10 @@ enum class TTSGender {
 enum class TTSVoiceQuality {
     /** Standard quality, faster synthesis */
     STANDARD,
+
     /** High quality, better audio */
     HIGH,
+
     /** Premium quality, best audio */
     PREMIUM,
 }

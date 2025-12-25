@@ -5,8 +5,8 @@ import com.runanywhere.sdk.features.llm.LLMInput
 import com.runanywhere.sdk.features.llm.LLMOutput
 import com.runanywhere.sdk.features.llm.LLMService
 import com.runanywhere.sdk.models.LLMGenerationChunk
-import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.LLMGenerationOptions
+import com.runanywhere.sdk.models.ModelInfo
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -29,24 +29,35 @@ import kotlinx.coroutines.flow.Flow
  * }
  * ```
  */
-expect class LlamaCppService(configuration: LLMConfiguration) : LLMService {
+expect class LlamaCppService(
+    configuration: LLMConfiguration,
+) : LLMService {
     // Core LLMService interface methods (from iOS LLMService protocol)
     override suspend fun initialize(modelPath: String?)
+
     override suspend fun generate(prompt: String, options: LLMGenerationOptions): String
+
     override suspend fun streamGenerate(
         prompt: String,
         options: LLMGenerationOptions,
-        onToken: (String) -> Unit
+        onToken: (String) -> Unit,
     )
+
     override suspend fun cleanup()
+
     override val isReady: Boolean
     override val currentModel: String?
 
     // Additional utility methods (not part of LLMService interface, but useful for direct service access)
     suspend fun process(input: LLMInput): LLMOutput
+
     fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk>
+
     suspend fun loadModel(modelInfo: ModelInfo)
+
     fun cancelCurrent()
+
     fun getTokenCount(text: String): Int
+
     fun fitsInContext(prompt: String, maxTokens: Int): Boolean
 }

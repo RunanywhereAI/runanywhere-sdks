@@ -119,11 +119,12 @@ class SimpleEnergyVADService : VADService {
         // Call audio buffer callback
         onAudioBuffer?.invoke(floatArrayToByteArray(audioSamples))
 
-        val confidence = if (hasVoice) {
-            (energy / energyThreshold).coerceIn(0.5f, 1.0f)
-        } else {
-            (energy / energyThreshold).coerceIn(0.0f, 0.5f)
-        }
+        val confidence =
+            if (hasVoice) {
+                (energy / energyThreshold).coerceIn(0.5f, 1.0f)
+            } else {
+                (energy / energyThreshold).coerceIn(0.0f, 0.5f)
+            }
 
         return VADResult(
             isSpeechDetected = currentSpeechState,
@@ -229,8 +230,12 @@ class SimpleEnergyVADService : VADService {
     // MARK: - Statistics
 
     override fun getStatistics(): VADStatistics {
-        val recent = if (recentEnergyValues.isEmpty()) 0.0f
-        else recentEnergyValues.sum() / recentEnergyValues.size
+        val recent =
+            if (recentEnergyValues.isEmpty()) {
+                0.0f
+            } else {
+                recentEnergyValues.sum() / recentEnergyValues.size
+            }
 
         return VADStatistics(
             current = recentEnergyValues.lastOrNull() ?: 0.0f,

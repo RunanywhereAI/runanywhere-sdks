@@ -90,23 +90,27 @@ class VoiceAgentCapability internal constructor(
     /**
      * Get component states for UI feedback
      */
-    fun getComponentStates(): VoiceAgentComponentStates = VoiceAgentComponentStates(
-        stt = if (stt.isModelLoaded) {
-            ComponentLoadState.Loaded(stt.currentModelId ?: "unknown")
-        } else {
-            ComponentLoadState.NotLoaded
-        },
-        llm = if (llm.isModelLoaded) {
-            ComponentLoadState.Loaded(llm.currentModelId ?: "unknown")
-        } else {
-            ComponentLoadState.NotLoaded
-        },
-        tts = if (tts.isVoiceLoaded) {
-            ComponentLoadState.Loaded(tts.currentVoiceId ?: "unknown")
-        } else {
-            ComponentLoadState.NotLoaded
-        },
-    )
+    fun getComponentStates(): VoiceAgentComponentStates =
+        VoiceAgentComponentStates(
+            stt =
+                if (stt.isModelLoaded) {
+                    ComponentLoadState.Loaded(stt.currentModelId ?: "unknown")
+                } else {
+                    ComponentLoadState.NotLoaded
+                },
+            llm =
+                if (llm.isModelLoaded) {
+                    ComponentLoadState.Loaded(llm.currentModelId ?: "unknown")
+                } else {
+                    ComponentLoadState.NotLoaded
+                },
+            tts =
+                if (tts.isVoiceLoaded) {
+                    ComponentLoadState.Loaded(tts.currentVoiceId ?: "unknown")
+                } else {
+                    ComponentLoadState.NotLoaded
+                },
+        )
 
     // ============================================================================
     // MARK: - Initialization (iOS VoiceAgentCapability pattern)
@@ -123,30 +127,31 @@ class VoiceAgentCapability internal constructor(
      * @param config VoiceAgentConfiguration with all sub-component configs
      * @throws SDKError if initialization fails
      */
-    suspend fun initialize(config: VoiceAgentConfiguration) = mutex.withLock {
-        logger.info("Initializing Voice Agent")
+    suspend fun initialize(config: VoiceAgentConfiguration) =
+        mutex.withLock {
+            logger.info("Initializing Voice Agent")
 
-        try {
-            EventPublisher.track(SDKVoiceEvent.PipelineStarted)
+            try {
+                EventPublisher.track(SDKVoiceEvent.PipelineStarted)
 
-            initializeVAD(config.vadConfig)
-            initializeSTTModel(config.sttConfig)
-            initializeLLMModel(config.llmConfig)
-            initializeTTSVoice(config.ttsConfig)
-            verifyAllComponentsReady()
+                initializeVAD(config.vadConfig)
+                initializeSTTModel(config.sttConfig)
+                initializeLLMModel(config.llmConfig)
+                initializeTTSVoice(config.ttsConfig)
+                verifyAllComponentsReady()
 
-            currentConfiguration = config
-            isConfigured = true
+                currentConfiguration = config
+                isConfigured = true
 
-            logger.info("Voice Agent initialized successfully - all components ready")
-            EventPublisher.track(SDKVoiceEvent.PipelineCompleted)
-        } catch (e: Exception) {
-            logger.error("Failed to initialize Voice Agent", e)
-            isConfigured = false
-            EventPublisher.track(SDKVoiceEvent.PipelineError(e))
-            throw SDKError.InitializationFailed("Voice Agent initialization failed: ${e.message}")
+                logger.info("Voice Agent initialized successfully - all components ready")
+                EventPublisher.track(SDKVoiceEvent.PipelineCompleted)
+            } catch (e: Exception) {
+                logger.error("Failed to initialize Voice Agent", e)
+                isConfigured = false
+                EventPublisher.track(SDKVoiceEvent.PipelineError(e))
+                throw SDKError.InitializationFailed("Voice Agent initialization failed: ${e.message}")
+            }
         }
-    }
 
     /**
      * Quick initialization with model IDs
@@ -161,12 +166,13 @@ class VoiceAgentCapability internal constructor(
         llmModelId: String,
         ttsVoice: String = "",
     ) {
-        val config = VoiceAgentConfiguration(
-            vadConfig = VADConfiguration(),
-            sttConfig = STTConfiguration(modelId = sttModelId.ifEmpty { null }),
-            llmConfig = LLMConfiguration(modelId = llmModelId.ifEmpty { null }),
-            ttsConfig = TTSConfiguration(modelId = ttsVoice),
-        )
+        val config =
+            VoiceAgentConfiguration(
+                vadConfig = VADConfiguration(),
+                sttConfig = STTConfiguration(modelId = sttModelId.ifEmpty { null }),
+                llmConfig = LLMConfiguration(modelId = llmModelId.ifEmpty { null }),
+                ttsConfig = TTSConfiguration(modelId = ttsVoice),
+            )
         initialize(config)
     }
 
@@ -176,53 +182,54 @@ class VoiceAgentCapability internal constructor(
      *
      * Uses whatever models are already loaded in STT, LLM, and TTS capabilities
      */
-    suspend fun initializeWithLoadedModels() = mutex.withLock {
-        logger.info("Initializing Voice Agent with already-loaded models")
+    suspend fun initializeWithLoadedModels() =
+        mutex.withLock {
+            logger.info("Initializing Voice Agent with already-loaded models")
 
-        try {
-            EventPublisher.track(SDKVoiceEvent.PipelineStarted)
-
-            // Initialize VAD
             try {
-                vad.initialize(VADConfiguration())
+                EventPublisher.track(SDKVoiceEvent.PipelineStarted)
+
+                // Initialize VAD
+                try {
+                    vad.initialize(VADConfiguration())
+                } catch (e: Exception) {
+                    throw CapabilityError.CompositeComponentFailed("VAD", e)
+                }
+
+                // Verify all components are ready
+                val sttReady = stt.isModelLoaded
+                val llmReady = llm.isModelLoaded
+                val ttsReady = tts.isVoiceLoaded
+
+                if (!sttReady) {
+                    throw CapabilityError.CompositeComponentFailed(
+                        "STT",
+                        CapabilityError.ResourceNotLoaded("No STT model loaded. Load one first via loadSTTModel()"),
+                    )
+                }
+                if (!llmReady) {
+                    throw CapabilityError.CompositeComponentFailed(
+                        "LLM",
+                        CapabilityError.ResourceNotLoaded("No LLM model loaded. Load one first via loadModel()"),
+                    )
+                }
+                if (!ttsReady) {
+                    throw CapabilityError.CompositeComponentFailed(
+                        "TTS",
+                        CapabilityError.ResourceNotLoaded("No TTS voice loaded. Load one first via loadTTSVoice()"),
+                    )
+                }
+
+                isConfigured = true
+                logger.info("Voice Agent initialized with pre-loaded models - all components ready")
+                EventPublisher.track(SDKVoiceEvent.PipelineCompleted)
             } catch (e: Exception) {
-                throw CapabilityError.CompositeComponentFailed("VAD", e)
+                logger.error("Failed to initialize Voice Agent with loaded models", e)
+                isConfigured = false
+                EventPublisher.track(SDKVoiceEvent.PipelineError(e))
+                throw e
             }
-
-            // Verify all components are ready
-            val sttReady = stt.isModelLoaded
-            val llmReady = llm.isModelLoaded
-            val ttsReady = tts.isVoiceLoaded
-
-            if (!sttReady) {
-                throw CapabilityError.CompositeComponentFailed(
-                    "STT",
-                    CapabilityError.ResourceNotLoaded("No STT model loaded. Load one first via loadSTTModel()")
-                )
-            }
-            if (!llmReady) {
-                throw CapabilityError.CompositeComponentFailed(
-                    "LLM",
-                    CapabilityError.ResourceNotLoaded("No LLM model loaded. Load one first via loadModel()")
-                )
-            }
-            if (!ttsReady) {
-                throw CapabilityError.CompositeComponentFailed(
-                    "TTS",
-                    CapabilityError.ResourceNotLoaded("No TTS voice loaded. Load one first via loadTTSVoice()")
-                )
-            }
-
-            isConfigured = true
-            logger.info("Voice Agent initialized with pre-loaded models - all components ready")
-            EventPublisher.track(SDKVoiceEvent.PipelineCompleted)
-        } catch (e: Exception) {
-            logger.error("Failed to initialize Voice Agent with loaded models", e)
-            isConfigured = false
-            EventPublisher.track(SDKVoiceEvent.PipelineError(e))
-            throw e
         }
-    }
 
     // MARK: - Private Initialization Helpers
 
@@ -343,21 +350,21 @@ class VoiceAgentCapability internal constructor(
         if (!sttReady) {
             throw CapabilityError.CompositeComponentFailed(
                 "STT",
-                CapabilityError.ResourceNotLoaded("STT model not loaded")
+                CapabilityError.ResourceNotLoaded("STT model not loaded"),
             )
         }
 
         if (!llmReady) {
             throw CapabilityError.CompositeComponentFailed(
                 "LLM",
-                CapabilityError.ResourceNotLoaded("LLM model not loaded")
+                CapabilityError.ResourceNotLoaded("LLM model not loaded"),
             )
         }
 
         if (!ttsReady) {
             throw CapabilityError.CompositeComponentFailed(
                 "TTS",
-                CapabilityError.ResourceNotLoaded("TTS voice not loaded")
+                CapabilityError.ResourceNotLoaded("TTS voice not loaded"),
             )
         }
     }
@@ -420,52 +427,54 @@ class VoiceAgentCapability internal constructor(
      * @param audioStream Flow of audio data chunks
      * @return Flow of VoiceAgentEvent for reactive consumption
      */
-    fun processStream(audioStream: Flow<ByteArray>): Flow<VoiceAgentEvent> = flow {
-        if (!isConfigured) {
-            throw CapabilityError.NotInitialized("Voice Agent")
+    fun processStream(audioStream: Flow<ByteArray>): Flow<VoiceAgentEvent> =
+        flow {
+            if (!isConfigured) {
+                throw CapabilityError.NotInitialized("Voice Agent")
+            }
+
+            // Collect audio chunks
+            val audioBuffer = mutableListOf<ByteArray>()
+            audioStream.collect { chunk ->
+                audioBuffer.add(chunk)
+            }
+
+            // Combine all chunks
+            val totalSize = audioBuffer.sumOf { it.size }
+            val combinedAudio = ByteArray(totalSize)
+            var offset = 0
+            audioBuffer.forEach { chunk ->
+                chunk.copyInto(combinedAudio, offset)
+                offset += chunk.size
+            }
+
+            try {
+                // Transcribe
+                val transcription = stt.transcribe(combinedAudio, STTOptions.default())
+                emit(VoiceAgentEvent.TranscriptionAvailable(transcription.text))
+
+                // Generate response
+                val llmResult = llm.generate(transcription.text, LLMGenerationOptions())
+                emit(VoiceAgentEvent.ResponseGenerated(llmResult.text))
+
+                // Synthesize
+                val ttsOutput = tts.synthesize(llmResult.text, TTSOptions.default)
+                emit(VoiceAgentEvent.AudioSynthesized(ttsOutput.audioData))
+
+                // Yield final result
+                val result =
+                    VoiceAgentResult(
+                        speechDetected = true,
+                        transcription = transcription.text,
+                        response = llmResult.text,
+                        synthesizedAudio = ttsOutput.audioData,
+                    )
+                emit(VoiceAgentEvent.Processed(result))
+            } catch (e: Exception) {
+                emit(VoiceAgentEvent.Error(e))
+                throw e
+            }
         }
-
-        // Collect audio chunks
-        val audioBuffer = mutableListOf<ByteArray>()
-        audioStream.collect { chunk ->
-            audioBuffer.add(chunk)
-        }
-
-        // Combine all chunks
-        val totalSize = audioBuffer.sumOf { it.size }
-        val combinedAudio = ByteArray(totalSize)
-        var offset = 0
-        audioBuffer.forEach { chunk ->
-            chunk.copyInto(combinedAudio, offset)
-            offset += chunk.size
-        }
-
-        try {
-            // Transcribe
-            val transcription = stt.transcribe(combinedAudio, STTOptions.default())
-            emit(VoiceAgentEvent.TranscriptionAvailable(transcription.text))
-
-            // Generate response
-            val llmResult = llm.generate(transcription.text, LLMGenerationOptions())
-            emit(VoiceAgentEvent.ResponseGenerated(llmResult.text))
-
-            // Synthesize
-            val ttsOutput = tts.synthesize(llmResult.text, TTSOptions.default)
-            emit(VoiceAgentEvent.AudioSynthesized(ttsOutput.audioData))
-
-            // Yield final result
-            val result = VoiceAgentResult(
-                speechDetected = true,
-                transcription = transcription.text,
-                response = llmResult.text,
-                synthesizedAudio = ttsOutput.audioData,
-            )
-            emit(VoiceAgentEvent.Processed(result))
-        } catch (e: Exception) {
-            emit(VoiceAgentEvent.Error(e))
-            throw e
-        }
-    }
 
     // ============================================================================
     // MARK: - Individual Component Access (iOS VoiceAgentCapability pattern)
@@ -534,20 +543,21 @@ class VoiceAgentCapability internal constructor(
     /**
      * Cleanup Voice Agent and release resources
      */
-    suspend fun cleanup() = mutex.withLock {
-        logger.info("Cleaning up Voice Agent")
+    suspend fun cleanup() =
+        mutex.withLock {
+            logger.info("Cleaning up Voice Agent")
 
-        llm.cleanup()
-        stt.cleanup()
-        tts.cleanup()
-        vad.cleanup()
+            llm.cleanup()
+            stt.cleanup()
+            tts.cleanup()
+            vad.cleanup()
 
-        isConfigured = false
-        currentConfiguration = null
-        pipelineState = VoiceAgentPipelineState.IDLE
+            isConfigured = false
+            currentConfiguration = null
+            pipelineState = VoiceAgentPipelineState.IDLE
 
-        logger.info("Voice Agent cleaned up")
-    }
+            logger.info("Voice Agent cleaned up")
+        }
 }
 
 // ============================================================================
@@ -563,9 +573,13 @@ sealed class ComponentLoadState {
 
     object Loading : ComponentLoadState()
 
-    data class Loaded(val modelId: String) : ComponentLoadState()
+    data class Loaded(
+        val modelId: String,
+    ) : ComponentLoadState()
 
-    data class Error(val message: String) : ComponentLoadState()
+    data class Error(
+        val message: String,
+    ) : ComponentLoadState()
 
     val isLoaded: Boolean
         get() = this is Loaded
@@ -599,9 +613,10 @@ data class VoiceAgentComponentStates(
      * Get list of missing (not loaded) component names
      */
     val missingComponents: List<String>
-        get() = buildList {
-            if (!stt.isLoaded) add("STT")
-            if (!llm.isLoaded) add("LLM")
-            if (!tts.isLoaded) add("TTS")
-        }
+        get() =
+            buildList {
+                if (!stt.isLoaded) add("STT")
+                if (!llm.isLoaded) add("LLM")
+                if (!tts.isLoaded) add("TTS")
+            }
 }

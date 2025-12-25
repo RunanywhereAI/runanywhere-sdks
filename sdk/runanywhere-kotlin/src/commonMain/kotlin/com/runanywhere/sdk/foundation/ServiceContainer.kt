@@ -61,10 +61,11 @@ class ServiceContainer {
     }
 
     val downloadService: DownloadService by lazy {
-        val ktorService = KtorDownloadService(
-            configuration = DownloadConfiguration(),
-            fileSystem = fileSystem,
-        )
+        val ktorService =
+            KtorDownloadService(
+                configuration = DownloadConfiguration(),
+                fileSystem = fileSystem,
+            )
         KtorDownloadServiceAdapter(ktorService)
     }
 

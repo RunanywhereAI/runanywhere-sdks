@@ -13,7 +13,9 @@ import com.runanywhere.sdk.storage.ModelStorageStrategy
  * Handles simple direct file downloads - no archive extraction needed.
  * GGUF models are single files that can be downloaded directly.
  */
-class LlamaCppDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
+class LlamaCppDownloadStrategy :
+    DownloadStrategy,
+    ModelStorageStrategy {
     private val logger = SDKLogger("LlamaCppDownloadStrategy")
 
     // MARK: - DownloadStrategy
@@ -36,12 +38,13 @@ class LlamaCppDownloadStrategy : DownloadStrategy, ModelStorageStrategy {
     override suspend fun download(
         model: ModelInfo,
         to: String,
-        progressHandler: ((Double) -> Unit)?
+        progressHandler: ((Double) -> Unit)?,
     ): String {
         logger.info("Downloading GGUF model: ${model.id}")
 
-        val downloadURL = model.downloadURL
-            ?: throw IllegalArgumentException("Model ${model.id} has no download URL")
+        val downloadURL =
+            model.downloadURL
+                ?: throw IllegalArgumentException("Model ${model.id} has no download URL")
 
         // Create destination folder
         createDirectory(to)
@@ -81,7 +84,7 @@ internal expect suspend fun downloadGGUFFile(
     url: String,
     modelId: String,
     destinationFolder: String,
-    progressHandler: ((Double) -> Unit)?
+    progressHandler: ((Double) -> Unit)?,
 ): String
 
 /**

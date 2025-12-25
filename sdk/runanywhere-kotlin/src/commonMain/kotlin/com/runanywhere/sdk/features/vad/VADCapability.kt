@@ -199,14 +199,15 @@ class VADCapability internal constructor(
      * @param audioStream Flow of audio samples
      * @return Flow of VADOutput with detection results
      */
-    fun streamDetectSpeech(audioStream: Flow<FloatArray>): Flow<VADOutput> = flow {
-        ensureReady()
+    fun streamDetectSpeech(audioStream: Flow<FloatArray>): Flow<VADOutput> =
+        flow {
+            ensureReady()
 
-        audioStream.collect { samples ->
-            val output = detectSpeech(samples)
-            emit(output)
+            audioStream.collect { samples ->
+                val output = detectSpeech(samples)
+                emit(output)
+            }
         }
-    }
 
     /**
      * Detect speech segments with callbacks (matching iOS pattern)
@@ -220,42 +221,43 @@ class VADCapability internal constructor(
         audioStream: Flow<FloatArray>,
         onSpeechStart: () -> Unit = {},
         onSpeechEnd: () -> Unit = {},
-    ): Flow<VADOutput> = flow {
-        ensureReady()
+    ): Flow<VADOutput> =
+        flow {
+            ensureReady()
 
-        var isInSpeech = false
-        var silenceFrames = 0
-        // Use iOS-style hysteresis - 10 frames of silence to end speech
-        val silenceFramesThreshold = 10
+            var isInSpeech = false
+            var silenceFrames = 0
+            // Use iOS-style hysteresis - 10 frames of silence to end speech
+            val silenceFramesThreshold = 10
 
-        audioStream.collect { samples ->
-            val output = detectSpeech(samples)
+            audioStream.collect { samples ->
+                val output = detectSpeech(samples)
 
-            when {
-                output.isSpeechDetected && !isInSpeech -> {
-                    isInSpeech = true
-                    silenceFrames = 0
-                    analyticsService.trackSpeechStart()
-                    onSpeechStart()
-                }
+                when {
+                    output.isSpeechDetected && !isInSpeech -> {
+                        isInSpeech = true
+                        silenceFrames = 0
+                        analyticsService.trackSpeechStart()
+                        onSpeechStart()
+                    }
 
-                !output.isSpeechDetected && isInSpeech -> {
-                    silenceFrames++
-                    if (silenceFrames >= silenceFramesThreshold) {
-                        isInSpeech = false
-                        analyticsService.trackSpeechEnd()
-                        onSpeechEnd()
+                    !output.isSpeechDetected && isInSpeech -> {
+                        silenceFrames++
+                        if (silenceFrames >= silenceFramesThreshold) {
+                            isInSpeech = false
+                            analyticsService.trackSpeechEnd()
+                            onSpeechEnd()
+                        }
+                    }
+
+                    output.isSpeechDetected && isInSpeech -> {
+                        silenceFrames = 0
                     }
                 }
 
-                output.isSpeechDetected && isInSpeech -> {
-                    silenceFrames = 0
-                }
+                emit(output)
             }
-
-            emit(output)
         }
-    }
 
     // ============================================================================
     // MARK: - Control API (iOS start/stop/reset pattern)

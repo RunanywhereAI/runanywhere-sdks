@@ -25,7 +25,9 @@ class ModelLifecycleManager<ServiceType : Any>(
     companion object
     // MARK: - State
 
-    private val mutex = Mutex()
+    private
+
+    val mutex = Mutex()
 
     /** The currently loaded service */
     private var service: ServiceType? = null

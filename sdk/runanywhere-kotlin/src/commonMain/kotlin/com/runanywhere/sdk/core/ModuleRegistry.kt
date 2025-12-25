@@ -119,36 +119,41 @@ object ModuleRegistry {
     // MARK: - Service Creation
 
     suspend fun createSTT(config: STTConfiguration): STTService {
-        val (name, factory) = sttFactory
-            ?: throw SDKError.ProviderNotFound("No STT service registered")
+        val (name, factory) =
+            sttFactory
+                ?: throw SDKError.ProviderNotFound("No STT service registered")
         logger.info("Creating STT service: $name")
         return factory(config)
     }
 
     suspend fun createLLM(config: LLMConfiguration): LLMService {
-        val (name, factory) = llmFactory
-            ?: throw SDKError.ProviderNotFound("No LLM service registered")
+        val (name, factory) =
+            llmFactory
+                ?: throw SDKError.ProviderNotFound("No LLM service registered")
         logger.info("Creating LLM service: $name")
         return factory(config)
     }
 
     suspend fun createTTS(config: TTSConfiguration): TTSService {
-        val (name, factory) = ttsFactory
-            ?: throw SDKError.ProviderNotFound("No TTS service registered")
+        val (name, factory) =
+            ttsFactory
+                ?: throw SDKError.ProviderNotFound("No TTS service registered")
         logger.info("Creating TTS service: $name")
         return factory(config)
     }
 
     suspend fun createVAD(config: VADConfiguration): VADService {
-        val (name, factory) = vadFactory
-            ?: throw SDKError.ProviderNotFound("No VAD service registered")
+        val (name, factory) =
+            vadFactory
+                ?: throw SDKError.ProviderNotFound("No VAD service registered")
         logger.info("Creating VAD service: $name")
         return factory(config)
     }
 
     suspend fun createSpeakerDiarization(config: SpeakerDiarizationConfiguration): SpeakerDiarizationService {
-        val (name, factory) = speakerDiarizationFactory
-            ?: throw SDKError.ProviderNotFound("No Speaker Diarization service registered")
+        val (name, factory) =
+            speakerDiarizationFactory
+                ?: throw SDKError.ProviderNotFound("No Speaker Diarization service registered")
         logger.info("Creating Speaker Diarization service: $name")
         return factory(config)
     }
@@ -162,13 +167,14 @@ object ModuleRegistry {
     val hasSpeakerDiarization: Boolean get() = speakerDiarizationFactory != null
 
     val registeredCapabilities: List<String>
-        get() = buildList {
-            if (hasSTT) add("STT")
-            if (hasLLM) add("LLM")
-            if (hasTTS) add("TTS")
-            if (hasVAD) add("VAD")
-            if (hasSpeakerDiarization) add("SpeakerDiarization")
-        }
+        get() =
+            buildList {
+                if (hasSTT) add("STT")
+                if (hasLLM) add("LLM")
+                if (hasTTS) add("TTS")
+                if (hasVAD) add("VAD")
+                if (hasSpeakerDiarization) add("SpeakerDiarization")
+            }
 
     // Backward compatibility alias
     val registeredModules: List<String> get() = registeredCapabilities

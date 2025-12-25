@@ -158,10 +158,11 @@ class LLMCapability internal constructor(
         val framework = config?.framework ?: InferenceFramework.LLAMA_CPP
 
         // Build prompt with system prompt
-        val fullPrompt = buildPrompt(
-            messages = listOf(Message(role = MessageRole.USER, content = prompt)),
-            systemPrompt = effectiveOptions.systemPrompt ?: config?.effectiveSystemPrompt,
-        )
+        val fullPrompt =
+            buildPrompt(
+                messages = listOf(Message(role = MessageRole.USER, content = prompt)),
+                systemPrompt = effectiveOptions.systemPrompt ?: config?.effectiveSystemPrompt,
+            )
 
         // Rough token estimation (~4 chars per token)
         val inputTokens = maxOf(1, fullPrompt.length / 4)
@@ -197,22 +198,24 @@ class LLMCapability internal constructor(
         logger.info("Generation completed: $outputTokens tokens in ${totalTimeMs.toLong()}ms")
 
         // Extract thinking content if enabled
-        val (responseText, thinkingContent, thinkingTokens) = if (options.enableThinking) {
-            val extraction = ThinkingTagPattern.autoExtract(generatedText)
-            Triple(extraction.responseContent, extraction.thinkingContent, extraction.thinkingTokens)
-        } else {
-            Triple(generatedText, null, null)
-        }
+        val (responseText, thinkingContent, thinkingTokens) =
+            if (options.enableThinking) {
+                val extraction = ThinkingTagPattern.autoExtract(generatedText)
+                Triple(extraction.responseContent, extraction.thinkingContent, extraction.thinkingTokens)
+            } else {
+                Triple(generatedText, null, null)
+            }
 
         return LLMGenerationResult(
             text = responseText,
             tokensUsed = outputTokens,
             latencyMs = totalTimeMs,
-            performanceMetrics = LLMPerformanceMetrics(
-                tokensPerSecond = tokensPerSecond,
-                timeToFirstTokenMs = null, // Non-streaming: no TTFT
-                inferenceTimeMs = totalTimeMs,
-            ),
+            performanceMetrics =
+                LLMPerformanceMetrics(
+                    tokensPerSecond = tokensPerSecond,
+                    timeToFirstTokenMs = null, // Non-streaming: no TTFT
+                    inferenceTimeMs = totalTimeMs,
+                ),
             thinkingTokensUsed = thinkingTokens,
             thinkingContent = thinkingContent,
         )
@@ -238,10 +241,11 @@ class LLMCapability internal constructor(
         logger.info("Starting streaming generation with model: $modelId")
 
         // Build prompt with system prompt
-        val fullPrompt = buildPrompt(
-            messages = listOf(Message(role = MessageRole.USER, content = prompt)),
-            systemPrompt = effectiveOptions.systemPrompt ?: config?.effectiveSystemPrompt,
-        )
+        val fullPrompt =
+            buildPrompt(
+                messages = listOf(Message(role = MessageRole.USER, content = prompt)),
+                systemPrompt = effectiveOptions.systemPrompt ?: config?.effectiveSystemPrompt,
+            )
 
         val inputTokens = maxOf(1, fullPrompt.length / 4)
 
@@ -249,42 +253,43 @@ class LLMCapability internal constructor(
         val generationId = analyticsService.startStreamingGeneration(modelId, framework)
 
         // Create the token stream
-        val tokenFlow = flow {
-            val tokens = mutableListOf<String>()
-            var firstTokenTracked = false
+        val tokenFlow =
+            flow {
+                val tokens = mutableListOf<String>()
+                var firstTokenTracked = false
 
-            try {
-                service.streamGenerate(fullPrompt, effectiveOptions) { token ->
-                    // Track first token
-                    if (!firstTokenTracked) {
-                        analyticsService.trackFirstToken(generationId)
-                        firstTokenTracked = true
+                try {
+                    service.streamGenerate(fullPrompt, effectiveOptions) { token ->
+                        // Track first token
+                        if (!firstTokenTracked) {
+                            analyticsService.trackFirstToken(generationId)
+                            firstTokenTracked = true
+                        }
+                        tokens.add(token)
                     }
-                    tokens.add(token)
-                }
 
-                // Emit collected tokens
-                for ((index, token) in tokens.withIndex()) {
-                    emit(token)
-                    // Track streaming update periodically (every 10 tokens)
-                    if ((index + 1) % 10 == 0) {
-                        analyticsService.trackStreamingUpdate(generationId, index + 1)
+                    // Emit collected tokens
+                    for ((index, token) in tokens.withIndex()) {
+                        emit(token)
+                        // Track streaming update periodically (every 10 tokens)
+                        if ((index + 1) % 10 == 0) {
+                            analyticsService.trackStreamingUpdate(generationId, index + 1)
+                        }
                     }
-                }
 
-                // Complete analytics tracking
-                val outputTokens = tokens.size
-                analyticsService.completeGeneration(
-                    generationId = generationId,
-                    inputTokens = inputTokens,
-                    outputTokens = outputTokens,
-                    modelId = modelId,
-                )
-            } catch (e: Exception) {
-                analyticsService.trackGenerationFailed(generationId, e)
-                throw e
+                    // Complete analytics tracking
+                    val outputTokens = tokens.size
+                    analyticsService.completeGeneration(
+                        generationId = generationId,
+                        inputTokens = inputTokens,
+                        outputTokens = outputTokens,
+                        modelId = modelId,
+                    )
+                } catch (e: Exception) {
+                    analyticsService.trackGenerationFailed(generationId, e)
+                    throw e
+                }
             }
-        }
 
         // Create result with metrics accessor
         return LLMStreamingResult(
@@ -437,14 +442,16 @@ private fun createLLMLifecycleManager(): ModelLifecycleManager<LLMService> {
             }
 
             // Ensure model is downloaded
-            val modelPath = modelInfo.localPath
-                ?: throw SDKError.ModelNotDownloaded(
-                    "Model not downloaded: $resourceId. Please download the model first."
-                )
+            val modelPath =
+                modelInfo.localPath
+                    ?: throw SDKError.ModelNotDownloaded(
+                        "Model not downloaded: $resourceId. Please download the model first.",
+                    )
 
             // Create configuration
-            val llmConfig = (config as? LLMConfiguration)
-                ?: LLMConfiguration(modelId = resourceId)
+            val llmConfig =
+                (config as? LLMConfiguration)
+                    ?: LLMConfiguration(modelId = resourceId)
 
             // Create service using registry
             val service = ModuleRegistry.createLLM(llmConfig)

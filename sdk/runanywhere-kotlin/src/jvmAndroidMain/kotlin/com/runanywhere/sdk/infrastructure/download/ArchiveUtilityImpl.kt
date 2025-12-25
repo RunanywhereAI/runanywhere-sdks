@@ -145,55 +145,55 @@ internal actual suspend fun extractZipImpl(
             return@withContext
         }
 
-    // Second pass: extract entries
-    var extractedCount = 0
-    ZipInputStream(FileInputStream(sourcePath)).use { zipIn ->
-        var entry = zipIn.nextEntry
-        while (entry != null) {
-            val entryName = entry.name
+        // Second pass: extract entries
+        var extractedCount = 0
+        ZipInputStream(FileInputStream(sourcePath)).use { zipIn ->
+            var entry = zipIn.nextEntry
+            while (entry != null) {
+                val entryName = entry.name
 
-            // Skip macOS resource fork files
-            if (entryName.startsWith("__MACOSX") || entryName.contains("/._") || entryName.startsWith("._")) {
-                entry = zipIn.nextEntry
-                continue
-            }
+                // Skip macOS resource fork files
+                if (entryName.startsWith("__MACOSX") || entryName.contains("/._") || entryName.startsWith("._")) {
+                    entry = zipIn.nextEntry
+                    continue
+                }
 
-            val outputFile = File(destDir, entryName)
+                val outputFile = File(destDir, entryName)
 
-            // Security check: prevent zip slip vulnerability
-            val destDirCanonical = destDir.canonicalPath
-            val outputFileCanonical = outputFile.canonicalPath
-            if (!outputFileCanonical.startsWith(destDirCanonical + File.separator) &&
-                outputFileCanonical != destDirCanonical
-            ) {
-                logger.warning("Skipping zip entry outside destination: $entryName")
-                entry = zipIn.nextEntry
-                continue
-            }
+                // Security check: prevent zip slip vulnerability
+                val destDirCanonical = destDir.canonicalPath
+                val outputFileCanonical = outputFile.canonicalPath
+                if (!outputFileCanonical.startsWith(destDirCanonical + File.separator) &&
+                    outputFileCanonical != destDirCanonical
+                ) {
+                    logger.warning("Skipping zip entry outside destination: $entryName")
+                    entry = zipIn.nextEntry
+                    continue
+                }
 
-            if (entry.isDirectory) {
-                outputFile.mkdirs()
-            } else {
-                // Create parent directories if needed
-                outputFile.parentFile?.mkdirs()
+                if (entry.isDirectory) {
+                    outputFile.mkdirs()
+                } else {
+                    // Create parent directories if needed
+                    outputFile.parentFile?.mkdirs()
 
-                // Write file
-                FileOutputStream(outputFile).use { fos ->
-                    val buffer = ByteArray(8192)
-                    var len: Int
-                    while (zipIn.read(buffer).also { len = it } > 0) {
-                        fos.write(buffer, 0, len)
+                    // Write file
+                    FileOutputStream(outputFile).use { fos ->
+                        val buffer = ByteArray(8192)
+                        var len: Int
+                        while (zipIn.read(buffer).also { len = it } > 0) {
+                            fos.write(buffer, 0, len)
+                        }
                     }
                 }
+
+                extractedCount++
+                val progress = 0.1 + (extractedCount.toDouble() / totalEntries) * 0.9
+                progressHandler?.invoke(progress)
+
+                entry = zipIn.nextEntry
             }
-
-            extractedCount++
-            val progress = 0.1 + (extractedCount.toDouble() / totalEntries) * 0.9
-            progressHandler?.invoke(progress)
-
-            entry = zipIn.nextEntry
         }
-    }
 
         logger.info("Extracted $extractedCount files from zip archive")
         progressHandler?.invoke(1.0)

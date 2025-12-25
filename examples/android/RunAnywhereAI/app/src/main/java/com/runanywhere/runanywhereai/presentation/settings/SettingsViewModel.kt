@@ -4,8 +4,6 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.runanywhere.runanywhereai.data.SecureStorage
-import com.runanywhere.runanywhereai.data.SettingsDataStore
 import com.runanywhere.sdk.infrastructure.events.EventBus
 import com.runanywhere.sdk.infrastructure.events.SDKModelEvent
 import com.runanywhere.sdk.`public`.extensions.clearCache
@@ -15,20 +13,8 @@ import com.runanywhere.sdk.`public`.extensions.getStorageInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-/**
- * Routing Policy enum matching iOS RoutingPolicy
- * iOS Reference: RoutingPolicy enum in CombinedSettingsView.swift
- */
-enum class RoutingPolicy(val displayName: String, val rawValue: String) {
-    AUTOMATIC("Auto", "automatic"),
-    DEVICE_ONLY("Device", "deviceOnly"),
-    PREFER_DEVICE("Prefer Device", "preferDevice"),
-    PREFER_CLOUD("Prefer Cloud", "preferCloud"),
-}
 
 /**
  * Simple stored model info for settings display
@@ -41,85 +27,42 @@ data class StoredModelInfo(
 
 /**
  * Settings UI State
- * iOS Reference: State properties in CombinedSettingsView.swift
  */
 @OptIn(kotlin.time.ExperimentalTime::class)
 data class SettingsUiState(
-    // SDK Configuration
-    val routingPolicy: RoutingPolicy = RoutingPolicy.AUTOMATIC,
-    // Generation Settings
-    val temperature: Float = 0.7f,
-    val maxTokens: Int = 10000,
-    // API Configuration
-    val apiKey: String = "",
-    val isApiKeyConfigured: Boolean = false,
     // Storage Overview
     val totalStorageSize: Long = 0L,
     val availableSpace: Long = 0L,
     val modelStorageSize: Long = 0L,
     // Downloaded Models
     val downloadedModels: List<StoredModelInfo> = emptyList(),
-    // Logging Configuration
-    val analyticsLogToLocal: Boolean = false,
     // Loading states
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
 )
 
 /**
- * Settings ViewModel matching iOS CombinedSettingsView + StorageViewModel
- *
- * iOS Reference: CombinedSettingsView state management and StorageViewModel
+ * Settings ViewModel
  *
  * This ViewModel manages:
- * - SDK configuration settings (persisted via DataStore)
- * - Generation parameters (persisted via DataStore)
- * - API key management (persisted via EncryptedSharedPreferences)
- * - Storage overview via RunAnywhere.getStorageInfo() (matching iOS exactly)
+ * - Storage overview via RunAnywhere.getStorageInfo()
  * - Model management via RunAnywhere storage APIs
- * - Logging configuration (persisted via DataStore)
  */
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
-
-    // Persistence layers - matching iOS UserDefaults + Keychain
-    private val settingsDataStore = SettingsDataStore(application)
-    private val secureStorage = SecureStorage(application)
 
     companion object {
         private const val TAG = "SettingsViewModel"
     }
 
     init {
-        loadCurrentConfiguration()
         loadStorageData()
         subscribeToModelEvents()
-        observeSettingsChanges()
-    }
-
-    /**
-     * Observe DataStore settings changes and update UI state
-     * This ensures UI stays in sync with persisted settings
-     */
-    private fun observeSettingsChanges() {
-        viewModelScope.launch {
-            settingsDataStore.settingsFlow.collect { settings ->
-                _uiState.update {
-                    it.copy(
-                        routingPolicy = settings.routingPolicy,
-                        temperature = settings.temperature,
-                        maxTokens = settings.maxTokens,
-                        analyticsLogToLocal = settings.analyticsLogToLocal,
-                    )
-                }
-            }
-        }
     }
 
     /**
      * Subscribe to SDK model events to automatically refresh storage when models are downloaded/deleted
-     * This ensures the settings screen shows up-to-date storage information
      */
     private fun subscribeToModelEvents() {
         viewModelScope.launch {
@@ -142,55 +85,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Load current configuration from storage
-     *
-     * iOS equivalent: loadCurrentConfiguration() in CombinedSettingsView
-     * - KeychainService.shared.retrieve(key: "runanywhere_api_key")
-     * - UserDefaults.standard.string(forKey: "routingPolicy")
-     * - UserDefaults.standard.double(forKey: "defaultTemperature")
-     * - UserDefaults.standard.integer(forKey: "defaultMaxTokens")
-     */
-    private fun loadCurrentConfiguration() {
-        viewModelScope.launch {
-            try {
-                // Load settings from DataStore (equivalent to UserDefaults)
-                val settings = settingsDataStore.settingsFlow.first()
-
-                // Load API key from secure storage (equivalent to Keychain)
-                val apiKey = secureStorage.getApiKey() ?: ""
-                val isApiKeyConfigured = apiKey.isNotEmpty()
-
-                _uiState.update {
-                    it.copy(
-                        routingPolicy = settings.routingPolicy,
-                        temperature = settings.temperature,
-                        maxTokens = settings.maxTokens,
-                        apiKey = apiKey,
-                        isApiKeyConfigured = isApiKeyConfigured,
-                        analyticsLogToLocal = settings.analyticsLogToLocal,
-                    )
-                }
-
-                Log.d(
-                    TAG,
-                    "Configuration loaded - Policy: ${settings.routingPolicy}, " +
-                        "Temperature: ${settings.temperature}, MaxTokens: ${settings.maxTokens}, " +
-                        "API Key configured: $isApiKeyConfigured",
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load configuration", e)
-                // Keep default values on error
-            }
-        }
-    }
-
-    /**
      * Load storage data using SDK's getStorageInfo() API
-     *
-     * iOS equivalent: StorageViewModel.loadData() which calls:
-     *   let storageInfo = await RunAnywhere.getStorageInfo()
-     *
-     * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RunAnywhere+Storage.swift
      */
     private fun loadStorageData() {
         viewModelScope.launch {
@@ -199,7 +94,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             try {
                 Log.d(TAG, "Loading storage info via getStorageInfo()...")
 
-                // Use SDK's getStorageInfo() - matches iOS exactly
+                // Use SDK's getStorageInfo()
                 val storageInfo = getStorageInfo()
 
                 // Map stored models to UI model
@@ -241,86 +136,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Update routing policy
-     *
-     * iOS equivalent: UserDefaults.standard.set(routingPolicy.rawValue, forKey: "routingPolicy")
-     */
-    fun updateRoutingPolicy(policy: RoutingPolicy) {
-        _uiState.update { it.copy(routingPolicy = policy) }
-        viewModelScope.launch {
-            settingsDataStore.saveRoutingPolicy(policy)
-            Log.d(TAG, "Routing policy updated: ${policy.rawValue}")
-        }
-    }
-
-    /**
-     * Update temperature setting
-     *
-     * iOS equivalent: UserDefaults.standard.set(defaultTemperature, forKey: "defaultTemperature")
-     */
-    fun updateTemperature(temperature: Float) {
-        _uiState.update { it.copy(temperature = temperature) }
-        viewModelScope.launch {
-            settingsDataStore.saveTemperature(temperature)
-            Log.d(TAG, "Temperature updated: $temperature")
-        }
-    }
-
-    /**
-     * Update max tokens setting
-     *
-     * iOS equivalent: UserDefaults.standard.set(defaultMaxTokens, forKey: "defaultMaxTokens")
-     */
-    fun updateMaxTokens(maxTokens: Int) {
-        val clampedValue = maxTokens.coerceIn(500, 20000)
-        _uiState.update { it.copy(maxTokens = clampedValue) }
-        viewModelScope.launch {
-            settingsDataStore.saveMaxTokens(clampedValue)
-            Log.d(TAG, "Max tokens updated: $clampedValue")
-        }
-    }
-
-    /**
-     * Update API key
-     *
-     * iOS equivalent: KeychainService.shared.save(key: "runanywhere_api_key", data: apiKeyData)
-     */
-    fun updateApiKey(apiKey: String) {
-        viewModelScope.launch {
-            // Save to encrypted storage (equivalent to Keychain)
-            if (apiKey.isNotEmpty()) {
-                secureStorage.saveApiKey(apiKey)
-            } else {
-                secureStorage.deleteApiKey()
-            }
-
-            _uiState.update {
-                it.copy(
-                    apiKey = apiKey,
-                    isApiKeyConfigured = apiKey.isNotEmpty(),
-                )
-            }
-            Log.d(TAG, "API key updated, configured: ${apiKey.isNotEmpty()}")
-        }
-    }
-
-    /**
-     * Update analytics logging preference
-     *
-     * iOS equivalent: KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
-     */
-    fun updateAnalyticsLogging(enabled: Boolean) {
-        _uiState.update { it.copy(analyticsLogToLocal = enabled) }
-        viewModelScope.launch {
-            settingsDataStore.saveAnalyticsLogToLocal(enabled)
-            Log.d(TAG, "Analytics logging updated: $enabled")
-        }
-    }
-
-    /**
      * Refresh storage data
-     *
-     * iOS equivalent: storageViewModel.refreshData()
      */
     fun refreshStorage() {
         loadStorageData()
@@ -328,12 +144,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     /**
      * Delete a downloaded model
-     *
-     * iOS equivalent:
-     * func deleteModel(_ modelId: String) async {
-     *     try await RunAnywhere.deleteStoredModel(modelId)
-     *     await refreshData()
-     * }
      */
     fun deleteModelById(modelId: String) {
         viewModelScope.launch {
@@ -356,9 +166,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     /**
      * Clear cache using SDK's clearCache() API
-     *
-     * iOS equivalent: await RunAnywhere.clearCache()
-     * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RunAnywhere+Storage.swift
      */
     fun clearCache() {
         viewModelScope.launch {
@@ -380,9 +187,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     /**
      * Clean temporary files using SDK's cleanTempFiles() API
-     *
-     * iOS equivalent: await RunAnywhere.cleanTempFiles()
-     * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RunAnywhere+Storage.swift
      */
     fun cleanTempFiles() {
         viewModelScope.launch {

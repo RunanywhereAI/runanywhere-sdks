@@ -59,14 +59,15 @@ class ONNXCoreService : NativeCoreService {
                 if (backendHandle == 0L) {
                     throw NativeBridgeException(
                         NativeResultCode.ERROR_INIT_FAILED,
-                        "Failed to create ONNX backend"
+                        "Failed to create ONNX backend",
                     )
                 }
 
                 // Initialize backend
-                val result = NativeResultCode.fromValue(
-                    RunAnywhereBridge.nativeInitialize(backendHandle, configJson)
-                )
+                val result =
+                    NativeResultCode.fromValue(
+                        RunAnywhereBridge.nativeInitialize(backendHandle, configJson),
+                    )
                 if (!result.isSuccess) {
                     val error = RunAnywhereBridge.nativeGetLastError()
                     RunAnywhereBridge.nativeDestroy(backendHandle)
@@ -83,7 +84,8 @@ class ONNXCoreService : NativeCoreService {
     override val supportedCapabilities: List<NativeCapability>
         get() {
             if (backendHandle == 0L) return emptyList()
-            return RunAnywhereBridge.nativeGetCapabilities(backendHandle)
+            return RunAnywhereBridge
+                .nativeGetCapabilities(backendHandle)
                 .toList()
                 .mapNotNull { NativeCapability.fromValue(it) }
         }
@@ -120,11 +122,20 @@ class ONNXCoreService : NativeCoreService {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
-                val result = NativeResultCode.fromValue(
-                    RunAnywhereBridge.nativeSTTLoadModel(backendHandle, modelPath, modelType, configJson)
-                )
+                val result =
+                    NativeResultCode.fromValue(
+                        RunAnywhereBridge.nativeSTTLoadModel(backendHandle, modelPath, modelType, configJson),
+                    )
                 if (!result.isSuccess) {
-                    throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
+                    val nativeError = RunAnywhereBridge.nativeGetLastError()
+                    val errorMessage = buildDetailedErrorMessage(
+                        operation = "STT model load",
+                        modelPath = modelPath,
+                        modelType = modelType,
+                        resultCode = result,
+                        nativeError = nativeError,
+                    )
+                    throw NativeBridgeException(result, errorMessage)
                 }
             }
         }
@@ -146,7 +157,7 @@ class ONNXCoreService : NativeCoreService {
     override suspend fun transcribe(
         audioSamples: FloatArray,
         sampleRate: Int,
-        language: String?
+        language: String?,
     ): String {
         return withContext(Dispatchers.IO) {
             mutex.withLock {
@@ -155,10 +166,10 @@ class ONNXCoreService : NativeCoreService {
                     backendHandle,
                     audioSamples,
                     sampleRate,
-                    language
+                    language,
                 ) ?: throw NativeBridgeException(
                     NativeResultCode.ERROR_INFERENCE_FAILED,
-                    RunAnywhereBridge.nativeGetLastError()
+                    RunAnywhereBridge.nativeGetLastError(),
                 )
             }
         }
@@ -175,11 +186,20 @@ class ONNXCoreService : NativeCoreService {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
-                val result = NativeResultCode.fromValue(
-                    RunAnywhereBridge.nativeTTSLoadModel(backendHandle, modelPath, modelType, configJson)
-                )
+                val result =
+                    NativeResultCode.fromValue(
+                        RunAnywhereBridge.nativeTTSLoadModel(backendHandle, modelPath, modelType, configJson),
+                    )
                 if (!result.isSuccess) {
-                    throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
+                    val nativeError = RunAnywhereBridge.nativeGetLastError()
+                    val errorMessage = buildDetailedErrorMessage(
+                        operation = "TTS model load",
+                        modelPath = modelPath,
+                        modelType = modelType,
+                        resultCode = result,
+                        nativeError = nativeError,
+                    )
+                    throw NativeBridgeException(result, errorMessage)
                 }
             }
         }
@@ -202,7 +222,7 @@ class ONNXCoreService : NativeCoreService {
         text: String,
         voiceId: String?,
         speedRate: Float,
-        pitchShift: Float
+        pitchShift: Float,
     ): NativeTTSSynthesisResult {
         return withContext(Dispatchers.IO) {
             mutex.withLock {
@@ -212,10 +232,10 @@ class ONNXCoreService : NativeCoreService {
                     text,
                     voiceId,
                     speedRate,
-                    pitchShift
+                    pitchShift,
                 ) ?: throw NativeBridgeException(
                     NativeResultCode.ERROR_INFERENCE_FAILED,
-                    RunAnywhereBridge.nativeGetLastError()
+                    RunAnywhereBridge.nativeGetLastError(),
                 )
             }
         }
@@ -238,9 +258,10 @@ class ONNXCoreService : NativeCoreService {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
-                val result = NativeResultCode.fromValue(
-                    RunAnywhereBridge.nativeVADLoadModel(backendHandle, modelPath, configJson)
-                )
+                val result =
+                    NativeResultCode.fromValue(
+                        RunAnywhereBridge.nativeVADLoadModel(backendHandle, modelPath, configJson),
+                    )
                 if (!result.isSuccess) {
                     throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
                 }
@@ -268,7 +289,7 @@ class ONNXCoreService : NativeCoreService {
                 RunAnywhereBridge.nativeVADProcess(backendHandle, audioSamples, sampleRate)
                     ?: throw NativeBridgeException(
                         NativeResultCode.ERROR_INFERENCE_FAILED,
-                        RunAnywhereBridge.nativeGetLastError()
+                        RunAnywhereBridge.nativeGetLastError(),
                     )
             }
         }
@@ -281,7 +302,7 @@ class ONNXCoreService : NativeCoreService {
                 RunAnywhereBridge.nativeVADDetectSegments(backendHandle, audioSamples, sampleRate)
                     ?: throw NativeBridgeException(
                         NativeResultCode.ERROR_INFERENCE_FAILED,
-                        RunAnywhereBridge.nativeGetLastError()
+                        RunAnywhereBridge.nativeGetLastError(),
                     )
             }
         }
@@ -295,9 +316,10 @@ class ONNXCoreService : NativeCoreService {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
-                val result = NativeResultCode.fromValue(
-                    RunAnywhereBridge.nativeEmbedLoadModel(backendHandle, modelPath, configJson)
-                )
+                val result =
+                    NativeResultCode.fromValue(
+                        RunAnywhereBridge.nativeEmbedLoadModel(backendHandle, modelPath, configJson),
+                    )
                 if (!result.isSuccess) {
                     throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
                 }
@@ -325,7 +347,7 @@ class ONNXCoreService : NativeCoreService {
                 RunAnywhereBridge.nativeEmbedText(backendHandle, text)
                     ?: throw NativeBridgeException(
                         NativeResultCode.ERROR_INFERENCE_FAILED,
-                        RunAnywhereBridge.nativeGetLastError()
+                        RunAnywhereBridge.nativeGetLastError(),
                     )
             }
         }
@@ -345,9 +367,53 @@ class ONNXCoreService : NativeCoreService {
         if (backendHandle == 0L) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_INVALID_HANDLE,
-                "Backend not initialized. Call initialize() first."
+                "Backend not initialized. Call initialize() first.",
             )
         }
+    }
+
+    /**
+     * Build a detailed error message when native operations fail.
+     * This helps diagnose issues when the native layer returns empty/unhelpful errors.
+     */
+    private fun buildDetailedErrorMessage(
+        operation: String,
+        modelPath: String,
+        modelType: String,
+        resultCode: NativeResultCode,
+        nativeError: String,
+    ): String {
+        val sb = StringBuilder()
+        sb.append("$operation failed")
+
+        // Add native error if available
+        if (nativeError.isNotBlank()) {
+            sb.append(": $nativeError")
+        }
+
+        // Add diagnostic info
+        sb.append("\n  - Model path: $modelPath")
+        sb.append("\n  - Model type: $modelType")
+        sb.append("\n  - Result code: ${resultCode.name}")
+
+        // Check if path exists and provide hints
+        val file = java.io.File(modelPath)
+        if (!file.exists()) {
+            sb.append("\n  ⚠️ Path does not exist! Model may need to be downloaded.")
+        } else if (file.isDirectory) {
+            val files = file.listFiles()
+            if (files.isNullOrEmpty()) {
+                sb.append("\n  ⚠️ Directory is empty! Model extraction may have failed.")
+            } else {
+                val onnxFiles = files.filter { it.extension.lowercase() == "onnx" }
+                sb.append("\n  - Directory contains ${files.size} files (${onnxFiles.size} .onnx)")
+                if (onnxFiles.isEmpty()) {
+                    sb.append("\n  ⚠️ No .onnx files found in directory!")
+                }
+            }
+        }
+
+        return sb.toString()
     }
 
     companion object {
@@ -373,7 +439,7 @@ class ONNXCoreService : NativeCoreService {
         fun extractArchive(archivePath: String, destDir: String): NativeResultCode {
             RunAnywhereBridge.loadLibrary()
             return NativeResultCode.fromValue(
-                RunAnywhereBridge.nativeExtractArchive(archivePath, destDir)
+                RunAnywhereBridge.nativeExtractArchive(archivePath, destDir),
             )
         }
     }

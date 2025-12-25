@@ -149,6 +149,7 @@ object ONNX : RunAnywhereModule {
     /**
      * Register only ONNX STT service
      */
+    @Suppress("UnusedParameter")
     private fun registerSTT(priority: Int = 100) {
         ModuleRegistry.shared.registerSTT(moduleName) { config -> createSTTService(config) }
         logger.info("ONNX STT registered")
@@ -157,6 +158,7 @@ object ONNX : RunAnywhereModule {
     /**
      * Register only ONNX TTS service
      */
+    @Suppress("UnusedParameter")
     private fun registerTTS(priority: Int = 100) {
         ModuleRegistry.shared.registerTTS("ONNX TTS") { config -> createTTSService(config) }
         logger.info("ONNX TTS registered")
@@ -165,6 +167,7 @@ object ONNX : RunAnywhereModule {
     /**
      * Register only ONNX VAD service
      */
+    @Suppress("UnusedParameter")
     private fun registerVAD(priority: Int = 100) {
         ModuleRegistry.shared.registerVAD("ONNX VAD") { config -> createVADService(config) }
         logger.info("ONNX VAD registered")
