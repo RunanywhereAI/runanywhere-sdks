@@ -181,17 +181,19 @@ class VoiceAgentCapability internal constructor(
      * Matches iOS initializeVoiceAgentWithLoadedModels()
      *
      * Uses whatever models are already loaded in STT, LLM, and TTS capabilities
+     *
+     * @param vadConfig Optional VAD configuration. Use VADConfiguration.sensitive() for whisper detection.
      */
-    suspend fun initializeWithLoadedModels() =
+    suspend fun initializeWithLoadedModels(vadConfig: VADConfiguration = VADConfiguration()) =
         mutex.withLock {
-            logger.info("Initializing Voice Agent with already-loaded models")
+            logger.info("Initializing Voice Agent with already-loaded models (VAD threshold: ${vadConfig.energyThreshold})")
 
             try {
                 EventPublisher.track(SDKVoiceEvent.PipelineStarted)
 
-                // Initialize VAD
+                // Initialize VAD with provided configuration
                 try {
-                    vad.initialize(VADConfiguration())
+                    vad.initialize(vadConfig)
                 } catch (e: Exception) {
                     throw CapabilityError.CompositeComponentFailed("VAD", e)
                 }

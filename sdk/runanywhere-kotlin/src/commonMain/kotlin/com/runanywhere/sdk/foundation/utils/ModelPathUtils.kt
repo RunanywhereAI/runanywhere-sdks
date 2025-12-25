@@ -6,17 +6,33 @@ import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
 
 /**
- * Centralized utility for all model path calculations
+ * Centralized utility for model path calculations.
  *
- * IMPORTANT: This is the SINGLE SOURCE OF TRUTH for model paths in the SDK.
- * All model path calculations should use this utility to ensure consistency.
+ * IMPORTANT: This is the SINGLE SOURCE OF TRUTH for model path CALCULATIONS in the SDK.
  *
- * Path Pattern: {baseDir}/models/{framework.value}/{modelId}/{filename}
- * Example Android: /data/data/app/files/runanywhere/models/LlamaCpp/lfm2-350m-q4-k-m/lfm2-350m-q4-k-m.gguf
- * Example iOS: {Documents}/RunAnywhere/Models/{framework}/{modelId}/{filename} (iOS uses uppercase "Models")
+ * ## Responsibilities
+ * - Calculate expected paths based on conventions
+ * - Provide path analysis utilities
+ * - Directory structure constants
  *
- * Note: Android uses lowercase "models", iOS uses uppercase "Models" - both are correct for their platforms.
- * Reference: Matches iOS ModelPathUtils.swift structure (adapted for Android conventions)
+ * ## NOT Responsible For (handled by ModelStorageStrategy per-module)
+ * - Finding actual model files within directories
+ * - Validating model content
+ * - Model type/format detection
+ *
+ * ## Directory Structure
+ * ```
+ * {baseDir}/models/{framework}/{modelId}/
+ *   └── {model files - structure varies by framework}
+ * ```
+ *
+ * ## Usage Pattern
+ * 1. Use ModelPathUtils.getModelFolder() to get expected location
+ * 2. Use ModuleRegistry.storageStrategy(framework).findModelPath() to resolve actual path
+ * 3. Use ModuleRegistry.storageStrategy(framework).isValidModelStorage() to validate
+ *
+ * Example Android: /data/data/app/files/runanywhere/models/LlamaCpp/lfm2-350m-q4-k-m/
+ * Example iOS: {Documents}/RunAnywhere/Models/{framework}/{modelId}/
  */
 object ModelPathUtils {
     // ============================================================

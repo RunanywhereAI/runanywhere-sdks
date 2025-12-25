@@ -13,8 +13,8 @@ import com.runanywhere.sdk.utils.getCurrentTimeMillis
 data class VADConfiguration(
     /** Model ID for VAD provider selection (optional for built-in VAD) */
     val modelId: String? = null,
-    /** Energy threshold for voice detection (0.0 to 1.0) */
-    val energyThreshold: Float = 0.015f,
+    /** Energy threshold for voice detection (0.0 to 1.0). Lower = more sensitive. */
+    val energyThreshold: Float = DEFAULT_ENERGY_THRESHOLD,
     /** Sample rate of the audio in Hz */
     val sampleRate: Int = 16000,
     /** Frame length in seconds */
@@ -44,8 +44,29 @@ data class VADConfiguration(
     }
 
     companion object {
+        /**
+         * Default energy threshold for voice detection.
+         * Lower value = more sensitive (detects quieter sounds including whispers).
+         * Higher value = less sensitive (requires louder speech).
+         *
+         * - 0.003f: Very sensitive (good for whispers, may have false positives in noisy environments)
+         * - 0.005f: Sensitive (balanced for most use cases)
+         * - 0.010f: Moderate (good for normal speech)
+         * - 0.015f: Conservative (requires clear speech, good for noisy environments)
+         */
+        const val DEFAULT_ENERGY_THRESHOLD = 0.005f
+
         /** Default configuration */
         val default = VADConfiguration()
+
+        /** Create a sensitive configuration for quiet environments/whispers */
+        fun sensitive() = VADConfiguration(energyThreshold = 0.002f)
+
+        /** Create a balanced configuration (default) */
+        fun balanced() = VADConfiguration(energyThreshold = 0.005f)
+
+        /** Create a conservative configuration for noisy environments */
+        fun conservative() = VADConfiguration(energyThreshold = 0.015f)
     }
 }
 

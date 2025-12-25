@@ -128,13 +128,14 @@ class ONNXCoreService : NativeCoreService {
                     )
                 if (!result.isSuccess) {
                     val nativeError = RunAnywhereBridge.nativeGetLastError()
-                    val errorMessage = buildDetailedErrorMessage(
-                        operation = "STT model load",
-                        modelPath = modelPath,
-                        modelType = modelType,
-                        resultCode = result,
-                        nativeError = nativeError,
-                    )
+                    val errorMessage =
+                        buildDetailedErrorMessage(
+                            operation = "STT model load",
+                            modelPath = modelPath,
+                            modelType = modelType,
+                            resultCode = result,
+                            nativeError = nativeError,
+                        )
                     throw NativeBridgeException(result, errorMessage)
                 }
             }
@@ -192,13 +193,14 @@ class ONNXCoreService : NativeCoreService {
                     )
                 if (!result.isSuccess) {
                     val nativeError = RunAnywhereBridge.nativeGetLastError()
-                    val errorMessage = buildDetailedErrorMessage(
-                        operation = "TTS model load",
-                        modelPath = modelPath,
-                        modelType = modelType,
-                        resultCode = result,
-                        nativeError = nativeError,
-                    )
+                    val errorMessage =
+                        buildDetailedErrorMessage(
+                            operation = "TTS model load",
+                            modelPath = modelPath,
+                            modelType = modelType,
+                            resultCode = result,
+                            nativeError = nativeError,
+                        )
                     throw NativeBridgeException(result, errorMessage)
                 }
             }

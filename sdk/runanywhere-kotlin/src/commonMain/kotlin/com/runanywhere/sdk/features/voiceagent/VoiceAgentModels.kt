@@ -291,3 +291,117 @@ enum class VoiceAgentPipelineState {
     COMPLETED,
     ERROR,
 }
+
+// =============================================================================
+// MARK: - Voice Session (High-level API matching iOS VoiceSession)
+// =============================================================================
+
+/**
+ * Events emitted during a voice session.
+ * Matches iOS VoiceSessionEvent exactly.
+ */
+sealed class VoiceSessionEvent {
+    /** Session started and ready */
+    data object Started : VoiceSessionEvent()
+
+    /** Listening for speech with current audio level (0.0 - 1.0) */
+    data class Listening(val audioLevel: Float) : VoiceSessionEvent()
+
+    /** Speech detected, started accumulating audio */
+    data object SpeechStarted : VoiceSessionEvent()
+
+    /** Speech ended, processing audio */
+    data object Processing : VoiceSessionEvent()
+
+    /** Got transcription from STT */
+    data class Transcribed(val text: String) : VoiceSessionEvent()
+
+    /** Got response from LLM */
+    data class Responded(val text: String) : VoiceSessionEvent()
+
+    /** Playing TTS audio */
+    data object Speaking : VoiceSessionEvent()
+
+    /** Complete turn result */
+    data class TurnCompleted(
+        val transcript: String,
+        val response: String,
+        val audio: ByteArray?,
+    ) : VoiceSessionEvent() {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is TurnCompleted) return false
+            return transcript == other.transcript &&
+                response == other.response &&
+                audio.contentEquals(other.audio)
+        }
+
+        override fun hashCode(): Int {
+            var result = transcript.hashCode()
+            result = 31 * result + response.hashCode()
+            result = 31 * result + (audio?.contentHashCode() ?: 0)
+            return result
+        }
+    }
+
+    /** Session stopped */
+    data object Stopped : VoiceSessionEvent()
+
+    /** Error occurred */
+    data class Error(val message: String) : VoiceSessionEvent()
+}
+
+/**
+ * Configuration for voice session behavior.
+ * Matches iOS VoiceSessionConfig exactly.
+ */
+data class VoiceSessionConfig(
+    /** Silence duration (seconds) before processing speech */
+    val silenceDuration: Float = 1.5f,
+
+    /** Minimum audio level to detect speech (0.0 - 1.0). Lower = more sensitive. */
+    val speechThreshold: Float = 0.02f,
+
+    /** Whether to auto-play TTS response */
+    val autoPlayTTS: Boolean = true,
+
+    /** Whether to auto-resume listening after TTS playback */
+    val continuousMode: Boolean = true,
+) {
+    companion object {
+        /** Default configuration */
+        val default = VoiceSessionConfig()
+
+        /** Sensitive configuration for whisper detection */
+        fun sensitive() = VoiceSessionConfig(speechThreshold = 0.005f)
+
+        /** Conservative configuration for noisy environments */
+        fun conservative() = VoiceSessionConfig(speechThreshold = 0.1f)
+    }
+}
+
+/**
+ * Voice session errors
+ */
+sealed class VoiceSessionError : Exception() {
+    data object MicrophonePermissionDenied : VoiceSessionError() {
+        @Suppress("UnusedPrivateMember")
+        private fun readResolve(): Any = MicrophonePermissionDenied
+
+        override val message: String = "Microphone permission denied"
+    }
+
+    data object NotReady : VoiceSessionError() {
+        @Suppress("UnusedPrivateMember")
+        private fun readResolve(): Any = NotReady
+
+        override val message: String = "Voice agent not ready. Load STT, LLM, and TTS models first."
+    }
+
+    data object AlreadyRunning : VoiceSessionError() {
+        @Suppress("UnusedPrivateMember")
+        private fun readResolve(): Any = AlreadyRunning
+
+        override val message: String = "Voice session already running"
+    }
+}
