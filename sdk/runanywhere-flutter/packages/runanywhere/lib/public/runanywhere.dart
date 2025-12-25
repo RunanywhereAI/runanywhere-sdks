@@ -6,6 +6,7 @@ import 'package:runanywhere/capabilities/text_generation/generation_service.dart
 import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
 import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
 import 'package:runanywhere/core/models/storage/storage_info.dart';
+import 'package:runanywhere/core/models/storage/stored_model.dart';
 import 'package:runanywhere/core/module_registry.dart' hide TTSService;
 import 'package:runanywhere/core/protocols/downloading/download_progress.dart';
 import 'package:runanywhere/features/llm/llm_capability.dart'
@@ -1533,6 +1534,78 @@ class RunAnywhere {
     }
 
     return result;
+  }
+
+  /// Get all downloaded models with detailed information including size
+  /// Returns a list of StoredModel objects with sizes calculated
+  static Future<List<StoredModel>> getDownloadedModelsWithInfo() async {
+    final result = <StoredModel>[];
+    final modelsDir = await ModelPathUtils.getModelsDirectory();
+
+    if (!await modelsDir.exists()) {
+      return result;
+    }
+
+    // Iterate through framework directories
+    await for (final frameworkDir in modelsDir.list()) {
+      if (frameworkDir is! Directory) continue;
+
+      final frameworkName = frameworkDir.path.split('/').last;
+      final framework = LLMFramework.values.cast<LLMFramework?>().firstWhere(
+            (f) => f?.rawValue == frameworkName,
+            orElse: () => null,
+          );
+
+      if (framework == null) continue;
+
+      // Iterate through model directories
+      await for (final modelDir in frameworkDir.list()) {
+        if (modelDir is! Directory) continue;
+
+        final modelId = modelDir.path.split('/').last;
+        final size = await _calculateDirectorySize(modelDir);
+
+        // Try to get model info from registry for display name
+        final registeredModel = serviceContainer.modelRegistry.getModel(modelId);
+        final displayName = registeredModel?.name ?? modelId;
+
+        // Get directory stats for creation date
+        final stat = await modelDir.stat();
+
+        result.add(StoredModel(
+          id: modelId,
+          name: displayName,
+          path: modelDir.path,
+          size: size,
+          format: ModelFormat.unknown,
+          framework: framework,
+          createdDate: stat.modified,
+        ));
+      }
+    }
+
+    return result;
+  }
+
+  /// Calculate the total size of a directory recursively
+  static Future<int> _calculateDirectorySize(Directory directory) async {
+    int totalSize = 0;
+
+    try {
+      await for (final entity in directory.list(recursive: true)) {
+        if (entity is File) {
+          try {
+            totalSize += await entity.length();
+          } catch (_) {
+            // Skip files we can't read
+          }
+        }
+      }
+    } catch (_) {
+      // Handle directory access errors
+    }
+
+    return totalSize;
   }
 
   /// Check if a model is downloaded

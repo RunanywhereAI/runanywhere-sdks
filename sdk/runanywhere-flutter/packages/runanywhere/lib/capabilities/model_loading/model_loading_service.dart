@@ -159,9 +159,10 @@ class ModelLoadingService {
       logger.info('✅ Found adapter: ${provider.name}');
 
       try {
-        // Create LLM configuration
+        // Create LLM configuration with actual model file path
         final config = LLMConfiguration(
           modelId: modelId,
+          modelPath: modelInfo.localPath?.toFilePath(),
           contextLength: modelInfo.contextLength ?? 2048,
           useGPUIfAvailable: true,
         );
@@ -312,12 +313,14 @@ class ModelLoadingService {
 // Placeholder for LLMConfiguration
 class LLMConfiguration {
   final String? modelId;
+  final String? modelPath; // Actual file path to the model
   final int contextLength;
   final bool useGPUIfAvailable;
   final String? quantizationLevel;
 
   LLMConfiguration({
     this.modelId,
+    this.modelPath,
     this.contextLength = 2048,
     this.useGPUIfAvailable = true,
     this.quantizationLevel,

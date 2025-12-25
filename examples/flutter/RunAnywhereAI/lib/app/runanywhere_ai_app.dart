@@ -158,7 +158,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       url:
           'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
       modality: ModelCategory.speechRecognition,
-      artifactType: ModelArtifactType.tarGzArchive,
+      artifactType: ModelArtifactType.tarGzArchive(
+        structure: ArchiveStructure.nestedDirectory,
+      ),
       memoryRequirement: 75000000,
     );
     Onnx.addModel(
@@ -167,7 +169,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       url:
           'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2',
       modality: ModelCategory.speechRecognition,
-      artifactType: ModelArtifactType.tarBz2Archive,
+      artifactType: ModelArtifactType.tarBz2Archive(
+        structure: ArchiveStructure.nestedDirectory,
+      ),
       memoryRequirement: 250000000,
     );
 
@@ -178,7 +182,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       url:
           'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
       modality: ModelCategory.speechSynthesis,
-      artifactType: ModelArtifactType.tarGzArchive,
+      artifactType: ModelArtifactType.tarGzArchive(
+        structure: ArchiveStructure.nestedDirectory,
+      ),
       memoryRequirement: 65000000,
     );
     Onnx.addModel(
@@ -187,7 +193,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       url:
           'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
       modality: ModelCategory.speechSynthesis,
-      artifactType: ModelArtifactType.tarGzArchive,
+      artifactType: ModelArtifactType.tarGzArchive(
+        structure: ArchiveStructure.nestedDirectory,
+      ),
       memoryRequirement: 65000000,
     );
     debugPrint('✅ ONNX module registered with STT/TTS models');

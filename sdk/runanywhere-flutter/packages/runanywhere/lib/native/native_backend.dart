@@ -724,6 +724,7 @@ class NativeBackend {
   }
 
   /// Get available TTS voices.
+  /// Returns a list of voice IDs extracted from the native backend.
   List<String> getTtsVoices() {
     _ensureInitialized();
 
@@ -734,7 +735,19 @@ class NativeBackend {
       final json = ptr.toDartString();
       final decoded = jsonDecode(json);
       if (decoded is List) {
-        return decoded.cast<String>();
+        // Handle both string lists and object lists
+        return decoded.map((item) {
+          if (item is String) {
+            return item;
+          } else if (item is Map<String, dynamic>) {
+            // Extract voice ID from object - try common field names
+            return (item['id'] ??
+                item['voice_id'] ??
+                item['name'] ??
+                item.toString()) as String;
+          }
+          return item.toString();
+        }).toList();
       }
       return [json];
     } finally {
