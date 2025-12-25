@@ -3,7 +3,6 @@ package com.runanywhere.sdk.llm.llamacpp
 import com.runanywhere.sdk.core.CapabilityType
 import com.runanywhere.sdk.core.ModuleDiscovery
 import com.runanywhere.sdk.core.ModuleRegistry
-import com.runanywhere.sdk.core.ModuleRegistry.shared
 import com.runanywhere.sdk.core.RunAnywhereModule
 import com.runanywhere.sdk.features.llm.LLMConfiguration
 import com.runanywhere.sdk.features.llm.LLMService
@@ -11,7 +10,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.infrastructure.download.DownloadStrategy
 import com.runanywhere.sdk.models.enums.InferenceFramework
-import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.storage.ModelStorageStrategy
 
 /**
@@ -27,11 +25,11 @@ import com.runanywhere.sdk.storage.ModelStorageStrategy
  * ```kotlin
  * import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
  *
- * // Option 1: Direct registration
+ * // Direct registration (recommended)
  * LlamaCPP.register()
  *
- * // Option 2: Via ModuleDiscovery (auto-discovery)
- * ModuleDiscovery.registerDiscoveredModules()
+ * // With custom priority
+ * LlamaCPP.register(priority = 200)
  * ```
  *
  * ## Adding Models
@@ -60,6 +58,10 @@ import com.runanywhere.sdk.storage.ModelStorageStrategy
 object LlamaCPP : RunAnywhereModule {
     private val logger = SDKLogger("LlamaCPP")
 
+    // Track if we're already registered to avoid duplicate work
+    @Volatile
+    private var servicesRegistered = false
+
     // MARK: - RunAnywhereModule Conformance
 
     override val moduleId: String = "llamacpp"
@@ -86,14 +88,34 @@ object LlamaCPP : RunAnywhereModule {
     override val storageStrategy: ModelStorageStrategy = LlamaCppDownloadStrategy.shared
 
     /**
-     * Register LlamaCPP LLM service with the SDK.
-     * Matches iOS: @MainActor public static func register(priority: Int)
+     * Register LlamaCPP module with the SDK.
+     * This is what app code should call: LlamaCPP.register()
+     *
+     * Matches iOS: LlamaCPP.register()
      *
      * @param priority Registration priority (higher values are preferred)
      */
-    override fun register(priority: Int) {
+    @JvmStatic
+    @JvmOverloads
+    fun register(priority: Int = defaultPriority) {
+        // Register through ModuleRegistry which stores metadata and calls registerServices
+        ModuleRegistry.shared.register(this, priority)
+    }
+
+    /**
+     * Internal: Register only the services (called by ModuleRegistry)
+     * Matches iOS register(priority:) which only registers with ServiceRegistry
+     */
+    override fun registerServices(priority: Int) {
+        if (servicesRegistered) {
+            logger.info("LlamaCPP services already registered")
+            return
+        }
+
         ModuleRegistry.shared.registerLLM(moduleName) { config -> createLLMService(config) }
-        logger.info("LlamaCPP LLM registered")
+
+        servicesRegistered = true
+        logger.info("LlamaCPP LLM service registered with priority $priority")
     }
 
     // MARK: - Private Helpers

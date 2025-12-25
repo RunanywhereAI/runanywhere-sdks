@@ -106,17 +106,13 @@ interface RunAnywhereModule {
         get() = null
 
     /**
-     * Register all services provided by this module with the ServiceRegistry
+     * Register all services provided by this module with the ServiceRegistry.
+     * This is called by ModuleRegistry.register(module) - modules should NOT call
+     * ModuleRegistry from this method to avoid infinite recursion.
+     *
      * @param priority Registration priority (higher values are preferred)
      */
-    fun register(priority: Int)
-
-    /**
-     * Convenience registration with default priority
-     */
-    fun register() {
-        register(defaultPriority)
-    }
+    fun registerServices(priority: Int)
 }
 
 /**
