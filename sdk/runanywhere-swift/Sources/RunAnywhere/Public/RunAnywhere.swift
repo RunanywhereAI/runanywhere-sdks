@@ -316,26 +316,42 @@ public enum RunAnywhere {
             ? serviceContainer.networkService == nil
             : serviceContainer.authenticationService == nil
 
+        let apiClient: APIClient?
+        let telemetryRepo: TelemetryRepositoryImpl?
+
         if needsInit {
             logger.info("Initializing services for \(environment.description) mode...")
 
             // Step 1: Setup API client
-            let apiClient = try await setupAPIClient(params: params, environment: environment, logger: logger)
+            apiClient = try await setupAPIClient(params: params, environment: environment, logger: logger)
 
             // Step 2: Create and inject core services
-            let (telemetryRepo, modelInfoService) = await setupCoreServices(
+            let (repo, modelInfoService) = await setupCoreServices(
                 apiClient: apiClient,
                 environment: environment,
                 logger: logger
             )
+            telemetryRepo = repo
 
             // Step 3: Load models
             await loadModels(modelInfoService: modelInfoService, logger: logger)
+        } else {
+            apiClient = serviceContainer.apiClient
+            telemetryRepo = nil
+        }
 
-            // Step 4: Initialize analytics
-            await initializeAnalytics(telemetryRepository: telemetryRepo, apiKey: params.apiKey, logger: logger)
-
-            logger.info("✅ Services initialized")
+        // Step 4: Initialize analytics
+        if let repo = telemetryRepo {
+            await initializeAnalytics(telemetryRepository: repo, apiKey: params.apiKey, logger: logger)
+        } else if let existingApiClient = apiClient ?? serviceContainer.apiClient {
+            let repo = TelemetryRepositoryImpl(
+                databaseManager: DatabaseManager.shared,
+                apiClient: existingApiClient,
+                environment: environment
+            )
+            await initializeAnalytics(telemetryRepository: repo, apiKey: params.apiKey, logger: logger)
+        } else {
+            logger.error("Cannot initialize analytics: No API client available")
         }
 
         // Step 5: Register device

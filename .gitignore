@@ -281,3 +281,4 @@ pubspec.lock
 # Flutter auto-generated files (contain developer-specific local paths)
 **/ios/Flutter/Generated.xcconfig
 **/ios/Flutter/flutter_export_environment.sh
+sdk/runanywhere-swift/Sources/RunAnywhere/Data/Network/DevelopmentConfig.swift

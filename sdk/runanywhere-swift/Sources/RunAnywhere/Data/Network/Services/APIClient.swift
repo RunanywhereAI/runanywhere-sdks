@@ -88,7 +88,25 @@ public actor APIClient: NetworkService {
                     if let detail = errorData["detail"] as? String {
                         errorMessage = detail
                     } else if let detail = errorData["detail"] as? [[String: Any]] { // swiftlint:disable:this avoid_any_type
-                        let errors = detail.compactMap { $0["msg"] as? String }.joined(separator: ", ")
+                        // Parse Pydantic validation errors with field location
+                        let errors = detail.compactMap { error -> String? in
+                            guard let msg = error["msg"] as? String else { return nil }
+                            // Extract field path from loc array (e.g., ["body", "events", 0, "id"] → "events[0].id")
+                            if let loc = error["loc"] as? [Any] { // swiftlint:disable:this avoid_any_type
+                                let fieldPath = loc.dropFirst() // Skip "body"
+                                    .map { item -> String in
+                                        if let index = item as? Int {
+                                            return "[\(index)]"
+                                        }
+                                        return String(describing: item)
+                                    }
+                                    .joined()
+                                    .replacingOccurrences(of: "][", with: "].")  // Fix array notation
+                                    .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+                                return fieldPath.isEmpty ? msg : "\(fieldPath): \(msg)"
+                            }
+                            return msg
+                        }.joined(separator: "; ")
                         errorMessage = errors.isEmpty ? errorMessage : errors
                     } else if let message = errorData["message"] as? String {
                         errorMessage = message
@@ -141,7 +159,25 @@ public actor APIClient: NetworkService {
                 if let detail = errorData["detail"] as? String {
                     errorMessage = detail
                 } else if let detail = errorData["detail"] as? [[String: Any]] { // swiftlint:disable:this avoid_any_type
-                    let errors = detail.compactMap { $0["msg"] as? String }.joined(separator: ", ")
+                    // Parse Pydantic validation errors with field location
+                    let errors = detail.compactMap { error -> String? in
+                        guard let msg = error["msg"] as? String else { return nil }
+                        // Extract field path from loc array
+                        if let loc = error["loc"] as? [Any] { // swiftlint:disable:this avoid_any_type
+                            let fieldPath = loc.dropFirst() // Skip "body"
+                                .map { item -> String in
+                                    if let index = item as? Int {
+                                        return "[\(index)]"
+                                    }
+                                    return String(describing: item)
+                                }
+                                .joined()
+                                .replacingOccurrences(of: "][", with: "].")
+                                .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+                            return fieldPath.isEmpty ? msg : "\(fieldPath): \(msg)"
+                        }
+                        return msg
+                    }.joined(separator: "; ")
                     errorMessage = errors.isEmpty ? errorMessage : errors
                 }
             }

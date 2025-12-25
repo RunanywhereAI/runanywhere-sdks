@@ -82,8 +82,8 @@ public enum ModelEvent: SDKEvent {
     public var destination: EventDestination {
         switch self {
         case .downloadProgress, .extractionProgress:
-            // Progress updates are analytics only (too chatty)
-            return .analyticsOnly
+            // Progress updates are for public EventBus (UI updates) - not sent to analytics/remote
+            return .publicOnly
         default:
             return .all
         }

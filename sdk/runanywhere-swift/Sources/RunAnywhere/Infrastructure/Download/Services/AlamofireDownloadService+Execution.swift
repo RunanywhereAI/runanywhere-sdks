@@ -17,6 +17,7 @@ extension AlamofireDownloadService {
             return (destination, [.removePreviousFile, .createIntermediateDirectories])
         }
 
+        var lastReportedProgress = -1.0
         let downloadRequest = session.download(url, to: destination)
             .downloadProgress { progress in
                 let downloadProgress = DownloadProgress(
@@ -27,7 +28,7 @@ extension AlamofireDownloadService {
                     state: .downloading
                 )
 
-                // Log progress at 25% intervals (local logging only, no analytics)
+                // Log progress at 25% intervals (local logging only)
                 let progressPercent = Int(progress.fractionCompleted * 100)
                 if progressPercent % 25 == 0 && progressPercent > 0 {
                     self.logger.debug("Download progress", metadata: [
@@ -38,7 +39,18 @@ extension AlamofireDownloadService {
                         "speed": self.calculateDownloadSpeed(progress: progress)
                     ])
                 }
-                // Note: Progress events removed from analytics - only start/complete are tracked
+
+                // Track progress at 10% intervals (public EventBus only - for UI updates)
+                let progressValue = progress.fractionCompleted
+                if progressValue - lastReportedProgress >= 0.1 {
+                    lastReportedProgress = progressValue
+                    EventPublisher.shared.track(ModelEvent.downloadProgress(
+                        modelId: model.id,
+                        progress: progressValue,
+                        bytesDownloaded: progress.completedUnitCount,
+                        totalBytes: progress.totalUnitCount
+                    ))
+                }
 
                 progressContinuation.yield(downloadProgress)
             }
@@ -108,12 +120,21 @@ extension AlamofireDownloadService {
         progressContinuation.yield(.extraction(modelId: model.id, progress: 0.0))
 
         do {
+            var lastReportedExtractionProgress: Double = -1.0
             let result = try await extractionService.extract(
                 archiveURL: archiveURL,
                 to: destinationFolder,
                 artifactType: model.artifactType,
                 progressHandler: { progress in
-                    // Progress updates are for UI only - analytics tracks start/complete only
+                    // Track extraction progress (public EventBus only - for UI updates)
+                    if progress - lastReportedExtractionProgress >= 0.1 {
+                        lastReportedExtractionProgress = progress
+                        EventPublisher.shared.track(ModelEvent.extractionProgress(
+                            modelId: model.id,
+                            progress: progress
+                        ))
+                    }
+
                     progressContinuation.yield(.extraction(
                         modelId: model.id,
                         progress: progress,

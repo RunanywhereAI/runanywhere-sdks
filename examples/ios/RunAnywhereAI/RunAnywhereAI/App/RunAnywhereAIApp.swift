@@ -71,7 +71,7 @@ struct RunAnywhereAIApp: App {
 
             let startTime = Date()
 
-            // Initialize SDK based on build configuration
+             // Initialize SDK based on build configuration
             #if DEBUG
             // Development mode - uses Supabase, no API key needed
             try RunAnywhere.initialize()
@@ -88,6 +88,8 @@ struct RunAnywhereAIApp: App {
             )
             logger.info("✅ SDK initialized in PRODUCTION mode")
             #endif
+
+            try RunAnywhere.initialize(environment: .development)
 
             // Register modules and models
             await registerModulesAndModels()
@@ -199,6 +201,22 @@ struct RunAnywhereAIApp: App {
             logger.info("✅ AppleAI module registered (Foundation Models)")
         }
         #endif
+
+        // Register System TTS provider (for "system-tts" model ID)
+        ServiceRegistry.shared.registerTTS(
+            name: "System TTS",
+            priority: 50, // Lower priority than ONNX TTS (so ONNX takes precedence when model exists)
+            canHandle: { voiceId in
+                // Handle "system-tts" model ID
+                voiceId?.lowercased() == "system-tts" || voiceId?.lowercased() == "system_tts"
+            },
+            factory: { config in
+                let service = SystemTTSService()
+                try await service.initialize()
+                return service
+            }
+        )
+        logger.info("✅ System TTS provider registered")
 
         logger.info("🎉 All modules and models registered")
     }
