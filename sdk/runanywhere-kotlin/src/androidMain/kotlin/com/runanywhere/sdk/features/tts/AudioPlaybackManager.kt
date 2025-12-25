@@ -2,7 +2,6 @@ package com.runanywhere.sdk.features.tts
 
 import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioManager
 import android.media.AudioTrack
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.Dispatchers
@@ -110,21 +109,22 @@ class AudioPlaybackManager {
             val bufferSize = maxOf(minBufferSize, pcmData.size)
 
             val track =
-                AudioTrack.Builder()
+                AudioTrack
+                    .Builder()
                     .setAudioAttributes(
-                        AudioAttributes.Builder()
+                        AudioAttributes
+                            .Builder()
                             .setUsage(AudioAttributes.USAGE_MEDIA)
                             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                             .build(),
-                    )
-                    .setAudioFormat(
-                        AudioFormat.Builder()
+                    ).setAudioFormat(
+                        AudioFormat
+                            .Builder()
                             .setEncoding(audioFormat)
                             .setSampleRate(sampleRate)
                             .setChannelMask(channelConfig)
                             .build(),
-                    )
-                    .setBufferSizeInBytes(bufferSize)
+                    ).setBufferSizeInBytes(bufferSize)
                     .setTransferMode(AudioTrack.MODE_STATIC)
                     .build()
 
@@ -239,19 +239,27 @@ class AudioPlaybackManager {
  */
 sealed class AudioPlaybackException : Exception() {
     data object EmptyAudioData : AudioPlaybackException() {
+        @Suppress("UnusedPrivateMember")
         private fun readResolve(): Any = EmptyAudioData
+
         override val message: String = "Audio data is empty"
     }
 
-    data class PlaybackFailed(override val message: String?) : AudioPlaybackException()
+    data class PlaybackFailed(
+        override val message: String?,
+    ) : AudioPlaybackException()
 
     data object PlaybackInterrupted : AudioPlaybackException() {
+        @Suppress("UnusedPrivateMember")
         private fun readResolve(): Any = PlaybackInterrupted
+
         override val message: String = "Audio playback was interrupted"
     }
 
     data object InvalidAudioFormat : AudioPlaybackException() {
+        @Suppress("UnusedPrivateMember")
         private fun readResolve(): Any = InvalidAudioFormat
+
         override val message: String = "Invalid audio format"
     }
 }
