@@ -3,7 +3,6 @@ package com.runanywhere.sdk.core.onnx
 import com.runanywhere.sdk.core.CapabilityType
 import com.runanywhere.sdk.core.ModuleDiscovery
 import com.runanywhere.sdk.core.ModuleRegistry
-import com.runanywhere.sdk.core.ModuleRegistryMetadata
 import com.runanywhere.sdk.core.RunAnywhereModule
 import com.runanywhere.sdk.features.stt.STTConfiguration
 import com.runanywhere.sdk.features.stt.STTService
@@ -15,7 +14,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.infrastructure.download.DownloadStrategy
 import com.runanywhere.sdk.models.enums.InferenceFramework
-import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.storage.ModelStorageStrategy
 
 /**
@@ -115,19 +113,10 @@ object ONNX : RunAnywhereModule {
      * @param priority Registration priority (higher values are preferred)
      */
     override fun register(priority: Int) {
-        // Check for duplicate registration
-        if (ModuleRegistryMetadata.isRegistered(moduleId)) {
-            logger.warning("ONNX module already registered, skipping")
-            return
-        }
-
         // Register services using factory closures (matching iOS exactly)
         registerSTT(priority)
         registerTTS(priority)
         registerVAD(priority)
-
-        // Register module metadata for tracking
-        ModuleRegistryMetadata.registerModule(this, priority)
 
         logger.info("ONNX module registered (STT + TTS + VAD) with priority $priority")
     }
@@ -136,29 +125,17 @@ object ONNX : RunAnywhereModule {
 
     /**
      * Register only ONNX STT service
-     * Matches iOS: @MainActor public static func registerSTT(priority: Int = 100)
      */
     fun registerSTT(priority: Int = 100) {
-        ModuleRegistry.shared.registerSTTFactory(
-            name = moduleName,
-            priority = priority,
-            canHandle = { modelId -> canHandleSTT(modelId) },
-            factory = { config -> createSTTService(config) },
-        )
+        ModuleRegistry.shared.registerSTT(moduleName) { config -> createSTTService(config) }
         logger.info("ONNX STT registered")
     }
 
     /**
      * Register only ONNX TTS service
-     * Matches iOS: @MainActor public static func registerTTS(priority: Int = 100)
      */
     fun registerTTS(priority: Int = 100) {
-        ModuleRegistry.shared.registerTTSFactory(
-            name = "ONNX TTS",
-            priority = priority,
-            canHandle = { modelId -> canHandleTTS(modelId) },
-            factory = { config -> createTTSService(config) },
-        )
+        ModuleRegistry.shared.registerTTS("ONNX TTS") { config -> createTTSService(config) }
         logger.info("ONNX TTS registered")
     }
 
@@ -166,58 +143,11 @@ object ONNX : RunAnywhereModule {
      * Register only ONNX VAD service
      */
     fun registerVAD(priority: Int = 100) {
-        ModuleRegistry.shared.registerVADFactory(
-            name = "ONNX VAD",
-            priority = priority,
-            canHandle = { modelId -> canHandleVAD(modelId) },
-            factory = { config -> createVADService(config) },
-        )
+        ModuleRegistry.shared.registerVAD("ONNX VAD") { config -> createVADService(config) }
         logger.info("ONNX VAD registered")
     }
 
-    // MARK: - STT Helpers (matching iOS exactly)
-
-    /**
-     * Check if this module can handle the given STT model
-     * Matches iOS canHandleSTT(_:) implementation
-     */
-    private fun canHandleSTT(modelId: String?): Boolean {
-        if (modelId == null) return false
-
-        val lowercased = modelId.lowercase()
-
-        // Check model info cache first (matching iOS)
-        val modelInfo = ServiceContainer.shared.modelRegistry.getModel(modelId)
-        if (modelInfo != null) {
-            if (modelInfo.preferredFramework == InferenceFramework.ONNX &&
-                modelInfo.category == ModelCategory.SPEECH_RECOGNITION
-            ) {
-                return true
-            }
-            if (modelInfo.compatibleFrameworks.contains(InferenceFramework.ONNX) &&
-                modelInfo.category == ModelCategory.SPEECH_RECOGNITION
-            ) {
-                return true
-            }
-            return false
-        }
-
-        // Fallback: Pattern-based matching (matching iOS)
-        if (lowercased.contains("onnx") || lowercased.endsWith(".onnx")) {
-            return true
-        }
-        if (lowercased.contains("zipformer") || lowercased.contains("sherpa")) {
-            return true
-        }
-        if (lowercased.contains("whisper") && (lowercased.contains("onnx") || lowercased.contains("sherpa"))) {
-            return true
-        }
-        if (lowercased.contains("distil") || lowercased.contains("glados") || lowercased.contains("paraformer")) {
-            return true
-        }
-
-        return false
-    }
+    // MARK: - STT Helpers
 
     /**
      * Create an STT service with the given configuration
@@ -244,49 +174,7 @@ object ONNX : RunAnywhereModule {
         return service
     }
 
-    // MARK: - TTS Helpers (matching iOS exactly)
-
-    /**
-     * Check if this module can handle the given TTS model
-     * Matches iOS canHandleTTS(_:) implementation
-     */
-    private fun canHandleTTS(modelId: String?): Boolean {
-        if (modelId == null) return false
-
-        val lowercased = modelId.lowercase()
-
-        // Check model info cache first (matching iOS)
-        val modelInfo = ServiceContainer.shared.modelRegistry.getModel(modelId)
-        if (modelInfo != null) {
-            if (modelInfo.preferredFramework == InferenceFramework.ONNX &&
-                modelInfo.category == ModelCategory.SPEECH_SYNTHESIS
-            ) {
-                return true
-            }
-            if (modelInfo.compatibleFrameworks.contains(InferenceFramework.ONNX) &&
-                modelInfo.category == ModelCategory.SPEECH_SYNTHESIS
-            ) {
-                return true
-            }
-            return false
-        }
-
-        // Fallback: Pattern-based matching (matching iOS)
-        if (lowercased.contains("piper")) {
-            return true
-        }
-        if (lowercased.contains("vits")) {
-            return true
-        }
-        if (lowercased.contains("tts") && lowercased.contains("onnx")) {
-            return true
-        }
-        if (lowercased.contains("sherpa-onnx") && lowercased.contains("tts")) {
-            return true
-        }
-
-        return false
-    }
+    // MARK: - TTS Helpers
 
     /**
      * Create a TTS service with the given configuration
@@ -314,34 +202,6 @@ object ONNX : RunAnywhereModule {
     }
 
     // MARK: - VAD Helpers
-
-    /**
-     * Check if this module can handle the given VAD model
-     */
-    private fun canHandleVAD(modelId: String?): Boolean {
-        if (modelId == null) return false
-
-        val lowercased = modelId.lowercase()
-
-        // Check model info cache first
-        val modelInfo = ServiceContainer.shared.modelRegistry.getModel(modelId)
-        if (modelInfo != null) {
-            if (modelInfo.preferredFramework == InferenceFramework.ONNX &&
-                modelInfo.category == ModelCategory.AUDIO
-            ) {
-                return true
-            }
-            if (modelInfo.compatibleFrameworks.contains(InferenceFramework.ONNX) &&
-                modelInfo.category == ModelCategory.AUDIO
-            ) {
-                return true
-            }
-        }
-
-        // Pattern-based matching
-        return lowercased.contains("silero") ||
-            (lowercased.contains("vad") && lowercased.contains("onnx"))
-    }
 
     /**
      * Create a VAD service with the given configuration

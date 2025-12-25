@@ -610,7 +610,7 @@ class KtorDownloadService(
 
     /**
      * Find a download strategy that can handle the given model.
-     * Uses ModuleRegistryMetadata to get strategies from registered modules.
+     * Uses ModuleRegistry.shared to get strategies from registered modules.
      * Matches iOS findCustomStrategy(for:) implementation.
      *
      * @param model The model to find a strategy for
@@ -624,17 +624,17 @@ class KtorDownloadService(
             }
         }
 
-        // Then check ModuleRegistryMetadata for module-provided strategies
+        // Then check ModuleRegistry.shared for module-provided strategies
         // First try the model's preferred framework
         model.preferredFramework?.let { framework ->
-            val strategy = com.runanywhere.sdk.core.ModuleRegistryMetadata.downloadStrategy(framework)
+            val strategy = com.runanywhere.sdk.core.ModuleRegistry.shared.downloadStrategy(framework)
             if (strategy != null && strategy.canHandle(model)) {
                 return strategy
             }
         }
 
         // Try all registered download strategies
-        for (strategy in com.runanywhere.sdk.core.ModuleRegistryMetadata.allDownloadStrategies) {
+        for (strategy in com.runanywhere.sdk.core.ModuleRegistry.shared.allDownloadStrategies) {
             if (strategy.canHandle(model)) {
                 return strategy
             }

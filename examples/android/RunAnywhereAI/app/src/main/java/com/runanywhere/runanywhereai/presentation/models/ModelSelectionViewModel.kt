@@ -86,30 +86,20 @@ class ModelSelectionViewModel(
                     }
                 android.util.Log.d("ModelSelectionVM", "📦 Filtered to ${filteredModels.size} models for context $context")
 
-                // Get registered framework providers from ModuleRegistry
-                val llmProviders = com.runanywhere.sdk.core.ModuleRegistry.allLLMProviders
-                val sttProviders = com.runanywhere.sdk.core.ModuleRegistry.allSTTProviders
-                val ttsProviders = com.runanywhere.sdk.core.ModuleRegistry.allTTSProviders
+                // Get registered capabilities from ModuleRegistry
+                val hasLLM = com.runanywhere.sdk.core.ModuleRegistry.hasLLM
+                val hasSTT = com.runanywhere.sdk.core.ModuleRegistry.hasSTT
+                val hasTTS = com.runanywhere.sdk.core.ModuleRegistry.hasTTS
 
                 android.util.Log.d(
                     "ModelSelectionVM",
-                    "🔍 LLM Providers: ${llmProviders.size}, STT Providers: ${sttProviders.size}, TTS Providers: ${ttsProviders.size}",
+                    "🔍 LLM: $hasLLM, STT: $hasSTT, TTS: $hasTTS",
                 )
 
-                // Build framework list from registered providers - filtered by context
+                // Build framework list from registered modules
                 val allRegisteredFrameworks = mutableSetOf<InferenceFramework>()
-
-                // Add LLM frameworks
-                llmProviders.forEach { provider ->
-                    allRegisteredFrameworks.add(provider.framework)
-                }
-                // Add STT frameworks
-                sttProviders.forEach { provider ->
-                    allRegisteredFrameworks.add(provider.framework)
-                }
-                // Add TTS frameworks
-                ttsProviders.forEach { provider ->
-                    allRegisteredFrameworks.add(provider.framework)
+                com.runanywhere.sdk.core.ModuleRegistry.allModules.forEach { module ->
+                    allRegisteredFrameworks.add(module.inferenceFramework)
                 }
 
                 // Filter frameworks by context - matches iOS shouldShowFramework logic

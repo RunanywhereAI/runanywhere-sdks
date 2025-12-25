@@ -1,0 +1,453 @@
+package com.runanywhere.sdk.core.onnx
+
+import com.runanywhere.sdk.features.stt.STTConfiguration
+import com.runanywhere.sdk.features.stt.STTOptions
+import com.runanywhere.sdk.features.stt.STTService
+import com.runanywhere.sdk.features.stt.STTTranscriptionResult
+import com.runanywhere.sdk.features.tts.TTSConfiguration
+import com.runanywhere.sdk.features.tts.TTSOptions
+import com.runanywhere.sdk.features.tts.TTSService
+import com.runanywhere.sdk.features.vad.VADConfiguration
+import com.runanywhere.sdk.features.vad.VADResult
+import com.runanywhere.sdk.features.vad.VADService
+import com.runanywhere.sdk.features.vad.VADStatistics
+import com.runanywhere.sdk.features.vad.SpeechActivityEvent
+import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.ServiceContainer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+private val logger = SDKLogger("ONNXServices")
+
+// JSON parser for native results
+private val jsonParser = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+}
+
+@Serializable
+private data class NativeSTTResult(
+    val text: String = "",
+    val confidence: Double = 0.0,
+    val detected_language: String = "",
+    val audio_duration_ms: Double = 0.0,
+    val inference_time_ms: Double = 0.0,
+    val is_final: Boolean = true
+)
+
+// =============================================================================
+// MARK: - Service Creation Functions (actual implementations for expect)
+// =============================================================================
+
+internal actual suspend fun createONNXSTTService(configuration: STTConfiguration): STTService {
+    logger.info("Creating ONNX STT service: ${configuration.modelId}")
+
+    val service = ONNXCoreService()
+    service.initialize()
+
+    // Load model if path provided
+    configuration.modelId?.let { modelId ->
+        if (modelId.contains("/") || modelId.endsWith(".onnx")) {
+            val modelType = detectSTTModelType(modelId)
+            service.loadSTTModel(modelId, modelType)
+            logger.info("STT model loaded: $modelId")
+        }
+    }
+
+    return ONNXSTTService(service)
+}
+
+internal actual suspend fun createONNXTTSService(configuration: TTSConfiguration): TTSService {
+    logger.info("Creating ONNX TTS service: ${configuration.modelId}")
+    return ONNXTTSService(configuration)
+}
+
+internal actual suspend fun createONNXVADService(configuration: VADConfiguration): VADService {
+    logger.info("Creating ONNX VAD service")
+
+    val service = ONNXCoreService()
+    service.initialize()
+
+    configuration.modelId?.let { modelId ->
+        service.loadVADModel(modelId)
+    }
+
+    return ONNXVADService(service, configuration)
+}
+
+// =============================================================================
+// MARK: - ONNX STT Service
+// =============================================================================
+
+internal class ONNXSTTService(
+    private val coreService: ONNXCoreService
+) : STTService {
+    private val sttLogger = SDKLogger("ONNXSTTService")
+    private var modelPath: String? = null
+
+    override val isReady: Boolean
+        get() = coreService.isInitialized && coreService.isSTTModelLoaded
+
+    override val currentModel: String?
+        get() = modelPath?.substringAfterLast("/")?.substringBeforeLast(".")
+
+    override val supportsStreaming: Boolean
+        get() = coreService.supportsSTTStreaming
+
+    override suspend fun initialize(modelPath: String?) {
+        modelPath?.let { path ->
+            val modelType = detectSTTModelType(path)
+            coreService.loadSTTModel(path, modelType)
+            this.modelPath = path
+            sttLogger.info("STT model loaded: $path")
+        }
+    }
+
+    override suspend fun transcribe(audioData: ByteArray, options: STTOptions): STTTranscriptionResult {
+        if (!isReady) {
+            throw IllegalStateException("STT service not ready - model not loaded")
+        }
+
+        val samples = convertToFloat32Samples(audioData)
+        val jsonResult = coreService.transcribe(samples, options.sampleRate, options.language)
+        return parseSTTResult(jsonResult)
+    }
+
+    override suspend fun streamTranscribe(
+        audioStream: Flow<ByteArray>,
+        options: STTOptions,
+        onPartial: (String) -> Unit
+    ): STTTranscriptionResult {
+        // Collect all audio and transcribe in batch (streaming not fully implemented)
+        val allAudio = mutableListOf<Byte>()
+        audioStream.collect { chunk ->
+            allAudio.addAll(chunk.toList())
+        }
+        return transcribe(allAudio.toByteArray(), options)
+    }
+
+    override suspend fun cleanup() {
+        if (coreService.isSTTModelLoaded) {
+            coreService.unloadSTTModel()
+        }
+        coreService.destroy()
+    }
+
+    fun setModelPath(path: String) {
+        this.modelPath = path
+    }
+
+    private fun parseSTTResult(jsonResult: String): STTTranscriptionResult {
+        return try {
+            val result = jsonParser.decodeFromString<NativeSTTResult>(jsonResult)
+            STTTranscriptionResult(
+                transcript = result.text.trim(),
+                confidence = result.confidence.toFloat(),
+                language = result.detected_language.ifEmpty { null }
+            )
+        } catch (e: Exception) {
+            STTTranscriptionResult(transcript = jsonResult.trim(), confidence = 1.0f, language = null)
+        }
+    }
+}
+
+// =============================================================================
+// MARK: - ONNX TTS Service
+// =============================================================================
+
+internal class ONNXTTSService(
+    private val configuration: TTSConfiguration
+) : TTSService {
+    private val ttsLogger = SDKLogger("ONNXTTSService")
+    private var coreService: ONNXCoreService? = null
+    private var loadedModelPath: String? = null
+    private var _isSynthesizing = false
+
+    override val inferenceFramework: String = "ONNX Runtime"
+    override val isSynthesizing: Boolean get() = _isSynthesizing
+    override val availableVoices: List<String> = emptyList()
+
+    override suspend fun initialize() {
+        ttsLogger.info("Initializing ONNX TTS service")
+        val service = ONNXCoreService()
+        service.initialize()
+        coreService = service
+        ttsLogger.info("ONNX TTS service initialized")
+    }
+
+    override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
+        if (coreService == null) {
+            initialize()
+        }
+
+        val service = coreService ?: throw IllegalStateException("TTS service not initialized")
+
+        _isSynthesizing = true
+        try {
+            val modelPath = resolveModelPath(options.voice ?: configuration.modelId)
+                ?: throw IllegalStateException("No TTS model path provided")
+
+            // Load model if needed
+            if (loadedModelPath != modelPath) {
+                ttsLogger.info("Loading TTS model: $modelPath")
+                service.loadTTSModel(modelPath, "vits")
+                loadedModelPath = modelPath
+            }
+
+            val result = service.synthesize(
+                text = text,
+                voiceId = "0",
+                speedRate = options.rate,
+                pitchShift = options.pitch
+            )
+
+            ttsLogger.info("Synthesized ${result.samples.size} samples at ${result.sampleRate} Hz")
+            return convertToWav(result.samples, result.sampleRate)
+        } finally {
+            _isSynthesizing = false
+        }
+    }
+
+    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> = flow {
+        val audio = synthesize(text, options)
+        val chunkSize = options.sampleRate * 2
+        var offset = 0
+        while (offset < audio.size) {
+            val end = minOf(offset + chunkSize, audio.size)
+            emit(audio.copyOfRange(offset, end))
+            offset = end
+        }
+    }
+
+    override fun stop() {
+        _isSynthesizing = false
+    }
+
+    override suspend fun cleanup() {
+        coreService?.let { service ->
+            if (service.isTTSModelLoaded) service.unloadTTSModel()
+            service.destroy()
+        }
+        coreService = null
+        loadedModelPath = null
+    }
+
+    private fun resolveModelPath(voice: String?): String? {
+        return when {
+            voice.isNullOrEmpty() -> null
+            voice.contains("/") -> voice
+            else -> ServiceContainer.shared.modelRegistry.getModel(voice)?.localPath ?: voice
+        }
+    }
+}
+
+// =============================================================================
+// MARK: - ONNX VAD Service
+// =============================================================================
+
+internal class ONNXVADService(
+    private val coreService: ONNXCoreService,
+    private val initialConfiguration: VADConfiguration
+) : VADService {
+    private val vadLogger = SDKLogger("ONNXVADService")
+
+    override var energyThreshold: Float = initialConfiguration.energyThreshold
+    override val sampleRate: Int = initialConfiguration.sampleRate
+    override val frameLength: Float = initialConfiguration.frameLength
+    override var isSpeechActive: Boolean = false
+        private set
+
+    override var onSpeechActivity: ((SpeechActivityEvent) -> Unit)? = null
+    override var onAudioBuffer: ((ByteArray) -> Unit)? = null
+
+    override val isReady: Boolean
+        get() = coreService.isInitialized && coreService.isVADModelLoaded
+
+    override val configuration: VADConfiguration
+        get() = initialConfiguration
+
+    // TTS feedback prevention
+    override var isTTSActive: Boolean = false
+        private set
+    private var baseEnergyThreshold: Float = 0.0f
+    private var ttsThresholdMultiplier: Float = 3.0f
+
+    // Statistics
+    private val recentConfidenceValues = mutableListOf<Float>()
+    private val maxRecentValues = 20
+
+    override suspend fun initialize(configuration: VADConfiguration) {
+        energyThreshold = configuration.energyThreshold
+        configuration.modelId?.let { modelId ->
+            coreService.loadVADModel(modelId)
+        }
+    }
+
+    override fun start() {
+        // ONNX VAD doesn't require explicit start
+    }
+
+    override fun stop() {
+        // ONNX VAD doesn't require explicit stop
+    }
+
+    override fun reset() {
+        isSpeechActive = false
+        recentConfidenceValues.clear()
+    }
+
+    override fun processAudioChunk(audioSamples: FloatArray): VADResult {
+        if (isTTSActive) {
+            return VADResult(isSpeechDetected = false, confidence = 0.0f)
+        }
+
+        val result = runBlocking(Dispatchers.Default) {
+            coreService.processVAD(audioSamples, sampleRate)
+        }
+
+        val wasActive = isSpeechActive
+        isSpeechActive = result.isSpeech
+
+        // Track for statistics
+        recentConfidenceValues.add(result.probability)
+        if (recentConfidenceValues.size > maxRecentValues) {
+            recentConfidenceValues.removeAt(0)
+        }
+
+        // Fire callbacks on state change
+        if (isSpeechActive && !wasActive) {
+            onSpeechActivity?.invoke(SpeechActivityEvent.STARTED)
+        } else if (!isSpeechActive && wasActive) {
+            onSpeechActivity?.invoke(SpeechActivityEvent.ENDED)
+        }
+
+        return VADResult(isSpeechDetected = result.isSpeech, confidence = result.probability)
+    }
+
+    override fun processAudioData(audioData: FloatArray): Boolean {
+        return processAudioChunk(audioData).isSpeechDetected
+    }
+
+    override suspend fun cleanup() {
+        coreService.unloadVADModel()
+    }
+
+    // TTS Feedback Prevention
+    override fun notifyTTSWillStart() {
+        isTTSActive = true
+        baseEnergyThreshold = energyThreshold
+        if (isSpeechActive) {
+            isSpeechActive = false
+            onSpeechActivity?.invoke(SpeechActivityEvent.ENDED)
+        }
+    }
+
+    override fun notifyTTSDidFinish() {
+        isTTSActive = false
+        energyThreshold = baseEnergyThreshold
+        recentConfidenceValues.clear()
+        isSpeechActive = false
+    }
+
+    override fun setTTSThresholdMultiplier(multiplier: Float) {
+        ttsThresholdMultiplier = multiplier.coerceIn(2.0f, 5.0f)
+    }
+
+    override suspend fun startCalibration(): Boolean {
+        return false // ONNX VAD uses pre-trained models
+    }
+
+    override fun getStatistics(): VADStatistics {
+        val recent = if (recentConfidenceValues.isEmpty()) 0.0f
+            else recentConfidenceValues.sum() / recentConfidenceValues.size
+
+        return VADStatistics(
+            current = recentConfidenceValues.lastOrNull() ?: 0.0f,
+            threshold = energyThreshold,
+            ambient = 0.0f,
+            recentAvg = recent,
+            recentMax = recentConfidenceValues.maxOrNull() ?: 0.0f
+        )
+    }
+}
+
+// =============================================================================
+// MARK: - Helper Functions
+// =============================================================================
+
+private fun detectSTTModelType(modelPath: String): String {
+    val lowercased = modelPath.lowercase()
+    return when {
+        lowercased.contains("zipformer") -> "zipformer"
+        lowercased.contains("whisper") -> "whisper"
+        lowercased.contains("paraformer") -> "paraformer"
+        lowercased.contains("sherpa") -> "zipformer"
+        else -> "zipformer"
+    }
+}
+
+private fun convertToFloat32Samples(audioData: ByteArray): FloatArray {
+    val samples = FloatArray(audioData.size / 2)
+    for (i in samples.indices) {
+        val low = audioData[i * 2].toInt() and 0xFF
+        val high = audioData[i * 2 + 1].toInt()
+        val sample = (high shl 8) or low
+        samples[i] = sample / 32768.0f
+    }
+    return samples
+}
+
+private fun convertToWav(samples: FloatArray, sampleRate: Int): ByteArray {
+    val numSamples = samples.size
+    val bitsPerSample = 16
+    val byteRate = sampleRate * bitsPerSample / 8
+    val dataSize = numSamples * 2
+    val fileSize = 36 + dataSize
+
+    val buffer = ByteArray(44 + dataSize)
+    var offset = 0
+
+    // RIFF header
+    "RIFF".toByteArray().copyInto(buffer, offset); offset += 4
+    writeInt32LE(buffer, offset, fileSize); offset += 4
+    "WAVE".toByteArray().copyInto(buffer, offset); offset += 4
+
+    // fmt chunk
+    "fmt ".toByteArray().copyInto(buffer, offset); offset += 4
+    writeInt32LE(buffer, offset, 16); offset += 4
+    writeInt16LE(buffer, offset, 1); offset += 2
+    writeInt16LE(buffer, offset, 1); offset += 2
+    writeInt32LE(buffer, offset, sampleRate); offset += 4
+    writeInt32LE(buffer, offset, byteRate); offset += 4
+    writeInt16LE(buffer, offset, 2); offset += 2
+    writeInt16LE(buffer, offset, bitsPerSample); offset += 2
+
+    // data chunk
+    "data".toByteArray().copyInto(buffer, offset); offset += 4
+    writeInt32LE(buffer, offset, dataSize); offset += 4
+
+    // Write samples
+    for (sample in samples) {
+        val intSample = (sample * 32767).toInt().coerceIn(-32768, 32767)
+        writeInt16LE(buffer, offset, intSample)
+        offset += 2
+    }
+
+    return buffer
+}
+
+private fun writeInt16LE(buffer: ByteArray, offset: Int, value: Int) {
+    buffer[offset] = (value and 0xFF).toByte()
+    buffer[offset + 1] = ((value shr 8) and 0xFF).toByte()
+}
+
+private fun writeInt32LE(buffer: ByteArray, offset: Int, value: Int) {
+    buffer[offset] = (value and 0xFF).toByte()
+    buffer[offset + 1] = ((value shr 8) and 0xFF).toByte()
+    buffer[offset + 2] = ((value shr 16) and 0xFF).toByte()
+    buffer[offset + 3] = ((value shr 24) and 0xFF).toByte()
+}

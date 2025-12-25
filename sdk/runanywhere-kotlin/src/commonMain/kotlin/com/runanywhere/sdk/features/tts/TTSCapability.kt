@@ -361,21 +361,12 @@ private fun createTTSLifecycleManager(): ModelLifecycleManager<TTSService> {
         loadResource = { resourceId, config ->
             logger.info("Loading TTS voice: $resourceId")
 
-            // Get provider from registry (same pattern as LLM/STT)
-            val provider = ModuleRegistry.ttsProvider(resourceId)
-                ?: throw SDKError.ComponentNotInitialized(
-                    "No TTS service provider registered for voice: $resourceId. " +
-                        "Make sure a TTS module is registered."
-                )
-
-            logger.info("Found TTS provider: ${provider.name}")
-
             // Create configuration
             val ttsConfig = (config as? TTSConfiguration)
                 ?: TTSConfiguration(modelId = resourceId)
 
-            // Create service through provider (same pattern as LLM/STT)
-            val service = provider.createTTSService(ttsConfig)
+            // Create service using registry
+            val service = ModuleRegistry.createTTS(ttsConfig)
 
             // Initialize the service
             service.initialize()

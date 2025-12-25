@@ -634,22 +634,12 @@ object RunAnywhere {
     }
 
     /**
-     * Register the built-in SimpleEnergyVAD provider
+     * Register the built-in SimpleEnergyVAD
      */
     private fun registerBuiltInVADProvider() {
-        val simpleVADProvider = object : com.runanywhere.sdk.core.VADServiceProvider {
-            override suspend fun createVADService(configuration: VADConfiguration): VADService =
-                SimpleEnergyVAD(vadConfig = configuration)
-
-            override fun canHandle(modelId: String): Boolean =
-                modelId.isEmpty() || // Default provider
-                    modelId.contains("simple", ignoreCase = true) ||
-                    modelId.contains("energy", ignoreCase = true)
-
-            override val name: String = "SimpleEnergyVAD"
+        ModuleRegistry.registerVAD("SimpleEnergyVAD") { config ->
+            SimpleEnergyVAD(vadConfig = config)
         }
-
-        ModuleRegistry.registerVAD(simpleVADProvider)
     }
 
     /**

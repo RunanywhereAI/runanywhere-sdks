@@ -446,25 +446,3 @@ class JvmTTSService : TTSService {
             deleteOnExit()
         }
 }
-
-/**
- * JVM TTS Service Provider for integration with ModuleRegistry
- * Follows the same pattern as LLMServiceProvider and STTServiceProvider
- */
-class JvmTTSServiceProvider : com.runanywhere.sdk.core.TTSServiceProvider {
-    override suspend fun createTTSService(configuration: TTSConfiguration): TTSService {
-        val service = JvmTTSService()
-        service.initialize()
-        return service
-    }
-
-    override fun canHandle(voiceId: String): Boolean {
-        // JVM TTS can handle system TTS requests
-        return voiceId.startsWith("system") || voiceId == "default"
-    }
-
-    override val name: String = "JvmTTSProvider"
-
-    override val framework: com.runanywhere.sdk.models.enums.InferenceFramework =
-        com.runanywhere.sdk.models.enums.InferenceFramework.SYSTEM_TTS
-}

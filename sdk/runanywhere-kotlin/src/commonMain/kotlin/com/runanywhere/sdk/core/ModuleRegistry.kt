@@ -3,7 +3,6 @@ package com.runanywhere.sdk.core
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.features.llm.LLMConfiguration
 import com.runanywhere.sdk.features.llm.LLMService
-import com.runanywhere.sdk.features.llm.LLMServiceProvider
 import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration
 import com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationService
 import com.runanywhere.sdk.features.stt.STTConfiguration
@@ -13,14 +12,13 @@ import com.runanywhere.sdk.features.tts.TTSService
 import com.runanywhere.sdk.features.vad.VADConfiguration
 import com.runanywhere.sdk.features.vad.VADService
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.currentTimeMillis
+import com.runanywhere.sdk.infrastructure.download.DownloadStrategy
+import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.InferenceFramework
-
-// MARK: - Factory Type Aliases (matches iOS ServiceRegistry.swift lines 12-26)
+import com.runanywhere.sdk.storage.ModelStorageStrategy
 
 /**
- * Factory closure types for service creation
- * Matches iOS pattern: typealias STTServiceFactory = @Sendable (STTConfiguration) async throws -> STTService
+ * Simple service factory type aliases
  */
 typealias STTServiceFactory = suspend (STTConfiguration) -> STTService
 typealias LLMServiceFactory = suspend (LLMConfiguration) -> LLMService
@@ -29,671 +27,181 @@ typealias VADServiceFactory = suspend (VADConfiguration) -> VADService
 typealias SpeakerDiarizationServiceFactory = suspend (SpeakerDiarizationConfiguration) -> SpeakerDiarizationService
 
 /**
- * Registration structure for service factories
- * Matches iOS ServiceRegistration<Factory> structure (lines 30-47)
+ * Central registry for modules and their services.
  *
- * @param name Display name of the provider
- * @param priority Priority for selection (higher = selected first)
- * @param canHandle Closure to check if this provider can handle a model ID
- * @param factory Closure to create the service
- */
-data class ServiceRegistration<Factory>(
-    val name: String,
-    val priority: Int,
-    val canHandle: (String?) -> Boolean,
-    val factory: Factory,
-    val registrationTime: Long = currentTimeMillis(),
-)
-
-/**
- * Central registry for external AI module implementations
- *
- * This allows optional dependencies to register their implementations
- * at runtime, enabling a plugin-based architecture where modules like
- * WhisperCPP, llama.cpp, and other providers can be added as needed.
- *
- * Example usage:
- * ```kotlin
- * // In your app initialization:
- * ModuleRegistry.shared.registerSTT(WhisperSTTProvider())
- * ModuleRegistry.shared.registerLLM(LlamaProvider())
- * ```
- *
- * Thread Safety:
- * All operations are synchronized using a mutex to prevent race conditions
- * during concurrent access. Registration can safely happen from multiple threads.
- *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/ModuleRegistry.swift
+ * Simple architecture:
+ * - Modules register themselves with their capabilities
+ * - Each module provides service factories for what it supports
+ * - Registry finds the right factory and creates the service
  */
 object ModuleRegistry {
     private val logger = SDKLogger("ModuleRegistry")
 
-    /**
-     * Wrapper for registered providers with priority
-     * Matches iOS ServiceRegistry.PrioritizedProvider pattern
-     */
-    private data class PrioritizedProvider<T>(
-        val provider: T,
-        val priority: Int,
-        val registrationTime: Long = currentTimeMillis(),
-    )
+    // Registered modules
+    private val modules = mutableMapOf<String, RunAnywhereModule>()
 
-    // Provider lists - protected by synchronized blocks for thread safety
-    // Matches iOS @MainActor pattern but using Kotlin's synchronized for cross-platform support
-    // Now using PrioritizedProvider for priority-based selection
-    private val _sttProviders = mutableListOf<PrioritizedProvider<STTServiceProvider>>()
-    private val _vadProviders = mutableListOf<PrioritizedProvider<VADServiceProvider>>()
-    private val _llmProviders = mutableListOf<PrioritizedProvider<LLMServiceProvider>>()
-    private val _ttsProviders = mutableListOf<PrioritizedProvider<TTSServiceProvider>>()
-    private val _speakerDiarizationProviders = mutableListOf<PrioritizedProvider<SpeakerDiarizationServiceProvider>>()
+    // Service factories (one per capability, from the module that provides it)
+    private var sttFactory: Pair<String, STTServiceFactory>? = null
+    private var llmFactory: Pair<String, LLMServiceFactory>? = null
+    private var ttsFactory: Pair<String, TTSServiceFactory>? = null
+    private var vadFactory: Pair<String, VADServiceFactory>? = null
+    private var speakerDiarizationFactory: Pair<String, SpeakerDiarizationServiceFactory>? = null
 
-    // MARK: - Factory-Based Registrations (iOS Pattern - ServiceRegistry.swift lines 77-90)
+    // Strategies (from modules)
+    private val storageStrategies = mutableMapOf<InferenceFramework, ModelStorageStrategy>()
+    private val downloadStrategies = mutableMapOf<InferenceFramework, DownloadStrategy>()
+
+    // MARK: - Module Registration
 
     /**
-     * Factory-based service registrations matching iOS ServiceRegistry pattern
-     * These allow for closure-based service creation with direct createXXX methods
+     * Register a module. The module's register() method will set up its factories.
      */
-    private val _sttRegistrations = mutableListOf<ServiceRegistration<STTServiceFactory>>()
-    private val _llmRegistrations = mutableListOf<ServiceRegistration<LLMServiceFactory>>()
-    private val _ttsRegistrations = mutableListOf<ServiceRegistration<TTSServiceFactory>>()
-    private val _vadRegistrations = mutableListOf<ServiceRegistration<VADServiceFactory>>()
-    private val _speakerDiarizationRegistrations = mutableListOf<ServiceRegistration<SpeakerDiarizationServiceFactory>>()
-
-    // MARK: - Registration Methods
-
-    /**
-     * Default priority for providers (matches iOS defaultPriority = 100)
-     */
-    const val DEFAULT_PRIORITY = 100
-
-    /**
-     * Register a Speech-to-Text provider (e.g., WhisperCPP)
-     * Thread-safe: Can be called from any thread
-     *
-     * @param provider The STT provider to register
-     * @param priority Priority for selection (higher = selected first). Default is 100.
-     */
-    fun registerSTT(provider: STTServiceProvider, priority: Int = DEFAULT_PRIORITY) {
-        synchronized(_sttProviders) {
-            _sttProviders.add(PrioritizedProvider(provider, priority))
-            // Sort by priority descending, then registration time ascending
-            _sttProviders.sortWith(
-                compareByDescending<PrioritizedProvider<STTServiceProvider>> { it.priority }
-                    .thenBy { it.registrationTime },
-            )
-        }
-        logger.info("Registered STT provider: ${provider.name} with priority $priority")
-    }
-
-    /**
-     * Register a Voice Activity Detection provider
-     * Thread-safe: Can be called from any thread
-     *
-     * @param provider The VAD provider to register
-     * @param priority Priority for selection (higher = selected first). Default is 100.
-     */
-    fun registerVAD(provider: VADServiceProvider, priority: Int = DEFAULT_PRIORITY) {
-        synchronized(_vadProviders) {
-            _vadProviders.add(PrioritizedProvider(provider, priority))
-            _vadProviders.sortWith(
-                compareByDescending<PrioritizedProvider<VADServiceProvider>> { it.priority }
-                    .thenBy { it.registrationTime },
-            )
-        }
-        logger.info("Registered VAD provider: ${provider.name} with priority $priority")
-    }
-
-    /**
-     * Register a Language Model provider (e.g., llama.cpp)
-     * Thread-safe: Can be called from any thread
-     *
-     * @param provider The LLM provider to register
-     * @param priority Priority for selection (higher = selected first). Default is 100.
-     */
-    fun registerLLM(provider: LLMServiceProvider, priority: Int = DEFAULT_PRIORITY) {
-        synchronized(_llmProviders) {
-            _llmProviders.add(PrioritizedProvider(provider, priority))
-            _llmProviders.sortWith(
-                compareByDescending<PrioritizedProvider<LLMServiceProvider>> { it.priority }
-                    .thenBy { it.registrationTime },
-            )
-        }
-        logger.info("Registered LLM provider: ${provider.name} with priority $priority")
-    }
-
-    /**
-     * Register a Text-to-Speech provider
-     * Thread-safe: Can be called from any thread
-     *
-     * @param provider The TTS provider to register
-     * @param priority Priority for selection (higher = selected first). Default is 100.
-     */
-    fun registerTTS(provider: TTSServiceProvider, priority: Int = DEFAULT_PRIORITY) {
-        synchronized(_ttsProviders) {
-            _ttsProviders.add(PrioritizedProvider(provider, priority))
-            _ttsProviders.sortWith(
-                compareByDescending<PrioritizedProvider<TTSServiceProvider>> { it.priority }
-                    .thenBy { it.registrationTime },
-            )
-        }
-        logger.info("Registered TTS provider: ${provider.name} with priority $priority")
-    }
-
-    /**
-     * Register a Speaker Diarization provider
-     * Thread-safe: Can be called from any thread
-     *
-     * @param provider The Speaker Diarization provider to register
-     * @param priority Priority for selection (higher = selected first). Default is 100.
-     */
-    fun registerSpeakerDiarization(provider: SpeakerDiarizationServiceProvider, priority: Int = DEFAULT_PRIORITY) {
-        synchronized(_speakerDiarizationProviders) {
-            _speakerDiarizationProviders.add(PrioritizedProvider(provider, priority))
-            _speakerDiarizationProviders.sortWith(
-                compareByDescending<PrioritizedProvider<SpeakerDiarizationServiceProvider>> { it.priority }
-                    .thenBy { it.registrationTime },
-            )
-        }
-        logger.info("Registered Speaker Diarization provider: ${provider.name} with priority $priority")
-    }
-
-    // MARK: - Factory-Based Registration (iOS Pattern)
-
-    /**
-     * Register an STT service factory with closure-based creation
-     * Matches iOS ServiceRegistry.registerSTT(name:priority:canHandle:factory:)
-     *
-     * @param name Display name of the provider
-     * @param priority Priority for selection (higher = selected first)
-     * @param canHandle Closure to check if this provider can handle a model ID
-     * @param factory Closure to create the STT service
-     */
-    fun registerSTTFactory(
-        name: String,
-        priority: Int = DEFAULT_PRIORITY,
-        canHandle: (String?) -> Boolean = { true },
-        factory: STTServiceFactory,
-    ) {
-        synchronized(_sttRegistrations) {
-            val registration = ServiceRegistration(name, priority, canHandle, factory)
-            _sttRegistrations.add(registration)
-            _sttRegistrations.sortWith(
-                compareByDescending<ServiceRegistration<STTServiceFactory>> { it.priority }
-                    .thenBy { it.registrationTime },
-            )
-        }
-        logger.info("Registered STT factory: $name with priority $priority")
-    }
-
-    /**
-     * Register an LLM service factory with closure-based creation
-     * Matches iOS ServiceRegistry.registerLLM(name:priority:canHandle:factory:)
-     */
-    fun registerLLMFactory(
-        name: String,
-        priority: Int = DEFAULT_PRIORITY,
-        canHandle: (String?) -> Boolean = { true },
-        factory: LLMServiceFactory,
-    ) {
-        synchronized(_llmRegistrations) {
-            val registration = ServiceRegistration(name, priority, canHandle, factory)
-            _llmRegistrations.add(registration)
-            _llmRegistrations.sortWith(
-                compareByDescending<ServiceRegistration<LLMServiceFactory>> { it.priority }
-                    .thenBy { it.registrationTime },
-            )
-        }
-        logger.info("Registered LLM factory: $name with priority $priority")
-    }
-
-    /**
-     * Register a TTS service factory with closure-based creation
-     * Matches iOS ServiceRegistry.registerTTS(name:priority:canHandle:factory:)
-     */
-    fun registerTTSFactory(
-        name: String,
-        priority: Int = DEFAULT_PRIORITY,
-        canHandle: (String?) -> Boolean = { true },
-        factory: TTSServiceFactory,
-    ) {
-        synchronized(_ttsRegistrations) {
-            val registration = ServiceRegistration(name, priority, canHandle, factory)
-            _ttsRegistrations.add(registration)
-            _ttsRegistrations.sortWith(
-                compareByDescending<ServiceRegistration<TTSServiceFactory>> { it.priority }
-                    .thenBy { it.registrationTime },
-            )
-        }
-        logger.info("Registered TTS factory: $name with priority $priority")
-    }
-
-    /**
-     * Register a VAD service factory with closure-based creation
-     * Matches iOS ServiceRegistry.registerVAD(name:priority:canHandle:factory:)
-     */
-    fun registerVADFactory(
-        name: String,
-        priority: Int = DEFAULT_PRIORITY,
-        canHandle: (String?) -> Boolean = { true },
-        factory: VADServiceFactory,
-    ) {
-        synchronized(_vadRegistrations) {
-            val registration = ServiceRegistration(name, priority, canHandle, factory)
-            _vadRegistrations.add(registration)
-            _vadRegistrations.sortWith(
-                compareByDescending<ServiceRegistration<VADServiceFactory>> { it.priority }
-                    .thenBy { it.registrationTime },
-            )
-        }
-        logger.info("Registered VAD factory: $name with priority $priority")
-    }
-
-    /**
-     * Register a Speaker Diarization service factory with closure-based creation
-     */
-    fun registerSpeakerDiarizationFactory(
-        name: String,
-        priority: Int = DEFAULT_PRIORITY,
-        canHandle: (String?) -> Boolean = { true },
-        factory: SpeakerDiarizationServiceFactory,
-    ) {
-        synchronized(_speakerDiarizationRegistrations) {
-            val registration = ServiceRegistration(name, priority, canHandle, factory)
-            _speakerDiarizationRegistrations.add(registration)
-            _speakerDiarizationRegistrations.sortWith(
-                compareByDescending<ServiceRegistration<SpeakerDiarizationServiceFactory>> { it.priority }
-                    .thenBy { it.registrationTime },
-            )
-        }
-        logger.info("Registered Speaker Diarization factory: $name with priority $priority")
-    }
-
-    // MARK: - Direct Service Creation (iOS Pattern)
-
-    /**
-     * Create an STT service for the specified model
-     * Matches iOS ServiceRegistry.createSTT(for:config:)
-     *
-     * @param modelId Optional model ID to match against providers
-     * @param config Configuration for the STT service
-     * @return The created STT service
-     * @throws SDKError.ProviderNotFound if no provider can handle the model
-     */
-    suspend fun createSTT(
-        modelId: String? = null,
-        config: STTConfiguration,
-    ): STTService {
-        val registration =
-            synchronized(_sttRegistrations) {
-                _sttRegistrations.firstOrNull { it.canHandle(modelId) }
-            } ?: throw SDKError.ProviderNotFound("STT provider for model: ${modelId ?: "default"}")
-
-        logger.info("Creating STT service: ${registration.name} for model: ${modelId ?: "default"}")
-        return registration.factory(config)
-    }
-
-    /**
-     * Create an LLM service for the specified model
-     * Matches iOS ServiceRegistry.createLLM(for:config:)
-     */
-    suspend fun createLLM(
-        modelId: String? = null,
-        config: LLMConfiguration,
-    ): LLMService {
-        val registration =
-            synchronized(_llmRegistrations) {
-                _llmRegistrations.firstOrNull { it.canHandle(modelId) }
-            } ?: throw SDKError.ProviderNotFound("LLM provider for model: ${modelId ?: "default"}")
-
-        logger.info("Creating LLM service: ${registration.name} for model: ${modelId ?: "default"}")
-        return registration.factory(config)
-    }
-
-    /**
-     * Create a TTS service for the specified model
-     * Matches iOS ServiceRegistry.createTTS(for:config:)
-     */
-    suspend fun createTTS(
-        modelId: String? = null,
-        config: TTSConfiguration,
-    ): TTSService {
-        val registration =
-            synchronized(_ttsRegistrations) {
-                _ttsRegistrations.firstOrNull { it.canHandle(modelId) }
-            } ?: throw SDKError.ProviderNotFound("TTS provider for model: ${modelId ?: "default"}")
-
-        logger.info("Creating TTS service: ${registration.name} for model: ${modelId ?: "default"}")
-        return registration.factory(config)
-    }
-
-    /**
-     * Create a VAD service for the specified model
-     * Matches iOS ServiceRegistry.createVAD(config:)
-     */
-    suspend fun createVAD(
-        modelId: String? = null,
-        config: VADConfiguration,
-    ): VADService {
-        val registration =
-            synchronized(_vadRegistrations) {
-                _vadRegistrations.firstOrNull { it.canHandle(modelId) }
-            } ?: throw SDKError.ProviderNotFound("VAD provider for model: ${modelId ?: "default"}")
-
-        logger.info("Creating VAD service: ${registration.name} for model: ${modelId ?: "default"}")
-        return registration.factory(config)
-    }
-
-    /**
-     * Create a Speaker Diarization service for the specified model
-     */
-    suspend fun createSpeakerDiarization(
-        modelId: String? = null,
-        config: SpeakerDiarizationConfiguration,
-    ): SpeakerDiarizationService {
-        val registration =
-            synchronized(_speakerDiarizationRegistrations) {
-                _speakerDiarizationRegistrations.firstOrNull { it.canHandle(modelId) }
-            } ?: throw SDKError.ProviderNotFound("Speaker Diarization provider for model: ${modelId ?: "default"}")
-
-        logger.info("Creating Speaker Diarization service: ${registration.name} for model: ${modelId ?: "default"}")
-        return registration.factory(config)
-    }
-
-    // MARK: - Factory Registration Availability
-
-    /**
-     * Check if any STT factories are registered
-     */
-    val hasSTTFactory: Boolean
-        get() = synchronized(_sttRegistrations) { _sttRegistrations.isNotEmpty() }
-
-    /**
-     * Check if any LLM factories are registered
-     */
-    val hasLLMFactory: Boolean
-        get() = synchronized(_llmRegistrations) { _llmRegistrations.isNotEmpty() }
-
-    /**
-     * Check if any TTS factories are registered
-     */
-    val hasTTSFactory: Boolean
-        get() = synchronized(_ttsRegistrations) { _ttsRegistrations.isNotEmpty() }
-
-    /**
-     * Check if any VAD factories are registered
-     */
-    val hasVADFactory: Boolean
-        get() = synchronized(_vadRegistrations) { _vadRegistrations.isNotEmpty() }
-
-    /**
-     * Check if any Speaker Diarization factories are registered
-     */
-    val hasSpeakerDiarizationFactory: Boolean
-        get() = synchronized(_speakerDiarizationRegistrations) { _speakerDiarizationRegistrations.isNotEmpty() }
-
-    // MARK: - Provider Access
-
-    /**
-     * Get an STT provider for the specified model
-     * Returns the highest-priority provider that can handle the model
-     * Thread-safe: Can be called from any thread
-     */
-    fun sttProvider(modelId: String? = null): STTServiceProvider? =
-        synchronized(_sttProviders) {
-            if (modelId != null) {
-                _sttProviders.firstOrNull { it.provider.canHandle(modelId) }?.provider
-            } else {
-                _sttProviders.firstOrNull()?.provider
-            }
+    fun register(module: RunAnywhereModule, priority: Int? = null) {
+        if (modules.containsKey(module.moduleId)) {
+            logger.warning("Module '${module.moduleId}' already registered")
+            return
         }
 
-    /**
-     * Get a VAD provider for the specified model
-     * Returns the highest-priority provider that can handle the model
-     * Thread-safe: Can be called from any thread
-     */
-    fun vadProvider(modelId: String? = null): VADServiceProvider? =
-        synchronized(_vadProviders) {
-            if (modelId != null) {
-                _vadProviders.firstOrNull { it.provider.canHandle(modelId) }?.provider
-            } else {
-                _vadProviders.firstOrNull()?.provider
-            }
+        // Let the module register its services
+        module.register(priority ?: module.defaultPriority)
+
+        // Store the module
+        modules[module.moduleId] = module
+
+        // Store strategies
+        module.storageStrategy?.let { storageStrategies[module.inferenceFramework] = it }
+        module.downloadStrategy?.let { downloadStrategies[module.inferenceFramework] = it }
+
+        logger.info("Module registered: ${module.moduleName}")
+    }
+
+    // MARK: - Service Factory Registration (called by modules)
+
+    fun registerSTT(name: String, factory: STTServiceFactory) {
+        sttFactory = name to factory
+        logger.info("STT service registered: $name")
+    }
+
+    fun registerLLM(name: String, factory: LLMServiceFactory) {
+        llmFactory = name to factory
+        logger.info("LLM service registered: $name")
+    }
+
+    fun registerTTS(name: String, factory: TTSServiceFactory) {
+        ttsFactory = name to factory
+        logger.info("TTS service registered: $name")
+    }
+
+    fun registerVAD(name: String, factory: VADServiceFactory) {
+        vadFactory = name to factory
+        logger.info("VAD service registered: $name")
+    }
+
+    fun registerSpeakerDiarization(name: String, factory: SpeakerDiarizationServiceFactory) {
+        speakerDiarizationFactory = name to factory
+        logger.info("Speaker Diarization service registered: $name")
+    }
+
+    // MARK: - Service Creation
+
+    suspend fun createSTT(config: STTConfiguration): STTService {
+        val (name, factory) = sttFactory
+            ?: throw SDKError.ProviderNotFound("No STT service registered")
+        logger.info("Creating STT service: $name")
+        return factory(config)
+    }
+
+    suspend fun createLLM(config: LLMConfiguration): LLMService {
+        val (name, factory) = llmFactory
+            ?: throw SDKError.ProviderNotFound("No LLM service registered")
+        logger.info("Creating LLM service: $name")
+        return factory(config)
+    }
+
+    suspend fun createTTS(config: TTSConfiguration): TTSService {
+        val (name, factory) = ttsFactory
+            ?: throw SDKError.ProviderNotFound("No TTS service registered")
+        logger.info("Creating TTS service: $name")
+        return factory(config)
+    }
+
+    suspend fun createVAD(config: VADConfiguration): VADService {
+        val (name, factory) = vadFactory
+            ?: throw SDKError.ProviderNotFound("No VAD service registered")
+        logger.info("Creating VAD service: $name")
+        return factory(config)
+    }
+
+    suspend fun createSpeakerDiarization(config: SpeakerDiarizationConfiguration): SpeakerDiarizationService {
+        val (name, factory) = speakerDiarizationFactory
+            ?: throw SDKError.ProviderNotFound("No Speaker Diarization service registered")
+        logger.info("Creating Speaker Diarization service: $name")
+        return factory(config)
+    }
+
+    // MARK: - Availability
+
+    val hasSTT: Boolean get() = sttFactory != null
+    val hasLLM: Boolean get() = llmFactory != null
+    val hasTTS: Boolean get() = ttsFactory != null
+    val hasVAD: Boolean get() = vadFactory != null
+    val hasSpeakerDiarization: Boolean get() = speakerDiarizationFactory != null
+
+    val registeredCapabilities: List<String>
+        get() = buildList {
+            if (hasSTT) add("STT")
+            if (hasLLM) add("LLM")
+            if (hasTTS) add("TTS")
+            if (hasVAD) add("VAD")
+            if (hasSpeakerDiarization) add("SpeakerDiarization")
         }
 
-    /**
-     * Get an LLM provider for the specified model
-     * Returns the highest-priority provider that can handle the model
-     * Thread-safe: Can be called from any thread
-     */
-    fun llmProvider(modelId: String? = null): LLMServiceProvider? =
-        synchronized(_llmProviders) {
-            if (modelId != null) {
-                _llmProviders.firstOrNull { it.provider.canHandle(modelId) }?.provider
-            } else {
-                _llmProviders.firstOrNull()?.provider
-            }
+    // Backward compatibility alias
+    val registeredModules: List<String> get() = registeredCapabilities
+
+    // MARK: - Module Queries
+
+    fun isRegistered(moduleId: String): Boolean = modules.containsKey(moduleId)
+
+    fun getModule(moduleId: String): RunAnywhereModule? = modules[moduleId]
+
+    val allModules: List<RunAnywhereModule> get() = modules.values.toList()
+
+    // MARK: - Strategies
+
+    fun storageStrategy(framework: InferenceFramework): ModelStorageStrategy? =
+        storageStrategies[framework]
+
+    fun downloadStrategy(framework: InferenceFramework): DownloadStrategy? =
+        downloadStrategies[framework]
+
+    fun downloadStrategy(model: ModelInfo): DownloadStrategy? {
+        model.preferredFramework?.let { framework ->
+            downloadStrategies[framework]?.let { if (it.canHandle(model)) return it }
         }
-
-    /**
-     * Get a TTS provider for the specified model
-     * Returns the highest-priority provider that can handle the model
-     * Thread-safe: Can be called from any thread
-     */
-    fun ttsProvider(modelId: String? = null): TTSServiceProvider? =
-        synchronized(_ttsProviders) {
-            if (modelId != null) {
-                _ttsProviders.firstOrNull { it.provider.canHandle(modelId) }?.provider
-            } else {
-                _ttsProviders.firstOrNull()?.provider
-            }
+        for (framework in model.compatibleFrameworks) {
+            downloadStrategies[framework]?.let { if (it.canHandle(model)) return it }
         }
+        return null
+    }
 
-    /**
-     * Get a Speaker Diarization provider
-     * Returns the highest-priority provider that can handle the model
-     * Thread-safe: Can be called from any thread
-     */
-    fun speakerDiarizationProvider(modelId: String? = null): SpeakerDiarizationServiceProvider? =
-        synchronized(_speakerDiarizationProviders) {
-            if (modelId != null) {
-                _speakerDiarizationProviders.firstOrNull { it.provider.canHandle(modelId) }?.provider
-            } else {
-                _speakerDiarizationProviders.firstOrNull()?.provider
-            }
-        }
+    val allDownloadStrategies: List<DownloadStrategy>
+        get() = downloadStrategies.values.toList()
 
-    // MARK: - Provider List Access (for framework management)
+    // MARK: - Reset
 
-    /**
-     * Get all registered STT providers, sorted by priority
-     * Thread-safe: Returns a snapshot of the current provider list
-     */
-    val allSTTProviders: List<STTServiceProvider>
-        get() = synchronized(_sttProviders) { _sttProviders.map { it.provider } }
+    fun reset() {
+        modules.clear()
+        sttFactory = null
+        llmFactory = null
+        ttsFactory = null
+        vadFactory = null
+        speakerDiarizationFactory = null
+        storageStrategies.clear()
+        downloadStrategies.clear()
+        logger.info("Registry reset")
+    }
 
-    /**
-     * Get all registered LLM providers, sorted by priority
-     * Thread-safe: Returns a snapshot of the current provider list
-     */
-    val allLLMProviders: List<LLMServiceProvider>
-        get() = synchronized(_llmProviders) { _llmProviders.map { it.provider } }
-
-    /**
-     * Get all registered TTS providers, sorted by priority
-     * Thread-safe: Returns a snapshot of the current provider list
-     */
-    val allTTSProviders: List<TTSServiceProvider>
-        get() = synchronized(_ttsProviders) { _ttsProviders.map { it.provider } }
-
-    /**
-     * Get all registered VAD providers, sorted by priority
-     * Thread-safe: Returns a snapshot of the current provider list
-     */
-    val allVADProviders: List<VADServiceProvider>
-        get() = synchronized(_vadProviders) { _vadProviders.map { it.provider } }
-
-    /**
-     * Get all registered Speaker Diarization providers, sorted by priority
-     * Thread-safe: Returns a snapshot of the current provider list
-     */
-    val allSpeakerDiarizationProviders: List<SpeakerDiarizationServiceProvider>
-        get() = synchronized(_speakerDiarizationProviders) { _speakerDiarizationProviders.map { it.provider } }
-
-    // MARK: - Availability Checking
-
-    /**
-     * Check if STT is available
-     * Thread-safe: Can be called from any thread
-     */
-    val hasSTT: Boolean
-        get() = synchronized(_sttProviders) { _sttProviders.isNotEmpty() }
-
-    /**
-     * Check if VAD is available
-     * Thread-safe: Can be called from any thread
-     */
-    val hasVAD: Boolean
-        get() = synchronized(_vadProviders) { _vadProviders.isNotEmpty() }
-
-    /**
-     * Check if LLM is available
-     * Thread-safe: Can be called from any thread
-     */
-    val hasLLM: Boolean
-        get() = synchronized(_llmProviders) { _llmProviders.isNotEmpty() }
-
-    /**
-     * Check if TTS is available
-     * Thread-safe: Can be called from any thread
-     */
-    val hasTTS: Boolean
-        get() = synchronized(_ttsProviders) { _ttsProviders.isNotEmpty() }
-
-    /**
-     * Check if Speaker Diarization is available
-     * Thread-safe: Can be called from any thread
-     */
-    val hasSpeakerDiarization: Boolean
-        get() = synchronized(_speakerDiarizationProviders) { _speakerDiarizationProviders.isNotEmpty() }
-
-    /**
-     * Get list of all registered modules
-     * Thread-safe: Can be called from any thread
-     */
-    val registeredModules: List<String>
-        get() =
-            buildList {
-                if (hasSTT) add("STT")
-                if (hasVAD) add("VAD")
-                if (hasLLM) add("LLM")
-                if (hasTTS) add("TTS")
-                if (hasSpeakerDiarization) add("SpeakerDiarization")
-            }
-
-    /**
-     * Get provider count for each capability
-     * Returns a summary of all registered providers with their counts
-     */
-    val providerSummary: Map<String, Int>
-        get() =
-            mapOf(
-                "STT" to synchronized(_sttProviders) { _sttProviders.size },
-                "VAD" to synchronized(_vadProviders) { _vadProviders.size },
-                "LLM" to synchronized(_llmProviders) { _llmProviders.size },
-                "TTS" to synchronized(_ttsProviders) { _ttsProviders.size },
-                "SpeakerDiarization" to synchronized(_speakerDiarizationProviders) { _speakerDiarizationProviders.size },
-            )
-
-    /**
-     * Singleton instance for convenience
-     */
-    val shared: ModuleRegistry = this
+    // Singleton accessor
+    val shared: ModuleRegistry get() = this
 }
-
-// MARK: - Service Provider Protocols
-
-/**
- * Provider for Speech-to-Text services
- */
-interface STTServiceProvider {
-    suspend fun createSTTService(configuration: STTConfiguration): STTService
-
-    fun canHandle(modelId: String?): Boolean
-
-    val name: String
-    val framework: InferenceFramework
-}
-
-/**
- * Provider for Voice Activity Detection services
- */
-interface VADServiceProvider {
-    suspend fun createVADService(configuration: VADConfiguration): VADService
-
-    fun canHandle(modelId: String): Boolean
-
-    val name: String
-}
-
-// LLMServiceProvider is now imported from com.runanywhere.sdk.features.llm.LLMServiceProvider
-
-/**
- * Provider for Text-to-Speech services
- * Matches the pattern of LLMServiceProvider and STTServiceProvider
- */
-interface TTSServiceProvider {
-    /**
-     * Create a TTS service for the given configuration
-     */
-    suspend fun createTTSService(configuration: com.runanywhere.sdk.features.tts.TTSConfiguration): com.runanywhere.sdk.features.tts.TTSService
-
-    /**
-     * Check if this provider can handle the given voice/model ID
-     */
-    fun canHandle(voiceId: String): Boolean = true
-
-    /**
-     * Provider name for identification
-     */
-    val name: String
-
-    /**
-     * Framework this provider supports
-     */
-    val framework: InferenceFramework
-}
-
-/**
- * Provider for Speaker Diarization services
- */
-interface SpeakerDiarizationServiceProvider {
-    suspend fun createSpeakerDiarizationService(
-        configuration: com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationConfiguration,
-    ): com.runanywhere.sdk.features.speakerdiarization.SpeakerDiarizationService
-
-    fun canHandle(modelId: String?): Boolean
-
-    val name: String
-}
-
-// MARK: - Module Auto-Registration
-
-/**
- * Protocol for modules that can auto-register themselves
- */
-interface AutoRegisteringModule {
-    fun register()
-}
-
-/**
- * Example implementation for external modules:
- * ```kotlin
- * // In WhisperCPP module
- * object WhisperModule : AutoRegisteringModule {
- *     override fun register() {
- *         ModuleRegistry.shared.registerSTT(WhisperSTTProvider())
- *     }
- * }
- * ```
- */
