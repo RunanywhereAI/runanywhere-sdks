@@ -76,26 +76,8 @@ struct MarkdownText: View {
                     container.font = fontToUIFont(baseFont)
                 }
 
-                // Merge font styles (combine bold+italic if both present)
-                if let existingFont = attributedString[run.range].font,
-                   let newFont = container.font {
-                    #if canImport(UIKit)
-                    let combinedTraits = existingFont.fontDescriptor.symbolicTraits
-                        .union(newFont.fontDescriptor.symbolicTraits)
-                    if let mergedDescriptor = existingFont.fontDescriptor.withSymbolicTraits(combinedTraits) {
-                        container.font = UIFont(descriptor: mergedDescriptor, size: newFont.pointSize)
-                    }
-                    #elseif canImport(AppKit)
-                    let combinedTraits = existingFont.fontDescriptor.symbolicTraits
-                        .union(newFont.fontDescriptor.symbolicTraits)
-                    container.font = NSFont(descriptor: NSFontDescriptor(fontAttributes: [
-                        .family: existingFont.familyName ?? "System",
-                        .traits: [NSFontDescriptor.TraitKey.symbolic: combinedTraits]
-                    ]), size: newFont.pointSize)
-                    #endif
-                }
-
                 // Apply custom styling
+                // Note: AttributedString's markdown parser already handles bold+italic merging correctly
                 attributedString[run.range].mergeAttributes(container)
             }
 

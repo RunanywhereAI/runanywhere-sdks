@@ -72,10 +72,10 @@ class MarkdownDetector {
         analysis.listCount = listCount
 
         // Calculate markdown richness
-        let markdownScore = Double(headingCount) * 0.5 +
-                           Double(boldCount) * 0.3 +
-                           Double(inlineCodeCount) * 0.2 +
-                           Double(listCount) * 0.3
+        let markdownScore = Double(analysis.headingCount) * 0.5 +
+                           Double(analysis.boldCount) * 0.3 +
+                           Double(analysis.inlineCodeCount) * 0.2 +
+                           Double(analysis.listCount) * 0.3
 
         // Classify based on score
         if markdownScore > 3.0 {
