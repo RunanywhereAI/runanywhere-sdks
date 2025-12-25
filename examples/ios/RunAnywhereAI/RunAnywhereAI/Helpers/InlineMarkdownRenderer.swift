@@ -76,6 +76,25 @@ struct MarkdownText: View {
                     container.font = fontToUIFont(baseFont)
                 }
 
+                // Merge font styles (combine bold+italic if both present)
+                if let existingFont = attributedString[run.range].font,
+                   let newFont = container.font {
+                    #if canImport(UIKit)
+                    let combinedTraits = existingFont.fontDescriptor.symbolicTraits
+                        .union(newFont.fontDescriptor.symbolicTraits)
+                    if let mergedDescriptor = existingFont.fontDescriptor.withSymbolicTraits(combinedTraits) {
+                        container.font = UIFont(descriptor: mergedDescriptor, size: newFont.pointSize)
+                    }
+                    #elseif canImport(AppKit)
+                    let combinedTraits = existingFont.fontDescriptor.symbolicTraits
+                        .union(newFont.fontDescriptor.symbolicTraits)
+                    container.font = NSFont(descriptor: NSFontDescriptor(fontAttributes: [
+                        .family: existingFont.familyName ?? "System",
+                        .traits: [NSFontDescriptor.TraitKey.symbolic: combinedTraits]
+                    ]), size: newFont.pointSize)
+                    #endif
+                }
+
                 // Apply custom styling
                 attributedString[run.range].mergeAttributes(container)
             }
@@ -152,15 +171,3 @@ struct MarkdownText: View {
         return font
     }
 }
-
-// MARK: - AttributeContainer Extension for isEmpty check
-
-private extension AttributeContainer {
-    var isEmpty: Bool {
-        // Check if the container has any attributes set
-        return self.font == nil &&
-               self.foregroundColor == nil &&
-               self.backgroundColor == nil
-    }
-}
-
