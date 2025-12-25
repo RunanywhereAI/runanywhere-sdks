@@ -11,4 +11,4 @@ package com.runanywhere.sdk.features.vad
  * - Same RMS energy calculation
  * - Same speech activity events (STARTED/ENDED)
  */
-actual fun createPlatformVADService(): VADService = SimpleEnergyVAD()
+fun createPlatformVADService(): VADService = SimpleEnergyVAD()
