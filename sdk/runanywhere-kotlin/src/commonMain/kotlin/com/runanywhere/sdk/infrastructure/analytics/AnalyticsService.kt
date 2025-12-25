@@ -31,7 +31,7 @@ import kotlinx.serialization.Serializable
  */
 class AnalyticsService internal constructor(
     private val telemetryRepository: TelemetryRepository?,
-    @Suppress("unused") private val syncCoordinator: SyncCoordinator?,
+    private val syncCoordinator: SyncCoordinator?,
     private val supabaseConfig: SupabaseConfig? = null,
     private val environment: SDKEnvironment = SDKEnvironment.PRODUCTION,
 ) {
@@ -365,9 +365,19 @@ class AnalyticsService internal constructor(
 
     /**
      * Flush all pending analytics to backend
+     * Uses SyncCoordinator if available for coordinated telemetry synchronization
      */
     suspend fun flush() {
-        // TODO: Implement telemetry sync mechanism when available
+        if (syncCoordinator != null) {
+            try {
+                syncCoordinator.syncTelemetry()
+                logger.debug("Telemetry flushed via SyncCoordinator")
+            } catch (e: Exception) {
+                logger.warn("Failed to flush telemetry via SyncCoordinator: ${e.message}")
+            }
+        } else {
+            logger.debug("No SyncCoordinator available, skipping telemetry flush")
+        }
     }
 
     suspend fun cleanup() {
@@ -572,5 +582,4 @@ private fun mapEventTypeToTelemetryType(eventType: String): com.runanywhere.sdk.
             com.runanywhere.sdk.data.models.TelemetryEventType.SDK_INITIALIZATION
     }
 
-@Suppress("FunctionOnlyReturningConstant") // TODO: Platform-specific implementation will be provided by expect/actual
-private fun getOSVersion(): String = "Unknown"
+private fun getOSVersion(): String = com.runanywhere.sdk.data.models.getPlatformOSVersion()

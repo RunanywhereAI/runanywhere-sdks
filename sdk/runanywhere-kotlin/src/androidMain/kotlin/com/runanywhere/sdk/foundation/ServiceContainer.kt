@@ -8,15 +8,18 @@ import com.runanywhere.sdk.data.repositories.TelemetryRepositoryImpl
 
 /**
  * Android implementation for creating telemetry repository
- * Using in-memory database for now - can be easily swapped with real Room database
- * by changing InMemoryDatabase.getInstance() to RunAnywhereDatabase.getDatabase(context)
+ *
+ * Uses InMemoryDatabase which provides a complete in-memory implementation of all DAOs.
+ * This implementation is suitable for development and testing. For production with
+ * persistent storage, swap InMemoryDatabase.getInstance() with
+ * RunAnywhereDatabase.getDatabase(context).
  *
  * NOTE: In development mode with Supabase, analytics go directly via SupabaseClient,
  * so NetworkService is not needed. We create a mock NetworkService to avoid errors.
  */
 actual fun createTelemetryRepository(): TelemetryRepository {
-    // Get the in-memory database instance
-    // TODO: Replace with RunAnywhereDatabase.getDatabase(context) when ready for production
+    // Get the in-memory database instance (fully functional implementation)
+    // To use Room persistence, replace with: RunAnywhereDatabase.getDatabase(context)
     val database = InMemoryDatabase.getInstance()
 
     // Create a mock network service for development mode
