@@ -47,8 +47,11 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         logger.info("📌 initialize() called with modelPath: $modelPath")
         logger.info("📌 configuration.modelId: ${configuration.modelId}")
 
-        val actualModelPath = modelPath ?: configuration.modelId
+        val providedPath = modelPath ?: configuration.modelId
             ?: throw IllegalArgumentException("No model path provided")
+
+        // Resolve actual file path - if providedPath is a directory, find the .gguf file inside
+        val actualModelPath = resolveGGUFFilePath(providedPath)
 
         logger.info("📌 actualModelPath resolved to: $actualModelPath")
 
@@ -418,4 +421,51 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
  */
 internal actual suspend fun createLlamaCppService(config: LLMConfiguration): LLMService {
     return LlamaCppService(config)
+}
+
+/**
+ * Resolve the actual GGUF file path from a given path.
+ * If the path is a directory, finds the .gguf or .ggml file inside.
+ * If the path is already a file, returns it as-is.
+ *
+ * Directory structure: Models/{framework}/{modelId}/{modelId}.gguf
+ */
+private fun resolveGGUFFilePath(path: String): String {
+    val file = java.io.File(path)
+
+    // If it's already a file (not a directory), use it directly
+    if (file.isFile) {
+        return path
+    }
+
+    // If it's a directory, find the .gguf or .ggml file inside
+    if (file.isDirectory) {
+        // First, look for .gguf files in the directory
+        file.listFiles()?.forEach { child ->
+            if (child.isFile) {
+                val ext = child.extension.lowercase()
+                if (ext == "gguf" || ext == "ggml") {
+                    return child.absolutePath
+                }
+            }
+        }
+
+        // Check one level deep (in case of nested structure)
+        file.listFiles()?.filter { it.isDirectory }?.forEach { subDir ->
+            subDir.listFiles()?.forEach { child ->
+                if (child.isFile) {
+                    val ext = child.extension.lowercase()
+                    if (ext == "gguf" || ext == "ggml") {
+                        return child.absolutePath
+                    }
+                }
+            }
+        }
+    }
+
+    // Path doesn't exist yet or no model file found - return the expected file path
+    // Assume it should be: {folder}/{modelId}.gguf where modelId is the last path component
+    val modelId = file.name
+    val expectedFile = java.io.File(file, "$modelId.gguf")
+    return expectedFile.absolutePath
 }

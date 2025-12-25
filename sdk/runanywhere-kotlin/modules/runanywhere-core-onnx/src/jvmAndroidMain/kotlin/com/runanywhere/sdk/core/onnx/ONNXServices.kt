@@ -49,16 +49,33 @@ internal actual suspend fun createONNXSTTService(configuration: STTConfiguration
     val service = ONNXCoreService()
     service.initialize()
 
-    // Load model if path provided
+    // Resolve and load model
     configuration.modelId?.let { modelId ->
-        if (modelId.contains("/") || modelId.endsWith(".onnx")) {
-            val modelType = detectSTTModelType(modelId)
-            service.loadSTTModel(modelId, modelType)
-            logger.info("STT model loaded: $modelId")
+        // Resolve the actual model path from registry or use as-is if it's already a path
+        val modelPath = if (modelId.contains("/")) {
+            modelId // Already a path
+        } else {
+            // Look up model in registry to get the local path
+            ServiceContainer.shared.modelRegistry.getModel(modelId)?.localPath ?: modelId
+        }
+
+        logger.info("Resolved model path: $modelPath")
+
+        if (modelPath.isNotEmpty()) {
+            val modelType = detectSTTModelType(modelPath)
+            service.loadSTTModel(modelPath, modelType)
+            logger.info("STT model loaded: $modelPath (type: $modelType)")
         }
     }
 
-    return ONNXSTTService(service)
+    return ONNXSTTService(service).also { sttService ->
+        // Store the path for currentModel property
+        configuration.modelId?.let { modelId ->
+            val resolvedPath = if (modelId.contains("/")) modelId
+                else ServiceContainer.shared.modelRegistry.getModel(modelId)?.localPath
+            resolvedPath?.let { sttService.setModelPath(it) }
+        }
+    }
 }
 
 internal actual suspend fun createONNXTTSService(configuration: TTSConfiguration): TTSService {

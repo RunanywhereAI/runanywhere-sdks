@@ -54,25 +54,39 @@ object ModuleRegistry {
     // MARK: - Module Registration
 
     /**
-     * Register a module. The module's register() method will set up its factories.
+     * Register a module with the SDK.
+     * This stores the module metadata and calls registerServices() to set up factories.
+     *
+     * Matches iOS ModuleRegistry.register(_:priority:)
+     *
+     * @param module The module to register
+     * @param priority Override the default priority (optional)
      */
     fun register(module: RunAnywhereModule, priority: Int? = null) {
+        val effectivePriority = priority ?: module.defaultPriority
+
         if (modules.containsKey(module.moduleId)) {
             logger.warning("Module '${module.moduleId}' already registered")
             return
         }
 
-        // Let the module register its services
-        module.register(priority ?: module.defaultPriority)
+        // Let the module register its services (this should NOT call back to ModuleRegistry)
+        module.registerServices(effectivePriority)
 
         // Store the module
         modules[module.moduleId] = module
 
-        // Store strategies
-        module.storageStrategy?.let { storageStrategies[module.inferenceFramework] = it }
-        module.downloadStrategy?.let { downloadStrategies[module.inferenceFramework] = it }
+        // Store strategies if provided
+        module.storageStrategy?.let {
+            storageStrategies[module.inferenceFramework] = it
+            logger.info("Storage strategy registered for ${module.inferenceFramework.value}")
+        }
+        module.downloadStrategy?.let {
+            downloadStrategies[module.inferenceFramework] = it
+            logger.info("Download strategy registered for ${module.inferenceFramework.value}")
+        }
 
-        logger.info("Module registered: ${module.moduleName}")
+        logger.info("Module registered: ${module.moduleName} [${module.moduleId}] with capabilities: ${module.capabilities.map { it.value }.joinToString(", ")}")
     }
 
     // MARK: - Service Factory Registration (called by modules)

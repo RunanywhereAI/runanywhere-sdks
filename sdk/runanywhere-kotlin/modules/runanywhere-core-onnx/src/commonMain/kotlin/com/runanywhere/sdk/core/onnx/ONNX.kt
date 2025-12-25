@@ -30,11 +30,11 @@ import com.runanywhere.sdk.storage.ModelStorageStrategy
  * ```kotlin
  * import com.runanywhere.sdk.core.onnx.ONNX
  *
- * // Option 1: Direct registration
+ * // Direct registration (recommended)
  * ONNX.register()
  *
- * // Option 2: Via ModuleDiscovery (auto-discovery)
- * ModuleDiscovery.registerDiscoveredModules()
+ * // With custom priority
+ * ONNX.register(priority = 200)
  * ```
  *
  * ## Adding Models
@@ -74,6 +74,10 @@ import com.runanywhere.sdk.storage.ModelStorageStrategy
 object ONNX : RunAnywhereModule {
     private val logger = SDKLogger("ONNX")
 
+    // Track if we're already registered to avoid duplicate work
+    @Volatile
+    private var servicesRegistered = false
+
     // MARK: - RunAnywhereModule Conformance
 
     override val moduleId: String = "onnx"
@@ -107,18 +111,37 @@ object ONNX : RunAnywhereModule {
     const val VERSION: String = "1.23.2"
 
     /**
-     * Register all ONNX services with the SDK
-     * Matches iOS: @MainActor public static func register(priority: Int)
+     * Register ONNX module with the SDK.
+     * This is what app code should call: ONNX.register()
+     *
+     * Matches iOS: LlamaCPP.register() / ONNX.register()
      *
      * @param priority Registration priority (higher values are preferred)
      */
-    override fun register(priority: Int) {
+    @JvmStatic
+    @JvmOverloads
+    fun register(priority: Int = defaultPriority) {
+        // Register through ModuleRegistry which stores metadata and calls registerServices
+        ModuleRegistry.shared.register(this, priority)
+    }
+
+    /**
+     * Internal: Register only the services (called by ModuleRegistry)
+     * Matches iOS register(priority:) which only registers with ServiceRegistry
+     */
+    override fun registerServices(priority: Int) {
+        if (servicesRegistered) {
+            logger.info("ONNX services already registered")
+            return
+        }
+
         // Register services using factory closures (matching iOS exactly)
         registerSTT(priority)
         registerTTS(priority)
         registerVAD(priority)
 
-        logger.info("ONNX module registered (STT + TTS + VAD) with priority $priority")
+        servicesRegistered = true
+        logger.info("ONNX module services registered (STT + TTS + VAD) with priority $priority")
     }
 
     // MARK: - Individual Service Registration (matching iOS exactly)
@@ -126,7 +149,7 @@ object ONNX : RunAnywhereModule {
     /**
      * Register only ONNX STT service
      */
-    fun registerSTT(priority: Int = 100) {
+    private fun registerSTT(priority: Int = 100) {
         ModuleRegistry.shared.registerSTT(moduleName) { config -> createSTTService(config) }
         logger.info("ONNX STT registered")
     }
@@ -134,7 +157,7 @@ object ONNX : RunAnywhereModule {
     /**
      * Register only ONNX TTS service
      */
-    fun registerTTS(priority: Int = 100) {
+    private fun registerTTS(priority: Int = 100) {
         ModuleRegistry.shared.registerTTS("ONNX TTS") { config -> createTTSService(config) }
         logger.info("ONNX TTS registered")
     }
@@ -142,7 +165,7 @@ object ONNX : RunAnywhereModule {
     /**
      * Register only ONNX VAD service
      */
-    fun registerVAD(priority: Int = 100) {
+    private fun registerVAD(priority: Int = 100) {
         ModuleRegistry.shared.registerVAD("ONNX VAD") { config -> createVADService(config) }
         logger.info("ONNX VAD registered")
     }

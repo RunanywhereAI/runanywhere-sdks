@@ -5,9 +5,11 @@ import com.runanywhere.sdk.features.stt.STTEvent
 import com.runanywhere.sdk.features.tts.TTSEvent
 import com.runanywhere.sdk.features.vad.VADEvent
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.currentTimeMillis
 import com.runanywhere.sdk.infrastructure.events.EventPublisher
 import com.runanywhere.sdk.infrastructure.events.SDKEvent
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -235,42 +237,56 @@ class ManagedLifecycle<ServiceType : Any>(
         resourceId: String,
         durationMs: Double?,
         error: Throwable?,
-    ): STTEvent =
-        when (type) {
-            LifecycleEventType.LOAD_STARTED -> STTEvent.ModelLoadStarted(modelId = resourceId)
+    ): STTEvent {
+        // Look up the model's framework from the registry
+        val modelInfo = ServiceContainer.shared.modelRegistry.getModel(resourceId)
+        val framework = modelInfo?.preferredFramework ?: InferenceFramework.ONNX
+
+        return when (type) {
+            LifecycleEventType.LOAD_STARTED -> STTEvent.ModelLoadStarted(modelId = resourceId, framework = framework)
             LifecycleEventType.LOAD_COMPLETED ->
                 STTEvent.ModelLoadCompleted(
                     modelId = resourceId,
                     durationMs = durationMs ?: 0.0,
+                    framework = framework,
                 )
             LifecycleEventType.LOAD_FAILED ->
                 STTEvent.ModelLoadFailed(
                     modelId = resourceId,
                     error = error?.message ?: "Unknown error",
+                    framework = framework,
                 )
             LifecycleEventType.UNLOADED -> STTEvent.ModelUnloaded(modelId = resourceId)
         }
+    }
 
     private fun createTTSEvent(
         type: LifecycleEventType,
         resourceId: String,
         durationMs: Double?,
         error: Throwable?,
-    ): TTSEvent =
-        when (type) {
-            LifecycleEventType.LOAD_STARTED -> TTSEvent.ModelLoadStarted(modelId = resourceId)
+    ): TTSEvent {
+        // Look up the model's framework from the registry
+        val modelInfo = ServiceContainer.shared.modelRegistry.getModel(resourceId)
+        val framework = modelInfo?.preferredFramework ?: InferenceFramework.ONNX
+
+        return when (type) {
+            LifecycleEventType.LOAD_STARTED -> TTSEvent.ModelLoadStarted(modelId = resourceId, framework = framework)
             LifecycleEventType.LOAD_COMPLETED ->
                 TTSEvent.ModelLoadCompleted(
                     modelId = resourceId,
                     durationMs = durationMs ?: 0.0,
+                    framework = framework,
                 )
             LifecycleEventType.LOAD_FAILED ->
                 TTSEvent.ModelLoadFailed(
                     modelId = resourceId,
                     error = error?.message ?: "Unknown error",
+                    framework = framework,
                 )
             LifecycleEventType.UNLOADED -> TTSEvent.ModelUnloaded(modelId = resourceId)
         }
+    }
 
     private fun createVADEvent(
         type: LifecycleEventType,
