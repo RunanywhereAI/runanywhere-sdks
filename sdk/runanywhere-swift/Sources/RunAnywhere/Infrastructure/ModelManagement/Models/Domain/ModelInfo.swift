@@ -32,7 +32,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
 
     // Framework compatibility
     public let compatibleFrameworks: [InferenceFramework]
-    public let preferredFramework: InferenceFramework?
+    public let framework: InferenceFramework?
 
     // Model-specific capabilities (optional based on category)
     public let contextLength: Int?  // For language models
@@ -84,7 +84,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         case id, name, category, format, downloadURL, localPath
         case artifactType
         case downloadSize, memoryRequired
-        case compatibleFrameworks, preferredFramework
+        case compatibleFrameworks, framework
         case contextLength, supportsThinking, thinkingPattern
         case tags, description
         case source, createdAt, updatedAt, syncPending
@@ -102,7 +102,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         downloadSize: Int64? = nil,
         memoryRequired: Int64? = nil,
         compatibleFrameworks: [InferenceFramework] = [],
-        preferredFramework: InferenceFramework? = nil,
+        framework: InferenceFramework? = nil,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
         thinkingPattern: ThinkingTagPattern? = nil,
@@ -128,7 +128,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         self.downloadSize = downloadSize
         self.memoryRequired = memoryRequired
         self.compatibleFrameworks = compatibleFrameworks
-        self.preferredFramework = preferredFramework ?? compatibleFrameworks.first
+        self.framework = framework ?? compatibleFrameworks.first
 
         // Set contextLength based on category if not provided
         if category.requiresContextLength {
@@ -174,7 +174,7 @@ extension ModelInfo {
         case downloadSize
         case memoryRequired
         case compatibleFrameworks
-        case preferredFramework
+        case framework
         case contextLength
         case supportsThinking
         case thinkingPattern

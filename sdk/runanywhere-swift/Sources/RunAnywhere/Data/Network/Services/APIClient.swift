@@ -78,43 +78,11 @@ public actor APIClient: NetworkService {
             let (data, response) = try await session.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw RepositoryError.syncFailure("Invalid response")
+                throw APIError.invalidResponse(message: "Invalid HTTP response")
             }
 
-            guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
-                // Try to parse error response
-                var errorMessage = "HTTP \(httpResponse.statusCode)"
-                if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { // swiftlint:disable:this avoid_any_type
-                    if let detail = errorData["detail"] as? String {
-                        errorMessage = detail
-                    } else if let detail = errorData["detail"] as? [[String: Any]] { // swiftlint:disable:this avoid_any_type
-                        // Parse Pydantic validation errors with field location
-                        let errors = detail.compactMap { error -> String? in
-                            guard let msg = error["msg"] as? String else { return nil }
-                            // Extract field path from loc array (e.g., ["body", "events", 0, "id"] → "events[0].id")
-                            if let loc = error["loc"] as? [Any] { // swiftlint:disable:this avoid_any_type
-                                let fieldPath = loc.dropFirst() // Skip "body"
-                                    .map { item -> String in
-                                        if let index = item as? Int {
-                                            return "[\(index)]"
-                                        }
-                                        return String(describing: item)
-                                    }
-                                    .joined()
-                                    .replacingOccurrences(of: "][", with: "].")  // Fix array notation
-                                    .trimmingCharacters(in: CharacterSet(charactersIn: "."))
-                                return fieldPath.isEmpty ? msg : "\(fieldPath): \(msg)"
-                            }
-                            return msg
-                        }.joined(separator: "; ")
-                        errorMessage = errors.isEmpty ? errorMessage : errors
-                    } else if let message = errorData["message"] as? String {
-                        errorMessage = message
-                    } else if let error = errorData["error"] as? String {
-                        errorMessage = error
-                    }
-                }
-                throw RepositoryError.syncFailure(errorMessage)
+            guard (200...299).contains(httpResponse.statusCode) else {
+                throw APIError.from(statusCode: httpResponse.statusCode, data: data)
             }
 
             return data
@@ -149,40 +117,11 @@ public actor APIClient: NetworkService {
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw RepositoryError.syncFailure("Invalid response")
+            throw APIError.invalidResponse(message: "Invalid HTTP response")
         }
 
-        guard httpResponse.statusCode == 200 else {
-            // Try to parse error response
-            var errorMessage = "HTTP \(httpResponse.statusCode)"
-            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { // swiftlint:disable:this avoid_any_type
-                if let detail = errorData["detail"] as? String {
-                    errorMessage = detail
-                } else if let detail = errorData["detail"] as? [[String: Any]] { // swiftlint:disable:this avoid_any_type
-                    // Parse Pydantic validation errors with field location
-                    let errors = detail.compactMap { error -> String? in
-                        guard let msg = error["msg"] as? String else { return nil }
-                        // Extract field path from loc array
-                        if let loc = error["loc"] as? [Any] { // swiftlint:disable:this avoid_any_type
-                            let fieldPath = loc.dropFirst() // Skip "body"
-                                .map { item -> String in
-                                    if let index = item as? Int {
-                                        return "[\(index)]"
-                                    }
-                                    return String(describing: item)
-                                }
-                                .joined()
-                                .replacingOccurrences(of: "][", with: "].")
-                                .trimmingCharacters(in: CharacterSet(charactersIn: "."))
-                            return fieldPath.isEmpty ? msg : "\(fieldPath): \(msg)"
-                        }
-                        return msg
-                    }.joined(separator: "; ")
-                    errorMessage = errors.isEmpty ? errorMessage : errors
-                }
-            }
-
-            throw RepositoryError.syncFailure(errorMessage)
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.from(statusCode: httpResponse.statusCode, data: data)
         }
 
         return data

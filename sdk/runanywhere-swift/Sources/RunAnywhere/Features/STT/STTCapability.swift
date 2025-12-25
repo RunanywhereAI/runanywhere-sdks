@@ -105,7 +105,7 @@ public actor STTCapability: ModelLoadableCapability {
             audioSizeBytes: audioSizeBytes,
             language: effectiveOptions.language,
             isStreaming: false,
-            sampleRate: 16000,
+            sampleRate: STTConstants.defaultSampleRate,
             framework: service.inferenceFramework
         )
 
@@ -127,7 +127,7 @@ public actor STTCapability: ModelLoadableCapability {
         await analyticsService.completeTranscription(
             transcriptionId: transcriptionId,
             text: result.transcript,
-            confidence: result.confidence ?? 0.9
+            confidence: result.confidence ?? STTConstants.defaultConfidence
         )
 
         let metrics = await analyticsService.getMetrics()
@@ -138,13 +138,13 @@ public actor STTCapability: ModelLoadableCapability {
         // Convert to output
         return STTOutput(
             text: result.transcript,
-            confidence: result.confidence ?? 0.9,
+            confidence: result.confidence ?? STTConstants.defaultConfidence,
             wordTimestamps: result.timestamps?.map { timestamp in
                 WordTimestamp(
                     word: timestamp.word,
                     startTime: timestamp.startTime,
                     endTime: timestamp.endTime,
-                    confidence: timestamp.confidence ?? 0.9
+                    confidence: timestamp.confidence ?? STTConstants.defaultConfidence
                 )
             },
             detectedLanguage: result.language,
@@ -205,7 +205,7 @@ public actor STTCapability: ModelLoadableCapability {
                     audioSizeBytes: 0, // Unknown for streaming
                     language: effectiveOptions.language,
                     isStreaming: true,
-                    sampleRate: 16000,
+                    sampleRate: STTConstants.defaultSampleRate,
                     framework: service.inferenceFramework
                 )
 
@@ -232,7 +232,7 @@ public actor STTCapability: ModelLoadableCapability {
                     await self.analyticsService.completeTranscription(
                         transcriptionId: transcriptionId,
                         text: result.transcript,
-                        confidence: result.confidence ?? 0.9
+                        confidence: result.confidence ?? STTConstants.defaultConfidence
                     )
 
                     // Yield final result
@@ -290,7 +290,7 @@ public actor STTCapability: ModelLoadableCapability {
         }
     }
 
-    private func estimateAudioLength(dataSize: Int, sampleRate: Int = 16000) -> TimeInterval {
+    private func estimateAudioLength(dataSize: Int, sampleRate: Int = STTConstants.defaultSampleRate) -> TimeInterval {
         let bytesPerSample = 2 // 16-bit PCM
         let samples = dataSize / bytesPerSample
         return TimeInterval(samples) / TimeInterval(sampleRate)

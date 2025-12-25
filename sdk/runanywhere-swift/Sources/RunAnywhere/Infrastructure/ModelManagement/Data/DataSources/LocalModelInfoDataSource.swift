@@ -213,7 +213,7 @@ public actor LocalModelInfoDataSource: LocalDataSource {
 
                     // Framework compatibility
                     t.column("compatibleFrameworks", .blob).notNull()
-                    t.column("preferredFramework", .text)
+                    t.column("framework", .text)
 
                     // Model-specific capabilities
                     t.column("contextLength", .integer)

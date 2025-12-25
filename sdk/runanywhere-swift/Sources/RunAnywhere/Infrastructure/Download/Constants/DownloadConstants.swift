@@ -21,4 +21,12 @@ public enum DownloadConstants {
 
     /// Default batch size for operations
     public static let defaultBatchSize = 32
+
+    // MARK: - Progress Reporting
+
+    /// Log progress at this percentage interval (25 = log at 25%, 50%, 75%, 100%)
+    public static let logProgressIntervalPercent = 25
+
+    /// Track public progress events at this fraction interval (0.1 = every 10%)
+    public static let publicProgressIntervalFraction: Double = 0.1
 }

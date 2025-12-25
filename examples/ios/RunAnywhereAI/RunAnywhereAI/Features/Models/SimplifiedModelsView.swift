@@ -20,8 +20,8 @@ struct SimplifiedModelsView: View {
     /// All available models sorted by availability (downloaded first)
     private var sortedModels: [ModelInfo] {
         viewModel.availableModels.sorted { model1, model2 in
-            let m1Priority = model1.preferredFramework == .foundationModels ? 0 : (model1.localPath != nil ? 1 : 2)
-            let m2Priority = model2.preferredFramework == .foundationModels ? 0 : (model2.localPath != nil ? 1 : 2)
+            let m1Priority = model1.framework == .foundationModels ? 0 : (model1.localPath != nil ? 1 : 2)
+            let m2Priority = model2.framework == .foundationModels ? 0 : (model2.localPath != nil ? 1 : 2)
             if m1Priority != m2Priority {
                 return m1Priority < m2Priority
             }
@@ -176,7 +176,7 @@ private struct SimplifiedModelRow: View {
     @State private var downloadProgress: Double = 0.0
 
     private var frameworkColor: Color {
-        guard let framework = model.preferredFramework else { return .gray }
+        guard let framework = model.framework else { return .gray }
         switch framework {
         case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
@@ -187,7 +187,7 @@ private struct SimplifiedModelRow: View {
     }
 
     private var frameworkName: String {
-        guard let framework = model.preferredFramework else { return "Unknown" }
+        guard let framework = model.framework else { return "Unknown" }
         switch framework {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
@@ -198,7 +198,7 @@ private struct SimplifiedModelRow: View {
     }
 
     private var isReady: Bool {
-        model.preferredFramework == .foundationModels || model.localPath != nil
+        model.framework == .foundationModels || model.localPath != nil
     }
 
     var body: some View {
@@ -246,7 +246,7 @@ private struct SimplifiedModelRow: View {
                             Image(systemName: isReady ? "checkmark.circle.fill" : "arrow.down.circle")
                                 .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                                 .font(AppTypography.caption2)
-                            Text(model.preferredFramework == .foundationModels ? "Built-in" : (model.localPath != nil ? "Ready" : "Download"))
+                            Text(model.framework == .foundationModels ? "Built-in" : (model.localPath != nil ? "Ready" : "Download"))
                                 .font(AppTypography.caption2)
                                 .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                         }
@@ -270,7 +270,7 @@ private struct SimplifiedModelRow: View {
             Spacer()
 
             // Action button
-            if model.preferredFramework == .foundationModels {
+            if model.framework == .foundationModels {
                 Button("Use") {
                     onSelectModel()
                 }

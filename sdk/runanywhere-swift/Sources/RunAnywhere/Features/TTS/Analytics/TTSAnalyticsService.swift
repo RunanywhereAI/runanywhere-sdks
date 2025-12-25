@@ -56,13 +56,13 @@ public actor TTSAnalyticsService {
     /// - Parameters:
     ///   - text: The text to synthesize
     ///   - voice: The voice ID being used
-    ///   - sampleRate: Audio sample rate in Hz (default 22050)
+    ///   - sampleRate: Audio sample rate in Hz (default: TTSConstants.defaultSampleRate)
     ///   - framework: The inference framework being used
     /// - Returns: A unique synthesis ID for tracking
     public func startSynthesis(
         text: String,
         voice: String,
-        sampleRate: Int = 22050,
+        sampleRate: Int = TTSConstants.defaultSampleRate,
         framework: InferenceFrameworkType = .unknown
     ) -> String {
         let id = UUID().uuidString

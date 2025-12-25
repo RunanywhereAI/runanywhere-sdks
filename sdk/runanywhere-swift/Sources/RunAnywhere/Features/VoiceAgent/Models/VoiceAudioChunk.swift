@@ -23,7 +23,7 @@ public struct VoiceAudioChunk {
     public init(
         samples: [Float],
         timestamp: TimeInterval,
-        sampleRate: Int = 16000,
+        sampleRate: Int = VoiceAgentConstants.inputSampleRate,
         channels: Int = 1,
         sequenceNumber: Int = 0,
         isFinal: Bool = false

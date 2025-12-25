@@ -5,6 +5,9 @@
 //  All TTS-related events in one place.
 //  Each event declares its destination (public, analytics, or both).
 //
+//  Note: TTSEvent conforms to TypedEventProperties for strongly typed analytics.
+//  This avoids string conversion/parsing and enables compile-time type checking.
+//
 
 import Foundation
 
@@ -16,7 +19,13 @@ import Foundation
 /// ```swift
 /// EventPublisher.shared.track(TTSEvent.synthesisCompleted(...))
 /// ```
-public enum TTSEvent: SDKEvent {
+///
+/// TTSEvent provides strongly typed properties via `typedProperties`.
+/// This enables:
+/// - Type safety at compile time
+/// - No string parsing for analytics
+/// - Validation guardrails
+public enum TTSEvent: SDKEvent, TypedEventProperties {
 
     // MARK: - Model Lifecycle
 
@@ -30,12 +39,12 @@ public enum TTSEvent: SDKEvent {
     /// Synthesis started event
     /// - Parameters:
     ///   - characterCount: Number of characters in the text to synthesize
-    ///   - sampleRate: Audio sample rate in Hz (default 22050 for most TTS)
+    ///   - sampleRate: Audio sample rate in Hz (default: TTSConstants.defaultSampleRate)
     case synthesisStarted(
         synthesisId: String,
         voiceId: String,
         characterCount: Int,
-        sampleRate: Int = 22050,
+        sampleRate: Int = TTSConstants.defaultSampleRate,
         framework: InferenceFrameworkType = .unknown
     )
 
@@ -57,7 +66,7 @@ public enum TTSEvent: SDKEvent {
         audioSizeBytes: Int,
         processingDurationMs: Double,
         charactersPerSecond: Double,
-        sampleRate: Int = 22050,
+        sampleRate: Int = TTSConstants.defaultSampleRate,
         framework: InferenceFrameworkType = .unknown
     )
     case synthesisFailed(synthesisId: String, voiceId: String, error: String)
@@ -171,6 +180,97 @@ public enum TTSEvent: SDKEvent {
                 "error": error,
                 "success": "false"
             ]
+        }
+    }
+
+    // MARK: - TypedEventProperties Conformance
+
+    /// Strongly typed event properties - no string conversion needed.
+    /// These values are used directly by TelemetryEventPayload.
+    public var typedProperties: EventProperties {
+        switch self {
+        case .modelLoadStarted(let voiceId, let modelSizeBytes, let framework):
+            return EventProperties(
+                modelId: voiceId,
+                framework: framework.rawValue,
+                voice: voiceId,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadCompleted(let voiceId, let durationMs, let modelSizeBytes, let framework):
+            return EventProperties(
+                modelId: voiceId,
+                framework: framework.rawValue,
+                processingTimeMs: durationMs,
+                success: true,
+                voice: voiceId,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadFailed(let voiceId, let error, let framework):
+            return EventProperties(
+                modelId: voiceId,
+                framework: framework.rawValue,
+                success: false,
+                errorMessage: error,
+                voice: voiceId
+            )
+
+        case .modelUnloaded(let voiceId):
+            return EventProperties(
+                modelId: voiceId,
+                voice: voiceId
+            )
+
+        case .synthesisStarted(let id, let voiceId, let characterCount, let sampleRate, let framework):
+            return EventProperties(
+                modelId: voiceId,
+                framework: framework.rawValue,
+                characterCount: characterCount,
+                sampleRate: sampleRate,
+                voice: voiceId,
+                synthesisId: id
+            )
+
+        case .synthesisChunk(let id, let chunkSize):
+            return EventProperties(
+                audioSizeBytes: chunkSize,
+                synthesisId: id
+            )
+
+        case .synthesisCompleted(
+            let id,
+            let voiceId,
+            let charCount,
+            let audioDurationMs,
+            let audioSize,
+            let processingDurationMs,
+            let charsPerSecond,
+            let sampleRate,
+            let framework
+        ):
+            return EventProperties(
+                modelId: voiceId,
+                framework: framework.rawValue,
+                processingTimeMs: processingDurationMs,
+                success: true,
+                characterCount: charCount,
+                charactersPerSecond: charsPerSecond,
+                audioSizeBytes: audioSize,
+                sampleRate: sampleRate,
+                voice: voiceId,
+                outputDurationMs: audioDurationMs,
+                synthesisId: id
+            )
+
+        case .synthesisFailed(let id, let voiceId, let error):
+            return EventProperties(
+                modelId: voiceId,
+                success: false,
+                errorMessage: error,
+                voice: voiceId,
+                synthesisId: id
+            )
         }
     }
 }

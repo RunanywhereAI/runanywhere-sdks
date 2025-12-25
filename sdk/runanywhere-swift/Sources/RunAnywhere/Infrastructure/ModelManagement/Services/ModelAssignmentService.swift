@@ -139,7 +139,7 @@ public struct ModelAssignment: Codable, Sendable {
     public let contextLength: Int?
     public let supportsThinking: Bool
     public let compatibleFrameworks: [String]
-    public let preferredFramework: String?
+    public let framework: String?
     public let metadata: ModelAssignmentMetadata?
     public let isRequired: Bool
     public let priority: Int
@@ -152,7 +152,7 @@ public struct ModelAssignment: Codable, Sendable {
         case contextLength = "context_length"
         case supportsThinking = "supports_thinking"
         case compatibleFrameworks = "compatible_frameworks"
-        case preferredFramework = "preferred_framework"
+        case framework = "preferred_framework"
         case metadata
         case isRequired = "is_required"
         case priority
@@ -187,7 +187,7 @@ extension ModelAssignment {
 
         // Convert string frameworks to InferenceFramework enum
         let frameworks = compatibleFrameworks.compactMap { InferenceFramework(rawValue: $0.lowercased()) }
-        let preferred = preferredFramework.flatMap { InferenceFramework(rawValue: $0.lowercased()) }
+        let preferred = framework.flatMap { InferenceFramework(rawValue: $0.lowercased()) }
 
         // Extract tags and description from metadata
         let modelTags = metadata?.tags ?? []
@@ -206,7 +206,7 @@ extension ModelAssignment {
             downloadSize: size,
             memoryRequired: memoryRequired,
             compatibleFrameworks: frameworks,
-            preferredFramework: preferred,
+            framework: preferred,
             contextLength: contextLength,
             supportsThinking: supportsThinking,
             tags: modelTags,

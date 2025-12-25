@@ -103,7 +103,7 @@ class TTSViewModel: ObservableObject {
 
         do {
             try await RunAnywhere.loadTTSModel(model.id)
-            selectedFramework = model.preferredFramework
+            selectedFramework = model.framework
             selectedModelName = model.name
             selectedModelId = model.id
             logger.info("TTS model loaded successfully: \(model.name)")
@@ -134,6 +134,7 @@ class TTSViewModel: ObservableObject {
             let output = try await RunAnywhere.synthesize(text, options: options)
 
             if !output.audioData.isEmpty {
+                // Audio data returned - create player for manual playback control
                 try await createAudioPlayer(from: output.audioData)
 
                 // Get sample rate from audio player format
@@ -148,8 +149,23 @@ class TTSViewModel: ObservableObject {
 
                 hasGeneratedAudio = true
                 duration = output.duration
+                logger.info("Speech generation complete - audio data ready for playback")
+            } else {
+                // System TTS plays directly through speakers - no audio data to store
+                // This is expected behavior for system-tts
+                logger.info("Speech played directly through speakers (System TTS)")
+
+                // Set metadata to indicate direct playback occurred
+                metadata = TTSMetadata(
+                    durationMs: output.duration * 1000,
+                    audioSize: 0,
+                    sampleRate: 22050
+                )
+
+                // Mark as "generated" even though audio was played directly
+                // The play button won't work, but user already heard the speech
+                hasGeneratedAudio = false // No audio to replay
             }
-            logger.info("Speech generation complete")
         } catch {
             logger.error("Speech generation failed: \(error.localizedDescription)")
             errorMessage = "Generation failed: \(error.localizedDescription)"

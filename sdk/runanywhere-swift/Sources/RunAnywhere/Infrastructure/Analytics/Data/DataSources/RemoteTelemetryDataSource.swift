@@ -80,47 +80,15 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
         )
     }
 
-    // MARK: - Sync Support
+    // MARK: - Sync Support (Protocol Requirement)
 
+    /// Sync batch from TelemetryData - not used, telemetry sends directly via sendPayloads()
+    /// Required by RemoteDataSource protocol but never called for telemetry
     public func syncBatch(_ batch: [TelemetryData]) async throws -> [String] {
-        guard let apiClient = apiClient else {
-            throw DataSourceError.notAvailable
-        }
-
-        let typedEvents = batch.map { TelemetryEventPayload(from: $0) }
-        let endpoint = APIEndpoint.telemetryEndpoint(for: environment)
-
-        // Development mode: Send array directly to Supabase
-        if environment == .development {
-            let _: [TelemetryEventPayload] = try await apiClient.post(endpoint, typedEvents, requiresAuth: false)
-            return typedEvents.map { $0.id }
-        }
-
-        // Production mode: Send batch requests grouped by modality
-        var syncedIds: [String] = []
-        let eventsByModality = Dictionary(grouping: typedEvents) { TelemetryModality.infer(from: $0.eventType) }
-
-        for (_, modalityEvents) in eventsByModality where !modalityEvents.isEmpty {
-            let batchRequest = TelemetryBatchRequest(
-                events: modalityEvents,
-                deviceId: DeviceIdentity.persistentUUID,
-                timestamp: Date(),
-                inferModality: true
-            )
-
-            do {
-                let response: TelemetryBatchResponse = try await apiClient.post(endpoint, batchRequest, requiresAuth: true)
-                syncedIds.append(contentsOf: modalityEvents.map { $0.id })
-
-                if !response.success {
-                    logger.warning("Partial sync: \(response.eventsStored)/\(response.eventsReceived) stored")
-                }
-            } catch {
-                logger.error("Failed to sync telemetry batch: \(error)")
-            }
-        }
-
-        return syncedIds
+        // Telemetry doesn't use background sync - events are sent immediately via sendPayloads()
+        // This method exists only for RemoteDataSource protocol conformance
+        logger.warning("syncBatch called on TelemetryDataSource - this path is not used")
+        return batch.map { $0.id }
     }
 
     public func testConnection() async throws -> Bool {
@@ -137,38 +105,49 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
 
     // MARK: - Telemetry-specific methods
 
-    /// Send batch of telemetry events (immediate send, no local storage)
-    public func sendBatch(_ events: [TelemetryData]) async throws {
+    /// Send batch of typed telemetry payloads directly (preserves category → modality)
+    public func sendPayloads(_ payloads: [TelemetryEventPayload]) async throws {
         guard let apiClient = apiClient else {
             throw DataSourceError.notAvailable
         }
 
-        guard !events.isEmpty else {
+        guard !payloads.isEmpty else {
             return
         }
 
-        // Convert to typed payloads
-        let typedEvents = events.map { TelemetryEventPayload(from: $0) }
+        let typedEvents = payloads
         let endpoint = APIEndpoint.telemetryEndpoint(for: environment)
 
         // Development mode: Send array directly to Supabase REST API
         // Production mode: Send batch request wrapper to FastAPI backend
         if environment == .development {
+            // Supabase needs all fields per event
+            TelemetryEventPayload.productionEncodingMode = false
+
             // Supabase REST API expects array of rows: POST /rest/v1/table_name with body [{...}, {...}]
             let _: [TelemetryEventPayload] = try await operationHelper.withTimeout {
                 try await apiClient.post(endpoint, typedEvents, requiresAuth: false)
             }
             logger.debug("Sent \(typedEvents.count) events to Supabase")
         } else {
-            // Production: Group by modality and send batch requests
-            let eventsByModality = Dictionary(grouping: typedEvents) { TelemetryModality.infer(from: $0.eventType) }
+            // FastAPI expects batch-level device_id/modality, not per-event
+            TelemetryEventPayload.productionEncodingMode = true
 
-            for (_, modalityEvents) in eventsByModality where !modalityEvents.isEmpty {
+            // Production: Group by modality and send batch requests
+            // V2 modalities: llm, stt, tts, model
+            // V1 fallback: "system" events use modality=nil for legacy table
+            let v2Modalities: Set<String> = ["llm", "stt", "tts", "model"]
+            let eventsByModality = Dictionary(grouping: typedEvents) { $0.modality ?? "system" }
+
+            for (modality, modalityEvents) in eventsByModality where !modalityEvents.isEmpty {
+                // For "system" events, use V1 path (modality=nil)
+                let effectiveModality: String? = v2Modalities.contains(modality) ? modality : nil
+
                 let batchRequest = TelemetryBatchRequest(
                     events: modalityEvents,
                     deviceId: DeviceIdentity.persistentUUID,
                     timestamp: Date(),
-                    inferModality: true
+                    modality: effectiveModality  // nil for V1 (system), actual value for V2
                 )
 
                 let response: TelemetryBatchResponse = try await operationHelper.withTimeout {

@@ -37,7 +37,7 @@ public extension RunAnywhere {
 
         for model in allModels {
             // Add preferred framework
-            if let preferred = model.preferredFramework {
+            if let preferred = model.framework {
                 frameworks.insert(preferred)
             }
             // Add all compatible frameworks
@@ -73,7 +73,7 @@ public extension RunAnywhere {
         }
 
         for model in allModels where relevantCategories.contains(model.category) {
-            if let preferred = model.preferredFramework {
+            if let preferred = model.framework {
                 frameworks.insert(preferred)
             }
             for framework in model.compatibleFrameworks {

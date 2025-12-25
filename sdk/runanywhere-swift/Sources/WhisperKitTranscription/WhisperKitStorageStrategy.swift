@@ -140,7 +140,7 @@ public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
     public func canHandle(model: ModelInfo) -> Bool {
         // Handle speech recognition models compatible with WhisperKit
         model.category == .speechRecognition &&
-        (model.preferredFramework == .whisperKit ||
+        (model.framework == .whisperKit ||
          model.compatibleFrameworks.contains(.whisperKit))
     }
 

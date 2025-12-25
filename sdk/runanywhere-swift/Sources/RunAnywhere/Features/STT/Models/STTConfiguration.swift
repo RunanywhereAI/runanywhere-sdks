@@ -29,7 +29,7 @@ public struct STTConfiguration: ComponentConfiguration, Sendable {
     public init(
         modelId: String? = nil,
         language: String = "en-US",
-        sampleRate: Int = 16000,
+        sampleRate: Int = STTConstants.defaultSampleRate,
         enablePunctuation: Bool = true,
         enableDiarization: Bool = false,
         vocabularyList: [String] = [],

@@ -87,7 +87,7 @@ class ModelListViewModel: ObservableObject {
 
             // Filter out Foundation Models for older iOS versions
             if #unavailable(iOS 26.0) {
-                filteredModels = allModels.filter { $0.preferredFramework != .foundationModels }
+                filteredModels = allModels.filter { $0.framework != .foundationModels }
                 print("iOS < 26 - Foundation Models not available")
             }
 
@@ -95,7 +95,7 @@ class ModelListViewModel: ObservableObject {
             print("Loaded \(availableModels.count) models from registry")
 
             for model in availableModels {
-                print("  - \(model.name) (\(model.preferredFramework?.displayName ?? "Unknown"))")
+                print("  - \(model.name) (\(model.framework?.displayName ?? "Unknown"))")
             }
 
             // Sync currentModel with SDK's current model state
@@ -169,7 +169,7 @@ class ModelListViewModel: ObservableObject {
     }
 
     func deleteModel(_ model: ModelInfo) async throws {
-        guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
+        guard let framework = model.framework ?? model.compatibleFrameworks.first else {
             throw RunAnywhereError.modelNotFound("Model has no associated framework")
         }
         try await RunAnywhere.deleteStoredModel(model.id, framework: framework)

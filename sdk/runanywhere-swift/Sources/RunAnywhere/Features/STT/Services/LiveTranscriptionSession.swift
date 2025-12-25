@@ -68,12 +68,16 @@ public final class LiveTranscriptionSession: ObservableObject {
 
     /// Async stream of transcription text updates
     public var transcriptions: AsyncStream<String> {
-        AsyncStream { continuation in
-            self.onPartialCallback = { text in
-                continuation.yield(text)
+        AsyncStream { [weak self] continuation in
+            Task { @MainActor in
+                self?.onPartialCallback = { text in
+                    continuation.yield(text)
+                }
             }
-            continuation.onTermination = { _ in
-                self.onPartialCallback = nil
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor in
+                    self?.onPartialCallback = nil
+                }
             }
         }
     }
@@ -91,11 +95,11 @@ public final class LiveTranscriptionSession: ObservableObject {
 
     /// Start live transcription
     /// - Parameter onPartial: Optional callback for each partial transcription update
-    /// - Throws: If microphone permission is denied or audio capture fails
+    /// - Throws: `LiveTranscriptionError.alreadyActive` if session is already running,
+    ///           `LiveTranscriptionError.microphonePermissionDenied` if mic access denied
     public func start(onPartial: ((String) -> Void)? = nil) async throws {
         guard !isActive else {
-            logger.warning("Session already active")
-            return
+            throw LiveTranscriptionError.alreadyActive
         }
 
         // Request microphone permission

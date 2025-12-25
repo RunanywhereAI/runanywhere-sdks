@@ -28,9 +28,9 @@ extension AlamofireDownloadService {
                     state: .downloading
                 )
 
-                // Log progress at 25% intervals (local logging only)
+                // Log progress at defined intervals (local logging only)
                 let progressPercent = Int(progress.fractionCompleted * 100)
-                if progressPercent % 25 == 0 && progressPercent > 0 {
+                if progressPercent % DownloadConstants.logProgressIntervalPercent == 0 && progressPercent > 0 {
                     self.logger.debug("Download progress", metadata: [
                         "modelId": model.id,
                         "progress": progressPercent,
@@ -40,9 +40,9 @@ extension AlamofireDownloadService {
                     ])
                 }
 
-                // Track progress at 10% intervals (public EventBus only - for UI updates)
+                // Track progress at defined intervals (public EventBus only - for UI updates)
                 let progressValue = progress.fractionCompleted
-                if progressValue - lastReportedProgress >= 0.1 {
+                if progressValue - lastReportedProgress >= DownloadConstants.publicProgressIntervalFraction {
                     lastReportedProgress = progressValue
                     EventPublisher.shared.track(ModelEvent.downloadProgress(
                         modelId: model.id,

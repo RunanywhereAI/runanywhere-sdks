@@ -215,7 +215,7 @@ public final class ModuleRegistry {
     /// - Returns: A download strategy that can handle the model, or nil
     public func downloadStrategy(for model: ModelInfo) -> DownloadStrategy? {
         // First try the model's preferred framework
-        if let framework = model.preferredFramework,
+        if let framework = model.framework,
            let strategy = downloadStrategies[framework],
            strategy.canHandle(model: model) {
             return strategy

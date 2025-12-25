@@ -74,7 +74,7 @@ public enum LlamaCPP: RunAnywhereModule {
 
         // Check model info cache first
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.preferredFramework == .llamaCpp {
+            if modelInfo.framework == .llamaCpp {
                 return true
             }
             if modelInfo.compatibleFrameworks.contains(.llamaCpp) {

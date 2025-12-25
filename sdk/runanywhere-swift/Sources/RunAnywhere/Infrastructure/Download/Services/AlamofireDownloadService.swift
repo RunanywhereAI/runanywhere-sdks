@@ -168,7 +168,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
         // Get destination folder (framework is required)
-        guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
+        guard let framework = model.framework ?? model.compatibleFrameworks.first else {
             logger.error("Model has no associated framework: \(model.id)")
             throw DownloadError.invalidURL
         }

@@ -261,7 +261,7 @@ final class VoiceAgentViewModel: ObservableObject {
         // Find model info from shared model list
         let model = ModelListViewModel.shared.availableModels.first { $0.id == id }
         let name = model?.name ?? id
-        let framework = model?.preferredFramework ?? (type == .llm ? .llamaCpp : .onnx)
+        let framework = model?.framework ?? (type == .llm ? .llamaCpp : .onnx)
 
         switch type {
         case .stt:
@@ -353,7 +353,7 @@ final class VoiceAgentViewModel: ObservableObject {
 
     /// Set the STT model
     func setSTTModel(_ model: ModelInfo) {
-        sttModel = (model.preferredFramework ?? .onnx, model.name, model.id)
+        sttModel = (model.framework ?? .onnx, model.name, model.id)
         Task {
             await syncModelStates()
         }
@@ -361,7 +361,7 @@ final class VoiceAgentViewModel: ObservableObject {
 
     /// Set the LLM model
     func setLLMModel(_ model: ModelInfo) {
-        llmModel = (model.preferredFramework ?? .llamaCpp, model.name, model.id)
+        llmModel = (model.framework ?? .llamaCpp, model.name, model.id)
         Task {
             await syncModelStates()
         }
@@ -369,7 +369,7 @@ final class VoiceAgentViewModel: ObservableObject {
 
     /// Set the TTS model
     func setTTSModel(_ model: ModelInfo) {
-        ttsModel = (model.preferredFramework ?? .onnx, model.name, model.id)
+        ttsModel = (model.framework ?? .onnx, model.name, model.id)
         Task {
             await syncModelStates()
         }

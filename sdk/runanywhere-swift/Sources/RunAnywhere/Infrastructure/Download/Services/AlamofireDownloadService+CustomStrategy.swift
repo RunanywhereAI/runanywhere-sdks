@@ -61,7 +61,7 @@ extension AlamofireDownloadService {
                 }
 
                 do {
-                    let destinationFolder = try getDestinationFolder(for: model.id, framework: model.preferredFramework)
+                    let destinationFolder = try getDestinationFolder(for: model.id, framework: model.framework)
 
                     var lastReportedProgress: Double = -1.0
                     let resultURL = try await strategy.download(
