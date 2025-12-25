@@ -41,8 +41,14 @@ public actor AnalyticsQueueManager {
 
     // MARK: - Public Methods
 
-    public func initialize(telemetryRepository: TelemetryRepositoryImpl) {
+    public func initialize(telemetryRepository: TelemetryRepositoryImpl) async {
         self.telemetryRepository = telemetryRepository
+
+        // Verify remote data source is available
+        let hasRemote = await telemetryRepository.remoteDataSource != nil
+        if !hasRemote {
+            logger.error("TelemetryRepository has no remoteDataSource - events will NOT be sent to backend")
+        }
     }
 
     /// Enqueue an event for analytics processing
@@ -72,6 +78,10 @@ public actor AnalyticsQueueManager {
 
     private func flushBatch() async {
         guard !eventQueue.isEmpty else {
+            return
+        }
+
+        guard telemetryRepository != nil else {
             return
         }
 
@@ -110,18 +120,22 @@ public actor AnalyticsQueueManager {
 
         while attempt < maxRetries && !success {
             do {
-                // Store each event locally
-                for telemetryData in telemetryEvents {
-                    if let eventType = TelemetryEventType(rawValue: telemetryData.eventType) {
-                        try await telemetryRepository.trackEvent(eventType, properties: telemetryData.properties)
-                    } else {
-                        try await telemetryRepository.trackEvent(
-                            .custom,
-                            properties: telemetryData.properties.merging(
-                                ["event_type": telemetryData.eventType]
-                            ) { _, new in new }
-                        )
+                // Try to store events locally (optional - skip if database not available)
+                do {
+                    for telemetryData in telemetryEvents {
+                        if let eventType = TelemetryEventType(rawValue: telemetryData.eventType) {
+                            try await telemetryRepository.trackEvent(eventType, properties: telemetryData.properties)
+                        } else {
+                            try await telemetryRepository.trackEvent(
+                                .custom,
+                                properties: telemetryData.properties.merging(
+                                    ["event_type": telemetryData.eventType]
+                                ) { _, new in new }
+                            )
+                        }
                     }
+                } catch {
+                    // Database not available - skip local storage, continue to remote
                 }
 
                 // Sync to backend

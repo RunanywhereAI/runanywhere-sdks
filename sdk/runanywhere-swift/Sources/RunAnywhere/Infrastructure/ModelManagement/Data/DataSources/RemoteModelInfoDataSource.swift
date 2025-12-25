@@ -50,30 +50,17 @@ public actor RemoteModelInfoDataSource: RemoteDataSource {
         apiClient != nil
     }
 
-    // MARK: - Sync Support (actual implementation)
+    // MARK: - Sync Support
 
+    /// Sync batch marks models as synced locally.
+    /// Note: SDK does not POST models to backend - models are created via web dashboard
+    /// and fetched via ModelAssignmentService. This just marks local models as "synced".
     public func syncBatch(_ batch: [ModelInfo]) async throws -> [String] {
-        guard let apiClient = apiClient else {
-            throw DataSourceError.notAvailable
-        }
-
-        var syncedIds: [String] = []
-
-        for modelInfo in batch {
-            do {
-                let _: ModelInfo = try await apiClient.post(
-                    .models,
-                    modelInfo,
-                    requiresAuth: true
-                )
-                syncedIds.append(modelInfo.id)
-            } catch {
-                logger.error("Failed to sync model \(modelInfo.id): \(error)")
-            }
-        }
+        // SDK is read-only for models - just mark as synced locally
+        let syncedIds = batch.map { $0.id }
 
         if !syncedIds.isEmpty {
-            logger.info("Synced \(syncedIds.count) of \(batch.count) models")
+            logger.debug("Marked \(syncedIds.count) models as synced (local-only)")
         }
 
         return syncedIds

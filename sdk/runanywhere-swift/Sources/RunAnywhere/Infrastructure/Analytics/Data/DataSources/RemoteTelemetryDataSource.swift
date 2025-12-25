@@ -87,35 +87,37 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
             throw DataSourceError.notAvailable
         }
 
-        var syncedIds: [String] = []
-
-        // Convert TelemetryData to typed TelemetryEventPayload for API transmission
-        // Backend expects typed fields, not a properties dictionary
         let typedEvents = batch.map { TelemetryEventPayload(from: $0) }
+        let endpoint = APIEndpoint.telemetryEndpoint(for: environment)
 
-        let batchRequest = TelemetryBatchRequest(
-            events: typedEvents,
-            deviceId: DeviceIdentity.persistentUUID,
-            timestamp: Date()
-        )
+        // Development mode: Send array directly to Supabase
+        if environment == .development {
+            let _: [TelemetryEventPayload] = try await apiClient.post(endpoint, typedEvents, requiresAuth: false)
+            return typedEvents.map { $0.id }
+        }
 
-        do {
-            // POST typed batch to analytics endpoint based on environment
-            let endpoint = APIEndpoint.analyticsEndpoint(for: environment)
-            let response: TelemetryBatchResponse = try await apiClient.post(
-                endpoint,
-                batchRequest,
-                requiresAuth: environment != .development
+        // Production mode: Send batch requests grouped by modality
+        var syncedIds: [String] = []
+        let eventsByModality = Dictionary(grouping: typedEvents) { TelemetryModality.infer(from: $0.eventType) }
+
+        for (_, modalityEvents) in eventsByModality where !modalityEvents.isEmpty {
+            let batchRequest = TelemetryBatchRequest(
+                events: modalityEvents,
+                deviceId: DeviceIdentity.persistentUUID,
+                timestamp: Date(),
+                inferModality: true
             )
 
-            if response.success {
-                syncedIds = batch.map { $0.id }
-            } else {
-                // Still mark as synced to avoid infinite retries
-                syncedIds = batch.map { $0.id }
+            do {
+                let response: TelemetryBatchResponse = try await apiClient.post(endpoint, batchRequest, requiresAuth: true)
+                syncedIds.append(contentsOf: modalityEvents.map { $0.id })
+
+                if !response.success {
+                    logger.warning("Partial sync: \(response.eventsStored)/\(response.eventsReceived) stored")
+                }
+            } catch {
+                logger.error("Failed to sync telemetry batch: \(error)")
             }
-        } catch {
-            logger.error("Failed to sync telemetry batch: \(error)")
         }
 
         return syncedIds
@@ -147,26 +149,36 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
 
         // Convert to typed payloads
         let typedEvents = events.map { TelemetryEventPayload(from: $0) }
+        let endpoint = APIEndpoint.telemetryEndpoint(for: environment)
 
-        let batchRequest = TelemetryBatchRequest(
-            events: typedEvents,
-            deviceId: DeviceIdentity.persistentUUID,
-            timestamp: Date()
-        )
+        // Development mode: Send array directly to Supabase REST API
+        // Production mode: Send batch request wrapper to FastAPI backend
+        if environment == .development {
+            // Supabase REST API expects array of rows: POST /rest/v1/table_name with body [{...}, {...}]
+            let _: [TelemetryEventPayload] = try await operationHelper.withTimeout {
+                try await apiClient.post(endpoint, typedEvents, requiresAuth: false)
+            }
+            logger.debug("Sent \(typedEvents.count) events to Supabase")
+        } else {
+            // Production: Group by modality and send batch requests
+            let eventsByModality = Dictionary(grouping: typedEvents) { TelemetryModality.infer(from: $0.eventType) }
 
-        // Use analytics endpoint based on environment
-        let endpoint = APIEndpoint.analyticsEndpoint(for: environment)
+            for (_, modalityEvents) in eventsByModality where !modalityEvents.isEmpty {
+                let batchRequest = TelemetryBatchRequest(
+                    events: modalityEvents,
+                    deviceId: DeviceIdentity.persistentUUID,
+                    timestamp: Date(),
+                    inferModality: true
+                )
 
-        let response: TelemetryBatchResponse = try await operationHelper.withTimeout {
-            try await apiClient.post(
-                endpoint,
-                batchRequest,
-                requiresAuth: self.environment != .development
-            )
-        }
+                let response: TelemetryBatchResponse = try await operationHelper.withTimeout {
+                    try await apiClient.post(endpoint, batchRequest, requiresAuth: true)
+                }
 
-        if !response.success {
-            logger.warning("Telemetry send partial failure: \(response.errors?.joined(separator: ", ") ?? "unknown")")
+                if !response.success {
+                    logger.warning("Telemetry partial failure: stored=\(response.eventsStored), skipped=\(response.eventsSkipped ?? 0)")
+                }
+            }
         }
     }
 }

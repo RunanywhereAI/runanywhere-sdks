@@ -18,6 +18,16 @@ public struct TelemetryEventPayload: Codable, Sendable {
     public let timestamp: Date
     public let createdAt: Date
 
+    // MARK: - Event Classification
+
+    /// Event modality for V2 routing (llm, stt, tts, model, system)
+    public let modality: String?
+
+    // MARK: - Device Identification
+
+    /// Persistent device UUID (for V2 base table)
+    public let deviceId: String?
+
     // MARK: - Session Tracking
 
     public let sessionId: String?
@@ -77,10 +87,12 @@ public struct TelemetryEventPayload: Codable, Sendable {
     // MARK: - Coding Keys (snake_case for API)
 
     enum CodingKeys: String, CodingKey {
-        case id
+        case id = "sdk_event_id"  // Maps to sdk_event_id in V2 schema (db generates its own id)
         case eventType = "event_type"
-        case timestamp
+        case timestamp = "event_timestamp"  // V2 schema uses event_timestamp
         case createdAt = "created_at"
+        case modality
+        case deviceId = "device_id"
         case sessionId = "session_id"
         case modelId = "model_id"
         case modelName = "model_name"
@@ -118,6 +130,59 @@ public struct TelemetryEventPayload: Codable, Sendable {
         case outputDurationMs = "output_duration_ms"
     }
 
+    // MARK: - Custom Encoding (always include all keys for Supabase bulk insert)
+
+    /// Custom encoder that always includes all keys, even when nil.
+    /// Supabase bulk insert requires all objects to have identical keys.
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        // Required fields
+        try container.encode(id, forKey: .id)
+        try container.encode(eventType, forKey: .eventType)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(createdAt, forKey: .createdAt)
+
+        // All optional fields - always encode (null if nil) for Supabase compatibility
+        try container.encode(modality, forKey: .modality)
+        try container.encode(deviceId, forKey: .deviceId)
+        try container.encode(sessionId, forKey: .sessionId)
+        try container.encode(modelId, forKey: .modelId)
+        try container.encode(modelName, forKey: .modelName)
+        try container.encode(framework, forKey: .framework)
+        try container.encode(device, forKey: .device)
+        try container.encode(osVersion, forKey: .osVersion)
+        try container.encode(platform, forKey: .platform)
+        try container.encode(sdkVersion, forKey: .sdkVersion)
+        try container.encode(processingTimeMs, forKey: .processingTimeMs)
+        try container.encode(success, forKey: .success)
+        try container.encode(errorMessage, forKey: .errorMessage)
+        try container.encode(errorCode, forKey: .errorCode)
+        try container.encode(inputTokens, forKey: .inputTokens)
+        try container.encode(outputTokens, forKey: .outputTokens)
+        try container.encode(totalTokens, forKey: .totalTokens)
+        try container.encode(tokensPerSecond, forKey: .tokensPerSecond)
+        try container.encode(timeToFirstTokenMs, forKey: .timeToFirstTokenMs)
+        try container.encode(promptEvalTimeMs, forKey: .promptEvalTimeMs)
+        try container.encode(generationTimeMs, forKey: .generationTimeMs)
+        try container.encode(contextLength, forKey: .contextLength)
+        try container.encode(temperature, forKey: .temperature)
+        try container.encode(maxTokens, forKey: .maxTokens)
+        try container.encode(audioDurationMs, forKey: .audioDurationMs)
+        try container.encode(realTimeFactor, forKey: .realTimeFactor)
+        try container.encode(wordCount, forKey: .wordCount)
+        try container.encode(confidence, forKey: .confidence)
+        try container.encode(language, forKey: .language)
+        try container.encode(isStreaming, forKey: .isStreaming)
+        try container.encode(segmentIndex, forKey: .segmentIndex)
+        try container.encode(characterCount, forKey: .characterCount)
+        try container.encode(charactersPerSecond, forKey: .charactersPerSecond)
+        try container.encode(audioSizeBytes, forKey: .audioSizeBytes)
+        try container.encode(sampleRate, forKey: .sampleRate)
+        try container.encode(voice, forKey: .voice)
+        try container.encode(outputDurationMs, forKey: .outputDurationMs)
+    }
+
     // MARK: - Initializer
 
     public init(
@@ -125,6 +190,8 @@ public struct TelemetryEventPayload: Codable, Sendable {
         eventType: String,
         timestamp: Date,
         createdAt: Date,
+        modality: String? = nil,
+        deviceId: String? = nil,
         sessionId: String? = nil,
         modelId: String? = nil,
         modelName: String? = nil,
@@ -165,6 +232,8 @@ public struct TelemetryEventPayload: Codable, Sendable {
         self.eventType = eventType
         self.timestamp = timestamp
         self.createdAt = createdAt
+        self.modality = modality
+        self.deviceId = deviceId
         self.sessionId = sessionId
         self.modelId = modelId
         self.modelName = modelName
@@ -212,6 +281,11 @@ extension TelemetryEventPayload {
         self.eventType = telemetryData.eventType
         self.timestamp = telemetryData.timestamp
         self.createdAt = telemetryData.createdAt
+
+        // V2 required fields - modality inferred from event type
+        // Modality enables backend routing to specialized storage (defaults to "system" for SDK events)
+        self.modality = TelemetryModality.infer(from: telemetryData.eventType)?.rawValue ?? "system"
+        self.deviceId = DeviceIdentity.persistentUUID
 
         let props = telemetryData.properties
 
@@ -287,22 +361,79 @@ extension TelemetryEventPayload {
 
 // MARK: - Batch Request/Response
 
-/// Batch telemetry request for API
+/// Batch telemetry request for API.
+///
+/// Supports both V1 and V2 storage paths:
+/// - V1 (legacy): Set `modality` to nil → stores in `sdk_telemetry_events` table
+/// - V2 (normalized): Set `modality` to "llm"/"stt"/"tts"/"model" → stores in normalized tables
 public struct TelemetryBatchRequest: Codable, Sendable {
     public let events: [TelemetryEventPayload]
     public let deviceId: String
     public let timestamp: Date
 
+    /// Optional modality for V2 API routing.
+    ///
+    /// - `nil` → V1 path (backward compatible, uses legacy `sdk_telemetry_events` table)
+    /// - `"llm"` → V2 path (uses `telemetry_events` + `llm_telemetry` tables)
+    /// - `"stt"` → V2 path (uses `telemetry_events` + `stt_telemetry` tables)
+    /// - `"tts"` → V2 path (uses `telemetry_events` + `tts_telemetry` tables)
+    /// - `"model"` → V2 path (uses `telemetry_events` table only, for download/extraction)
+    public let modality: String?
+
     enum CodingKeys: String, CodingKey {
         case events
         case deviceId = "device_id"
         case timestamp
+        case modality
     }
 
+    /// V1 initializer (backward compatible - no modality, uses legacy table)
     public init(events: [TelemetryEventPayload], deviceId: String, timestamp: Date = Date()) {
         self.events = events
         self.deviceId = deviceId
         self.timestamp = timestamp
+        self.modality = nil
+    }
+
+    /// V2 initializer with explicit modality for normalized table routing.
+    ///
+    /// - Parameters:
+    ///   - events: Array of telemetry events to send
+    ///   - deviceId: Persistent device UUID
+    ///   - timestamp: When the batch was created
+    ///   - modality: The modality for V2 routing (llm/stt/tts/model)
+    public init(
+        events: [TelemetryEventPayload],
+        deviceId: String,
+        timestamp: Date = Date(),
+        modality: TelemetryModality?
+    ) {
+        self.events = events
+        self.deviceId = deviceId
+        self.timestamp = timestamp
+        self.modality = modality?.rawValue
+    }
+
+    /// V2 initializer with auto-inferred modality from events.
+    ///
+    /// Infers modality from the first event's `event_type` prefix.
+    /// Use this for automatic V2 routing without manual modality specification.
+    ///
+    /// - Parameters:
+    ///   - events: Array of telemetry events to send
+    ///   - deviceId: Persistent device UUID
+    ///   - timestamp: When the batch was created
+    ///   - inferModality: If true, automatically infer modality from events
+    public init(
+        events: [TelemetryEventPayload],
+        deviceId: String,
+        timestamp: Date = Date(),
+        inferModality: Bool
+    ) {
+        self.events = events
+        self.deviceId = deviceId
+        self.timestamp = timestamp
+        self.modality = inferModality ? TelemetryModality.infer(from: events)?.rawValue : nil
     }
 }
 
@@ -311,12 +442,22 @@ public struct TelemetryBatchResponse: Codable, Sendable {
     public let success: Bool
     public let eventsReceived: Int
     public let eventsStored: Int
+
+    /// Number of duplicate events skipped (idempotency)
+    public let eventsSkipped: Int?
+
+    /// Array of error messages if any events failed
     public let errors: [String]?
+
+    /// Storage path used: "V1" (legacy) or "V2" (normalized)
+    public let storageVersion: String?
 
     enum CodingKeys: String, CodingKey {
         case success
         case eventsReceived = "events_received"
         case eventsStored = "events_stored"
+        case eventsSkipped = "events_skipped"
         case errors
+        case storageVersion = "storage_version"
     }
 }

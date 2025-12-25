@@ -30,11 +30,30 @@ class STTViewModel: ObservableObject {
     @Published var isTranscribing = false
     @Published var audioLevel: Float = 0.0
     @Published var errorMessage: String?
-    @Published var selectedMode: STTMode = .batch
+    @Published var selectedMode: STTMode = .batch {
+        didSet {
+            // Stop any active recording/transcription when mode changes
+            if oldValue != selectedMode {
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    if self.isRecording {
+                        self.logger.info("Mode changed from \(oldValue.rawValue) to \(self.selectedMode.rawValue) - stopping active recording")
+                        await self.stopRecording()
+                    }
+                    // Also clean up any lingering live transcription resources
+                    if oldValue == .live {
+                        self.stopLiveTranscription()
+                    }
+                }
+            }
+        }
+    }
 
     // MARK: - Private Properties
 
     private var audioBuffer = Data()
+    private var streamingTask: Task<Void, Never>?
+    private var audioContinuation: AsyncStream<Data>.Continuation?
 
     // MARK: - Initialization State (for idempotency)
 
@@ -199,13 +218,19 @@ class STTViewModel: ObservableObject {
         }
 
         do {
-            try audioCapture.startRecording { [weak self] audioData in
-                Task { @MainActor in
-                    self?.audioBuffer.append(audioData)
+            if selectedMode == .live {
+                // Live mode: Start streaming transcription
+                try await startLiveTranscription()
+            } else {
+                // Batch mode: Collect audio for later transcription
+                try audioCapture.startRecording { [weak self] audioData in
+                    Task { @MainActor in
+                        self?.audioBuffer.append(audioData)
+                    }
                 }
             }
             isRecording = true
-            logger.info("Recording started")
+            logger.info("Recording started in \(self.selectedMode.rawValue) mode")
         } catch {
             logger.error("Failed to start recording: \(error.localizedDescription)")
             errorMessage = "Failed to start recording: \(error.localizedDescription)"
@@ -220,8 +245,13 @@ class STTViewModel: ObservableObject {
         isRecording = false
         audioLevel = 0.0
 
-        // Perform batch transcription
-        await performBatchTranscription()
+        if selectedMode == .live {
+            // Live mode: Stop streaming
+            stopLiveTranscription()
+        } else {
+            // Batch mode: Perform transcription
+            await performBatchTranscription()
+        }
     }
 
     // MARK: - Private Methods - Transcription
@@ -249,12 +279,73 @@ class STTViewModel: ObservableObject {
         isTranscribing = false
     }
 
+    /// Start live streaming transcription
+    private func startLiveTranscription() async throws {
+        logger.info("Starting live transcription")
+        isTranscribing = true
+
+        // Create audio stream
+        let audioStream = AsyncStream<Data> { continuation in
+            self.audioContinuation = continuation
+        }
+
+        // Start audio capture with stream callback
+        try audioCapture.startRecording { [weak self] audioData in
+            Task { @MainActor in
+                guard let self = self else { return }
+                // Send audio chunk to stream
+                self.audioContinuation?.yield(audioData)
+                // Also buffer for fallback
+                self.audioBuffer.append(audioData)
+            }
+        }
+
+        // Start streaming transcription task
+        streamingTask = Task { @MainActor in
+            do {
+                let transcriptionStream = try await RunAnywhere.transcribeStream(audioStream)
+
+                for try await partialText in transcriptionStream {
+                    // Update UI with partial transcription
+                    self.transcription = partialText
+                    self.logger.debug("Live transcription update: \(partialText)")
+                }
+
+                self.logger.info("Live transcription stream completed")
+            } catch {
+                self.logger.error("Live transcription failed: \(error.localizedDescription)")
+                self.errorMessage = "Live transcription failed: \(error.localizedDescription)"
+            }
+
+            self.isTranscribing = false
+        }
+    }
+
+    /// Stop live streaming transcription
+    private func stopLiveTranscription() {
+        logger.info("Stopping live transcription")
+
+        // Cancel streaming task first to stop consuming from stream
+        streamingTask?.cancel()
+        streamingTask = nil
+
+        // Finish audio stream (this will cause the transcription stream to complete)
+        audioContinuation?.finish()
+        audioContinuation = nil
+
+        isTranscribing = false
+    }
+
     // MARK: - Cleanup
 
     /// Clean up resources - call from view's onDisappear
     /// This replaces deinit cleanup to comply with Swift 6 concurrency
     func cleanup() {
         audioCapture.stopRecording()
+
+        // Clean up streaming resources
+        stopLiveTranscription()
+
         cancellables.removeAll()
 
         // Reset initialization flags to allow re-initialization if needed

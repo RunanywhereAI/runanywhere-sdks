@@ -9,21 +9,18 @@ public enum APIEndpoint: Equatable {
 
     // Device Management - Production/Staging
     case deviceRegistration
-    case analytics
+    case telemetry
 
     // Device Management - Development
     case devDeviceRegistration
-    case devAnalytics
+    case devTelemetry
 
     // Model Management
     case modelAssignments(deviceType: String, platform: String)
-
-    // Core endpoints
-    case telemetry
-    case models
-    case deviceInfo
-    case generationHistory
-    case userPreferences
+    case modelsAvailable
+    case modelDownload(modelId: String)
+    // Note: compatibleModels endpoint exists in backend but not used in SDK yet
+    // Backend: /api/v1/devices/{device_id}/compatible-models
 
     var path: String {
         switch self {
@@ -38,30 +35,22 @@ public enum APIEndpoint: Equatable {
         // Device Management - Production/Staging
         case .deviceRegistration:
             return "/api/v1/devices/register"
-        case .analytics:
-            return "/api/v1/sdk/telemetry"  // Backend uses sdk/telemetry for production
+        case .telemetry:
+            return "/api/v1/sdk/telemetry"
 
         // Device Management - Development (Supabase REST API format)
         case .devDeviceRegistration:
             return "/rest/v1/device_registrations"
-        case .devAnalytics:
-            return "/rest/v1/analytics_events"
+        case .devTelemetry:
+            return "/rest/v1/telemetry_events"  // V2 normalized base table (matches production)
 
         // Model Management
         case .modelAssignments(let deviceType, let platform):
             return "/api/v1/model-assignments/for-sdk?device_type=\(deviceType)&platform=\(platform)"
-
-        // Core endpoints
-        case .telemetry:
-            return "/api/v1/sdk/telemetry"
-        case .models:
-            return "/api/v1/models"
-        case .deviceInfo:
-            return "/api/v1/device"
-        case .generationHistory:
-            return "/api/v1/history"
-        case .userPreferences:
-            return "/api/v1/preferences"
+        case .modelsAvailable:
+            return "/api/v1/models/available"
+        case .modelDownload(let modelId):
+            return "/api/v1/models/\(modelId)/download"
         }
     }
 }
@@ -81,15 +70,15 @@ extension APIEndpoint {
         }
     }
 
-    /// Get the analytics endpoint for the given environment
+    /// Get the telemetry endpoint for the given environment
     /// - Parameter environment: The SDK environment
     /// - Returns: The appropriate endpoint (dev or production)
-    public static func analyticsEndpoint(for environment: SDKEnvironment) -> APIEndpoint {
+    public static func telemetryEndpoint(for environment: SDKEnvironment) -> APIEndpoint {
         switch environment {
         case .development:
-            return .devAnalytics
+            return .devTelemetry
         case .staging, .production:
-            return .analytics
+            return .telemetry
         }
     }
 }
