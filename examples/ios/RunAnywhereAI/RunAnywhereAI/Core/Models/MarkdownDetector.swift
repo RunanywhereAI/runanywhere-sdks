@@ -40,9 +40,18 @@ class MarkdownDetector {
         // Detect code blocks (```language)
         analysis.hasCodeBlocks = content.contains("```")
 
-        // Detect headings (####)
+        // Detect headings (#### text) - must be 1-6 # followed by space
         let headingCount = content.components(separatedBy: .newlines)
-            .filter { $0.hasPrefix("#") && $0.contains(" ") }.count
+            .filter { line in
+                // Trim leading spaces
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                // Must start with 1-6 # characters followed by a space
+                guard trimmed.hasPrefix("#") else { return false }
+                let hashes = trimmed.prefix(while: { $0 == "#" })
+                return hashes.count >= 1 && hashes.count <= 6
+                    && trimmed.count > hashes.count
+                    && trimmed[trimmed.index(trimmed.startIndex, offsetBy: hashes.count)] == " "
+            }.count
         analysis.headingCount = headingCount
 
         // Detect bold (**text**)
