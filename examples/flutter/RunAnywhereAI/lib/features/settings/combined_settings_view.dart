@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -9,12 +10,11 @@ import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// CombinedSettingsView (mirroring iOS CombinedSettingsView.swift)
 ///
-/// Comprehensive settings interface with SDK configuration, storage management,
-/// and API settings. Uses RunAnywhere SDK for actual storage operations.
+/// Settings interface with storage management and logging configuration.
+/// Uses RunAnywhere SDK for actual storage operations.
 class CombinedSettingsView extends StatefulWidget {
   const CombinedSettingsView({super.key});
 
@@ -23,15 +23,6 @@ class CombinedSettingsView extends StatefulWidget {
 }
 
 class _CombinedSettingsViewState extends State<CombinedSettingsView> {
-  // Generation settings
-  double _temperature = 0.7;
-  int _maxTokens = 1000;
-
-  // API Configuration
-  bool _showApiKeyEntry = false;
-  String _apiKey = '';
-  bool _isApiKeyConfigured = false;
-
   // Logging
   bool _analyticsLogToLocal = false;
 
@@ -39,7 +30,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   int _totalStorageSize = 0;
   int _availableSpace = 0;
   int _modelStorageSize = 0;
-  List<StoredModelInfo> _storedModels = [];
+  List<sdk.StoredModel> _storedModels = [];
 
   // Loading state
   bool _isRefreshingStorage = false;
@@ -52,30 +43,12 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    setState(() {
-      _temperature =
-          prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
-      _maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000;
-    });
-
     // Load from keychain
     _analyticsLogToLocal =
         await KeychainHelper.loadBool(KeychainKeys.analyticsLogToLocal);
-    final savedApiKey = await KeychainHelper.loadString(KeychainKeys.apiKey);
-    if (savedApiKey != null && savedApiKey.isNotEmpty) {
-      setState(() {
-        _apiKey = savedApiKey;
-        _isApiKeyConfigured = true;
-      });
+    if (mounted) {
+      setState(() {});
     }
-  }
-
-  Future<void> _saveSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(PreferenceKeys.defaultTemperature, _temperature);
-    await prefs.setInt(PreferenceKeys.defaultMaxTokens, _maxTokens);
   }
 
   /// Load storage data using RunAnywhere SDK
@@ -88,28 +61,20 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
       // Get storage info from SDK
       final storageInfo = await sdk.RunAnywhere.getStorageInfo();
 
-      // Get downloaded models from SDK
-      final downloadedModels = await sdk.RunAnywhere.getDownloadedModels();
-      final storedModels = <StoredModelInfo>[];
+      // Get downloaded models with full info (including sizes)
+      final storedModels = await sdk.RunAnywhere.getDownloadedModelsWithInfo();
 
-      // Convert to StoredModelInfo list
-      downloadedModels.forEach((framework, modelIds) {
-        for (final modelId in modelIds) {
-          storedModels.add(StoredModelInfo(
-            id: modelId,
-            name: modelId, // Will be replaced with actual name if available
-            framework: framework,
-            size: 0, // Size would need to be calculated
-            createdDate: DateTime.now(),
-          ));
-        }
-      });
+      // Calculate total model storage from actual models
+      int totalModelStorage = 0;
+      for (final model in storedModels) {
+        totalModelStorage += model.size;
+      }
 
       if (mounted) {
         setState(() {
           _totalStorageSize = storageInfo.appStorage.totalSize;
           _availableSpace = storageInfo.deviceStorage.freeSpace;
-          _modelStorageSize = storageInfo.modelStorage.totalSize;
+          _modelStorageSize = totalModelStorage;
           _storedModels = storedModels;
           _isRefreshingStorage = false;
         });
@@ -126,27 +91,6 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
 
   Future<void> _refreshStorageData() async {
     await _loadStorageData();
-  }
-
-  Future<void> _saveApiKey() async {
-    if (_apiKey.isNotEmpty) {
-      await KeychainHelper.saveString(key: KeychainKeys.apiKey, data: _apiKey);
-      if (mounted) {
-        setState(() {
-          _isApiKeyConfigured = true;
-          _showApiKeyEntry = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('API Key saved securely')),
-        );
-      }
-    }
-  }
-
-  void _cancelApiKeyEntry() {
-    setState(() {
-      _showApiKeyEntry = false;
-    });
   }
 
   Future<void> _toggleAnalyticsLogging(bool value) async {
@@ -178,35 +122,18 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     }
   }
 
-  /// Clean temp files using RunAnywhere SDK
-  Future<void> _cleanTempFiles() async {
-    try {
-      await sdk.RunAnywhere.cleanTempFiles();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Temporary files cleaned')),
-        );
-      }
-      await _loadStorageData();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to clean temp files: $e')),
-        );
-      }
-    }
-  }
-
   /// Delete a stored model using RunAnywhere SDK
-  Future<void> _deleteModel(StoredModelInfo model) async {
+  Future<void> _deleteModel(sdk.StoredModel model) async {
     try {
-      await sdk.RunAnywhere.deleteStoredModel(model.id, model.framework);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${model.name} deleted')),
-        );
+      if (model.framework != null) {
+        await sdk.RunAnywhere.deleteStoredModel(model.id, model.framework!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${model.name} deleted')),
+          );
+        }
+        await _loadStorageData();
       }
-      await _loadStorageData();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -216,13 +143,16 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     }
   }
 
-  Future<void> _openDocumentation() async {
-    // Documentation URL - would use url_launcher in production
-    debugPrint('Opening documentation: https://docs.runanywhere.ai');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Documentation: docs.runanywhere.ai')),
-      );
+  Future<void> _openGitHub() async {
+    final uri = Uri.parse('https://github.com/RunanywhereAI/runanywhere-sdks/');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open GitHub')),
+        );
+      }
     }
   }
 
@@ -235,16 +165,6 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.large),
         children: [
-          // Generation Settings Section
-          _buildSectionHeader('Generation Settings'),
-          _buildGenerationSettingsCard(),
-          const SizedBox(height: AppSpacing.large),
-
-          // API Configuration Section
-          _buildSectionHeader('API Configuration'),
-          _buildApiConfigCard(),
-          const SizedBox(height: AppSpacing.large),
-
           // Storage Overview Section
           _buildSectionHeader('Storage Overview', trailing: _buildRefreshButton()),
           _buildStorageOverviewCard(),
@@ -303,143 +223,6 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
       label: Text(
         'Refresh',
         style: AppTypography.caption(context),
-      ),
-    );
-  }
-
-  Widget _buildGenerationSettingsCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Temperature
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Temperature', style: AppTypography.subheadline(context)),
-                Text(
-                  _temperature.toStringAsFixed(2),
-                  style: AppTypography.monospaced.copyWith(
-                    color: AppColors.primaryBlue,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            Slider(
-              value: _temperature,
-              min: 0,
-              max: 2,
-              divisions: 20,
-              onChanged: (value) {
-                setState(() {
-                  _temperature = value;
-                });
-              },
-              onChangeEnd: (_) => _saveSettings(),
-            ),
-            const SizedBox(height: AppSpacing.large),
-
-            // Max Tokens
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Max Tokens', style: AppTypography.subheadline(context)),
-                Text(
-                  _maxTokens.toString(),
-                  style: AppTypography.monospaced.copyWith(
-                    color: AppColors.primaryBlue,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            Slider(
-              value: _maxTokens.toDouble(),
-              min: 500,
-              max: 20000,
-              divisions: 39,
-              onChanged: (value) {
-                setState(() {
-                  _maxTokens = value.toInt();
-                });
-              },
-              onChangeEnd: (_) => _saveSettings(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildApiConfigCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_showApiKeyEntry) ...[
-              TextField(
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'API Key',
-                  hintText: 'Enter your API key',
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _apiKey = value;
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.smallMedium),
-              Text(
-                'Your API key is stored securely in the keychain',
-                style: AppTypography.caption(context).copyWith(
-                  color: AppColors.textSecondary(context),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.mediumLarge),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: _cancelApiKeyEntry,
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: AppSpacing.smallMedium),
-                  FilledButton(
-                    onPressed: _apiKey.isEmpty ? null : _saveApiKey,
-                    child: const Text('Save'),
-                  ),
-                ],
-              ),
-            ] else ...[
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  _isApiKeyConfigured ? Icons.check_circle : Icons.warning,
-                  color: _isApiKeyConfigured
-                      ? AppColors.statusGreen
-                      : AppColors.statusOrange,
-                ),
-                title: const Text('API Key'),
-                subtitle: Text(_isApiKeyConfigured ? 'Configured' : 'Not Set'),
-                trailing: TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _showApiKeyEntry = true;
-                    });
-                  },
-                  child: Text(_isApiKeyConfigured ? 'Change' : 'Configure'),
-                ),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -552,24 +335,12 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
-          children: [
-            _buildManagementButton(
-              icon: Icons.delete_outline,
-              title: 'Clear Cache',
-              subtitle: 'Free up space by clearing cached data',
-              color: AppColors.primaryRed,
-              onTap: _clearCache,
-            ),
-            const SizedBox(height: AppSpacing.large),
-            _buildManagementButton(
-              icon: Icons.cleaning_services,
-              title: 'Clean Temporary Files',
-              subtitle: 'Remove temporary files and logs',
-              color: AppColors.primaryOrange,
-              onTap: _cleanTempFiles,
-            ),
-          ],
+        child: _buildManagementButton(
+          icon: Icons.delete_outline,
+          title: 'Clear Cache',
+          subtitle: 'Free up space by clearing cached data',
+          color: AppColors.primaryRed,
+          onTap: _clearCache,
         ),
       ),
     );
@@ -642,52 +413,22 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
-          children: [
-            const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.extension, color: AppColors.primaryBlue),
-              title: Text('RunAnywhere SDK'),
-              subtitle: Text('Version 0.1'),
-            ),
-            const Divider(),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.book),
-              title: const Text('Documentation'),
-              subtitle: const Text('https://docs.runanywhere.ai'),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: _openDocumentation,
-            ),
-          ],
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.code, color: AppColors.primaryBlue),
+          title: const Text('RunAnywhere SDK'),
+          subtitle: const Text('github.com/RunanywhereAI/runanywhere-sdks'),
+          trailing: const Icon(Icons.open_in_new),
+          onTap: _openGitHub,
         ),
       ),
     );
   }
 }
 
-/// Stored model info for display
-class StoredModelInfo {
-  final String id;
-  final String name;
-  final sdk.LLMFramework framework;
-  final int size;
-  final DateTime createdDate;
-  final DateTime? lastUsed;
-
-  const StoredModelInfo({
-    required this.id,
-    required this.name,
-    required this.framework,
-    required this.size,
-    required this.createdDate,
-    this.lastUsed,
-  });
-}
-
 /// Stored model row widget
 class _StoredModelRow extends StatefulWidget {
-  final StoredModelInfo model;
+  final sdk.StoredModel model;
   final VoidCallback onDelete;
 
   const _StoredModelRow({
@@ -794,7 +535,8 @@ class _StoredModelRowState extends State<_StoredModelRow> {
                   if (widget.model.lastUsed != null)
                     _buildDetailRow('Last used:', _formatRelativeDate(widget.model.lastUsed!)),
                   _buildDetailRow('Size:', widget.model.size.formattedFileSize),
-                  _buildDetailRow('Framework:', widget.model.framework.displayName),
+                  if (widget.model.framework != null)
+                    _buildDetailRow('Framework:', widget.model.framework!.displayName),
                 ],
               ),
             ),

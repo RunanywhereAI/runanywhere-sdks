@@ -304,98 +304,110 @@ class ModelPathUtils {
 
   /// Find model file at expected path: framework/modelId/modelId.format
   /// Simple structure: Models/{framework}/{modelId}/{modelId}.{format}
-  /// For ONNX, also searches nested directories (sherpa-onnx structure)
+  /// For framework-specific detection, use StorageStrategy from module
   static Future<Uri?> findModelFile({
     required String modelId,
     required LLMFramework framework,
     required ModelFormat format,
   }) async {
-    // Simple structure: Models/{framework}/{modelId}/{modelId}.{format}
+    final modelFolder =
+        await getModelFolder(modelId: modelId, framework: framework);
+
+    if (!await modelFolder.exists()) {
+      return null;
+    }
+
+    // For directory-based formats, return folder if it has content
     if (format.isDirectoryBased) {
-      final modelFolder =
-          await getModelFolder(modelId: modelId, framework: framework);
-      if (await modelFolder.exists()) {
-        final contents = await modelFolder.list().toList();
-        if (contents.isNotEmpty) {
-          return Uri.directory(modelFolder.path);
-        }
+      final contents = await modelFolder.list().toList();
+      if (contents.isNotEmpty) {
+        return Uri.directory(modelFolder.path);
       }
-    } else {
-      // For ONNX, check nested directories (sherpa-onnx tar.bz2 structure)
-      if (framework == LLMFramework.onnx && format == ModelFormat.onnx) {
-        final modelFolder =
-            await getModelFolder(modelId: modelId, framework: framework);
-        if (await modelFolder.exists()) {
-          // Check nested subdirectories (sherpa-onnx structure)
-          // For Sherpa ONNX models, we need to return the directory containing
-          // all the model files (encoder, decoder, tokens), not just one file
-          final contents = await modelFolder.list().toList();
-          for (final item in contents) {
-            if (item is Directory) {
-              final hasOnnxFiles = await _hasOnnxFilesInDirectory(item);
-              if (hasOnnxFiles) {
-                // Return the directory path, not a single file
-                return Uri.directory(item.path);
-              }
-            }
-          }
+      return null;
+    }
 
-          // Check for direct .onnx file in model folder (non-sherpa models)
-          final directFile = await _findOnnxFileInDirectory(modelFolder);
-          if (directFile != null) {
-            // If there are multiple .onnx files in the folder, return the directory
-            final allOnnxFiles = await modelFolder
-                .list()
-                .where((e) => e.path.toLowerCase().endsWith('.onnx'))
-                .toList();
-            if (allOnnxFiles.length > 1) {
-              return Uri.directory(modelFolder.path);
-            }
-            return Uri.file(directFile.path);
-          }
-        }
-      } else {
-        // Standard single-file model
-        final modelFile = await getModelFilePath(
-          modelId: modelId,
-          framework: framework,
-          format: format,
-        );
-        if (await modelFile.exists()) {
-          return Uri.file(modelFile.path);
-        }
-      }
+    // For single-file models, check direct file path
+    final modelFile = await getModelFilePath(
+      modelId: modelId,
+      framework: framework,
+      format: format,
+    );
+    if (await modelFile.exists()) {
+      return Uri.file(modelFile.path);
+    }
+
+    // Fallback: check if folder has content (for extracted archives)
+    final contents = await modelFolder.list().toList();
+    if (contents.isNotEmpty) {
+      return Uri.directory(modelFolder.path);
     }
 
     return null;
   }
 
-  /// Find .onnx file in a directory (non-recursive)
-  static Future<File?> _findOnnxFileInDirectory(Directory directory) async {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Generic Archive Extraction Helpers
+  // Generic utilities for archive handling
+  // Framework-specific logic should use StorageStrategy from each module
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Find nested directory (for archives that extract with a root folder)
+  /// Generic utility - archives often create: modelFolder/archiveRootFolder/files
+  static Future<Directory> findNestedDirectory(Directory extractedDir) async {
     try {
-      final contents = await directory.list().toList();
-      for (final item in contents) {
-        if (item is File) {
-          final extension = item.path.split('.').last.toLowerCase();
-          if (extension == 'onnx') {
-            return item;
-          }
+      final contents = await extractedDir.list().toList();
+
+      // Filter out hidden files and macOS resource forks
+      final visibleContents = contents.where((item) {
+        final name = item.path.split('/').last;
+        return !name.startsWith('.') && !name.startsWith('._');
+      }).toList();
+
+      // If there's a single visible subdirectory, return it
+      if (visibleContents.length == 1 && visibleContents.first is Directory) {
+        final nestedDir = visibleContents.first as Directory;
+        final nestedContents = await nestedDir.list().toList();
+        if (nestedContents.isNotEmpty) {
+          return nestedDir;
         }
       }
+
+      return extractedDir;
     } catch (e) {
-      // Directory might not be readable
+      return extractedDir;
     }
-    return null;
   }
 
-  /// Check if directory contains any .onnx files
-  static Future<bool> _hasOnnxFilesInDirectory(Directory directory) async {
-    try {
-      final file = await _findOnnxFileInDirectory(directory);
-      return file != null;
-    } catch (e) {
-      return false;
-    }
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARK: - Generic Model Discovery
+  // Framework-specific detection should use StorageStrategy from module
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Check if a model folder exists and has content
+  /// Generic check - for framework-specific detection, use StorageStrategy
+  static Future<bool> modelFolderHasContent({
+    required String modelId,
+    required LLMFramework framework,
+  }) async {
+    final modelFolder =
+        await getModelFolder(modelId: modelId, framework: framework);
+    if (!await modelFolder.exists()) return false;
+    final contents = await modelFolder.list().toList();
+    return contents.isNotEmpty;
+  }
+
+  /// Get the model folder URI if it exists and has content
+  /// Generic method - for framework-specific path resolution, use StorageStrategy
+  static Future<Uri?> getModelFolderIfExists({
+    required String modelId,
+    required LLMFramework framework,
+  }) async {
+    final modelFolder =
+        await getModelFolder(modelId: modelId, framework: framework);
+    if (!await modelFolder.exists()) return null;
+    final contents = await modelFolder.list().toList();
+    if (contents.isEmpty) return null;
+    return modelFolder.uri;
   }
 }
 

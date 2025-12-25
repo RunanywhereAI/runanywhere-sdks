@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:runanywhere/capabilities/model_loading/model_loading_service.dart';
 import 'package:runanywhere/core/module_registry.dart';
 import 'package:runanywhere/native/native_backend.dart';
 import 'package:runanywhere_llamacpp/services/llamacpp_llm_service.dart';
@@ -57,7 +58,12 @@ class LlamaCppLLMServiceProvider implements LLMServiceProvider {
     final service = LlamaCppLLMService(_backend);
 
     String? modelPath;
-    if (configuration is Map) {
+
+    // Handle LLMConfiguration objects (from ModelLoadingService)
+    if (configuration is LLMConfiguration) {
+      // Prefer the actual file path over model ID
+      modelPath = configuration.modelPath ?? configuration.modelId;
+    } else if (configuration is Map) {
       modelPath = configuration['modelPath'] as String? ??
           configuration['modelId'] as String?;
     } else if (configuration is String) {

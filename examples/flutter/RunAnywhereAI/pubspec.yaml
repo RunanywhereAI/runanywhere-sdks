@@ -35,6 +35,8 @@ dependencies:
   device_info_plus: ^10.0.0
   # App package info
   package_info_plus: ^4.2.0
+  # URL launcher
+  url_launcher: ^6.2.0
 
 dev_dependencies:
   flutter_test:

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:runanywhere/core/models/common.dart';
+import 'package:runanywhere/core/module/inference_framework.dart';
+import 'package:runanywhere/core/module_registry.dart';
 import 'package:runanywhere/core/protocols/registry/model_registry.dart';
 import 'package:runanywhere/foundation/file_operations/model_path_utils.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
@@ -64,14 +66,17 @@ class RegistryService implements ModelRegistry {
       return;
     }
 
-    // Check if model file exists locally and update localPath
-    // Matches iOS RegistryService.registerModel pattern
+    // Register immediately (synchronously) to avoid race conditions
+    // This ensures the model is available in _models right away
+    logger.debug('Registering model: ${model.id} - ${model.name}');
+    _models[model.id] = model;
+    logger.info('Successfully registered model: ${model.id}');
+
+    // Check if model file exists locally and update localPath asynchronously
+    // This updates the localPath after the model is already registered
     unawaited(_checkAndUpdateLocalPath(model).then((updatedModel) {
-      logger.debug(
-          'Registering model: ${updatedModel.id} - ${updatedModel.name}');
-      _models[updatedModel.id] = updatedModel;
-      logger.info('Successfully registered model: ${updatedModel.id}');
-      if (updatedModel.localPath != null) {
+      if (updatedModel.localPath != model.localPath) {
+        _models[updatedModel.id] = updatedModel;
         logger.info(
             'Found local file for model ${updatedModel.id}: ${updatedModel.localPath}');
       }
@@ -79,9 +84,8 @@ class RegistryService implements ModelRegistry {
   }
 
   /// Check if model file exists locally and update localPath
-  /// Simple check: framework/modelId/modelId.format
+  /// Uses StorageStrategy from module for framework-specific detection
   Future<ModelInfo> _checkAndUpdateLocalPath(ModelInfo model) async {
-    // Need framework and format to check
     final framework =
         model.preferredFramework ?? model.compatibleFrameworks.firstOrNull;
     if (framework == null) {
@@ -96,30 +100,54 @@ class RegistryService implements ModelRegistry {
 
       if (await file.exists() ||
           (await dir.exists() && (await dir.list().toList()).isNotEmpty)) {
-        // File still exists, keep the localPath
         return model;
       } else {
-        // File no longer exists, clear localPath
         logger.debug(
             'Model file no longer exists for ${model.id}, clearing localPath');
         return model.copyWith(localPath: null);
       }
     }
 
-    // Check expected path: framework/modelId/modelId.format
-    final modelFile = await ModelPathUtils.findModelFile(
+    // Get the model folder: Models/{framework}/{modelId}/
+    final modelFolder = await ModelPathUtils.getModelFolder(
       modelId: model.id,
       framework: framework,
-      format: model.format,
     );
 
-    if (modelFile != null) {
-      logger.info(
-          'Found local file for model ${model.id}: ${modelFile.toFilePath()}');
-      return model.copyWith(localPath: modelFile);
+    if (!await modelFolder.exists()) {
+      return model;
     }
 
-    return model;
+    final contents = await modelFolder.list().toList();
+    if (contents.isEmpty) {
+      return model;
+    }
+
+    // Try storage strategy from module for framework-specific detection
+    final inferenceFramework =
+        InferenceFramework.fromRawValue(framework.rawValue);
+    if (inferenceFramework != null) {
+      final storageStrategy =
+          ModuleRegistry.shared.storageStrategy(inferenceFramework);
+      if (storageStrategy != null) {
+        final modelPath = storageStrategy.findModelPath(model.id, modelFolder);
+        if (modelPath != null) {
+          logger.info('Found model via storage strategy: $modelPath');
+          return model.copyWith(localPath: Uri.directory(modelPath));
+        }
+      }
+    }
+
+    // Generic fallback: check for nested directory (common archive pattern)
+    final nestedDir = await ModelPathUtils.findNestedDirectory(modelFolder);
+    if (nestedDir.path != modelFolder.path) {
+      logger.info('Found model at nested path: ${nestedDir.path}');
+      return model.copyWith(localPath: nestedDir.uri);
+    }
+
+    // Fallback: if folder has content, use it as localPath
+    logger.info('Found model folder with content: ${modelFolder.path}');
+    return model.copyWith(localPath: modelFolder.uri);
   }
 
   /// Register model and save to database for persistence
@@ -131,15 +159,12 @@ class RegistryService implements ModelRegistry {
   @override
   void updateModel(ModelInfo model) {
     if (_models.containsKey(model.id)) {
-      // Check and update localPath when updating model
-      unawaited(_checkAndUpdateLocalPath(model).then((updatedModel) {
-        _models[updatedModel.id] = updatedModel;
-        logger.info('Updated model: ${updatedModel.id}');
-        if (updatedModel.localPath != null) {
-          logger.debug(
-              'Model ${updatedModel.id} has localPath: ${updatedModel.localPath}');
-        }
-      }));
+      // Update immediately (synchronously) to avoid race conditions
+      _models[model.id] = model;
+      logger.info('Updated model: ${model.id}');
+      if (model.localPath != null) {
+        logger.debug('Model ${model.id} has localPath: ${model.localPath}');
+      }
     }
   }
 
@@ -192,13 +217,14 @@ class RegistryService implements ModelRegistry {
     // Infer format from URL if not provided
     final format = ModelFormat.fromFilename(url.pathSegments.last);
 
-    // Create model info
+    // Create model info with artifact type
     final model = ModelInfo(
       id: modelId,
       name: name,
       downloadURL: url,
       format: format,
       category: category,
+      artifactType: artifactType,
       compatibleFrameworks: [framework],
       preferredFramework: framework,
       downloadSize: estimatedSize,

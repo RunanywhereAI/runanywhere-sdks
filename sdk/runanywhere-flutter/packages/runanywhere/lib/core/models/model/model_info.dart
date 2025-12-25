@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:runanywhere/core/models/common/configuration_source.dart';
 import 'package:runanywhere/core/models/common/thinking_tag_pattern.dart';
 import 'package:runanywhere/core/models/framework/llm_framework.dart';
+import 'package:runanywhere/core/models/framework/model_artifact_type.dart';
 import 'package:runanywhere/core/models/framework/model_format.dart';
 import 'package:runanywhere/core/models/model/model_category.dart';
 import 'package:runanywhere/core/models/model/model_info_metadata.dart';
@@ -19,6 +20,9 @@ class ModelInfo {
   final ModelFormat format;
   final Uri? downloadURL;
   Uri? localPath;
+
+  // Artifact type (how the model is packaged)
+  final ModelArtifactType artifactType;
 
   // Size information (in bytes)
   final int? downloadSize;
@@ -56,6 +60,7 @@ class ModelInfo {
     required this.format,
     this.downloadURL,
     this.localPath,
+    ModelArtifactType? artifactType,
     this.downloadSize,
     this.memoryRequired,
     List<LLMFramework>? compatibleFrameworks,
@@ -71,7 +76,8 @@ class ModelInfo {
     this.lastUsed,
     this.usageCount = 0,
     Map<String, String>? additionalProperties,
-  })  : compatibleFrameworks = compatibleFrameworks ?? [],
+  })  : artifactType = artifactType ?? const SingleFileArtifact(),
+        compatibleFrameworks = compatibleFrameworks ?? [],
         preferredFramework =
             preferredFramework ?? compatibleFrameworks?.firstOrNull,
         contextLength = category.requiresContextLength
@@ -124,6 +130,7 @@ class ModelInfo {
         'format': format.rawValue,
         if (downloadURL != null) 'downloadURL': downloadURL.toString(),
         if (localPath != null) 'localPath': localPath.toString(),
+        'artifactType': artifactType.toJson(),
         if (downloadSize != null) 'downloadSize': downloadSize,
         if (memoryRequired != null) 'memoryRequired': memoryRequired,
         'compatibleFrameworks':
@@ -155,6 +162,10 @@ class ModelInfo {
           : null,
       localPath: json['localPath'] != null
           ? Uri.parse(json['localPath'] as String)
+          : null,
+      artifactType: json['artifactType'] != null
+          ? ModelArtifactType.fromJson(
+              json['artifactType'] as Map<String, dynamic>)
           : null,
       downloadSize: json['downloadSize'] as int?,
       memoryRequired: json['memoryRequired'] as int?,
@@ -199,6 +210,7 @@ class ModelInfo {
     ModelFormat? format,
     Uri? downloadURL,
     Uri? localPath,
+    ModelArtifactType? artifactType,
     int? downloadSize,
     int? memoryRequired,
     List<LLMFramework>? compatibleFrameworks,
@@ -222,6 +234,7 @@ class ModelInfo {
       format: format ?? this.format,
       downloadURL: downloadURL ?? this.downloadURL,
       localPath: localPath ?? this.localPath,
+      artifactType: artifactType ?? this.artifactType,
       downloadSize: downloadSize ?? this.downloadSize,
       memoryRequired: memoryRequired ?? this.memoryRequired,
       compatibleFrameworks: compatibleFrameworks ?? this.compatibleFrameworks,

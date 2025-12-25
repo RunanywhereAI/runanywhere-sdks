@@ -31,28 +31,44 @@ sealed class ModelArtifactType {
   const factory ModelArtifactType.builtIn() = BuiltInArtifact;
 
   // ============================================================================
-  // Convenience Static Getters (match iOS pattern)
+  // Factory Methods (match iOS pattern exactly)
   // ============================================================================
 
-  /// Convenience for tar.gz archive with nested directory structure.
-  /// Matches iOS `.tarGzArchive(structure: .nestedDirectory)`.
-  static const ModelArtifactType tarGzArchive = ArchiveArtifact(
-    ArchiveType.tarGz,
-    structure: ArchiveStructure.nested,
-  );
+  /// Create a tar.gz archive type.
+  /// Matches iOS `ModelArtifactType.tarGzArchive(structure:expectedFiles:)`.
+  static ModelArtifactType tarGzArchive({
+    ArchiveStructure structure = ArchiveStructure.nestedDirectory,
+    ExpectedModelFiles expectedFiles = ExpectedModelFiles.none,
+  }) =>
+      ArchiveArtifact(
+        ArchiveType.tarGz,
+        structure: structure,
+        expectedFiles: expectedFiles,
+      );
 
-  /// Convenience for tar.bz2 archive with nested directory structure.
-  /// Matches iOS `.tarBz2Archive(structure: .nestedDirectory)`.
-  static const ModelArtifactType tarBz2Archive = ArchiveArtifact(
-    ArchiveType.tarBz2,
-    structure: ArchiveStructure.nested,
-  );
+  /// Create a tar.bz2 archive type.
+  /// Matches iOS `ModelArtifactType.tarBz2Archive(structure:expectedFiles:)`.
+  static ModelArtifactType tarBz2Archive({
+    ArchiveStructure structure = ArchiveStructure.nestedDirectory,
+    ExpectedModelFiles expectedFiles = ExpectedModelFiles.none,
+  }) =>
+      ArchiveArtifact(
+        ArchiveType.tarBz2,
+        structure: structure,
+        expectedFiles: expectedFiles,
+      );
 
-  /// Convenience for zip archive with nested directory structure.
-  static const ModelArtifactType zipArchive = ArchiveArtifact(
-    ArchiveType.zip,
-    structure: ArchiveStructure.nested,
-  );
+  /// Create a ZIP archive type.
+  /// Matches iOS `ModelArtifactType.zipArchive(structure:expectedFiles:)`.
+  static ModelArtifactType zipArchive({
+    ArchiveStructure structure = ArchiveStructure.directoryBased,
+    ExpectedModelFiles expectedFiles = ExpectedModelFiles.none,
+  }) =>
+      ArchiveArtifact(
+        ArchiveType.zip,
+        structure: structure,
+        expectedFiles: expectedFiles,
+      );
 
   /// Convenience for single file artifact.
   static const ModelArtifactType singleFileType = SingleFileArtifact();
@@ -189,19 +205,19 @@ enum ArchiveType {
 }
 
 /// Archive structure enum
-/// Matches iOS ArchiveStructure
+/// Matches iOS ArchiveStructure from Infrastructure/ModelManagement/Models/Domain/ModelArtifactType.swift
 enum ArchiveStructure {
-  /// Single file in the archive (extract to get model file)
-  flat('flat'),
+  /// Archive contains a single model file at root or nested in one directory
+  singleFileNested('singleFileNested'),
 
-  /// Files are in a subdirectory within the archive
-  nested('nested'),
+  /// Archive extracts to a directory containing multiple files
+  directoryBased('directoryBased'),
 
-  /// Multiple files at root level
-  multipleFlat('multipleFlat'),
+  /// Archive has a subdirectory structure (e.g., extracts to subfolder)
+  nestedDirectory('nestedDirectory'),
 
-  /// Complex directory structure
-  directory('directory');
+  /// Unknown structure - will be detected after extraction
+  unknown('unknown');
 
   final String rawValue;
   const ArchiveStructure(this.rawValue);
@@ -209,7 +225,7 @@ enum ArchiveStructure {
   static ArchiveStructure fromRawValue(String value) {
     return ArchiveStructure.values.firstWhere(
       (s) => s.rawValue == value,
-      orElse: () => ArchiveStructure.flat,
+      orElse: () => ArchiveStructure.unknown,
     );
   }
 }
