@@ -8,7 +8,7 @@ import FoundationModels
 #endif
 
 /// Service implementation for Apple's Foundation Models
-@available(iOS 18.0, macOS 26.0, *)
+@available(iOS 26.0, *)
 public class FoundationModelsService: LLMService {
     private var hardwareConfig: HardwareConfiguration?
     private var _currentModel: String?
@@ -29,7 +29,7 @@ public class FoundationModelsService: LLMService {
     }
 
     public func initialize(modelPath: String?) async throws {
-        logger.info("🚀 Initializing Apple Foundation Models (iOS 18+/macOS 26+)")
+        logger.info("🚀 Initializing Apple Foundation Models (iOS 26.0+)")
         
         // Log system information for debugging
         #if os(iOS)
@@ -41,8 +41,8 @@ public class FoundationModelsService: LLMService {
         #endif
 
         #if canImport(FoundationModels)
-        guard #available(iOS 18.0, macOS 26.0, *) else {
-            let errorMsg = "iOS 18.0+ or macOS 26.0+ required. Current: \(ProcessInfo.processInfo.operatingSystemVersionString)"
+        guard #available(iOS 26.0, macOS 26.0, *) else {
+            let errorMsg = "iOS 26.0+ (or macOS 26.0+) required for Foundation Models. Current: \(ProcessInfo.processInfo.operatingSystemVersionString)"
             logger.error("❌ \(errorMsg)")
             throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -1, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
         }
@@ -195,6 +195,12 @@ public class FoundationModelsService: LLMService {
         logger.debug("Generating response for prompt: \(prompt.prefix(100))...")
 
         #if canImport(FoundationModels)
+        guard #available(iOS 26.0, macOS 26.0, *) else {
+            let errorMsg = "iOS 26.0+ (or macOS 26.0+) required for Foundation Models generation"
+            logger.error("❌ \(errorMsg)")
+            throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -1, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
+        }
+        
         guard let sessionObj = session as? LanguageModelSession else {
             logger.error("Session not available - was initialization successful?")
             throw LLMServiceError.notInitialized
@@ -248,6 +254,12 @@ public class FoundationModelsService: LLMService {
         logger.debug("Starting streaming generation for prompt: \(prompt.prefix(100))...")
 
         #if canImport(FoundationModels)
+        guard #available(iOS 26.0, macOS 26.0, *) else {
+            let errorMsg = "iOS 26.0+ (or macOS 26.0+) required for Foundation Models streaming"
+            logger.error("❌ \(errorMsg)")
+            throw LLMServiceError.generationFailed(NSError(domain: "FoundationModels", code: -1, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
+        }
+        
         guard let sessionObj = session as? LanguageModelSession else {
             logger.error("Session not available for streaming")
             throw LLMServiceError.notInitialized
