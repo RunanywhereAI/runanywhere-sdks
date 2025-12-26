@@ -3,6 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Simple utility for device identity management (UUID persistence)
+//  Uses lock-based synchronization for thread-safe initialization
 //
 
 import Foundation
@@ -19,13 +20,35 @@ public enum DeviceIdentity {
 
     private static let logger = SDKLogger(category: "DeviceIdentity")
 
+    /// Lock for thread-safe UUID initialization (read-check-write atomicity)
+    private static let initLock = NSLock()
+
+    /// Cached UUID to avoid repeated keychain lookups after first access
+    private static var cachedUUID: String?
+
     // MARK: - Public API
 
     /// Get a persistent device UUID that survives app reinstalls
     /// Uses keychain for persistence, falls back to vendor ID or generates new UUID
+    /// Thread-safe: uses lock to ensure atomic read-check-write on first access
     public static var persistentUUID: String {
+        // Fast path: return cached value without locking (safe after initialization)
+        if let cached = cachedUUID {
+            return cached
+        }
+
+        // Slow path: lock and initialize atomically
+        initLock.lock()
+        defer { initLock.unlock() }
+
+        // Double-check after acquiring lock (another thread may have initialized)
+        if let cached = cachedUUID {
+            return cached
+        }
+
         // Strategy 1: Try to get from keychain (survives app reinstalls)
         if let persistentUUID = KeychainManager.shared.retrieveDeviceUUID() {
+            cachedUUID = persistentUUID
             return persistentUUID
         }
 
@@ -33,6 +56,7 @@ public enum DeviceIdentity {
         if let vendorUUID = vendorUUID {
             try? KeychainManager.shared.storeDeviceUUID(vendorUUID)
             logger.debug("Stored vendor UUID in keychain")
+            cachedUUID = vendorUUID
             return vendorUUID
         }
 
@@ -40,6 +64,7 @@ public enum DeviceIdentity {
         let newUUID = UUID().uuidString
         try? KeychainManager.shared.storeDeviceUUID(newUUID)
         logger.debug("Generated and stored new device UUID")
+        cachedUUID = newUUID
         return newUUID
     }
 
