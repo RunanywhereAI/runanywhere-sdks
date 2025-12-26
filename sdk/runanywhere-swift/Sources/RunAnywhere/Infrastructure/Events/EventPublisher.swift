@@ -85,8 +85,8 @@ public final class EventPublisher: @unchecked Sendable {
 
         // Create payload directly from event (preserves category → modality)
         let payload: TelemetryEventPayload
-        if let typedEvent = event as? (any TypedEventProperties) {
-            payload = TelemetryEventPayload(from: event, typedProperties: typedEvent.typedProperties)
+        if let telemetryEvent = event as? (any TelemetryEventProperties) {
+            payload = TelemetryEventPayload(from: event, telemetryProperties: telemetryEvent.telemetryProperties)
         } else {
             payload = TelemetryEventPayload(from: event)
         }

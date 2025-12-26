@@ -5,7 +5,7 @@
 //  All STT-related events in one place.
 //  Each event declares its destination (public, analytics, or both).
 //
-//  Note: STTEvent conforms to TypedEventProperties for strongly typed analytics.
+//  Note: STTEvent conforms to TelemetryEventProperties for strongly typed analytics.
 //  This avoids string conversion/parsing and enables compile-time type checking.
 //
 
@@ -20,12 +20,12 @@ import Foundation
 /// EventPublisher.shared.track(STTEvent.transcriptionCompleted(...))
 /// ```
 ///
-/// STTEvent provides strongly typed properties via `typedProperties`.
+/// STTEvent provides strongly typed properties via `telemetryProperties`.
 /// This enables:
 /// - Type safety at compile time
 /// - No string parsing for analytics
 /// - Validation guardrails (e.g., confidence between 0-1)
-public enum STTEvent: SDKEvent, TypedEventProperties {
+public enum STTEvent: SDKEvent, TelemetryEventProperties {
 
     // MARK: - Model Lifecycle
 
@@ -221,21 +221,21 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
         }
     }
 
-    // MARK: - TypedEventProperties Conformance
+    // MARK: - TelemetryEventProperties Conformance
 
-    /// Strongly typed event properties - no string conversion needed.
+    /// Strongly typed telemetry properties - no string conversion needed.
     /// These values are used directly by TelemetryEventPayload.
-    public var typedProperties: EventProperties {
+    public var telemetryProperties: TelemetryProperties {
         switch self {
         case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 framework: framework.rawValue,
                 modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
             )
 
         case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 framework: framework.rawValue,
                 processingTimeMs: durationMs,
@@ -244,7 +244,7 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
             )
 
         case .modelLoadFailed(let modelId, let error, let framework):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 framework: framework.rawValue,
                 success: false,
@@ -253,7 +253,7 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
             )
 
         case .modelUnloaded(let modelId):
-            return EventProperties(modelId: modelId)
+            return TelemetryProperties(modelId: modelId)
 
         case .transcriptionStarted(
             let id,
@@ -265,7 +265,7 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
             let sampleRate,
             let framework
         ):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 framework: framework.rawValue,
                 isStreaming: isStreaming,
@@ -277,13 +277,13 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
             )
 
         case .partialTranscript(let text, let wordCount):
-            return EventProperties(
+            return TelemetryProperties(
                 wordCount: wordCount,
                 characterCount: text.count
             )
 
         case .finalTranscript(let text, let confidence):
-            return EventProperties(
+            return TelemetryProperties(
                 confidence: Double(confidence),
                 characterCount: text.count
             )
@@ -303,7 +303,7 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
             let sampleRate,
             let framework
         ):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 framework: framework.rawValue,
                 processingTimeMs: durationMs,
@@ -321,7 +321,7 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
             )
 
         case .transcriptionFailed(let id, let modelId, let error):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 success: false,
                 errorMessage: error.message,
@@ -330,7 +330,7 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
             )
 
         case .languageDetected(let language, let confidence):
-            return EventProperties(
+            return TelemetryProperties(
                 confidence: Double(confidence),
                 language: language
             )

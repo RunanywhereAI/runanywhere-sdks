@@ -5,7 +5,7 @@
 //  All TTS-related events in one place.
 //  Each event declares its destination (public, analytics, or both).
 //
-//  Note: TTSEvent conforms to TypedEventProperties for strongly typed analytics.
+//  Note: TTSEvent conforms to TelemetryEventProperties for strongly typed analytics.
 //  This avoids string conversion/parsing and enables compile-time type checking.
 //
 
@@ -20,12 +20,12 @@ import Foundation
 /// EventPublisher.shared.track(TTSEvent.synthesisCompleted(...))
 /// ```
 ///
-/// TTSEvent provides strongly typed properties via `typedProperties`.
+/// TTSEvent provides strongly typed properties via `telemetryProperties`.
 /// This enables:
 /// - Type safety at compile time
 /// - No string parsing for analytics
 /// - Validation guardrails
-public enum TTSEvent: SDKEvent, TypedEventProperties {
+public enum TTSEvent: SDKEvent, TelemetryEventProperties {
 
     // MARK: - Model Lifecycle
 
@@ -178,14 +178,14 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
         }
     }
 
-    // MARK: - TypedEventProperties Conformance
+    // MARK: - TelemetryEventProperties Conformance
 
-    /// Strongly typed event properties - no string conversion needed.
+    /// Strongly typed telemetry properties - no string conversion needed.
     /// These values are used directly by TelemetryEventPayload.
-    public var typedProperties: EventProperties {
+    public var telemetryProperties: TelemetryProperties {
         switch self {
         case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 framework: framework.rawValue,
                 voice: modelId,
@@ -193,7 +193,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             )
 
         case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 framework: framework.rawValue,
                 processingTimeMs: durationMs,
@@ -203,7 +203,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             )
 
         case .modelLoadFailed(let modelId, let error, let framework):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 framework: framework.rawValue,
                 success: false,
@@ -213,13 +213,13 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             )
 
         case .modelUnloaded(let modelId):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 voice: modelId
             )
 
         case .synthesisStarted(let id, let modelId, let characterCount, let sampleRate, let framework):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 framework: framework.rawValue,
                 characterCount: characterCount,
@@ -229,7 +229,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             )
 
         case .synthesisChunk(let id, let chunkSize):
-            return EventProperties(
+            return TelemetryProperties(
                 audioSizeBytes: chunkSize,
                 synthesisId: id
             )
@@ -245,7 +245,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             let sampleRate,
             let framework
         ):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 framework: framework.rawValue,
                 processingTimeMs: processingDurationMs,
@@ -260,7 +260,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             )
 
         case .synthesisFailed(let id, let modelId, let error):
-            return EventProperties(
+            return TelemetryProperties(
                 modelId: modelId,
                 success: false,
                 errorMessage: error.message,
