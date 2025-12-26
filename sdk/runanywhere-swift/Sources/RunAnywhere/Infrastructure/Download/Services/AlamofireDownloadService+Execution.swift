@@ -69,7 +69,7 @@ extension AlamofireDownloadService {
                             modelId: model.id,
                             error: "Invalid response - no URL returned"
                         ))
-                        continuation.resume(throwing: DownloadError.invalidResponse)
+                        continuation.resume(throwing: SDKError.download(.invalidResponse, "Invalid response - no URL returned"))
                     }
 
                 case .failure(let error):
@@ -98,7 +98,7 @@ extension AlamofireDownloadService {
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
         guard case .archive(let archiveType, _, _) = model.artifactType else {
-            throw DownloadError.extractionFailed("Model does not require extraction")
+            throw SDKError.download(.extractionFailed, "Model does not require extraction")
         }
 
         let extractionStartTime = Date()

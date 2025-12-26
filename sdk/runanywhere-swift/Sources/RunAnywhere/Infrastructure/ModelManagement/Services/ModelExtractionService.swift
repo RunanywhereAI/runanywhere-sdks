@@ -70,7 +70,7 @@ public final class DefaultModelExtractionService: ModelExtractionServiceProtocol
         let startTime = Date()
 
         guard case .archive(let archiveType, let structure, _) = artifactType else {
-            throw DownloadError.extractionFailed("Artifact type does not require extraction")
+            throw SDKError.download(.extractionFailed, "Artifact type does not require extraction")
         }
 
         logger.info("Starting extraction", metadata: [

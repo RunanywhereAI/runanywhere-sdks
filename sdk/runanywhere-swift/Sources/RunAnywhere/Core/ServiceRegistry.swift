@@ -109,7 +109,7 @@ public final class ServiceRegistry {
     /// Create an STT service for the given model
     public func createSTT(for modelId: String?, config: STTConfiguration) async throws -> STTService {
         guard let registration = sttRegistrations.first(where: { $0.canHandle(modelId) }) else {
-            throw CapabilityError.providerNotFound("STT service for model: \(modelId ?? "default")")
+            throw SDKError.stt(.serviceNotAvailable, "STT service for model: \(modelId ?? "default") not found")
         }
 
         logger.info("Creating STT service: \(registration.name) for model: \(modelId ?? "default")")
@@ -142,7 +142,7 @@ public final class ServiceRegistry {
     /// Create an LLM service for the given model
     public func createLLM(for modelId: String?, config: LLMConfiguration) async throws -> LLMService {
         guard let registration = llmRegistrations.first(where: { $0.canHandle(modelId) }) else {
-            throw CapabilityError.providerNotFound("LLM service for model: \(modelId ?? "default")")
+            throw SDKError.llm(.serviceNotAvailable, "LLM service for model: \(modelId ?? "default") not found")
         }
 
         logger.info("Creating LLM service: \(registration.name) for model: \(modelId ?? "default")")
@@ -175,7 +175,7 @@ public final class ServiceRegistry {
     /// Create a TTS service for the given voice
     public func createTTS(for voiceId: String?, config: TTSConfiguration) async throws -> TTSService {
         guard let registration = ttsRegistrations.first(where: { $0.canHandle(voiceId) }) else {
-            throw CapabilityError.providerNotFound("TTS service for voice: \(voiceId ?? "default")")
+            throw SDKError.tts(.serviceNotAvailable, "TTS service for voice: \(voiceId ?? "default") not found")
         }
 
         logger.info("Creating TTS service: \(registration.name) for voice: \(voiceId ?? "default")")
@@ -207,7 +207,7 @@ public final class ServiceRegistry {
     /// Create a VAD service
     public func createVAD(config: VADConfiguration) async throws -> VADService {
         guard let registration = vadRegistrations.first else {
-            throw CapabilityError.providerNotFound("VAD service")
+            throw SDKError.vad(.serviceNotAvailable, "VAD service not found")
         }
 
         logger.info("Creating VAD service: \(registration.name)")

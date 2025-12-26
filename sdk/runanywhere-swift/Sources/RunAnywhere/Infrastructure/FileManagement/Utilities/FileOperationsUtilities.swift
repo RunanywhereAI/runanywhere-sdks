@@ -11,7 +11,7 @@ public struct FileOperationsUtilities {
     /// - Throws: SDKError if documents directory is not accessible
     public static func getDocumentsDirectory() throws -> URL {
         guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            throw RunAnywhereError.storageError("Unable to access documents directory")
+            throw SDKError.fileManagement(.permissionDenied, "Unable to access documents directory")
         }
         return documentsURL
     }
@@ -21,7 +21,7 @@ public struct FileOperationsUtilities {
     /// - Throws: SDKError if caches directory is not accessible
     public static func getCachesDirectory() throws -> URL {
         guard let cachesURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
-            throw RunAnywhereError.storageError("Unable to access caches directory")
+            throw SDKError.fileManagement(.permissionDenied, "Unable to access caches directory")
         }
         return cachesURL
     }

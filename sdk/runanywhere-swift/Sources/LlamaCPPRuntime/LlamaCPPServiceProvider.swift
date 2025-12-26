@@ -110,7 +110,7 @@ public enum LlamaCPP: RunAnywhereModule {
                 logger.info("Found local model path: \(modelPath ?? "nil")")
             } else {
                 logger.error("Model '\(modelId)' is not downloaded")
-                throw SDKError.modelNotFound("Model '\(modelId)' is not downloaded. Please download the model first.")
+                throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded. Please download the model first.")
             }
         }
 

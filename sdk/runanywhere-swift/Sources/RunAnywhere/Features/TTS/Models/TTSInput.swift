@@ -49,7 +49,7 @@ public struct TTSInput: ComponentInput, Sendable {
 
     public func validate() throws {
         if text.isEmpty && ssml == nil {
-            throw TTSError.emptyText
+            throw SDKError.tts(.emptyInput, "Text cannot be empty")
         }
     }
 

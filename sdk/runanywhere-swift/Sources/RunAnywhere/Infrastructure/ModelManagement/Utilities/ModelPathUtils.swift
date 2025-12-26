@@ -24,7 +24,7 @@ public struct ModelPathUtils {
     /// - Throws: If Documents directory is not accessible
     public static func getBaseDirectory() throws -> URL {
         guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            throw RunAnywhereError.storageError("Documents directory not accessible")
+            throw SDKError.fileManagement(.storageError, "Documents directory not accessible")
         }
         return documentsURL.appendingPathComponent("RunAnywhere", isDirectory: true)
     }

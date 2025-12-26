@@ -45,7 +45,7 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
     public func initialize() async throws {
         guard let modelPath = modelPath else {
             logger.error("No model path provided for ONNX TTS")
-            throw SDKError.modelNotFound("No model path provided for ONNX TTS")
+            throw SDKError.runtime(.modelNotFound, "No model path provided for ONNX TTS")
         }
 
         logger.info("Initializing ONNX TTS with model at: \(modelPath)")
@@ -63,7 +63,7 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
 
     public func synthesize(text: String, options: TTSOptions) async throws -> Data {
         guard _isReady, let backend = backendHandle else {
-            throw SDKError.componentNotInitialized("ONNX TTS not initialized")
+            throw SDKError.runtime(.notInitialized, "ONNX TTS not initialized")
         }
 
         _isSynthesizing = true
@@ -99,7 +99,7 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
 
         guard result == RA_SUCCESS, let samples = samples, numSamples > 0 else {
             logger.error("Failed to synthesize speech. Error code: \(result.rawValue)")
-            throw SDKError.generationFailed("Failed to synthesize speech from ONNX TTS")
+            throw SDKError.runtime(.generationFailed, "Failed to synthesize speech from ONNX TTS")
         }
 
         defer {
@@ -213,7 +213,7 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
             } else {
                 logger.error("ra_create_backend('onnx') returned nil - No error message available")
             }
-            throw ONNXError.initializationFailed
+            throw SDKError.runtime(.initializationFailed, "Failed to create ONNX backend")
         }
 
         // Initialize backend
@@ -230,7 +230,7 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
             }
             ra_destroy(backendHandle)
             backendHandle = nil
-            throw ONNXError.from(code: Int32(initStatus.rawValue))
+            throw SDKError.fromONNXCode(Int32(initStatus.rawValue))
         }
         logger.info("Backend initialized successfully")
     }
@@ -272,7 +272,7 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
             } else {
                 logger.error("Failed to load TTS model: status=\(loadStatus.rawValue), modelDir=\(modelDir)")
             }
-            throw ONNXError.modelLoadFailed(originalPath)
+            throw SDKError.runtime(.modelLoadFailed, "Failed to load TTS model from: \(originalPath)")
         }
     }
 

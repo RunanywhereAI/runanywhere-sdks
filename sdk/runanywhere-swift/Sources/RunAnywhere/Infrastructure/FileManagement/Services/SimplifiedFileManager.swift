@@ -25,7 +25,7 @@ public class SimplifiedFileManager: FileManagementService {
 
     public init() throws {
         guard let documentsFolder = Folder.documents else {
-            throw RunAnywhereError.storageError("Unable to access documents directory")
+            throw SDKError.fileManagement(.permissionDenied, "Unable to access documents directory")
         }
         self.baseFolder = try documentsFolder.createSubfolderIfNeeded(withName: "RunAnywhere")
         try createDirectoryStructure()

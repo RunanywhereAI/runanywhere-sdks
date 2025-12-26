@@ -70,7 +70,7 @@ public enum NetworkRetry {
             }
         }
 
-        throw lastError ?? RunAnywhereError.networkError("Operation failed after \(config.maxAttempts) attempts")
+        throw lastError ?? SDKError.network(.requestFailed, "Operation failed after \(config.maxAttempts) attempts")
     }
 
     /// Execute an async operation with retry, returning nil on failure instead of throwing
@@ -83,10 +83,10 @@ public enum NetworkRetry {
 
     /// Check if an error is retryable
     private static func isRetryable(_ error: Error) -> Bool {
-        // SDK errors
+        // SDKError (new unified error type)
         if let sdkError = error as? SDKError {
-            switch sdkError {
-            case .networkError, .timeout, .serverError:
+            switch sdkError.code {
+            case .networkError, .timeout, .serverError, .networkUnavailable, .connectionLost:
                 return true
             default:
                 return false

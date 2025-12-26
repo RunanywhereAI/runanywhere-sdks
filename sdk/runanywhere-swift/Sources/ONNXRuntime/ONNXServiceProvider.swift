@@ -130,7 +130,7 @@ public enum ONNX: RunAnywhereModule {
                 logger.info("Found local model path: \(modelPath ?? "nil")")
             } else {
                 logger.error("Model '\(modelId)' is not downloaded")
-                throw SDKError.modelNotFound("Model '\(modelId)' is not downloaded. Please download the model first.")
+                throw SDKError.runtime(.modelNotFound, "Model '\(modelId)' is not downloaded. Please download the model first.")
             }
         }
 
@@ -179,7 +179,7 @@ public enum ONNX: RunAnywhereModule {
             allModels = try await RunAnywhere.availableModels()
         } catch {
             logger.error("Failed to fetch available models: \(error)")
-            throw SDKError.modelNotFound("Failed to query available models: \(error.localizedDescription)")
+            throw SDKError.runtime(.modelNotFound, "Failed to query available models: \(error.localizedDescription)")
         }
 
         let modelInfo = allModels.first { $0.id == modelId }
@@ -189,11 +189,11 @@ public enum ONNX: RunAnywhereModule {
             logger.info("Found local model path: \(modelPath ?? "nil")")
         } else {
             logger.error("TTS Model '\(modelId)' is not downloaded")
-            throw SDKError.modelNotFound("TTS Model '\(modelId)' is not downloaded. Please download the model first.")
+            throw SDKError.runtime(.modelNotFound, "TTS Model '\(modelId)' is not downloaded. Please download the model first.")
         }
 
         guard let path = modelPath else {
-            throw SDKError.modelNotFound("Could not find model path for: \(modelId)")
+            throw SDKError.runtime(.modelNotFound, "Could not find model path for: \(modelId)")
         }
 
         logger.info("Creating ONNXTTSService with path: \(path)")

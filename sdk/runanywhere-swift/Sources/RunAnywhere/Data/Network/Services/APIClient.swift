@@ -74,19 +74,17 @@ public actor APIClient: NetworkService {
         // Set authorization header (always set for Supabase compatibility)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        do {
-            let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw APIError.invalidResponse(message: "Invalid HTTP response")
-            }
-
-            guard (200...299).contains(httpResponse.statusCode) else {
-                throw APIError.from(statusCode: httpResponse.statusCode, data: data)
-            }
-
-            return data
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SDKError.network(.invalidResponse, "Invalid HTTP response")
         }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw Self.sdkErrorFromHTTPStatus(httpResponse.statusCode, data: data)
+        }
+
+        return data
     }
 
     /// Perform a raw GET request
@@ -117,13 +115,56 @@ public actor APIClient: NetworkService {
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse(message: "Invalid HTTP response")
+            throw SDKError.network(.invalidResponse, "Invalid HTTP response")
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.from(statusCode: httpResponse.statusCode, data: data)
+            throw Self.sdkErrorFromHTTPStatus(httpResponse.statusCode, data: data)
         }
 
         return data
+    }
+
+    // MARK: - Private Helpers
+
+    /// Convert HTTP status code and response data to SDKError
+    private static func sdkErrorFromHTTPStatus(_ statusCode: Int, data: Data?) -> SDKError {
+        // Try to parse error response for better message
+        var message: String?
+        if let data = data,
+           let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+            if let detail = errorResponse.detail {
+                switch detail {
+                case .message(let msg):
+                    message = msg
+                case .validationErrors(let errors):
+                    let messages = errors.map { $0.formattedMessage }
+                    message = messages.joined(separator: "; ")
+                }
+            } else if let msg = errorResponse.message {
+                message = msg
+            } else if let err = errorResponse.error {
+                message = err
+            }
+        }
+
+        switch statusCode {
+        case 401:
+            return SDKError.network(.unauthorized, message ?? "Authentication required")
+        case 403:
+            return SDKError.network(.forbidden, message ?? "Access denied")
+        case 404:
+            return SDKError.network(.invalidResponse, message ?? "Resource not found")
+        case 408, 504:
+            return SDKError.network(.timeout, message ?? "Request timed out")
+        case 422:
+            return SDKError.network(.validationFailed, message ?? "Validation failed")
+        case 400..<500:
+            return SDKError.network(.httpError, "Client error \(statusCode): \(message ?? "Unknown error")")
+        case 500..<600:
+            return SDKError.network(.serverError, "Server error \(statusCode): \(message ?? "Unknown error")")
+        default:
+            return SDKError.network(.unknown, message ?? "Unknown error with status code \(statusCode)")
+        }
     }
 }

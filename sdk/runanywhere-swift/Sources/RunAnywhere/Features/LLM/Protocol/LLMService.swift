@@ -56,7 +56,7 @@ public protocol LLMService: AnyObject { // swiftlint:disable:this avoid_any_obje
 
     /// Whether the service supports true streaming generation (token-by-token)
     /// Services that don't support streaming should return false.
-    /// When false, calling `streamGenerate` may result in `LLMError.streamingNotSupported`.
+    /// When false, calling `streamGenerate` may result in `SDKError.llm(.streamingNotSupported, ...)`.
     var supportsStreaming: Bool { get }
 
     // MARK: - Lifecycle

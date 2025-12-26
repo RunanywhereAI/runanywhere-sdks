@@ -59,7 +59,7 @@ public class ONNXSTTService: STTService {
         backendHandle = ra_create_backend("onnx")
         guard backendHandle != nil else {
             logger.error("Failed to create ONNX backend")
-            throw ONNXError.initializationFailed
+            throw SDKError.runtime(.initializationFailed, "Failed to create ONNX backend")
         }
 
         // Initialize backend
@@ -68,7 +68,7 @@ public class ONNXSTTService: STTService {
             logger.error("Failed to initialize ONNX backend: \(initStatus.rawValue)")
             ra_destroy(backendHandle)
             backendHandle = nil
-            throw ONNXError.from(code: Int32(initStatus.rawValue))
+            throw SDKError.fromONNXCode(Int32(initStatus.rawValue))
         }
 
         // Load STT model if path provided
@@ -90,7 +90,7 @@ public class ONNXSTTService: STTService {
             let loadStatus = ra_stt_load_model(backendHandle, modelDir, modelType, nil)
             guard loadStatus == RA_SUCCESS else {
                 logger.error("Failed to load STT model: \(loadStatus.rawValue)")
-                throw ONNXError.modelLoadFailed(modelPath)
+                throw SDKError.runtime(.modelLoadFailed, "Failed to load STT model from: \(modelPath)")
             }
 
             _currentModel = modelPath
@@ -104,7 +104,7 @@ public class ONNXSTTService: STTService {
 
     public func transcribe(audioData: Data, options: STTOptions) async throws -> STTTranscriptionResult {
         guard isReady, let backend = backendHandle else {
-            throw ONNXError.invalidHandle
+            throw SDKError.runtime(.invalidState, "Invalid ONNX handle: service not ready")
         }
 
         logger.info("Transcribing audio: \(audioData.count) bytes, input sample rate: \(options.sampleRate)Hz")
@@ -130,7 +130,7 @@ public class ONNXSTTService: STTService {
 
         guard status == RA_SUCCESS, let resultPtr = resultPtr else {
             logger.error("Transcription failed with status: \(status.rawValue)")
-            throw ONNXError.from(code: Int32(status.rawValue))
+            throw SDKError.fromONNXCode(Int32(status.rawValue))
         }
 
         defer {
@@ -150,7 +150,7 @@ public class ONNXSTTService: STTService {
         onPartial: @escaping (String) -> Void
     ) async throws -> STTTranscriptionResult where S: AsyncSequence, S.Element == Data {
         guard isReady, let backend = backendHandle else {
-            throw ONNXError.invalidHandle
+            throw SDKError.runtime(.invalidState, "Invalid ONNX handle: service not ready")
         }
 
         guard supportsStreaming else {
@@ -230,7 +230,7 @@ public class ONNXSTTService: STTService {
 
     private func parseTranscriptionResult(json: String, language: String?) throws -> STTTranscriptionResult {
         guard let jsonData = json.data(using: .utf8) else {
-            throw ONNXError.transcriptionFailed("Invalid JSON encoding")
+            throw SDKError.runtime(.generationFailed, "Transcription failed: Invalid JSON encoding")
         }
 
         let result = try JSONDecoder().decode(TranscriptionResult.self, from: jsonData)
@@ -253,17 +253,17 @@ public class ONNXSTTService: STTService {
         // Validate input parameters
         guard !audioData.isEmpty else {
             logger.error("Audio data is empty")
-            throw ONNXError.invalidParameters
+            throw SDKError.runtime(.invalidInput, "Invalid ONNX parameters: audio data is empty")
         }
 
         guard inputSampleRate > 0 else {
             logger.error("Invalid input sample rate: \(inputSampleRate)")
-            throw ONNXError.invalidParameters
+            throw SDKError.runtime(.invalidInput, "Invalid ONNX parameters: invalid sample rate \(inputSampleRate)")
         }
 
         guard audioData.count.isMultiple(of: MemoryLayout<Int16>.size) else {
             logger.error("Audio data size (\(audioData.count) bytes) is not a multiple of Int16 size")
-            throw ONNXError.invalidParameters
+            throw SDKError.runtime(.invalidInput, "Invalid ONNX parameters: audio data size is not a multiple of Int16 size")
         }
 
         let targetSampleRate = 16000
@@ -314,7 +314,7 @@ public class ONNXSTTService: STTService {
         // Create streaming session
         guard let stream = ra_stt_create_stream(backend, nil) else {
             logger.error("Failed to create STT stream")
-            throw ONNXError.initializationFailed
+            throw SDKError.runtime(.initializationFailed, "Failed to create STT streaming session")
         }
 
         streamHandle = stream

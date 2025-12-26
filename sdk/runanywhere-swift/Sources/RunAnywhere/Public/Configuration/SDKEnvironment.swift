@@ -127,7 +127,7 @@ public struct SDKInitParams {
     ///   - apiKey: Your RunAnywhere API key (required)
     ///   - baseURL: Base URL for API requests (required, must be valid HTTPS URL)
     ///   - environment: Environment mode (default: production)
-    /// - Throws: RunAnywhereError if validation fails
+    /// - Throws: SDKError if validation fails
     public init(
         apiKey: String,
         baseURL: URL,
@@ -146,14 +146,14 @@ public struct SDKInitParams {
     ///   - apiKey: Your RunAnywhere API key
     ///   - baseURL: Base URL string for API requests
     ///   - environment: Environment mode (default: production)
-    /// - Throws: RunAnywhereError if URL is invalid or validation fails
+    /// - Throws: SDKError if URL is invalid or validation fails
     public init(
         apiKey: String,
         baseURL: String,
         environment: SDKEnvironment = .production
     ) throws {
         guard let url = URL(string: baseURL) else {
-            throw RunAnywhereError.validationFailed("Invalid base URL format: \(baseURL)")
+            throw SDKError.general(.validationFailed, "Invalid base URL format: \(baseURL)")
         }
         try self.init(apiKey: apiKey, baseURL: url, environment: environment)
     }
@@ -174,7 +174,7 @@ public struct SDKInitParams {
     ///   - apiKey: The API key to validate
     ///   - baseURL: The base URL to validate
     ///   - environment: The target environment
-    /// - Throws: RunAnywhereError if validation fails
+    /// - Throws: SDKError if validation fails
     private static func validate(
         apiKey: String,
         baseURL: URL,
@@ -185,22 +185,23 @@ public struct SDKInitParams {
         // 1. Check build configuration compatibility for production
         if environment == .production {
             #if DEBUG
-            throw RunAnywhereError.environmentMismatch(
-                "Production environment cannot be used in DEBUG builds. " +
-                "Use .development or .staging for testing, or build in Release mode for production."
-            )
+            let message = """
+                Production environment cannot be used in DEBUG builds. \
+                Use .development or .staging for testing, or build in Release mode.
+                """
+            throw SDKError.general(.environmentMismatch, message)
             #endif
         }
 
         // 2. Validate API key for staging and production
         if environment.requiresAuthentication {
             guard !apiKey.isEmpty else {
-                throw RunAnywhereError.invalidAPIKey("API key is required for \(environment.description)")
+                throw SDKError.general(.invalidAPIKey, "API key is required for \(environment.description)")
             }
 
             // Basic API key format validation (at least 10 characters)
             guard apiKey.count >= 10 else {
-                throw RunAnywhereError.invalidAPIKey("API key appears to be invalid (too short)")
+                throw SDKError.general(.invalidAPIKey, "API key appears to be invalid (too short)")
             }
         }
 
@@ -208,31 +209,33 @@ public struct SDKInitParams {
         if environment.requiresBackendURL {
             // Check for valid scheme (must be HTTPS for production, HTTPS or HTTP for staging)
             guard let scheme = baseURL.scheme?.lowercased() else {
-                throw RunAnywhereError.validationFailed("Base URL must have a valid scheme (https)")
+                throw SDKError.general(.validationFailed, "Base URL must have a valid scheme (https)")
             }
 
             if environment == .production {
                 guard scheme == "https" else {
-                    throw RunAnywhereError.validationFailed(
+                    throw SDKError.general(
+                        .validationFailed,
                         "Production environment requires HTTPS. Got: \(scheme)"
                     )
                 }
             } else if environment == .staging {
                 guard scheme == "https" || scheme == "http" else {
-                    throw RunAnywhereError.validationFailed(
+                    throw SDKError.general(
+                        .validationFailed,
                         "Staging environment requires HTTP or HTTPS. Got: \(scheme)"
                     )
                 }
 
                 // Warn if using HTTP in staging
                 if scheme == "http" {
-                    logger.warning("⚠️ Using HTTP for staging environment. Consider using HTTPS for security.")
+                    logger.warning("Using HTTP for staging environment. Consider using HTTPS for security.")
                 }
             }
 
             // Check for valid host
             guard let host = baseURL.host, !host.isEmpty else {
-                throw RunAnywhereError.validationFailed("Base URL must have a valid host")
+                throw SDKError.general(.validationFailed, "Base URL must have a valid host")
             }
 
             // Warn about localhost/example URLs
@@ -242,15 +245,16 @@ public struct SDKInitParams {
                lowercaseHost.contains("example.com") ||
                lowercaseHost.contains(".local") {
                 if environment == .production {
-                    throw RunAnywhereError.validationFailed(
+                    throw SDKError.general(
+                        .validationFailed,
                         "Production environment cannot use localhost or example URLs: \(host)"
                     )
                 } else {
-                    logger.warning("⚠️ Staging environment using local/example URL: \(host)")
+                    logger.warning("Staging environment using local/example URL: \(host)")
                 }
             }
 
-            logger.info("✅ URL validated for \(environment.description): \(baseURL.absoluteString)")
+            logger.info("URL validated for \(environment.description): \(baseURL.absoluteString)")
         }
     }
 }

@@ -21,7 +21,7 @@ public extension RunAnywhere {
     /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func transcribe(_ audioData: Data) async throws -> String {
         guard isInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
@@ -36,7 +36,7 @@ public extension RunAnywhere {
     /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func unloadSTTModel() async throws {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         try await serviceContainer.sttCapability.unload()
@@ -62,7 +62,7 @@ public extension RunAnywhere {
         options: STTOptions
     ) async throws -> STTOutput {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         return try await serviceContainer.sttCapability.transcribe(audioData, options: options)
@@ -79,7 +79,7 @@ public extension RunAnywhere {
         language: String? = nil
     ) async throws -> STTOutput {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         return try await serviceContainer.sttCapability.transcribe(buffer, language: language)
@@ -95,7 +95,7 @@ public extension RunAnywhere {
         options: STTOptions = STTOptions()
     ) async throws -> AsyncThrowingStream<String, Error> where S.Element == Data {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         return await serviceContainer.sttCapability.streamTranscribe(audioStream, options: options)

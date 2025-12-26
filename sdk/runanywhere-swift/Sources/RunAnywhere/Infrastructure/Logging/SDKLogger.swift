@@ -150,7 +150,7 @@ public struct SDKLogger: Sendable {
 /// Internal helper for building error log context.
 /// Captures all debugging information at the call site.
 private struct ErrorLogContext {
-    let raError: RunAnywhereError
+    let sdkError: SDKError
     let fileName: String
     let line: Int
     let function: String
@@ -168,7 +168,12 @@ private struct ErrorLogContext {
         additionalInfo: String?,
         isFault: Bool = false
     ) {
-        self.raError = error.asRunAnywhereError()
+        // Convert any error to SDKError
+        if let sdk = error as? SDKError {
+            self.sdkError = sdk
+        } else {
+            self.sdkError = SDKError.from(error)
+        }
         self.fileName = (file as NSString).lastPathComponent
         self.line = line
         self.function = function
@@ -183,21 +188,22 @@ private struct ErrorLogContext {
     var formattedMessage: String {
         let prefix = isFault ? "FAULT: " : ""
         var message = """
-        \(prefix)\(raError.errorDescription ?? "Unknown error")
+        \(prefix)\(sdkError.errorDescription ?? "Unknown error")
         └─ Location: \(fileName):\(line) in \(function)
         └─ Thread: \(threadInfo)
-        └─ Code: \(raError.errorCode)
+        └─ Code: \(sdkError.code.rawValue)
+        └─ Category: \(sdkError.category.rawValue)
         """
 
         if let additional = additionalInfo {
             message += "\n└─ Context: \(additional)"
         }
 
-        if let reason = raError.failureReason {
+        if let reason = sdkError.failureReason {
             message += "\n└─ Reason: \(reason)"
         }
 
-        if let suggestion = raError.recoverySuggestion {
+        if let suggestion = sdkError.recoverySuggestion {
             message += "\n└─ Recovery: \(suggestion)"
         }
 
@@ -209,8 +215,9 @@ private struct ErrorLogContext {
     /// Structured metadata for log aggregation systems.
     var metadata: [String: Any] { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         var meta: [String: Any] = [ // swiftlint:disable:this prefer_concrete_types avoid_any_type
-            "error_code": raError.errorCode,
-            "error_domain": runAnywhereErrorDomain,
+            "error_code": sdkError.code.rawValue,
+            "error_category": sdkError.category.rawValue,
+            "error_domain": "com.runanywhere.sdk",
             "source_file": fileName,
             "source_line": line,
             "source_function": function,
@@ -223,7 +230,7 @@ private struct ErrorLogContext {
             meta["context"] = additional
         }
 
-        if let reason = raError.failureReason {
+        if let reason = sdkError.failureReason {
             meta["failure_reason"] = reason
         }
 

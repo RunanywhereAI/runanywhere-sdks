@@ -136,7 +136,7 @@ public actor TTSCapability: ModelLoadableCapability {
                 errorMessage: error.localizedDescription
             )
             await managedLifecycle.trackOperationError(error, operation: "synthesize")
-            throw CapabilityError.operationFailed("Synthesis", error)
+            throw SDKError.tts(.generationFailed, "Synthesis failed: \(error.localizedDescription)", underlying: error)
         }
 
         // Calculate audio duration from the generated audio data
@@ -184,7 +184,7 @@ public actor TTSCapability: ModelLoadableCapability {
             Task {
                 guard let service = await self.managedLifecycle.currentService else {
                     continuation.finish(
-                        throwing: CapabilityError.resourceNotLoaded("TTS voice")
+                        throwing: SDKError.tts(.componentNotReady, "TTS voice not loaded")
                     )
                     return
                 }
