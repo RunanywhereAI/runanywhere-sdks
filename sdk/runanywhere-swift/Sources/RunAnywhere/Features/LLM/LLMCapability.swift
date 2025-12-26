@@ -51,7 +51,7 @@ public actor LLMCapability: ModelLoadableCapability {
     }
 
     public var currentModelId: String? {
-        get async { await managedLifecycle.currentResourceId }
+        get async { await managedLifecycle.currentModelId }
     }
 
     public func loadModel(_ modelId: String) async throws {
@@ -91,7 +91,7 @@ public actor LLMCapability: ModelLoadableCapability {
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) async throws -> LLMGenerationResult {
         let service = try await managedLifecycle.requireService()
-        let modelId = await managedLifecycle.resourceIdOrUnknown()
+        let modelId = await managedLifecycle.modelIdOrUnknown()
 
         logger.info("Generating with model: \(modelId) (non-streaming)")
 
@@ -186,7 +186,7 @@ public actor LLMCapability: ModelLoadableCapability {
             throw LLMError.streamingNotSupported
         }
 
-        let modelId = await managedLifecycle.resourceIdOrUnknown()
+        let modelId = await managedLifecycle.modelIdOrUnknown()
         let effectiveOptions = mergeOptions(options)
         let framework = service.inferenceFramework
 

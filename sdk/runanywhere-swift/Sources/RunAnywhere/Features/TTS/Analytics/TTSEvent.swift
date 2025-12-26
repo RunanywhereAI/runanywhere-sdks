@@ -29,10 +29,10 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
 
     // MARK: - Model Lifecycle
 
-    case modelLoadStarted(voiceId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
-    case modelLoadCompleted(voiceId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
-    case modelLoadFailed(voiceId: String, error: String, framework: InferenceFramework = .unknown)
-    case modelUnloaded(voiceId: String)
+    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadFailed(modelId: String, error: String, framework: InferenceFramework = .unknown)
+    case modelUnloaded(modelId: String)
 
     // MARK: - Synthesis
 
@@ -42,7 +42,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
     ///   - sampleRate: Audio sample rate in Hz (default: TTSConstants.defaultSampleRate)
     case synthesisStarted(
         synthesisId: String,
-        voiceId: String,
+        modelId: String,
         characterCount: Int,
         sampleRate: Int = TTSConstants.defaultSampleRate,
         framework: InferenceFramework = .unknown
@@ -60,7 +60,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
     ///   - sampleRate: Audio sample rate in Hz
     case synthesisCompleted(
         synthesisId: String,
-        voiceId: String,
+        modelId: String,
         characterCount: Int,
         audioDurationMs: Double,
         audioSizeBytes: Int,
@@ -69,7 +69,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
         sampleRate: Int = TTSConstants.defaultSampleRate,
         framework: InferenceFramework = .unknown
     )
-    case synthesisFailed(synthesisId: String, voiceId: String, error: String)
+    case synthesisFailed(synthesisId: String, modelId: String, error: String)
 
     // MARK: - SDKEvent Conformance
 
@@ -100,9 +100,9 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
 
     public var properties: [String: String] {
         switch self {
-        case .modelLoadStarted(let voiceId, let modelSizeBytes, let framework):
+        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
             var props = [
-                "voice_id": voiceId,
+                "model_id": modelId,
                 "framework": framework.rawValue
             ]
             if modelSizeBytes > 0 {
@@ -110,9 +110,9 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             }
             return props
 
-        case .modelLoadCompleted(let voiceId, let durationMs, let modelSizeBytes, let framework):
+        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
             var props = [
-                "voice_id": voiceId,
+                "model_id": modelId,
                 "duration_ms": String(format: "%.1f", durationMs),
                 "framework": framework.rawValue
             ]
@@ -121,21 +121,20 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             }
             return props
 
-        case .modelLoadFailed(let voiceId, let error, let framework):
+        case .modelLoadFailed(let modelId, let error, let framework):
             return [
-                "voice_id": voiceId,
+                "model_id": modelId,
                 "error": error,
                 "framework": framework.rawValue
             ]
 
-        case .modelUnloaded(let voiceId):
-            return ["voice_id": voiceId]
+        case .modelUnloaded(let modelId):
+            return ["model_id": modelId]
 
-        case .synthesisStarted(let id, let voiceId, let characterCount, let sampleRate, let framework):
+        case .synthesisStarted(let id, let modelId, let characterCount, let sampleRate, let framework):
             return [
                 "synthesis_id": id,
-                "voice_id": voiceId,
-                "model_id": voiceId,  // Alias for consistency with backend
+                "model_id": modelId,
                 "character_count": String(characterCount),
                 "sample_rate": String(sampleRate),
                 "framework": framework.rawValue
@@ -149,7 +148,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
 
         case .synthesisCompleted(
             let id,
-            let voiceId,
+            let modelId,
             let charCount,
             let audioDurationMs,
             let audioSize,
@@ -160,8 +159,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
         ):
             return [
                 "synthesis_id": id,
-                "voice_id": voiceId,
-                "model_id": voiceId,  // Alias for consistency with backend
+                "model_id": modelId,
                 "character_count": String(charCount),
                 "audio_duration_ms": String(format: "%.1f", audioDurationMs),
                 "audio_size_bytes": String(audioSize),
@@ -172,11 +170,10 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
                 "framework": framework.rawValue
             ]
 
-        case .synthesisFailed(let id, let voiceId, let error):
+        case .synthesisFailed(let id, let modelId, let error):
             return [
                 "synthesis_id": id,
-                "voice_id": voiceId,
-                "model_id": voiceId,  // Alias for consistency with backend
+                "model_id": modelId,
                 "error": error,
                 "success": "false"
             ]
@@ -189,46 +186,46 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
     /// These values are used directly by TelemetryEventPayload.
     public var typedProperties: EventProperties {
         switch self {
-        case .modelLoadStarted(let voiceId, let modelSizeBytes, let framework):
+        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
             return EventProperties(
-                modelId: voiceId,
+                modelId: modelId,
                 framework: framework.rawValue,
-                voice: voiceId,
+                voice: modelId,
                 modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
             )
 
-        case .modelLoadCompleted(let voiceId, let durationMs, let modelSizeBytes, let framework):
+        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
             return EventProperties(
-                modelId: voiceId,
+                modelId: modelId,
                 framework: framework.rawValue,
                 processingTimeMs: durationMs,
                 success: true,
-                voice: voiceId,
+                voice: modelId,
                 modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
             )
 
-        case .modelLoadFailed(let voiceId, let error, let framework):
+        case .modelLoadFailed(let modelId, let error, let framework):
             return EventProperties(
-                modelId: voiceId,
+                modelId: modelId,
                 framework: framework.rawValue,
                 success: false,
                 errorMessage: error,
-                voice: voiceId
+                voice: modelId
             )
 
-        case .modelUnloaded(let voiceId):
+        case .modelUnloaded(let modelId):
             return EventProperties(
-                modelId: voiceId,
-                voice: voiceId
+                modelId: modelId,
+                voice: modelId
             )
 
-        case .synthesisStarted(let id, let voiceId, let characterCount, let sampleRate, let framework):
+        case .synthesisStarted(let id, let modelId, let characterCount, let sampleRate, let framework):
             return EventProperties(
-                modelId: voiceId,
+                modelId: modelId,
                 framework: framework.rawValue,
                 characterCount: characterCount,
                 sampleRate: sampleRate,
-                voice: voiceId,
+                voice: modelId,
                 synthesisId: id
             )
 
@@ -240,7 +237,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
 
         case .synthesisCompleted(
             let id,
-            let voiceId,
+            let modelId,
             let charCount,
             let audioDurationMs,
             let audioSize,
@@ -250,7 +247,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             let framework
         ):
             return EventProperties(
-                modelId: voiceId,
+                modelId: modelId,
                 framework: framework.rawValue,
                 processingTimeMs: processingDurationMs,
                 success: true,
@@ -258,17 +255,17 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
                 charactersPerSecond: charsPerSecond,
                 audioSizeBytes: audioSize,
                 sampleRate: sampleRate,
-                voice: voiceId,
+                voice: modelId,
                 outputDurationMs: audioDurationMs,
                 synthesisId: id
             )
 
-        case .synthesisFailed(let id, let voiceId, let error):
+        case .synthesisFailed(let id, let modelId, let error):
             return EventProperties(
-                modelId: voiceId,
+                modelId: modelId,
                 success: false,
                 errorMessage: error,
-                voice: voiceId,
+                voice: modelId,
                 synthesisId: id
             )
         }

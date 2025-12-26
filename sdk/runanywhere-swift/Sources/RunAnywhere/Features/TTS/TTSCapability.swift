@@ -55,12 +55,12 @@ public actor TTSCapability: ModelLoadableCapability {
     }
 
     public var currentModelId: String? {
-        get async { await managedLifecycle.currentResourceId }
+        get async { await managedLifecycle.currentModelId }
     }
 
     /// Alias for voice-specific naming
     public var currentVoiceId: String? {
-        get async { await managedLifecycle.currentResourceId }
+        get async { await managedLifecycle.currentModelId }
     }
 
     /// Get available voices
@@ -110,9 +110,9 @@ public actor TTSCapability: ModelLoadableCapability {
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSOutput {
         let service = try await managedLifecycle.requireService()
-        let voiceId = await managedLifecycle.resourceIdOrUnknown()
+        let modelId = await managedLifecycle.modelIdOrUnknown()
 
-        logger.info("Synthesizing text with voice: \(voiceId)")
+        logger.info("Synthesizing text with model: \(modelId)")
 
         // Merge options with config defaults
         let effectiveOptions = mergeOptions(options)
@@ -120,7 +120,7 @@ public actor TTSCapability: ModelLoadableCapability {
         // Start synthesis tracking
         let synthesisId = await analyticsService.startSynthesis(
             text: text,
-            voice: effectiveOptions.voice ?? voiceId,
+            voice: effectiveOptions.voice ?? modelId,
             sampleRate: effectiveOptions.sampleRate,
             framework: service.inferenceFramework
         )
@@ -156,7 +156,7 @@ public actor TTSCapability: ModelLoadableCapability {
         logger.info("Synthesis completed in \(Int(processingTime * 1000))ms, \(audioData.count) bytes")
 
         let metadata = TTSSynthesisMetadata(
-            voice: effectiveOptions.voice ?? voiceId,
+            voice: effectiveOptions.voice ?? modelId,
             language: effectiveOptions.language,
             processingTime: processingTime,
             characterCount: text.count
@@ -189,13 +189,13 @@ public actor TTSCapability: ModelLoadableCapability {
                     return
                 }
 
-                let voiceId = await self.managedLifecycle.resourceIdOrUnknown()
+                let modelId = await self.managedLifecycle.modelIdOrUnknown()
                 let effectiveOptions = self.mergeOptions(options)
 
                 // Start synthesis tracking
                 let synthesisId = await self.analyticsService.startSynthesis(
                     text: text,
-                    voice: effectiveOptions.voice ?? voiceId,
+                    voice: effectiveOptions.voice ?? modelId,
                     sampleRate: effectiveOptions.sampleRate,
                     framework: service.inferenceFramework
                 )

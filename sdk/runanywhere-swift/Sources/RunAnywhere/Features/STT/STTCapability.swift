@@ -51,7 +51,7 @@ public actor STTCapability: ModelLoadableCapability {
     }
 
     public var currentModelId: String? {
-        get async { await managedLifecycle.currentResourceId }
+        get async { await managedLifecycle.currentModelId }
     }
 
     /// Whether the service supports streaming transcription
@@ -86,7 +86,7 @@ public actor STTCapability: ModelLoadableCapability {
         options: STTOptions = STTOptions()
     ) async throws -> STTOutput {
         let service = try await managedLifecycle.requireService()
-        let modelId = await managedLifecycle.resourceIdOrUnknown()
+        let modelId = await managedLifecycle.modelIdOrUnknown()
 
         logger.info("Transcribing audio with model: \(modelId)")
 
@@ -195,7 +195,7 @@ public actor STTCapability: ModelLoadableCapability {
                 }
 
                 let effectiveOptions = self.mergeOptions(options)
-                let modelId = await self.managedLifecycle.resourceIdOrUnknown()
+                let modelId = await self.managedLifecycle.modelIdOrUnknown()
 
                 // Start transcription tracking (streaming mode - audio length unknown upfront)
                 let transcriptionId = await self.analyticsService.startTranscription(
