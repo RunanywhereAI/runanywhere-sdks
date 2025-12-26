@@ -65,9 +65,6 @@ public protocol Capability: Actor {
 /// Protocol for capabilities that load models/resources
 /// Provides a standardized interface for model lifecycle management
 public protocol ModelLoadableCapability: Capability {
-    /// The type of service this capability uses
-    associatedtype Service
-
     /// Whether a model is currently loaded
     var isModelLoaded: Bool { get async }
 
@@ -87,9 +84,6 @@ public protocol ModelLoadableCapability: Capability {
 /// Protocol for capabilities that initialize a service without model loading
 /// (e.g., VAD, Speaker Diarization)
 public protocol ServiceBasedCapability: Capability {
-    /// The type of service this capability uses
-    associatedtype Service
-
     /// Whether the capability is ready to use
     var isReady: Bool { get }
 
@@ -136,34 +130,5 @@ public struct CapabilityMetrics: Sendable {
             processingTimeMs: elapsedMs,
             resourceId: resourceId
         )
-    }
-}
-
-// MARK: - Capability Error
-
-/// Common errors for capability operations
-public enum CapabilityError: LocalizedError, Sendable {
-    case notInitialized(String)
-    case resourceNotLoaded(String)
-    case loadFailed(String, Error?)
-    case operationFailed(String, Error?)
-    case providerNotFound(String)
-    case compositeComponentFailed(component: String, Error?)
-
-    public var errorDescription: String? {
-        switch self {
-        case .notInitialized(let capability):
-            return "\(capability) is not initialized"
-        case .resourceNotLoaded(let resource):
-            return "No \(resource) is loaded. Call load first."
-        case .loadFailed(let resource, let error):
-            return "Failed to load \(resource): \(error?.localizedDescription ?? "Unknown error")"
-        case .operationFailed(let operation, let error):
-            return "\(operation) failed: \(error?.localizedDescription ?? "Unknown error")"
-        case .providerNotFound(let provider):
-            return "No \(provider) provider registered. Please register a provider first."
-        case .compositeComponentFailed(let component, let error):
-            return "\(component) component failed: \(error?.localizedDescription ?? "Unknown error")"
-        }
     }
 }

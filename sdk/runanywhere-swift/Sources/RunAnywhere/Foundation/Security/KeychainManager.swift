@@ -93,10 +93,10 @@ public final class KeychainManager {
     /// - Parameters:
     ///   - value: String value to store
     ///   - key: Unique key for the value
-    /// - Throws: KeychainError if storage fails
+    /// - Throws: SDKError if storage fails
     public func store(_ value: String, for key: String) throws {
         guard let data = value.data(using: .utf8) else {
-            throw KeychainError.encodingError
+            throw SDKError.security(.encodingError, "Failed to encode string data for keychain storage")
         }
 
         try store(data, for: key)
@@ -106,7 +106,7 @@ public final class KeychainManager {
     /// - Parameters:
     ///   - data: Data to store
     ///   - key: Unique key for the data
-    /// - Throws: KeychainError if storage fails
+    /// - Throws: SDKError if storage fails
     public func store(_ data: Data, for key: String) throws {
         var query = baseQuery(for: key)
         query[kSecValueData as String] = data
@@ -120,19 +120,19 @@ public final class KeychainManager {
         }
 
         guard status == errSecSuccess else {
-            throw KeychainError.storageError(status)
+            throw SDKError.security(.keychainError, "Failed to store item in keychain: OSStatus \(status)")
         }
     }
 
     /// Retrieve a string value from the keychain
     /// - Parameter key: Key for the value
     /// - Returns: Stored string value
-    /// - Throws: KeychainError if retrieval fails
+    /// - Throws: SDKError if retrieval fails
     public func retrieve(for key: String) throws -> String {
         let data = try retrieveData(for: key)
 
         guard let string = String(data: data, encoding: .utf8) else {
-            throw KeychainError.decodingError
+            throw SDKError.security(.decodingError, "Failed to decode string data from keychain")
         }
 
         return string
@@ -141,7 +141,7 @@ public final class KeychainManager {
     /// Retrieve data from the keychain
     /// - Parameter key: Key for the data
     /// - Returns: Stored data
-    /// - Throws: KeychainError if retrieval fails
+    /// - Throws: SDKError if retrieval fails
     public func retrieveData(for key: String) throws -> Data {
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = true
@@ -154,9 +154,9 @@ public final class KeychainManager {
         guard status == errSecSuccess,
               let data = result as? Data else {
             if status == errSecItemNotFound {
-                throw KeychainError.itemNotFound
+                throw SDKError.security(.keychainError, "Item not found in keychain")
             }
-            throw KeychainError.retrievalError(status)
+            throw SDKError.security(.keychainError, "Failed to retrieve item from keychain: OSStatus \(status)")
         }
 
         return data
@@ -164,13 +164,13 @@ public final class KeychainManager {
 
     /// Delete an item from the keychain
     /// - Parameter key: Key for the item to delete
-    /// - Throws: KeychainError if deletion fails
+    /// - Throws: SDKError if deletion fails
     public func delete(for key: String) throws {
         let query = baseQuery(for: key)
         let status = SecItemDelete(query as CFDictionary)
 
         guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.deletionError(status)
+            throw SDKError.security(.keychainError, "Failed to delete item from keychain: OSStatus \(status)")
         }
     }
 
@@ -204,34 +204,5 @@ public final class KeychainManager {
         query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
 
         return query
-    }
-}
-
-// MARK: - KeychainError
-
-/// Errors that can occur during keychain operations
-public enum KeychainError: LocalizedError {
-    case encodingError
-    case decodingError
-    case itemNotFound
-    case storageError(OSStatus)
-    case retrievalError(OSStatus)
-    case deletionError(OSStatus)
-
-    public var errorDescription: String? {
-        switch self {
-        case .encodingError:
-            return "Failed to encode data for keychain storage"
-        case .decodingError:
-            return "Failed to decode data from keychain"
-        case .itemNotFound:
-            return "Item not found in keychain"
-        case .storageError(let status):
-            return "Failed to store item in keychain: \(status)"
-        case .retrievalError(let status):
-            return "Failed to retrieve item from keychain: \(status)"
-        case .deletionError(let status):
-            return "Failed to delete item from keychain: \(status)"
-        }
     }
 }

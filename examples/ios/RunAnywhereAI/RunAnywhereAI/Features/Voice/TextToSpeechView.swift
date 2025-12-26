@@ -1,6 +1,5 @@
 import SwiftUI
 import RunAnywhere
-import AVFoundation
 #if os(macOS)
 import AppKit
 #endif
@@ -33,7 +32,7 @@ private let funnyTTSSampleTexts: [String] = [
 
 // MARK: - Text-to-Speech View
 
-/// Dedicated Text-to-Speech view with text input and playback
+/// Dedicated Text-to-Speech view with text input and instant playback
 struct TextToSpeechView: View {
     @StateObject private var viewModel = TTSViewModel()
     @State private var showModelPicker = false
@@ -58,9 +57,8 @@ struct TextToSpeechView: View {
                 ModelStatusBanner(
                     framework: viewModel.selectedFramework,
                     modelName: viewModel.selectedModelName,
-                    isLoading: viewModel.isGenerating && viewModel.selectedModelName == nil,
-                    onSelectModel: { showModelPicker = true }
-                )
+                    isLoading: viewModel.isSpeaking && viewModel.selectedModelName == nil
+                ) { showModelPicker = true }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
 
@@ -77,11 +75,10 @@ struct TextToSpeechView: View {
             }
 
             // Overlay when no model is selected
-            if !hasModelSelected && !viewModel.isGenerating {
+            if !hasModelSelected && !viewModel.isSpeaking {
                 ModelRequiredOverlay(
-                    modality: .tts,
-                    onSelectModel: { showModelPicker = true }
-                )
+                    modality: .tts
+                ) { showModelPicker = true }
             }
         }
         .sheet(isPresented: $showModelPicker) {
@@ -132,9 +129,9 @@ struct TextToSpeechView: View {
                 // Voice settings section
                 voiceSettingsSection
 
-                // Generated audio info
-                if let metadata = viewModel.metadata {
-                    audioInfoSection(metadata: metadata)
+                // Speech info (shown after speaking)
+                if let result = viewModel.lastResult {
+                    speechInfoSection(result: result)
                 }
             }
             .padding()
@@ -226,10 +223,10 @@ struct TextToSpeechView: View {
         .cornerRadius(12)
     }
 
-    /// Audio info section showing metadata
-    private func audioInfoSection(metadata: TTSMetadata) -> some View {
+    /// Speech info section showing result details
+    private func speechInfoSection(result: TTSSpeakResult) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Audio Info")
+            Text("Last Speech")
                 .font(.headline)
                 .foregroundColor(.primary)
 
@@ -237,17 +234,24 @@ struct TextToSpeechView: View {
                 metadataRow(
                     icon: "waveform",
                     label: "Duration",
-                    value: String(format: "%.2fs", metadata.durationMs / 1000)
+                    value: String(format: "%.2fs", result.duration)
                 )
+                if result.audioSizeBytes > 0 {
+                    metadataRow(
+                        icon: "doc.text",
+                        label: "Size",
+                        value: viewModel.formatBytes(result.audioSizeBytes)
+                    )
+                    metadataRow(
+                        icon: "speaker.wave.2",
+                        label: "Format",
+                        value: result.format.rawValue.uppercased()
+                    )
+                }
                 metadataRow(
-                    icon: "doc.text",
-                    label: "Size",
-                    value: viewModel.formatBytes(metadata.audioSize)
-                )
-                metadataRow(
-                    icon: "speaker.wave.2",
-                    label: "Sample Rate",
-                    value: "\(metadata.sampleRate) Hz"
+                    icon: "person.wave.2",
+                    label: "Voice",
+                    value: result.metadata.voice
                 )
             }
             .font(.caption)
@@ -258,7 +262,7 @@ struct TextToSpeechView: View {
         .cornerRadius(12)
     }
 
-    /// Controls section with buttons and playback progress
+    /// Controls section with speak button
     private var controlsView: some View {
         VStack(spacing: 16) {
             // Error message
@@ -270,25 +274,8 @@ struct TextToSpeechView: View {
                     .padding(.horizontal)
             }
 
-            // Playback progress
-            if viewModel.isPlaying {
-                HStack {
-                    Text(viewModel.formatTime(viewModel.currentTime))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    ProgressView(value: viewModel.playbackProgress)
-                        .tint(AppColors.primaryPurple)
-
-                    Text(viewModel.formatTime(viewModel.duration))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal, 40)
-            }
-
-            // Action buttons
-            actionButtonsView
+            // Speak button
+            speakButton
 
             // Status text
             Text(statusText)
@@ -299,55 +286,41 @@ struct TextToSpeechView: View {
         .background(AppColors.backgroundPrimary)
     }
 
-    /// Action buttons for generate and play/stop
-    private var actionButtonsView: some View {
-        HStack(spacing: 20) {
-            // Generate/Speak button
-            Button(action: {
+    /// Speak button - synthesizes and plays audio instantly
+    private var speakButton: some View {
+        Button(
+            action: {
                 Task {
-                    await viewModel.generateSpeech(text: inputText)
+                    if viewModel.isSpeaking {
+                        await viewModel.stopSpeaking()
+                    } else {
+                        await viewModel.speak(text: inputText)
+                    }
                 }
-            }) {
+            },
+            label: {
                 HStack {
-                    if viewModel.isGenerating {
+                    if viewModel.isSpeaking {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             .scaleEffect(0.8)
+                        Text("Speaking...")
+                            .fontWeight(.semibold)
                     } else {
-                        Image(systemName: "waveform.circle.fill")
+                        Image(systemName: "speaker.wave.2.fill")
                             .font(.system(size: 20))
+                        Text("Speak")
+                            .fontWeight(.semibold)
                     }
-                    Text("Generate")
-                        .fontWeight(.semibold)
                 }
-                .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
+                .frame(minWidth: 160, idealWidth: 200, maxWidth: 240)
                 .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
-                .background(generateButtonColor)
+                .background(speakButtonColor)
                 .foregroundColor(.white)
                 .cornerRadius(25)
             }
-            .disabled(inputText.isEmpty || viewModel.selectedModelName == nil || viewModel.isGenerating)
-
-            // Play/Stop button
-            Button(action: {
-                Task {
-                    await viewModel.togglePlayback()
-                }
-            }) {
-                HStack {
-                    Image(systemName: viewModel.isPlaying ? "stop.fill" : "play.fill")
-                        .font(.system(size: 20))
-                    Text(viewModel.isPlaying ? "Stop" : "Play")
-                        .fontWeight(.semibold)
-                }
-                .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
-                .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
-                .background(playButtonColor)
-                .foregroundColor(.white)
-                .cornerRadius(25)
-            }
-            .disabled(!viewModel.hasGeneratedAudio)
-        }
+        )
+        .disabled(inputText.isEmpty || viewModel.selectedModelName == nil)
     }
 
     // MARK: - Helper Views
@@ -369,27 +342,24 @@ struct TextToSpeechView: View {
 
     /// Status text based on current state
     private var statusText: String {
-        if viewModel.isGenerating {
-            return "Generating speech..."
-        } else if viewModel.isPlaying {
-            return "Playing..."
+        if viewModel.isSpeaking {
+            return "Speaking..."
+        } else if viewModel.lastResult != nil {
+            return "Tap Speak to hear it again"
         } else {
             return "Ready"
         }
     }
 
-    /// Generate button color based on state
-    private var generateButtonColor: Color {
+    /// Speak button color based on state
+    private var speakButtonColor: Color {
         if inputText.isEmpty || viewModel.selectedModelName == nil {
             return AppColors.statusGray
+        } else if viewModel.isSpeaking {
+            return AppColors.statusOrange
         } else {
             return AppColors.primaryPurple
         }
-    }
-
-    /// Play button color based on state
-    private var playButtonColor: Color {
-        viewModel.hasGeneratedAudio ? AppColors.statusGreen : AppColors.statusGray
     }
 }
 

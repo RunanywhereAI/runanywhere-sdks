@@ -75,13 +75,13 @@ public struct TTSConfiguration: ComponentConfiguration, Sendable {
 
     public func validate() throws {
         guard speakingRate >= 0.5 && speakingRate <= 2.0 else {
-            throw TTSError.invalidSpeakingRate(value: speakingRate)
+            throw SDKError.tts(.invalidSpeakingRate, "Invalid speaking rate: \(speakingRate). Must be between 0.5 and 2.0.")
         }
         guard pitch >= 0.5 && pitch <= 2.0 else {
-            throw TTSError.invalidPitch(value: pitch)
+            throw SDKError.tts(.invalidPitch, "Invalid pitch: \(pitch). Must be between 0.5 and 2.0.")
         }
         guard volume >= 0.0 && volume <= 1.0 else {
-            throw TTSError.invalidVolume(value: volume)
+            throw SDKError.tts(.invalidVolume, "Invalid volume: \(volume). Must be between 0.0 and 1.0.")
         }
     }
 }

@@ -73,5 +73,4 @@ class StorageViewModel: ObservableObject {
             errorMessage = "Failed to delete model: \(error.localizedDescription)"
         }
     }
-
 }

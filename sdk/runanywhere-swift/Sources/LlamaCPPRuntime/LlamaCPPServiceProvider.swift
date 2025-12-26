@@ -13,7 +13,7 @@ import RunAnywhere
 /// LlamaCPP module for LLM text generation.
 ///
 /// Provides large language model capabilities using llama.cpp
-/// with GGUF/GGML models and Metal acceleration.
+/// with GGUF models and Metal acceleration.
 ///
 /// ## Registration
 ///
@@ -70,40 +70,13 @@ public enum LlamaCPP: RunAnywhereModule {
     private static func canHandleModel(_ modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
 
-        let lowercased = modelId.lowercased()
-
-        // Check model info cache first
+        // Framework from model info is the single source of truth
+        // Models must be registered with the SDK via addModel() to be handled
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.preferredFramework == .llamaCpp {
-                return true
-            }
-            if modelInfo.compatibleFrameworks.contains(.llamaCpp) {
-                return true
-            }
-            if modelInfo.format == .gguf || modelInfo.format == .ggml {
-                return true
-            }
-            return false
+            return modelInfo.framework == .llamaCpp
         }
 
-        // Fallback: Pattern-based matching
-        if lowercased.contains("gguf") || lowercased.hasSuffix(".gguf") {
-            return true
-        }
-        if lowercased.contains("ggml") || lowercased.hasSuffix(".ggml") {
-            return true
-        }
-        if lowercased.contains("llamacpp") || lowercased.contains("llama-cpp") || lowercased.contains("llama_cpp") {
-            return true
-        }
-
-        // Check for GGUF quantization patterns
-        let quantizationPattern = #"q[2-8]([_-][kK])?([_-][mMsS0])?"#
-        if let regex = try? NSRegularExpression(pattern: quantizationPattern, options: []),
-           regex.firstMatch(in: lowercased, range: NSRange(lowercased.startIndex..., in: lowercased)) != nil {
-            return true
-        }
-
+        // Model is not registered - cannot handle unknown models
         return false
     }
 
@@ -121,7 +94,7 @@ public enum LlamaCPP: RunAnywhereModule {
                 logger.info("Found local model path: \(modelPath ?? "nil")")
             } else {
                 logger.error("Model '\(modelId)' is not downloaded")
-                throw SDKError.modelNotFound("Model '\(modelId)' is not downloaded. Please download the model first.")
+                throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded. Please download the model first.")
             }
         }
 

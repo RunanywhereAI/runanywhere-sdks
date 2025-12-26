@@ -14,7 +14,6 @@ import Foundation
 /// Uses `ManagedLifecycle` to handle voice loading/unloading with automatic analytics tracking.
 public actor TTSCapability: ModelLoadableCapability {
     public typealias Configuration = TTSConfiguration
-    public typealias Service = TTSService
 
     // MARK: - State
 
@@ -28,6 +27,9 @@ public actor TTSCapability: ModelLoadableCapability {
 
     private let logger = SDKLogger(category: "TTSCapability")
     private let analyticsService: TTSAnalyticsService
+
+    /// Audio playback manager for speak() API
+    private let playbackManager = AudioPlaybackManager()
 
     // MARK: - Initialization
 
@@ -56,12 +58,12 @@ public actor TTSCapability: ModelLoadableCapability {
     }
 
     public var currentModelId: String? {
-        get async { await managedLifecycle.currentResourceId }
+        get async { await managedLifecycle.currentModelId }
     }
 
     /// Alias for voice-specific naming
     public var currentVoiceId: String? {
-        get async { await managedLifecycle.currentResourceId }
+        get async { await managedLifecycle.currentModelId }
     }
 
     /// Get available voices
@@ -111,9 +113,9 @@ public actor TTSCapability: ModelLoadableCapability {
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSOutput {
         let service = try await managedLifecycle.requireService()
-        let voiceId = await managedLifecycle.resourceIdOrUnknown()
+        let modelId = await managedLifecycle.modelIdOrUnknown()
 
-        logger.info("Synthesizing text with voice: \(voiceId)")
+        logger.info("Synthesizing text with model: \(modelId)")
 
         // Merge options with config defaults
         let effectiveOptions = mergeOptions(options)
@@ -121,7 +123,8 @@ public actor TTSCapability: ModelLoadableCapability {
         // Start synthesis tracking
         let synthesisId = await analyticsService.startSynthesis(
             text: text,
-            voice: effectiveOptions.voice ?? voiceId,
+            voice: effectiveOptions.voice ?? modelId,
+            sampleRate: effectiveOptions.sampleRate,
             framework: service.inferenceFramework
         )
 
@@ -133,10 +136,10 @@ public actor TTSCapability: ModelLoadableCapability {
             logger.error("Synthesis failed: \(error)")
             await analyticsService.trackSynthesisFailed(
                 synthesisId: synthesisId,
-                errorMessage: error.localizedDescription
+                error: error
             )
             await managedLifecycle.trackOperationError(error, operation: "synthesize")
-            throw CapabilityError.operationFailed("Synthesis", error)
+            throw SDKError.tts(.generationFailed, "Synthesis failed: \(error.localizedDescription)", underlying: error)
         }
 
         // Calculate audio duration from the generated audio data
@@ -156,7 +159,7 @@ public actor TTSCapability: ModelLoadableCapability {
         logger.info("Synthesis completed in \(Int(processingTime * 1000))ms, \(audioData.count) bytes")
 
         let metadata = TTSSynthesisMetadata(
-            voice: effectiveOptions.voice ?? voiceId,
+            voice: effectiveOptions.voice ?? modelId,
             language: effectiveOptions.language,
             processingTime: processingTime,
             characterCount: text.count
@@ -184,18 +187,19 @@ public actor TTSCapability: ModelLoadableCapability {
             Task {
                 guard let service = await self.managedLifecycle.currentService else {
                     continuation.finish(
-                        throwing: CapabilityError.resourceNotLoaded("TTS voice")
+                        throwing: SDKError.tts(.componentNotReady, "TTS voice not loaded")
                     )
                     return
                 }
 
-                let voiceId = await self.managedLifecycle.resourceIdOrUnknown()
+                let modelId = await self.managedLifecycle.modelIdOrUnknown()
                 let effectiveOptions = self.mergeOptions(options)
 
                 // Start synthesis tracking
                 let synthesisId = await self.analyticsService.startSynthesis(
                     text: text,
-                    voice: effectiveOptions.voice ?? voiceId,
+                    voice: effectiveOptions.voice ?? modelId,
+                    sampleRate: effectiveOptions.sampleRate,
                     framework: service.inferenceFramework
                 )
 
@@ -230,7 +234,7 @@ public actor TTSCapability: ModelLoadableCapability {
                 } catch {
                     await self.analyticsService.trackSynthesisFailed(
                         synthesisId: synthesisId,
-                        errorMessage: error.localizedDescription
+                        error: error
                     )
                     continuation.finish(throwing: error)
                 }
@@ -242,6 +246,53 @@ public actor TTSCapability: ModelLoadableCapability {
     public func stop() async {
         logger.info("Stopping synthesis")
         await managedLifecycle.currentService?.stop()
+    }
+
+    // MARK: - Speak (Synthesis + Playback)
+
+    /// Speak text aloud - synthesizes and plays audio internally.
+    ///
+    /// This is the simplest way to use TTS. The SDK handles all audio playback internally.
+    /// Returns metadata about what was spoken for display purposes.
+    ///
+    /// ## Example
+    /// ```swift
+    /// let result = try await RunAnywhere.speak("Hello world")
+    /// print("Duration: \(result.duration)s")
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - text: The text to speak
+    ///   - options: Synthesis options (rate, pitch, voice, etc.)
+    /// - Returns: Result containing metadata about the spoken audio
+    /// - Throws: Error if synthesis or playback fails
+    public func speak(
+        _ text: String,
+        options: TTSOptions = TTSOptions()
+    ) async throws -> TTSSpeakResult {
+        // Synthesize the text
+        let output = try await synthesize(text, options: options)
+
+        // Play the audio if we have audio data (neural TTS)
+        // System TTS plays directly through AVSpeechSynthesizer, so audioData is empty
+        if !output.audioData.isEmpty {
+            logger.info("Playing synthesized audio (\(output.audioData.count) bytes)")
+            try await playbackManager.play(output.audioData)
+            logger.info("Playback completed")
+        }
+
+        return TTSSpeakResult(from: output)
+    }
+
+    /// Whether audio is currently playing from a speak() call
+    public nonisolated var isSpeaking: Bool {
+        playbackManager.isPlaying
+    }
+
+    /// Stop current speech playback
+    public func stopSpeaking() {
+        logger.info("Stopping speech playback")
+        playbackManager.stop()
     }
 
     // MARK: - Analytics
@@ -267,7 +318,7 @@ public actor TTSCapability: ModelLoadableCapability {
         )
     }
 
-    private func estimateAudioDuration(dataSize: Int, sampleRate: Int = 22050) -> TimeInterval {
+    private func estimateAudioDuration(dataSize: Int, sampleRate: Int = TTSConstants.defaultSampleRate) -> TimeInterval {
         let bytesPerSample = 2 // 16-bit PCM
         let samples = dataSize / bytesPerSample
         return TimeInterval(samples) / TimeInterval(sampleRate)

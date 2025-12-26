@@ -18,7 +18,7 @@ public actor VADAnalyticsService {
     private let logger = SDKLogger(category: "VADAnalytics")
 
     /// Current framework being used
-    private var currentFramework: InferenceFrameworkType = .builtIn
+    private var currentFramework: InferenceFramework = .builtIn
 
     /// Speech segment tracking
     private var speechStartTime: Date?
@@ -36,7 +36,7 @@ public actor VADAnalyticsService {
     // MARK: - Lifecycle Tracking
 
     /// Track VAD initialization
-    public func trackInitialized(framework: InferenceFrameworkType) {
+    public func trackInitialized(framework: InferenceFramework) {
         currentFramework = framework
         lastEventTime = Date()
 
@@ -45,11 +45,14 @@ public actor VADAnalyticsService {
     }
 
     /// Track VAD initialization failure
-    public func trackInitializationFailed(error: String, framework: InferenceFrameworkType) {
+    public func trackInitializationFailed(error: Error, framework: InferenceFramework) {
         currentFramework = framework
         lastEventTime = Date()
 
-        EventPublisher.shared.track(VADEvent.initializationFailed(error: error, framework: framework))
+        EventPublisher.shared.track(VADEvent.initializationFailed(
+            error: SDKError.from(error, category: .vad),
+            framework: framework
+        ))
     }
 
     /// Track VAD cleanup
@@ -111,7 +114,7 @@ public actor VADAnalyticsService {
     // MARK: - Model Lifecycle (for model-based VAD)
 
     /// Track model load started (for model-based VAD like Silero)
-    public func trackModelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType) {
+    public func trackModelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework) {
         currentFramework = framework
         lastEventTime = Date()
 
@@ -135,12 +138,12 @@ public actor VADAnalyticsService {
     }
 
     /// Track model load failed
-    public func trackModelLoadFailed(modelId: String, error: String) {
+    public func trackModelLoadFailed(modelId: String, error: Error) {
         lastEventTime = Date()
 
         EventPublisher.shared.track(VADEvent.modelLoadFailed(
             modelId: modelId,
-            error: error,
+            error: SDKError.from(error, category: .vad),
             framework: currentFramework
         ))
     }

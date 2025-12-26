@@ -21,7 +21,7 @@ public extension RunAnywhere {
     static func downloadModel(_ modelId: String) async throws -> AsyncStream<DownloadProgress> {
         let models = try await availableModels()
         guard let model = models.first(where: { $0.id == modelId }) else {
-            throw RunAnywhereError.modelNotFound(modelId)
+            throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")
         }
 
         let task = try await Download.shared.downloadModel(model)

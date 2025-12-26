@@ -91,7 +91,7 @@ public class StructuredOutputHandler {
 
         // Convert to Data
         guard let jsonData = jsonString.data(using: .utf8) else {
-            throw StructuredOutputError.invalidJSON("Failed to convert string to data")
+            throw SDKError.llm(.invalidFormat, "Failed to convert JSON string to data")
         }
 
         // Always use strict validation
@@ -128,7 +128,7 @@ public class StructuredOutputHandler {
 
         // Log the text that couldn't be parsed
         logger.error("Failed to extract JSON from text: \(trimmed.prefix(200))...")
-        throw StructuredOutputError.extractionFailed("No valid JSON found in the response")
+        throw SDKError.llm(.extractionFailed, "No valid JSON found in the response")
     }
 
     /// Find a complete JSON object or array in the text
@@ -255,7 +255,7 @@ public class StructuredOutputHandler {
         do {
             return try decoder.decode(type, from: data)
         } catch {
-            throw StructuredOutputError.validationFailed("Strict validation failed: \(error.localizedDescription)")
+            throw SDKError.llm(.validationFailed, "Strict validation failed: \(error.localizedDescription)")
         }
     }
 
@@ -289,23 +289,9 @@ public struct StructuredOutputValidation: Sendable {
     public let error: String?
 }
 
-/// Structured output errors
-public enum StructuredOutputError: LocalizedError {
-    case invalidJSON(String)
-    case validationFailed(String)
-    case extractionFailed(String)
-    case unsupportedType(String)
-
-    public var errorDescription: String? {
-        switch self {
-        case .invalidJSON(let detail):
-            return "Invalid JSON: \(detail)"
-        case .validationFailed(let detail):
-            return "Validation failed: \(detail)"
-        case .extractionFailed(let detail):
-            return "Failed to extract structured output: \(detail)"
-        case .unsupportedType(let type):
-            return "Unsupported type for structured output: \(type)"
-        }
-    }
-}
+// MARK: - Error Handling
+// StructuredOutputError has been replaced with SDKError.llm():
+// - .invalidJSON(msg) -> SDKError.llm(.invalidFormat, msg)
+// - .validationFailed(msg) -> SDKError.llm(.validationFailed, msg)
+// - .extractionFailed(msg) -> SDKError.llm(.extractionFailed, msg)
+// - .unsupportedType(msg) -> SDKError.llm(.invalidFormat, msg)

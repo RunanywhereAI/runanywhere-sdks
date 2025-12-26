@@ -94,7 +94,7 @@ extension RunAnywhere {
 
         // Ensure SDK is initialized
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure network services are initialized (lazy initialization via device registration)
@@ -120,7 +120,7 @@ extension RunAnywhere {
     public static func getModelsForFramework(_ framework: InferenceFramework) async throws -> [ModelInfo] {
         // Ensure SDK is initialized
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure network services are initialized (lazy initialization via device registration)
@@ -136,7 +136,7 @@ extension RunAnywhere {
     public static func getModelsForCategory(_ category: ModelCategory) async throws -> [ModelInfo] {
         // Ensure SDK is initialized
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure network services are initialized (lazy initialization via device registration)

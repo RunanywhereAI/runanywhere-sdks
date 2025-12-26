@@ -40,9 +40,10 @@ public actor TTSAnalyticsService {
 
     private struct SynthesisTracker {
         let startTime: Date
-        let voiceId: String
+        let modelId: String
         let characterCount: Int
-        let framework: InferenceFrameworkType
+        let sampleRate: Int
+        let framework: InferenceFramework
     }
 
     // MARK: - Initialization
@@ -55,31 +56,35 @@ public actor TTSAnalyticsService {
     /// - Parameters:
     ///   - text: The text to synthesize
     ///   - voice: The voice ID being used
+    ///   - sampleRate: Audio sample rate in Hz (default: TTSConstants.defaultSampleRate)
     ///   - framework: The inference framework being used
     /// - Returns: A unique synthesis ID for tracking
     public func startSynthesis(
         text: String,
         voice: String,
-        framework: InferenceFrameworkType = .unknown
+        sampleRate: Int = TTSConstants.defaultSampleRate,
+        framework: InferenceFramework = .unknown
     ) -> String {
         let id = UUID().uuidString
         let characterCount = text.count
 
         activeSyntheses[id] = SynthesisTracker(
             startTime: Date(),
-            voiceId: voice,
+            modelId: voice,
             characterCount: characterCount,
+            sampleRate: sampleRate,
             framework: framework
         )
 
         EventPublisher.shared.track(TTSEvent.synthesisStarted(
             synthesisId: id,
-            voiceId: voice,
+            modelId: voice,
             characterCount: characterCount,
+            sampleRate: sampleRate,
             framework: framework
         ))
 
-        logger.debug("Synthesis started: \(id), \(characterCount) characters")
+        logger.debug("Synthesis started: \(id), voice: \(voice), \(characterCount) characters")
         return id
     }
 
@@ -121,40 +126,46 @@ public actor TTSAnalyticsService {
 
         EventPublisher.shared.track(TTSEvent.synthesisCompleted(
             synthesisId: synthesisId,
-            voiceId: tracker.voiceId,
+            modelId: tracker.modelId,
             characterCount: characterCount,
             audioDurationMs: audioDurationMs,
             audioSizeBytes: audioSizeBytes,
             processingDurationMs: processingTimeMs,
             charactersPerSecond: charsPerSecond,
+            sampleRate: tracker.sampleRate,
             framework: tracker.framework
         ))
 
-        logger.debug("Synthesis completed: \(synthesisId), audio: \(String(format: "%.1f", audioDurationMs))ms, \(audioSizeBytes) bytes")
+        let audioDurationFormatted = String(format: "%.1f", audioDurationMs)
+        logger.debug("Synthesis completed: \(synthesisId), voice: \(tracker.modelId), audio: \(audioDurationFormatted)ms, \(audioSizeBytes) bytes")
     }
 
     /// Track synthesis failure
     public func trackSynthesisFailed(
         synthesisId: String,
-        errorMessage: String
+        error: Error
     ) {
-        activeSyntheses.removeValue(forKey: synthesisId)
+        let tracker = activeSyntheses.removeValue(forKey: synthesisId)
         lastEventTime = Date()
 
         EventPublisher.shared.track(TTSEvent.synthesisFailed(
             synthesisId: synthesisId,
-            error: errorMessage
+            modelId: tracker?.modelId ?? "unknown",
+            error: SDKError.from(error, category: .tts)
         ))
     }
 
-    /// Track an error during operations
-    public func trackError(_ error: Error, operation: String) {
+    /// Track an error during TTS operations with full SDKError context
+    public func trackError(_ error: Error, operation: String, modelId: String? = nil, synthesisId: String? = nil) {
         lastEventTime = Date()
-        EventPublisher.shared.track(ErrorEvent.error(
-            operation: operation,
-            message: error.localizedDescription,
-            code: (error as NSError).code
-        ))
+        let sdkError = SDKError.from(error, category: .tts)
+        let errorEvent = SDKErrorEvent.ttsError(
+            error: sdkError,
+            modelId: modelId,
+            synthesisId: synthesisId,
+            operation: operation
+        )
+        EventPublisher.shared.track(errorEvent)
     }
 
     // MARK: - Metrics

@@ -41,9 +41,13 @@ public actor STTAnalyticsService {
 
     private struct TranscriptionTracker {
         let startTime: Date
+        let modelId: String
         let audioLengthMs: Double
         let audioSizeBytes: Int
-        let framework: InferenceFrameworkType
+        let language: String
+        let isStreaming: Bool
+        let sampleRate: Int
+        let framework: InferenceFramework
     }
 
     // MARK: - Initialization
@@ -54,34 +58,47 @@ public actor STTAnalyticsService {
 
     /// Start tracking a transcription
     /// - Parameters:
+    ///   - modelId: The STT model identifier
     ///   - audioLengthMs: Duration of audio in milliseconds
     ///   - audioSizeBytes: Size of audio data in bytes
     ///   - language: Language code for transcription
+    ///   - isStreaming: Whether this is a streaming transcription
+    ///   - sampleRate: Audio sample rate in Hz (default: STTConstants.defaultSampleRate)
     ///   - framework: The inference framework being used
     /// - Returns: A unique transcription ID for tracking
     public func startTranscription(
+        modelId: String,
         audioLengthMs: Double,
         audioSizeBytes: Int,
         language: String,
-        framework: InferenceFrameworkType = .unknown
+        isStreaming: Bool = false,
+        sampleRate: Int = STTConstants.defaultSampleRate,
+        framework: InferenceFramework = .unknown
     ) -> String {
         let id = UUID().uuidString
         activeTranscriptions[id] = TranscriptionTracker(
             startTime: Date(),
+            modelId: modelId,
             audioLengthMs: audioLengthMs,
             audioSizeBytes: audioSizeBytes,
+            language: language,
+            isStreaming: isStreaming,
+            sampleRate: sampleRate,
             framework: framework
         )
 
         EventPublisher.shared.track(STTEvent.transcriptionStarted(
             transcriptionId: id,
+            modelId: modelId,
             audioLengthMs: audioLengthMs,
             audioSizeBytes: audioSizeBytes,
             language: language,
+            isStreaming: isStreaming,
+            sampleRate: sampleRate,
             framework: framework
         ))
 
-        logger.debug("Transcription started: \(id), audio: \(String(format: "%.1f", audioLengthMs))ms, \(audioSizeBytes) bytes")
+        logger.debug("Transcription started: \(id), model: \(modelId), audio: \(String(format: "%.1f", audioLengthMs))ms, \(audioSizeBytes) bytes")
         return id
     }
 
@@ -126,6 +143,7 @@ public actor STTAnalyticsService {
 
         EventPublisher.shared.track(STTEvent.transcriptionCompleted(
             transcriptionId: transcriptionId,
+            modelId: tracker.modelId,
             text: text,
             confidence: confidence,
             durationMs: processingTimeMs,
@@ -133,23 +151,27 @@ public actor STTAnalyticsService {
             audioSizeBytes: tracker.audioSizeBytes,
             wordCount: wordCount,
             realTimeFactor: realTimeFactor,
+            language: tracker.language,
+            isStreaming: tracker.isStreaming,
+            sampleRate: tracker.sampleRate,
             framework: tracker.framework
         ))
 
-        logger.debug("Transcription completed: \(transcriptionId), RTF: \(String(format: "%.3f", realTimeFactor))")
+        logger.debug("Transcription completed: \(transcriptionId), model: \(tracker.modelId), RTF: \(String(format: "%.3f", realTimeFactor))")
     }
 
     /// Track transcription failure
     public func trackTranscriptionFailed(
         transcriptionId: String,
-        errorMessage: String
+        error: Error
     ) {
-        activeTranscriptions.removeValue(forKey: transcriptionId)
+        let tracker = activeTranscriptions.removeValue(forKey: transcriptionId)
         lastEventTime = Date()
 
         EventPublisher.shared.track(STTEvent.transcriptionFailed(
             transcriptionId: transcriptionId,
-            error: errorMessage
+            modelId: tracker?.modelId ?? "unknown",
+            error: SDKError.from(error, category: .stt)
         ))
     }
 
@@ -161,14 +183,17 @@ public actor STTAnalyticsService {
         ))
     }
 
-    /// Track an error during operations
-    public func trackError(_ error: Error, operation: String) {
+    /// Track an error during STT operations with full SDKError context
+    public func trackError(_ error: Error, operation: String, modelId: String? = nil, transcriptionId: String? = nil) {
         lastEventTime = Date()
-        EventPublisher.shared.track(ErrorEvent.error(
-            operation: operation,
-            message: error.localizedDescription,
-            code: (error as NSError).code
-        ))
+        let sdkError = SDKError.from(error, category: .stt)
+        let errorEvent = SDKErrorEvent.sttError(
+            error: sdkError,
+            modelId: modelId,
+            transcriptionId: transcriptionId,
+            operation: operation
+        )
+        EventPublisher.shared.track(errorEvent)
     }
 
     // MARK: - Metrics

@@ -5,6 +5,9 @@
 //  All LLM-related events in one place.
 //  Each event declares its destination (public, analytics, or both).
 //
+//  Note: LLMEvent conforms to TelemetryEventProperties for strongly typed analytics.
+//  This avoids string conversion/parsing and enables compile-time type checking.
+//
 
 import Foundation
 
@@ -16,13 +19,19 @@ import Foundation
 /// ```swift
 /// EventPublisher.shared.track(LLMEvent.generationCompleted(...))
 /// ```
-public enum LLMEvent: SDKEvent {
+///
+/// LLMEvent provides strongly typed properties via `telemetryProperties`.
+/// This enables:
+/// - Type safety at compile time
+/// - No string parsing for analytics
+/// - Validation guardrails (e.g., tokensPerSecond > 0)
+public enum LLMEvent: SDKEvent, TelemetryEventProperties {
 
     // MARK: - Model Lifecycle
 
-    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
-    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
-    case modelLoadFailed(modelId: String, error: String, framework: InferenceFrameworkType = .unknown)
+    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadFailed(modelId: String, error: SDKError, framework: InferenceFramework = .unknown)
     case modelUnloaded(modelId: String)
     case modelUnloadStarted(modelId: String)
 
@@ -36,11 +45,11 @@ public enum LLMEvent: SDKEvent {
         modelId: String,
         prompt: String?,
         isStreaming: Bool = false,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFramework = .unknown
     )
 
     /// First token received (only applicable for streaming generation)
-    case firstToken(generationId: String, latencyMs: Double)
+    case firstToken(generationId: String, modelId: String, timeToFirstTokenMs: Double, framework: InferenceFramework = .unknown)
 
     /// Streaming update (only applicable for streaming generation)
     case streamingUpdate(generationId: String, tokensGenerated: Int)
@@ -58,9 +67,12 @@ public enum LLMEvent: SDKEvent {
         tokensPerSecond: Double,
         isStreaming: Bool = false,
         timeToFirstTokenMs: Double? = nil,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFramework = .unknown,
+        temperature: Float? = nil,
+        maxTokens: Int? = nil,
+        contextLength: Int? = nil
     )
-    case generationFailed(generationId: String, error: String)
+    case generationFailed(generationId: String, error: SDKError)
 
     // MARK: - SDKEvent Conformance
 
@@ -106,8 +118,9 @@ public enum LLMEvent: SDKEvent {
         case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
             var props = [
                 "model_id": modelId,
-                "duration_ms": String(format: "%.1f", durationMs),
-                "framework": framework.rawValue
+                "processing_time_ms": String(format: "%.1f", durationMs),
+                "framework": framework.rawValue,
+                "success": "true"
             ]
             if modelSizeBytes > 0 {
                 props["model_size_bytes"] = String(modelSizeBytes)
@@ -117,9 +130,9 @@ public enum LLMEvent: SDKEvent {
         case .modelLoadFailed(let modelId, let error, let framework):
             return [
                 "model_id": modelId,
-                "error": error,
-                "framework": framework.rawValue
-            ]
+                "framework": framework.rawValue,
+                "success": "false"
+            ].merging(error.telemetryProperties) { _, new in new }
 
         case .modelUnloaded(let modelId):
             return ["model_id": modelId]
@@ -139,10 +152,12 @@ public enum LLMEvent: SDKEvent {
             }
             return props
 
-        case .firstToken(let generationId, let latencyMs):
+        case .firstToken(let generationId, let modelId, let timeToFirstTokenMs, let framework):
             return [
                 "generation_id": generationId,
-                "latency_ms": String(format: "%.1f", latencyMs)
+                "model_id": modelId,
+                "time_to_first_token_ms": String(format: "%.1f", timeToFirstTokenMs),
+                "framework": framework.rawValue
             ]
 
         case .streamingUpdate(let generationId, let tokensGenerated):
@@ -160,28 +175,144 @@ public enum LLMEvent: SDKEvent {
             let tokensPerSecond,
             let isStreaming,
             let timeToFirstTokenMs,
-            let framework
+            let framework,
+            let temperature,
+            let maxTokens,
+            let contextLength
         ):
             var props = [
                 "generation_id": generationId,
                 "model_id": modelId,
                 "input_tokens": String(inputTokens),
                 "output_tokens": String(outputTokens),
-                "duration_ms": String(format: "%.1f", durationMs),
+                "total_tokens": String(inputTokens + outputTokens),
+                "processing_time_ms": String(format: "%.1f", durationMs),
+                "generation_time_ms": String(format: "%.1f", durationMs),
                 "tokens_per_second": String(format: "%.2f", tokensPerSecond),
                 "is_streaming": String(isStreaming),
-                "framework": framework.rawValue
+                "framework": framework.rawValue,
+                "success": "true"
             ]
             if let ttft = timeToFirstTokenMs {
                 props["time_to_first_token_ms"] = String(format: "%.1f", ttft)
+            }
+            if let temp = temperature {
+                props["temperature"] = String(format: "%.2f", temp)
+            }
+            if let maxTok = maxTokens {
+                props["max_tokens"] = String(maxTok)
+            }
+            if let ctx = contextLength {
+                props["context_length"] = String(ctx)
             }
             return props
 
         case .generationFailed(let generationId, let error):
             return [
                 "generation_id": generationId,
-                "error": error
-            ]
+                "success": "false"
+            ].merging(error.telemetryProperties) { _, new in new }
+        }
+    }
+
+    // MARK: - TelemetryEventProperties Conformance
+
+    /// Strongly typed telemetry properties - no string conversion needed.
+    /// These values are used directly by TelemetryEventPayload.
+    public var telemetryProperties: TelemetryProperties {
+        switch self {
+        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
+            return TelemetryProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
+            return TelemetryProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                processingTimeMs: durationMs,
+                success: true,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadFailed(let modelId, let error, let framework):
+            return TelemetryProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
+            )
+
+        case .modelUnloaded(let modelId):
+            return TelemetryProperties(modelId: modelId)
+
+        case .modelUnloadStarted(let modelId):
+            return TelemetryProperties(modelId: modelId)
+
+        case .generationStarted(let generationId, let modelId, _, let isStreaming, let framework):
+            return TelemetryProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                isStreaming: isStreaming,
+                generationId: generationId
+            )
+
+        case .firstToken(let generationId, let modelId, let timeToFirstTokenMs, let framework):
+            return TelemetryProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                timeToFirstTokenMs: timeToFirstTokenMs,
+                generationId: generationId
+            )
+
+        case .streamingUpdate(let generationId, let tokensGenerated):
+            return TelemetryProperties(
+                outputTokens: tokensGenerated,
+                generationId: generationId
+            )
+
+        case .generationCompleted(
+            let generationId,
+            let modelId,
+            let inputTokens,
+            let outputTokens,
+            let durationMs,
+            let tokensPerSecond,
+            let isStreaming,
+            let timeToFirstTokenMs,
+            let framework,
+            let temperature,
+            let maxTokens,
+            let contextLength
+        ):
+            return TelemetryProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                processingTimeMs: durationMs,
+                success: true,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                totalTokens: inputTokens + outputTokens,
+                tokensPerSecond: tokensPerSecond,
+                timeToFirstTokenMs: timeToFirstTokenMs,
+                generationTimeMs: durationMs,
+                contextLength: contextLength,
+                temperature: temperature.map { Double($0) },
+                maxTokens: maxTokens,
+                isStreaming: isStreaming,
+                generationId: generationId
+            )
+
+        case .generationFailed(let generationId, let error):
+            return TelemetryProperties(
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue,
+                generationId: generationId
+            )
         }
     }
 }

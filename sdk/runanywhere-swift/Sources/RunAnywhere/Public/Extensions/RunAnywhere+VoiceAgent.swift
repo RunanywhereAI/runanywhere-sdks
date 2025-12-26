@@ -83,7 +83,7 @@ public extension RunAnywhere {
     /// Initialize the voice agent with configuration
     static func initializeVoiceAgent(_ config: VoiceAgentConfiguration) async throws {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
@@ -94,7 +94,7 @@ public extension RunAnywhere {
             try await serviceContainer.voiceAgentCapability.initialize(config)
             EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
-            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
             throw error
         }
     }
@@ -113,7 +113,7 @@ public extension RunAnywhere {
         ttsVoice: String = ""
     ) async throws {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
@@ -128,7 +128,7 @@ public extension RunAnywhere {
             )
             EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
-            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
             throw error
         }
     }
@@ -154,7 +154,7 @@ public extension RunAnywhere {
     /// ```
     static func initializeVoiceAgentWithLoadedModels() async throws {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         try await ensureServicesReady()
@@ -165,7 +165,7 @@ public extension RunAnywhere {
             try await serviceContainer.voiceAgentCapability.initializeWithLoadedModels()
             EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
-            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
             throw error
         }
     }
@@ -182,7 +182,7 @@ public extension RunAnywhere {
     /// Process a complete voice turn: audio → transcription → LLM response → synthesized speech
     static func processVoiceTurn(_ audioData: Data) async throws -> VoiceAgentResult {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         do {
@@ -190,7 +190,7 @@ public extension RunAnywhere {
             let result = try await serviceContainer.voiceAgentCapability.processVoiceTurn(audioData)
             return result
         } catch {
-            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
             throw error
         }
     }
@@ -199,7 +199,7 @@ public extension RunAnywhere {
     static func processVoiceStream(_ audioStream: AsyncStream<Data>) async -> AsyncThrowingStream<VoiceAgentEvent, Error> {
         guard isSDKInitialized else {
             return AsyncThrowingStream { continuation in
-                continuation.finish(throwing: RunAnywhereError.notInitialized)
+                continuation.finish(throwing: SDKError.general(.notInitialized, "SDK not initialized"))
             }
         }
 
@@ -211,7 +211,7 @@ public extension RunAnywhere {
     /// Transcribe audio (voice agent must be initialized)
     static func voiceAgentTranscribe(_ audioData: Data) async throws -> String {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
         return try await serviceContainer.voiceAgentCapability.transcribe(audioData)
     }
@@ -219,7 +219,7 @@ public extension RunAnywhere {
     /// Generate LLM response (voice agent must be initialized)
     static func voiceAgentGenerateResponse(_ prompt: String) async throws -> String {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
         return try await serviceContainer.voiceAgentCapability.generateResponse(prompt)
     }
@@ -227,7 +227,7 @@ public extension RunAnywhere {
     /// Synthesize speech (voice agent must be initialized)
     static func voiceAgentSynthesizeSpeech(_ text: String) async throws -> Data {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
         return try await serviceContainer.voiceAgentCapability.synthesizeSpeech(text)
     }

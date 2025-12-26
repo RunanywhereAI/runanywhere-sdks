@@ -1,6 +1,6 @@
 # RunAnywhere Swift SDK – Developer Documentation
 
-> **SDK Version**: 1.0.0
+> **SDK Version**: 0.16.0
 > **Minimum Platform**: iOS 17+ / macOS 14+
 > **Swift Version**: 5.9+
 
@@ -22,7 +22,7 @@ The **RunAnywhere Swift SDK** is a production-grade, on-device AI platform for i
 ### 1.2 Core Philosophy
 
 1. **On-Device First**: All AI inference runs locally on the device, ensuring low latency and data privacy.
-2. **Plugin Architecture**: Backend engines (ONNX, LlamaCPP, WhisperKit, CoreML) are optional modules—include only what you need.
+2. **Plugin Architecture**: Backend engines (ONNX, LlamaCPP) are optional modules—include only what you need.
 3. **Privacy by Design**: Audio and text data never leaves the device unless explicitly configured.
 4. **Framework Agnostic**: Unified API abstracts away backend complexity; swap engines without changing app code.
 5. **Event-Driven**: Subscribe to SDK events for reactive UI updates and observability.
@@ -104,7 +104,7 @@ Each AI capability follows a consistent pattern:
 │  STT Capability │ TTS Capability │ LLM Capability │ VAD Cap.    │
 ├─────────────────────────────────────────────────────────────────┤
 │     ONNX STT    │   ONNX TTS    │  LlamaCPP LLM  │ Energy VAD  │
-│   WhisperKit    │   System TTS  │   Apple AI     │             │
+│                 │   System TTS  │   Apple AI     │             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -145,7 +145,7 @@ public struct ModelInfo {
     let id: String                           // Unique identifier
     let name: String                         // Human-readable name
     let category: ModelCategory              // .languageModel, .speechRecognition, etc.
-    let format: ModelFormat                  // .gguf, .onnx, .mlpackage
+    let format: ModelFormat                  // .gguf, .onnx
     let downloadURL: URL?                    // Remote download location
     var localPath: URL?                      // Local file path (when downloaded)
     let downloadSize: Int64?                 // Size in bytes
@@ -166,9 +166,8 @@ public struct ModelInfo {
 - `.speakerDiarization` – Speaker ID models
 
 **Model Formats:**
-- `.gguf` / `.ggml` – LlamaCPP (quantized LLMs)
+- `.gguf` – LlamaCPP (quantized LLMs)
 - `.onnx` – ONNX Runtime (STT/TTS)
-- `.mlpackage` / `.mlmodel` – CoreML (WhisperKit)
 
 ### 2.6 Error Handling Model
 
@@ -222,7 +221,7 @@ Add RunAnywhere to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "1.0.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.16.0")
 ]
 ```
 
@@ -1414,13 +1413,11 @@ NotificationCenter.default.addObserver(
 
 1. **Single LLM Model**: Only one LLM can be loaded at a time due to memory constraints.
 
-2. **WhisperKit Module**: Temporarily disabled pending API updates (v0.13 compatibility).
+2. **Apple Intelligence**: Requires iOS 26+ / macOS 26+ (currently in beta).
 
-3. **Apple Intelligence**: Requires iOS 26+ / macOS 26+ (currently in beta).
+3. **Resume Downloads**: Partial download resume is not yet implemented.
 
-4. **Resume Downloads**: Partial download resume is not yet implemented.
-
-5. **VLM (Vision-Language Models)**: Architecture defined but not yet fully implemented.
+4. **VLM (Vision-Language Models)**: Architecture defined but not yet fully implemented.
 
 ### Platform Requirements
 

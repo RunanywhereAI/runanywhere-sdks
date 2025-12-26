@@ -17,6 +17,7 @@ extension AlamofireDownloadService {
             return (destination, [.removePreviousFile, .createIntermediateDirectories])
         }
 
+        var lastReportedProgress = -1.0
         let downloadRequest = session.download(url, to: destination)
             .downloadProgress { progress in
                 let downloadProgress = DownloadProgress(
@@ -27,9 +28,9 @@ extension AlamofireDownloadService {
                     state: .downloading
                 )
 
-                // Log progress at 10% intervals
-                let progressPercent = progress.fractionCompleted * 100
-                if progressPercent.truncatingRemainder(dividingBy: 10) < 0.1 {
+                // Log progress at defined intervals (local logging only)
+                let progressPercent = Int(progress.fractionCompleted * 100)
+                if progressPercent.isMultiple(of: DownloadConstants.logProgressIntervalPercent) && progressPercent > 0 {
                     self.logger.debug("Download progress", metadata: [
                         "modelId": model.id,
                         "progress": progressPercent,
@@ -37,10 +38,15 @@ extension AlamofireDownloadService {
                         "totalBytes": progress.totalUnitCount,
                         "speed": self.calculateDownloadSpeed(progress: progress)
                     ])
+                }
 
+                // Track progress at defined intervals (public EventBus only - for UI updates)
+                let progressValue = progress.fractionCompleted
+                if progressValue - lastReportedProgress >= DownloadConstants.publicProgressIntervalFraction {
+                    lastReportedProgress = progressValue
                     EventPublisher.shared.track(ModelEvent.downloadProgress(
                         modelId: model.id,
-                        progress: progress.fractionCompleted,
+                        progress: progressValue,
                         bytesDownloaded: progress.completedUnitCount,
                         totalBytes: progress.totalUnitCount
                     ))
@@ -59,23 +65,18 @@ extension AlamofireDownloadService {
                     if let downloadedURL = downloadedURL {
                         continuation.resume(returning: downloadedURL)
                     } else {
-                        EventPublisher.shared.track(ModelEvent.downloadFailed(
-                            modelId: model.id,
-                            error: "Invalid response - no URL returned"
-                        ))
-                        continuation.resume(throwing: DownloadError.invalidResponse)
+                        let downloadError = SDKError.download(.invalidResponse, "Invalid response - no URL returned")
+                        EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: downloadError))
+                        continuation.resume(throwing: downloadError)
                     }
 
                 case .failure(let error):
                     let downloadError = self.mapAlamofireError(error)
-                    EventPublisher.shared.track(ModelEvent.downloadFailed(
-                        modelId: model.id,
-                        error: error.localizedDescription
-                    ))
+                    EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: downloadError))
                     self.logger.error("Download failed", metadata: [
                         "modelId": model.id,
                         "url": url.absoluteString,
-                        "error": error.localizedDescription,
+                        "error": downloadError.message,
                         "statusCode": response.response?.statusCode ?? 0
                     ])
                     continuation.resume(throwing: downloadError)
@@ -92,7 +93,7 @@ extension AlamofireDownloadService {
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
         guard case .archive(let archiveType, _, _) = model.artifactType else {
-            throw DownloadError.extractionFailed("Model does not require extraction")
+            throw SDKError.download(.extractionFailed, "Model does not require extraction")
         }
 
         let extractionStartTime = Date()
@@ -114,21 +115,25 @@ extension AlamofireDownloadService {
         progressContinuation.yield(.extraction(modelId: model.id, progress: 0.0))
 
         do {
+            var lastReportedExtractionProgress: Double = -1.0
             let result = try await extractionService.extract(
                 archiveURL: archiveURL,
                 to: destinationFolder,
                 artifactType: model.artifactType,
                 progressHandler: { progress in
+                    // Track extraction progress (public EventBus only - for UI updates)
+                    if progress - lastReportedExtractionProgress >= 0.1 {
+                        lastReportedExtractionProgress = progress
+                        EventPublisher.shared.track(ModelEvent.extractionProgress(
+                            modelId: model.id,
+                            progress: progress
+                        ))
+                    }
+
                     progressContinuation.yield(.extraction(
                         modelId: model.id,
                         progress: progress,
                         totalBytes: model.downloadSize ?? 0
-                    ))
-
-                    // Track extraction progress
-                    EventPublisher.shared.track(ModelEvent.extractionProgress(
-                        modelId: model.id,
-                        progress: progress
                     ))
                 }
             )
@@ -153,7 +158,7 @@ extension AlamofireDownloadService {
         } catch {
             EventPublisher.shared.track(ModelEvent.extractionFailed(
                 modelId: model.id,
-                error: error.localizedDescription
+                error: SDKError.from(error, category: .download)
             ))
             throw error
         }

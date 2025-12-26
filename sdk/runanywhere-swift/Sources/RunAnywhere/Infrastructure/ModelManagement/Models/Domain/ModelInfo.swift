@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 
 /// Source of model data (where the model info came from)
 public enum ModelSource: String, Codable, Sendable {
@@ -10,8 +9,8 @@ public enum ModelSource: String, Codable, Sendable {
     case local
 }
 
-/// Information about a model - database entity with sync support
-public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, PersistableRecord, Sendable {
+/// Information about a model - in-memory entity
+public struct ModelInfo: Codable, Sendable, Identifiable {
     // Essential identifiers
     public let id: String
     public let name: String
@@ -30,9 +29,8 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     public let downloadSize: Int64?  // Size when downloading
     public let memoryRequired: Int64?  // RAM needed to run the model
 
-    // Framework compatibility
-    public let compatibleFrameworks: [InferenceFramework]
-    public let preferredFramework: InferenceFramework?
+    // Framework (1:1 mapping - each model has exactly one framework)
+    public let framework: InferenceFramework
 
     // Model-specific capabilities (optional based on category)
     public let contextLength: Int?  // For language models
@@ -43,11 +41,10 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     public let tags: [String]
     public let description: String?
 
-    // Tracking fields for sync and database
+    // Tracking fields
     public let source: ModelSource
     public let createdAt: Date
     public var updatedAt: Date
-    public var syncPending: Bool
 
     // Usage tracking
     public var lastUsed: Date?
@@ -84,10 +81,10 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         case id, name, category, format, downloadURL, localPath
         case artifactType
         case downloadSize, memoryRequired
-        case compatibleFrameworks, preferredFramework
+        case framework
         case contextLength, supportsThinking, thinkingPattern
         case tags, description
-        case source, createdAt, updatedAt, syncPending
+        case source, createdAt, updatedAt
         case lastUsed, usageCount
     }
 
@@ -96,13 +93,12 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         name: String,
         category: ModelCategory,
         format: ModelFormat,
+        framework: InferenceFramework,
         downloadURL: URL? = nil,
         localPath: URL? = nil,
         artifactType: ModelArtifactType? = nil,
         downloadSize: Int64? = nil,
         memoryRequired: Int64? = nil,
-        compatibleFrameworks: [InferenceFramework] = [],
-        preferredFramework: InferenceFramework? = nil,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
         thinkingPattern: ThinkingTagPattern? = nil,
@@ -111,7 +107,6 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         source: ModelSource = .remote,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
-        syncPending: Bool = false,
         lastUsed: Date? = nil,
         usageCount: Int = 0
     ) {
@@ -119,6 +114,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         self.name = name
         self.category = category
         self.format = format
+        self.framework = framework
         self.downloadURL = downloadURL
         self.localPath = localPath
 
@@ -127,8 +123,6 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
 
         self.downloadSize = downloadSize
         self.memoryRequired = memoryRequired
-        self.compatibleFrameworks = compatibleFrameworks
-        self.preferredFramework = preferredFramework ?? compatibleFrameworks.first
 
         // Set contextLength based on category if not provided
         if category.requiresContextLength {
@@ -148,43 +142,8 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         self.source = source
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-        self.syncPending = syncPending
         self.lastUsed = lastUsed
         self.usageCount = usageCount
     }
 
-    // MARK: - Sync methods provided by RepositoryEntity protocol extension
-
-    // MARK: - GRDB
-
-    public static var databaseTableName: String { "models" }
-}
-
-// MARK: - Database Columns
-
-extension ModelInfo {
-    public enum Columns: String, ColumnExpression {
-        case id
-        case name
-        case category
-        case format
-        case downloadURL
-        case localPath
-        case artifactType
-        case downloadSize
-        case memoryRequired
-        case compatibleFrameworks
-        case preferredFramework
-        case contextLength
-        case supportsThinking
-        case thinkingPattern
-        case tags
-        case description
-        case source
-        case createdAt
-        case updatedAt
-        case syncPending
-        case lastUsed
-        case usageCount
-    }
 }
