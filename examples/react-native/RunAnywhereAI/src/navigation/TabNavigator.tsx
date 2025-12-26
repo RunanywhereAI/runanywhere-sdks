@@ -51,16 +51,27 @@ const tabLabels: Record<keyof RootTabParamList, string> = {
   Settings: 'Settings',
 };
 
+/**
+ * Stable tab bar icon component to avoid react/no-unstable-nested-components
+ */
+const renderTabBarIcon = (
+  routeName: keyof RootTabParamList,
+  focused: boolean,
+  color: string,
+  size: number
+) => {
+  const iconName = focused
+    ? tabIcons[routeName].focused
+    : tabIcons[routeName].unfocused;
+  return <Icon name={iconName} size={size} color={color} />;
+};
+
 export const TabNavigator: React.FC = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          const iconName = focused
-            ? tabIcons[route.name].focused
-            : tabIcons[route.name].unfocused;
-          return <Icon name={iconName} size={size} color={color} />;
-        },
+        tabBarIcon: ({ focused, color, size }) =>
+          renderTabBarIcon(route.name, focused, color, size),
         tabBarActiveTintColor: Colors.primaryBlue,
         tabBarInactiveTintColor: Colors.textSecondary,
         tabBarStyle: {

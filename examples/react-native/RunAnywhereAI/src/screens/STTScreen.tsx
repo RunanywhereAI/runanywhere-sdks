@@ -140,7 +140,7 @@ export const STTScreen: React.FC = () => {
       const allModels = await RunAnywhere.getAvailableModels();
       // Filter by category (speech-recognition) matching SDK's ModelCategory
       const sttModels = allModels.filter(
-        (m: any) => m.category === 'speech-recognition'
+        (m: SDKModelInfo) => m.category === 'speech-recognition'
       );
       setAvailableModels(sttModels);
 
@@ -162,15 +162,18 @@ export const STTScreen: React.FC = () => {
         // Try to find which model is loaded from downloaded models
         const downloadedStt = sttModels.filter((m) => m.isDownloaded);
         if (downloadedStt.length > 0) {
-          setCurrentModel({
-            id: downloadedStt[0]!.id,
-            name: downloadedStt[0]!.name,
-            preferredFramework: LLMFramework.ONNX,
-          } as ModelInfo);
-          console.log(
-            '[STTScreen] Set currentModel from downloaded:',
-            downloadedStt[0]!.name
-          );
+          const firstModel = downloadedStt[0];
+          if (firstModel) {
+            setCurrentModel({
+              id: firstModel.id,
+              name: firstModel.name,
+              preferredFramework: LLMFramework.ONNX,
+            } as ModelInfo);
+            console.log(
+              '[STTScreen] Set currentModel from downloaded:',
+              firstModel.name
+            );
+          }
         } else {
           setCurrentModel({
             id: 'stt-model',
@@ -440,9 +443,11 @@ export const STTScreen: React.FC = () => {
       // Clean up temp file
       await RNFS.unlink(normalizedPath).catch(() => {});
       recordingPath.current = null;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[STTScreen] Transcription error:', error);
-      Alert.alert('Transcription Error', error.message || `${error}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      Alert.alert('Transcription Error', errorMessage);
       setTranscript('');
     } finally {
       setIsProcessing(false);

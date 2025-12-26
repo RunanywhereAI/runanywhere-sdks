@@ -9,8 +9,10 @@
 // MARK: - Base Analytics Interfaces
 
 /**
- * Base protocol for all structured event data
+ * Base protocol for all structured event data.
+ * This is an intentionally empty marker interface that other event data types extend.
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface AnalyticsEventData {}
 
 /**

@@ -48,6 +48,11 @@ interface ConversationRowProps {
   onDelete: () => void;
 }
 
+/**
+ * Stable separator component to avoid react/no-unstable-nested-components
+ */
+const ItemSeparator: React.FC = () => <View style={styles.separator} />;
+
 const ConversationRow: React.FC<ConversationRowProps> = ({
   conversation,
   onPress,
@@ -255,7 +260,7 @@ export const ConversationListScreen: React.FC<ConversationListScreenProps> = ({
         ]}
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={ItemSeparator}
       />
     </SafeAreaView>
   );

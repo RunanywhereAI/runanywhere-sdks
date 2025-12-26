@@ -8,8 +8,6 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Data/Storage/FileSystem/SimplifiedFileManager.swift
  */
 
-/// <reference path="../../types/react-native-fs.d.ts" />
-
 import { Platform } from 'react-native';
 import { SDKLogger } from '../Logging/Logger/SDKLogger';
 import type { LLMFramework } from '../../Core/Models/Framework/LLMFramework';

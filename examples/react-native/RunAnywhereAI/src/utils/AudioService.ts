@@ -19,6 +19,7 @@ const NativeAudioModule =
   Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
 
 // Lazy load LiveAudioStream (Android only)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let LiveAudioStream: any = null;
 
 function getLiveAudioStream() {
@@ -215,7 +216,7 @@ export async function startRecording(
           }
 
           resolve(result.path);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error(
             '[AudioService] iOS: Failed to start recording:',
             error
@@ -500,6 +501,7 @@ export async function playAudio(
     Sound.setCategory('Playback');
 
     return new Promise((resolve, reject) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sound = new Sound(uri, '', (error: any) => {
         if (error) {
           console.error('[AudioService] Failed to load sound:', error);

@@ -9,8 +9,6 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/ModelManagement/Utilities/ModelPathUtils.swift
  */
 
-/// <reference path="../../../types/react-native-fs.d.ts" />
-
 import RNFS from 'react-native-fs';
 import { ModelFormat } from '../../../Core/Models/Model/ModelFormat';
 import { InferenceFramework } from '../Models/InferenceFramework';

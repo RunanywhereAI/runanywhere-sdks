@@ -233,7 +233,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       // Filter models based on context (using category field)
       // Check both enum string value and direct comparison
       let filteredModels = categoryFilter
-        ? allModels.filter((m: any) => {
+        ? allModels.filter((m: SDKModelInfo) => {
             const modelCategory = m.category;
             const matches =
               modelCategory === categoryFilter ||
@@ -256,12 +256,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         console.log(
           '[ModelSelectionSheet] No category matches, trying framework fallback'
         );
-        filteredModels = allModels.filter((m: any) => {
+        filteredModels = allModels.filter((m: SDKModelInfo) => {
           const hasLlamaFramework =
             m.preferredFramework === SDKLLMFramework.LlamaCpp ||
-            m.preferredFramework === 'LlamaCpp' ||
-            m.compatibleFrameworks?.includes(SDKLLMFramework.LlamaCpp) ||
-            m.compatibleFrameworks?.includes('LlamaCpp');
+            m.compatibleFrameworks?.includes(SDKLLMFramework.LlamaCpp);
           return hasLlamaFramework;
         });
         console.log(
@@ -355,12 +353,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       availableModels.length
     );
 
-    availableModels.forEach((model: any, index: number) => {
+    availableModels.forEach((model: SDKModelInfo, index: number) => {
       // Determine framework from model - use preferredFramework or first compatibleFramework
       const frameworkValue =
-        model.preferredFramework ||
-        model.compatibleFrameworks?.[0] ||
-        model.framework;
+        model.preferredFramework || model.compatibleFrameworks?.[0];
 
       if (index < 3) {
         console.log(
@@ -405,12 +401,11 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    */
   const getModelsForFramework = useCallback(
     (framework: LLMFramework): SDKModelInfo[] => {
-      return availableModels.filter((model: any) => {
-        // Check preferredFramework first, then compatibleFrameworks, then fallback
+      return availableModels.filter((model: SDKModelInfo) => {
+        // Check preferredFramework first, then compatibleFrameworks
         const modelFramework =
           (model.preferredFramework as LLMFramework) ||
           (model.compatibleFrameworks?.[0] as LLMFramework) ||
-          (model.framework as LLMFramework) ||
           LLMFramework.LlamaCpp;
 
         // Also check if this framework is in compatibleFrameworks
@@ -745,7 +740,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           </Text>
 
           <View style={styles.modelMeta}>
-            {(model as any).downloadSize && (
+            {model.downloadSize != null && model.downloadSize > 0 && (
               <View style={styles.sizeTag}>
                 <Icon
                   name="server-outline"
@@ -753,7 +748,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                   color={Colors.textSecondary}
                 />
                 <Text style={styles.sizeText}>
-                  {formatBytes((model as any).downloadSize)}
+                  {formatBytes(model.downloadSize)}
                 </Text>
               </View>
             )}

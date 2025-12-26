@@ -42,6 +42,7 @@ const NativeAudioModule =
   Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
 
 // Audio playback using react-native-sound (Android only - iOS uses NativeAudioModule)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let Sound: any = null;
 let soundInitialized = false;
 
@@ -66,6 +67,7 @@ function getSound() {
 }
 
 // Lazy load Tts for System TTS (Android only)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let Tts: any = null;
 function getTts() {
   if (Platform.OS === 'ios') {
@@ -114,8 +116,8 @@ export const TTSScreen: React.FC = () => {
   const [duration, setDuration] = useState(0);
   const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
   const [isModelLoading, setIsModelLoading] = useState(false);
-  const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
-  const [lastGeneratedAudio, setLastGeneratedAudio] = useState<string | null>(
+  const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
+  const [_lastGeneratedAudio, setLastGeneratedAudio] = useState<string | null>(
     null
   );
   const [currentTime, setCurrentTime] = useState(0);
@@ -194,7 +196,7 @@ export const TTSScreen: React.FC = () => {
       const allModels = await RunAnywhere.getAvailableModels();
       // Filter by category (speech-synthesis) matching SDK's ModelCategory
       const ttsModels = allModels.filter(
-        (m: any) => m.category === 'speech-synthesis'
+        (m: SDKModelInfo) => m.category === 'speech-synthesis'
       );
       setAvailableModels(ttsModels);
 
@@ -217,15 +219,18 @@ export const TTSScreen: React.FC = () => {
         const downloadedTts = ttsModels.filter((m) => m.isDownloaded);
         if (downloadedTts.length > 0) {
           // Use the first downloaded model as the likely loaded one
-          setCurrentModel({
-            id: downloadedTts[0]!.id,
-            name: downloadedTts[0]!.name,
-            preferredFramework: LLMFramework.ONNX,
-          } as ModelInfo);
-          console.log(
-            '[TTSScreen] Set currentModel from downloaded:',
-            downloadedTts[0]!.name
-          );
+          const firstModel = downloadedTts[0];
+          if (firstModel) {
+            setCurrentModel({
+              id: firstModel.id,
+              name: firstModel.name,
+              preferredFramework: LLMFramework.ONNX,
+            } as ModelInfo);
+            console.log(
+              '[TTSScreen] Set currentModel from downloaded:',
+              firstModel.name
+            );
+          }
         } else {
           setCurrentModel({
             id: 'tts-model',
@@ -276,7 +281,7 @@ export const TTSScreen: React.FC = () => {
         // Handle System TTS specially - it's always available, no download needed
         const isSystemTTS =
           model.id === 'system-tts' ||
-          (model as any).preferredFramework === 'SystemTTS' ||
+          model.preferredFramework === LLMFramework.SystemTTS ||
           model.localPath?.startsWith('builtin://');
 
         if (isSystemTTS) {
@@ -404,7 +409,8 @@ export const TTSScreen: React.FC = () => {
 
     for (let i = 0; i < numSamples; i++) {
       // Clamp and convert to int16 range
-      const sample = Math.max(-1, Math.min(1, floatView[i]!));
+      const floatSample = floatView[i] ?? 0;
+      const sample = Math.max(-1, Math.min(1, floatSample));
       int16Samples[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
     }
 
@@ -448,13 +454,13 @@ export const TTSScreen: React.FC = () => {
     const wavBytes = new Uint8Array(wavBuffer);
     const int16Bytes = new Uint8Array(int16Samples.buffer);
     for (let i = 0; i < int16Bytes.length; i++) {
-      wavBytes[44 + i] = int16Bytes[i]!;
+      wavBytes[44 + i] = int16Bytes[i] ?? 0;
     }
 
     // Convert to base64 and write to file
     let wavBase64 = '';
     for (let i = 0; i < wavBytes.length; i++) {
-      wavBase64 += String.fromCharCode(wavBytes[i]!);
+      wavBase64 += String.fromCharCode(wavBytes[i] ?? 0);
     }
     wavBase64 = btoa(wavBase64);
 
@@ -490,12 +496,13 @@ export const TTSScreen: React.FC = () => {
           const result = await NativeAudioModule.speak(text, speed, pitch);
           console.log('[TTSScreen] iOS System TTS result:', result);
           setIsPlaying(false);
-        } catch (speakError: any) {
+        } catch (speakError: unknown) {
           console.error('[TTSScreen] iOS System TTS error:', speakError);
-          Alert.alert(
-            'Error',
-            `System TTS failed: ${speakError.message || speakError}`
-          );
+          const errorMessage =
+            speakError instanceof Error
+              ? speakError.message
+              : String(speakError);
+          Alert.alert('Error', `System TTS failed: ${errorMessage}`);
           setIsPlaying(false);
         }
         return;
@@ -858,11 +865,13 @@ export const TTSScreen: React.FC = () => {
               }, 100);
 
               return;
-            } catch (error: any) {
+            } catch (error: unknown) {
               console.error('[TTSScreen] iOS playback error:', error);
+              const errorMessage =
+                error instanceof Error ? error.message : String(error);
               Alert.alert(
                 'Playback Error',
-                `Failed to play audio: ${error.message}`
+                `Failed to play audio: ${errorMessage}`
               );
               return;
             }
