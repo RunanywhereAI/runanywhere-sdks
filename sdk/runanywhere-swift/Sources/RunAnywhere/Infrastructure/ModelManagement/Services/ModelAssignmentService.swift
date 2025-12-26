@@ -178,6 +178,9 @@ public struct ModelAssignmentMetadata: Codable, Sendable {
 
 extension ModelAssignment {
     /// Convert API model assignment to SDK ModelInfo
+    ///
+    /// The framework must be provided by the API. This method does not infer framework from format
+    /// to ensure clean separation of concerns - the backend is responsible for model-framework assignments.
     public func toModelInfo() -> ModelInfo {
         // Convert string category to ModelCategory enum
         let modelCategory = ModelCategory(rawValue: category.lowercased()) ?? .language
@@ -185,23 +188,9 @@ extension ModelAssignment {
         // Convert string format to ModelFormat enum
         let modelFormat = ModelFormat(rawValue: format.lowercased()) ?? .unknown
 
-        // Convert string framework to InferenceFramework enum
-        // Use framework field from API, or infer from format as fallback
-        let modelFramework: InferenceFramework
-        if let fw = framework.flatMap({ InferenceFramework(rawValue: $0.lowercased()) }) {
-            modelFramework = fw
-        } else {
-            // Infer from format if framework not specified
-            let inferredFormat = ModelFormat(rawValue: format.lowercased()) ?? .unknown
-            switch inferredFormat {
-            case .gguf:
-                modelFramework = .llamaCpp
-            case .onnx, .ort:
-                modelFramework = .onnx
-            default:
-                modelFramework = .unknown  // Explicit unknown - don't assume framework
-            }
-        }
+        // Convert string framework to InferenceFramework enum using case-insensitive matching
+        // Framework should always be provided by API - we don't infer from format
+        let modelFramework = framework.flatMap { InferenceFramework(caseInsensitive: $0) } ?? .unknown
 
         // Extract tags and description from metadata
         let modelTags = metadata?.tags ?? []

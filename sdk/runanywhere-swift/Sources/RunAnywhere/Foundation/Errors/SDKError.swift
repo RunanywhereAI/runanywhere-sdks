@@ -12,6 +12,9 @@ import Foundation
 /// All errors in the SDK are represented by this type, providing consistent
 /// error handling across all components and features.
 ///
+/// Errors are automatically logged to configured destinations (Sentry, console)
+/// when created via factory methods.
+///
 /// Example usage:
 /// ```swift
 /// throw SDKError.stt(.modelNotFound, "Whisper model not found at path")
@@ -41,7 +44,7 @@ public struct SDKError: Error, LocalizedError, Sendable, CustomStringConvertible
     /// Creates a new SDKError with all properties.
     ///
     /// Prefer using the factory methods (e.g., `SDKError.stt()`, `SDKError.llm()`)
-    /// which automatically capture the stack trace.
+    /// which automatically capture the stack trace and log the error.
     public init(
         code: ErrorCode,
         message: String,
@@ -108,7 +111,6 @@ public struct SDKError: Error, LocalizedError, Sendable, CustomStringConvertible
         var result = description
         if !stackTrace.isEmpty {
             result += "\n  Stack trace:\n"
-            // Limit to first 10 frames for readability
             for frame in stackTrace.prefix(10) {
                 result += "    \(frame)\n"
             }
@@ -129,20 +131,36 @@ public struct SDKError: Error, LocalizedError, Sendable, CustomStringConvertible
 
 extension SDKError {
 
-    /// Creates an SDKError with automatic stack trace capture.
+    /// Creates an SDKError with automatic stack trace capture and logging.
+    ///
+    /// - Parameters:
+    ///   - code: The error code
+    ///   - message: Human-readable error message
+    ///   - category: The error category
+    ///   - underlyingError: Optional underlying error
+    ///   - shouldLog: Whether to automatically log this error (default: true)
+    /// - Returns: A new SDKError instance
     public static func make(
         code: ErrorCode,
         message: String,
         category: ErrorCategory,
-        underlyingError: (any Error)? = nil
+        underlyingError: (any Error)? = nil,
+        shouldLog: Bool = true
     ) -> SDKError {
-        SDKError(
+        let error = SDKError(
             code: code,
             message: message,
             category: category,
             stackTrace: Thread.callStackSymbols,
             underlyingError: underlyingError
         )
+
+        // Automatically log the error unless it's expected (cancelled, etc.)
+        if shouldLog && !code.isExpected {
+            error.log()
+        }
+
+        return error
     }
 
     // MARK: - Category-Specific Factories
@@ -283,6 +301,49 @@ extension SDKError {
     }
 }
 
+// MARK: - Error Logging
+
+extension SDKError {
+
+    /// Log this error to all configured destinations.
+    ///
+    /// Called automatically by factory methods for unexpected errors.
+    /// Can be called manually for errors created via init.
+    public func log(file: String = #file, line: Int = #line, function: String = #function) {
+        let level: LogLevel = (code == .cancelled) ? .info : .error
+        let fileName = (file as NSString).lastPathComponent
+
+        var metadata: [String: Any] = [ // swiftlint:disable:this prefer_concrete_types avoid_any_type
+            "error_code": code.rawValue,
+            "error_category": category.rawValue,
+            "source_file": fileName,
+            "source_line": line,
+            "source_function": function
+        ]
+
+        if let underlying = underlyingError {
+            metadata["underlying_error"] = String(describing: underlying)
+        }
+
+        if let reason = failureReason {
+            metadata["failure_reason"] = reason
+        }
+
+        // Include condensed SDK stack trace
+        let sdkFrames = sdkStackTrace.prefix(5)
+        if !sdkFrames.isEmpty {
+            metadata["stack_trace"] = sdkFrames.joined(separator: "\n")
+        }
+
+        Logging.shared.log(
+            level: level,
+            category: category.rawValue,
+            message: message,
+            metadata: metadata
+        )
+    }
+}
+
 // MARK: - Error Conversion
 
 extension SDKError {
@@ -360,23 +421,9 @@ extension SDKError: Hashable {
 extension SDKError {
 
     /// Convert ONNX Runtime C error code to SDKError
-    ///
-    /// Error code mapping:
-    /// - 0: RA_SUCCESS (should not create error)
-    /// - -1: RA_ERROR_INIT_FAILED -> initializationFailed
-    /// - -2: RA_ERROR_MODEL_LOAD_FAILED -> modelLoadFailed
-    /// - -3: RA_ERROR_INFERENCE_FAILED -> generationFailed
-    /// - -4: RA_ERROR_INVALID_HANDLE -> invalidState
-    /// - -5: RA_ERROR_INVALID_PARAMS -> invalidInput
-    /// - -6: RA_ERROR_OUT_OF_MEMORY -> insufficientMemory
-    /// - -7: RA_ERROR_NOT_IMPLEMENTED -> notImplemented
-    /// - -8: RA_ERROR_CANCELLED -> cancelled
-    /// - -9: RA_ERROR_TIMEOUT -> timeout
-    /// - -10: RA_ERROR_IO -> storageError
     public static func fromONNXCode(_ code: Int32) -> SDKError {
         switch code {
         case 0:
-            // This shouldn't happen - success code
             return runtime(.unknown, "Unexpected success code passed to error handler")
         case -1:
             return runtime(.initializationFailed, "ONNX Runtime initialization failed")

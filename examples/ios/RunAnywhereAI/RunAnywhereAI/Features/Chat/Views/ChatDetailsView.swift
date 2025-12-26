@@ -419,34 +419,35 @@ struct PerformanceTab: View {
                                 let totalTime = modelMessages.map { $0.totalGenerationTime }.reduce(0, +)
                                 let avgTime = totalTime / Double(modelMessages.count)
 
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(modelName)
-                                        .font(AppTypography.subheadline)
-                                        .fontWeight(.medium)
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(modelName)
+                                            .font(AppTypography.subheadline)
+                                            .fontWeight(.medium)
 
-                                    Text("\(modelMessages.count) message\(modelMessages.count == 1 ? "" : "s")")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        Text("\(modelMessages.count) message\(modelMessages.count == 1 ? "" : "s")")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    VStack(alignment: .trailing, spacing: 4) {
+                                        Text(String(format: "%.1fs avg", avgTime))
+                                            .font(.caption)
+                                            .foregroundColor(.green)
+
+                                        Text("\(Int(avgSpeed)) tok/s")
+                                            .font(.caption)
+                                            .foregroundColor(AppColors.primaryAccent)
+                                    }
                                 }
-
-                                Spacer()
-
-                                VStack(alignment: .trailing, spacing: 4) {
-                                    Text(String(format: "%.1fs avg", avgTime))
-                                        .font(.caption)
-                                        .foregroundColor(.green)
-
-                                    Text("\(Int(avgSpeed)) tok/s")
-                                        .font(.caption)
-                                        .foregroundColor(AppColors.primaryAccent)
-                                }
+                                .padding(AppSpacing.large)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(AppColors.backgroundGray6)
+                                )
                             }
-                            .padding(AppSpacing.large)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(AppColors.backgroundGray6)
-                            )
                         }
                     }
 

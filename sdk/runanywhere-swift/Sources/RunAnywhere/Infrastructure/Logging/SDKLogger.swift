@@ -2,41 +2,344 @@
 //  SDKLogger.swift
 //  RunAnywhere SDK
 //
-//  Production-ready logging utility with full stack trace capture.
-//  Thread-safe, Sendable-compliant, and optimized for debugging.
+//  Simplified logging system with multi-destination support.
+//  Thread-safe, Sendable-compliant, and easy to configure.
 //
 
 import Foundation
+import os
 
-// MARK: - SDKLogger
+// MARK: - LogLevel
 
-/// Production-ready logging utility for SDK components.
-///
-/// Features:
-/// - **Thread-safe**: Sendable-compliant for concurrent use
-/// - **Stack traces**: Full call stack capture for debugging
-/// - **Structured metadata**: Key-value pairs for log aggregation
-/// - **Category support**: Filter logs by component
-///
-/// ## Usage
-/// ```swift
-/// let logger = SDKLogger(category: "LLM")
-/// logger.info("Model loaded successfully")
-/// logger.logError(error, additionalInfo: "During generation")
-/// ```
+/// Log severity levels
+public enum LogLevel: Int, Comparable, CustomStringConvertible, Codable, Sendable {
+    case debug = 0
+    case info = 1
+    case warning = 2
+    case error = 3
+    case fault = 4
+
+    public static func < (lhs: LogLevel, rhs: LogLevel) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+
+    public var description: String {
+        switch self {
+        case .debug: return "debug"
+        case .info: return "info"
+        case .warning: return "warning"
+        case .error: return "error"
+        case .fault: return "fault"
+        }
+    }
+}
+
+// MARK: - LogEntry
+
+/// Represents a single log message with metadata
+public struct LogEntry: Sendable {
+    public let timestamp: Date
+    public let level: LogLevel
+    public let category: String
+    public let message: String
+    public let metadata: [String: String]?
+    public let deviceInfo: DeviceInfo?
+
+    public init(
+        timestamp: Date = Date(),
+        level: LogLevel,
+        category: String,
+        message: String,
+        metadata: [String: Any]? = nil, // swiftlint:disable:this prefer_concrete_types avoid_any_type
+        deviceInfo: DeviceInfo? = nil
+    ) {
+        self.timestamp = timestamp
+        self.level = level
+        self.category = category
+        self.message = message
+        self.metadata = metadata?.mapValues { String(describing: $0) }
+        self.deviceInfo = deviceInfo
+    }
+}
+
+// MARK: - LogDestination Protocol
+
+/// Protocol for log output destinations (Console, Sentry, etc.)
+public protocol LogDestination: AnyObject, Sendable { // swiftlint:disable:this avoid_any_object
+    var identifier: String { get }
+    var isAvailable: Bool { get }
+    func write(_ entry: LogEntry)
+    func flush()
+}
+
+// MARK: - LoggingConfiguration
+
+/// Simple configuration for the logging system
+public struct LoggingConfiguration: Sendable {
+    public var enableLocalLogging: Bool
+    public var minLogLevel: LogLevel
+    public var includeDeviceMetadata: Bool
+    public var enableSentryLogging: Bool
+
+    public init(
+        enableLocalLogging: Bool = true,
+        minLogLevel: LogLevel = .info,
+        includeDeviceMetadata: Bool = true,
+        enableSentryLogging: Bool = false
+    ) {
+        self.enableLocalLogging = enableLocalLogging
+        self.minLogLevel = minLogLevel
+        self.includeDeviceMetadata = includeDeviceMetadata
+        self.enableSentryLogging = enableSentryLogging
+    }
+
+    // MARK: - Environment Presets
+
+    public static var development: LoggingConfiguration {
+        LoggingConfiguration(
+            enableLocalLogging: true,
+            minLogLevel: .debug,
+            includeDeviceMetadata: false,
+            enableSentryLogging: true
+        )
+    }
+
+    public static var staging: LoggingConfiguration {
+        LoggingConfiguration(
+            enableLocalLogging: true,
+            minLogLevel: .info,
+            includeDeviceMetadata: true,
+            enableSentryLogging: false
+        )
+    }
+
+    public static var production: LoggingConfiguration {
+        LoggingConfiguration(
+            enableLocalLogging: false,
+            minLogLevel: .warning,
+            includeDeviceMetadata: true,
+            enableSentryLogging: false
+        )
+    }
+}
+
+// MARK: - Logging (Central Service)
+
+/// Central logging service that routes logs to multiple destinations
+public final class Logging: @unchecked Sendable {
+
+    public static let shared = Logging()
+
+    // MARK: - Thread-safe State
+
+    private let lock = OSAllocatedUnfairLock<State>(initialState: State())
+
+    private struct State {
+        var configuration: LoggingConfiguration
+        var destinations: [LogDestination] = []
+
+        init() {
+            let environment = RunAnywhere.currentEnvironment ?? .production
+            self.configuration = LoggingConfiguration.forEnvironment(environment)
+        }
+    }
+
+    public var configuration: LoggingConfiguration {
+        get { lock.withLock { $0.configuration } }
+        set { lock.withLock { $0.configuration = newValue } }
+    }
+
+    public var destinations: [LogDestination] {
+        lock.withLock { $0.destinations }
+    }
+
+    // MARK: - Initialization
+
+    private init() {
+        let config = lock.withLock { $0.configuration }
+        if config.enableSentryLogging {
+            setupSentryLogging()
+        }
+    }
+
+    // MARK: - Configuration
+
+    public func configure(_ config: LoggingConfiguration) {
+        let oldConfig = lock.withLock { state -> LoggingConfiguration in
+            let old = state.configuration
+            state.configuration = config
+            return old
+        }
+
+        // Handle Sentry state changes
+        if config.enableSentryLogging && !oldConfig.enableSentryLogging {
+            setupSentryLogging()
+        } else if !config.enableSentryLogging && oldConfig.enableSentryLogging {
+            removeSentryDestination()
+        }
+    }
+
+    public func setLocalLoggingEnabled(_ enabled: Bool) {
+        lock.withLock { $0.configuration.enableLocalLogging = enabled }
+    }
+
+    public func setMinLogLevel(_ level: LogLevel) {
+        lock.withLock { $0.configuration.minLogLevel = level }
+    }
+
+    public func setIncludeDeviceMetadata(_ include: Bool) {
+        lock.withLock { $0.configuration.includeDeviceMetadata = include }
+    }
+
+    public func setSentryLoggingEnabled(_ enabled: Bool) {
+        var config = configuration
+        config.enableSentryLogging = enabled
+        configure(config)
+    }
+
+    // MARK: - Core Logging
+
+    public func log(
+        level: LogLevel,
+        category: String,
+        message: String,
+        metadata: [String: Any]? = nil // swiftlint:disable:this prefer_concrete_types avoid_any_type
+    ) {
+        let (config, currentDestinations) = lock.withLock { ($0.configuration, $0.destinations) }
+
+        guard level >= config.minLogLevel else { return }
+        guard config.enableLocalLogging || config.enableSentryLogging else { return }
+
+        let entry = LogEntry(
+            level: level,
+            category: category,
+            message: message,
+            metadata: sanitizeMetadata(metadata),
+            deviceInfo: config.includeDeviceMetadata ? DeviceInfo.current : nil
+        )
+
+        // Write to console if local logging enabled
+        if config.enableLocalLogging {
+            printToConsole(entry)
+        }
+
+        // Write to all registered destinations
+        for destination in currentDestinations where destination.isAvailable {
+            destination.write(entry)
+        }
+    }
+
+    // MARK: - Destination Management
+
+    public func addDestination(_ destination: LogDestination) {
+        lock.withLock { state in
+            guard !state.destinations.contains(where: { $0.identifier == destination.identifier }) else { return }
+            state.destinations.append(destination)
+        }
+    }
+
+    public func removeDestination(_ destination: LogDestination) {
+        lock.withLock { state in
+            state.destinations.removeAll { $0.identifier == destination.identifier }
+        }
+    }
+
+    public func flush() {
+        let currentDestinations = destinations
+        for destination in currentDestinations {
+            destination.flush()
+        }
+    }
+
+    // MARK: - Private Helpers
+
+    private func setupSentryLogging() {
+        let environment = RunAnywhere.currentEnvironment ?? .development
+        SentryManager.shared.initialize(environment: environment)
+        addDestination(SentryDestination())
+    }
+
+    private func removeSentryDestination() {
+        lock.withLock { state in
+            state.destinations.removeAll { $0.identifier == SentryDestination.destinationID }
+        }
+    }
+
+    private func printToConsole(_ entry: LogEntry) {
+        let emoji: String
+        switch entry.level {
+        case .debug: emoji = "🔍"
+        case .info: emoji = "ℹ️"
+        case .warning: emoji = "⚠️"
+        case .error: emoji = "❌"
+        case .fault: emoji = "💥"
+        }
+
+        var output = "\(emoji) [\(entry.category)] \(entry.message)"
+        if let metadata = entry.metadata, !metadata.isEmpty {
+            let metaStr = metadata.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
+            output += " | \(metaStr)"
+        }
+
+        #if DEBUG
+        print(output)
+        #endif
+    }
+
+    // MARK: - Metadata Sanitization
+
+    private static let sensitivePatterns = ["key", "secret", "password", "token", "auth", "credential"]
+
+    private func sanitizeMetadata(_ metadata: [String: Any]?) -> [String: Any]? { // swiftlint:disable:this prefer_concrete_types avoid_any_type
+        guard let metadata = metadata else { return nil }
+
+        var sanitized: [String: Any] = [:] // swiftlint:disable:this prefer_concrete_types avoid_any_type
+        for (key, value) in metadata {
+            let lowercased = key.lowercased()
+            if Self.sensitivePatterns.contains(where: { lowercased.contains($0) }) {
+                sanitized[key] = "[REDACTED]"
+            } else if let nested = value as? [String: Any] { // swiftlint:disable:this avoid_any_type
+                sanitized[key] = sanitizeMetadata(nested) ?? [:]
+            } else {
+                sanitized[key] = value
+            }
+        }
+        return sanitized
+    }
+}
+
+// MARK: - Environment Helper
+
+extension LoggingConfiguration {
+    static func forEnvironment(_ environment: SDKEnvironment) -> LoggingConfiguration {
+        switch environment {
+        case .development: return .development
+        case .staging: return .staging
+        case .production: return .production
+        }
+    }
+}
+
+extension Logging {
+    /// Apply configuration based on SDK environment
+    public func applyEnvironmentConfiguration(_ environment: SDKEnvironment) {
+        let config = LoggingConfiguration.forEnvironment(environment)
+        configure(config)
+    }
+}
+
+// MARK: - SDKLogger (Convenience Wrapper)
+
+/// Simple logger for SDK components with category-based filtering
 public struct SDKLogger: Sendable {
-    /// The category/component name for this logger instance.
     public let category: String
 
-    /// Creates a logger for the specified category.
-    /// - Parameter category: The component or module name (e.g., "LLM", "STT", "Download")
     public init(category: String = "SDK") {
         self.category = category
     }
 
-    // MARK: - Standard Logging
+    // MARK: - Logging Methods
 
-    /// Log a debug message (verbose development info).
     @inlinable
     public func debug(_ message: @autoclosure () -> String, metadata: [String: Any]? = nil) { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         #if DEBUG
@@ -44,48 +347,24 @@ public struct SDKLogger: Sendable {
         #endif
     }
 
-    /// Log an informational message.
     public func info(_ message: String, metadata: [String: Any]? = nil) { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         Logging.shared.log(level: .info, category: category, message: message, metadata: metadata)
     }
 
-    /// Log a warning message (potential issue, not an error).
     public func warning(_ message: String, metadata: [String: Any]? = nil) { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         Logging.shared.log(level: .warning, category: category, message: message, metadata: metadata)
     }
 
-    /// Log an error message.
     public func error(_ message: String, metadata: [String: Any]? = nil) { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         Logging.shared.log(level: .error, category: category, message: message, metadata: metadata)
     }
 
-    /// Log a fault message (critical/unrecoverable error).
     public func fault(_ message: String, metadata: [String: Any]? = nil) { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         Logging.shared.log(level: .fault, category: category, message: message, metadata: metadata)
     }
 
-    /// Log with a specific level.
-    public func log(level: LogLevel, _ message: String, metadata: [String: Any]? = nil) { // swiftlint:disable:this prefer_concrete_types avoid_any_type
-        Logging.shared.log(level: level, category: category, message: message, metadata: metadata)
-    }
+    // MARK: - Error Logging with Context
 
-    // MARK: - Error Logging with Stack Trace
-
-    /// Log an error with full debugging context.
-    ///
-    /// Captures:
-    /// - Error description and recovery suggestion
-    /// - Source location (file, line, function)
-    /// - Thread information
-    /// - Full stack trace (filtered for relevance)
-    /// - Timestamp
-    ///
-    /// - Parameters:
-    ///   - error: The error to log
-    ///   - additionalInfo: Optional context about what operation was being performed
-    ///   - file: Auto-captured source file
-    ///   - line: Auto-captured line number
-    ///   - function: Auto-captured function name
     public func logError(
         _ error: Error,
         additionalInfo: String? = nil,
@@ -93,249 +372,36 @@ public struct SDKLogger: Sendable {
         line: Int = #line,
         function: String = #function
     ) {
-        let context = ErrorLogContext(
-            error: error,
-            file: file,
-            line: line,
-            function: function,
-            additionalInfo: additionalInfo
-        )
+        let fileName = (file as NSString).lastPathComponent
+        let errorDesc = (error as? SDKError)?.errorDescription ?? error.localizedDescription
 
-        Logging.shared.log(
-            level: .error,
-            category: category,
-            message: context.formattedMessage,
-            metadata: context.metadata
-        )
-    }
-
-    /// Log a critical/unrecoverable error with full stack trace.
-    ///
-    /// Use for errors that indicate a serious SDK bug or unrecoverable state.
-    /// Always includes full stack trace regardless of build configuration.
-    ///
-    /// - Parameters:
-    ///   - error: The error to log
-    ///   - additionalInfo: Optional context about what operation was being performed
-    ///   - file: Auto-captured source file
-    ///   - line: Auto-captured line number
-    ///   - function: Auto-captured function name
-    public func logFault(
-        _ error: Error,
-        additionalInfo: String? = nil,
-        file: String = #file,
-        line: Int = #line,
-        function: String = #function
-    ) {
-        let context = ErrorLogContext(
-            error: error,
-            file: file,
-            line: line,
-            function: function,
-            additionalInfo: additionalInfo,
-            isFault: true
-        )
-
-        Logging.shared.log(
-            level: .fault,
-            category: category,
-            message: context.formattedMessage,
-            metadata: context.metadata
-        )
-    }
-}
-
-// MARK: - ErrorLogContext
-
-/// Internal helper for building error log context.
-/// Captures all debugging information at the call site.
-private struct ErrorLogContext {
-    let sdkError: SDKError
-    let fileName: String
-    let line: Int
-    let function: String
-    let additionalInfo: String?
-    let threadInfo: String
-    let timestamp: String
-    let stackTrace: String
-    let isFault: Bool
-
-    init(
-        error: Error,
-        file: String,
-        line: Int,
-        function: String,
-        additionalInfo: String?,
-        isFault: Bool = false
-    ) {
-        // Convert any error to SDKError
-        if let sdk = error as? SDKError {
-            self.sdkError = sdk
-        } else {
-            self.sdkError = SDKError.from(error)
-        }
-        self.fileName = (file as NSString).lastPathComponent
-        self.line = line
-        self.function = function
-        self.additionalInfo = additionalInfo
-        self.threadInfo = Self.captureThreadInfo()
-        self.timestamp = ISO8601DateFormatter().string(from: Date())
-        self.stackTrace = Self.captureStackTrace()
-        self.isFault = isFault
-    }
-
-    /// Formatted message for logging.
-    var formattedMessage: String {
-        let prefix = isFault ? "FAULT: " : ""
-        var message = """
-        \(prefix)\(sdkError.errorDescription ?? "Unknown error")
-        └─ Location: \(fileName):\(line) in \(function)
-        └─ Thread: \(threadInfo)
-        └─ Code: \(sdkError.code.rawValue)
-        └─ Category: \(sdkError.category.rawValue)
-        """
-
-        if let additional = additionalInfo {
-            message += "\n└─ Context: \(additional)"
+        var message = "\(errorDesc) at \(fileName):\(line) in \(function)"
+        if let info = additionalInfo {
+            message += " | Context: \(info)"
         }
 
-        if let reason = sdkError.failureReason {
-            message += "\n└─ Reason: \(reason)"
-        }
-
-        if let suggestion = sdkError.recoverySuggestion {
-            message += "\n└─ Recovery: \(suggestion)"
-        }
-
-        message += "\n└─ Stack Trace:\n\(stackTrace)"
-
-        return message
-    }
-
-    /// Structured metadata for log aggregation systems.
-    var metadata: [String: Any] { // swiftlint:disable:this prefer_concrete_types avoid_any_type
-        var meta: [String: Any] = [ // swiftlint:disable:this prefer_concrete_types avoid_any_type
-            "error_code": sdkError.code.rawValue,
-            "error_category": sdkError.category.rawValue,
-            "error_domain": "com.runanywhere.sdk",
+        var metadata: [String: Any] = [ // swiftlint:disable:this prefer_concrete_types avoid_any_type
             "source_file": fileName,
             "source_line": line,
-            "source_function": function,
-            "thread": threadInfo,
-            "timestamp": timestamp,
-            "stack_trace": stackTrace
+            "source_function": function
         ]
 
-        if let additional = additionalInfo {
-            meta["context"] = additional
+        if let sdkError = error as? SDKError {
+            metadata["error_code"] = sdkError.code.rawValue
+            metadata["error_category"] = sdkError.category.rawValue
         }
 
-        if let reason = sdkError.failureReason {
-            meta["failure_reason"] = reason
-        }
-
-        if isFault {
-            meta["severity"] = "fault"
-        }
-
-        return meta
-    }
-
-    // MARK: - Stack Trace Capture
-
-    /// Capture the current call stack, filtered for relevance.
-    private static func captureStackTrace() -> String {
-        let symbols = Thread.callStackSymbols
-
-        // Filter to relevant frames
-        let relevantFrames = symbols
-            .enumerated()
-            .filter { index, frame in
-                // Skip logging infrastructure (first 4-5 frames)
-                guard index > 4 else { return false }
-
-                // Always include RunAnywhere and App frames
-                if frame.contains("RunAnywhere") || frame.contains("App") {
-                    return true
-                }
-
-                // Exclude noisy system frames
-                let excludePatterns = [
-                    "libswiftCore",
-                    "libdispatch",
-                    "CoreFoundation",
-                    "libsystem",
-                    "UIKitCore",
-                    "SwiftUI",
-                    "AttributeGraph"
-                ]
-
-                return !excludePatterns.contains { frame.contains($0) }
-            }
-            .prefix(25)
-            .map { index, frame in
-                // Clean up the frame for readability
-                let cleaned = Self.cleanStackFrame(frame)
-                return "   \(index). \(cleaned)"
-            }
-
-        if relevantFrames.isEmpty {
-            // Fallback: show raw frames
-            return symbols
-                .prefix(20)
-                .enumerated()
-                .map { "   \($0.offset). \($0.element)" }
-                .joined(separator: "\n")
-        }
-
-        return relevantFrames.joined(separator: "\n")
-    }
-
-    /// Clean up a stack frame for readability.
-    private static func cleanStackFrame(_ frame: String) -> String {
-        // Stack frames look like:
-        // "4   RunAnywhere  0x000000010a1b2c3d $s11RunAnywhere..."
-        // We want to preserve the important parts but make it readable
-        frame
-    }
-
-    /// Capture current thread information.
-    private static func captureThreadInfo() -> String {
-        if Thread.isMainThread {
-            return "main"
-        }
-
-        if let name = Thread.current.name, !name.isEmpty {
-            return name
-        }
-
-        // For unnamed background threads, include useful identifiers
-        if let queueLabel = OperationQueue.current?.underlyingQueue?.label, !queueLabel.isEmpty {
-            return queueLabel
-        }
-
-        return "background-\(Unmanaged.passUnretained(Thread.current).toOpaque())"
+        Logging.shared.log(level: .error, category: category, message: message, metadata: metadata)
     }
 }
 
 // MARK: - Convenience Loggers
 
 extension SDKLogger {
-    /// Shared logger for general SDK operations.
     public static let shared = SDKLogger(category: "RunAnywhere")
-
-    /// Logger for LLM operations.
     public static let llm = SDKLogger(category: "LLM")
-
-    /// Logger for STT operations.
     public static let stt = SDKLogger(category: "STT")
-
-    /// Logger for TTS operations.
     public static let tts = SDKLogger(category: "TTS")
-
-    /// Logger for download operations.
     public static let download = SDKLogger(category: "Download")
-
-    /// Logger for model management.
     public static let models = SDKLogger(category: "Models")
 }

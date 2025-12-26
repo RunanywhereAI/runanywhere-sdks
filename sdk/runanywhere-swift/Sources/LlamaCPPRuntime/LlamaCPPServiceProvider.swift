@@ -70,29 +70,13 @@ public enum LlamaCPP: RunAnywhereModule {
     private static func canHandleModel(_ modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
 
-        let lowercased = modelId.lowercased()
-
-        // Check model info cache first - framework is the single source of truth
+        // Framework from model info is the single source of truth
+        // Models must be registered with the SDK via addModel() to be handled
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
             return modelInfo.framework == .llamaCpp
-                || modelInfo.format == .gguf
         }
 
-        // Fallback: Pattern-based matching
-        if lowercased.contains("gguf") || lowercased.hasSuffix(".gguf") {
-            return true
-        }
-        if lowercased.contains("llamacpp") || lowercased.contains("llama-cpp") || lowercased.contains("llama_cpp") {
-            return true
-        }
-
-        // Check for GGUF quantization patterns
-        let quantizationPattern = #"q[2-8]([_-][kK])?([_-][mMsS0])?"#
-        if let regex = try? NSRegularExpression(pattern: quantizationPattern, options: []),
-           regex.firstMatch(in: lowercased, range: NSRange(lowercased.startIndex..., in: lowercased)) != nil {
-            return true
-        }
-
+        // Model is not registered - cannot handle unknown models
         return false
     }
 

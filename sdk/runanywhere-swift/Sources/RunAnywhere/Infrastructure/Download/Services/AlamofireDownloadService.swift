@@ -1,7 +1,6 @@
 import Alamofire
 import Files
 import Foundation
-import Pulse
 
 /// Simplified download service using Alamofire
 public class AlamofireDownloadService: DownloadService, @unchecked Sendable {

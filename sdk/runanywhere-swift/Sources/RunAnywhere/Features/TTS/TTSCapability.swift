@@ -28,6 +28,9 @@ public actor TTSCapability: ModelLoadableCapability {
     private let logger = SDKLogger(category: "TTSCapability")
     private let analyticsService: TTSAnalyticsService
 
+    /// Audio playback manager for speak() API
+    private let playbackManager = AudioPlaybackManager()
+
     // MARK: - Initialization
 
     public init(analyticsService: TTSAnalyticsService = TTSAnalyticsService()) {
@@ -243,6 +246,53 @@ public actor TTSCapability: ModelLoadableCapability {
     public func stop() async {
         logger.info("Stopping synthesis")
         await managedLifecycle.currentService?.stop()
+    }
+
+    // MARK: - Speak (Synthesis + Playback)
+
+    /// Speak text aloud - synthesizes and plays audio internally.
+    ///
+    /// This is the simplest way to use TTS. The SDK handles all audio playback internally.
+    /// Returns metadata about what was spoken for display purposes.
+    ///
+    /// ## Example
+    /// ```swift
+    /// let result = try await RunAnywhere.speak("Hello world")
+    /// print("Duration: \(result.duration)s")
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - text: The text to speak
+    ///   - options: Synthesis options (rate, pitch, voice, etc.)
+    /// - Returns: Result containing metadata about the spoken audio
+    /// - Throws: Error if synthesis or playback fails
+    public func speak(
+        _ text: String,
+        options: TTSOptions = TTSOptions()
+    ) async throws -> TTSSpeakResult {
+        // Synthesize the text
+        let output = try await synthesize(text, options: options)
+
+        // Play the audio if we have audio data (neural TTS)
+        // System TTS plays directly through AVSpeechSynthesizer, so audioData is empty
+        if !output.audioData.isEmpty {
+            logger.info("Playing synthesized audio (\(output.audioData.count) bytes)")
+            try await playbackManager.play(output.audioData)
+            logger.info("Playback completed")
+        }
+
+        return TTSSpeakResult(from: output)
+    }
+
+    /// Whether audio is currently playing from a speak() call
+    public nonisolated var isSpeaking: Bool {
+        playbackManager.isPlaying
+    }
+
+    /// Stop current speech playback
+    public func stopSpeaking() {
+        logger.info("Stopping speech playback")
+        playbackManager.stop()
     }
 
     // MARK: - Analytics

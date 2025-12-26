@@ -150,6 +150,14 @@ public class RegistryService: ModelRegistry {
         let format = detectFormatFromURL(url)
         let resolvedCategory = category ?? ModelCategory.from(framework: framework)
 
+        // Validate format compatibility with framework
+        if format != .unknown && !framework.supports(format: format) {
+            logger.warning(
+                "Model '\(name)' has format '\(format.rawValue)' which may not be supported by \(framework.displayName). " +
+                "Supported formats: \(framework.supportedFormats.map(\.rawValue).joined(separator: ", "))"
+            )
+        }
+
         let modelInfo = ModelInfo(
             id: modelId,
             name: name,
@@ -226,7 +234,7 @@ public class RegistryService: ModelRegistry {
                 if let storageStrategy = ModuleRegistry.shared.storageStrategy(for: framework),
                    let (format, size) = storageStrategy.detectModel(in: modelFolder) {
                     let modelPath = storageStrategy.findModelPath(modelId: modelId, in: modelFolder) ?? modelFolder
-                    let category = ModelCategory.from(format: format, framework: framework)
+                    let category = ModelCategory.from(framework: framework)
                     models.append(ModelInfo(
                         id: modelId,
                         name: generateModelName(from: modelFolder),
@@ -264,7 +272,7 @@ public class RegistryService: ModelRegistry {
 
             let fileSize = FileOperationsUtilities.fileSize(at: file) ?? 0
             let modelId = folder.lastPathComponent
-            let category = ModelCategory.from(format: format, framework: framework)
+            let category = ModelCategory.from(framework: framework)
 
             return ModelInfo(
                 id: modelId,
@@ -297,7 +305,7 @@ public class RegistryService: ModelRegistry {
             for url in urls {
                 let fileSize = FileOperationsUtilities.fileSize(at: url) ?? 0
                 let modelId = url.deletingPathExtension().lastPathComponent
-                let category = ModelCategory.from(format: format, framework: framework)
+                let category = ModelCategory.from(framework: framework)
 
                 models.append(ModelInfo(
                     id: modelId,
@@ -361,11 +369,8 @@ public class RegistryService: ModelRegistry {
     }
 
     private func detectFramework(for format: ModelFormat) -> InferenceFramework? {
-        switch format {
-        case .onnx, .ort: return .onnx
-        case .gguf: return .llamaCpp
-        default: return nil
-        }
+        // Use centralized framework detection from InferenceFramework
+        InferenceFramework.framework(for: format)
     }
 
     private func estimateMemoryFromURL(_ url: URL) -> Int64 {

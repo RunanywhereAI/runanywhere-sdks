@@ -1,5 +1,4 @@
 import Foundation
-import Pulse
 
 /// Production API client for backend operations
 /// Implements NetworkService protocol for real network calls
@@ -29,12 +28,7 @@ public actor APIClient: NetworkService {
             "Prefer": "return=representation"
         ]
 
-        // Configure URLSession with Pulse proxy for automatic network logging
-        self.session = URLSession(
-            configuration: config,
-            delegate: URLSessionProxyDelegate(),
-            delegateQueue: nil
-        )
+        self.session = URLSession(configuration: config)
     }
 
     // MARK: - Public Methods
