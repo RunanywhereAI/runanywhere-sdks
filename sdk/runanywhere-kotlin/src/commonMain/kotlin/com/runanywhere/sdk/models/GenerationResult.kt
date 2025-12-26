@@ -10,9 +10,8 @@ import kotlinx.serialization.Serializable
 data class TokenUsage(
     /** Number of tokens in the prompt */
     val promptTokens: Int,
-
     /** Number of tokens in the completion */
-    val completionTokens: Int
+    val completionTokens: Int,
 ) {
     /** Total tokens used (prompt + completion) */
     val totalTokens: Int
@@ -34,18 +33,14 @@ data class TokenUsage(
 data class GenerationMetadata(
     /** Model identifier used for generation */
     val modelId: String,
-
     /** Temperature used for generation */
     val temperature: Float,
-
     /** Generation time in milliseconds */
     val generationTime: Long,
-
     /** Tokens per second (performance metric) */
     val tokensPerSecond: Double? = null,
-
     /** Additional metadata */
-    val additionalInfo: Map<String, String> = emptyMap()
+    val additionalInfo: Map<String, String> = emptyMap(),
 ) {
     /**
      * Validate metadata
@@ -59,16 +54,19 @@ data class GenerationMetadata(
     /**
      * Create a copy with additional info
      */
-    fun withAdditionalInfo(key: String, value: String): GenerationMetadata {
-        return copy(additionalInfo = additionalInfo + (key to value))
-    }
+    fun withAdditionalInfo(
+        key: String,
+        value: String,
+    ): GenerationMetadata = copy(additionalInfo = additionalInfo + (key to value))
 }
 
 /**
  * Reason for generation completion - exact match with iOS FinishReason
  */
 @Serializable
-enum class FinishReason(val value: String) {
+enum class FinishReason(
+    val value: String,
+) {
     /** Generation completed normally */
     COMPLETED("completed"),
 
@@ -85,71 +83,12 @@ enum class FinishReason(val value: String) {
     ERROR("error"),
 
     /** Generation was cancelled */
-    CANCELLED("cancelled");
+    CANCELLED("cancelled"),
+    ;
 
     companion object {
-        fun fromValue(value: String): FinishReason? {
-            return values().find { it.value == value }
-        }
+        fun fromValue(value: String): FinishReason? = values().find { it.value == value }
     }
-}
-
-/**
- * Enhanced generation result with comprehensive metadata and token tracking
- * Combines aspects of both iOS LLMOutput and Kotlin GenerationResult
- */
-@Serializable
-data class LLMGenerationResult(
-    /** Generated text */
-    val text: String,
-
-    /** Token usage statistics */
-    val tokenUsage: TokenUsage,
-
-    /** Generation metadata */
-    val metadata: GenerationMetadata,
-
-    /** Finish reason */
-    val finishReason: FinishReason,
-
-    /** Timestamp when generation completed */
-    val timestamp: Long = getCurrentTimeMillis(),
-
-    /** Session ID for tracking */
-    val sessionId: String? = null,
-
-    /** Cost savings compared to cloud execution */
-    val savedAmount: Double = 0.0,
-
-    /** Execution target that was actually used */
-    val actualExecutionTarget: ExecutionTarget? = null
-) {
-    /**
-     * Validate the result
-     */
-    fun validate() {
-        require(text.isNotEmpty() || finishReason == FinishReason.ERROR) {
-            "Text must not be empty unless generation failed"
-        }
-        tokenUsage.validate()
-        metadata.validate()
-        require(timestamp > 0) { "Timestamp must be positive" }
-        require(savedAmount >= 0.0) { "Saved amount must be non-negative" }
-    }
-
-    /**
-     * Check if generation was successful
-     */
-    val isSuccessful: Boolean
-        get() = finishReason == FinishReason.COMPLETED || finishReason == FinishReason.MAX_TOKENS || finishReason == FinishReason.STOP_SEQUENCE
-
-    /**
-     * Get effective tokens per second
-     */
-    val effectiveTokensPerSecond: Double?
-        get() = metadata.tokensPerSecond ?: if (metadata.generationTime > 0) {
-            tokenUsage.completionTokens.toDouble() / (metadata.generationTime / 1000.0)
-        } else null
 }
 
 /**
@@ -159,24 +98,18 @@ data class LLMGenerationResult(
 data class LLMGenerationChunk(
     /** Text chunk */
     val text: String,
-
     /** Whether this is the final chunk */
     val isComplete: Boolean = false,
-
     /** Token count for this chunk */
     val tokenCount: Int = 0,
-
     /** Timestamp for this chunk */
     val timestamp: Long = getCurrentTimeMillis(),
-
     /** Chunk index in the stream */
     val chunkIndex: Int = 0,
-
     /** Session ID for tracking */
     val sessionId: String? = null,
-
     /** Finish reason if this is the final chunk */
-    val finishReason: FinishReason? = null
+    val finishReason: FinishReason? = null,
 ) {
     /**
      * Validate the chunk
@@ -196,16 +129,17 @@ data class LLMGenerationChunk(
  * Matches iOS MessageAnalytics.CompletionStatus
  */
 @Serializable
-enum class CompletionStatus(val value: String) {
+enum class CompletionStatus(
+    val value: String,
+) {
     COMPLETE("complete"),
     INTERRUPTED("interrupted"),
     FAILED("failed"),
-    TIMEOUT("timeout");
+    TIMEOUT("timeout"),
+    ;
 
     companion object {
-        fun fromValue(value: String): CompletionStatus? {
-            return values().find { it.value == value }
-        }
+        fun fromValue(value: String): CompletionStatus? = values().find { it.value == value }
     }
 }
 
@@ -214,14 +148,15 @@ enum class CompletionStatus(val value: String) {
  * Matches iOS MessageAnalytics.GenerationMode
  */
 @Serializable
-enum class GenerationMode(val value: String) {
+enum class GenerationMode(
+    val value: String,
+) {
     STREAMING("streaming"),
-    NON_STREAMING("nonStreaming");
+    NON_STREAMING("nonStreaming"),
+    ;
 
     companion object {
-        fun fromValue(value: String): GenerationMode? {
-            return values().find { it.value == value }
-        }
+        fun fromValue(value: String): GenerationMode? = values().find { it.value == value }
     }
 }
 
@@ -234,7 +169,7 @@ data class GenerationParameters(
     val temperature: Double = 0.7,
     val maxTokens: Int = 500,
     val topP: Double? = null,
-    val topK: Int? = null
+    val topK: Int? = null,
 )
 
 /**
@@ -249,36 +184,31 @@ data class MessageAnalytics(
     val conversationId: String,
     val modelId: String,
     val modelName: String,
-    val framework: com.runanywhere.sdk.models.enums.LLMFramework,
+    val framework: com.runanywhere.sdk.models.enums.InferenceFramework,
     val timestamp: Long,
-
     // Timing Metrics (in milliseconds)
     val timeToFirstToken: Long? = null,
     val totalGenerationTime: Long,
     val thinkingTime: Long? = null,
     val responseTime: Long? = null,
-
     // Token Metrics
     val inputTokens: Int,
     val outputTokens: Int,
     val thinkingTokens: Int? = null,
     val responseTokens: Int,
     val averageTokensPerSecond: Double,
-
     // Quality Metrics
     val messageLength: Int,
     val wasThinkingMode: Boolean = false,
     val wasInterrupted: Boolean = false,
     val retryCount: Int = 0,
     val completionStatus: CompletionStatus,
-
     // Performance Indicators
     val tokensPerSecondHistory: List<Double> = emptyList(),
     val generationMode: GenerationMode,
-
     // Context Information
     val contextWindowUsage: Double = 0.0,
-    val generationParameters: GenerationParameters
+    val generationParameters: GenerationParameters,
 ) {
     /**
      * Validate analytics data
@@ -305,7 +235,7 @@ data class MessageAnalytics(
 data class MessageModelInfo(
     val modelId: String,
     val modelName: String,
-    val framework: com.runanywhere.sdk.models.enums.LLMFramework
+    val framework: com.runanywhere.sdk.models.enums.InferenceFramework,
 )
 
 /**
@@ -318,21 +248,18 @@ data class ConversationAnalytics(
     val startTime: Long,
     val endTime: Long? = null,
     val messageCount: Int,
-
     // Aggregate Metrics (timing in milliseconds, speed in tokens/sec)
     val averageTTFT: Double,
     val averageGenerationSpeed: Double,
     val totalTokensUsed: Int,
     val modelsUsed: Set<String>,
-
     // Efficiency Metrics (percentages as doubles 0.0-1.0)
     val thinkingModeUsage: Double,
     val completionRate: Double,
     val averageMessageLength: Int,
-
     // Real-time Metrics
     val currentModel: String? = null,
-    val ongoingMetrics: MessageAnalytics? = null
+    val ongoingMetrics: MessageAnalytics? = null,
 ) {
     /**
      * Validate conversation analytics
@@ -366,7 +293,7 @@ data class PerformanceSummary(
     val averageTokensPerSecond: Double,
     val totalTokensProcessed: Int,
     val thinkingModeUsage: Double, // percentage as 0.0-1.0
-    val successRate: Double // percentage as 0.0-1.0
+    val successRate: Double, // percentage as 0.0-1.0
 ) {
     /**
      * Validate performance summary

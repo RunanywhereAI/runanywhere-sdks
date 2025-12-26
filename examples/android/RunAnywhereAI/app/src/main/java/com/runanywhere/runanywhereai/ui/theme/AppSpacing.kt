@@ -38,14 +38,14 @@ object AppSpacing {
     val messageBubbleMaxWidth = 280.dp
 
     // Component-specific sizes
-    val buttonHeight = 44.dp  // iOS standard button height
+    val buttonHeight = 44.dp // iOS standard button height
     val buttonHeightSmall = 32.dp
     val buttonHeightLarge = 56.dp
 
-    val micButtonSize = 80.dp  // Large mic button for voice input
+    val micButtonSize = 80.dp // Large mic button for voice input
     val modelBadgeHeight = 32.dp
     val progressBarHeight = 4.dp
-    val dividerThickness = 0.5.dp  // iOS hairline divider
+    val dividerThickness = 0.5.dp // iOS hairline divider
 
     // Icon sizes
     val iconSizeSmall = 16.dp
@@ -54,7 +54,7 @@ object AppSpacing {
     val iconSizeXLarge = 48.dp
 
     // Minimum touch targets (accessibility)
-    val minTouchTarget = 44.dp  // iOS minimum for accessibility
+    val minTouchTarget = 44.dp // iOS minimum for accessibility
 
     // Animation durations (in milliseconds, matching iOS)
     const val animationFast = 200

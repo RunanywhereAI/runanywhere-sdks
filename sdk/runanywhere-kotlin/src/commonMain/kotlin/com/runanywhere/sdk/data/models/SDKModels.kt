@@ -6,18 +6,20 @@ import com.runanywhere.sdk.models.ModelInfo
  * Extensions for SDKEnvironment
  */
 val SDKEnvironment.defaultLogLevel: LogLevel
-    get() = when (this) {
-        SDKEnvironment.DEVELOPMENT -> LogLevel.DEBUG
-        SDKEnvironment.STAGING -> LogLevel.INFO
-        SDKEnvironment.PRODUCTION -> LogLevel.WARNING
-    }
+    get() =
+        when (this) {
+            SDKEnvironment.DEVELOPMENT -> LogLevel.DEBUG
+            SDKEnvironment.STAGING -> LogLevel.INFO
+            SDKEnvironment.PRODUCTION -> LogLevel.WARNING
+        }
 
 val SDKEnvironment.defaultBaseURL: String
-    get() = when (this) {
-        SDKEnvironment.DEVELOPMENT -> "http://localhost:8080"
-        SDKEnvironment.STAGING -> "https://staging-api.runanywhere.ai"
-        SDKEnvironment.PRODUCTION -> "https://api.runanywhere.ai"
-    }
+    get() =
+        when (this) {
+            SDKEnvironment.DEVELOPMENT -> "http://localhost:8080"
+            SDKEnvironment.STAGING -> "https://staging-api.runanywhere.ai"
+            SDKEnvironment.PRODUCTION -> "https://api.runanywhere.ai"
+        }
 
 /**
  * Loaded model information
@@ -25,7 +27,7 @@ val SDKEnvironment.defaultBaseURL: String
 data class LoadedModel(
     val model: ModelInfo,
     val localPath: String,
-    val loadedAt: Long
+    val loadedAt: Long,
 )
 
 /**
@@ -36,5 +38,5 @@ enum class LogLevel {
     INFO,
     WARNING,
     ERROR,
-    NONE
+    NONE,
 }

@@ -1,6 +1,5 @@
 package com.runanywhere.sdk.data.network
 
-import com.runanywhere.sdk.network.NetworkChecker
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -9,24 +8,24 @@ import android.os.Build
 /**
  * Create platform-specific network checker for Android
  */
-actual fun createPlatformNetworkChecker(): NetworkChecker? {
-    return try {
+actual fun createPlatformNetworkChecker(): NetworkChecker? =
+    try {
         // This would require a context parameter in real implementation
         // For now, return null and fallback to basic connectivity check
         null
     } catch (e: Exception) {
         null
     }
-}
 
 /**
  * Android-specific network connectivity checker
  * Requires Android context to function properly
  */
-class AndroidNetworkChecker(private val context: Context) : NetworkChecker {
-
-    override suspend fun isNetworkAvailable(): Boolean {
-        return try {
+class AndroidNetworkChecker(
+    private val context: Context,
+) : NetworkChecker {
+    override suspend fun isNetworkAvailable(): Boolean =
+        try {
             val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -41,10 +40,9 @@ class AndroidNetworkChecker(private val context: Context) : NetworkChecker {
         } catch (e: Exception) {
             false
         }
-    }
 
-    override suspend fun getNetworkType(): String {
-        return try {
+    override suspend fun getNetworkType(): String =
+        try {
             val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -70,5 +68,4 @@ class AndroidNetworkChecker(private val context: Context) : NetworkChecker {
         } catch (e: Exception) {
             "unknown"
         }
-    }
 }

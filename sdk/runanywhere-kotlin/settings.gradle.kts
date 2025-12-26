@@ -30,16 +30,6 @@ rootProject.name = "RunAnywhereKotlinSDK"
 
 // Include JNI module
 include(":jni")
-
-// WhisperKit module - standalone STT module using WhisperJNI
-include(":modules:runanywhere-whisperkit")
-
-// Old LlamaCpp module removed - now using runanywhere-core-llamacpp
-// which provides the same capabilities via runanywhere-core C++ with chat template support
-
-// MLC-LLM module - temporarily disabled
-// include(":modules:runanywhere-llm-mlc")
-
 // =============================================================================
 // RunAnywhere Core Modules (mirrors iOS XCFramework architecture)
 // =============================================================================
@@ -61,10 +51,3 @@ include(":modules:runanywhere-core-llamacpp")
 // Depends on main SDK (which includes native libs transitively)
 // Provides: ONNXAdapter, ONNXService
 include(":modules:runanywhere-core-onnx")
-
-// Other modules temporarily disabled due to build issues
-// TODO: Fix module build configurations
-// include(":modules:runanywhere-vad")
-// include(":modules:runanywhere-llm")
-// include(":modules:runanywhere-tts")
-// include(":modules:runanywhere-speaker-diarization")

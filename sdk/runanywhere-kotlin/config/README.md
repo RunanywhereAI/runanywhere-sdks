@@ -1,5 +1,9 @@
 # SDK Configuration Management
 
+> **Note:** The `config-manager.sh` script referenced in this documentation was never implemented.
+> Configuration should be done manually by copying example files and editing them directly.
+> See the "Manual Setup" section below for the recommended approach.
+
 This directory contains configuration files for the RunAnywhere Kotlin SDK. The configuration system allows you to easily switch between development, staging, and production environments without modifying code or committing sensitive data to Git.
 
 ## Overview

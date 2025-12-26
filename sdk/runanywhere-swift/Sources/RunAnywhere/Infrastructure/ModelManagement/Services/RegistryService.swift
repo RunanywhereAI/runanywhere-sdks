@@ -103,31 +103,8 @@ public class RegistryService: ModelRegistry {
         accessQueue.sync { models[id] }
     }
 
-    public func filterModels(by criteria: ModelCriteria) -> [ModelInfo] {
-        accessQueue.sync {
-            models.values.filter { model in
-                if let framework = criteria.framework, !model.compatibleFrameworks.contains(framework) {
-                    return false
-                }
-                if let format = criteria.format, model.format != format {
-                    return false
-                }
-                if let maxSize = criteria.maxSize, let downloadSize = model.downloadSize, downloadSize > maxSize {
-                    return false
-                }
-                if !criteria.tags.isEmpty && !criteria.tags.allSatisfy({ model.tags.contains($0) }) {
-                    return false
-                }
-                if let search = criteria.search, !search.isEmpty {
-                    let searchLower = search.lowercased()
-                    let matches = model.name.lowercased().contains(searchLower)
-                        || model.id.lowercased().contains(searchLower)
-                        || (model.description?.lowercased().contains(searchLower) ?? false)
-                    if !matches { return false }
-                }
-                return true
-            }
-        }
+    public func getAllModels() -> [ModelInfo] {
+        accessQueue.sync { Array(models.values) }
     }
 
     public func updateModel(_ model: ModelInfo) {

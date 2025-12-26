@@ -3,34 +3,34 @@ package com.runanywhere.sdk.data.repositories
 import com.runanywhere.sdk.data.models.ConfigurationData
 import com.runanywhere.sdk.data.models.ConfigurationSource
 import com.runanywhere.sdk.foundation.SDKLogger
-import java.io.File
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.File
 
 /**
  * JVM implementation of ConfigurationRepository using file system storage
  * Matches iOS ConfigurationRepositoryImpl interface patterns
  */
 class ConfigurationRepositoryImpl : ConfigurationRepository {
-
     private val logger = SDKLogger("ConfigurationRepository")
     private val configFile = File(System.getProperty("user.home"), ".runanywhere/config.json")
     private val consumerConfigFile = File(System.getProperty("user.home"), ".runanywhere/consumer-config.json")
     private var consumerConfig: ConfigurationData? = null
 
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
 
     init {
         // Ensure config directory exists
         configFile.parentFile?.mkdirs()
     }
 
-    override suspend fun fetchRemoteConfiguration(apiKey: String): ConfigurationData? {
-        return try {
+    override suspend fun fetchRemoteConfiguration(apiKey: String): ConfigurationData? =
+        try {
             logger.debug("Fetching remote configuration for API key: ${apiKey.take(8)}...")
             // For JVM, we don't implement remote fetching by default
             // This would be implemented with actual HTTP client calls
@@ -39,10 +39,9 @@ class ConfigurationRepositoryImpl : ConfigurationRepository {
             logger.error("Failed to fetch remote configuration", e)
             null
         }
-    }
 
-    override suspend fun getLocalConfiguration(): ConfigurationData? {
-        return try {
+    override suspend fun getLocalConfiguration(): ConfigurationData? =
+        try {
             if (configFile.exists()) {
                 val jsonContent = configFile.readText()
                 json.decodeFromString<ConfigurationData>(jsonContent)
@@ -53,7 +52,6 @@ class ConfigurationRepositoryImpl : ConfigurationRepository {
             logger.error("Failed to get local configuration from file", e)
             null
         }
-    }
 
     override suspend fun saveLocalConfiguration(configuration: ConfigurationData) {
         try {
@@ -66,8 +64,8 @@ class ConfigurationRepositoryImpl : ConfigurationRepository {
         }
     }
 
-    override suspend fun getConsumerConfiguration(): ConfigurationData? {
-        return try {
+    override suspend fun getConsumerConfiguration(): ConfigurationData? =
+        try {
             consumerConfig ?: run {
                 if (consumerConfigFile.exists()) {
                     val jsonContent = consumerConfigFile.readText()
@@ -82,7 +80,6 @@ class ConfigurationRepositoryImpl : ConfigurationRepository {
             logger.error("Failed to get consumer configuration", e)
             null
         }
-    }
 
     override suspend fun setConsumerConfiguration(configuration: ConfigurationData) {
         try {
@@ -99,9 +96,7 @@ class ConfigurationRepositoryImpl : ConfigurationRepository {
         }
     }
 
-    override fun getSDKDefaultConfiguration(): ConfigurationData {
-        return ConfigurationData.sdkDefaults("default-api-key")
-    }
+    override fun getSDKDefaultConfiguration(): ConfigurationData = ConfigurationData.sdkDefaults("default-api-key")
 
     override suspend fun syncToRemote(configuration: ConfigurationData) {
         try {
@@ -115,13 +110,9 @@ class ConfigurationRepositoryImpl : ConfigurationRepository {
     }
 
     // Legacy methods for backward compatibility
-    override suspend fun getConfiguration(): ConfigurationData? {
-        return getLocalConfiguration()
-    }
+    override suspend fun getConfiguration(): ConfigurationData? = getLocalConfiguration()
 
-    override suspend fun saveConfiguration(configuration: ConfigurationData) {
-        return saveLocalConfiguration(configuration)
-    }
+    override suspend fun saveConfiguration(configuration: ConfigurationData) = saveLocalConfiguration(configuration)
 
     override suspend fun clearConfiguration() {
         try {

@@ -11,14 +11,16 @@ import com.runanywhere.sdk.data.models.SDKError
  * - Native: Platform-specific secure storage APIs
  */
 interface SecureStorage {
-
     /**
      * Store a string value securely
      * @param key Unique identifier for the value
      * @param value String value to store
      * @throws SDKError.SecurityError if storage fails
      */
-    suspend fun setSecureString(key: String, value: String)
+    suspend fun setSecureString(
+        key: String,
+        value: String,
+    )
 
     /**
      * Retrieve a stored string value
@@ -34,7 +36,10 @@ interface SecureStorage {
      * @param data Binary data to store
      * @throws SDKError.SecurityError if storage fails
      */
-    suspend fun setSecureData(key: String, data: ByteArray)
+    suspend fun setSecureData(
+        key: String,
+        data: ByteArray,
+    )
 
     /**
      * Retrieve stored binary data
@@ -81,6 +86,7 @@ interface SecureStorage {
  * Platform-specific secure storage factory
  * Each platform provides its own implementation
  */
+@Suppress("UtilityClassWithPublicConstructor") // KMP expect/actual pattern requires class
 expect class SecureStorageFactory {
     companion object {
         /**
@@ -102,7 +108,6 @@ expect class SecureStorageFactory {
  * Convenience functions for common secure storage operations
  */
 object SecureStorageUtils {
-
     /**
      * Store authentication tokens securely
      */
@@ -110,7 +115,7 @@ object SecureStorageUtils {
         storage: SecureStorage,
         accessToken: String,
         refreshToken: String?,
-        expiresAt: Long
+        expiresAt: Long,
     ) {
         storage.setSecureString("access_token", accessToken)
         refreshToken?.let { storage.setSecureString("refresh_token", it) }
@@ -128,7 +133,7 @@ object SecureStorageUtils {
         return AuthTokens(
             accessToken = accessToken,
             refreshToken = refreshToken,
-            expiresAt = expiresAt
+            expiresAt = expiresAt,
         )
     }
 
@@ -151,5 +156,5 @@ object SecureStorageUtils {
 data class AuthTokens(
     val accessToken: String,
     val refreshToken: String? = null,
-    val expiresAt: Long
+    val expiresAt: Long,
 )

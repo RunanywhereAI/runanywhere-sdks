@@ -23,17 +23,18 @@ fun MessageInput(
     onTextChange: (String) -> Unit,
     onSendMessage: () -> Unit,
     enabled: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.Bottom
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+            verticalAlignment = Alignment.Bottom,
         ) {
             OutlinedTextField(
                 value = text,
@@ -44,28 +45,30 @@ fun MessageInput(
                 },
                 enabled = enabled,
                 maxLines = 4,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
-                    imeAction = ImeAction.Send
-                ),
-                keyboardActions = KeyboardActions(
-                    onSend = {
-                        if (text.isNotBlank() && enabled) {
-                            onSendMessage()
-                        }
-                    }
-                )
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Send,
+                    ),
+                keyboardActions =
+                    KeyboardActions(
+                        onSend = {
+                            if (text.isNotBlank() && enabled) {
+                                onSendMessage()
+                            }
+                        },
+                    ),
             )
 
             Spacer(modifier = Modifier.width(8.dp))
 
             FilledIconButton(
                 onClick = onSendMessage,
-                enabled = enabled && text.isNotBlank()
+                enabled = enabled && text.isNotBlank(),
             ) {
                 Icon(
                     Icons.Default.Send,
-                    contentDescription = "Send message"
+                    contentDescription = "Send message",
                 )
             }
         }

@@ -1,7 +1,8 @@
 package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.data.models.fileExists
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
+import com.runanywhere.sdk.models.enums.ModelArtifactType
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.utils.SimpleInstant
@@ -17,44 +18,37 @@ data class ModelInfo(
     val id: String,
     val name: String,
     val category: ModelCategory,
-
     // Format and location
     val format: ModelFormat,
     val downloadURL: String? = null,
     var localPath: String? = null,
-
+    // Artifact type - describes how the model is packaged (matching iOS)
+    val artifactType: ModelArtifactType? = null,
     // Size information (in bytes)
     val downloadSize: Long? = null,
     val memoryRequired: Long? = null,
-
     // Integrity verification
     val sha256Checksum: String? = null,
     val md5Checksum: String? = null,
-
     // Framework compatibility
-    val compatibleFrameworks: List<LLMFramework> = emptyList(),
-    val preferredFramework: LLMFramework? = null,
-
+    val compatibleFrameworks: List<InferenceFramework> = emptyList(),
+    val preferredFramework: InferenceFramework? = null,
     // Model-specific capabilities (optional based on category)
     val contextLength: Int? = null,
     val supportsThinking: Boolean = false,
-
     // Optional metadata
     val metadata: ModelInfoMetadata? = null,
-
     // Tracking fields
     val source: ConfigurationSource = ConfigurationSource.REMOTE,
     val createdAt: SimpleInstant = SimpleInstant.now(),
     var updatedAt: SimpleInstant = SimpleInstant.now(),
     var syncPending: Boolean = false,
-
     // Usage tracking
     var lastUsed: SimpleInstant? = null,
     var usageCount: Int = 0,
-
     // Non-persistent runtime properties
     @Transient
-    var additionalProperties: Map<String, String> = emptyMap()
+    var additionalProperties: Map<String, String> = emptyMap(),
 ) {
     /**
      * Whether this model is downloaded and available locally
@@ -83,17 +77,37 @@ data class ModelInfo(
      * Get the effective context length (with defaults based on category)
      */
     val effectiveContextLength: Int?
-        get() = if (category.requiresContextLength) {
-            contextLength ?: 2048
-        } else {
-            contextLength
-        }
+        get() =
+            if (category.requiresContextLength) {
+                contextLength ?: 2048
+            } else {
+                contextLength
+            }
 
     /**
      * Get the effective thinking support (based on category)
      */
     val effectiveSupportsThinking: Boolean
         get() = if (category.supportsThinking) supportsThinking else false
+
+    /**
+     * Get the effective artifact type (inferred from URL if not explicitly set)
+     * Matches iOS behavior
+     */
+    val effectiveArtifactType: ModelArtifactType
+        get() = artifactType ?: ModelArtifactType.infer(downloadURL, format)
+
+    /**
+     * Whether this model requires extraction after download
+     */
+    val requiresExtraction: Boolean
+        get() = effectiveArtifactType.requiresExtraction
+
+    /**
+     * Whether this model requires downloading
+     */
+    val requiresDownload: Boolean
+        get() = effectiveArtifactType.requiresDownload
 }
 
 /**
@@ -110,14 +124,16 @@ data class ModelInfoMetadata(
     val quantizationLevel: QuantizationLevel? = null,
     val version: String? = null,
     val minOSVersion: String? = null,
-    val minMemory: Long? = null
+    val minMemory: Long? = null,
 )
 
 /**
  * Quantization level for models
  */
 @Serializable
-enum class QuantizationLevel(val value: String) {
+enum class QuantizationLevel(
+    val value: String,
+) {
     Q2_K("q2_k"),
     Q3_K_S("q3_k_s"),
     Q3_K_M("q3_k_m"),
@@ -134,12 +150,11 @@ enum class QuantizationLevel(val value: String) {
     Q6_K_L("q6_k_l"),
     Q8_0("q8_0"),
     F16("f16"),
-    F32("f32");
+    F32("f32"),
+    ;
 
     companion object {
-        fun fromValue(value: String): QuantizationLevel? {
-            return entries.find { it.value.equals(value, ignoreCase = true) }
-        }
+        fun fromValue(value: String): QuantizationLevel? = entries.find { it.value.equals(value, ignoreCase = true) }
     }
 }
 
@@ -150,5 +165,5 @@ enum class QuantizationLevel(val value: String) {
 enum class ConfigurationSource {
     LOCAL,
     REMOTE,
-    DEFAULT
+    DEFAULT,
 }

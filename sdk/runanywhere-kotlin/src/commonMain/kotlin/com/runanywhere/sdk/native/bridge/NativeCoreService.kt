@@ -6,7 +6,7 @@ package com.runanywhere.sdk.native.bridge
  * This is the generic interface that ALL native backends (ONNX, TFLite, CoreML, etc.)
  * must implement. It provides a unified API for ML capabilities across different runtimes.
  *
- * This is the Kotlin equivalent of UnifiedFrameworkAdapter in the Swift SDK.
+ * This is the Kotlin equivalent of NativeBackend protocols in the Swift SDK.
  *
  * Usage:
  * ```kotlin
@@ -25,7 +25,6 @@ package com.runanywhere.sdk.native.bridge
  * ```
  */
 interface NativeCoreService {
-
     /**
      * Initialize the native backend.
      * Must be called before any other operations.
@@ -72,7 +71,11 @@ interface NativeCoreService {
      * @param configJson Optional JSON configuration
      * @throws NativeBridgeException if loading fails
      */
-    suspend fun loadSTTModel(modelPath: String, modelType: String, configJson: String? = null)
+    suspend fun loadSTTModel(
+        modelPath: String,
+        modelType: String,
+        configJson: String? = null,
+    )
 
     /**
      * Check if STT model is loaded.
@@ -96,7 +99,7 @@ interface NativeCoreService {
     suspend fun transcribe(
         audioSamples: FloatArray,
         sampleRate: Int,
-        language: String? = null
+        language: String? = null,
     ): String
 
     /**
@@ -116,7 +119,11 @@ interface NativeCoreService {
      * @param configJson Optional JSON configuration
      * @throws NativeBridgeException if loading fails
      */
-    suspend fun loadTTSModel(modelPath: String, modelType: String, configJson: String? = null)
+    suspend fun loadTTSModel(
+        modelPath: String,
+        modelType: String,
+        configJson: String? = null,
+    )
 
     /**
      * Check if TTS model is loaded.
@@ -142,7 +149,7 @@ interface NativeCoreService {
         text: String,
         voiceId: String? = null,
         speedRate: Float = 1.0f,
-        pitchShift: Float = 0.0f
+        pitchShift: Float = 0.0f,
     ): NativeTTSSynthesisResult
 
     /**
@@ -160,7 +167,10 @@ interface NativeCoreService {
      * @param modelPath Path to the model (or null for built-in)
      * @param configJson Optional JSON configuration
      */
-    suspend fun loadVADModel(modelPath: String? = null, configJson: String? = null)
+    suspend fun loadVADModel(
+        modelPath: String? = null,
+        configJson: String? = null,
+    )
 
     /**
      * Check if VAD model is loaded.
@@ -179,7 +189,10 @@ interface NativeCoreService {
      * @param sampleRate Sample rate
      * @return NativeVADResult with speech status and probability
      */
-    suspend fun processVAD(audioSamples: FloatArray, sampleRate: Int): NativeVADResult
+    suspend fun processVAD(
+        audioSamples: FloatArray,
+        sampleRate: Int,
+    ): NativeVADResult
 
     /**
      * Detect speech segments in audio.
@@ -188,7 +201,10 @@ interface NativeCoreService {
      * @param sampleRate Sample rate
      * @return JSON array of speech segments
      */
-    suspend fun detectVADSegments(audioSamples: FloatArray, sampleRate: Int): String
+    suspend fun detectVADSegments(
+        audioSamples: FloatArray,
+        sampleRate: Int,
+    ): String
 
     // =============================================================================
     // Embedding Operations
@@ -200,7 +216,10 @@ interface NativeCoreService {
      * @param modelPath Path to the model
      * @param configJson Optional JSON configuration
      */
-    suspend fun loadEmbeddingModel(modelPath: String, configJson: String? = null)
+    suspend fun loadEmbeddingModel(
+        modelPath: String,
+        configJson: String? = null,
+    )
 
     /**
      * Check if embedding model is loaded.

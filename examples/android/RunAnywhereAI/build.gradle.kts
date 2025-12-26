@@ -7,13 +7,31 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
+// =============================================================================
+// Detekt Configuration
+// =============================================================================
 detekt {
     buildUponDefaultConfig = true
     allRules = false
-    config.setFrom("$projectDir/detekt-config.yml")
-    baseline = file("$projectDir/detekt-baseline.xml")
+    config.setFrom(files("detekt.yml"))
+}
+
+// =============================================================================
+// ktlint Configuration
+// =============================================================================
+ktlint {
+    version.set("1.5.0")
+    android.set(true)
+    verbose.set(true)
+    outputToConsole.set(true)
+    enableExperimentalRules.set(false)
+    filter {
+        exclude("**/generated/**")
+        include("**/kotlin/**")
+    }
 }
 
 tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {

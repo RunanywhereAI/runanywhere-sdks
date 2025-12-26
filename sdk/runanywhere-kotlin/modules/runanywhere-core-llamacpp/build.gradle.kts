@@ -21,7 +21,39 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
     `maven-publish`
+}
+
+// =============================================================================
+// Detekt Configuration - Use parent's detekt.yml
+// =============================================================================
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("../../detekt.yml"))
+    source.setFrom(
+        "src/commonMain/kotlin",
+        "src/jvmMain/kotlin",
+        "src/jvmAndroidMain/kotlin",
+        "src/androidMain/kotlin",
+    )
+}
+
+// =============================================================================
+// ktlint Configuration
+// =============================================================================
+ktlint {
+    version.set("1.5.0")
+    android.set(true)
+    verbose.set(true)
+    outputToConsole.set(true)
+    enableExperimentalRules.set(false)
+    filter {
+        exclude("**/generated/**")
+        include("**/kotlin/**")
+    }
 }
 
 // =============================================================================
@@ -102,7 +134,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }

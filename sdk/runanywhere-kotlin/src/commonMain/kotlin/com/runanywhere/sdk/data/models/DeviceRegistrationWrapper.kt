@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.data.models
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Device registration request wrapper for backend API
@@ -9,7 +9,7 @@ import kotlinx.serialization.SerialName
 @Serializable
 data class DeviceRegistrationPayload(
     @SerialName("device_info")
-    val deviceInfo: DeviceInfoData
+    val deviceInfo: DeviceInfoData,
 )
 
 /**
@@ -19,10 +19,8 @@ data class DeviceRegistrationPayload(
 data class DeviceRegistrationResult(
     @SerialName("device_id")
     val deviceId: String,
-
     @SerialName("status")
     val status: String, // "registered", "updated"
-
     @SerialName("sync_status")
-    val syncStatus: String // "synced", "pending"
+    val syncStatus: String, // "synced", "pending"
 )

@@ -5,18 +5,11 @@ package com.runanywhere.sdk.storage
  * Extends shared implementation and provides JVM-specific directory paths
  */
 internal class JvmFileSystem : SharedFileSystem() {
+    override fun getCacheDirectory(): String = System.getProperty("java.io.tmpdir") ?: "/tmp"
 
-    override fun getCacheDirectory(): String {
-        return System.getProperty("java.io.tmpdir") ?: "/tmp"
-    }
+    override fun getDataDirectory(): String = System.getProperty("user.home") + "/.runanywhere"
 
-    override fun getDataDirectory(): String {
-        return System.getProperty("user.home") + "/.runanywhere"
-    }
-
-    override fun getTempDirectory(): String {
-        return System.getProperty("java.io.tmpdir") ?: "/tmp"
-    }
+    override fun getTempDirectory(): String = System.getProperty("java.io.tmpdir") ?: "/tmp"
 }
 
 /**

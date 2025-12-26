@@ -19,7 +19,7 @@ actual suspend fun getPlatformStorageInfo(path: String): PlatformStorageInfo {
     return PlatformStorageInfo(
         totalSpace = totalSpace,
         availableSpace = availableSpace,
-        usedSpace = usedSpace
+        usedSpace = usedSpace,
     )
 }
 

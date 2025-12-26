@@ -97,57 +97,57 @@ object Dimensions {
     // ====================
 
     // Message Bubbles
-    val messageBubbleCornerRadius = cornerRadiusBubble  // 18.dp
-    val messageBubblePaddingHorizontal = padding16  // 16.dp
-    val messageBubblePaddingVertical = padding12  // 12.dp
-    val messageBubbleShadowRadius = shadowLarge  // 4.dp
-    val messageBubbleMinSpacing = padding60  // 60.dp (for alignment)
-    val messageSpacingBetween = large  // 16.dp
+    val messageBubbleCornerRadius = cornerRadiusBubble // 18.dp
+    val messageBubblePaddingHorizontal = padding16 // 16.dp
+    val messageBubblePaddingVertical = padding12 // 12.dp
+    val messageBubbleShadowRadius = shadowLarge // 4.dp
+    val messageBubbleMinSpacing = padding60 // 60.dp (for alignment)
+    val messageSpacingBetween = large // 16.dp
 
     // Thinking Section
-    val thinkingSectionCornerRadius = mediumLarge  // 12.dp
-    val thinkingSectionPaddingHorizontal = regular  // 14.dp
-    val thinkingSectionPaddingVertical = padding9  // 9.dp
-    val thinkingContentCornerRadius = medium  // 10.dp
-    val thinkingContentPadding = mediumLarge  // 12.dp
-    val thinkingContentMaxHeight = minFrameHeight  // 150.dp
+    val thinkingSectionCornerRadius = mediumLarge // 12.dp
+    val thinkingSectionPaddingHorizontal = regular // 14.dp
+    val thinkingSectionPaddingVertical = padding9 // 9.dp
+    val thinkingContentCornerRadius = medium // 10.dp
+    val thinkingContentPadding = mediumLarge // 12.dp
+    val thinkingContentMaxHeight = minFrameHeight // 150.dp
 
     // Model Badge
-    val modelBadgePaddingHorizontal = medium  // 10.dp
+    val modelBadgePaddingHorizontal = medium // 10.dp
     val modelBadgePaddingVertical = 5.dp
-    val modelBadgeCornerRadius = regular  // 14.dp
-    val modelBadgeSpacing = smallMedium  // 8.dp
+    val modelBadgeCornerRadius = regular // 14.dp
+    val modelBadgeSpacing = smallMedium // 8.dp
 
     // Model Info Bar
-    val modelInfoBarPaddingHorizontal = large  // 16.dp
-    val modelInfoBarPaddingVertical = small  // 6.dp
-    val modelInfoFrameworkBadgeCornerRadius = cornerRadiusSmall  // 4.dp
-    val modelInfoFrameworkBadgePaddingHorizontal = small  // 6.dp
-    val modelInfoFrameworkBadgePaddingVertical = xSmall  // 2.dp
+    val modelInfoBarPaddingHorizontal = large // 16.dp
+    val modelInfoBarPaddingVertical = small // 6.dp
+    val modelInfoFrameworkBadgeCornerRadius = cornerRadiusSmall // 4.dp
+    val modelInfoFrameworkBadgePaddingHorizontal = small // 6.dp
+    val modelInfoFrameworkBadgePaddingVertical = xSmall // 2.dp
     val modelInfoStatsIconTextSpacing = 3.dp
-    val modelInfoStatsItemSpacing = mediumLarge  // 12.dp
+    val modelInfoStatsItemSpacing = mediumLarge // 12.dp
 
     // Input Area
-    val inputAreaPadding = large  // 16.dp
-    val inputFieldButtonSpacing = mediumLarge  // 12.dp
-    val sendButtonSize = iconMedium  // 28.dp
+    val inputAreaPadding = large // 16.dp
+    val inputFieldButtonSpacing = mediumLarge // 12.dp
+    val sendButtonSize = iconMedium // 28.dp
 
     // Typing Indicator
-    val typingIndicatorDotSize = iconSmall  // 8.dp
-    val typingIndicatorDotSpacing = xSmall  // 4.dp
-    val typingIndicatorPaddingHorizontal = mediumLarge  // 12.dp
-    val typingIndicatorPaddingVertical = smallMedium  // 8.dp
-    val typingIndicatorCornerRadius = medium  // 10.dp
-    val typingIndicatorTextSpacing = mediumLarge  // 12.dp
+    val typingIndicatorDotSize = iconSmall // 8.dp
+    val typingIndicatorDotSpacing = xSmall // 4.dp
+    val typingIndicatorPaddingHorizontal = mediumLarge // 12.dp
+    val typingIndicatorPaddingVertical = smallMedium // 8.dp
+    val typingIndicatorCornerRadius = medium // 10.dp
+    val typingIndicatorTextSpacing = mediumLarge // 12.dp
 
     // Empty State
-    val emptyStateIconSize = iconXLarge  // 60.dp
-    val emptyStateIconTextSpacing = large  // 16.dp
-    val emptyStateTitleSubtitleSpacing = smallMedium  // 8.dp
+    val emptyStateIconSize = iconXLarge // 60.dp
+    val emptyStateIconTextSpacing = large // 16.dp
+    val emptyStateTitleSubtitleSpacing = smallMedium // 8.dp
 
     // Toolbar
-    val toolbarButtonSpacing = smallMedium  // 8.dp
-    val toolbarHeight = buttonHeightRegular  // 44.dp
+    val toolbarButtonSpacing = smallMedium // 8.dp
+    val toolbarHeight = buttonHeightRegular // 44.dp
 
     // ====================
     // MAX WIDTHS

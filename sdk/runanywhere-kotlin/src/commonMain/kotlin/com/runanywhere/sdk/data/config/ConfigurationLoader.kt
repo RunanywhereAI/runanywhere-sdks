@@ -7,20 +7,20 @@ import kotlinx.serialization.json.Json
 
 /**
  * Loads configuration from JSON files based on environment
- * Optional enhancement - existing ConfigurationService already handles config loading
  *
- * This provides an alternative way to load environment-specific configs from files:
+ * This provides environment-specific config loading from files:
  * - dev.json for development
  * - staging.json for staging
  * - prod.json for production
  */
 class ConfigurationLoader {
     private val logger = SDKLogger("ConfigurationLoader")
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        prettyPrint = false
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            prettyPrint = false
+        }
 
     /**
      * Load configuration for the given environment
@@ -30,11 +30,12 @@ class ConfigurationLoader {
      * @return ConfigurationData if file exists and is valid, null otherwise
      */
     suspend fun loadConfiguration(environment: SDKEnvironment): ConfigurationData? {
-        val configFileName = when (environment) {
-            SDKEnvironment.DEVELOPMENT -> "dev.json"
-            SDKEnvironment.STAGING -> "staging.json"
-            SDKEnvironment.PRODUCTION -> "prod.json"
-        }
+        val configFileName =
+            when (environment) {
+                SDKEnvironment.DEVELOPMENT -> "dev.json"
+                SDKEnvironment.STAGING -> "staging.json"
+                SDKEnvironment.PRODUCTION -> "prod.json"
+            }
 
         return try {
             val configJson = loadResourceFile(configFileName)
@@ -56,9 +57,9 @@ class ConfigurationLoader {
      * Load resource file from platform-specific location
      * Delegates to platform-specific implementation
      */
-    private suspend fun loadResourceFile(fileName: String): String {
-        return com.runanywhere.sdk.data.config.loadResourceFile(fileName)
-    }
+    private suspend fun loadResourceFile(fileName: String): String =
+        com.runanywhere.sdk.data.config
+            .loadResourceFile(fileName)
 }
 
 /**

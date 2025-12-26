@@ -64,6 +64,7 @@ navigationCompose = "2.8.5"
 # Code Quality
 # ============================================================================
 detekt = "1.23.7"
+ktlint = "12.1.2"
 
 # ============================================================================
 # IDE Plugin Development
@@ -85,6 +86,7 @@ workManager = "2.10.0"
 # File Management
 # ============================================================================
 commonsIo = "2.18.0"
+commonsCompress = "1.27.1"
 okio = "3.9.0"
 
 # ============================================================================
@@ -248,6 +250,7 @@ androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx"
 # File Management
 # ----------------------------------------------------------------------------
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commonsIo" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 okio-fakefilesystem = { group = "com.squareup.okio", name = "okio-fakefilesystem", version.ref = "okio" }
 
@@ -337,6 +340,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 # Code Quality
 # ----------------------------------------------------------------------------
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 
 # ----------------------------------------------------------------------------
 # IDE Plugin Development

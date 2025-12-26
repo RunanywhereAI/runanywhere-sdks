@@ -1,11 +1,11 @@
 package com.runanywhere.sdk.data.models
 
-import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.InferenceFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Model info data models
@@ -17,7 +17,6 @@ import kotlinx.serialization.SerialName
  */
 expect fun fileExists(path: String): Boolean
 
-
 /**
  * Model info data class
  * One-to-one translation from iOS ModelInfo
@@ -28,7 +27,7 @@ data class ModelInfo(
     val name: String,
     val category: ModelCategory,
     val format: ModelFormat,
-    val framework: LLMFramework,
+    val framework: InferenceFramework,
     @SerialName("download_url")
     val downloadURL: String,
     @SerialName("local_path")
@@ -55,9 +54,8 @@ data class ModelInfo(
     @SerialName("created_at")
     val createdAt: Long = getCurrentTimeMillis(),
     @SerialName("updated_at")
-    val updatedAt: Long = getCurrentTimeMillis()
+    val updatedAt: Long = getCurrentTimeMillis(),
 ) {
-
     /**
      * Check if model file exists locally
      * Equivalent to iOS computed property
@@ -83,10 +81,9 @@ data class ModelInfo(
      * Check if model supports specific framework
      * Equivalent to iOS method
      */
-    fun supportsFramework(framework: String): Boolean {
-        return compatibleFrameworks.contains(framework) ||
-               this.framework.name.equals(framework, ignoreCase = true)
-    }
+    fun supportsFramework(framework: String): Boolean =
+        compatibleFrameworks.contains(framework) ||
+            this.framework.name.equals(framework, ignoreCase = true)
 
     private fun formatBytes(bytes: Long): String {
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
@@ -112,7 +109,7 @@ enum class ModelDownloadStatus {
     DOWNLOADED,
     FAILED,
     CANCELLED,
-    PAUSED
+    PAUSED,
 }
 
 /**
@@ -137,7 +134,7 @@ data class ModelDownloadInfo(
     @SerialName("started_at")
     val startedAt: Long? = null,
     @SerialName("completed_at")
-    val completedAt: Long? = null
+    val completedAt: Long? = null,
 )
 
 /**
@@ -161,7 +158,7 @@ data class ModelCapabilities(
     @SerialName("input_modalities")
     val inputModalities: List<String> = listOf("text"),
     @SerialName("output_modalities")
-    val outputModalities: List<String> = listOf("text")
+    val outputModalities: List<String> = listOf("text"),
 )
 
 /**
@@ -185,7 +182,7 @@ data class ModelPerformanceMetrics(
     @SerialName("benchmark_date")
     val benchmarkDate: Long? = null,
     @SerialName("device_info")
-    val deviceInfo: String? = null
+    val deviceInfo: String? = null,
 )
 
 /**
@@ -198,7 +195,7 @@ data class ModelRegistryEntry(
     val capabilities: ModelCapabilities,
     val performance: ModelPerformanceMetrics? = null,
     @SerialName("download_info")
-    val downloadInfo: ModelDownloadInfo? = null
+    val downloadInfo: ModelDownloadInfo? = null,
 )
 
 /**
@@ -207,12 +204,12 @@ data class ModelRegistryEntry(
  */
 data class ModelSearchCriteria(
     val category: ModelCategory? = null,
-    val framework: LLMFramework? = null,
+    val framework: InferenceFramework? = null,
     val format: ModelFormat? = null,
     val maxSize: Long? = null,
     val minAccuracy: Float? = null,
     val supportedLanguages: List<String>? = null,
     val capabilities: List<String>? = null,
     val isDownloaded: Boolean? = null,
-    val searchQuery: String? = null
+    val searchQuery: String? = null,
 )

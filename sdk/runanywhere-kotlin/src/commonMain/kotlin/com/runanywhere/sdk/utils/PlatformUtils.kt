@@ -34,8 +34,3 @@ expect object PlatformUtils {
      */
     fun getAppVersion(): String?
 }
-
-/**
- * Secure storage implementation for each platform
- */
-expect class SecureStorageImpl() : com.runanywhere.sdk.storage.SecureStorage

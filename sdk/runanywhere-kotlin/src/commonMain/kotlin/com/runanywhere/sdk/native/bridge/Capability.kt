@@ -6,13 +6,16 @@ package com.runanywhere.sdk.native.bridge
  *
  * This is a generic definition used by all native backends (ONNX, TFLite, CoreML, etc.)
  */
-enum class NativeCapability(val value: Int) {
+enum class NativeCapability(
+    val value: Int,
+) {
     TEXT_GENERATION(0),
     EMBEDDINGS(1),
     STT(2),
     TTS(3),
     VAD(4),
-    DIARIZATION(5);
+    DIARIZATION(5),
+    ;
 
     companion object {
         fun fromValue(value: Int): NativeCapability? = entries.find { it.value == value }
@@ -23,7 +26,9 @@ enum class NativeCapability(val value: Int) {
  * Device types used by native backends.
  * Maps directly to ra_device_type in types.h
  */
-enum class NativeDeviceType(val value: Int) {
+enum class NativeDeviceType(
+    val value: Int,
+) {
     CPU(0),
     GPU(1),
     NEURAL_ENGINE(2),
@@ -32,7 +37,8 @@ enum class NativeDeviceType(val value: Int) {
     VULKAN(5),
     COREML(6),
     TFLITE(7),
-    ONNX(8);
+    ONNX(8),
+    ;
 
     companion object {
         fun fromValue(value: Int): NativeDeviceType = entries.find { it.value == value } ?: CPU
@@ -43,7 +49,9 @@ enum class NativeDeviceType(val value: Int) {
  * Result codes from C API operations.
  * Maps directly to ra_result_code in types.h
  */
-enum class NativeResultCode(val value: Int) {
+enum class NativeResultCode(
+    val value: Int,
+) {
     SUCCESS(0),
     ERROR_INIT_FAILED(-1),
     ERROR_MODEL_LOAD_FAILED(-2),
@@ -55,7 +63,8 @@ enum class NativeResultCode(val value: Int) {
     ERROR_CANCELLED(-8),
     ERROR_TIMEOUT(-9),
     ERROR_IO(-10),
-    ERROR_UNKNOWN(-99);
+    ERROR_UNKNOWN(-99),
+    ;
 
     val isSuccess: Boolean get() = this == SUCCESS
 
