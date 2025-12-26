@@ -10,7 +10,7 @@ extension RunAnywhere {
     public static func loadModel(_ modelId: String) async throws {
         // Ensure initialized
         guard isInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure services are ready (O(1) after first call)
@@ -24,7 +24,7 @@ extension RunAnywhere {
     /// - Note: Events are automatically dispatched to both EventBus and Analytics
     public static func unloadModel() async throws {
         guard isInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         // LLMCapability handles all event tracking automatically
@@ -58,7 +58,7 @@ extension RunAnywhere {
     public static func loadSTTModel(_ modelId: String) async throws {
         // Ensure initialized
         guard isInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure services are ready (O(1) after first call)
@@ -75,7 +75,7 @@ extension RunAnywhere {
     public static func loadTTSModel(_ voiceId: String) async throws {
         // Ensure initialized
         guard isInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure services are ready (O(1) after first call)
@@ -88,7 +88,7 @@ extension RunAnywhere {
     /// Get available models
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
-        guard isInitialized else { throw RunAnywhereError.notInitialized }
+        guard isInitialized else { throw SDKError.general(.notInitialized, "SDK not initialized") }
         return await serviceContainer.modelRegistry.discoverModels()
     }
 

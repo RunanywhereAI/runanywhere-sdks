@@ -87,7 +87,7 @@ public actor VoiceAgentCapability: CompositeCapability {
         do {
             try await vad.initialize(vadConfig)
         } catch {
-            throw CapabilityError.compositeComponentFailed(component: "VAD", error)
+            throw SDKError.voiceAgent(.initializationFailed, "VAD component failed: \(error.localizedDescription)", underlying: error)
         }
     }
 
@@ -109,7 +109,7 @@ public actor VoiceAgentCapability: CompositeCapability {
         do {
             try await stt.loadModel(sttModelId)
         } catch {
-            throw CapabilityError.compositeComponentFailed(component: "STT", error)
+            throw SDKError.voiceAgent(.initializationFailed, "STT component failed: \(error.localizedDescription)", underlying: error)
         }
     }
 
@@ -141,7 +141,7 @@ public actor VoiceAgentCapability: CompositeCapability {
         do {
             try await llm.loadModel(llmModelId)
         } catch {
-            throw CapabilityError.compositeComponentFailed(component: "LLM", error)
+            throw SDKError.voiceAgent(.initializationFailed, "LLM component failed: \(error.localizedDescription)", underlying: error)
         }
     }
 
@@ -174,7 +174,7 @@ public actor VoiceAgentCapability: CompositeCapability {
         do {
             try await tts.loadVoice(ttsVoice)
         } catch {
-            throw CapabilityError.compositeComponentFailed(component: "TTS", error)
+            throw SDKError.voiceAgent(.initializationFailed, "TTS component failed: \(error.localizedDescription)", underlying: error)
         }
     }
 
@@ -195,24 +195,15 @@ public actor VoiceAgentCapability: CompositeCapability {
         let ttsReady = await tts.isVoiceLoaded
 
         guard sttReady else {
-            throw CapabilityError.compositeComponentFailed(
-                component: "STT",
-                CapabilityError.resourceNotLoaded("STT model not loaded")
-            )
+            throw SDKError.voiceAgent(.componentNotReady, "STT model not loaded")
         }
 
         guard llmReady else {
-            throw CapabilityError.compositeComponentFailed(
-                component: "LLM",
-                CapabilityError.resourceNotLoaded("LLM model not loaded")
-            )
+            throw SDKError.voiceAgent(.componentNotReady, "LLM model not loaded")
         }
 
         guard ttsReady else {
-            throw CapabilityError.compositeComponentFailed(
-                component: "TTS",
-                CapabilityError.resourceNotLoaded("TTS voice not loaded")
-            )
+            throw SDKError.voiceAgent(.componentNotReady, "TTS voice not loaded")
         }
     }
 
@@ -229,7 +220,7 @@ public actor VoiceAgentCapability: CompositeCapability {
         do {
             try await vad.initialize(VADConfiguration())
         } catch {
-            throw CapabilityError.compositeComponentFailed(component: "VAD", error)
+            throw SDKError.voiceAgent(.initializationFailed, "VAD component failed: \(error.localizedDescription)", underlying: error)
         }
 
         // Verify all components are ready
@@ -238,22 +229,13 @@ public actor VoiceAgentCapability: CompositeCapability {
         let ttsReady = await tts.isVoiceLoaded
 
         guard sttReady else {
-            throw CapabilityError.compositeComponentFailed(
-                component: "STT",
-                CapabilityError.resourceNotLoaded("No STT model loaded. Load one first via RunAnywhere.loadSTTModel()")
-            )
+            throw SDKError.voiceAgent(.componentNotReady, "No STT model loaded. Load one first via RunAnywhere.loadSTTModel()")
         }
         guard llmReady else {
-            throw CapabilityError.compositeComponentFailed(
-                component: "LLM",
-                CapabilityError.resourceNotLoaded("No LLM model loaded. Load one first via RunAnywhere.loadModel()")
-            )
+            throw SDKError.voiceAgent(.componentNotReady, "No LLM model loaded. Load one first via RunAnywhere.loadModel()")
         }
         guard ttsReady else {
-            throw CapabilityError.compositeComponentFailed(
-                component: "TTS",
-                CapabilityError.resourceNotLoaded("No TTS voice loaded. Load one first via RunAnywhere.loadTTSVoice()")
-            )
+            throw SDKError.voiceAgent(.componentNotReady, "No TTS voice loaded. Load one first via RunAnywhere.loadTTSVoice()")
         }
 
         self.isConfigured = true
@@ -286,7 +268,7 @@ public actor VoiceAgentCapability: CompositeCapability {
     /// - Returns: Voice agent result with all intermediate outputs
     public func processVoiceTurn(_ audioData: Data) async throws -> VoiceAgentResult {
         guard isConfigured else {
-            throw CapabilityError.notInitialized("Voice Agent")
+            throw SDKError.voiceAgent(.notInitialized, "Voice Agent is not initialized")
         }
 
         let metrics = CapabilityMetrics(resourceId: "voice-agent")
@@ -299,7 +281,7 @@ public actor VoiceAgentCapability: CompositeCapability {
 
         if transcription.isEmpty {
             logger.warning("Empty transcription, skipping processing")
-            throw VoiceAgentError.emptyTranscription
+            throw SDKError.voiceAgent(.emptyInput, "No speech detected in audio")
         }
 
         logger.info("Transcription: \(transcription)")
@@ -333,7 +315,7 @@ public actor VoiceAgentCapability: CompositeCapability {
             Task {
                 guard self.isConfigured else {
                     continuation.finish(
-                        throwing: CapabilityError.notInitialized("Voice Agent")
+                        throwing: SDKError.voiceAgent(.notInitialized, "Voice Agent is not initialized")
                     )
                     return
                 }
@@ -380,7 +362,7 @@ public actor VoiceAgentCapability: CompositeCapability {
     /// Transcribe audio only (without LLM/TTS)
     public func transcribe(_ audioData: Data) async throws -> String {
         guard isConfigured else {
-            throw CapabilityError.notInitialized("Voice Agent")
+            throw SDKError.voiceAgent(.notInitialized, "Voice Agent is not initialized")
         }
         let output = try await stt.transcribe(audioData)
         return output.text
@@ -389,7 +371,7 @@ public actor VoiceAgentCapability: CompositeCapability {
     /// Generate LLM response only
     public func generateResponse(_ prompt: String) async throws -> String {
         guard isConfigured else {
-            throw CapabilityError.notInitialized("Voice Agent")
+            throw SDKError.voiceAgent(.notInitialized, "Voice Agent is not initialized")
         }
         let result = try await llm.generate(prompt)
         return result.text
@@ -398,7 +380,7 @@ public actor VoiceAgentCapability: CompositeCapability {
     /// Synthesize speech only
     public func synthesizeSpeech(_ text: String) async throws -> Data {
         guard isConfigured else {
-            throw CapabilityError.notInitialized("Voice Agent")
+            throw SDKError.voiceAgent(.notInitialized, "Voice Agent is not initialized")
         }
         let output = try await tts.synthesize(text)
         return output.audioData
@@ -408,22 +390,5 @@ public actor VoiceAgentCapability: CompositeCapability {
     public func detectSpeech(_ samples: [Float]) async throws -> Bool {
         let output = try await vad.detectSpeech(in: samples)
         return output.isSpeechDetected
-    }
-}
-
-// MARK: - Voice Agent Error
-
-/// Errors specific to voice agent operations
-public enum VoiceAgentError: Error, LocalizedError {
-    case emptyTranscription
-    case pipelineInterrupted(String)
-
-    public var errorDescription: String? {
-        switch self {
-        case .emptyTranscription:
-            return "No speech detected in audio"
-        case .pipelineInterrupted(let reason):
-            return "Voice pipeline interrupted: \(reason)"
-        }
     }
 }

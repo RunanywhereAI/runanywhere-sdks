@@ -115,7 +115,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     func downloadModelWithArtifactType(_ model: ModelInfo) async throws -> DownloadTask {
         guard let downloadURL = model.downloadURL else {
             EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: "Invalid download URL"))
-            throw DownloadError.invalidURL
+            throw SDKError.download(.invalidInput, "Invalid download URL for model: \(model.id)")
         }
 
         // Track download started
@@ -322,18 +322,19 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     func mapAlamofireError(_ error: AFError) -> Error {
         switch error {
         case .sessionTaskFailed(let underlyingError):
-            return DownloadError.networkError(underlyingError)
+            let message = "Network error during download: \(underlyingError.localizedDescription)"
+            return SDKError.download(.networkError, message, underlying: underlyingError)
         case .responseValidationFailed(reason: let reason):
             switch reason {
             case .unacceptableStatusCode(let code):
-                return DownloadError.httpError(code)
+                return SDKError.download(.httpError, "HTTP error \(code)")
             default:
-                return DownloadError.invalidResponse
+                return SDKError.download(.invalidResponse, "Invalid response from server")
             }
         case .createURLRequestFailed, .invalidURL:
-            return DownloadError.invalidURL
+            return SDKError.download(.invalidInput, "Invalid URL")
         default:
-            return DownloadError.unknown
+            return SDKError.download(.unknown, "Unknown download error: \(error.localizedDescription)")
         }
     }
 }

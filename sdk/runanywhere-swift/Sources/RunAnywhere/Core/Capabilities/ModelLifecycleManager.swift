@@ -135,7 +135,7 @@ public actor ModelLifecycleManager<ServiceType> {
         } catch {
             inflightTask = nil
             logger.error("Failed to load resource: \(error)")
-            throw CapabilityError.loadFailed(resourceId, error)
+            throw SDKError.general(.modelLoadFailed, "Failed to load \(resourceId): \(error.localizedDescription)", underlying: error)
         }
     }
 
@@ -167,7 +167,7 @@ public actor ModelLifecycleManager<ServiceType> {
     /// Get service or throw if not loaded
     public func requireService() throws -> ServiceType {
         guard let service = service else {
-            throw CapabilityError.resourceNotLoaded("resource")
+            throw SDKError.general(.componentNotReady, "Resource not loaded")
         }
         return service
     }

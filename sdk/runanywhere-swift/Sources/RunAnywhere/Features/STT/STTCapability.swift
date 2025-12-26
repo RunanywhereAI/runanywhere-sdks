@@ -119,7 +119,7 @@ public actor STTCapability: ModelLoadableCapability {
                 errorMessage: error.localizedDescription
             )
             await managedLifecycle.trackOperationError(error, operation: "transcribe")
-            throw CapabilityError.operationFailed("Transcription", error)
+            throw SDKError.stt(.generationFailed, "Transcription failed: \(error.localizedDescription)", underlying: error)
         }
 
         // Complete transcription tracking
@@ -189,7 +189,7 @@ public actor STTCapability: ModelLoadableCapability {
             Task {
                 guard let service = await self.managedLifecycle.currentService else {
                     continuation.finish(
-                        throwing: CapabilityError.resourceNotLoaded("STT model")
+                        throwing: SDKError.stt(.componentNotReady, "STT model not loaded")
                     )
                     return
                 }

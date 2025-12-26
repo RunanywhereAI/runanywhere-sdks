@@ -185,7 +185,7 @@ public enum RunAnywhere {
      *   - baseURL: Backend API base URL (optional for development, required for production/staging)
      *   - environment: SDK environment (default: .development)
      *
-     * - Throws: RunAnywhereError if validation fails
+     * - Throws: SDKError if validation fails
      */
     public static func initialize(
         apiKey: String? = nil,
@@ -200,10 +200,10 @@ public enum RunAnywhere {
         } else {
             // Production/Staging mode - require API key and URL
             guard let apiKey = apiKey, !apiKey.isEmpty else {
-                throw RunAnywhereError.invalidConfiguration("API key is required for \(environment.description) mode")
+                throw SDKError.general(.invalidConfiguration, "API key is required for \(environment.description) mode")
             }
             guard let baseURL = baseURL, !baseURL.isEmpty else {
-                throw RunAnywhereError.invalidConfiguration("Base URL is required for \(environment.description) mode")
+                throw SDKError.general(.invalidConfiguration, "Base URL is required for \(environment.description) mode")
             }
             params = try SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
         }
@@ -309,7 +309,7 @@ public enum RunAnywhere {
         }
 
         guard let params = initParams, let environment = currentEnvironment else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         let logger = SDKLogger(category: "RunAnywhere.Services")

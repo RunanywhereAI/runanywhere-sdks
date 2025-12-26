@@ -24,7 +24,7 @@ public actor RemoteTelemetryDataSource {
     /// Send batch of typed telemetry payloads directly (preserves category → modality)
     public func sendPayloads(_ payloads: [TelemetryEventPayload]) async throws {
         guard let apiClient = apiClient else {
-            throw DataSourceError.notAvailable
+            throw SDKError.network(.serviceNotAvailable, "Remote telemetry data source not available")
         }
 
         guard !payloads.isEmpty else {

@@ -20,7 +20,7 @@ public extension RunAnywhere {
     /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func loadTTSVoice(_ voiceId: String) async throws {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         try await serviceContainer.ttsCapability.loadVoice(voiceId)
@@ -30,7 +30,7 @@ public extension RunAnywhere {
     /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func unloadTTSVoice() async throws {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         try await serviceContainer.ttsCapability.unload()
@@ -63,7 +63,7 @@ public extension RunAnywhere {
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSOutput {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         return try await serviceContainer.ttsCapability.synthesize(text, options: options)
@@ -80,7 +80,7 @@ public extension RunAnywhere {
     ) async -> AsyncThrowingStream<Data, Error> {
         guard isSDKInitialized else {
             return AsyncThrowingStream { continuation in
-                continuation.finish(throwing: RunAnywhereError.notInitialized)
+                continuation.finish(throwing: SDKError.general(.notInitialized, "SDK not initialized"))
             }
         }
 

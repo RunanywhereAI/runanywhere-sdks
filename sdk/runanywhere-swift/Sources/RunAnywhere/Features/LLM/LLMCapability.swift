@@ -119,7 +119,7 @@ public actor LLMCapability: ModelLoadableCapability {
             logger.error("Generation failed: \(error)")
             await analyticsService.trackGenerationFailed(generationId: generationId, error: error)
             await managedLifecycle.trackOperationError(error, operation: "generate")
-            throw CapabilityError.operationFailed("Generation", error)
+            throw SDKError.llm(.generationFailed, "Generation failed: \(error.localizedDescription)", underlying: error)
         }
 
         let endTime = Date()
@@ -172,7 +172,7 @@ public actor LLMCapability: ModelLoadableCapability {
     ///   - prompt: The input prompt
     ///   - options: Generation options
     /// - Returns: Streaming result with token stream and final metrics
-    /// - Throws: `LLMError.streamingNotSupported` if the service doesn't support streaming
+    /// - Throws: `SDKError.llm(.streamingNotSupported, ...)` if the service doesn't support streaming
     /// - Note: Time-to-first-token (TTFT) is tracked for streaming generations
     public func generateStream(
         _ prompt: String,
@@ -183,7 +183,7 @@ public actor LLMCapability: ModelLoadableCapability {
         // Check if streaming is supported by this service
         guard service.supportsStreaming else {
             logger.error("Streaming not supported by current service")
-            throw LLMError.streamingNotSupported
+            throw SDKError.llm(.streamingNotSupported, "Streaming generation is not supported by this service")
         }
 
         let modelId = await managedLifecycle.modelIdOrUnknown()

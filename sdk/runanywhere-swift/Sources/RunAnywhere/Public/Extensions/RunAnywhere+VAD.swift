@@ -17,7 +17,7 @@ public extension RunAnywhere {
     /// Initialize VAD with default configuration
     static func initializeVAD() async throws {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         try await serviceContainer.vadCapability.initialize()
@@ -27,7 +27,7 @@ public extension RunAnywhere {
     /// - Parameter config: VAD configuration
     static func initializeVAD(_ config: VADConfiguration) async throws {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         try await serviceContainer.vadCapability.initialize(config)
@@ -47,7 +47,7 @@ public extension RunAnywhere {
     /// - Returns: VAD output with detection result
     static func detectSpeech(in buffer: AVAudioPCMBuffer) async throws -> VADOutput {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         return try await serviceContainer.vadCapability.detectSpeech(in: buffer)
@@ -58,7 +58,7 @@ public extension RunAnywhere {
     /// - Returns: VAD output with detection result
     static func detectSpeech(in samples: [Float]) async throws -> VADOutput {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         return try await serviceContainer.vadCapability.detectSpeech(in: samples)

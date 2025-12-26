@@ -32,9 +32,9 @@ public struct APIResponse<T: Decodable>: Decodable {
             return data
         }
         if let error = error {
-            throw error.toAPIError(statusCode: statusCode)
+            throw error.toSDKError(statusCode: statusCode)
         }
-        throw APIError.unknown(statusCode: statusCode, message: "No data or error in response")
+        throw SDKError.network(.unknown, "No data or error in response (status: \(statusCode))")
     }
 
     /// Check if response indicates success
@@ -64,24 +64,43 @@ public struct APIErrorResponse: Decodable, Sendable {
     /// Error code from backend
     public let code: String?
 
-    /// Convert to APIError
-    public func toAPIError(statusCode: Int) -> APIError {
-        // Priority: detail > message > error > generic
+    /// Convert to SDKError
+    public func toSDKError(statusCode: Int) -> SDKError {
+        // Extract message from detail, message, or error fields
+        var errorMessage: String?
         if let detail = detail {
             switch detail {
             case .message(let msg):
-                return APIError.serverError(statusCode: statusCode, message: msg, code: code)
+                errorMessage = msg
             case .validationErrors(let errors):
-                return APIError.validationError(statusCode: statusCode, errors: errors, code: code)
+                let messages = errors.map { $0.formattedMessage }
+                errorMessage = messages.joined(separator: "; ")
             }
+        } else if let message = message {
+            errorMessage = message
+        } else if let error = error {
+            errorMessage = error
         }
-        if let message = message {
-            return APIError.serverError(statusCode: statusCode, message: message, code: code)
+
+        // Map status code to appropriate SDKError
+        switch statusCode {
+        case 401:
+            return SDKError.network(.unauthorized, errorMessage ?? "Authentication required")
+        case 403:
+            return SDKError.network(.forbidden, errorMessage ?? "Access denied")
+        case 404:
+            return SDKError.network(.invalidResponse, errorMessage ?? "Resource not found")
+        case 408, 504:
+            return SDKError.network(.timeout, errorMessage ?? "Request timed out")
+        case 422:
+            return SDKError.network(.validationFailed, errorMessage ?? "Validation failed")
+        case 400..<500:
+            return SDKError.network(.httpError, "Client error \(statusCode): \(errorMessage ?? "Unknown error")")
+        case 500..<600:
+            return SDKError.network(.serverError, "Server error \(statusCode): \(errorMessage ?? "Unknown error")")
+        default:
+            return SDKError.network(.unknown, errorMessage ?? "Unknown error with status code \(statusCode)")
         }
-        if let error = error {
-            return APIError.serverError(statusCode: statusCode, message: error, code: code)
-        }
-        return APIError.unknown(statusCode: statusCode, message: nil)
     }
 }
 

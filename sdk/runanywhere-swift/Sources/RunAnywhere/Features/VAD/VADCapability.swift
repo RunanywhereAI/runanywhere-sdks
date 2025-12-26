@@ -116,7 +116,7 @@ public actor VADCapability: ServiceBasedCapability {
     /// - Returns: VAD output with detection result
     public func detectSpeech(in buffer: AVAudioPCMBuffer) async throws -> VADOutput {
         guard let service = service else {
-            throw CapabilityError.notInitialized("VAD")
+            throw SDKError.vad(.notInitialized, "VAD is not initialized")
         }
 
         service.processAudioBuffer(buffer)
@@ -133,7 +133,7 @@ public actor VADCapability: ServiceBasedCapability {
     /// - Returns: VAD output with detection result
     public func detectSpeech(in samples: [Float]) async throws -> VADOutput {
         guard let service = service else {
-            throw CapabilityError.notInitialized("VAD")
+            throw SDKError.vad(.notInitialized, "VAD is not initialized")
         }
 
         let isSpeech = service.processAudioData(samples)
