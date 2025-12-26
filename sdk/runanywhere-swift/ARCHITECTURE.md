@@ -26,7 +26,6 @@ runanywhere-swift/
 │   ├── LlamaCPPRuntime/          # LlamaCPP backend for LLM (~4 files)
 │   ├── FoundationModelsAdapter/  # Apple Intelligence integration (~2 files)
 │   ├── FluidAudioDiarization/    # Speaker diarization (~2 files)
-│   ├── WhisperKitTranscription/  # WhisperKit STT (temporarily disabled)
 │   └── CRunAnywhereCore/         # C bridge to unified xcframework
 ├── Binaries/                     # Binary dependencies (xcframework, dylibs)
 ├── Docs/                         # Architecture and design documentation
@@ -450,7 +449,7 @@ The following are marked `@MainActor`:
 ### 6.2 Binary Dependencies
 
 - **RunAnywhereCoreBinary** (xcframework): Contains compiled C/C++ backends (ONNX, LlamaCPP)
-- **onnxruntime** (dylib, macOS only): ONNX Runtime with CoreML provider
+- **onnxruntime** (dylib, macOS only): ONNX Runtime
 
 ### 6.3 Module Boundaries
 
@@ -633,7 +632,6 @@ The codebase includes testability features:
 ### 10.2 Dependency Cleanup
 
 - Database layer has been removed; models are managed in-memory with remote API sync via ModelAssignmentService
-- WhisperKit integration is temporarily disabled pending API updates
 
 ### 10.3 Test Infrastructure
 

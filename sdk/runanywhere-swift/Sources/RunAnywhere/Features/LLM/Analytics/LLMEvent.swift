@@ -301,7 +301,7 @@ public enum LLMEvent: SDKEvent, TypedEventProperties {
                 timeToFirstTokenMs: timeToFirstTokenMs,
                 generationTimeMs: durationMs,
                 contextLength: contextLength,
-                temperature: temperature != nil ? Double(temperature!) : nil,
+                temperature: temperature.map { Double($0) },
                 maxTokens: maxTokens,
                 isStreaming: isStreaming,
                 generationId: generationId

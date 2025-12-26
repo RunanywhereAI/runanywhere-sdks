@@ -77,7 +77,7 @@ class ModelListViewModel: ObservableObject {
             // Get all models from SDK registry
             // This now includes:
             // 1. Models from remote configuration (if available)
-            // 2. Models from framework adapters (like WhisperKit)
+            // 2. Models from framework adapters
             // 3. Models from local storage
             // 4. User-added models
             let allModels = try await RunAnywhere.availableModels()

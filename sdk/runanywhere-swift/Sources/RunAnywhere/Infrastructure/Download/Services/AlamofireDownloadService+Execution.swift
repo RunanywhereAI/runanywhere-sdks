@@ -30,7 +30,7 @@ extension AlamofireDownloadService {
 
                 // Log progress at defined intervals (local logging only)
                 let progressPercent = Int(progress.fractionCompleted * 100)
-                if progressPercent % DownloadConstants.logProgressIntervalPercent == 0 && progressPercent > 0 {
+                if progressPercent.isMultiple(of: DownloadConstants.logProgressIntervalPercent) && progressPercent > 0 {
                     self.logger.debug("Download progress", metadata: [
                         "modelId": model.id,
                         "progress": progressPercent,

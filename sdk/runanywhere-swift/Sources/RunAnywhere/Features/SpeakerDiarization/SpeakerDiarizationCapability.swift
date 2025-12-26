@@ -10,7 +10,6 @@ import Foundation
 /// Actor-based Speaker Diarization capability for identifying and tracking speakers
 public actor SpeakerDiarizationCapability: ServiceBasedCapability {
     public typealias Configuration = SpeakerDiarizationConfiguration
-    public typealias Service = SpeakerDiarizationService
 
     // MARK: - State
 

@@ -176,7 +176,7 @@ public final class DefaultModelExtractionService: ModelExtractionServiceProtocol
         }
 
         // Known model file extensions
-        let modelExtensions = Set(["gguf", "ggml", "onnx", "mlmodel", "mlpackage", "tflite", "pte", "safetensors"])
+        let modelExtensions = Set(["gguf", "onnx", "ort", "bin"])
 
         // Look for model files at this level
         for item in contents where modelExtensions.contains(item.pathExtension.lowercased()) {

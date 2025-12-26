@@ -257,7 +257,7 @@ public class RegistryService: ModelRegistry {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey]) else { return nil }
 
-        let modelExtensions = ["gguf", "ggml", "onnx", "mlmodel", "mlpackage", "tflite", "safetensors", "pte"]
+        let modelExtensions = ["gguf", "onnx", "ort", "bin"]
         for file in files {
             let ext = file.pathExtension.lowercased()
             guard modelExtensions.contains(ext), let format = detectFormatFromExtension(ext) else { continue }
@@ -287,7 +287,7 @@ public class RegistryService: ModelRegistry {
     private func discoverBundleModels() -> [ModelInfo]? {
         var models: [ModelInfo] = []
         let bundle = Bundle.main
-        let modelExtensions = ["mlmodel", "mlmodelc", "mlpackage", "tflite", "onnx", "gguf"]
+        let modelExtensions = ["onnx", "ort", "gguf", "bin"]
 
         for ext in modelExtensions {
             guard let urls = bundle.urls(forResourcesWithExtension: ext, subdirectory: nil),
@@ -333,7 +333,7 @@ public class RegistryService: ModelRegistry {
 
     private func generateModelId(from url: URL) -> String {
         var filename = url.lastPathComponent
-        let knownExtensions = ["gz", "bz2", "tar", "zip", "gguf", "onnx", "mlmodel", "mlpackage", "tflite", "safetensors", "pte", "bin"]
+        let knownExtensions = ["gz", "bz2", "tar", "zip", "gguf", "onnx", "ort", "bin"]
         while let ext = filename.split(separator: ".").last, knownExtensions.contains(String(ext).lowercased()) {
             filename = String(filename.dropLast(ext.count + 1))
         }
@@ -352,31 +352,18 @@ public class RegistryService: ModelRegistry {
 
     private func detectFormatFromExtension(_ ext: String) -> ModelFormat? {
         switch ext {
-        case "mlmodel", "mlmodelc": return .mlmodel
-        case "mlpackage": return .mlpackage
-        case "tflite": return .tflite
         case "onnx": return .onnx
         case "ort": return .ort
         case "gguf": return .gguf
-        case "ggml": return .ggml
-        case "mlx": return .mlx
-        case "pte": return .pte
-        case "safetensors": return .safetensors
         case "bin": return .bin
-        case "weights": return .weights
-        case "checkpoint": return .checkpoint
         default: return nil
         }
     }
 
     private func detectFramework(for format: ModelFormat) -> InferenceFramework? {
         switch format {
-        case .mlmodel, .mlpackage: return .coreML
-        case .tflite: return .tensorFlowLite
         case .onnx, .ort: return .onnx
-        case .safetensors: return .mlx
-        case .gguf, .ggml: return .llamaCpp
-        case .pte: return .execuTorch
+        case .gguf: return .llamaCpp
         default: return nil
         }
     }
@@ -396,9 +383,8 @@ public class RegistryService: ModelRegistry {
 
     private func estimateMemoryUsage(fileSize: Int64, format: ModelFormat) -> Int64 {
         switch format {
-        case .gguf, .ggml, .tflite: return fileSize
-        case .mlmodel, .mlpackage: return Int64(Double(fileSize) * 1.5)
-        case .safetensors: return Int64(Double(fileSize) * 1.2)
+        case .gguf: return fileSize
+        case .onnx, .ort: return Int64(Double(fileSize) * 1.2)
         default: return Int64(Double(fileSize) * 1.5)
         }
     }

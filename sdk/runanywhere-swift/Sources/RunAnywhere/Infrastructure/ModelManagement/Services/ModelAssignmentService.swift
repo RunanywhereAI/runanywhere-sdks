@@ -194,12 +194,10 @@ extension ModelAssignment {
             // Infer from format if framework not specified
             let inferredFormat = ModelFormat(rawValue: format.lowercased()) ?? .unknown
             switch inferredFormat {
-            case .gguf, .ggml:
+            case .gguf:
                 modelFramework = .llamaCpp
             case .onnx, .ort:
                 modelFramework = .onnx
-            case .mlmodel, .mlpackage:
-                modelFramework = .coreML
             default:
                 modelFramework = .unknown  // Explicit unknown - don't assume framework
             }

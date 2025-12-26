@@ -25,7 +25,6 @@ public enum STTConstants {
     /// This is the expected input format for most STT models including:
     /// - OpenAI Whisper (all sizes)
     /// - Sherpa-ONNX Whisper
-    /// - WhisperKit
     ///
     /// Audio at different sample rates should be resampled to 16kHz before processing.
     public static let defaultSampleRate: Int = 16000

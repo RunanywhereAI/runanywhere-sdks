@@ -37,7 +37,8 @@ class STTViewModel: ObservableObject {
                 Task { @MainActor [weak self] in
                     guard let self = self else { return }
                     if self.isRecording {
-                        self.logger.info("Mode changed from \(oldValue.rawValue) to \(self.selectedMode.rawValue) - stopping active recording")
+                        let msg = "Mode changed from \(oldValue.rawValue) to \(self.selectedMode.rawValue)"
+                        self.logger.info("\(msg) - stopping active recording")
                         await self.stopRecording()
                     }
                     // Also clean up any lingering live transcription resources
@@ -131,7 +132,7 @@ class STTViewModel: ObservableObject {
     // MARK: - Private Methods - Permissions
 
     private func requestMicrophonePermission() async -> Bool {
-        return await audioCapture.requestPermission()
+        await audioCapture.requestPermission()
     }
 
     // MARK: - Private Methods - Subscriptions

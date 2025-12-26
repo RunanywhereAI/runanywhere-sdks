@@ -13,7 +13,7 @@ import RunAnywhere
 /// LlamaCPP module for LLM text generation.
 ///
 /// Provides large language model capabilities using llama.cpp
-/// with GGUF/GGML models and Metal acceleration.
+/// with GGUF models and Metal acceleration.
 ///
 /// ## Registration
 ///
@@ -76,14 +76,10 @@ public enum LlamaCPP: RunAnywhereModule {
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
             return modelInfo.framework == .llamaCpp
                 || modelInfo.format == .gguf
-                || modelInfo.format == .ggml
         }
 
         // Fallback: Pattern-based matching
         if lowercased.contains("gguf") || lowercased.hasSuffix(".gguf") {
-            return true
-        }
-        if lowercased.contains("ggml") || lowercased.hasSuffix(".ggml") {
             return true
         }
         if lowercased.contains("llamacpp") || lowercased.contains("llama-cpp") || lowercased.contains("llama_cpp") {

@@ -38,7 +38,7 @@ public struct STTOptions: Sendable {
     /// Sample rate of input audio (default: 16000 Hz for STT models)
     public let sampleRate: Int
 
-    /// Preferred framework for transcription (WhisperKit, ONNX, etc.)
+    /// Preferred framework for transcription (ONNX, etc.)
     public let preferredFramework: InferenceFramework?
 
     public init(

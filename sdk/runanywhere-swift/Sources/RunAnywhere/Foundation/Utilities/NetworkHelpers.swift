@@ -25,7 +25,9 @@ public struct RemoteOperationHelper: Sendable {
             }
 
             // First completed task wins - guaranteed non-nil with 2 tasks
-            let result = try await group.next()!
+            guard let result = try await group.next() else {
+                throw DataSourceError.operationFailed("No result from task group")
+            }
             group.cancelAll()
             return result
         }

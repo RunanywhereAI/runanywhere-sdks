@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Energy-based Voice Activity Detection implementation
-//  Based on WhisperKit's EnergyVAD but simplified for real-time audio processing
+//  Simplified for real-time audio processing
 //
 
 import Accelerate

@@ -43,7 +43,6 @@ let package = Package(
         // - Pulse 4.2.7 (logging)
         //
         // Via Optional Modules:
-        // - WhisperKit 0.13.1 (via RunAnywhereWhisperKit)
         // - FluidAudio (via RunAnywhereFluidAudio)
         // - ONNX Runtime binary (via RunAnywhereONNX)
         // - LlamaCPP binary (via RunAnywhereLlamaCPP)

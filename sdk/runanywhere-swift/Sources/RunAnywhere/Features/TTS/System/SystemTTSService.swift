@@ -31,10 +31,6 @@ private actor SpeechState {
         continuation = nil
         isSpeaking = false
     }
-
-    func checkSpeaking() -> Bool {
-        isSpeaking
-    }
 }
 
 // MARK: - System TTS Service

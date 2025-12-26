@@ -150,7 +150,6 @@ public struct SDKLogger: Sendable {
 /// Internal helper for building error log context.
 /// Captures all debugging information at the call site.
 private struct ErrorLogContext {
-    let error: Error
     let raError: RunAnywhereError
     let fileName: String
     let line: Int
@@ -169,7 +168,6 @@ private struct ErrorLogContext {
         additionalInfo: String?,
         isFault: Bool = false
     ) {
-        self.error = error
         self.raError = error.asRunAnywhereError()
         self.fileName = (file as NSString).lastPathComponent
         self.line = line
@@ -212,7 +210,7 @@ private struct ErrorLogContext {
     var metadata: [String: Any] { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         var meta: [String: Any] = [ // swiftlint:disable:this prefer_concrete_types avoid_any_type
             "error_code": raError.errorCode,
-            "error_domain": RunAnywhereErrorDomain,
+            "error_domain": runAnywhereErrorDomain,
             "source_file": fileName,
             "source_line": line,
             "source_function": function,

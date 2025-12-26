@@ -22,7 +22,7 @@ extension LlamaCPPService: LLMService {
     public var contextLength: Int? {
         guard isReady else { return nil }
         // Default to 8192 which is the typical capped value for mobile
-        // TODO: Get actual value from C bridge when ra_get_context_length is available
+        // Note: When ra_get_context_length is available in the C bridge, use that instead
         return 8192
     }
 

@@ -15,7 +15,6 @@ import Foundation
 /// eliminating duplicate lifecycle management code.
 public actor LLMCapability: ModelLoadableCapability {
     public typealias Configuration = LLMConfiguration
-    public typealias Service = LLMService
 
     // MARK: - State
 
