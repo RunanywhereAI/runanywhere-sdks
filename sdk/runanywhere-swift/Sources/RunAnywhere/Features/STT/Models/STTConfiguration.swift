@@ -29,7 +29,7 @@ public struct STTConfiguration: ComponentConfiguration, Sendable {
     public init(
         modelId: String? = nil,
         language: String = "en-US",
-        sampleRate: Int = 16000,
+        sampleRate: Int = STTConstants.defaultSampleRate,
         enablePunctuation: Bool = true,
         enableDiarization: Bool = false,
         vocabularyList: [String] = [],
@@ -48,10 +48,10 @@ public struct STTConfiguration: ComponentConfiguration, Sendable {
 
     public func validate() throws {
         guard sampleRate > 0 && sampleRate <= 48000 else {
-            throw RunAnywhereError.validationFailed("Sample rate must be between 1 and 48000 Hz")
+            throw SDKError.general(.validationFailed, "Sample rate must be between 1 and 48000 Hz")
         }
         guard maxAlternatives > 0 && maxAlternatives <= 10 else {
-            throw RunAnywhereError.validationFailed("Max alternatives must be between 1 and 10")
+            throw SDKError.general(.validationFailed, "Max alternatives must be between 1 and 10")
         }
     }
 }

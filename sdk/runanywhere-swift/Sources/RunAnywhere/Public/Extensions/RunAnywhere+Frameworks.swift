@@ -36,14 +36,8 @@ public extension RunAnywhere {
         var frameworks: Set<InferenceFramework> = []
 
         for model in allModels {
-            // Add preferred framework
-            if let preferred = model.preferredFramework {
-                frameworks.insert(preferred)
-            }
-            // Add all compatible frameworks
-            for framework in model.compatibleFrameworks {
-                frameworks.insert(framework)
-            }
+            // Add the model's framework (1:1 mapping)
+            frameworks.insert(model.framework)
         }
 
         return Array(frameworks).sorted { $0.displayName < $1.displayName }
@@ -68,17 +62,11 @@ public extension RunAnywhere {
             relevantCategories = [.speechSynthesis]
         case .vad:
             relevantCategories = [.audio]
-        case .speakerDiarization:
-            relevantCategories = [.audio]
         }
 
         for model in allModels where relevantCategories.contains(model.category) {
-            if let preferred = model.preferredFramework {
-                frameworks.insert(preferred)
-            }
-            for framework in model.compatibleFrameworks {
-                frameworks.insert(framework)
-            }
+            // Add the model's framework (1:1 mapping)
+            frameworks.insert(model.framework)
         }
 
         return Array(frameworks).sorted { $0.displayName < $1.displayName }

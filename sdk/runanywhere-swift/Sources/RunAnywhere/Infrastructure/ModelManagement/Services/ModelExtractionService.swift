@@ -70,7 +70,7 @@ public final class DefaultModelExtractionService: ModelExtractionServiceProtocol
         let startTime = Date()
 
         guard case .archive(let archiveType, let structure, _) = artifactType else {
-            throw DownloadError.extractionFailed("Artifact type does not require extraction")
+            throw SDKError.download(.extractionFailed, "Artifact type does not require extraction")
         }
 
         logger.info("Starting extraction", metadata: [
@@ -176,7 +176,7 @@ public final class DefaultModelExtractionService: ModelExtractionServiceProtocol
         }
 
         // Known model file extensions
-        let modelExtensions = Set(["gguf", "ggml", "onnx", "mlmodel", "mlpackage", "tflite", "pte", "safetensors"])
+        let modelExtensions = Set(["gguf", "onnx", "ort", "bin"])
 
         // Look for model files at this level
         for item in contents where modelExtensions.contains(item.pathExtension.lowercased()) {

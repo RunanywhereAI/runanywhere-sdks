@@ -18,6 +18,16 @@ public struct TelemetryEventPayload: Codable, Sendable {
     public let timestamp: Date
     public let createdAt: Date
 
+    // MARK: - Event Classification
+
+    /// Event modality for V2 routing (llm, stt, tts, model, system)
+    public let modality: String?
+
+    // MARK: - Device Identification
+
+    /// Persistent device UUID (for V2 base table)
+    public let deviceId: String?
+
     // MARK: - Session Tracking
 
     public let sessionId: String?
@@ -75,12 +85,17 @@ public struct TelemetryEventPayload: Codable, Sendable {
     public let outputDurationMs: Double?
 
     // MARK: - Coding Keys (snake_case for API)
+    // NOTE: Production (FastAPI) uses `id` and `timestamp`
+    //       Development (Supabase) uses `sdk_event_id` and `event_timestamp`
+    //       The encode(to:) method handles this difference based on productionEncodingMode
 
     enum CodingKeys: String, CodingKey {
-        case id
+        case id  // Production: "id", Development: manually encoded as "sdk_event_id"
         case eventType = "event_type"
-        case timestamp
+        case timestamp  // Production: "timestamp", Development: manually encoded as "event_timestamp"
         case createdAt = "created_at"
+        case modality  // Only used for Supabase; skipped in production encoding
+        case deviceId = "device_id"  // Only used for Supabase; skipped in production encoding
         case sessionId = "session_id"
         case modelId = "model_id"
         case modelName = "model_name"
@@ -118,6 +133,90 @@ public struct TelemetryEventPayload: Codable, Sendable {
         case outputDurationMs = "output_duration_ms"
     }
 
+    /// Dynamic coding key for environment-specific field names
+    private struct DynamicCodingKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+
+        init(stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(intValue: Int) {
+            return nil
+        }
+    }
+
+    // MARK: - Environment-Aware Encoding
+
+    /// Flag to control encoding mode (set by RemoteTelemetryDataSource based on environment)
+    /// - `true`: Production mode - skip `modality` and `device_id` (FastAPI has them at batch level)
+    /// - `false`: Development mode - include all fields (Supabase needs them per event)
+    public static var productionEncodingMode = false
+
+    /// Custom encoder that handles both Supabase (all keys) and FastAPI (skip batch-level fields).
+    /// - Production (FastAPI): uses `id` and `timestamp`
+    /// - Development (Supabase): uses `sdk_event_id` and `event_timestamp`
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        // Required fields - use different key names based on environment
+        if Self.productionEncodingMode {
+            // Production: FastAPI expects "id" and "timestamp"
+            try container.encode(id, forKey: .id)
+            try container.encode(timestamp, forKey: .timestamp)
+        } else {
+            // Development: Supabase expects "sdk_event_id" and "event_timestamp"
+            var dynamicContainer = encoder.container(keyedBy: DynamicCodingKey.self)
+            try dynamicContainer.encode(id, forKey: DynamicCodingKey(stringValue: "sdk_event_id"))
+            try dynamicContainer.encode(timestamp, forKey: DynamicCodingKey(stringValue: "event_timestamp"))
+        }
+        try container.encode(eventType, forKey: .eventType)
+        try container.encode(createdAt, forKey: .createdAt)
+
+        // Conditional fields - skip for production (FastAPI has them at batch level)
+        if !Self.productionEncodingMode {
+            try container.encode(modality, forKey: .modality)
+            try container.encode(deviceId, forKey: .deviceId)
+        }
+
+        try container.encode(sessionId, forKey: .sessionId)
+        try container.encode(modelId, forKey: .modelId)
+        try container.encode(modelName, forKey: .modelName)
+        try container.encode(framework, forKey: .framework)
+        try container.encode(device, forKey: .device)
+        try container.encode(osVersion, forKey: .osVersion)
+        try container.encode(platform, forKey: .platform)
+        try container.encode(sdkVersion, forKey: .sdkVersion)
+        try container.encode(processingTimeMs, forKey: .processingTimeMs)
+        try container.encode(success, forKey: .success)
+        try container.encode(errorMessage, forKey: .errorMessage)
+        try container.encode(errorCode, forKey: .errorCode)
+        try container.encode(inputTokens, forKey: .inputTokens)
+        try container.encode(outputTokens, forKey: .outputTokens)
+        try container.encode(totalTokens, forKey: .totalTokens)
+        try container.encode(tokensPerSecond, forKey: .tokensPerSecond)
+        try container.encode(timeToFirstTokenMs, forKey: .timeToFirstTokenMs)
+        try container.encode(promptEvalTimeMs, forKey: .promptEvalTimeMs)
+        try container.encode(generationTimeMs, forKey: .generationTimeMs)
+        try container.encode(contextLength, forKey: .contextLength)
+        try container.encode(temperature, forKey: .temperature)
+        try container.encode(maxTokens, forKey: .maxTokens)
+        try container.encode(audioDurationMs, forKey: .audioDurationMs)
+        try container.encode(realTimeFactor, forKey: .realTimeFactor)
+        try container.encode(wordCount, forKey: .wordCount)
+        try container.encode(confidence, forKey: .confidence)
+        try container.encode(language, forKey: .language)
+        try container.encode(isStreaming, forKey: .isStreaming)
+        try container.encode(segmentIndex, forKey: .segmentIndex)
+        try container.encode(characterCount, forKey: .characterCount)
+        try container.encode(charactersPerSecond, forKey: .charactersPerSecond)
+        try container.encode(audioSizeBytes, forKey: .audioSizeBytes)
+        try container.encode(sampleRate, forKey: .sampleRate)
+        try container.encode(voice, forKey: .voice)
+        try container.encode(outputDurationMs, forKey: .outputDurationMs)
+    }
+
     // MARK: - Initializer
 
     public init(
@@ -125,6 +224,8 @@ public struct TelemetryEventPayload: Codable, Sendable {
         eventType: String,
         timestamp: Date,
         createdAt: Date,
+        modality: String? = nil,
+        deviceId: String? = nil,
         sessionId: String? = nil,
         modelId: String? = nil,
         modelName: String? = nil,
@@ -165,6 +266,8 @@ public struct TelemetryEventPayload: Codable, Sendable {
         self.eventType = eventType
         self.timestamp = timestamp
         self.createdAt = createdAt
+        self.modality = modality
+        self.deviceId = deviceId
         self.sessionId = sessionId
         self.modelId = modelId
         self.modelName = modelName
@@ -203,40 +306,45 @@ public struct TelemetryEventPayload: Codable, Sendable {
     }
 }
 
-// MARK: - Conversion from TelemetryData
+// MARK: - Conversion from SDKEvent
 
 extension TelemetryEventPayload {
-    /// Convert from local TelemetryData (with properties dict) to typed payload for API
-    public init(from telemetryData: TelemetryData) {
-        self.id = telemetryData.id
-        self.eventType = telemetryData.eventType
-        self.timestamp = telemetryData.timestamp
-        self.createdAt = telemetryData.createdAt
+    /// Create payload directly from SDKEvent (preserves category → modality).
+    /// Use this for events that don't have typed properties.
+    public init(from event: any SDKEvent) {
+        self.id = event.id
+        self.eventType = event.type
+        self.timestamp = event.timestamp
+        self.createdAt = Date()
 
-        let props = telemetryData.properties
+        // V2 required fields - use event category directly (single source of truth!)
+        self.modality = Self.modalityFromCategory(event.category)
+        self.deviceId = DeviceIdentity.persistentUUID
+        self.sessionId = event.sessionId
 
-        // Session
-        self.sessionId = props["session_id"]
-
-        // Model info
-        self.modelId = props["model_id"]
+        // Parse properties from event's string dictionary
+        let props = event.properties
+        self.modelId = props["model_id"] ?? props["voice_id"]
         self.modelName = props["model_name"]
         self.framework = props["framework"]
 
         // Device info
-        self.device = props["device"]
-        self.osVersion = props["os_version"]
-        self.platform = props["platform"]
-        self.sdkVersion = props["sdk_version"]
+        let deviceInfo = DeviceInfo.current
+        self.device = deviceInfo.deviceModel
+        self.osVersion = deviceInfo.osVersion
+        self.platform = deviceInfo.platform
+        self.sdkVersion = SDKConstants.version
 
         // Common metrics
-        self.processingTimeMs = Self.parseDouble(props["processing_time_ms"] ?? props["total_time_ms"])
+        self.processingTimeMs = Self.parseDouble(
+            props["processing_time_ms"] ?? props["processing_duration_ms"] ?? props["duration_ms"]
+        )
         self.success = Self.parseBool(props["success"])
-        self.errorMessage = props["error_message"]
+        self.errorMessage = props["error_message"] ?? props["error"]
         self.errorCode = props["error_code"]
 
-        // LLM
-        self.inputTokens = Self.parseInt(props["input_tokens"] ?? props["prompt_tokens"])
+        // LLM fields
+        self.inputTokens = Self.parseInt(props["input_tokens"])
         self.outputTokens = Self.parseInt(props["output_tokens"])
         self.totalTokens = Self.parseInt(props["total_tokens"])
         self.tokensPerSecond = Self.parseDouble(props["tokens_per_second"])
@@ -247,8 +355,8 @@ extension TelemetryEventPayload {
         self.temperature = Self.parseDouble(props["temperature"])
         self.maxTokens = Self.parseInt(props["max_tokens"])
 
-        // STT
-        self.audioDurationMs = Self.parseDouble(props["audio_duration_ms"])
+        // STT fields
+        self.audioDurationMs = Self.parseDouble(props["audio_duration_ms"] ?? props["audio_length_ms"])
         self.realTimeFactor = Self.parseDouble(props["real_time_factor"])
         self.wordCount = Self.parseInt(props["word_count"])
         self.confidence = Self.parseDouble(props["confidence"])
@@ -256,13 +364,95 @@ extension TelemetryEventPayload {
         self.isStreaming = Self.parseBool(props["is_streaming"])
         self.segmentIndex = Self.parseInt(props["segment_index"])
 
-        // TTS
-        self.characterCount = Self.parseInt(props["character_count"])
+        // TTS fields
+        self.characterCount = Self.parseInt(props["character_count"] ?? props["text_length"])
         self.charactersPerSecond = Self.parseDouble(props["characters_per_second"])
         self.audioSizeBytes = Self.parseInt(props["audio_size_bytes"])
         self.sampleRate = Self.parseInt(props["sample_rate"])
-        self.voice = props["voice"]
+        self.voice = props["voice"] ?? props["voice_id"]
         self.outputDurationMs = Self.parseDouble(props["output_duration_ms"] ?? props["audio_duration_ms"])
+    }
+
+    /// Create payload from strongly typed event properties.
+    /// This avoids string parsing entirely - types are preserved directly.
+    public init(
+        from event: any SDKEvent,
+        typedProperties props: EventProperties
+    ) {
+        self.id = event.id
+        self.eventType = event.type
+        self.timestamp = event.timestamp
+        self.createdAt = Date()
+
+        // V2 required fields - use event category directly
+        self.modality = Self.modalityFromCategory(event.category)
+        self.deviceId = DeviceIdentity.persistentUUID
+        self.sessionId = event.sessionId
+
+        // Model info - directly from typed properties
+        self.modelId = props.modelId
+        self.modelName = props.modelName
+        self.framework = props.framework
+
+        // Device info
+        let deviceInfo = DeviceInfo.current
+        self.device = deviceInfo.deviceModel
+        self.osVersion = deviceInfo.osVersion
+        self.platform = deviceInfo.platform
+        self.sdkVersion = SDKConstants.version
+
+        // Common metrics - typed values, no parsing needed!
+        self.processingTimeMs = props.processingTimeMs ?? props.durationMs
+        self.success = props.success
+        self.errorMessage = props.errorMessage
+        self.errorCode = props.errorCode
+
+        // LLM fields - typed values, no parsing needed!
+        self.inputTokens = props.inputTokens
+        self.outputTokens = props.outputTokens
+        self.totalTokens = props.totalTokens ?? {
+            if let input = props.inputTokens, let output = props.outputTokens {
+                return input + output
+            }
+            return nil
+        }()
+        self.tokensPerSecond = props.tokensPerSecond
+        self.timeToFirstTokenMs = props.timeToFirstTokenMs
+        self.promptEvalTimeMs = props.promptEvalTimeMs
+        self.generationTimeMs = props.generationTimeMs
+        self.contextLength = props.contextLength
+        self.temperature = props.temperature
+        self.maxTokens = props.maxTokens
+
+        // STT fields - typed values!
+        self.audioDurationMs = props.audioDurationMs
+        self.realTimeFactor = props.realTimeFactor
+        self.wordCount = props.wordCount
+        self.confidence = props.confidence
+        self.language = props.language
+        self.isStreaming = props.isStreaming
+        self.segmentIndex = props.segmentIndex
+
+        // TTS fields - typed values!
+        self.characterCount = props.characterCount
+        self.charactersPerSecond = props.charactersPerSecond
+        self.audioSizeBytes = props.audioSizeBytes
+        self.sampleRate = props.sampleRate
+        self.voice = props.voice
+        self.outputDurationMs = props.outputDurationMs
+    }
+
+    // MARK: - Modality Mapping (Single Source of Truth)
+
+    /// Convert EventCategory to modality string for V2 routing.
+    /// This is the ONLY place that defines category → modality mapping.
+    private static func modalityFromCategory(_ category: EventCategory) -> String {
+        switch category {
+        case .llm, .stt, .tts, .model:
+            return category.rawValue
+        default:
+            return "system"
+        }
     }
 
     // MARK: - Private Helpers
@@ -285,22 +475,59 @@ extension TelemetryEventPayload {
 
 // MARK: - Batch Request/Response
 
-/// Batch telemetry request for API
+/// Batch telemetry request for API.
+///
+/// Supports both V1 and V2 storage paths:
+/// - V1 (legacy): Set `modality` to nil → stores in `sdk_telemetry_events` table
+/// - V2 (normalized): Set `modality` to "llm"/"stt"/"tts"/"model" → stores in normalized tables
 public struct TelemetryBatchRequest: Codable, Sendable {
     public let events: [TelemetryEventPayload]
     public let deviceId: String
     public let timestamp: Date
 
+    /// Optional modality for V2 API routing.
+    ///
+    /// - `nil` → V1 path (backward compatible, uses legacy `sdk_telemetry_events` table)
+    /// - `"llm"` → V2 path (uses `telemetry_events` + `llm_telemetry` tables)
+    /// - `"stt"` → V2 path (uses `telemetry_events` + `stt_telemetry` tables)
+    /// - `"tts"` → V2 path (uses `telemetry_events` + `tts_telemetry` tables)
+    /// - `"model"` → V2 path (uses `telemetry_events` table only, for download/extraction)
+    public let modality: String?
+
     enum CodingKeys: String, CodingKey {
         case events
         case deviceId = "device_id"
         case timestamp
+        case modality
     }
 
+    /// V1 initializer (backward compatible - no modality, uses legacy table)
     public init(events: [TelemetryEventPayload], deviceId: String, timestamp: Date = Date()) {
         self.events = events
         self.deviceId = deviceId
         self.timestamp = timestamp
+        self.modality = nil
+    }
+
+    /// V2 initializer with modality string for normalized table routing.
+    ///
+    /// Use this when the modality is already known as a string (e.g., from grouped payloads).
+    ///
+    /// - Parameters:
+    ///   - events: Array of telemetry events to send
+    ///   - deviceId: Persistent device UUID
+    ///   - timestamp: When the batch was created
+    ///   - modality: The modality string for V2 routing (llm/stt/tts/model), or nil for V1 legacy
+    public init(
+        events: [TelemetryEventPayload],
+        deviceId: String,
+        timestamp: Date = Date(),
+        modality: String?
+    ) {
+        self.events = events
+        self.deviceId = deviceId
+        self.timestamp = timestamp
+        self.modality = modality
     }
 }
 
@@ -309,12 +536,22 @@ public struct TelemetryBatchResponse: Codable, Sendable {
     public let success: Bool
     public let eventsReceived: Int
     public let eventsStored: Int
+
+    /// Number of duplicate events skipped (idempotency)
+    public let eventsSkipped: Int?
+
+    /// Array of error messages if any events failed
     public let errors: [String]?
+
+    /// Storage path used: "V1" (legacy) or "V2" (normalized)
+    public let storageVersion: String?
 
     enum CodingKeys: String, CodingKey {
         case success
         case eventsReceived = "events_received"
         case eventsStored = "events_stored"
+        case eventsSkipped = "events_skipped"
         case errors
+        case storageVersion = "storage_version"
     }
 }

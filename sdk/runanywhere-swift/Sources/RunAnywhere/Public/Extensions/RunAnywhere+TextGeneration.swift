@@ -31,7 +31,7 @@ public extension RunAnywhere {
         options: LLMGenerationOptions? = nil
     ) async throws -> LLMGenerationResult {
         guard isInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure services are ready (O(1) after first call)
@@ -73,7 +73,7 @@ public extension RunAnywhere {
         options: LLMGenerationOptions? = nil
     ) async throws -> LLMStreamingResult {
         guard isInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         // Ensure services are ready (O(1) after first call)

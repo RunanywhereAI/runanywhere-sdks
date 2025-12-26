@@ -15,7 +15,6 @@ import Foundation
 /// eliminating duplicate lifecycle management code.
 public actor LLMCapability: ModelLoadableCapability {
     public typealias Configuration = LLMConfiguration
-    public typealias Service = LLMService
 
     // MARK: - State
 
@@ -52,7 +51,7 @@ public actor LLMCapability: ModelLoadableCapability {
     }
 
     public var currentModelId: String? {
-        get async { await managedLifecycle.currentResourceId }
+        get async { await managedLifecycle.currentModelId }
     }
 
     public func loadModel(_ modelId: String) async throws {
@@ -92,7 +91,7 @@ public actor LLMCapability: ModelLoadableCapability {
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) async throws -> LLMGenerationResult {
         let service = try await managedLifecycle.requireService()
-        let modelId = await managedLifecycle.resourceIdOrUnknown()
+        let modelId = await managedLifecycle.modelIdOrUnknown()
 
         logger.info("Generating with model: \(modelId) (non-streaming)")
 
@@ -102,9 +101,14 @@ public actor LLMCapability: ModelLoadableCapability {
         let startTime = Date()
 
         // Start generation tracking (non-streaming mode)
+        // Use service's actual context length, fallback to config if not available
+        let contextLength = service.contextLength ?? config?.contextLength
         let generationId = await analyticsService.startGeneration(
             modelId: modelId,
-            framework: service.inferenceFramework
+            framework: service.inferenceFramework,
+            temperature: effectiveOptions.temperature,
+            maxTokens: effectiveOptions.maxTokens,
+            contextLength: contextLength
         )
 
         // Generate text
@@ -115,7 +119,7 @@ public actor LLMCapability: ModelLoadableCapability {
             logger.error("Generation failed: \(error)")
             await analyticsService.trackGenerationFailed(generationId: generationId, error: error)
             await managedLifecycle.trackOperationError(error, operation: "generate")
-            throw CapabilityError.operationFailed("Generation", error)
+            throw SDKError.llm(.generationFailed, "Generation failed: \(error.localizedDescription)", underlying: error)
         }
 
         let endTime = Date()
@@ -168,7 +172,7 @@ public actor LLMCapability: ModelLoadableCapability {
     ///   - prompt: The input prompt
     ///   - options: Generation options
     /// - Returns: Streaming result with token stream and final metrics
-    /// - Throws: `LLMError.streamingNotSupported` if the service doesn't support streaming
+    /// - Throws: `SDKError.llm(.streamingNotSupported, ...)` if the service doesn't support streaming
     /// - Note: Time-to-first-token (TTFT) is tracked for streaming generations
     public func generateStream(
         _ prompt: String,
@@ -179,19 +183,24 @@ public actor LLMCapability: ModelLoadableCapability {
         // Check if streaming is supported by this service
         guard service.supportsStreaming else {
             logger.error("Streaming not supported by current service")
-            throw LLMError.streamingNotSupported
+            throw SDKError.llm(.streamingNotSupported, "Streaming generation is not supported by this service")
         }
 
-        let modelId = await managedLifecycle.resourceIdOrUnknown()
+        let modelId = await managedLifecycle.modelIdOrUnknown()
         let effectiveOptions = mergeOptions(options)
         let framework = service.inferenceFramework
 
         logger.info("Starting streaming generation with model: \(modelId)")
 
         // Start streaming generation tracking
+        // Use service's actual context length, fallback to config if not available
+        let contextLength = service.contextLength ?? config?.contextLength
         let generationId = await analyticsService.startStreamingGeneration(
             modelId: modelId,
-            framework: framework
+            framework: framework,
+            temperature: effectiveOptions.temperature,
+            maxTokens: effectiveOptions.maxTokens,
+            contextLength: contextLength
         )
 
         // Create metrics collector
@@ -269,7 +278,7 @@ private actor StreamingMetricsCollector {
     private let modelId: String
     private let generationId: String
     private let analyticsService: GenerationAnalyticsService
-    private let framework: InferenceFrameworkType
+    private let framework: InferenceFramework
     private let promptLength: Int
 
     private var startTime: Date?
@@ -285,7 +294,7 @@ private actor StreamingMetricsCollector {
         modelId: String,
         generationId: String,
         analyticsService: GenerationAnalyticsService,
-        framework: InferenceFrameworkType,
+        framework: InferenceFramework,
         promptLength: Int
     ) {
         self.modelId = modelId

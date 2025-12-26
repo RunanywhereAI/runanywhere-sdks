@@ -1,7 +1,6 @@
 import Alamofire
 import Files
 import Foundation
-import Pulse
 
 /// Simplified download service using Alamofire
 public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
@@ -114,8 +113,9 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     /// Download model using artifact-type-based approach
     func downloadModelWithArtifactType(_ model: ModelInfo) async throws -> DownloadTask {
         guard let downloadURL = model.downloadURL else {
-            EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: "Invalid download URL"))
-            throw DownloadError.invalidURL
+            let downloadError = SDKError.download(.invalidInput, "Invalid download URL for model: \(model.id)")
+            EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: downloadError))
+            throw downloadError
         }
 
         // Track download started
@@ -167,11 +167,8 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         downloadStartTime: Date,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        // Get destination folder (framework is required)
-        guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
-            logger.error("Model has no associated framework: \(model.id)")
-            throw DownloadError.invalidURL
-        }
+        // Get destination folder (framework is required - 1:1 mapping)
+        let framework = model.framework
         let fileManager = ServiceContainer.shared.fileManager
         let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
         let modelFolderURL = URL(fileURLWithPath: modelFolder.path)
@@ -322,21 +319,22 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         return progressHandler.calculateSpeed(progress: progress)
     }
 
-    func mapAlamofireError(_ error: AFError) -> Error {
+    func mapAlamofireError(_ error: AFError) -> SDKError {
         switch error {
         case .sessionTaskFailed(let underlyingError):
-            return DownloadError.networkError(underlyingError)
+            let message = "Network error during download: \(underlyingError.localizedDescription)"
+            return SDKError.download(.networkError, message, underlying: underlyingError)
         case .responseValidationFailed(reason: let reason):
             switch reason {
             case .unacceptableStatusCode(let code):
-                return DownloadError.httpError(code)
+                return SDKError.download(.httpError, "HTTP error \(code)")
             default:
-                return DownloadError.invalidResponse
+                return SDKError.download(.invalidResponse, "Invalid response from server")
             }
         case .createURLRequestFailed, .invalidURL:
-            return DownloadError.invalidURL
+            return SDKError.download(.invalidInput, "Invalid URL")
         default:
-            return DownloadError.unknown
+            return SDKError.download(.unknown, "Unknown download error: \(error.localizedDescription)")
         }
     }
 }

@@ -13,7 +13,7 @@ import Foundation
 public enum SDKLifecycleEvent: SDKEvent {
     case initStarted
     case initCompleted(durationMs: Double)
-    case initFailed(error: String)
+    case initFailed(error: SDKError)
     case modelsLoaded(count: Int)
 
     public var type: String {
@@ -34,7 +34,7 @@ public enum SDKLifecycleEvent: SDKEvent {
         case .initCompleted(let durationMs):
             return ["duration_ms": String(format: "%.1f", durationMs)]
         case .initFailed(let error):
-            return ["error": error]
+            return error.telemetryProperties
         case .modelsLoaded(let count):
             return ["count": String(count)]
         }
@@ -50,14 +50,14 @@ public enum ModelEvent: SDKEvent {
     case downloadStarted(modelId: String)
     case downloadProgress(modelId: String, progress: Double, bytesDownloaded: Int64, totalBytes: Int64)
     case downloadCompleted(modelId: String, durationMs: Double, sizeBytes: Int64)
-    case downloadFailed(modelId: String, error: String)
+    case downloadFailed(modelId: String, error: SDKError)
     case downloadCancelled(modelId: String)
 
     // Extraction events (for archive-based models)
     case extractionStarted(modelId: String, archiveType: String)
     case extractionProgress(modelId: String, progress: Double)
     case extractionCompleted(modelId: String, durationMs: Double)
-    case extractionFailed(modelId: String, error: String)
+    case extractionFailed(modelId: String, error: SDKError)
 
     // Deletion events
     case deleted(modelId: String)
@@ -82,8 +82,8 @@ public enum ModelEvent: SDKEvent {
     public var destination: EventDestination {
         switch self {
         case .downloadProgress, .extractionProgress:
-            // Progress updates are analytics only (too chatty)
-            return .analyticsOnly
+            // Progress updates are for public EventBus (UI updates) - not sent to analytics/remote
+            return .publicOnly
         default:
             return .all
         }
@@ -110,7 +110,7 @@ public enum ModelEvent: SDKEvent {
             ]
 
         case .downloadFailed(let modelId, let error):
-            return ["model_id": modelId, "error": error]
+            return ["model_id": modelId].merging(error.telemetryProperties) { _, new in new }
 
         case .downloadCancelled(let modelId):
             return ["model_id": modelId]
@@ -131,7 +131,7 @@ public enum ModelEvent: SDKEvent {
             ]
 
         case .extractionFailed(let modelId, let error):
-            return ["model_id": modelId, "error": error]
+            return ["model_id": modelId].merging(error.telemetryProperties) { _, new in new }
 
         case .deleted(let modelId):
             return ["model_id": modelId]
@@ -144,7 +144,7 @@ public enum ModelEvent: SDKEvent {
 /// Storage-related events.
 public enum StorageEvent: SDKEvent {
     case cacheCleared(freedBytes: Int64)
-    case cacheClearFailed(error: String)
+    case cacheClearFailed(error: SDKError)
     case tempFilesCleaned(freedBytes: Int64)
 
     public var type: String {
@@ -162,7 +162,7 @@ public enum StorageEvent: SDKEvent {
         case .cacheCleared(let freedBytes):
             return ["freed_bytes": String(freedBytes)]
         case .cacheClearFailed(let error):
-            return ["error": error]
+            return error.telemetryProperties
         case .tempFilesCleaned(let freedBytes):
             return ["freed_bytes": String(freedBytes)]
         }
@@ -174,7 +174,7 @@ public enum StorageEvent: SDKEvent {
 /// Device-related events.
 public enum DeviceEvent: SDKEvent {
     case registered(deviceId: String)
-    case registrationFailed(error: String)
+    case registrationFailed(error: SDKError)
 
     public var type: String {
         switch self {
@@ -190,7 +190,7 @@ public enum DeviceEvent: SDKEvent {
         case .registered(let deviceId):
             return ["device_id": deviceId]
         case .registrationFailed(let error):
-            return ["error": error]
+            return error.telemetryProperties
         }
     }
 }
@@ -200,19 +200,16 @@ public enum DeviceEvent: SDKEvent {
 /// Network-related events.
 public enum NetworkEvent: SDKEvent {
     case connectivityChanged(isOnline: Bool)
-    case requestFailed(url: String, statusCode: Int?, error: String)
 
     public var type: String {
         switch self {
         case .connectivityChanged: return "network_connectivity_changed"
-        case .requestFailed: return "network_request_failed"
         }
     }
 
     public var category: EventCategory { .network }
 
     public var destination: EventDestination {
-        // Network events are analytics only by default
         .analyticsOnly
     }
 
@@ -220,35 +217,167 @@ public enum NetworkEvent: SDKEvent {
         switch self {
         case .connectivityChanged(let isOnline):
             return ["is_online": String(isOnline)]
-        case .requestFailed(let url, let statusCode, let error):
-            var props = ["url": url, "error": error]
-            if let code = statusCode {
-                props["status_code"] = String(code)
-            }
-            return props
         }
     }
 }
 
-// MARK: - Error Event
+// MARK: - SDK Error Event
 
-/// General error events.
-public enum ErrorEvent: SDKEvent {
-    case error(operation: String, message: String, code: Int?)
+/// SDK error events - exposed to consumers for error handling and logging.
+/// These events carry full error context including stack traces for debugging.
+///
+/// Consumers can subscribe to these events via EventBus:
+/// ```swift
+/// EventBus.shared.events(for: .error)
+///     .compactMap { $0 as? SDKErrorEvent }
+///     .sink { errorEvent in
+///         // Log to Sentry, Crashlytics, etc.
+///         print("Error: \(errorEvent.error.code) - \(errorEvent.error.message)")
+///         print("Stack: \(errorEvent.error.stackTrace)")
+///     }
+/// ```
+public struct SDKErrorEvent: SDKEvent, TypedEventProperties {
 
-    public var type: String { "error" }
+    // MARK: - Properties
+
+    /// The underlying SDK error with full context (code, message, category, stack trace)
+    public let error: SDKError
+
+    /// The operation that was being performed when the error occurred
+    public let operation: String
+
+    /// Additional context about the error (URL, status code, response body, etc.)
+    public let context: [String: String]
+
+    // MARK: - SDKEvent Protocol
+
+    public let id: String
+    public let timestamp: Date
+    public var type: String { "sdk_error" }
     public var category: EventCategory { .error }
-    public var destination: EventDestination { .analyticsOnly }
+    public var sessionId: String? { nil }
+
+    /// Error events go to both consumers (EventBus) and analytics
+    /// Consumers can listen to these for error handling/logging
+    public var destination: EventDestination { .all }
 
     public var properties: [String: String] {
-        switch self {
-        case .error(let operation, let message, let code):
-            var props = ["operation": operation, "message": message]
-            if let code = code {
-                props["code"] = String(code)
-            }
-            return props
+        var props = error.telemetryProperties
+        props["operation"] = operation
+
+        // Merge context
+        for (key, value) in context {
+            props[key] = value
         }
+
+        return props
+    }
+
+    // MARK: - TypedEventProperties
+
+    public var typedProperties: EventProperties {
+        EventProperties(
+            errorMessage: error.message,
+            errorCode: error.code.rawValue
+        )
+    }
+
+    // MARK: - Initialization
+
+    public init(
+        error: SDKError,
+        operation: String,
+        context: [String: String] = [:]
+    ) {
+        self.id = UUID().uuidString
+        self.timestamp = Date()
+        self.error = error
+        self.operation = operation
+        self.context = context
+    }
+
+    // MARK: - Factory Methods
+
+    /// Create an error event for a network failure (used by APIClient)
+    public static func networkError(
+        error: SDKError,
+        url: String? = nil,
+        statusCode: Int? = nil,
+        responseBody: String? = nil
+    ) -> SDKErrorEvent {
+        var context: [String: String] = [:]
+        if let url = url {
+            context["url"] = url
+        }
+        if let statusCode = statusCode {
+            context["status_code"] = String(statusCode)
+        }
+        if let body = responseBody {
+            // Truncate long response bodies for logging
+            context["response_body"] = String(body.prefix(500))
+        }
+        return SDKErrorEvent(error: error, operation: "network_request", context: context)
+    }
+
+    /// Create an error event for LLM operations (used by analytics services)
+    public static func llmError(
+        error: SDKError,
+        modelId: String? = nil,
+        generationId: String? = nil,
+        operation: String
+    ) -> SDKErrorEvent {
+        var context: [String: String] = ["capability": "llm"]
+        if let modelId = modelId {
+            context["model_id"] = modelId
+        }
+        if let generationId = generationId {
+            context["generation_id"] = generationId
+        }
+        return SDKErrorEvent(error: error, operation: operation, context: context)
+    }
+
+    /// Create an error event for STT operations (used by analytics services)
+    public static func sttError(
+        error: SDKError,
+        modelId: String? = nil,
+        transcriptionId: String? = nil,
+        operation: String
+    ) -> SDKErrorEvent {
+        var context: [String: String] = ["capability": "stt"]
+        if let modelId = modelId {
+            context["model_id"] = modelId
+        }
+        if let transcriptionId = transcriptionId {
+            context["transcription_id"] = transcriptionId
+        }
+        return SDKErrorEvent(error: error, operation: operation, context: context)
+    }
+
+    /// Create an error event for TTS operations (used by analytics services)
+    public static func ttsError(
+        error: SDKError,
+        modelId: String? = nil,
+        synthesisId: String? = nil,
+        operation: String
+    ) -> SDKErrorEvent {
+        var context: [String: String] = ["capability": "tts"]
+        if let modelId = modelId {
+            context["model_id"] = modelId
+        }
+        if let synthesisId = synthesisId {
+            context["synthesis_id"] = synthesisId
+        }
+        return SDKErrorEvent(error: error, operation: operation, context: context)
+    }
+
+    /// Create from any Error, converting to SDKError if needed
+    public static func from(
+        _ error: Error,
+        operation: String,
+        context: [String: String] = [:]
+    ) -> SDKErrorEvent {
+        let sdkError = SDKError.from(error)
+        return SDKErrorEvent(error: sdkError, operation: operation, context: context)
     }
 }
 
@@ -285,7 +414,7 @@ public enum FrameworkEvent: SDKEvent {
 public enum VoicePipelineEvent: SDKEvent {
     case pipelineStarted
     case pipelineCompleted(durationMs: Double)
-    case pipelineFailed(error: String)
+    case pipelineFailed(error: SDKError)
     case vadStarted
     case speechDetected
     case speechEnded
@@ -312,7 +441,7 @@ public enum VoicePipelineEvent: SDKEvent {
         case .pipelineCompleted(let durationMs):
             return ["duration_ms": String(format: "%.1f", durationMs)]
         case .pipelineFailed(let error):
-            return ["error": error]
+            return error.telemetryProperties
         }
     }
 }

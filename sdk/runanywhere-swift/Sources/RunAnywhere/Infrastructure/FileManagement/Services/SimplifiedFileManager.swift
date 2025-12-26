@@ -7,7 +7,7 @@ import Foundation
 /// ```
 /// Documents/RunAnywhere/
 ///   Models/
-///     {framework}/          # e.g., "onnx", "llamacpp", "whisperkit"
+///     {framework}/          # e.g., "onnx", "llamacpp"
 ///       {modelId}/          # e.g., "sherpa-onnx-whisper-tiny.en"
 ///         [model files]     # Single file or directory with multiple files
 ///   Cache/
@@ -25,7 +25,7 @@ public class SimplifiedFileManager: FileManagementService {
 
     public init() throws {
         guard let documentsFolder = Folder.documents else {
-            throw RunAnywhereError.storageError("Unable to access documents directory")
+            throw SDKError.fileManagement(.permissionDenied, "Unable to access documents directory")
         }
         self.baseFolder = try documentsFolder.createSubfolderIfNeeded(withName: "RunAnywhere")
         try createDirectoryStructure()

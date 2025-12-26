@@ -27,7 +27,8 @@ public final class EventPublisher: @unchecked Sendable {
     // MARK: - Dependencies
 
     private let eventBus: EventBus
-    private var analyticsQueue: AnalyticsQueueManager?
+    private var remoteDataSource: RemoteTelemetryDataSource?
+    private let logger = SDKLogger(category: "EventPublisher")
 
     // MARK: - Initialization
 
@@ -35,9 +36,9 @@ public final class EventPublisher: @unchecked Sendable {
         self.eventBus = eventBus
     }
 
-    /// Initialize with analytics queue (call during SDK startup)
-    public func initialize(analyticsQueue: AnalyticsQueueManager) {
-        self.analyticsQueue = analyticsQueue
+    /// Initialize with remote data source (call during SDK startup)
+    public func initialize(remoteDataSource: RemoteTelemetryDataSource) {
+        self.remoteDataSource = remoteDataSource
     }
 
     // MARK: - Track
@@ -51,10 +52,10 @@ public final class EventPublisher: @unchecked Sendable {
             eventBus.publish(event)
         }
 
-        // Route to Analytics (telemetry)
+        // Route to Analytics (telemetry) - fire and forget
         if destination != .publicOnly {
             Task {
-                await analyticsQueue?.enqueue(event)
+                await sendToRemote(event)
             }
         }
     }
@@ -68,9 +69,34 @@ public final class EventPublisher: @unchecked Sendable {
             eventBus.publish(event)
         }
 
-        // Route to Analytics (telemetry)
+        // Route to Analytics (telemetry) - fire and forget
         if destination != .publicOnly {
-            await analyticsQueue?.enqueue(event)
+            await sendToRemote(event)
+        }
+    }
+
+    // MARK: - Private
+
+    private func sendToRemote(_ event: any SDKEvent) async {
+        guard let remoteDataSource = remoteDataSource else {
+            // Not initialized yet - events before SDK init are dropped
+            return
+        }
+
+        // Create payload directly from event (preserves category → modality)
+        let payload: TelemetryEventPayload
+        if let typedEvent = event as? (any TypedEventProperties) {
+            payload = TelemetryEventPayload(from: event, typedProperties: typedEvent.typedProperties)
+        } else {
+            payload = TelemetryEventPayload(from: event)
+        }
+
+        // Fire and forget - backend handles failures
+        do {
+            try await remoteDataSource.sendPayloads([payload])
+        } catch {
+            // Log but don't fail - telemetry is non-critical
+            logger.debug("Telemetry send failed (non-critical): \(error.localizedDescription)")
         }
     }
 }

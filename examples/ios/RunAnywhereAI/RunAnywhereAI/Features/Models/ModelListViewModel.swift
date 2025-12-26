@@ -77,7 +77,7 @@ class ModelListViewModel: ObservableObject {
             // Get all models from SDK registry
             // This now includes:
             // 1. Models from remote configuration (if available)
-            // 2. Models from framework adapters (like WhisperKit)
+            // 2. Models from framework adapters
             // 3. Models from local storage
             // 4. User-added models
             let allModels = try await RunAnywhere.availableModels()
@@ -87,7 +87,7 @@ class ModelListViewModel: ObservableObject {
 
             // Filter out Foundation Models for older iOS versions
             if #unavailable(iOS 26.0) {
-                filteredModels = allModels.filter { $0.preferredFramework != .foundationModels }
+                filteredModels = allModels.filter { $0.framework != .foundationModels }
                 print("iOS < 26 - Foundation Models not available")
             }
 
@@ -95,7 +95,7 @@ class ModelListViewModel: ObservableObject {
             print("Loaded \(availableModels.count) models from registry")
 
             for model in availableModels {
-                print("  - \(model.name) (\(model.preferredFramework?.displayName ?? "Unknown"))")
+                print("  - \(model.name) (\(model.framework.displayName))")
             }
 
             // Sync currentModel with SDK's current model state
@@ -150,7 +150,7 @@ class ModelListViewModel: ObservableObject {
         // Get the model info and use the Download service
         let allModels = try await RunAnywhere.availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == model.id }) else {
-            throw RunAnywhereError.modelNotFound(model.id)
+            throw SDKError.general(.modelNotFound, "Model not found: \(model.id)")
         }
 
         // Use the SDK's download mechanism via the Download class
@@ -169,10 +169,7 @@ class ModelListViewModel: ObservableObject {
     }
 
     func deleteModel(_ model: ModelInfo) async throws {
-        guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
-            throw RunAnywhereError.modelNotFound("Model has no associated framework")
-        }
-        try await RunAnywhere.deleteStoredModel(model.id, framework: framework)
+        try await RunAnywhere.deleteStoredModel(model.id, framework: model.framework)
         // Reload models after deletion
         await loadModelsFromRegistry()
     }

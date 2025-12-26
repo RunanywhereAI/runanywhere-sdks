@@ -151,7 +151,7 @@ public class DefaultStorageAnalyzer: StorageAnalyzer {
         let (exists, isDirectory) = FileOperationsUtilities.existsWithType(at: url)
 
         guard exists else {
-            throw RunAnywhereError.modelNotFound("File not found: \(url.path)")
+            throw SDKError.fileManagement(.fileNotFound, "File not found: \(url.path)")
         }
 
         if isDirectory {

@@ -26,7 +26,6 @@ runanywhere-swift/
 │   ├── LlamaCPPRuntime/          # LlamaCPP backend for LLM (~4 files)
 │   ├── FoundationModelsAdapter/  # Apple Intelligence integration (~2 files)
 │   ├── FluidAudioDiarization/    # Speaker diarization (~2 files)
-│   ├── WhisperKitTranscription/  # WhisperKit STT (temporarily disabled)
 │   └── CRunAnywhereCore/         # C bridge to unified xcframework
 ├── Binaries/                     # Binary dependencies (xcframework, dylibs)
 ├── Docs/                         # Architecture and design documentation
@@ -70,8 +69,7 @@ RunAnywhere/
 │
 ├── Data/                         # Data layer
 │   ├── Network/                  # APIClient, AuthenticationService
-│   ├── Storage/Database/         # GRDB-based persistence
-│   └── Sync/                     # SyncCoordinator
+│   └── Protocols/                # DataSource, RemoteOperationHelper
 │
 └── Foundation/                   # Core utilities
     ├── Constants/                # SDK version, build tokens
@@ -226,7 +224,7 @@ public func createLLM(for modelId: String?, config: LLMConfiguration) async thro
 - Capabilities: `llmCapability`, `sttCapability`, `ttsCapability`, `vadCapability`, `voiceAgentCapability`
 - Infrastructure: `downloadService`, `fileManager`, `storageAnalyzer`, `modelRegistry`
 - Network: `networkService`, `apiClient`, `authenticationService`
-- Data: `configurationService`, `modelInfoService`, `syncCoordinator`
+- Data: `configurationService`, `modelInfoService`
 - Analytics: `analyticsQueueManager`, `devAnalyticsService`
 
 ```swift
@@ -246,13 +244,13 @@ public class ServiceContainer {
 **Key Types**:
 - `ModelInfo`: Immutable model metadata (ID, format, download URL, local path, etc.)
 - `RegistryService`: In-memory model registry with integrated local model discovery
-- `ModelInfoService`: Persistent model metadata via database
+- `ModelInfoService`: In-memory model metadata storage
 - `AlamofireDownloadService`: Model downloading with progress, extraction, and resume support
 
 **Model Flow**:
 1. Models are registered via `RegistryService.registerModel(_:)`
 2. Downloads are handled by `AlamofireDownloadService.downloadModel(_:)`
-3. After download, `localPath` is set and model is saved to database
+3. After download, `localPath` is set and model is cached in memory
 4. On app restart, `RegistryService` discovers cached models and updates registry
 
 **Artifact Types**:
@@ -444,7 +442,6 @@ The following are marked `@MainActor`:
 | **Alamofire** | Network requests, downloads | `AlamofireDownloadService`, `APIClient` |
 | **Files** | File system abstraction | `SimplifiedFileManager` |
 | **ZIPFoundation** | Archive extraction | `ArchiveUtility` |
-| **GRDB** | SQLite database | `DatabaseManager` |
 | **DeviceKit** | Device information | `Device`, telemetry |
 | **Pulse** | Network logging | `PulseDestination` |
 | **FluidAudio** | Speaker diarization | `FluidAudioDiarization` |
@@ -452,7 +449,7 @@ The following are marked `@MainActor`:
 ### 6.2 Binary Dependencies
 
 - **RunAnywhereCoreBinary** (xcframework): Contains compiled C/C++ backends (ONNX, LlamaCPP)
-- **onnxruntime** (dylib, macOS only): ONNX Runtime with CoreML provider
+- **onnxruntime** (dylib, macOS only): ONNX Runtime
 
 ### 6.3 Module Boundaries
 
@@ -484,7 +481,6 @@ The following are marked `@MainActor`:
 ### 6.4 Dependency Encapsulation
 
 - **Alamofire**: Wrapped in `AlamofireDownloadService`, not exposed in public API
-- **GRDB**: Accessed only through `DatabaseManager`, not in public types
 - **Files**: Used internally by `SimplifiedFileManager`
 - **External service protocols** (`LLMService`, `STTService`, etc.): Not directly exposed; capabilities mediate all access
 
@@ -570,7 +566,7 @@ The codebase includes testability features:
 
 ### 8.3 Internal Testing Hooks
 
-- `DatabaseManager.isEnabled`: Flag to disable database for testing
+- Development environment disables certain features for testing
 - `testLocal` flag in `Package.swift`: Use local xcframework for development
 - Mock network service created in development mode
 
@@ -635,8 +631,7 @@ The codebase includes testability features:
 
 ### 10.2 Dependency Cleanup
 
-- `DatabaseManager.isEnabled = false`: Database is currently disabled; either remove or complete integration
-- WhisperKit integration is temporarily disabled pending API updates
+- Database layer has been removed; models are managed in-memory with remote API sync via ModelAssignmentService
 
 ### 10.3 Test Infrastructure
 

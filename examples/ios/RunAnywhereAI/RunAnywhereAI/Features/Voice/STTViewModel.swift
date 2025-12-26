@@ -30,11 +30,32 @@ class STTViewModel: ObservableObject {
     @Published var isTranscribing = false
     @Published var audioLevel: Float = 0.0
     @Published var errorMessage: String?
-    @Published var selectedMode: STTMode = .batch
+    @Published var selectedMode: STTMode = .batch {
+        didSet {
+            // Stop any active recording/transcription when mode changes
+            if oldValue != selectedMode {
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    if self.isRecording {
+                        let msg = "Mode changed from \(oldValue.rawValue) to \(self.selectedMode.rawValue)"
+                        self.logger.info("\(msg) - stopping active recording")
+                        await self.stopRecording()
+                    }
+                    // Also clean up any lingering live transcription resources
+                    if oldValue == .live {
+                        await self.stopLiveTranscription()
+                    }
+                }
+            }
+        }
+    }
 
     // MARK: - Private Properties
 
     private var audioBuffer = Data()
+
+    /// SDK-managed live transcription session (handles audio capture + streaming internally)
+    private var liveSession: LiveTranscriptionSession?
 
     // MARK: - Initialization State (for idempotency)
 
@@ -69,7 +90,7 @@ class STTViewModel: ObservableObject {
             return
         }
 
-        // Subscribe to audio level updates
+        // Subscribe to audio level updates (for batch mode)
         subscribeToAudioLevelUpdates()
 
         // Subscribe to SDK events for STT model state
@@ -87,7 +108,7 @@ class STTViewModel: ObservableObject {
 
         do {
             try await RunAnywhere.loadSTTModel(model.id)
-            selectedFramework = model.preferredFramework
+            selectedFramework = model.framework
             selectedModelName = model.name
             selectedModelId = model.id
             logger.info("STT model loaded successfully: \(model.name)")
@@ -111,7 +132,7 @@ class STTViewModel: ObservableObject {
     // MARK: - Private Methods - Permissions
 
     private func requestMicrophonePermission() async -> Bool {
-        return await audioCapture.requestPermission()
+        await audioCapture.requestPermission()
     }
 
     // MARK: - Private Methods - Subscriptions
@@ -160,7 +181,7 @@ class STTViewModel: ObservableObject {
                 // Look up the model name from available models
                 if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
                     selectedModelName = matchingModel.name
-                    selectedFramework = matchingModel.preferredFramework
+                    selectedFramework = matchingModel.framework
                 } else {
                     selectedModelName = modelId // Fallback to ID if model not found
                 }
@@ -180,7 +201,7 @@ class STTViewModel: ObservableObject {
         if let model = await RunAnywhere.currentSTTModel {
             selectedModelId = model.id
             selectedModelName = model.name
-            selectedFramework = model.preferredFramework
+            selectedFramework = model.framework
             logger.info("STT model already loaded: \(model.name)")
         }
     }
@@ -199,13 +220,19 @@ class STTViewModel: ObservableObject {
         }
 
         do {
-            try audioCapture.startRecording { [weak self] audioData in
-                Task { @MainActor in
-                    self?.audioBuffer.append(audioData)
+            if selectedMode == .live {
+                // Live mode: Use SDK's LiveTranscriptionSession (handles audio capture internally)
+                try await startLiveTranscription()
+            } else {
+                // Batch mode: Collect audio for later transcription
+                try audioCapture.startRecording { [weak self] audioData in
+                    Task { @MainActor in
+                        self?.audioBuffer.append(audioData)
+                    }
                 }
             }
             isRecording = true
-            logger.info("Recording started")
+            logger.info("Recording started in \(self.selectedMode.rawValue) mode")
         } catch {
             logger.error("Failed to start recording: \(error.localizedDescription)")
             errorMessage = "Failed to start recording: \(error.localizedDescription)"
@@ -215,13 +242,17 @@ class STTViewModel: ObservableObject {
     private func stopRecording() async {
         logger.info("Stopping recording")
 
-        // Stop audio capture
-        audioCapture.stopRecording()
+        if selectedMode == .live {
+            // Live mode: Stop SDK session (handles audio cleanup internally)
+            await stopLiveTranscription()
+        } else {
+            // Batch mode: Stop audio capture and perform transcription
+            audioCapture.stopRecording()
+            await performBatchTranscription()
+        }
+
         isRecording = false
         audioLevel = 0.0
-
-        // Perform batch transcription
-        await performBatchTranscription()
     }
 
     // MARK: - Private Methods - Transcription
@@ -249,12 +280,54 @@ class STTViewModel: ObservableObject {
         isTranscribing = false
     }
 
+    /// Start live streaming transcription using SDK's LiveTranscriptionSession
+    private func startLiveTranscription() async throws {
+        logger.info("Starting live transcription via SDK")
+        isTranscribing = true
+
+        // Start session and consume transcription stream
+        let session = try await RunAnywhere.startLiveTranscription()
+        self.liveSession = session
+
+        // Subscribe to audio level for visualization
+        session.$audioLevel
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$audioLevel)
+
+        // Consume transcription updates
+        Task { @MainActor [weak self] in
+            for await text in session.transcriptions {
+                self?.transcription = text
+            }
+            // Stream ended
+            self?.isTranscribing = false
+            self?.logger.info("Live transcription completed")
+        }
+    }
+
+    /// Stop live streaming transcription
+    private func stopLiveTranscription() async {
+        logger.info("Stopping live transcription")
+
+        await liveSession?.stop()
+        liveSession = nil
+
+        isTranscribing = false
+    }
+
     // MARK: - Cleanup
 
     /// Clean up resources - call from view's onDisappear
     /// This replaces deinit cleanup to comply with Swift 6 concurrency
     func cleanup() {
         audioCapture.stopRecording()
+
+        // Clean up live transcription session
+        Task { @MainActor in
+            await liveSession?.stop()
+            liveSession = nil
+        }
+
         cancellables.removeAll()
 
         // Reset initialization flags to allow re-initialization if needed

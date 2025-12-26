@@ -42,9 +42,8 @@ struct SpeechToTextView: View {
                 ModelStatusBanner(
                     framework: viewModel.selectedFramework,
                     modelName: viewModel.selectedModelName,
-                    isLoading: viewModel.isProcessing && viewModel.selectedModelName == nil,
-                    onSelectModel: { showModelPicker = true }
-                )
+                    isLoading: viewModel.isProcessing && viewModel.selectedModelName == nil
+                ) { showModelPicker = true }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
 
@@ -197,8 +196,16 @@ struct SpeechToTextView: View {
                                 await viewModel.toggleRecording()
                             }
                         }
-                        .disabled(viewModel.selectedModelName == nil || viewModel.isProcessing || viewModel.isTranscribing)
-                        .opacity(viewModel.selectedModelName == nil || viewModel.isProcessing || viewModel.isTranscribing ? 0.6 : 1.0)
+                        .disabled(
+                            viewModel.selectedModelName == nil ||
+                            viewModel.isProcessing ||
+                            viewModel.isTranscribing
+                        )
+                        .opacity(
+                            viewModel.selectedModelName == nil ||
+                            viewModel.isProcessing ||
+                            viewModel.isTranscribing ? 0.6 : 1.0
+                        )
 
                         Text(statusMessage)
                             .font(.caption)
@@ -219,9 +226,8 @@ struct SpeechToTextView: View {
             // Overlay when no model is selected
             if !hasModelSelected && !viewModel.isProcessing {
                 ModelRequiredOverlay(
-                    modality: .stt,
-                    onSelectModel: { showModelPicker = true }
-                )
+                    modality: .stt
+                ) { showModelPicker = true }
             }
         }
         .sheet(isPresented: $showModelPicker) {

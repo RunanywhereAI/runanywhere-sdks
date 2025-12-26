@@ -7,7 +7,6 @@ skip_build: false
 clean_build: false
 
 # Targets to analyze (main SDK and backend modules)
-# Note: WhisperKitTranscription excluded due to API incompatibility
 targets:
   - RunAnywhere
   - ONNXRuntime

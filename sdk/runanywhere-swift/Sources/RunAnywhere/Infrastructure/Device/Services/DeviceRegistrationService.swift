@@ -54,14 +54,13 @@ public actor DeviceRegistrationService {
         }
 
         let deviceId = DeviceIdentity.persistentUUID
-        logger.info("Registering device: \(deviceId.prefix(8))... [\(environment.description)]")
 
         do {
             let request = DeviceRegistrationRequest.fromCurrentDevice()
             let endpoint = APIEndpoint.deviceRegistrationEndpoint(for: environment)
 
             // Use NetworkService for the request
-            // Development mode doesn't require auth, staging/production do
+            // Development mode uses build token, staging/production use JWT
             let _: DeviceRegistrationResponse = try await networkService.post(
                 endpoint,
                 request,
@@ -74,8 +73,8 @@ public actor DeviceRegistrationService {
 
         } catch {
             // Registration failure is non-critical - log and continue
-            EventPublisher.shared.track(DeviceEvent.registrationFailed(error: error.localizedDescription))
-            logger.warning("Device registration failed (non-critical): \(error.localizedDescription)")
+            EventPublisher.shared.track(DeviceEvent.registrationFailed(error: SDKError.from(error, category: .network)))
+            logger.warning("Device registration failed: \(error.localizedDescription)")
         }
     }
 

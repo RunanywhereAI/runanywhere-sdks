@@ -46,35 +46,38 @@ public struct VADInput: ComponentInput {
     public func validate() throws {
         // Must have either buffer or audioSamples
         if buffer == nil && audioSamples == nil {
-            throw VADError.invalidInput(
-                reason: "VADInput must contain either buffer or audioSamples"
+            throw SDKError.vad(
+                .invalidInput,
+                "VADInput must contain either buffer or audioSamples"
             )
         }
 
         // Both cannot be provided
         if buffer != nil && audioSamples != nil {
-            throw VADError.invalidInput(
-                reason: "VADInput cannot contain both buffer and audioSamples"
+            throw SDKError.vad(
+                .invalidInput,
+                "VADInput cannot contain both buffer and audioSamples"
             )
         }
 
         // Validate threshold override if provided
         if let threshold = energyThresholdOverride {
             guard threshold >= 0 && threshold <= 1.0 else {
-                throw VADError.invalidInput(
-                    reason: "Energy threshold override must be between 0 and 1.0"
+                throw SDKError.vad(
+                    .invalidInput,
+                    "Energy threshold override must be between 0 and 1.0"
                 )
             }
         }
 
         // Validate audio samples are not empty
         if let samples = audioSamples, samples.isEmpty {
-            throw VADError.emptyAudioBuffer
+            throw SDKError.vad(.emptyAudioBuffer, "Audio buffer is empty")
         }
 
         // Validate buffer is not empty
         if let buf = buffer, buf.frameLength == 0 {
-            throw VADError.emptyAudioBuffer
+            throw SDKError.vad(.emptyAudioBuffer, "Audio buffer is empty")
         }
     }
 }
