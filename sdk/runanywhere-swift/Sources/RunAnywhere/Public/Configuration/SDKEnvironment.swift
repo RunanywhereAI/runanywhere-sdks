@@ -183,15 +183,14 @@ public struct SDKInitParams {
         let logger = SDKLogger(category: "SDKInitParams")
 
         // 1. Check build configuration compatibility for production
-        // NOTE: Temporarily disabled for testing production mode in DEBUG builds
-        // if environment == .production {
-        //     #if DEBUG
-        //     throw RunAnywhereError.environmentMismatch(
-        //         "Production environment cannot be used in DEBUG builds. " +
-        //         "Use .development or .staging for testing, or build in Release mode for production."
-        //     )
-        //     #endif
-        // }
+        if environment == .production {
+            #if DEBUG
+            throw RunAnywhereError.environmentMismatch(
+                "Production environment cannot be used in DEBUG builds. " +
+                "Use .development or .staging for testing, or build in Release mode for production."
+            )
+            #endif
+        }
 
         // 2. Validate API key for staging and production
         if environment.requiresAuthentication {

@@ -85,12 +85,14 @@ public struct TelemetryEventPayload: Codable, Sendable {
     public let outputDurationMs: Double?
 
     // MARK: - Coding Keys (snake_case for API)
-    // NOTE: FastAPI backend expects `id` and `timestamp` (not `sdk_event_id` / `event_timestamp`)
+    // NOTE: Production (FastAPI) uses `id` and `timestamp`
+    //       Development (Supabase) uses `sdk_event_id` and `event_timestamp`
+    //       The encode(to:) method handles this difference based on productionEncodingMode
 
     enum CodingKeys: String, CodingKey {
-        case id  // FastAPI expects "id"
+        case id  // Production: "id", Development: manually encoded as "sdk_event_id"
         case eventType = "event_type"
-        case timestamp  // FastAPI expects "timestamp"
+        case timestamp  // Production: "timestamp", Development: manually encoded as "event_timestamp"
         case createdAt = "created_at"
         case modality  // Only used for Supabase; skipped in production encoding
         case deviceId = "device_id"  // Only used for Supabase; skipped in production encoding
@@ -131,6 +133,20 @@ public struct TelemetryEventPayload: Codable, Sendable {
         case outputDurationMs = "output_duration_ms"
     }
 
+    /// Dynamic coding key for environment-specific field names
+    private struct DynamicCodingKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+
+        init(stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(intValue: Int) {
+            return nil
+        }
+    }
+
     // MARK: - Environment-Aware Encoding
 
     /// Flag to control encoding mode (set by RemoteTelemetryDataSource based on environment)
@@ -139,13 +155,23 @@ public struct TelemetryEventPayload: Codable, Sendable {
     public static var productionEncodingMode = false
 
     /// Custom encoder that handles both Supabase (all keys) and FastAPI (skip batch-level fields).
+    /// - Production (FastAPI): uses `id` and `timestamp`
+    /// - Development (Supabase): uses `sdk_event_id` and `event_timestamp`
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
-        // Required fields
-        try container.encode(id, forKey: .id)
+        // Required fields - use different key names based on environment
+        if Self.productionEncodingMode {
+            // Production: FastAPI expects "id" and "timestamp"
+            try container.encode(id, forKey: .id)
+            try container.encode(timestamp, forKey: .timestamp)
+        } else {
+            // Development: Supabase expects "sdk_event_id" and "event_timestamp"
+            var dynamicContainer = encoder.container(keyedBy: DynamicCodingKey.self)
+            try dynamicContainer.encode(id, forKey: DynamicCodingKey(stringValue: "sdk_event_id"))
+            try dynamicContainer.encode(timestamp, forKey: DynamicCodingKey(stringValue: "event_timestamp"))
+        }
         try container.encode(eventType, forKey: .eventType)
-        try container.encode(timestamp, forKey: .timestamp)
         try container.encode(createdAt, forKey: .createdAt)
 
         // Conditional fields - skip for production (FastAPI has them at batch level)
