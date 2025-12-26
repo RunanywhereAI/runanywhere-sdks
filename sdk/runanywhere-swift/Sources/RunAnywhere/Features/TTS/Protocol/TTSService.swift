@@ -14,7 +14,7 @@ public protocol TTSService: AnyObject { // swiftlint:disable:this avoid_any_obje
 
     /// The inference framework used by this service.
     /// Required for analytics and performance tracking.
-    var inferenceFramework: InferenceFrameworkType { get }
+    var inferenceFramework: InferenceFramework { get }
 
     /// Initialize the TTS service
     func initialize() async throws

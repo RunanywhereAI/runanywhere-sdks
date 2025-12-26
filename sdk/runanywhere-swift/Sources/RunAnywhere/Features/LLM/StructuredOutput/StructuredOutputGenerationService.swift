@@ -160,7 +160,7 @@ public final class StructuredOutputGenerationService {
                 }
             }
 
-            throw lastError ?? StructuredOutputError.extractionFailed("Failed to parse structured output after 3 attempts")
+            throw lastError ?? SDKError.llm(.extractionFailed, "Failed to parse structured output after 3 attempts")
         }
 
         return StructuredOutputStreamResult(

@@ -113,11 +113,11 @@ extension DeviceRegistrationRequest {
 // MARK: - Convenience Accessors
 
 extension DeviceRegistrationRequest {
-    /// Direct access to device ID (convenience)
-    public var deviceId: String { deviceInfo.deviceId }
+    /// Direct access to device fingerprint (convenience)
+    public var deviceId: String { deviceInfo.deviceFingerprint ?? "" }
 
     /// Direct access to device model name (convenience)
-    public var deviceModel: String { deviceInfo.modelName }
+    public var deviceModel: String { deviceInfo.deviceModel }
 
     /// Direct access to OS version (convenience)
     public var osVersion: String { deviceInfo.cleanOSVersion }

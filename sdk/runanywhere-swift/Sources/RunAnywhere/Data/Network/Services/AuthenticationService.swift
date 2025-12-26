@@ -53,7 +53,7 @@ public actor AuthenticationService {
             sdkVersion: SDKConstants.version
         )
 
-        logger.debug("Authenticating with backend")
+        logger.info("Starting authentication...")
 
         // Use APIClient for the authentication request (doesn't require auth)
         let authResponse: AuthenticationResponse = try await apiClient.post(
@@ -92,7 +92,7 @@ public actor AuthenticationService {
         }
 
         // Otherwise, we can't re-authenticate without API key
-        throw RunAnywhereError.authenticationFailed("No valid token and no way to re-authenticate")
+        throw SDKError.authentication(.authenticationFailed, "No valid token and no way to re-authenticate")
     }
 
     /// Perform health check
@@ -134,11 +134,11 @@ public actor AuthenticationService {
 
     private func refreshAccessToken() async throws -> String {
         guard let refreshToken = refreshToken else {
-            throw RunAnywhereError.invalidAPIKey("No refresh token available")
+            throw SDKError.authentication(.invalidAPIKey, "No refresh token available")
         }
 
         guard let deviceId = deviceId else {
-            throw RunAnywhereError.authenticationFailed("No device ID available for refresh")
+            throw SDKError.authentication(.authenticationFailed, "No device ID available for refresh")
         }
 
         logger.debug("Refreshing access token")

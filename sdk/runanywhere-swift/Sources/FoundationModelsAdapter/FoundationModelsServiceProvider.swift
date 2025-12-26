@@ -77,13 +77,12 @@ public enum AppleAI: RunAnywhereModule {
             name: "Apple Intelligence (Foundation Models)",
             category: .language,
             format: .unknown,
+            framework: .foundationModels,
             downloadURL: nil,
             localPath: URL(string: "builtin://foundation-models"),  // Special builtin scheme
             artifactType: .builtIn,
             downloadSize: nil,
             memoryRequired: nil,  // System managed
-            compatibleFrameworks: [.foundationModels],
-            preferredFramework: .foundationModels,
             contextLength: 4096,
             supportsThinking: false,
             tags: ["apple", "foundation-models", "built-in", "on-device"],

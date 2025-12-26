@@ -20,7 +20,7 @@ public final class ArchiveUtility {
     ///   - sourceURL: The URL of the tar.bz2 file to extract
     ///   - destinationURL: The destination directory URL
     ///   - progressHandler: Optional callback for extraction progress (0.0 to 1.0)
-    /// - Throws: DownloadError if extraction fails
+    /// - Throws: SDKError if extraction fails
     public static func extractTarBz2Archive(
         from sourceURL: URL,
         to destinationURL: URL,
@@ -45,8 +45,8 @@ public final class ArchiveUtility {
         do {
             tarData = try BZip2.decompress(data: compressedData)
         } catch {
-            logger.error("❌ BZip2 decompression failed: \(error)")
-            throw DownloadError.extractionFailed("BZip2 decompression failed: \(error.localizedDescription)")
+            logger.error("BZip2 decompression failed: \(error)")
+            throw SDKError.download(.extractionFailed, "BZip2 decompression failed: \(error.localizedDescription)", underlying: error)
         }
         let decompressTime = Date().timeIntervalSince(decompressStart)
         logger.info("✅ [DECOMPRESS] \(formatBytes(compressedData.count)) → \(formatBytes(tarData.count)) in \(String(format: "%.2f", decompressTime))s")
@@ -77,7 +77,7 @@ public final class ArchiveUtility {
     ///   - sourceURL: The URL of the tar.gz file to extract
     ///   - destinationURL: The destination directory URL
     ///   - progressHandler: Optional callback for extraction progress (0.0 to 1.0)
-    /// - Throws: DownloadError if extraction fails
+    /// - Throws: SDKError if extraction fails
     public static func extractTarGzArchive(
         from sourceURL: URL,
         to destinationURL: URL,
@@ -101,13 +101,13 @@ public final class ArchiveUtility {
         do {
             tarData = try decompressGzipNative(compressedData)
         } catch {
-            logger.error("❌ Native gzip decompression failed: \(error), falling back to pure Swift")
+            logger.error("Native gzip decompression failed: \(error), falling back to pure Swift")
             // Fallback to SWCompression if native fails
             do {
                 tarData = try GzipArchive.unarchive(archive: compressedData)
             } catch {
-                logger.error("❌ Gzip decompression failed: \(error)")
-                throw DownloadError.extractionFailed("Gzip decompression failed: \(error.localizedDescription)")
+                logger.error("Gzip decompression failed: \(error)")
+                throw SDKError.download(.extractionFailed, "Gzip decompression failed: \(error.localizedDescription)", underlying: error)
             }
         }
         let decompressTime = Date().timeIntervalSince(decompressStart)
@@ -139,17 +139,17 @@ public final class ArchiveUtility {
         // Gzip files have a header we need to skip to get to the raw deflate stream
         // Gzip header: magic (2) + method (1) + flags (1) + mtime (4) + xfl (1) + os (1) = 10 bytes minimum
         guard compressedData.count >= 10 else {
-            throw DownloadError.extractionFailed("Invalid gzip data: too short")
+            throw SDKError.download(.extractionFailed, "Invalid gzip data: too short")
         }
 
         // Verify gzip magic number
         guard compressedData[0] == 0x1f && compressedData[1] == 0x8b else {
-            throw DownloadError.extractionFailed("Invalid gzip magic number")
+            throw SDKError.download(.extractionFailed, "Invalid gzip magic number")
         }
 
         // Check compression method (must be 8 = deflate)
         guard compressedData[2] == 8 else {
-            throw DownloadError.extractionFailed("Unsupported gzip compression method")
+            throw SDKError.download(.extractionFailed, "Unsupported gzip compression method")
         }
 
         let flags = compressedData[3]
@@ -158,7 +158,7 @@ public final class ArchiveUtility {
         // Skip optional extra field (FEXTRA)
         if flags & 0x04 != 0 {
             guard compressedData.count >= offset + 2 else {
-                throw DownloadError.extractionFailed("Invalid gzip extra field")
+                throw SDKError.download(.extractionFailed, "Invalid gzip extra field")
             }
             let extraLen = Int(compressedData[offset]) | (Int(compressedData[offset + 1]) << 8)
             offset += 2 + extraLen
@@ -187,7 +187,7 @@ public final class ArchiveUtility {
 
         // The rest is the deflate stream (minus 8 bytes at end for CRC32 + size)
         guard compressedData.count > offset + 8 else {
-            throw DownloadError.extractionFailed("Invalid gzip structure")
+            throw SDKError.download(.extractionFailed, "Invalid gzip structure")
         }
 
         let deflateData = compressedData.subdata(in: offset..<(compressedData.count - 8))
@@ -244,7 +244,7 @@ public final class ArchiveUtility {
             }
 
             guard retrySize > 0 && retrySize < destinationBufferSize else {
-                throw DownloadError.extractionFailed("Native decompression failed - buffer too small or corrupted data")
+                throw SDKError.download(.extractionFailed, "Native decompression failed - buffer too small or corrupted data")
             }
 
             decompressedData.count = retrySize
@@ -261,7 +261,7 @@ public final class ArchiveUtility {
     ///   - sourceURL: The URL of the tar.xz file to extract
     ///   - destinationURL: The destination directory URL
     ///   - progressHandler: Optional callback for extraction progress (0.0 to 1.0)
-    /// - Throws: DownloadError if extraction fails
+    /// - Throws: SDKError if extraction fails
     public static func extractTarXzArchive(
         from sourceURL: URL,
         to destinationURL: URL,
@@ -282,7 +282,7 @@ public final class ArchiveUtility {
             tarData = try XZArchive.unarchive(archive: compressedData)
         } catch {
             logger.error("XZ decompression failed: \(error)")
-            throw DownloadError.extractionFailed("XZ decompression failed: \(error.localizedDescription)")
+            throw SDKError.download(.extractionFailed, "XZ decompression failed: \(error.localizedDescription)", underlying: error)
         }
         logger.debug("Decompressed to \(formatBytes(tarData.count)) of tar data")
         progressHandler?(0.4)
@@ -303,7 +303,7 @@ public final class ArchiveUtility {
     ///   - sourceURL: The URL of the zip file to extract
     ///   - destinationURL: The destination directory URL
     ///   - progressHandler: Optional callback for extraction progress (0.0 to 1.0)
-    /// - Throws: DownloadError if extraction fails
+    /// - Throws: SDKError if extraction fails
     public static func extractZipArchive(
         from sourceURL: URL,
         to destinationURL: URL,
@@ -333,7 +333,7 @@ public final class ArchiveUtility {
             progressHandler?(1.0)
         } catch {
             logger.error("Zip extraction failed: \(error)")
-            throw DownloadError.extractionFailed("Failed to extract zip archive: \(error.localizedDescription)")
+            throw SDKError.download(.extractionFailed, "Failed to extract zip archive: \(error.localizedDescription)", underlying: error)
         }
     }
 
@@ -342,7 +342,7 @@ public final class ArchiveUtility {
     ///   - sourceURL: The archive file URL
     ///   - destinationURL: The destination directory URL
     ///   - progressHandler: Optional callback for extraction progress (0.0 to 1.0)
-    /// - Throws: DownloadError if extraction fails or format is unsupported
+    /// - Throws: SDKError if extraction fails or format is unsupported
     public static func extractArchive(
         from sourceURL: URL,
         to destinationURL: URL,
@@ -360,7 +360,7 @@ public final class ArchiveUtility {
         case .zip:
             try extractZipArchive(from: sourceURL, to: destinationURL, progressHandler: progressHandler)
         case .unknown:
-            throw DownloadError.unsupportedArchive(sourceURL.pathExtension)
+            throw SDKError.download(.unsupportedArchive, "Unsupported archive format: \(sourceURL.pathExtension)")
         }
     }
 
@@ -418,7 +418,7 @@ public final class ArchiveUtility {
     /// - Parameters:
     ///   - sourceURL: The source directory URL
     ///   - destinationURL: The destination zip file URL
-    /// - Throws: DownloadError if compression fails
+    /// - Throws: SDKError if compression fails
     public static func createZipArchive(
         from sourceURL: URL,
         to destinationURL: URL
@@ -434,7 +434,7 @@ public final class ArchiveUtility {
             logger.info("Created zip archive at: \(destinationURL.path)")
         } catch {
             logger.error("Failed to create zip archive: \(error)")
-            throw DownloadError.extractionFailed("Failed to create archive: \(error.localizedDescription)")
+            throw SDKError.download(.extractionFailed, "Failed to create archive: \(error.localizedDescription)", underlying: error)
         }
     }
 
@@ -458,8 +458,8 @@ public final class ArchiveUtility {
         do {
             entries = try TarContainer.open(container: tarData)
         } catch {
-            logger.error("❌ Tar parsing failed: \(error)")
-            throw DownloadError.extractionFailed("Tar parsing failed: \(error.localizedDescription)")
+            logger.error("Tar parsing failed: \(error)")
+            throw SDKError.download(.extractionFailed, "Tar parsing failed: \(error.localizedDescription)", underlying: error)
         }
         let parseTime = Date().timeIntervalSince(parseStart)
         logger.info("   ✅ [TAR PARSE] Found \(entries.count) entries in \(String(format: "%.2f", parseTime))s")
@@ -547,7 +547,7 @@ public extension FileManager {
     ///   - sourceURL: The archive file URL
     ///   - destinationURL: The destination directory URL
     ///   - progressHandler: Optional callback for extraction progress (0.0 to 1.0)
-    /// - Throws: DownloadError if extraction fails or format is unsupported
+    /// - Throws: SDKError if extraction fails or format is unsupported
     func extractArchive(
         from sourceURL: URL,
         to destinationURL: URL,

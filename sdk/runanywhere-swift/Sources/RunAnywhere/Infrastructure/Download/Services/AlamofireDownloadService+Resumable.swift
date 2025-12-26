@@ -8,7 +8,7 @@ extension AlamofireDownloadService {
     /// Download with resume support
     public func downloadModelWithResume(_ model: ModelInfo, resumeData: Data? = nil) async throws -> DownloadTask {
         guard let downloadURL = model.downloadURL else {
-            throw DownloadError.invalidURL
+            throw SDKError.download(.invalidInput, "Invalid download URL for model: \(model.id)")
         }
 
         let taskId = UUID().uuidString
@@ -45,11 +45,8 @@ extension AlamofireDownloadService {
         resumeData: Data?,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        // Get destination folder (framework is required)
-        guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
-            logger.error("Model has no associated framework: \(model.id)")
-            throw DownloadError.invalidURL
-        }
+        // Get destination folder (framework is required - 1:1 mapping)
+        let framework = model.framework
         let fileManager = ServiceContainer.shared.fileManager
         let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
         let destinationURL = URL(fileURLWithPath: modelFolder.path).appendingPathComponent("\(model.id).\(model.format.rawValue)")
@@ -120,7 +117,7 @@ extension AlamofireDownloadService {
         return try await withCheckedThrowingContinuation { continuation in
             downloadRequest.response { [weak self] response in
                 guard let self = self else {
-                    continuation.resume(throwing: DownloadError.unknown)
+                    continuation.resume(throwing: SDKError.download(.unknown, "Download service was deallocated"))
                     return
                 }
 
@@ -178,7 +175,7 @@ extension AlamofireDownloadService {
 
             continuation.resume(returning: url)
         } else {
-            continuation.resume(throwing: DownloadError.invalidResponse)
+            continuation.resume(throwing: SDKError.download(.invalidResponse, "No URL returned from resumable download"))
         }
     }
 

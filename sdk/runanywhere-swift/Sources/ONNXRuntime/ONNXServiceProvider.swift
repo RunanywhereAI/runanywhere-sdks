@@ -99,30 +99,13 @@ public enum ONNX: RunAnywhereModule {
     private static func canHandleSTT(_ modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
 
-        let lowercased = modelId.lowercased()
-
-        // Check model info cache first
+        // Framework from model info is the single source of truth
+        // Models must be registered with the SDK via addModel() to be handled
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.preferredFramework == .onnx && modelInfo.category == .speechRecognition {
-                return true
-            }
-            if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechRecognition {
-                return true
-            }
-            if modelInfo.format == .onnx && modelInfo.category == .speechRecognition {
-                return true
-            }
-            return false
+            return modelInfo.framework == .onnx && modelInfo.category == .speechRecognition
         }
 
-        // Fallback: Pattern-based matching
-        if lowercased.contains("onnx") || lowercased.hasSuffix(".onnx") {
-            return true
-        }
-        if lowercased.contains("zipformer") || lowercased.contains("sherpa") {
-            return true
-        }
-
+        // Model is not registered - cannot handle unknown models
         return false
     }
 
@@ -139,7 +122,7 @@ public enum ONNX: RunAnywhereModule {
                 logger.info("Found local model path: \(modelPath ?? "nil")")
             } else {
                 logger.error("Model '\(modelId)' is not downloaded")
-                throw SDKError.modelNotFound("Model '\(modelId)' is not downloaded. Please download the model first.")
+                throw SDKError.runtime(.modelNotFound, "Model '\(modelId)' is not downloaded. Please download the model first.")
             }
         }
 
@@ -154,33 +137,13 @@ public enum ONNX: RunAnywhereModule {
     private static func canHandleTTS(_ modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
 
-        let lowercased = modelId.lowercased()
-
-        // Check model info cache first
+        // Framework from model info is the single source of truth
+        // Models must be registered with the SDK via addModel() to be handled
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.preferredFramework == .onnx && modelInfo.category == .speechSynthesis {
-                return true
-            }
-            if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechSynthesis {
-                return true
-            }
-            if modelInfo.format == .onnx && modelInfo.category == .speechSynthesis {
-                return true
-            }
-            return false
+            return modelInfo.framework == .onnx && modelInfo.category == .speechSynthesis
         }
 
-        // Fallback: Pattern-based matching
-        if lowercased.contains("piper") {
-            return true
-        }
-        if lowercased.contains("vits") {
-            return true
-        }
-        if lowercased.contains("tts") && lowercased.contains("onnx") {
-            return true
-        }
-
+        // Model is not registered - cannot handle unknown models
         return false
     }
 
@@ -197,7 +160,7 @@ public enum ONNX: RunAnywhereModule {
             allModels = try await RunAnywhere.availableModels()
         } catch {
             logger.error("Failed to fetch available models: \(error)")
-            throw SDKError.modelNotFound("Failed to query available models: \(error.localizedDescription)")
+            throw SDKError.runtime(.modelNotFound, "Failed to query available models: \(error.localizedDescription)")
         }
 
         let modelInfo = allModels.first { $0.id == modelId }
@@ -207,11 +170,11 @@ public enum ONNX: RunAnywhereModule {
             logger.info("Found local model path: \(modelPath ?? "nil")")
         } else {
             logger.error("TTS Model '\(modelId)' is not downloaded")
-            throw SDKError.modelNotFound("TTS Model '\(modelId)' is not downloaded. Please download the model first.")
+            throw SDKError.runtime(.modelNotFound, "TTS Model '\(modelId)' is not downloaded. Please download the model first.")
         }
 
         guard let path = modelPath else {
-            throw SDKError.modelNotFound("Could not find model path for: \(modelId)")
+            throw SDKError.runtime(.modelNotFound, "Could not find model path for: \(modelId)")
         }
 
         logger.info("Creating ONNXTTSService with path: \(path)")

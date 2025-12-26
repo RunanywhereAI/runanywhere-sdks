@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Shared audio capture utility for STT features.
-//  Can be used with any STT backend (ONNX, WhisperKit, etc.)
+//  Can be used with any STT backend (ONNX, etc.)
 //
 
 import AVFoundation
@@ -11,7 +11,7 @@ import Foundation
 
 /// Manages audio capture from microphone for STT services.
 ///
-/// This is a shared utility that works with any STT backend (ONNX, WhisperKit, etc.).
+/// This is a shared utility that works with any STT backend (ONNX, etc.).
 /// It captures audio at 16kHz mono Int16 format, which is the standard input format
 /// for speech recognition models like Whisper.
 ///
@@ -37,7 +37,7 @@ public class AudioCaptureManager: ObservableObject {
     @Published public var isRecording = false
     @Published public var audioLevel: Float = 0.0
 
-    private let targetSampleRate: Double = 16000.0 // Whisper requirement
+    private let targetSampleRate = Double(STTConstants.defaultSampleRate)
 
     public init() {
         logger.info("AudioCaptureManager initialized")

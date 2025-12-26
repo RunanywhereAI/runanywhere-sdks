@@ -20,8 +20,8 @@ struct SimplifiedModelsView: View {
     /// All available models sorted by availability (downloaded first)
     private var sortedModels: [ModelInfo] {
         viewModel.availableModels.sorted { model1, model2 in
-            let m1Priority = model1.preferredFramework == .foundationModels ? 0 : (model1.localPath != nil ? 1 : 2)
-            let m2Priority = model2.preferredFramework == .foundationModels ? 0 : (model2.localPath != nil ? 1 : 2)
+            let m1Priority = model1.framework == .foundationModels ? 0 : (model1.localPath != nil ? 1 : 2)
+            let m2Priority = model2.framework == .foundationModels ? 0 : (model2.localPath != nil ? 1 : 2)
             if m1Priority != m2Priority {
                 return m1Priority < m2Priority
             }
@@ -75,8 +75,11 @@ struct SimplifiedModelsView: View {
         Group {
             deviceInfoRow(label: "Model", systemImage: "iphone", value: device.modelName)
             deviceInfoRow(label: "Chip", systemImage: "cpu", value: device.chipName)
-            deviceInfoRow(label: "Memory", systemImage: "memorychip",
-                         value: ByteCountFormatter.string(fromByteCount: device.totalMemory, countStyle: .memory))
+            deviceInfoRow(
+                label: "Memory",
+                systemImage: "memorychip",
+                value: ByteCountFormatter.string(fromByteCount: device.totalMemory, countStyle: .memory)
+            )
 
             if device.neuralEngineAvailable {
                 neuralEngineRow
@@ -176,29 +179,25 @@ private struct SimplifiedModelRow: View {
     @State private var downloadProgress: Double = 0.0
 
     private var frameworkColor: Color {
-        guard let framework = model.preferredFramework else { return .gray }
-        switch framework {
+        switch model.framework {
         case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
-        case .whisperKit: return .green
         default: return .gray
         }
     }
 
     private var frameworkName: String {
-        guard let framework = model.preferredFramework else { return "Unknown" }
-        switch framework {
+        switch model.framework {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
-        case .whisperKit: return "Whisper"
-        default: return framework.displayName
+        default: return model.framework.displayName
         }
     }
 
     private var isReady: Bool {
-        model.preferredFramework == .foundationModels || model.localPath != nil
+        model.framework == .foundationModels || model.localPath != nil
     }
 
     var body: some View {
@@ -246,7 +245,10 @@ private struct SimplifiedModelRow: View {
                             Image(systemName: isReady ? "checkmark.circle.fill" : "arrow.down.circle")
                                 .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                                 .font(AppTypography.caption2)
-                            Text(model.preferredFramework == .foundationModels ? "Built-in" : (model.localPath != nil ? "Ready" : "Download"))
+                            let statusText = model.framework == .foundationModels
+                                ? "Built-in"
+                                : (model.localPath != nil ? "Ready" : "Download")
+                            Text(statusText)
                                 .font(AppTypography.caption2)
                                 .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                         }
@@ -270,7 +272,7 @@ private struct SimplifiedModelRow: View {
             Spacer()
 
             // Action button
-            if model.preferredFramework == .foundationModels {
+            if model.framework == .foundationModels {
                 Button("Use") {
                     onSelectModel()
                 }
@@ -358,7 +360,6 @@ private struct SimplifiedModelRow: View {
                 self.isDownloading = false
                 onDownloadCompleted()
             }
-
         } catch {
             await MainActor.run {
                 downloadProgress = 0.0

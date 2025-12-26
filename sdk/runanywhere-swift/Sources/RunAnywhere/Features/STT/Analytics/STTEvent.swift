@@ -5,6 +5,9 @@
 //  All STT-related events in one place.
 //  Each event declares its destination (public, analytics, or both).
 //
+//  Note: STTEvent conforms to TypedEventProperties for strongly typed analytics.
+//  This avoids string conversion/parsing and enables compile-time type checking.
+//
 
 import Foundation
 
@@ -16,13 +19,19 @@ import Foundation
 /// ```swift
 /// EventPublisher.shared.track(STTEvent.transcriptionCompleted(...))
 /// ```
-public enum STTEvent: SDKEvent {
+///
+/// STTEvent provides strongly typed properties via `typedProperties`.
+/// This enables:
+/// - Type safety at compile time
+/// - No string parsing for analytics
+/// - Validation guardrails (e.g., confidence between 0-1)
+public enum STTEvent: SDKEvent, TypedEventProperties {
 
     // MARK: - Model Lifecycle
 
-    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
-    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
-    case modelLoadFailed(modelId: String, error: String, framework: InferenceFrameworkType = .unknown)
+    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadFailed(modelId: String, error: SDKError, framework: InferenceFramework = .unknown)
     case modelUnloaded(modelId: String)
 
     // MARK: - Transcription
@@ -31,12 +40,17 @@ public enum STTEvent: SDKEvent {
     /// - Parameters:
     ///   - audioLengthMs: Duration of audio in milliseconds
     ///   - audioSizeBytes: Size of audio data in bytes
+    ///   - isStreaming: Whether this is a streaming transcription
+    ///   - sampleRate: Audio sample rate in Hz (default: STTConstants.defaultSampleRate)
     case transcriptionStarted(
         transcriptionId: String,
+        modelId: String,
         audioLengthMs: Double,
         audioSizeBytes: Int,
         language: String,
-        framework: InferenceFrameworkType = .unknown
+        isStreaming: Bool = false,
+        sampleRate: Int = STTConstants.defaultSampleRate,
+        framework: InferenceFramework = .unknown
     )
     case partialTranscript(text: String, wordCount: Int)
     case finalTranscript(text: String, confidence: Float)
@@ -46,6 +60,7 @@ public enum STTEvent: SDKEvent {
     ///   - realTimeFactor: Processing time / audio length (< 1.0 means faster than real-time)
     case transcriptionCompleted(
         transcriptionId: String,
+        modelId: String,
         text: String,
         confidence: Float,
         durationMs: Double,
@@ -53,9 +68,12 @@ public enum STTEvent: SDKEvent {
         audioSizeBytes: Int,
         wordCount: Int,
         realTimeFactor: Double,
-        framework: InferenceFrameworkType = .unknown
+        language: String,
+        isStreaming: Bool = false,
+        sampleRate: Int = STTConstants.defaultSampleRate,
+        framework: InferenceFramework = .unknown
     )
-    case transcriptionFailed(transcriptionId: String, error: String)
+    case transcriptionFailed(transcriptionId: String, modelId: String, error: SDKError)
 
     // MARK: - Detection (Analytics Only)
 
@@ -82,8 +100,8 @@ public enum STTEvent: SDKEvent {
 
     public var destination: EventDestination {
         switch self {
-        // Analytics only - internal metrics
-        case .languageDetected:
+        // Analytics only - internal metrics / streaming chunks (too chatty for public API)
+        case .languageDetected, .partialTranscript, .finalTranscript:
             return .analyticsOnly
         // Both - app developers need these
         default:
@@ -117,19 +135,30 @@ public enum STTEvent: SDKEvent {
         case .modelLoadFailed(let modelId, let error, let framework):
             return [
                 "model_id": modelId,
-                "error": error,
                 "framework": framework.rawValue
-            ]
+            ].merging(error.telemetryProperties) { _, new in new }
 
         case .modelUnloaded(let modelId):
             return ["model_id": modelId]
 
-        case .transcriptionStarted(let id, let audioLengthMs, let audioSizeBytes, let language, let framework):
+        case .transcriptionStarted(
+            let id,
+            let modelId,
+            let audioLengthMs,
+            let audioSizeBytes,
+            let language,
+            let isStreaming,
+            let sampleRate,
+            let framework
+        ):
             return [
                 "transcription_id": id,
+                "model_id": modelId,
                 "audio_length_ms": String(format: "%.1f", audioLengthMs),
                 "audio_size_bytes": String(audioSizeBytes),
                 "language": language,
+                "is_streaming": String(isStreaming),
+                "sample_rate": String(sampleRate),
                 "framework": framework.rawValue
             ]
 
@@ -147,6 +176,7 @@ public enum STTEvent: SDKEvent {
 
         case .transcriptionCompleted(
             let id,
+            let modelId,
             let text,
             let confidence,
             let durationMs,
@@ -154,10 +184,14 @@ public enum STTEvent: SDKEvent {
             let audioSizeBytes,
             let wordCount,
             let realTimeFactor,
+            let language,
+            let isStreaming,
+            let sampleRate,
             let framework
         ):
             return [
                 "transcription_id": id,
+                "model_id": modelId,
                 "text_length": String(text.count),
                 "confidence": String(format: "%.3f", confidence),
                 "duration_ms": String(format: "%.1f", durationMs),
@@ -165,17 +199,141 @@ public enum STTEvent: SDKEvent {
                 "audio_size_bytes": String(audioSizeBytes),
                 "word_count": String(wordCount),
                 "real_time_factor": String(format: "%.3f", realTimeFactor),
+                "language": language,
+                "is_streaming": String(isStreaming),
+                "sample_rate": String(sampleRate),
+                "success": "true",
                 "framework": framework.rawValue
             ]
 
-        case .transcriptionFailed(let id, let error):
-            return ["transcription_id": id, "error": error]
+        case .transcriptionFailed(let id, let modelId, let error):
+            return [
+                "transcription_id": id,
+                "model_id": modelId,
+                "success": "false"
+            ].merging(error.telemetryProperties) { _, new in new }
 
         case .languageDetected(let language, let confidence):
             return [
                 "language": language,
                 "confidence": String(format: "%.3f", confidence)
             ]
+        }
+    }
+
+    // MARK: - TypedEventProperties Conformance
+
+    /// Strongly typed event properties - no string conversion needed.
+    /// These values are used directly by TelemetryEventPayload.
+    public var typedProperties: EventProperties {
+        switch self {
+        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                processingTimeMs: durationMs,
+                success: true,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadFailed(let modelId, let error, let framework):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
+            )
+
+        case .modelUnloaded(let modelId):
+            return EventProperties(modelId: modelId)
+
+        case .transcriptionStarted(
+            let id,
+            let modelId,
+            let audioLengthMs,
+            let audioSizeBytes,
+            let language,
+            let isStreaming,
+            let sampleRate,
+            let framework
+        ):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                isStreaming: isStreaming,
+                audioDurationMs: audioLengthMs,
+                language: language,
+                transcriptionId: id,
+                audioSizeBytes: audioSizeBytes,
+                sampleRate: sampleRate
+            )
+
+        case .partialTranscript(let text, let wordCount):
+            return EventProperties(
+                wordCount: wordCount,
+                characterCount: text.count
+            )
+
+        case .finalTranscript(let text, let confidence):
+            return EventProperties(
+                confidence: Double(confidence),
+                characterCount: text.count
+            )
+
+        case .transcriptionCompleted(
+            let id,
+            let modelId,
+            let text,
+            let confidence,
+            let durationMs,
+            let audioLengthMs,
+            let audioSizeBytes,
+            let wordCount,
+            let realTimeFactor,
+            let language,
+            let isStreaming,
+            let sampleRate,
+            let framework
+        ):
+            return EventProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                processingTimeMs: durationMs,
+                success: true,
+                isStreaming: isStreaming,
+                audioDurationMs: audioLengthMs,
+                realTimeFactor: realTimeFactor,
+                wordCount: wordCount,
+                confidence: Double(confidence),
+                language: language,
+                transcriptionId: id,
+                characterCount: text.count,
+                audioSizeBytes: audioSizeBytes,
+                sampleRate: sampleRate
+            )
+
+        case .transcriptionFailed(let id, let modelId, let error):
+            return EventProperties(
+                modelId: modelId,
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue,
+                transcriptionId: id
+            )
+
+        case .languageDetected(let language, let confidence):
+            return EventProperties(
+                confidence: Double(confidence),
+                language: language
+            )
         }
     }
 }

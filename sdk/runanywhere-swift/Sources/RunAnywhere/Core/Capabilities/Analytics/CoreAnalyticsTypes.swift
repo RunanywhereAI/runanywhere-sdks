@@ -16,22 +16,6 @@ public protocol AnalyticsMetrics: Sendable {
     var lastEventTime: Date? { get }
 }
 
-// MARK: - Inference Framework
-
-/// Inference frameworks used for tracking which engine is processing requests.
-/// Use "none" for services that don't require a model/framework.
-public enum InferenceFrameworkType: String, Codable, Sendable {
-    case llamaCpp = "llama_cpp"
-    case whisperKit = "whisper_kit"
-    case onnx = "onnx"
-    case coreML = "core_ml"
-    case foundationModels = "foundation_models"
-    case mlx = "mlx"
-    case builtIn = "built_in"  // For simple services like energy-based VAD
-    case none = "none"         // For services that don't use a model
-    case unknown = "unknown"
-}
-
 // MARK: - Model Lifecycle Event Types
 
 /// Event types for model lifecycle across all capabilities
@@ -63,7 +47,7 @@ public struct ModelLifecycleMetrics: AnalyticsMetrics, Sendable {
     public let successfulDownloads: Int
     public let failedDownloads: Int
     public let totalBytesDownloaded: Int64
-    public let framework: InferenceFrameworkType
+    public let framework: InferenceFramework
 
     public init(
         totalEvents: Int = 0,
@@ -78,7 +62,7 @@ public struct ModelLifecycleMetrics: AnalyticsMetrics, Sendable {
         successfulDownloads: Int = 0,
         failedDownloads: Int = 0,
         totalBytesDownloaded: Int64 = 0,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFramework = .unknown
     ) {
         self.totalEvents = totalEvents
         self.startTime = startTime

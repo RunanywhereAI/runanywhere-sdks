@@ -9,7 +9,6 @@ import SwiftUI
 import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
-import FluidAudioDiarization
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -71,7 +70,7 @@ struct RunAnywhereAIApp: App {
 
             let startTime = Date()
 
-            // Initialize SDK based on build configuration
+             // Initialize SDK based on build configuration
             #if DEBUG
             // Development mode - uses Supabase, no API key needed
             try RunAnywhere.initialize()
@@ -123,7 +122,7 @@ struct RunAnywhereAIApp: App {
     /// Register modules with their associated models
     /// Each module explicitly owns its models - the framework is determined by the module
     @MainActor
-    private func registerModulesAndModels() async {
+    private func registerModulesAndModels() async { // swiftlint:disable:this function_body_length
         logger.info("📦 Registering modules with their models...")
 
         // LlamaCPP module with LLM models
@@ -166,12 +165,6 @@ struct RunAnywhereAIApp: App {
                       modality: .speechRecognition,
                       artifactType: .tarGzArchive(structure: .nestedDirectory),
                       memoryRequirement: 75_000_000)
-        ONNX.addModel(id: "sherpa-onnx-whisper-small.en",
-                      name: "Sherpa Whisper Small (ONNX)",
-                      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
-                      modality: .speechRecognition,
-                      artifactType: .tarBz2Archive(structure: .nestedDirectory),
-                      memoryRequirement: 250_000_000)
         // TTS Models (Piper VITS)
         ONNX.addModel(id: "vits-piper-en_US-lessac-medium",
                       name: "Piper TTS (US English - Medium)",
@@ -186,10 +179,6 @@ struct RunAnywhereAIApp: App {
                       artifactType: .tarGzArchive(structure: .nestedDirectory),
                       memoryRequirement: 65_000_000)
         logger.info("✅ ONNX module registered with STT/TTS models")
-
-        // FluidAudio module (no models - provides speaker diarization service)
-        FluidAudio.register()
-        logger.info("✅ FluidAudio module registered (Speaker Diarization)")
 
         // Foundation Models for iOS 26+ and macOS 26+
         // Built-in model is automatically registered by the module

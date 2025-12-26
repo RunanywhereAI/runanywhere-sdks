@@ -61,20 +61,14 @@ extension AlamofireDownloadService {
                 }
 
                 do {
-                    let destinationFolder = try getDestinationFolder(for: model.id, framework: model.preferredFramework)
-                    var lastReportedProgress = 0.0
+                    let destinationFolder = try getDestinationFolder(for: model.id, framework: model.framework)
 
+                    var lastReportedProgress: Double = -1.0
                     let resultURL = try await strategy.download(
                         model: model,
                         to: destinationFolder,
                         progressHandler: { progress in
-                            progressContinuation.yield(DownloadProgress(
-                                bytesDownloaded: Int64(progress * Double(model.downloadSize ?? 100)),
-                                totalBytes: Int64(model.downloadSize ?? 100),
-                                state: .downloading
-                            ))
-
-                            // Track progress at 10% intervals (analytics only)
+                            // Track progress at 10% intervals (public EventBus only - for UI updates)
                             if progress - lastReportedProgress >= 0.1 {
                                 lastReportedProgress = progress
                                 EventPublisher.shared.track(ModelEvent.downloadProgress(
@@ -84,6 +78,12 @@ extension AlamofireDownloadService {
                                     totalBytes: Int64(model.downloadSize ?? 100)
                                 ))
                             }
+
+                            progressContinuation.yield(DownloadProgress(
+                                bytesDownloaded: Int64(progress * Double(model.downloadSize ?? 100)),
+                                totalBytes: Int64(model.downloadSize ?? 100),
+                                state: .downloading
+                            ))
                         }
                     )
 
@@ -125,10 +125,8 @@ extension AlamofireDownloadService {
                     return resultURL
                 } catch {
                     // Track download failed
-                    EventPublisher.shared.track(ModelEvent.downloadFailed(
-                        modelId: model.id,
-                        error: error.localizedDescription
-                    ))
+                    let sdkError = SDKError.from(error, category: .download)
+                    EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: sdkError))
 
                     progressContinuation.yield(DownloadProgress(
                         bytesDownloaded: 0,
@@ -144,11 +142,7 @@ extension AlamofireDownloadService {
     }
 
     /// Helper to get destination folder for a model
-    func getDestinationFolder(for modelId: String, framework: InferenceFramework? = nil) throws -> URL {
-        if let framework = framework {
-            return try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
-        } else {
-            return try ModelPathUtils.getModelFolder(modelId: modelId)
-        }
+    func getDestinationFolder(for modelId: String, framework: InferenceFramework) throws -> URL {
+        return try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
     }
 }

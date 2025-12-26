@@ -60,12 +60,12 @@ public actor ModelAssignmentService {
             cachedAssignments = modelInfos
             lastFetchTime = Date()
 
-            // Save to local database for offline access
+            // Save to in-memory storage
             for model in modelInfos {
                 try await modelInfoService.saveModel(model)
             }
 
-            logger.info("Model assignments cached and saved locally")
+            logger.info("Model assignments cached")
             return modelInfos
 
         } catch {
@@ -77,10 +77,10 @@ public actor ModelAssignmentService {
                 return cached
             }
 
-            // Last resort: load from local database
+            // Last resort: load from in-memory storage
             let localModels = try await modelInfoService.loadStoredModels()
             if !localModels.isEmpty {
-                logger.info("Using \(localModels.count) locally stored models as fallback")
+                logger.info("Using \(localModels.count) in-memory stored models as fallback")
                 cachedAssignments = localModels
                 return localModels
             }
@@ -92,7 +92,7 @@ public actor ModelAssignmentService {
     /// Get model assignments for a specific framework
     public func getModelsForFramework(_ framework: InferenceFramework) async throws -> [ModelInfo] {
         let allModels = try await fetchModelAssignments()
-        return allModels.filter { $0.compatibleFrameworks.contains(framework) }
+        return allModels.filter { $0.framework == framework }
     }
 
     /// Get model assignments for a specific category
@@ -139,7 +139,7 @@ public struct ModelAssignment: Codable, Sendable {
     public let contextLength: Int?
     public let supportsThinking: Bool
     public let compatibleFrameworks: [String]
-    public let preferredFramework: String?
+    public let framework: String?
     public let metadata: ModelAssignmentMetadata?
     public let isRequired: Bool
     public let priority: Int
@@ -152,7 +152,7 @@ public struct ModelAssignment: Codable, Sendable {
         case contextLength = "context_length"
         case supportsThinking = "supports_thinking"
         case compatibleFrameworks = "compatible_frameworks"
-        case preferredFramework = "preferred_framework"
+        case framework = "preferred_framework"
         case metadata
         case isRequired = "is_required"
         case priority
@@ -178,16 +178,19 @@ public struct ModelAssignmentMetadata: Codable, Sendable {
 
 extension ModelAssignment {
     /// Convert API model assignment to SDK ModelInfo
+    ///
+    /// The framework must be provided by the API. This method does not infer framework from format
+    /// to ensure clean separation of concerns - the backend is responsible for model-framework assignments.
     public func toModelInfo() -> ModelInfo {
         // Convert string category to ModelCategory enum
         let modelCategory = ModelCategory(rawValue: category.lowercased()) ?? .language
 
         // Convert string format to ModelFormat enum
-        let modelFormat = ModelFormat(rawValue: format.lowercased()) ?? .gguf
+        let modelFormat = ModelFormat(rawValue: format.lowercased()) ?? .unknown
 
-        // Convert string frameworks to InferenceFramework enum
-        let frameworks = compatibleFrameworks.compactMap { InferenceFramework(rawValue: $0.lowercased()) }
-        let preferred = preferredFramework.flatMap { InferenceFramework(rawValue: $0.lowercased()) }
+        // Convert string framework to InferenceFramework enum using case-insensitive matching
+        // Framework should always be provided by API - we don't infer from format
+        let modelFramework = framework.flatMap { InferenceFramework(caseInsensitive: $0) } ?? .unknown
 
         // Extract tags and description from metadata
         let modelTags = metadata?.tags ?? []
@@ -201,12 +204,11 @@ extension ModelAssignment {
             name: name,
             category: modelCategory,
             format: modelFormat,
+            framework: modelFramework,
             downloadURL: downloadURL,
             localPath: nil,
             downloadSize: size,
             memoryRequired: memoryRequired,
-            compatibleFrameworks: frameworks,
-            preferredFramework: preferred,
             contextLength: contextLength,
             supportsThinking: supportsThinking,
             tags: modelTags,
@@ -214,7 +216,6 @@ extension ModelAssignment {
             source: .remote,
             createdAt: Date(),
             updatedAt: Date(),
-            syncPending: false,
             lastUsed: nil,
             usageCount: 0
         )

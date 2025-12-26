@@ -62,7 +62,7 @@ public struct STTInput: ComponentInput {
 
     public func validate() throws {
         if audioData.isEmpty && audioBuffer == nil {
-            throw RunAnywhereError.validationFailed("STTInput must contain either audioData or audioBuffer")
+            throw SDKError.general(.validationFailed, "STTInput must contain either audioData or audioBuffer")
         }
     }
 }
