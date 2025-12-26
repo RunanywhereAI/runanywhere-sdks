@@ -2,6 +2,7 @@ package com.runanywhere.sdk.infrastructure.analytics
 
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.TelemetryData
+import com.runanywhere.sdk.data.models.getPlatformOSVersion
 import com.runanywhere.sdk.data.network.models.DevAnalyticsSubmissionRequest
 import com.runanywhere.sdk.data.repositories.TelemetryRepository
 import com.runanywhere.sdk.data.sync.SyncCoordinator
@@ -582,4 +583,4 @@ private fun mapEventTypeToTelemetryType(eventType: String): com.runanywhere.sdk.
             com.runanywhere.sdk.data.models.TelemetryEventType.SDK_INITIALIZATION
     }
 
-private fun getOSVersion(): String = com.runanywhere.sdk.data.models.getPlatformOSVersion()
+private fun getOSVersion(): String = getPlatformOSVersion()

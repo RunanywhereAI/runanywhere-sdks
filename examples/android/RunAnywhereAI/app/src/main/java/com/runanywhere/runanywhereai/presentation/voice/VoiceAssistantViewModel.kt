@@ -1,22 +1,20 @@
 package com.runanywhere.runanywhereai.presentation.voice
 
 import android.app.Application
-import android.content.Context
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.domain.models.SessionState
-import com.runanywhere.runanywhereai.domain.services.AudioCaptureService
 import com.runanywhere.sdk.features.llm.LLMEvent
 import com.runanywhere.sdk.features.stt.STTEvent
 import com.runanywhere.sdk.features.tts.TTSEvent
 import com.runanywhere.sdk.features.voiceagent.ComponentLoadState
-import com.runanywhere.sdk.infrastructure.events.EventBus
-import com.runanywhere.sdk.infrastructure.events.ModularPipelineEvent
-import com.runanywhere.sdk.infrastructure.events.SDKEvent
 import com.runanywhere.sdk.features.voiceagent.VoiceSessionConfig
 import com.runanywhere.sdk.features.voiceagent.VoiceSessionEvent
 import com.runanywhere.sdk.features.voiceagent.VoiceSessionHandle
+import com.runanywhere.sdk.infrastructure.events.EventBus
+import com.runanywhere.sdk.infrastructure.events.ModularPipelineEvent
+import com.runanywhere.sdk.infrastructure.events.SDKEvent
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.cleanupVoiceAgent
 import com.runanywhere.sdk.public.extensions.getVoiceAgentComponentStates
@@ -113,8 +111,6 @@ data class VoiceUiState(
 class VoiceAssistantViewModel(
     application: Application,
 ) : AndroidViewModel(application) {
-    private val context: Context = application.applicationContext
-
     // Voice session handle
     private var voiceSession: VoiceSessionHandle? = null
 
