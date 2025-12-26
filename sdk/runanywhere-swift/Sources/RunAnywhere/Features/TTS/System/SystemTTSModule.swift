@@ -1,14 +1,14 @@
 //
-//  SystemTTSServiceProvider.swift
+//  SystemTTSModule.swift
 //  RunAnywhere SDK
 //
-//  Built-in System TTS provider using AVSpeechSynthesizer.
+//  Built-in System TTS module using AVSpeechSynthesizer.
 //  Auto-registered during SDK initialization as a fallback TTS option.
 //
 
 import Foundation
 
-// MARK: - System TTS Provider
+// MARK: - System TTS Module
 
 /// Built-in System TTS module using Apple's AVSpeechSynthesizer.
 ///
