@@ -32,14 +32,14 @@ public struct RemoteOperationHelper: Sendable {
     }
 }
 
-/// Errors that can occur in data sources
-public enum DataSourceError: LocalizedError {
+/// Errors that can occur in data sources (Swift 6 Sendable compliant)
+public enum DataSourceError: LocalizedError, Sendable {
     case notAvailable
     case configurationInvalid(String)
     case networkUnavailable
     case authenticationFailed
     case entityNotFound(String)
-    case operationFailed(Error)
+    case operationFailed(String)  // Stores error description for Sendable compliance
 
     public var errorDescription: String? {
         switch self {
@@ -53,8 +53,8 @@ public enum DataSourceError: LocalizedError {
             return "Authentication failed"
         case .entityNotFound(let id):
             return "Entity not found: \(id)"
-        case .operationFailed(let error):
-            return "Operation failed: \(error.localizedDescription)"
+        case .operationFailed(let message):
+            return "Operation failed: \(message)"
         }
     }
 }
