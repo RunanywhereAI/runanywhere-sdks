@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:runanywhere/core/models/common.dart';
-import 'package:runanywhere/core/module/inference_framework.dart';
-import 'package:runanywhere/core/module_registry.dart';
 import 'package:runanywhere/core/protocols/registry/model_registry.dart';
 import 'package:runanywhere/foundation/file_operations/model_path_utils.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
@@ -84,7 +82,7 @@ class RegistryService implements ModelRegistry {
   }
 
   /// Check if model file exists locally and update localPath
-  /// Uses StorageStrategy from module for framework-specific detection
+  /// Matches iOS RegistryService.resolveModelPath pattern
   Future<ModelInfo> _checkAndUpdateLocalPath(ModelInfo model) async {
     final framework =
         model.preferredFramework ?? model.compatibleFrameworks.firstOrNull;
@@ -98,8 +96,7 @@ class RegistryService implements ModelRegistry {
       final file = File(path);
       final dir = Directory(path);
 
-      if (await file.exists() ||
-          (await dir.exists() && (await dir.list().toList()).isNotEmpty)) {
+      if (await file.exists() || await dir.exists()) {
         return model;
       } else {
         logger.debug(
@@ -118,36 +115,45 @@ class RegistryService implements ModelRegistry {
       return model;
     }
 
-    final contents = await modelFolder.list().toList();
-    if (contents.isEmpty) {
+    // Resolve model path - matches iOS resolveModelPath(in: folderURL)
+    final resolvedPath = await _resolveModelPath(modelFolder);
+    if (resolvedPath == null) {
       return model;
     }
 
-    // Try storage strategy from module for framework-specific detection
-    final inferenceFramework =
-        InferenceFramework.fromRawValue(framework.rawValue);
-    if (inferenceFramework != null) {
-      final storageStrategy =
-          ModuleRegistry.shared.storageStrategy(inferenceFramework);
-      if (storageStrategy != null) {
-        final modelPath = storageStrategy.findModelPath(model.id, modelFolder);
-        if (modelPath != null) {
-          logger.info('Found model via storage strategy: $modelPath');
-          return model.copyWith(localPath: Uri.directory(modelPath));
+    logger.info('Found downloaded model ${model.id} at: $resolvedPath');
+    return model.copyWith(localPath: resolvedPath);
+  }
+
+  /// Resolve actual model path within a folder
+  /// Matches iOS: if folder has exactly 1 item, return it; otherwise return folder
+  Future<Uri?> _resolveModelPath(Directory folder) async {
+    try {
+      final contents = await folder
+          .list()
+          .where((e) => !e.path.split('/').last.startsWith('.')) // Skip hidden
+          .toList();
+
+      if (contents.isEmpty) {
+        return null;
+      }
+
+      // If exactly 1 item, return it (handles nested archives and single files)
+      if (contents.length == 1) {
+        final item = contents.first;
+        if (item is File) {
+          return Uri.file(item.path);
+        } else if (item is Directory) {
+          return Uri.directory(item.path);
         }
       }
-    }
 
-    // Generic fallback: check for nested directory (common archive pattern)
-    final nestedDir = await ModelPathUtils.findNestedDirectory(modelFolder);
-    if (nestedDir.path != modelFolder.path) {
-      logger.info('Found model at nested path: ${nestedDir.path}');
-      return model.copyWith(localPath: nestedDir.uri);
+      // Multiple items - return folder itself (directory-based models)
+      return folder.uri;
+    } catch (e) {
+      logger.error('Error resolving model path: $e');
+      return null;
     }
-
-    // Fallback: if folder has content, use it as localPath
-    logger.info('Found model folder with content: ${modelFolder.path}');
-    return model.copyWith(localPath: modelFolder.uri);
   }
 
   /// Register model and save to database for persistence

@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:runanywhere/core/capabilities/managed_lifecycle.dart';
 import 'package:runanywhere/core/capabilities_base/base_capability.dart';
-import 'package:runanywhere/core/models/common.dart' show LLMFramework, QuantizationLevel;
+import 'package:runanywhere/core/models/common.dart'
+    show LLMFramework, QuantizationLevel;
 import 'package:runanywhere/core/module_registry.dart' as core
     show ModuleRegistry, LLMService, LLMGenerationOptions;
 import 'package:runanywhere/core/protocols/component/component_configuration.dart';
@@ -214,8 +215,14 @@ class LLMCapability extends BaseCapability<core.LLMService> {
     }
 
     final effectiveConfig = config as LLMConfiguration? ?? llmConfig;
+
+    // Look up model path from registry (modelInfo.localPath is set by RegistryService)
+    final registry = serviceContainer?.modelRegistry;
+    final modelInfo = registry?.getModel(resourceId);
+    final modelPath = modelInfo?.localPath?.toFilePath() ?? resourceId;
+
     final service = await provider.createLLMService(effectiveConfig);
-    await service.initialize(modelPath: resourceId);
+    await service.initialize(modelPath: modelPath);
 
     return service;
   }
