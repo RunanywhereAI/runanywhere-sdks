@@ -99,11 +99,8 @@ import {
 import type { ModelInfo } from '../types/model';
 import { ModelModality, LLMFramework } from '../types/model';
 
-// Import RunAnywhere SDK
-import {
-  RunAnywhere,
-  type ModelInfo as SDKModelInfo,
-} from 'runanywhere-react-native';
+// Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
 
 export const TTSScreen: React.FC = () => {
   // State

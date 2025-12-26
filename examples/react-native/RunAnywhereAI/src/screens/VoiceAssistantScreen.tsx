@@ -48,11 +48,8 @@ import type { VoiceConversationEntry } from '../types/voice';
 import { VoicePipelineStatus } from '../types/voice';
 import * as AudioService from '../utils/AudioService';
 
-// Import actual RunAnywhere SDK
-import {
-  RunAnywhere,
-  type ModelInfo as SDKModelInfo,
-} from 'runanywhere-react-native';
+// Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -393,9 +390,15 @@ export const VoiceAssistantScreen: React.FC = () => {
             setRecordingDuration(Math.floor(currentPositionMs / 1000));
             // metering is in dB, normalize to 0-1 for display
             if (metering !== undefined) {
-              const normalizedLevel = Math.max(0, Math.min(1, (metering + 60) / 60));
+              const normalizedLevel = Math.max(
+                0,
+                Math.min(1, (metering + 60) / 60)
+              );
               // Could use this for audio level visualization
-              console.log('[VoiceAssistant] Audio level:', normalizedLevel.toFixed(2));
+              console.log(
+                '[VoiceAssistant] Audio level:',
+                normalizedLevel.toFixed(2)
+              );
             }
           },
         });

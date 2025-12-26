@@ -33,15 +33,10 @@ import {
   ButtonHeight,
 } from './src/theme/spacing';
 
-// Import RunAnywhere SDK
-import {
-  RunAnywhere,
-  SDKEnvironment,
-  LlamaCPP,
-  ONNX,
-  ModelCategory,
-  ModelArtifactType,
-} from 'runanywhere-react-native';
+// Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere, SDKEnvironment, ModelCategory } from '@runanywhere/core';
+import { LlamaCPP } from '@runanywhere/llamacpp';
+import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
 
 /**
  * App initialization state

@@ -49,11 +49,8 @@ import {
   ModelSelectionContext,
 } from '../components/model';
 
-// Import actual RunAnywhere SDK
-import {
-  RunAnywhere,
-  type ModelInfo as SDKModelInfo,
-} from 'runanywhere-react-native';
+// Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);

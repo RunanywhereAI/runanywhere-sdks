@@ -51,11 +51,8 @@ import type { ModelInfo } from '../types/model';
 import { ModelModality, LLMFramework } from '../types/model';
 import { STTMode } from '../types/voice';
 
-// Import RunAnywhere SDK
-import {
-  RunAnywhere,
-  type ModelInfo as SDKModelInfo,
-} from 'runanywhere-react-native';
+// Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
 
 // STT Model IDs (kept for reference, uses SDK model registry)
 const _STT_MODEL_IDS = ['whisper-tiny-en', 'whisper-base-en'];
