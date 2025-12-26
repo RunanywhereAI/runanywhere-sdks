@@ -12,6 +12,7 @@ import 'package:runanywhere/features/tts/tts_capability.dart';
 import 'package:runanywhere/features/vad/vad_capability.dart';
 import 'package:runanywhere/features/vad/vad_configuration.dart';
 import 'package:runanywhere/features/voice_agent/models/voice_agent_result.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 
 export 'models/voice_agent_component_state.dart';
@@ -58,6 +59,8 @@ class VoiceAgentService {
 /// Can be used as a complete pipeline or with individual capabilities
 /// Matches iOS VoiceAgentCapability from VoiceAgentCapability.swift
 class VoiceAgentCapability extends BaseCapability<VoiceAgentService> {
+  final SDKLogger logger = SDKLogger(category: 'VoiceAgentCapability');
+
   @override
   SDKComponent get componentType => SDKComponent.voiceAgent;
 
@@ -97,36 +100,56 @@ class VoiceAgentCapability extends BaseCapability<VoiceAgentService> {
 
   Future<void> _initializeCapabilities() async {
     final config = voiceAgentConfiguration;
+    logger.info('🔧 Initializing voice agent capabilities...');
+    logger.info(
+        '📋 Config: STT=${config.sttConfig.modelId}, LLM=${config.llmConfig.modelId}, TTS=${config.ttsConfig.modelId}');
 
     try {
-      // Initialize VAD (required)
+      // Initialize VAD (optional - we bypass it in processAudio anyway)
+      logger.info('🎯 Initializing VAD...');
       vadCapability = VADCapability(
         vadConfiguration: config.vadConfig,
         serviceContainer: serviceContainer,
       );
       await vadCapability!.initialize();
+      logger.info('✅ VAD initialized (but will be bypassed in favor of STT)');
 
       // Initialize STT (required)
+      logger.info(
+          '🎤 Initializing STT with model: ${config.sttConfig.modelId}...');
       sttCapability = STTCapability(
         sttConfig: config.sttConfig,
         serviceContainer: serviceContainer,
       );
       await sttCapability!.initialize();
+      logger.info(
+          '✅ STT initialized: ready=${sttCapability!.isReady}, service=${sttCapability!.service != null}');
 
       // Initialize LLM (required)
+      logger.info(
+          '🧠 Initializing LLM with model: ${config.llmConfig.modelId}...');
       llmCapability = LLMCapability(
         llmConfig: config.llmConfig,
         serviceContainer: serviceContainer,
       );
       await llmCapability!.initialize();
+      logger.info(
+          '✅ LLM initialized: ready=${llmCapability!.isReady}, service=${llmCapability!.service != null}');
 
       // Initialize TTS (required)
+      logger.info(
+          '🔊 Initializing TTS with model: ${config.ttsConfig.modelId}...');
       ttsCapability = TTSCapability(
         ttsConfiguration: config.ttsConfig,
         serviceContainer: serviceContainer,
       );
       await ttsCapability!.initialize();
+      logger.info(
+          '✅ TTS initialized: ready=${ttsCapability!.isReady}, service=${ttsCapability!.service != null}');
+
+      logger.info('✅ All voice agent capabilities initialized successfully');
     } catch (e) {
+      logger.error('❌ Failed to initialize capabilities: $e');
       // Cleanup any partially initialized capabilities to prevent resource leaks
       await _cleanupPartialInitialization();
       rethrow;
@@ -147,7 +170,9 @@ class VoiceAgentCapability extends BaseCapability<VoiceAgentService> {
   }
 
   /// Process audio through the full pipeline
-  /// Pipeline: Audio → VAD (detect speech) → STT (transcribe) → LLM (process) → TTS (synthesize)
+  /// Pipeline: Audio → STT (transcribe) → LLM (process) → TTS (synthesize)
+  /// Note: VAD is bypassed - VoiceSessionHandle already performs audio level detection,
+  /// and STT will return empty text if no speech is present.
   /// Matches iOS processAudio from VoiceAgentComponent.swift
   Future<VoiceAgentResult> processAudio(Uint8List audioData) async {
     if (state != ComponentState.ready) {
@@ -156,49 +181,83 @@ class VoiceAgentCapability extends BaseCapability<VoiceAgentService> {
 
     // Prevent concurrent processing (matches iOS pattern)
     _isProcessing = true;
+    logger.info(
+        '🔄 VoiceAgent: Processing ${audioData.length} bytes of audio...');
 
     try {
       final result = VoiceAgentResult();
 
-      // VAD Processing
-      final vad = vadCapability;
-      if (vad != null && vad.service != null) {
-        final vadResult = await vad.detectSpeech(buffer: audioData);
-        result.speechDetected = vadResult.hasSpeech;
-
-        if (!vadResult.hasSpeech) {
-          return result; // No speech, return early
-        }
-
-        eventBus.publish(SDKVoiceEvent.speechDetected());
-      }
+      // Skip VAD - VoiceSessionHandle already detected speech via audio level.
+      // Let STT determine if there's meaningful speech by checking if transcription is empty.
+      // This is more reliable than VAD which can be overly restrictive.
+      result.speechDetected = true; // Assume speech until STT proves otherwise
+      logger.info(
+          '📍 Bypassing VAD (VoiceSessionHandle already detected speech via audio level)');
 
       // STT Processing
       final stt = sttCapability;
       if (stt != null && stt.service != null) {
+        logger
+            .info('🎤 STT: Transcribing ${audioData.length} bytes of audio...');
         final sttResult = await stt.transcribe(audioData.toList());
         result.transcription = sttResult.text;
+        logger.info(
+            '🎤 STT result: "${sttResult.text}" (${sttResult.text.length} chars)');
+
+        // If STT returns empty, no meaningful speech was detected
+        if (sttResult.text.trim().isEmpty) {
+          logger.info(
+              '🔇 STT returned empty transcription - no meaningful speech detected');
+          result.speechDetected = false;
+          return result;
+        }
+
+        eventBus.publish(SDKVoiceEvent.speechDetected());
         eventBus
             .publish(SDKVoiceEvent.transcriptionFinal(text: sttResult.text));
+      } else {
+        logger.error('❌ STT not available! Cannot transcribe audio.');
+        result.speechDetected = false;
+        return result;
       }
 
       // LLM Processing
       final llm = llmCapability;
       if (llm != null && llm.service != null && result.transcription != null) {
+        logger
+            .info('🧠 LLM: Generating response for: "${result.transcription}"');
         final llmResult = await llm.generate(result.transcription!);
         result.response = llmResult.text;
+        final previewLen =
+            llmResult.text.length > 50 ? 50 : llmResult.text.length;
+        logger.info(
+            '🧠 LLM result: "${llmResult.text.substring(0, previewLen)}${llmResult.text.length > 50 ? "..." : ""}" (${llmResult.text.length} chars)');
         eventBus.publish(SDKVoiceEvent.responseGenerated(text: llmResult.text));
+      } else {
+        logger.warning('⚠️ LLM not available or no transcription to process');
       }
 
       // TTS Processing
       final tts = ttsCapability;
       if (tts != null && tts.service != null && result.response != null) {
+        logger.info('🔊 TTS: Synthesizing speech for response...');
         final ttsResult = await tts.synthesize(result.response!);
         result.synthesizedAudio = ttsResult.audioData;
+        logger.info(
+            '🔊 TTS result: ${ttsResult.audioData.length} bytes of audio');
         eventBus.publish(
             SDKVoiceEvent.audioGenerated(data: result.synthesizedAudio!));
+      } else {
+        logger.warning('⚠️ TTS not available or no response to synthesize');
       }
 
+      final transcriptPreview = result.transcription ?? "(null)";
+      final responsePreview = result.response != null
+          ? result.response!.substring(
+              0, (result.response!.length > 30 ? 30 : result.response!.length))
+          : "(null)";
+      logger.info(
+          '✅ VoiceAgent: Pipeline complete - speechDetected=${result.speechDetected}, transcription="$transcriptPreview", response="$responsePreview..."');
       return result;
     } finally {
       // Always reset processing flag (matches iOS defer pattern)

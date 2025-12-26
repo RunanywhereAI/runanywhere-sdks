@@ -81,6 +81,8 @@ class VoiceSessionConfig {
   final double silenceDuration;
 
   /// Minimum audio level to detect speech (0.0 - 1.0)
+  /// Default is 0.03 which is sensitive enough for most microphones.
+  /// Increase to 0.1 or higher for noisy environments.
   final double speechThreshold;
 
   /// Whether to auto-play TTS response
@@ -91,7 +93,7 @@ class VoiceSessionConfig {
 
   const VoiceSessionConfig({
     this.silenceDuration = 1.5,
-    this.speechThreshold = 0.1,
+    this.speechThreshold = 0.03,
     this.autoPlayTTS = true,
     this.continuousMode = true,
   });

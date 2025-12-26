@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Manages audio capture from microphone for STT services.
@@ -23,6 +25,9 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 class AudioCaptureManager {
   final SDKLogger _logger = SDKLogger(category: 'AudioCapture');
 
+  /// Audio recorder instance
+  final AudioRecorder _recorder = AudioRecorder();
+
   /// Whether audio is currently being recorded
   bool _isRecording = false;
 
@@ -30,10 +35,13 @@ class AudioCaptureManager {
   double _audioLevel = 0.0;
 
   /// Target sample rate for Whisper models
-  static const double targetSampleRate = 16000.0;
+  static const int targetSampleRate = 16000;
 
   /// Audio data callback
   void Function(Uint8List audioData)? _onAudioData;
+
+  /// Audio stream subscription
+  StreamSubscription<Uint8List>? _audioStreamSubscription;
 
   /// Stream controller for recording state changes
   final _recordingStateController = StreamController<bool>.broadcast();
@@ -60,22 +68,23 @@ class AudioCaptureManager {
   /// Request microphone permission
   ///
   /// Returns true if permission was granted, false otherwise.
-  /// On platforms without runtime permissions, returns true.
   Future<bool> requestPermission() async {
     try {
-      // Note: Actual permission request would use platform-specific
-      // APIs (e.g., permission_handler package)
-      // This is the interface that matches iOS
       _logger.info('Requesting microphone permission');
 
-      // Platform-specific implementation would go here
-      // For now, assume permission is granted
-      // In real implementation:
-      // - iOS/macOS: Use AVAudioSession/AVCaptureDevice
-      // - Android: Use permission_handler or platform channels
-      // - Web: Use getUserMedia API
-
-      return true;
+      // Check and request microphone permission
+      final status = await Permission.microphone.request();
+      if (status.isGranted) {
+        _logger.info('Microphone permission granted');
+        return true;
+      } else if (status.isPermanentlyDenied) {
+        _logger.warning(
+            'Microphone permission permanently denied - user should enable in settings');
+        return false;
+      } else {
+        _logger.warning('Microphone permission denied: $status');
+        return false;
+      }
     } catch (e) {
       _logger.error('Failed to request microphone permission: $e');
       return false;
@@ -97,22 +106,62 @@ class AudioCaptureManager {
     try {
       _onAudioData = onAudioData;
 
-      // Note: Actual recording implementation would use platform-specific
-      // audio capture APIs (e.g., record package, flutter_sound, or platform channels)
-      // This is the interface that matches iOS
+      // Check if we can record
+      _logger.info('Checking microphone permission...');
+      if (!await _recorder.hasPermission()) {
+        _logger.error('No microphone permission');
+        throw AudioCaptureError.permissionDenied();
+      }
+      _logger.info('✅ Microphone permission granted');
 
-      // Platform-specific implementation would:
-      // 1. Configure audio session/recorder
-      // 2. Set format to PCM 16-bit, 16kHz, mono
-      // 3. Install audio buffer callback
-      // 4. Start recording
+      // Start streaming audio in PCM 16-bit format
+      _logger.info(
+          'Starting audio stream: ${targetSampleRate}Hz, mono, PCM16bits...');
+      final stream = await _recorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: targetSampleRate,
+          numChannels: 1, // Mono
+          bitRate: 256000,
+        ),
+      );
+      _logger.info('✅ Audio stream created, setting up listener...');
+
+      // Track data delivery
+      int chunkCount = 0;
+
+      // Listen to audio stream
+      _audioStreamSubscription = stream.listen(
+        (data) {
+          chunkCount++;
+          // Log first few chunks to verify data flow
+          if (chunkCount <= 3) {
+            _logger.info(
+                '🎵 Audio data received: chunk #$chunkCount, ${data.length} bytes');
+          }
+          if (_isRecording && _onAudioData != null) {
+            _onAudioData!(data);
+          } else {
+            _logger.warning(
+                '⚠️ Audio data ignored: isRecording=$_isRecording, hasCallback=${_onAudioData != null}');
+          }
+        },
+        onError: (Object error) {
+          _logger.error('❌ Audio stream error: $error');
+        },
+        onDone: () {
+          _logger.info('🛑 Audio stream ended (total chunks: $chunkCount)');
+        },
+      );
 
       _isRecording = true;
       _recordingStateController.add(true);
 
-      _logger.info('Recording started');
+      _logger.info(
+          '✅ Recording started successfully (16kHz mono PCM) - waiting for audio data...');
     } catch (e) {
-      _logger.error('Failed to start recording: $e');
+      _logger.error('❌ Failed to start recording: $e');
+      _onAudioData = null;
       throw AudioCaptureError.engineStartFailed();
     }
   }
@@ -122,10 +171,12 @@ class AudioCaptureManager {
     if (!_isRecording) return;
 
     try {
-      // Platform-specific cleanup would go here:
-      // 1. Stop audio engine/recorder
-      // 2. Remove audio buffer callback
-      // 3. Deactivate audio session
+      // Cancel stream subscription
+      _audioStreamSubscription?.cancel();
+      _audioStreamSubscription = null;
+
+      // Stop the recorder
+      _recorder.stop();
 
       _isRecording = false;
       _audioLevel = 0.0;

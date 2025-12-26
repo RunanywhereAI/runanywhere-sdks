@@ -22,7 +22,8 @@ class LoggingManager {
   LoggingConfiguration configuration = const LoggingConfiguration();
 
   /// SDK Environment (set during SDK initialization)
-  SDKEnvironment _environment = SDKEnvironment.production;
+  /// Default to development for easier debugging
+  SDKEnvironment _environment = SDKEnvironment.development;
 
   /// Set the SDK environment
   void setEnvironment(SDKEnvironment environment) {
@@ -109,7 +110,11 @@ class LoggingManager {
     final logMessage =
         '$levelEmoji [${entry.category}]$sensitiveMarker ${entry.message}$metadataStr';
 
-    // Use dart:developer log for structured output
+    // Use print() for Android logcat visibility (shows as I/flutter)
+    // ignore: avoid_print
+    print(logMessage);
+
+    // Also use dart:developer log for structured output in DevTools
     developer.log(
       logMessage,
       name: entry.category,
@@ -184,6 +189,7 @@ class LoggingManager {
 
   void _applyEnvironmentConfiguration() {
     // Set defaults based on environment
+    // Local logging is enabled in all environments for easier debugging
     switch (_environment) {
       case SDKEnvironment.development:
         configuration = configuration.copyWith(
@@ -194,33 +200,31 @@ class LoggingManager {
         );
       case SDKEnvironment.staging:
         configuration = configuration.copyWith(
-          enableLocalLogging: false,
+          enableLocalLogging: true, // Enable for debugging
           enableRemoteLogging: true,
-          minLogLevel: LogLevel.info,
+          minLogLevel: LogLevel.debug, // Show all logs in staging
           includeDeviceMetadata: true,
         );
       case SDKEnvironment.production:
         configuration = configuration.copyWith(
-          enableLocalLogging: false,
+          enableLocalLogging: true, // Enable for debugging
           enableRemoteLogging: true,
-          minLogLevel: LogLevel.warning,
+          minLogLevel: LogLevel.info, // Show info and above in production
           includeDeviceMetadata: true,
         );
     }
 
     _updateBatcher();
 
-    // Log current environment for debugging
-    if (_environment == SDKEnvironment.development) {
-      final entry = LogEntry(
-        timestamp: DateTime.now(),
-        level: LogLevel.info,
-        category: 'LoggingManager',
-        message:
-            'Running in ${_environment.name} environment - Remote: ${configuration.enableRemoteLogging}, MinLevel: ${configuration.minLogLevel}',
-      );
-      _logToConsole(entry, isSensitive: false);
-    }
+    // Always log current environment for debugging
+    final entry = LogEntry(
+      timestamp: DateTime.now(),
+      level: LogLevel.info,
+      category: 'LoggingManager',
+      message:
+          'Running in ${_environment.name} environment - Local: ${configuration.enableLocalLogging}, Remote: ${configuration.enableRemoteLogging}, MinLevel: ${configuration.minLogLevel}',
+    );
+    _logToConsole(entry, isSensitive: false);
   }
 
   void _updateBatcher() {
