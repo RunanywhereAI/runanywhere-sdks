@@ -166,12 +166,6 @@ struct RunAnywhereAIApp: App {
                       modality: .speechRecognition,
                       artifactType: .tarGzArchive(structure: .nestedDirectory),
                       memoryRequirement: 75_000_000)
-        ONNX.addModel(id: "sherpa-onnx-whisper-small.en",
-                      name: "Sherpa Whisper Small (ONNX)",
-                      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
-                      modality: .speechRecognition,
-                      artifactType: .tarBz2Archive(structure: .nestedDirectory),
-                      memoryRequirement: 250_000_000)
         // TTS Models (Piper VITS)
         ONNX.addModel(id: "vits-piper-en_US-lessac-medium",
                       name: "Piper TTS (US English - Medium)",
