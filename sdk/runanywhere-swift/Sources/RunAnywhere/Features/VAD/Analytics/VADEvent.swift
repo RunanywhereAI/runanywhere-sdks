@@ -5,6 +5,9 @@
 //  All VAD-related events in one place.
 //  Each event declares its destination (public, analytics, or both).
 //
+//  Note: VADEvent conforms to TelemetryEventProperties for strongly typed analytics.
+//  This avoids string conversion/parsing and enables compile-time type checking.
+//
 
 import Foundation
 
@@ -16,7 +19,13 @@ import Foundation
 /// ```swift
 /// EventPublisher.shared.track(VADEvent.initialized(...))
 /// ```
-public enum VADEvent: SDKEvent {
+///
+/// VADEvent provides strongly typed properties via `telemetryProperties`.
+/// This enables:
+/// - Type safety at compile time
+/// - No string parsing for analytics
+/// - Validation guardrails (e.g., durationMs >= 0)
+public enum VADEvent: SDKEvent, TelemetryEventProperties {
 
     // MARK: - Service Lifecycle
 
@@ -137,6 +146,77 @@ public enum VADEvent: SDKEvent {
 
         case .resumed:
             return [:]
+        }
+    }
+
+    // MARK: - TelemetryEventProperties Conformance
+
+    /// Strongly typed telemetry properties - no string conversion needed.
+    /// These values are used directly by TelemetryEventPayload.
+    public var telemetryProperties: TelemetryProperties {
+        switch self {
+        case .initialized(let framework):
+            return TelemetryProperties(
+                framework: framework.rawValue,
+                success: true
+            )
+
+        case .initializationFailed(let error, let framework):
+            return TelemetryProperties(
+                framework: framework.rawValue,
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
+            )
+
+        case .cleanedUp:
+            return TelemetryProperties()
+
+        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
+            return TelemetryProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
+            return TelemetryProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                processingTimeMs: durationMs,
+                success: true,
+                modelSizeBytes: modelSizeBytes > 0 ? modelSizeBytes : nil
+            )
+
+        case .modelLoadFailed(let modelId, let error, let framework):
+            return TelemetryProperties(
+                modelId: modelId,
+                framework: framework.rawValue,
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
+            )
+
+        case .modelUnloaded(let modelId):
+            return TelemetryProperties(modelId: modelId)
+
+        case .started:
+            return TelemetryProperties()
+
+        case .stopped:
+            return TelemetryProperties()
+
+        case .speechStarted:
+            return TelemetryProperties()
+
+        case .speechEnded(let durationMs):
+            return TelemetryProperties(speechDurationMs: durationMs)
+
+        case .paused:
+            return TelemetryProperties()
+
+        case .resumed:
+            return TelemetryProperties()
         }
     }
 }

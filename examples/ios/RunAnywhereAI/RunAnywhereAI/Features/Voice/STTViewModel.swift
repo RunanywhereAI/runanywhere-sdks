@@ -283,26 +283,43 @@ class STTViewModel: ObservableObject {
     /// Start live streaming transcription using SDK's LiveTranscriptionSession
     private func startLiveTranscription() async throws {
         logger.info("Starting live transcription via SDK")
-        isTranscribing = true
 
-        // Start session and consume transcription stream
+        // Start session
         let session = try await RunAnywhere.startLiveTranscription()
         self.liveSession = session
 
-        // Subscribe to audio level for visualization
+        // Bind directly to SDK's published properties instead of manually iterating streams
+        // This eliminates state duplication and uses the SDK's reactive bindings
+
+        // Bind audio level directly from session
         session.$audioLevel
             .receive(on: DispatchQueue.main)
             .assign(to: &$audioLevel)
 
-        // Consume transcription updates
-        Task { @MainActor [weak self] in
-            for await text in session.transcriptions {
-                self?.transcription = text
+        // Bind transcription text directly from session's published property
+        session.$currentText
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$transcription)
+
+        // Bind isActive to isTranscribing (session manages this state)
+        session.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isActive in
+                self?.isTranscribing = isActive
+                if !isActive {
+                    self?.logger.info("Live transcription completed")
+                }
             }
-            // Stream ended
-            self?.isTranscribing = false
-            self?.logger.info("Live transcription completed")
-        }
+            .store(in: &cancellables)
+
+        // Bind error from session to propagate transcription errors
+        session.$error
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0?.localizedDescription }
+            .sink { [weak self] errorDescription in
+                self?.errorMessage = "Transcription error: \(errorDescription)"
+            }
+            .store(in: &cancellables)
     }
 
     /// Stop live streaming transcription
@@ -312,7 +329,7 @@ class STTViewModel: ObservableObject {
         await liveSession?.stop()
         liveSession = nil
 
-        isTranscribing = false
+        // Note: isTranscribing is automatically set to false via session.$isActive binding
     }
 
     // MARK: - Cleanup

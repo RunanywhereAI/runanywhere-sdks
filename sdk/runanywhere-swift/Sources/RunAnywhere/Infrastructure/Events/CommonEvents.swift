@@ -4,13 +4,22 @@
 //
 //  Common SDK events (initialization, storage, device, network).
 //
+//  Note: All events conform to TelemetryEventProperties for strongly typed analytics.
+//  This avoids string conversion/parsing and enables compile-time type checking.
+//
 
 import Foundation
 
 // MARK: - SDK Lifecycle Event
 
 /// SDK initialization and lifecycle events.
-public enum SDKLifecycleEvent: SDKEvent {
+///
+/// SDKLifecycleEvent provides strongly typed properties via `telemetryProperties`.
+/// This enables:
+/// - Type safety at compile time
+/// - No string parsing for analytics
+/// - Validation guardrails (e.g., durationMs >= 0)
+public enum SDKLifecycleEvent: SDKEvent, TelemetryEventProperties {
     case initStarted
     case initCompleted(durationMs: Double)
     case initFailed(error: SDKError)
@@ -39,13 +48,44 @@ public enum SDKLifecycleEvent: SDKEvent {
             return ["count": String(count)]
         }
     }
+
+    // MARK: - TelemetryEventProperties Conformance
+
+    public var telemetryProperties: TelemetryProperties {
+        switch self {
+        case .initStarted:
+            return TelemetryProperties()
+
+        case .initCompleted(let durationMs):
+            return TelemetryProperties(
+                durationMs: durationMs,
+                success: true
+            )
+
+        case .initFailed(let error):
+            return TelemetryProperties(
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
+            )
+
+        case .modelsLoaded(let count):
+            return TelemetryProperties(count: count)
+        }
+    }
 }
 
 // MARK: - Model Event
 
 /// Common model lifecycle events (download, delete).
 /// For capability-specific load/unload, use LLMEvent, STTEvent, TTSEvent.
-public enum ModelEvent: SDKEvent {
+///
+/// ModelEvent provides strongly typed properties via `telemetryProperties`.
+/// This enables:
+/// - Type safety at compile time
+/// - No string parsing for analytics
+/// - Validation guardrails (e.g., progress between 0-100)
+public enum ModelEvent: SDKEvent, TelemetryEventProperties {
     // Download events
     case downloadStarted(modelId: String)
     case downloadProgress(modelId: String, progress: Double, bytesDownloaded: Int64, totalBytes: Int64)
@@ -137,12 +177,74 @@ public enum ModelEvent: SDKEvent {
             return ["model_id": modelId]
         }
     }
+
+    // MARK: - TelemetryEventProperties Conformance
+
+    public var telemetryProperties: TelemetryProperties {
+        switch self {
+        case .downloadStarted(let modelId):
+            return TelemetryProperties(modelId: modelId)
+
+        case .downloadProgress(let modelId, _, _, _):
+            // .publicOnly event - not sent to telemetry, return minimal properties
+            return TelemetryProperties(modelId: modelId)
+
+        case .downloadCompleted(let modelId, let durationMs, let sizeBytes):
+            return TelemetryProperties(
+                modelId: modelId,
+                durationMs: durationMs,
+                success: true,
+                modelSizeBytes: sizeBytes
+            )
+
+        case .downloadFailed(let modelId, let error):
+            return TelemetryProperties(
+                modelId: modelId,
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
+            )
+
+        case .downloadCancelled(let modelId):
+            return TelemetryProperties(modelId: modelId)
+
+        case .extractionStarted(let modelId, let archiveType):
+            return TelemetryProperties(
+                modelId: modelId,
+                archiveType: archiveType
+            )
+
+        case .extractionProgress(let modelId, _):
+            // .publicOnly event - not sent to telemetry, return minimal properties
+            return TelemetryProperties(modelId: modelId)
+
+        case .extractionCompleted(let modelId, let durationMs):
+            return TelemetryProperties(
+                modelId: modelId,
+                durationMs: durationMs,
+                success: true
+            )
+
+        case .extractionFailed(let modelId, let error):
+            return TelemetryProperties(
+                modelId: modelId,
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
+            )
+
+        case .deleted(let modelId):
+            return TelemetryProperties(modelId: modelId)
+        }
+    }
 }
 
 // MARK: - Storage Event
 
 /// Storage-related events.
-public enum StorageEvent: SDKEvent {
+///
+/// StorageEvent provides strongly typed properties via `telemetryProperties`.
+public enum StorageEvent: SDKEvent, TelemetryEventProperties {
     case cacheCleared(freedBytes: Int64)
     case cacheClearFailed(error: SDKError)
     case tempFilesCleaned(freedBytes: Int64)
@@ -167,12 +269,39 @@ public enum StorageEvent: SDKEvent {
             return ["freed_bytes": String(freedBytes)]
         }
     }
+
+    // MARK: - TelemetryEventProperties Conformance
+
+    public var telemetryProperties: TelemetryProperties {
+        switch self {
+        case .cacheCleared(let freedBytes):
+            return TelemetryProperties(
+                success: true,
+                freedBytes: freedBytes
+            )
+
+        case .cacheClearFailed(let error):
+            return TelemetryProperties(
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
+            )
+
+        case .tempFilesCleaned(let freedBytes):
+            return TelemetryProperties(
+                success: true,
+                freedBytes: freedBytes
+            )
+        }
+    }
 }
 
 // MARK: - Device Event
 
 /// Device-related events.
-public enum DeviceEvent: SDKEvent {
+///
+/// DeviceEvent provides strongly typed properties via `telemetryProperties`.
+public enum DeviceEvent: SDKEvent, TelemetryEventProperties {
     case registered(deviceId: String)
     case registrationFailed(error: SDKError)
 
@@ -193,12 +322,31 @@ public enum DeviceEvent: SDKEvent {
             return error.telemetryProperties
         }
     }
+
+    // MARK: - TelemetryEventProperties Conformance
+
+    public var telemetryProperties: TelemetryProperties {
+        switch self {
+        case .registered:
+            // deviceId is set at batch level in TelemetryEventPayload from DeviceIdentity
+            return TelemetryProperties(success: true)
+
+        case .registrationFailed(let error):
+            return TelemetryProperties(
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
+            )
+        }
+    }
 }
 
 // MARK: - Network Event
 
 /// Network-related events.
-public enum NetworkEvent: SDKEvent {
+///
+/// NetworkEvent provides strongly typed properties via `telemetryProperties`.
+public enum NetworkEvent: SDKEvent, TelemetryEventProperties {
     case connectivityChanged(isOnline: Bool)
 
     public var type: String {
@@ -219,6 +367,15 @@ public enum NetworkEvent: SDKEvent {
             return ["is_online": String(isOnline)]
         }
     }
+
+    // MARK: - TelemetryEventProperties Conformance
+
+    public var telemetryProperties: TelemetryProperties {
+        switch self {
+        case .connectivityChanged(let isOnline):
+            return TelemetryProperties(isOnline: isOnline)
+        }
+    }
 }
 
 // MARK: - SDK Error Event
@@ -236,7 +393,7 @@ public enum NetworkEvent: SDKEvent {
 ///         print("Stack: \(errorEvent.error.stackTrace)")
 ///     }
 /// ```
-public struct SDKErrorEvent: SDKEvent, TypedEventProperties {
+public struct SDKErrorEvent: SDKEvent, TelemetryEventProperties {
 
     // MARK: - Properties
 
@@ -273,10 +430,10 @@ public struct SDKErrorEvent: SDKEvent, TypedEventProperties {
         return props
     }
 
-    // MARK: - TypedEventProperties
+    // MARK: - TelemetryEventProperties
 
-    public var typedProperties: EventProperties {
-        EventProperties(
+    public var telemetryProperties: TelemetryProperties {
+        TelemetryProperties(
             errorMessage: error.message,
             errorCode: error.code.rawValue
         )
@@ -384,7 +541,9 @@ public struct SDKErrorEvent: SDKEvent, TypedEventProperties {
 // MARK: - Framework Event
 
 /// Framework query events (analytics only).
-public enum FrameworkEvent: SDKEvent {
+///
+/// FrameworkEvent provides strongly typed properties via `telemetryProperties`.
+public enum FrameworkEvent: SDKEvent, TelemetryEventProperties {
     case modelsRequested(framework: String)
     case modelsRetrieved(framework: String, count: Int)
 
@@ -406,12 +565,29 @@ public enum FrameworkEvent: SDKEvent {
             return ["framework": framework, "count": String(count)]
         }
     }
+
+    // MARK: - TelemetryEventProperties Conformance
+
+    public var telemetryProperties: TelemetryProperties {
+        switch self {
+        case .modelsRequested(let framework):
+            return TelemetryProperties(framework: framework)
+
+        case .modelsRetrieved(let framework, let count):
+            return TelemetryProperties(
+                framework: framework,
+                count: count
+            )
+        }
+    }
 }
 
 // MARK: - Voice Pipeline Event
 
 /// Voice pipeline events (VAD, full pipeline).
-public enum VoicePipelineEvent: SDKEvent {
+///
+/// VoicePipelineEvent provides strongly typed properties via `telemetryProperties`.
+public enum VoicePipelineEvent: SDKEvent, TelemetryEventProperties {
     case pipelineStarted
     case pipelineCompleted(durationMs: Double)
     case pipelineFailed(error: SDKError)
@@ -442,6 +618,40 @@ public enum VoicePipelineEvent: SDKEvent {
             return ["duration_ms": String(format: "%.1f", durationMs)]
         case .pipelineFailed(let error):
             return error.telemetryProperties
+        }
+    }
+
+    // MARK: - TelemetryEventProperties Conformance
+
+    public var telemetryProperties: TelemetryProperties {
+        switch self {
+        case .pipelineStarted:
+            return TelemetryProperties()
+
+        case .pipelineCompleted(let durationMs):
+            return TelemetryProperties(
+                durationMs: durationMs,
+                success: true
+            )
+
+        case .pipelineFailed(let error):
+            return TelemetryProperties(
+                success: false,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
+            )
+
+        case .vadStarted:
+            return TelemetryProperties()
+
+        case .speechDetected:
+            return TelemetryProperties()
+
+        case .speechEnded:
+            return TelemetryProperties()
+
+        case .vadStopped:
+            return TelemetryProperties()
         }
     }
 }

@@ -92,9 +92,12 @@ public struct APIErrorInfo: Decodable, Sendable {
                 extractedMessage = standardError.detail ?? standardError.message ?? standardError.error
                 extractedCode = standardError.code
             }
-            // Try decoding as Pydantic validation error (array of validation messages)
-            else if let validationError = try? JSONDecoder().decode(ValidationErrorResponse.self, from: data) {
-                extractedMessage = validationError.detail.first?.msg
+            // Try extracting from Pydantic validation error format using simple dictionary access
+            else if let json = try? JSONSerialization.jsonObject(with: data) as? [String: AnyHashable],
+                    let detail = json["detail"] as? [[String: AnyHashable]],
+                    let firstError = detail.first,
+                    let msg = firstError["msg"] as? String {
+                extractedMessage = msg
             }
         }
 
@@ -179,11 +182,5 @@ private struct StandardErrorResponse: Decodable {
     let code: String?
 }
 
-/// Pydantic validation error response format
-private struct ValidationErrorResponse: Decodable {
-    let detail: [ValidationDetail]
-
-    struct ValidationDetail: Decodable {
-        let msg: String?
-    }
-}
+// Note: Pydantic validation errors are handled via JSONSerialization for simplicity
+// No dedicated struct needed - just extracts detail[0].msg from JSON dictionary

@@ -84,6 +84,22 @@ public struct TelemetryEventPayload: Codable, Sendable {
     public let voice: String?
     public let outputDurationMs: Double?
 
+    // MARK: - Model Lifecycle Fields
+    public let modelSizeBytes: Int64?
+    public let archiveType: String?
+
+    // MARK: - VAD Fields
+    public let speechDurationMs: Double?
+
+    // MARK: - SDK Lifecycle Fields
+    public let count: Int?
+
+    // MARK: - Storage Fields
+    public let freedBytes: Int64?
+
+    // MARK: - Network Fields
+    public let isOnline: Bool?
+
     // MARK: - Coding Keys (snake_case for API)
     // NOTE: Production (FastAPI) uses `id` and `timestamp`
     //       Development (Supabase) uses `sdk_event_id` and `event_timestamp`
@@ -131,6 +147,12 @@ public struct TelemetryEventPayload: Codable, Sendable {
         case sampleRate = "sample_rate"
         case voice
         case outputDurationMs = "output_duration_ms"
+        case modelSizeBytes = "model_size_bytes"
+        case archiveType = "archive_type"
+        case speechDurationMs = "speech_duration_ms"
+        case count
+        case freedBytes = "freed_bytes"
+        case isOnline = "is_online"
     }
 
     /// Dynamic coding key for environment-specific field names
@@ -215,6 +237,12 @@ public struct TelemetryEventPayload: Codable, Sendable {
         try container.encode(sampleRate, forKey: .sampleRate)
         try container.encode(voice, forKey: .voice)
         try container.encode(outputDurationMs, forKey: .outputDurationMs)
+        try container.encode(modelSizeBytes, forKey: .modelSizeBytes)
+        try container.encode(archiveType, forKey: .archiveType)
+        try container.encode(speechDurationMs, forKey: .speechDurationMs)
+        try container.encode(count, forKey: .count)
+        try container.encode(freedBytes, forKey: .freedBytes)
+        try container.encode(isOnline, forKey: .isOnline)
     }
 
     // MARK: - Initializer
@@ -260,7 +288,13 @@ public struct TelemetryEventPayload: Codable, Sendable {
         audioSizeBytes: Int? = nil,
         sampleRate: Int? = nil,
         voice: String? = nil,
-        outputDurationMs: Double? = nil
+        outputDurationMs: Double? = nil,
+        modelSizeBytes: Int64? = nil,
+        archiveType: String? = nil,
+        speechDurationMs: Double? = nil,
+        count: Int? = nil,
+        freedBytes: Int64? = nil,
+        isOnline: Bool? = nil
     ) {
         self.id = id
         self.eventType = eventType
@@ -303,6 +337,12 @@ public struct TelemetryEventPayload: Codable, Sendable {
         self.sampleRate = sampleRate
         self.voice = voice
         self.outputDurationMs = outputDurationMs
+        self.modelSizeBytes = modelSizeBytes
+        self.archiveType = archiveType
+        self.speechDurationMs = speechDurationMs
+        self.count = count
+        self.freedBytes = freedBytes
+        self.isOnline = isOnline
     }
 }
 
@@ -371,13 +411,29 @@ extension TelemetryEventPayload {
         self.sampleRate = Self.parseInt(props["sample_rate"])
         self.voice = props["voice"] ?? props["voice_id"]
         self.outputDurationMs = Self.parseDouble(props["output_duration_ms"] ?? props["audio_duration_ms"])
+
+        // Model lifecycle fields
+        self.modelSizeBytes = Self.parseInt64(props["model_size_bytes"] ?? props["size_bytes"])
+        self.archiveType = props["archive_type"]
+
+        // VAD fields
+        self.speechDurationMs = Self.parseDouble(props["speech_duration_ms"])
+
+        // SDK lifecycle fields
+        self.count = Self.parseInt(props["count"])
+
+        // Storage fields
+        self.freedBytes = Self.parseInt64(props["freed_bytes"])
+
+        // Network fields
+        self.isOnline = Self.parseBool(props["is_online"])
     }
 
-    /// Create payload from strongly typed event properties.
+    /// Create payload from strongly typed telemetry properties.
     /// This avoids string parsing entirely - types are preserved directly.
     public init(
         from event: any SDKEvent,
-        typedProperties props: EventProperties
+        telemetryProperties props: TelemetryProperties
     ) {
         self.id = event.id
         self.eventType = event.type
@@ -440,6 +496,22 @@ extension TelemetryEventPayload {
         self.sampleRate = props.sampleRate
         self.voice = props.voice
         self.outputDurationMs = props.outputDurationMs
+
+        // Model lifecycle fields - typed values!
+        self.modelSizeBytes = props.modelSizeBytes
+        self.archiveType = props.archiveType
+
+        // VAD fields - typed values!
+        self.speechDurationMs = props.speechDurationMs
+
+        // SDK lifecycle fields - typed values!
+        self.count = props.count
+
+        // Storage fields - typed values!
+        self.freedBytes = props.freedBytes
+
+        // Network fields - typed values!
+        self.isOnline = props.isOnline
     }
 
     // MARK: - Modality Mapping (Single Source of Truth)
@@ -465,6 +537,11 @@ extension TelemetryEventPayload {
     private static func parseInt(_ value: String?) -> Int? {
         guard let value = value else { return nil }
         return Int(value)
+    }
+
+    private static func parseInt64(_ value: String?) -> Int64? {
+        guard let value = value else { return nil }
+        return Int64(value)
     }
 
     private static func parseBool(_ value: String?) -> Bool? {
