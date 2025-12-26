@@ -2,6 +2,7 @@
 ///
 /// Matches iOS VoiceSessionManager.swift from Capabilities/Voice/Services/
 library voice_session_manager;
+
 import 'dart:async';
 
 import 'package:runanywhere/capabilities/voice/models/voice_session.dart';

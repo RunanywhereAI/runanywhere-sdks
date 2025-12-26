@@ -92,7 +92,8 @@ class FileLogDestination extends LogDestination {
 
   @override
   void write(LogEntry entry) {
-    final line = '${entry.timestamp.toIso8601String()} [${entry.level.name}] [${entry.category}] ${entry.message}';
+    final line =
+        '${entry.timestamp.toIso8601String()} [${entry.level.name}] [${entry.category}] ${entry.message}';
     _buffer.add(line);
 
     if (_buffer.length >= bufferSize) {

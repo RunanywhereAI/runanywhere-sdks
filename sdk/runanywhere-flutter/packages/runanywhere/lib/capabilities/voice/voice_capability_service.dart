@@ -10,11 +10,16 @@ import 'dart:typed_data';
 import 'package:runanywhere/capabilities/voice/services/voice_session_manager.dart';
 import 'package:runanywhere/core/module_registry.dart'
     show ModuleRegistry, STTService, LLMService;
-import 'package:runanywhere/features/llm/llm_capability.dart' show LLMConfiguration;
-import 'package:runanywhere/features/stt/stt_capability.dart' show STTConfiguration;
-import 'package:runanywhere/features/tts/models/tts_configuration.dart' show TTSConfiguration;
-import 'package:runanywhere/features/tts/protocol/tts_service.dart' show TTSService;
-import 'package:runanywhere/features/vad/vad_configuration.dart' show VADConfiguration;
+import 'package:runanywhere/features/llm/llm_capability.dart'
+    show LLMConfiguration;
+import 'package:runanywhere/features/stt/stt_capability.dart'
+    show STTConfiguration;
+import 'package:runanywhere/features/tts/models/tts_configuration.dart'
+    show TTSConfiguration;
+import 'package:runanywhere/features/tts/protocol/tts_service.dart'
+    show TTSService;
+import 'package:runanywhere/features/vad/vad_configuration.dart'
+    show VADConfiguration;
 import 'package:runanywhere/features/voice_agent/voice_agent_capability.dart';
 import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';

@@ -35,8 +35,10 @@ class DevelopmentNetworkConfig {
   static DevelopmentNetworkConfig? get shared {
     // These values should be provided by DevelopmentConfig
     // In Flutter, this would typically come from a config file or environment
-    const supabaseURL = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
-    const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+    const supabaseURL =
+        String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+    const supabaseAnonKey =
+        String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
     const buildToken = String.fromEnvironment('BUILD_TOKEN', defaultValue: '');
 
     if (supabaseURL.isEmpty) {
@@ -87,13 +89,15 @@ class DevelopmentNetworkConfig {
 /// Matches iOS environment-based network configuration
 class EnvironmentNetworkConfig {
   /// Development environment configuration
-  static DevelopmentNetworkConfig? get development => DevelopmentNetworkConfig.shared;
+  static DevelopmentNetworkConfig? get development =>
+      DevelopmentNetworkConfig.shared;
 
   /// Staging environment configuration
   /// Uses staging-specific URLs and keys
   static NetworkEnvironmentSettings? get staging {
     const stagingURL = String.fromEnvironment('STAGING_URL', defaultValue: '');
-    const stagingKey = String.fromEnvironment('STAGING_API_KEY', defaultValue: '');
+    const stagingKey =
+        String.fromEnvironment('STAGING_API_KEY', defaultValue: '');
 
     if (stagingURL.isEmpty) return null;
 
@@ -110,7 +114,8 @@ class EnvironmentNetworkConfig {
   /// Uses production-specific URLs and keys
   static NetworkEnvironmentSettings? get production {
     const prodURL = String.fromEnvironment('PRODUCTION_URL', defaultValue: '');
-    const prodKey = String.fromEnvironment('PRODUCTION_API_KEY', defaultValue: '');
+    const prodKey =
+        String.fromEnvironment('PRODUCTION_API_KEY', defaultValue: '');
 
     if (prodURL.isEmpty) return null;
 

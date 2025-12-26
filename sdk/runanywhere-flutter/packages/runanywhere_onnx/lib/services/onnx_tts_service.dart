@@ -91,11 +91,14 @@ class OnnxTTSService implements TTSService {
 
       // Get available voices
       final voiceStrings = _backend.getTtsVoices();
-      _voices = voiceStrings.map((voiceId) => TTSVoice(
-        id: voiceId,
-        name: voiceId,
-        language: 'en-US', // Default language, could be parsed from voice ID
-      )).toList();
+      _voices = voiceStrings
+          .map((voiceId) => TTSVoice(
+                id: voiceId,
+                name: voiceId,
+                language:
+                    'en-US', // Default language, could be parsed from voice ID
+              ))
+          .toList();
 
       debugPrint('[ONNXTTS] Found ${_voices.length} voices: $voiceStrings');
     } catch (e, stackTrace) {
@@ -143,8 +146,10 @@ class OnnxTTSService implements TTSService {
           '[ONNXTTS] Synthesis successful. Samples: ${samples.length}, Rate: $sampleRate');
 
       // Convert Float32 samples to PCM16 bytes
-      final audioData = Uint8List.fromList(_convertToPCM16(samples, sampleRate));
-      final processingTime = DateTime.now().difference(startTime).inMilliseconds / 1000.0;
+      final audioData =
+          Uint8List.fromList(_convertToPCM16(samples, sampleRate));
+      final processingTime =
+          DateTime.now().difference(startTime).inMilliseconds / 1000.0;
       final duration = samples.length / sampleRate;
 
       return TTSOutput(

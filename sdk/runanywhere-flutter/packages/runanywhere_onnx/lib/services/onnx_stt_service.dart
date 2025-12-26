@@ -105,7 +105,8 @@ class OnnxSTTService implements STTService {
 
   /// Feed audio to a streaming session.
   void feedAudio(Object stream, Float32List samples, {int sampleRate = 16000}) {
-    _backend.feedSttAudio(stream as RaStreamHandle, samples, sampleRate: sampleRate);
+    _backend.feedSttAudio(stream as RaStreamHandle, samples,
+        sampleRate: sampleRate);
   }
 
   /// Check if decoder is ready.
