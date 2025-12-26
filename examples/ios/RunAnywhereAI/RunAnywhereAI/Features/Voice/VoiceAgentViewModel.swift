@@ -286,7 +286,7 @@ final class VoiceAgentViewModel: ObservableObject {
             llmModelState = .loaded
             updateModel(.llm, id: id)
         case .modelLoadFailed(_, let error, _):
-            llmModelState = .error(error)
+            llmModelState = .error(error.message)
         case .modelUnloaded:
             llmModelState = .notLoaded
             llmModel = nil
@@ -303,7 +303,7 @@ final class VoiceAgentViewModel: ObservableObject {
             sttModelState = .loaded
             updateModel(.stt, id: id)
         case .modelLoadFailed(_, let error, _):
-            sttModelState = .error(error)
+            sttModelState = .error(error.message)
         case .modelUnloaded:
             sttModelState = .notLoaded
             sttModel = nil
@@ -320,7 +320,7 @@ final class VoiceAgentViewModel: ObservableObject {
             ttsModelState = .loaded
             updateModel(.tts, id: id)
         case .modelLoadFailed(_, let error, _):
-            ttsModelState = .error(error)
+            ttsModelState = .error(error.message)
         case .modelUnloaded:
             ttsModelState = .notLoaded
             ttsModel = nil
