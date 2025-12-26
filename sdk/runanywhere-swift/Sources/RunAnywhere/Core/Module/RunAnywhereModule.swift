@@ -16,7 +16,6 @@ public enum CapabilityType: String, CaseIterable, Sendable {
     case tts = "TTS"
     case llm = "LLM"
     case vad = "VAD"
-    case speakerDiarization = "SpeakerDiarization"
 }
 
 // MARK: - Module Protocol
@@ -146,7 +145,7 @@ public extension RunAnywhereModule {
             return .speechRecognition
         } else if capabilities.contains(.tts) {
             return .speechSynthesis
-        } else if capabilities.contains(.vad) || capabilities.contains(.speakerDiarization) {
+        } else if capabilities.contains(.vad) {
             return .audio
         }
         return .language // Default

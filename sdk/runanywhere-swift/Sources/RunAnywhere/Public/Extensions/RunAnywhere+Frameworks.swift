@@ -62,8 +62,6 @@ public extension RunAnywhere {
             relevantCategories = [.speechSynthesis]
         case .vad:
             relevantCategories = [.audio]
-        case .speakerDiarization:
-            relevantCategories = [.audio]
         }
 
         for model in allModels where relevantCategories.contains(model.category) {

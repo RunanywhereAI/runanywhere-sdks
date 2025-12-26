@@ -36,11 +36,6 @@ public class ServiceContainer {
         VADCapability()
     }()
 
-    /// Speaker Diarization capability - handles speaker identification
-    private(set) lazy var speakerDiarizationCapability: SpeakerDiarizationCapability = {
-        SpeakerDiarizationCapability()
-    }()
-
     /// Voice Agent capability - composes STT, LLM, TTS, VAD for full voice pipeline
     private(set) lazy var voiceAgentCapability: VoiceAgentCapability = {
         VoiceAgentCapability(
