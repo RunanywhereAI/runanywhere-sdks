@@ -183,7 +183,7 @@ extension ModelAssignment {
         let modelCategory = ModelCategory(rawValue: category.lowercased()) ?? .language
 
         // Convert string format to ModelFormat enum
-        let modelFormat = ModelFormat(rawValue: format.lowercased()) ?? .gguf
+        let modelFormat = ModelFormat(rawValue: format.lowercased()) ?? .unknown
 
         // Convert string framework to InferenceFramework enum
         // Use framework field from API, or infer from format as fallback
@@ -201,7 +201,7 @@ extension ModelAssignment {
             case .mlmodel, .mlpackage:
                 modelFramework = .coreML
             default:
-                modelFramework = .llamaCpp  // Default to llamaCpp for unknown formats
+                modelFramework = .unknown  // Explicit unknown - don't assume framework
             }
         }
 
