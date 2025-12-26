@@ -14,7 +14,7 @@ public protocol LLMService: AnyObject { // swiftlint:disable:this avoid_any_obje
 
     /// The inference framework used by this service.
     /// Required for analytics and performance tracking.
-    var inferenceFramework: InferenceFrameworkType { get }
+    var inferenceFramework: InferenceFramework { get }
 
     // MARK: - Initialization
 

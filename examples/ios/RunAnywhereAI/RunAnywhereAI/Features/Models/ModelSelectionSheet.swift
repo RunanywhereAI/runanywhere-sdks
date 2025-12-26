@@ -179,13 +179,9 @@ struct ModelSelectionSheet: View {
 
     /// Determines if a framework should be shown based on the current context
     private func shouldShowFramework(_ framework: InferenceFramework) -> Bool {
-        // Get models for this framework
+        // Get models for this framework (1:1 mapping)
         let modelsForFramework = viewModel.availableModels.filter { model in
-            if framework == .foundationModels {
-                return model.framework == .foundationModels
-            } else {
-                return model.compatibleFrameworks.contains(framework)
-            }
+            model.framework == framework
         }
 
         // Check if any model's category matches the context's relevant categories
@@ -359,9 +355,8 @@ struct ModelSelectionSheet: View {
             name: "System TTS",
             category: .speechSynthesis,
             format: .unknown,
-            downloadURL: nil,
-            compatibleFrameworks: [.systemTTS],
-            framework: .systemTTS
+            framework: .systemTTS,
+            downloadURL: nil
         )
 
         // Brief delay to show loading state
@@ -712,8 +707,7 @@ private struct FlatModelRow: View {
     @State private var downloadProgress: Double = 0.0
 
     private var frameworkColor: Color {
-        guard let framework = model.framework else { return .gray }
-        switch framework {
+        switch model.framework {
         case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
@@ -723,13 +717,12 @@ private struct FlatModelRow: View {
     }
 
     private var frameworkName: String {
-        guard let framework = model.framework else { return "Unknown" }
-        switch framework {
+        switch model.framework {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
         case .whisperKit: return "Whisper"
-        default: return framework.displayName
+        default: return model.framework.displayName
         }
     }
 

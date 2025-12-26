@@ -29,9 +29,9 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
 
     // MARK: - Model Lifecycle
 
-    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
-    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
-    case modelLoadFailed(modelId: String, error: String, framework: InferenceFrameworkType = .unknown)
+    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadFailed(modelId: String, error: String, framework: InferenceFramework = .unknown)
     case modelUnloaded(modelId: String)
 
     // MARK: - Transcription
@@ -50,7 +50,7 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
         language: String,
         isStreaming: Bool = false,
         sampleRate: Int = STTConstants.defaultSampleRate,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFramework = .unknown
     )
     case partialTranscript(text: String, wordCount: Int)
     case finalTranscript(text: String, confidence: Float)
@@ -71,7 +71,7 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
         language: String,
         isStreaming: Bool = false,
         sampleRate: Int = STTConstants.defaultSampleRate,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFramework = .unknown
     )
     case transcriptionFailed(transcriptionId: String, modelId: String, error: String)
 

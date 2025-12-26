@@ -45,11 +45,8 @@ extension AlamofireDownloadService {
         resumeData: Data?,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        // Get destination folder (framework is required)
-        guard let framework = model.framework ?? model.compatibleFrameworks.first else {
-            logger.error("Model has no associated framework: \(model.id)")
-            throw DownloadError.invalidURL
-        }
+        // Get destination folder (framework is required - 1:1 mapping)
+        let framework = model.framework
         let fileManager = ServiceContainer.shared.fileManager
         let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
         let destinationURL = URL(fileURLWithPath: modelFolder.path).appendingPathComponent("\(model.id).\(model.format.rawValue)")

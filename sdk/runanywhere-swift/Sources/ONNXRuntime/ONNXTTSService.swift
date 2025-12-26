@@ -15,7 +15,7 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
     // MARK: - Framework Identification
 
     /// ONNX Runtime inference framework
-    public let inferenceFramework: InferenceFrameworkType = .onnx
+    public let inferenceFramework: InferenceFramework = .onnx
 
     // MARK: - Initialization
 

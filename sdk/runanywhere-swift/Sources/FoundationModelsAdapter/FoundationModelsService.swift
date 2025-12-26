@@ -25,7 +25,7 @@ public class FoundationModelsService: LLMService {
     // MARK: - Framework Identification
 
     /// Apple Foundation Models inference framework
-    public let inferenceFramework: InferenceFrameworkType = .foundationModels
+    public let inferenceFramework: InferenceFramework = .foundationModels
 
     public var isReady: Bool { _isReady }
     public var currentModel: String? { _currentModel }

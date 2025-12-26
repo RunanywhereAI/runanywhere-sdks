@@ -9,6 +9,7 @@ import Foundation
 
 /// Supported inference frameworks/runtimes for executing models
 public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
+    // Model-based frameworks
     case coreML = "CoreML"
     case tensorFlowLite = "TFLite"
     case mlx = "MLX"
@@ -24,6 +25,11 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     case openAIWhisper = "OpenAIWhisper"
     case systemTTS = "SystemTTS"
     case fluidAudio = "FluidAudio"
+
+    // Special cases
+    case builtIn = "BuiltIn"      // For simple services (e.g., energy-based VAD)
+    case none = "None"            // For services that don't use a model
+    case unknown = "Unknown"      // For unknown/unspecified frameworks
 
     /// Human-readable display name for the framework
     public var displayName: String {
@@ -43,6 +49,33 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .openAIWhisper: return "OpenAI Whisper"
         case .systemTTS: return "System TTS"
         case .fluidAudio: return "FluidAudio"
+        case .builtIn: return "Built-in"
+        case .none: return "None"
+        case .unknown: return "Unknown"
+        }
+    }
+
+    /// Snake_case key for analytics/telemetry (e.g., "llama_cpp", "whisper_kit")
+    public var analyticsKey: String {
+        switch self {
+        case .coreML: return "core_ml"
+        case .tensorFlowLite: return "tensorflow_lite"
+        case .mlx: return "mlx"
+        case .swiftTransformers: return "swift_transformers"
+        case .onnx: return "onnx"
+        case .execuTorch: return "executorch"
+        case .llamaCpp: return "llama_cpp"
+        case .foundationModels: return "foundation_models"
+        case .picoLLM: return "pico_llm"
+        case .mlc: return "mlc"
+        case .mediaPipe: return "media_pipe"
+        case .whisperKit: return "whisper_kit"
+        case .openAIWhisper: return "openai_whisper"
+        case .systemTTS: return "system_tts"
+        case .fluidAudio: return "fluid_audio"
+        case .builtIn: return "built_in"
+        case .none: return "none"
+        case .unknown: return "unknown"
         }
     }
 
@@ -59,7 +92,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     /// Whether this framework supports STT (speech-to-text)
     public var supportsSTT: Bool {
         switch self {
-        case .whisperKit, .openAIWhisper, .mediaPipe:
+        case .whisperKit, .openAIWhisper, .mediaPipe, .onnx:
             return true
         default:
             return false
@@ -69,11 +102,10 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     /// Whether this framework supports TTS (text-to-speech)
     public var supportsTTS: Bool {
         switch self {
-        case .systemTTS:
+        case .systemTTS, .onnx:
             return true
         default:
             return false
         }
     }
-
 }

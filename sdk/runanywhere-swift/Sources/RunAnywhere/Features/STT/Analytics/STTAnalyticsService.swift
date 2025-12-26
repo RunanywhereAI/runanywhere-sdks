@@ -47,7 +47,7 @@ public actor STTAnalyticsService {
         let language: String
         let isStreaming: Bool
         let sampleRate: Int
-        let framework: InferenceFrameworkType
+        let framework: InferenceFramework
     }
 
     // MARK: - Initialization
@@ -73,7 +73,7 @@ public actor STTAnalyticsService {
         language: String,
         isStreaming: Bool = false,
         sampleRate: Int = STTConstants.defaultSampleRate,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFramework = .unknown
     ) -> String {
         let id = UUID().uuidString
         activeTranscriptions[id] = TranscriptionTracker(

@@ -18,7 +18,7 @@ public class DefaultSpeakerDiarizationService: SpeakerDiarizationService {
     // MARK: - Framework Identification
 
     /// This is a built-in simple implementation, no external framework required
-    public let inferenceFramework: InferenceFrameworkType = .builtIn
+    public let inferenceFramework: InferenceFramework = .builtIn
 
     // MARK: - Internal State
 

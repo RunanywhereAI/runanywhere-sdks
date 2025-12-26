@@ -97,21 +97,14 @@ public struct ModelPathUtils {
     /// - Returns: URL to the expected model path based on framework and format
     /// - Throws: If model folder cannot be accessed
     public static func getModelPath(modelInfo: ModelInfo) throws -> URL {
-        // Use preferred framework if available, otherwise use first compatible framework
-        if let framework = modelInfo.framework ?? modelInfo.compatibleFrameworks.first {
-            // For directory-based models (e.g., WhisperKit, CoreML packages), return the folder
-            if modelInfo.format.isDirectoryBased {
-                return try getModelFolder(modelId: modelInfo.id, framework: framework)
-            }
-            // For single-file models, return the full file path
-            return try getModelFilePath(modelId: modelInfo.id, framework: framework, format: modelInfo.format)
-        } else {
-            // Legacy fallback without framework
-            if modelInfo.format.isDirectoryBased {
-                return try getModelFolder(modelId: modelInfo.id)
-            }
-            return try getModelFilePath(modelId: modelInfo.id, format: modelInfo.format)
+        // Use the model's framework directly (1:1 mapping)
+        let framework = modelInfo.framework
+        // For directory-based models (e.g., WhisperKit, CoreML packages), return the folder
+        if modelInfo.format.isDirectoryBased {
+            return try getModelFolder(modelId: modelInfo.id, framework: framework)
         }
+        // For single-file models, return the full file path
+        return try getModelFilePath(modelId: modelInfo.id, framework: framework, format: modelInfo.format)
     }
 
     /// Get the expected model path from components

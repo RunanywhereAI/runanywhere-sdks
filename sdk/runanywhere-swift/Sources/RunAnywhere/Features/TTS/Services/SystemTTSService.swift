@@ -20,7 +20,7 @@ public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
     // MARK: - Framework Identification
 
     /// System TTS uses Apple's built-in speech synthesis (AVSpeechSynthesizer)
-    public let inferenceFramework: InferenceFrameworkType = .builtIn
+    public let inferenceFramework: InferenceFramework = .builtIn
 
     // MARK: - Properties
 

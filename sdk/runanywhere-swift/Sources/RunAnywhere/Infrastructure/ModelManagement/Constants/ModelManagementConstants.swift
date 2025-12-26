@@ -3,13 +3,10 @@ import Foundation
 /// Lifecycle and model management configuration constants
 public enum LifecycleConstants {
 
-    // MARK: - Database Configuration
+    // MARK: - SDK Configuration
 
-    /// Database file name
-    public static let databaseFileName = "runanywhere.db"
-
-    /// Default SDK version for database records
-    public static let sdkVersion = "1.0.0"
+    /// SDK version - references the single source of truth
+    public static var sdkVersion: String { SDKConstants.version }
 
     /// Default model version
     public static let modelVersion = "1.0"

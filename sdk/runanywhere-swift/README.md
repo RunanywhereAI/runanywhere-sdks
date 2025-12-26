@@ -74,7 +74,7 @@ Key differentiators:
 ### 📦 Model Management
 - Automatic model discovery and catalog sync
 - Download with progress tracking (download, extract, validate stages)
-- Local storage management with cleanup utilities
+- In-memory model storage with file system caching
 - Framework-specific model assignment
 
 ### 📊 Observability

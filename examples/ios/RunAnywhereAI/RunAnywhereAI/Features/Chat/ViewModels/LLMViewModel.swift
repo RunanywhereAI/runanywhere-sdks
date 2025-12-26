@@ -605,7 +605,7 @@ final class LLMViewModel {
             conversationId: conversationId,
             modelId: currentModel.id,
             modelName: modelName,
-            framework: result.framework ?? currentModel.compatibleFrameworks.first?.rawValue ?? "unknown",
+            framework: result.framework ?? currentModel.framework.rawValue,
             timestamp: Date(),
             timeToFirstToken: nil,
             totalGenerationTime: totalGenerationTime,

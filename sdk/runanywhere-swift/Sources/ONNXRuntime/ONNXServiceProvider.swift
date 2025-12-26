@@ -101,18 +101,9 @@ public enum ONNX: RunAnywhereModule {
 
         let lowercased = modelId.lowercased()
 
-        // Check model info cache first
+        // Check model info cache first - framework is the single source of truth
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.framework == .onnx && modelInfo.category == .speechRecognition {
-                return true
-            }
-            if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechRecognition {
-                return true
-            }
-            if modelInfo.format == .onnx && modelInfo.category == .speechRecognition {
-                return true
-            }
-            return false
+            return modelInfo.framework == .onnx && modelInfo.category == .speechRecognition
         }
 
         // Fallback: Pattern-based matching
@@ -156,18 +147,9 @@ public enum ONNX: RunAnywhereModule {
 
         let lowercased = modelId.lowercased()
 
-        // Check model info cache first
+        // Check model info cache first - framework is the single source of truth
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.framework == .onnx && modelInfo.category == .speechSynthesis {
-                return true
-            }
-            if modelInfo.compatibleFrameworks.contains(.onnx) && modelInfo.category == .speechSynthesis {
-                return true
-            }
-            if modelInfo.format == .onnx && modelInfo.category == .speechSynthesis {
-                return true
-            }
-            return false
+            return modelInfo.framework == .onnx && modelInfo.category == .speechSynthesis
         }
 
         // Fallback: Pattern-based matching

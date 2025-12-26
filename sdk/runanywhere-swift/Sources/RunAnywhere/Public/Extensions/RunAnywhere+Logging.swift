@@ -35,12 +35,10 @@ extension RunAnywhere {
         configureLocalLogging(enabled: enabled)
     }
 
-    /// Force flush all pending logs and analytics
-    public static func flushAll() async {
+    /// Force flush all pending logs
+    public static func flushAll() {
         // Flush SDK logs
         Logging.shared.flush()
-
-        // Flush analytics events
-        await AnalyticsQueueManager.shared.flush()
+        // Analytics events are fire-and-forget - no queue to flush
     }
 }

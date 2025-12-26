@@ -17,7 +17,7 @@ public protocol SpeakerDiarizationService: AnyObject { // swiftlint:disable:this
 
     /// The inference framework used by this service.
     /// Required for analytics and performance tracking.
-    var inferenceFramework: InferenceFrameworkType { get }
+    var inferenceFramework: InferenceFramework { get }
 
     // MARK: - Initialization
 

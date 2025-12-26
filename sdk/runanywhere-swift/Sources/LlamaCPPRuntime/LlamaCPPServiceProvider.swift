@@ -72,18 +72,11 @@ public enum LlamaCPP: RunAnywhereModule {
 
         let lowercased = modelId.lowercased()
 
-        // Check model info cache first
+        // Check model info cache first - framework is the single source of truth
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.framework == .llamaCpp {
-                return true
-            }
-            if modelInfo.compatibleFrameworks.contains(.llamaCpp) {
-                return true
-            }
-            if modelInfo.format == .gguf || modelInfo.format == .ggml {
-                return true
-            }
-            return false
+            return modelInfo.framework == .llamaCpp
+                || modelInfo.format == .gguf
+                || modelInfo.format == .ggml
         }
 
         // Fallback: Pattern-based matching

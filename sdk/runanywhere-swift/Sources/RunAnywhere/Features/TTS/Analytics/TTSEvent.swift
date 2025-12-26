@@ -29,9 +29,9 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
 
     // MARK: - Model Lifecycle
 
-    case modelLoadStarted(voiceId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
-    case modelLoadCompleted(voiceId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
-    case modelLoadFailed(voiceId: String, error: String, framework: InferenceFrameworkType = .unknown)
+    case modelLoadStarted(voiceId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadCompleted(voiceId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadFailed(voiceId: String, error: String, framework: InferenceFramework = .unknown)
     case modelUnloaded(voiceId: String)
 
     // MARK: - Synthesis
@@ -45,7 +45,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
         voiceId: String,
         characterCount: Int,
         sampleRate: Int = TTSConstants.defaultSampleRate,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFramework = .unknown
     )
 
     /// Streaming synthesis chunk generated
@@ -67,7 +67,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
         processingDurationMs: Double,
         charactersPerSecond: Double,
         sampleRate: Int = TTSConstants.defaultSampleRate,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFramework = .unknown
     )
     case synthesisFailed(synthesisId: String, voiceId: String, error: String)
 

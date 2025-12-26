@@ -16,7 +16,7 @@ public class SimpleEnergyVADService: NSObject, VADService {
     // MARK: - Framework Identification
 
     /// This is a built-in energy-based VAD, no external framework required
-    public let inferenceFramework: InferenceFrameworkType = .builtIn
+    public let inferenceFramework: InferenceFramework = .builtIn
 
     // MARK: - Properties
 

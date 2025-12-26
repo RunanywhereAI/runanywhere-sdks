@@ -43,7 +43,7 @@ public actor TTSAnalyticsService {
         let voiceId: String
         let characterCount: Int
         let sampleRate: Int
-        let framework: InferenceFrameworkType
+        let framework: InferenceFramework
     }
 
     // MARK: - Initialization
@@ -63,7 +63,7 @@ public actor TTSAnalyticsService {
         text: String,
         voice: String,
         sampleRate: Int = TTSConstants.defaultSampleRate,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFramework = .unknown
     ) -> String {
         let id = UUID().uuidString
         let characterCount = text.count

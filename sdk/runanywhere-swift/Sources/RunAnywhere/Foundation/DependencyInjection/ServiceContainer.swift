@@ -75,18 +75,8 @@ public class ServiceContainer {
     /// Authentication service
     public var authenticationService: AuthenticationService?
 
-    /// API client for sync operations
+    /// API client for network operations
     public var apiClient: APIClient?
-
-    /// Sync coordinator for centralized sync management
-    private var _syncCoordinator: SyncCoordinator?
-    public var syncCoordinator: SyncCoordinator? {
-        _syncCoordinator
-    }
-
-    internal func setSyncCoordinator(_ coordinator: SyncCoordinator?) {
-        _syncCoordinator = coordinator
-    }
 
     // MARK: - Data Services
 
@@ -114,13 +104,6 @@ public class ServiceContainer {
 
     internal func setModelAssignmentService(_ service: ModelAssignmentService) {
         _modelAssignmentService = service
-    }
-
-    // MARK: - Analytics Services
-
-    /// Analytics queue manager - centralized queue for all analytics
-    public var analyticsQueueManager: AnalyticsQueueManager {
-        AnalyticsQueueManager.shared
     }
 
     // MARK: - Device Services
@@ -169,7 +152,6 @@ public class ServiceContainer {
         authenticationService = nil
         apiClient = nil
         networkService = nil
-        _syncCoordinator = nil
         backingModelInfoService = nil
         _modelAssignmentService = nil
         _deviceRegistrationService = nil
