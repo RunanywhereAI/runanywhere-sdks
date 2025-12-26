@@ -29,41 +29,15 @@ import os
 /// The SDK handles the actual orchestration; this ViewModel bridges SDK events to UI state.
 @MainActor
 final class VoiceAgentViewModel: ObservableObject {
-
     // MARK: - Dependencies
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VoiceAgent")
     private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - Session State
-
-    /// Represents the current state of the voice session
-    enum SessionState: Equatable {
-        case disconnected       // Not connected, ready to start
-        case connecting         // Initializing session
-        case connected          // Session established, idle
-        case listening          // Actively listening for speech
-        case processing         // Processing transcribed speech
-        case speaking           // Playing back TTS response
-        case error(String)      // Error state
-
-        var displayName: String {
-            switch self {
-            case .disconnected: return "Ready"
-            case .connecting: return "Connecting"
-            case .connected: return "Ready"
-            case .listening: return "Listening"
-            case .processing: return "Thinking"
-            case .speaking: return "Speaking"
-            case .error: return "Error"
-            }
-        }
-    }
-
     // MARK: - Published State (Observable by Views)
 
     /// Current session state
-    @Published private(set) var sessionState: SessionState = .disconnected
+    @Published private(set) var sessionState: VoiceSessionState = .disconnected
 
     /// Initialization state
     @Published private(set) var isInitialized = false
@@ -89,13 +63,13 @@ final class VoiceAgentViewModel: ObservableObject {
     // MARK: - Model Selection State
 
     /// Selected STT model
-    @Published var sttModel: (framework: InferenceFramework, name: String, id: String)?
+    @Published var sttModel: SelectedModelInfo?
 
     /// Selected LLM model
-    @Published var llmModel: (framework: InferenceFramework, name: String, id: String)?
+    @Published var llmModel: SelectedModelInfo?
 
     /// Selected TTS model
-    @Published var ttsModel: (framework: InferenceFramework, name: String, id: String)?
+    @Published var ttsModel: SelectedModelInfo?
 
     /// STT model loading state
     @Published private(set) var sttModelState: ModelLoadState = .notLoaded
@@ -261,15 +235,16 @@ final class VoiceAgentViewModel: ObservableObject {
         // Find model info from shared model list
         let model = ModelListViewModel.shared.availableModels.first { $0.id == id }
         let name = model?.name ?? id
-        let framework = model?.preferredFramework ?? (type == .llm ? .llamaCpp : .onnx)
+        let framework = model?.framework ?? (type == .llm ? .llamaCpp : .onnx)  // Fallback only if no model selected
+        let selectedModel = SelectedModelInfo(framework: framework, name: name, id: id)
 
         switch type {
         case .stt:
-            sttModel = (framework, name, id)
+            sttModel = selectedModel
         case .llm:
-            llmModel = (framework, name, id)
+            llmModel = selectedModel
         case .tts:
-            ttsModel = (framework, name, id)
+            ttsModel = selectedModel
         }
     }
 
@@ -294,58 +269,63 @@ final class VoiceAgentViewModel: ObservableObject {
     }
 
     private func handleSDKEvent(_ event: any SDKEvent) {
-        // Handle LLM events
         if let llmEvent = event as? LLMEvent {
-            switch llmEvent {
-            case .modelLoadStarted:
-                llmModelState = .loading
-            case .modelLoadCompleted(let id, _, _, _):
-                llmModelState = .loaded
-                updateModel(.llm, id: id)
-            case .modelLoadFailed(_, let error, _):
-                llmModelState = .error(error)
-            case .modelUnloaded:
-                llmModelState = .notLoaded
-                llmModel = nil
-            default:
-                break
-            }
+            handleLLMEvent(llmEvent)
+        } else if let sttEvent = event as? STTEvent {
+            handleSTTEvent(sttEvent)
+        } else if let ttsEvent = event as? TTSEvent {
+            handleTTSEvent(ttsEvent)
         }
+    }
 
-        // Handle STT events
-        if let sttEvent = event as? STTEvent {
-            switch sttEvent {
-            case .modelLoadStarted:
-                sttModelState = .loading
-            case .modelLoadCompleted(let id, _, _, _):
-                sttModelState = .loaded
-                updateModel(.stt, id: id)
-            case .modelLoadFailed(_, let error, _):
-                sttModelState = .error(error)
-            case .modelUnloaded:
-                sttModelState = .notLoaded
-                sttModel = nil
-            default:
-                break
-            }
+    private func handleLLMEvent(_ event: LLMEvent) {
+        switch event {
+        case .modelLoadStarted:
+            llmModelState = .loading
+        case .modelLoadCompleted(let id, _, _, _):
+            llmModelState = .loaded
+            updateModel(.llm, id: id)
+        case .modelLoadFailed(_, let error, _):
+            llmModelState = .error(error.message)
+        case .modelUnloaded:
+            llmModelState = .notLoaded
+            llmModel = nil
+        default:
+            break
         }
+    }
 
-        // Handle TTS events
-        if let ttsEvent = event as? TTSEvent {
-            switch ttsEvent {
-            case .modelLoadStarted:
-                ttsModelState = .loading
-            case .modelLoadCompleted(let id, _, _, _):
-                ttsModelState = .loaded
-                updateModel(.tts, id: id)
-            case .modelLoadFailed(_, let error, _):
-                ttsModelState = .error(error)
-            case .modelUnloaded:
-                ttsModelState = .notLoaded
-                ttsModel = nil
-            default:
-                break
-            }
+    private func handleSTTEvent(_ event: STTEvent) {
+        switch event {
+        case .modelLoadStarted:
+            sttModelState = .loading
+        case .modelLoadCompleted(let id, _, _, _):
+            sttModelState = .loaded
+            updateModel(.stt, id: id)
+        case .modelLoadFailed(_, let error, _):
+            sttModelState = .error(error.message)
+        case .modelUnloaded:
+            sttModelState = .notLoaded
+            sttModel = nil
+        default:
+            break
+        }
+    }
+
+    private func handleTTSEvent(_ event: TTSEvent) {
+        switch event {
+        case .modelLoadStarted:
+            ttsModelState = .loading
+        case .modelLoadCompleted(let id, _, _, _):
+            ttsModelState = .loaded
+            updateModel(.tts, id: id)
+        case .modelLoadFailed(_, let error, _):
+            ttsModelState = .error(error.message)
+        case .modelUnloaded:
+            ttsModelState = .notLoaded
+            ttsModel = nil
+        default:
+            break
         }
     }
 
@@ -353,7 +333,7 @@ final class VoiceAgentViewModel: ObservableObject {
 
     /// Set the STT model
     func setSTTModel(_ model: ModelInfo) {
-        sttModel = (model.preferredFramework ?? .onnx, model.name, model.id)
+        sttModel = SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
         Task {
             await syncModelStates()
         }
@@ -361,7 +341,7 @@ final class VoiceAgentViewModel: ObservableObject {
 
     /// Set the LLM model
     func setLLMModel(_ model: ModelInfo) {
-        llmModel = (model.preferredFramework ?? .llamaCpp, model.name, model.id)
+        llmModel = SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
         Task {
             await syncModelStates()
         }
@@ -369,17 +349,14 @@ final class VoiceAgentViewModel: ObservableObject {
 
     /// Set the TTS model
     func setTTSModel(_ model: ModelInfo) {
-        ttsModel = (model.preferredFramework ?? .onnx, model.name, model.id)
-        Task {
-            await syncModelStates()
-        }
+        ttsModel = SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
+        Task { await syncModelStates() }
     }
 
     // MARK: - Conversation Control
 
     /// Start a voice conversation session
     func startConversation() async {
-        // Validate that all models are loaded
         guard allModelsLoaded else {
             sessionState = .error("Models not ready")
             errorMessage = "Please ensure all models (STT, LLM, TTS) are loaded before starting"
@@ -387,29 +364,21 @@ final class VoiceAgentViewModel: ObservableObject {
             return
         }
 
-        // Update state to connecting
         sessionState = .connecting
         currentStatus = "Connecting..."
         errorMessage = nil
 
         do {
-            // Start the voice session via SDK
             session = try await RunAnywhere.startVoiceSession()
             sessionState = .listening
             currentStatus = "Listening..."
-
-            // Start consuming session events
             eventTask = Task { [weak self] in
                 guard let session = self?.session else { return }
                 for await event in session.events {
-                    await MainActor.run {
-                        self?.handleSessionEvent(event)
-                    }
+                    await MainActor.run { self?.handleSessionEvent(event) }
                 }
             }
-
             logger.info("Voice session started successfully")
-
         } catch {
             sessionState = .error(error.localizedDescription)
             currentStatus = "Error"
@@ -421,21 +390,14 @@ final class VoiceAgentViewModel: ObservableObject {
     /// Stop the current voice conversation
     func stopConversation() async {
         logger.info("Stopping voice session...")
-
-        // Cancel event consumption
         eventTask?.cancel()
         eventTask = nil
-
-        // Stop the session
         await session?.stop()
         session = nil
-
-        // Reset state
         sessionState = .disconnected
         currentStatus = "Ready"
         audioLevel = 0.0
         isSpeechDetected = false
-
         logger.info("Voice session stopped")
     }
 
@@ -449,132 +411,36 @@ final class VoiceAgentViewModel: ObservableObject {
 
     private func handleSessionEvent(_ event: VoiceSessionEvent) {
         switch event {
-        case .started:
-            sessionState = .listening
-            currentStatus = "Listening..."
-            logger.debug("Session started event received")
-
-        case .listening(let level):
-            audioLevel = level
-
-        case .speechStarted:
-            isSpeechDetected = true
-            currentStatus = "Listening..."
-            logger.debug("Speech detected")
-
-        case .processing:
-            sessionState = .processing
-            currentStatus = "Processing..."
-            isSpeechDetected = false
-            logger.debug("Processing speech")
-
-        case .transcribed(let text):
-            currentTranscript = text
-            logger.debug("Transcribed: \(text)")
-
-        case .responded(let text):
-            assistantResponse = text
-            logger.debug("LLM responded: \(text)")
-
-        case .speaking:
-            sessionState = .speaking
-            currentStatus = "Speaking..."
-            logger.debug("Speaking response")
-
-        case .turnCompleted(let transcript, let response, _):
-            currentTranscript = transcript
-            assistantResponse = response
-            sessionState = .listening
-            currentStatus = "Listening..."
-            logger.info("Turn completed - Transcript: \(transcript), Response: \(response)")
-
-        case .stopped:
-            sessionState = .disconnected
-            currentStatus = "Ready"
-            logger.debug("Session stopped event received")
-
-        case .error(let message):
-            // Log error but don't change state to error for processing failures
-            // The session can continue listening
-            logger.error("Session error: \(message)")
-            errorMessage = message
+        case .started: sessionState = .listening; currentStatus = "Listening..."
+        case .listening(let level): audioLevel = level
+        case .speechStarted: isSpeechDetected = true; currentStatus = "Listening..."
+        case .processing: sessionState = .processing; currentStatus = "Processing..."; isSpeechDetected = false
+        case .transcribed(let text): currentTranscript = text
+        case .responded(let text): assistantResponse = text
+        case .speaking: sessionState = .speaking; currentStatus = "Speaking..."
+        case let .turnCompleted(transcript, response, _):
+            currentTranscript = transcript; assistantResponse = response
+            sessionState = .listening; currentStatus = "Listening..."
+        case .stopped: sessionState = .disconnected; currentStatus = "Ready"
+        case .error(let message): logger.error("Session error: \(message)"); errorMessage = message
         }
     }
 
     // MARK: - Cleanup
 
-    /// Clean up resources - call from view's onDisappear
-    /// This replaces deinit cleanup to comply with Swift 6 concurrency
     func cleanup() {
         eventTask?.cancel()
         eventTask = nil
         cancellables.removeAll()
-
-        // Reset initialization flags to allow re-initialization if needed
         isViewModelInitialized = false
         hasSubscribedToSDKEvents = false
-
         logger.info("VoiceAgentViewModel cleanup completed")
     }
-}
 
-// MARK: - Supporting Types
+    // MARK: - Helper Properties
 
-/// Color indicator for status
-enum StatusColor {
-    case gray, orange, green, red, blue
-}
-
-/// Color for microphone button
-enum MicButtonColor {
-    case orange, red, blue, green
-}
-
-// MARK: - Extensions for Color Conversion
-
-extension StatusColor {
-    var swiftUIColor: Color {
-        switch self {
-        case .gray: return .gray
-        case .orange: return AppColors.primaryAccent
-        case .green: return .green
-        case .red: return .red
-        case .blue: return AppColors.primaryAccent
-        }
-    }
-}
-
-extension MicButtonColor {
-    var swiftUIColor: Color {
-        switch self {
-        case .orange: return AppColors.primaryAccent
-        case .red: return .red
-        case .blue: return AppColors.primaryAccent
-        case .green: return .green
-        }
-    }
-}
-
-// MARK: - Helper Properties
-
-extension VoiceAgentViewModel {
-    /// Display name for the current STT model
-    var currentSTTModel: String {
-        sttModel?.name ?? "Not loaded"
-    }
-
-    /// Display name for the current LLM model
-    var currentLLMModel: String {
-        llmModel?.name ?? "Not loaded"
-    }
-
-    /// Display name for the current TTS model
-    var currentTTSModel: String {
-        ttsModel?.name ?? "Not loaded"
-    }
-
-    /// Whisper model name (legacy compatibility)
-    var whisperModel: String {
-        currentSTTModel
-    }
+    var currentSTTModel: String { sttModel?.name ?? "Not loaded" }
+    var currentLLMModel: String { llmModel?.name ?? "Not loaded" }
+    var currentTTSModel: String { ttsModel?.name ?? "Not loaded" }
+    var whisperModel: String { currentSTTModel }
 }

@@ -1,3 +1,96 @@
+RunAnywhere License
+Version 1.0, December 2025
+
+Copyright (c) 2025 RunAnywhere, Inc. All Rights Reserved.
+
+This software and associated documentation files (the "Software") are made
+available under the terms of this License. By using, copying, modifying, or
+distributing the Software, you agree to be bound by the terms of this License.
+
+
+PART I - GRANT OF PERMISSION
+=============================
+
+Subject to the conditions in Part II, permission is hereby granted, free of
+charge, to use, copy, modify, merge, publish, and distribute the Software, and
+to permit persons to whom the Software is furnished to do so, under the terms
+of the Apache License 2.0 (included in Part III below).
+
+
+PART II - CONDITIONS AND RESTRICTIONS
+=====================================
+
+1. PERMITTED USERS
+
+   This free license grant applies only to:
+
+   (a) Individual persons using the Software for personal, educational,
+       research, or non-commercial purposes;
+
+   (b) Organizations (including parent companies, subsidiaries, and affiliates)
+       that meet BOTH of the following criteria:
+       (i)  Less than $1,000,000 USD in total funding (including but not
+            limited to equity investments, debt financing, grants, and loans);
+            AND
+       (ii) Less than $1,000,000 USD in gross annual revenue;
+
+   (c) Educational institutions, including but not limited to universities,
+       colleges, schools, and students enrolled in such institutions;
+
+   (d) Non-profit organizations registered under section 501(c)(3) of the
+       United States Internal Revenue Code, or equivalent charitable status
+       in other jurisdictions;
+
+   (e) Government agencies and public sector organizations;
+
+   (f) Open source projects that are themselves licensed under an OSI-approved
+       open source license.
+
+2. COMMERCIAL LICENSE REQUIRED
+
+   Any person or organization not meeting the criteria in Section 1 must obtain
+   a separate commercial license from RunAnywhere, Inc.
+
+   Contact: san@runanywhere.ai for commercial licensing terms.
+
+3. THRESHOLD TRANSITION
+
+   If an organization initially qualifies under Section 1(b) but subsequently
+   exceeds either threshold:
+
+   (a) This free license automatically terminates upon exceeding the threshold;
+
+   (b) A commercial license must be obtained within thirty (30) days of
+       exceeding either threshold;
+
+   (c) For purposes of this license, "gross annual revenue" means total
+       revenue in the preceding twelve (12) months, calculated on a rolling
+       basis.
+
+4. ATTRIBUTION REQUIREMENTS
+
+   All copies or substantial portions of the Software must include:
+
+   (a) This License notice, or a prominent link to it;
+
+   (b) The copyright notice: "Copyright (c) 2025 RunAnywhere, Inc."
+
+   (c) If modifications are made, a statement that the Software has been
+       modified, including a description of the nature of modifications.
+
+5. TRADEMARK NOTICE
+
+   This License does not grant permission to use the trade names, trademarks,
+   service marks, or product names of RunAnywhere, Inc., including "RunAnywhere",
+   except as required for reasonable and customary use in describing the origin
+   of the Software.
+
+
+PART III - APACHE LICENSE 2.0
+=============================
+
+For users meeting the conditions in Part II, the following Apache License 2.0
+terms apply:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -174,29 +267,50 @@
       incurred by, or claims asserted against, such Contributor by reason
       of your accepting any such warranty or additional liability.
 
-   END OF TERMS AND CONDITIONS
+   END OF APACHE LICENSE 2.0 TERMS AND CONDITIONS
 
-   APPENDIX: How to apply the Apache License to your work.
 
-      To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "[]"
-      replaced with your own identifying information. (Don't include
-      the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. We also recommend that a
-      file or class name and description of purpose be included on the
-      same "printed page" as the copyright notice for easier
-      identification within third-party archives.
+PART IV - GENERAL PROVISIONS
+============================
 
-   Copyright 2025 RunAnywhere
+1. ENTIRE AGREEMENT
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+   This License constitutes the entire agreement between the parties with
+   respect to the Software and supersedes all prior or contemporaneous
+   understandings regarding such subject matter.
 
-       http://www.apache.org/licenses/LICENSE-2.0
+2. SEVERABILITY
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+   If any provision of this License is held to be unenforceable, such
+   provision shall be reformed only to the extent necessary to make it
+   enforceable, and the remaining provisions shall continue in full force
+   and effect.
+
+3. WAIVER
+
+   No waiver of any term of this License shall be deemed a further or
+   continuing waiver of such term or any other term.
+
+4. GOVERNING LAW
+
+   This License shall be governed by and construed in accordance with the
+   laws of the State of Delaware, United States, without regard to its
+   conflict of laws provisions.
+
+5. CONTACT
+
+   For commercial licensing inquiries, questions about this License, or
+   to report violations, please contact:
+
+   RunAnywhere, Inc.
+   Email: san@runanywhere.ai
+
+---
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+RUNANYWHERE, INC. OR ANY CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.

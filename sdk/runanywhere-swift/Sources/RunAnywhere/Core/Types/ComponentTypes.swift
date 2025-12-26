@@ -45,7 +45,6 @@ public enum SDKComponent: String, CaseIterable, Sendable {
     case stt
     case tts
     case vad
-    case speakerDiarization
     case voice
     case embedding
 
@@ -56,7 +55,6 @@ public enum SDKComponent: String, CaseIterable, Sendable {
         case .stt: return "Speech-to-Text"
         case .tts: return "Text-to-Speech"
         case .vad: return "Voice Activity Detection"
-        case .speakerDiarization: return "Speaker Diarization"
         case .voice: return "Voice Agent"
         case .embedding: return "Embedding"
         }

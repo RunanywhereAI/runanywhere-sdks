@@ -24,8 +24,7 @@ let package = Package(
     // NOTE: Platform minimums are set to support all modules.
     // Core SDK (RunAnywhere) has availability annotations for iOS 14+ / macOS 12+
     // Optional modules have higher requirements:
-    //   - WhisperKit, LlamaCPPRuntime: iOS 16+ / macOS 13+
-    //   - FluidAudio: iOS 17+ / macOS 14+
+    //   - LlamaCPPRuntime: iOS 16+ / macOS 13+
     //   - AppleAI: iOS 26+ runtime (builds on iOS 16+)
     platforms: [
         .iOS(.v17),
@@ -61,14 +60,6 @@ let package = Package(
         ),
 
         // =================================================================
-        // WhisperKit Backend - CoreML-based STT (iOS 16+)
-        // =================================================================
-        .library(
-            name: "RunAnywhereWhisperKit",
-            targets: ["WhisperKitTranscription"]
-        ),
-
-        // =================================================================
         // Apple Foundation Models - Apple Intelligence (iOS 26+)
         // =================================================================
         .library(
@@ -76,13 +67,6 @@ let package = Package(
             targets: ["FoundationModelsAdapter"]
         ),
 
-        // =================================================================
-        // FluidAudio - Speaker Diarization (iOS 17+)
-        // =================================================================
-        .library(
-            name: "RunAnywhereFluidAudio",
-            targets: ["FluidAudioDiarization"]
-        ),
     ],
     dependencies: [
         // Core SDK dependencies
@@ -90,18 +74,10 @@ let package = Package(
         .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.9.0"),
         .package(url: "https://github.com/JohnSundell/Files.git", from: "4.3.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
-        .package(url: "https://github.com/groue/GRDB.swift", from: "7.6.1"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.57.1"),
-        .package(url: "https://github.com/kean/Pulse", from: "4.0.0"),
         // SWCompression for pure Swift tar.bz2/tar.gz extraction (replaces native C dependency)
         .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
-
-        // WhisperKit dependency
-        .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.13.1"),
-
-        // FluidAudio dependency
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", branch: "main"),
 
         // Sentry for crash reporting and error tracking
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
@@ -117,19 +93,13 @@ let package = Package(
                 .product(name: "Alamofire", package: "Alamofire"),
                 .product(name: "Files", package: "Files"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
-                .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
-                .product(name: "Pulse", package: "Pulse"),
                 // SWCompression for pure Swift tar.bz2/tar.gz extraction
                 .product(name: "SWCompression", package: "SWCompression"),
                 // Sentry for crash reporting and error tracking
                 .product(name: "Sentry", package: "sentry-cocoa"),
             ],
             path: "Sources/RunAnywhere",
-            exclude: [
-                "Data/README.md",
-                "Data/Storage/Database/README.md"
-            ],
             swiftSettings: [
                 .define("SWIFT_PACKAGE")
             ]
@@ -200,19 +170,6 @@ let package = Package(
         ),
 
         // =================================================================
-        // WhisperKit Backend (iOS 16+, macOS 13+)
-        // Provides: CoreML-based Speech-to-Text
-        // =================================================================
-        .target(
-            name: "WhisperKitTranscription",
-            dependencies: [
-                "RunAnywhere",
-                "WhisperKit",
-            ],
-            path: "Sources/WhisperKitTranscription"
-        ),
-
-        // =================================================================
         // Apple Foundation Models (iOS 16+ build, iOS 26+ runtime)
         // Provides: Apple Intelligence integration
         // =================================================================
@@ -224,18 +181,6 @@ let package = Package(
             path: "Sources/FoundationModelsAdapter"
         ),
 
-        // =================================================================
-        // FluidAudio Diarization (iOS 17+, macOS 14+)
-        // Provides: Speaker diarization
-        // =================================================================
-        .target(
-            name: "FluidAudioDiarization",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "FluidAudio", package: "FluidAudio"),
-            ],
-            path: "Sources/FluidAudioDiarization"
-        ),
     ] + binaryTargets()
 )
 
@@ -260,7 +205,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RunAnywhereCoreBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.e6b7a2f/RunAnywhereCore.xcframework.zip",
-                checksum: "0c2da2bacb4931cdbe77eb0686ed20351ffe4ea1a66384f4522a61e1e4efa7aa"
+                checksum: "0786d494553226820a3a19ba5ee573d4bedf4096b9ebfae9010b621952bb617b"
             )
         ]
     }

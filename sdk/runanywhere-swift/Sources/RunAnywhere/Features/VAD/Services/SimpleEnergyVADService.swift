@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Energy-based Voice Activity Detection implementation
-//  Based on WhisperKit's EnergyVAD but simplified for real-time audio processing
+//  Simplified for real-time audio processing
 //
 
 import Accelerate
@@ -16,7 +16,7 @@ public class SimpleEnergyVADService: NSObject, VADService {
     // MARK: - Framework Identification
 
     /// This is a built-in energy-based VAD, no external framework required
-    public let inferenceFramework: InferenceFrameworkType = .builtIn
+    public let inferenceFramework: InferenceFramework = .builtIn
 
     // MARK: - Properties
 
@@ -80,7 +80,7 @@ public class SimpleEnergyVADService: NSObject, VADService {
     ///   - frameLength: Frame length in seconds (default: 0.1 = 100ms)
     ///   - energyThreshold: Energy threshold for voice detection (default: 0.005)
     public init(
-        sampleRate: Int = 16000,
+        sampleRate: Int = VADConstants.defaultSampleRate,
         frameLength: Float = 0.1,
         energyThreshold: Float = 0.005
     ) {

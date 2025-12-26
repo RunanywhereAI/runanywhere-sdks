@@ -10,7 +10,8 @@ import RunAnywhere
 import Combine
 
 struct AddModelFromURLView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss)
+    private var dismiss
     @State private var modelName: String = ""
     @State private var modelURL: String = ""
     @State private var selectedFramework: InferenceFramework = .llamaCpp
@@ -87,8 +88,7 @@ struct AddModelFromURLView: View {
         }
     }
 
-    @ViewBuilder
-    private var formContent: some View {
+    @ViewBuilder private var formContent: some View {
         Section("Model Information") {
             TextField("Model Name", text: $modelName)
                 .textFieldStyle(.roundedBorder)
@@ -166,8 +166,8 @@ struct AddModelFromURLView: View {
         await MainActor.run {
             self.availableFrameworks = frameworks.isEmpty ? [.llamaCpp] : frameworks
             // Set default selection to first available framework
-            if !frameworks.isEmpty && !frameworks.contains(selectedFramework) {
-                selectedFramework = frameworks.first!
+            if let first = frameworks.first, !frameworks.contains(selectedFramework) {
+                selectedFramework = first
             }
         }
     }
@@ -187,7 +187,7 @@ struct AddModelFromURLView: View {
                 name: modelName,
                 url: url,
                 framework: selectedFramework,
-                memoryRequirement: Int64(estimatedSize) ?? nil,
+                memoryRequirement: Int64(estimatedSize),
                 supportsThinking: supportsThinking
             )
         }

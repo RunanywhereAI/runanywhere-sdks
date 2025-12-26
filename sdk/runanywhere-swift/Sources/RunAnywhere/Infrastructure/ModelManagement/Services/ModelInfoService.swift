@@ -2,75 +2,65 @@
 //  ModelInfoService.swift
 //  RunAnywhere SDK
 //
-//  Service layer for model information management
+//  Service layer for model information management (in-memory)
 //
 
 import Foundation
 
-/// Service for managing model information
+/// Service for managing model information (in-memory storage)
 public actor ModelInfoService {
     private let logger = SDKLogger(category: "ModelInfoService")
-    private let modelInfoRepository: any ModelInfoRepository
-    private let syncCoordinator: SyncCoordinator?
 
-    /// Public access to the repository for advanced operations (like mock data population)
-    public var repository: any ModelInfoRepository {
-        return modelInfoRepository
-    }
+    /// In-memory storage for model metadata
+    private var models: [String: ModelInfo] = [:]
 
     // MARK: - Initialization
 
-    public init(modelInfoRepository: any ModelInfoRepository, syncCoordinator: SyncCoordinator?) {
-        self.modelInfoRepository = modelInfoRepository
-        self.syncCoordinator = syncCoordinator
-        logger.info("ModelInfoService initialized")
+    public init() {
+        logger.info("ModelInfoService initialized (in-memory)")
     }
 
     // MARK: - Public Methods
 
     /// Save model metadata
     public func saveModel(_ model: ModelInfo) async throws {
-        try await modelInfoRepository.save(model)
-        logger.info("Model metadata saved: \(model.id)")
+        models[model.id] = model
+        logger.debug("Model saved: \(model.id)")
     }
 
     /// Get model metadata by ID
     public func getModel(by modelId: String) async throws -> ModelInfo? {
-        return try await modelInfoRepository.fetch(id: modelId)
+        return models[modelId]
     }
 
     /// Load all stored models
     public func loadStoredModels() async throws -> [ModelInfo] {
-        return try await modelInfoRepository.fetchAll()
+        return Array(models.values)
     }
 
     /// Load models for specific frameworks
     public func loadModels(for frameworks: [InferenceFramework]) async throws -> [ModelInfo] {
-        var models: [ModelInfo] = []
-        for framework in frameworks {
-            let frameworkModels = try await modelInfoRepository.fetchByFramework(framework)
-            models.append(contentsOf: frameworkModels)
-        }
-        // Remove duplicates based on model ID
-        let uniqueModels = Array(Set(models))
-        return uniqueModels
+        return models.values.filter { frameworks.contains($0.framework) }
     }
 
     /// Update model last used date
     public func updateLastUsed(for modelId: String) async throws {
-        try await modelInfoRepository.updateLastUsed(for: modelId)
-        logger.debug("Updated last used date for model: \(modelId)")
+        guard var model = models[modelId] else { return }
+        model.lastUsed = Date()
+        model.usageCount += 1
+        models[modelId] = model
+        logger.debug("Updated last used for model: \(modelId)")
     }
 
     /// Remove model metadata
     public func removeModel(_ modelId: String) async throws {
-        try await modelInfoRepository.delete(id: modelId)
-        logger.info("Removed model metadata: \(modelId)")
+        models.removeValue(forKey: modelId)
+        logger.debug("Removed model: \(modelId)")
     }
 
     /// Get downloaded models
     public func getDownloadedModels() async throws -> [ModelInfo] {
-        return try await modelInfoRepository.fetchDownloaded()
+        return models.values.filter { $0.isDownloaded }
     }
 
     /// Update download status
@@ -79,37 +69,34 @@ public actor ModelInfoService {
         isDownloaded: Bool,
         localPath: URL? = nil
     ) async throws {
-        try await modelInfoRepository.updateDownloadStatus(modelId, localPath: localPath)
-        logger.info("Updated download status for model \(modelId): \(isDownloaded)")
+        guard var model = models[modelId] else { return }
+        model.localPath = localPath
+        model.updatedAt = Date()
+        models[modelId] = model
+        logger.debug("Updated download status for model \(modelId): \(isDownloaded)")
     }
 
     /// Get models by framework
     public func getModels(for framework: InferenceFramework) async throws -> [ModelInfo] {
-        return try await modelInfoRepository.fetchByFramework(framework)
+        return models.values.filter { $0.framework == framework }
     }
 
     /// Get models by category
     public func getModels(for category: ModelCategory) async throws -> [ModelInfo] {
-        return try await modelInfoRepository.fetchByCategory(category)
+        return models.values.filter { $0.category == category }
     }
 
-    /// Force sync model information
+    /// Sync model information - models are fetched via ModelAssignmentService
+    /// This method exists for API compatibility
     public func syncModelInfo() async throws {
-        if let syncCoordinator = syncCoordinator,
-           let repository = modelInfoRepository as? ModelInfoRepositoryImpl {
-            try await syncCoordinator.sync(repository)
-            logger.info("Model info sync completed")
-        } else {
-            logger.debug("Sync not available for model info")
-        }
+        // Model fetching is handled by ModelAssignmentService.fetchModelAssignments()
+        // This method is kept for API compatibility
+        logger.debug("syncModelInfo called - models are managed via ModelAssignmentService")
     }
 
     /// Clear all model metadata
     public func clearAllModels() async throws {
-        let models = try await modelInfoRepository.fetchAll()
-        for model in models {
-            try await modelInfoRepository.delete(id: model.id)
-        }
+        models.removeAll()
         logger.info("Cleared all model metadata")
     }
 }

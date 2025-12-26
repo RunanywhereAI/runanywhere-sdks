@@ -45,7 +45,7 @@ public actor ManagedLifecycle<ServiceType> {
         get async { await lifecycle.isLoaded }
     }
 
-    public var currentResourceId: String? {
+    public var currentModelId: String? {
         get async { await lifecycle.currentResourceId }
     }
 
@@ -65,45 +65,51 @@ public actor ManagedLifecycle<ServiceType> {
 
     // MARK: - Lifecycle Operations
 
-    /// Load a resource with automatic event tracking.
+    /// Load a model with automatic event tracking.
     @discardableResult
-    public func load(_ resourceId: String) async throws -> ServiceType {
-        let startTime = Date()
-        logger.info("Loading \(resourceType.rawValue): \(resourceId)")
+    public func load(_ modelId: String) async throws -> ServiceType {
+        // Check if already loaded with same ID - skip duplicate events
+        if await lifecycle.currentResourceId == modelId, let service = await lifecycle.currentService {
+            logger.info("Model already loaded, skipping duplicate load: \(modelId)")
+            return service
+        }
 
-        // Track load started
-        trackEvent(type: .loadStarted, resourceId: resourceId)
+        let startTime = Date()
+        logger.info("Loading \(resourceType.rawValue): \(modelId)")
+
+        // Track load started (only if not already loaded)
+        trackEvent(type: .loadStarted, modelId: modelId)
 
         do {
-            let service = try await lifecycle.load(resourceId)
+            let service = try await lifecycle.load(modelId)
             let loadTime = Date().timeIntervalSince(startTime)
 
             // Track load completed
-            trackEvent(type: .loadCompleted, resourceId: resourceId, durationMs: loadTime * 1000)
+            trackEvent(type: .loadCompleted, modelId: modelId, durationMs: loadTime * 1000)
 
             // Update metrics
             loadCount += 1
             totalLoadTime += loadTime
 
-            logger.info("Loaded \(resourceType.rawValue): \(resourceId) in \(Int(loadTime * 1000))ms")
+            logger.info("Loaded \(resourceType.rawValue): \(modelId) in \(Int(loadTime * 1000))ms")
             return service
         } catch {
             let loadTime = Date().timeIntervalSince(startTime)
 
             // Track load failed
-            trackEvent(type: .loadFailed, resourceId: resourceId, durationMs: loadTime * 1000, error: error)
+            trackEvent(type: .loadFailed, modelId: modelId, durationMs: loadTime * 1000, error: error)
 
             logger.error("Failed to load \(resourceType.rawValue): \(error)")
             throw error
         }
     }
 
-    /// Unload the currently loaded resource.
+    /// Unload the currently loaded model.
     public func unload() async {
-        if let resourceId = await lifecycle.currentResourceId {
-            logger.info("Unloading \(resourceType.rawValue): \(resourceId)")
+        if let modelId = await lifecycle.currentResourceId {
+            logger.info("Unloading \(resourceType.rawValue): \(modelId)")
             await lifecycle.unload()
-            trackEvent(type: .unloaded, resourceId: resourceId)
+            trackEvent(type: .unloaded, modelId: modelId)
         } else {
             await lifecycle.unload()
         }
@@ -111,8 +117,8 @@ public actor ManagedLifecycle<ServiceType> {
 
     /// Reset all state.
     public func reset() async {
-        if let resourceId = await lifecycle.currentResourceId {
-            trackEvent(type: .unloaded, resourceId: resourceId)
+        if let modelId = await lifecycle.currentResourceId {
+            trackEvent(type: .unloaded, modelId: modelId)
         }
         await lifecycle.reset()
     }
@@ -122,17 +128,14 @@ public actor ManagedLifecycle<ServiceType> {
         try await lifecycle.requireService()
     }
 
-    /// Track an operation error.
+    /// Track an operation error with full SDKError context.
     public func trackOperationError(_ error: Error, operation: String) {
-        EventPublisher.shared.track(ErrorEvent.error(
-            operation: operation,
-            message: error.localizedDescription,
-            code: (error as NSError).code
-        ))
+        let errorEvent = SDKErrorEvent.from(error, operation: operation)
+        EventPublisher.shared.track(errorEvent)
     }
 
-    /// Get current resource ID with fallback.
-    public func resourceIdOrUnknown() async -> String {
+    /// Get current model ID with fallback.
+    public func modelIdOrUnknown() async -> String {
         await lifecycle.currentResourceId ?? "unknown"
     }
 
@@ -166,110 +169,126 @@ public actor ManagedLifecycle<ServiceType> {
 
     private func trackEvent(
         type: LifecycleEventType,
-        resourceId: String,
+        modelId: String,
         durationMs: Double? = nil,
         error: Error? = nil
     ) {
+        // Look up the framework from the model registry
+        let framework = lookupFramework(for: modelId)
+
         // Create the appropriate event based on resource type
         let event: any SDKEvent = createEvent(
             type: type,
-            resourceId: resourceId,
+            modelId: modelId,
             durationMs: durationMs,
-            error: error
+            error: error,
+            framework: framework
         )
 
         // Track via EventPublisher - routes to both EventBus and Analytics
         EventPublisher.shared.track(event)
     }
 
+    /// Look up the framework for a model from the registry
+    private func lookupFramework(for modelId: String) -> InferenceFramework {
+        guard let modelInfo = ServiceContainer.shared.modelRegistry.getModel(by: modelId) else {
+            return .unknown
+        }
+        return modelInfo.framework
+    }
+
     private func createEvent(
         type: LifecycleEventType,
-        resourceId: String,
+        modelId: String,
         durationMs: Double?,
-        error: Error?
+        error: Error?,
+        framework: InferenceFramework
     ) -> any SDKEvent {
         switch resourceType {
         case .llmModel:
-            return createLLMEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error)
+            return createLLMEvent(type: type, modelId: modelId, durationMs: durationMs, error: error, framework: framework)
         case .sttModel:
-            return createSTTEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error)
+            return createSTTEvent(type: type, modelId: modelId, durationMs: durationMs, error: error, framework: framework)
         case .ttsVoice:
-            return createTTSEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error)
+            return createTTSEvent(type: type, modelId: modelId, durationMs: durationMs, error: error, framework: framework)
         case .vadModel, .diarizationModel:
             // Use generic model event for VAD and diarization
-            return createModelEvent(type: type, resourceId: resourceId, durationMs: durationMs, error: error)
+            return createModelEvent(type: type, modelId: modelId, durationMs: durationMs, error: error)
         }
     }
 
     private func createLLMEvent(
         type: LifecycleEventType,
-        resourceId: String,
+        modelId: String,
         durationMs: Double?,
-        error: Error?
+        error: Error?,
+        framework: InferenceFramework
     ) -> LLMEvent {
         switch type {
         case .loadStarted:
-            return .modelLoadStarted(modelId: resourceId)
+            return .modelLoadStarted(modelId: modelId, framework: framework)
         case .loadCompleted:
-            return .modelLoadCompleted(modelId: resourceId, durationMs: durationMs ?? 0)
+            return .modelLoadCompleted(modelId: modelId, durationMs: durationMs ?? 0, framework: framework)
         case .loadFailed:
-            return .modelLoadFailed(modelId: resourceId, error: error?.localizedDescription ?? "Unknown error")
+            return .modelLoadFailed(modelId: modelId, error: SDKError.from(error, category: .llm), framework: framework)
         case .unloaded:
-            return .modelUnloaded(modelId: resourceId)
+            return .modelUnloaded(modelId: modelId)
         }
     }
 
     private func createSTTEvent(
         type: LifecycleEventType,
-        resourceId: String,
+        modelId: String,
         durationMs: Double?,
-        error: Error?
+        error: Error?,
+        framework: InferenceFramework
     ) -> STTEvent {
         switch type {
         case .loadStarted:
-            return .modelLoadStarted(modelId: resourceId)
+            return .modelLoadStarted(modelId: modelId, framework: framework)
         case .loadCompleted:
-            return .modelLoadCompleted(modelId: resourceId, durationMs: durationMs ?? 0)
+            return .modelLoadCompleted(modelId: modelId, durationMs: durationMs ?? 0, framework: framework)
         case .loadFailed:
-            return .modelLoadFailed(modelId: resourceId, error: error?.localizedDescription ?? "Unknown error")
+            return .modelLoadFailed(modelId: modelId, error: SDKError.from(error, category: .stt), framework: framework)
         case .unloaded:
-            return .modelUnloaded(modelId: resourceId)
+            return .modelUnloaded(modelId: modelId)
         }
     }
 
     private func createTTSEvent(
         type: LifecycleEventType,
-        resourceId: String,
+        modelId: String,
         durationMs: Double?,
-        error: Error?
+        error: Error?,
+        framework: InferenceFramework
     ) -> TTSEvent {
         switch type {
         case .loadStarted:
-            return .modelLoadStarted(voiceId: resourceId)
+            return .modelLoadStarted(modelId: modelId, framework: framework)
         case .loadCompleted:
-            return .modelLoadCompleted(voiceId: resourceId, durationMs: durationMs ?? 0)
+            return .modelLoadCompleted(modelId: modelId, durationMs: durationMs ?? 0, framework: framework)
         case .loadFailed:
-            return .modelLoadFailed(voiceId: resourceId, error: error?.localizedDescription ?? "Unknown error")
+            return .modelLoadFailed(modelId: modelId, error: SDKError.from(error, category: .tts), framework: framework)
         case .unloaded:
-            return .modelUnloaded(voiceId: resourceId)
+            return .modelUnloaded(modelId: modelId)
         }
     }
 
     private func createModelEvent(
         type: LifecycleEventType,
-        resourceId: String,
+        modelId: String,
         durationMs: Double?,
         error: Error?
     ) -> ModelEvent {
         switch type {
         case .loadStarted:
-            return .downloadStarted(modelId: resourceId) // Reuse download as generic load
+            return .downloadStarted(modelId: modelId) // Reuse download as generic load
         case .loadCompleted:
-            return .downloadCompleted(modelId: resourceId, durationMs: durationMs ?? 0, sizeBytes: 0)
+            return .downloadCompleted(modelId: modelId, durationMs: durationMs ?? 0, sizeBytes: 0)
         case .loadFailed:
-            return .downloadFailed(modelId: resourceId, error: error?.localizedDescription ?? "Unknown error")
+            return .downloadFailed(modelId: modelId, error: SDKError.from(error, category: .download))
         case .unloaded:
-            return .deleted(modelId: resourceId)
+            return .deleted(modelId: modelId)
         }
     }
 }

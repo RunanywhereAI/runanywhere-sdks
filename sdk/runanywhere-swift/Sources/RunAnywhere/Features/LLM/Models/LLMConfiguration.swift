@@ -64,13 +64,13 @@ public struct LLMConfiguration: ComponentConfiguration, Sendable {
 
     public func validate() throws {
         guard contextLength > 0 && contextLength <= 32768 else {
-            throw RunAnywhereError.validationFailed("Context length must be between 1 and 32768")
+            throw SDKError.general(.validationFailed, "Context length must be between 1 and 32768")
         }
         guard temperature >= 0 && temperature <= 2.0 else {
-            throw RunAnywhereError.validationFailed("Temperature must be between 0 and 2.0")
+            throw SDKError.general(.validationFailed, "Temperature must be between 0 and 2.0")
         }
         guard maxTokens > 0 && maxTokens <= contextLength else {
-            throw RunAnywhereError.validationFailed("Max tokens must be between 1 and context length")
+            throw SDKError.general(.validationFailed, "Max tokens must be between 1 and context length")
         }
     }
 }

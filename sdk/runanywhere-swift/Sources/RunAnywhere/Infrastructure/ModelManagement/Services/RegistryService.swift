@@ -53,10 +53,10 @@ public class RegistryService: ModelRegistry {
         }
 
         var updatedModel = model
-        if updatedModel.localPath == nil, let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
+        if updatedModel.localPath == nil {
             let fileManager = ServiceContainer.shared.fileManager
-            if fileManager.modelFolderExists(modelId: model.id, framework: framework) {
-                if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: framework) {
+            if fileManager.modelFolderExists(modelId: model.id, framework: model.framework) {
+                if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: model.framework) {
                     updatedModel.localPath = resolveModelPath(in: folderURL)
                     logger.info("Found downloaded model \(model.id)")
                 }
@@ -69,7 +69,7 @@ public class RegistryService: ModelRegistry {
         ModelInfoCache.shared.cacheModels([updatedModel])
     }
 
-    /// Register model and save to database for persistence
+    /// Register model and save to in-memory storage
     public func registerModelPersistently(_ model: ModelInfo) async {
         guard !model.id.isEmpty else {
             logger.error("Attempted to register model with empty ID")
@@ -77,15 +77,13 @@ public class RegistryService: ModelRegistry {
         }
 
         var updatedModel = model
-        if let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
-            let fileManager = ServiceContainer.shared.fileManager
-            if fileManager.modelFolderExists(modelId: model.id, framework: framework) {
-                if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: framework) {
-                    updatedModel.localPath = resolveModelPath(in: folderURL)
-                }
-            } else {
-                updatedModel.localPath = nil
+        let fileManager = ServiceContainer.shared.fileManager
+        if fileManager.modelFolderExists(modelId: model.id, framework: model.framework) {
+            if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: model.framework) {
+                updatedModel.localPath = resolveModelPath(in: folderURL)
             }
+        } else {
+            updatedModel.localPath = nil
         }
 
         registerModel(updatedModel)
@@ -106,7 +104,7 @@ public class RegistryService: ModelRegistry {
     public func filterModels(by criteria: ModelCriteria) -> [ModelInfo] {
         accessQueue.sync {
             models.values.filter { model in
-                if let framework = criteria.framework, !model.compatibleFrameworks.contains(framework) {
+                if let framework = criteria.framework, model.framework != framework {
                     return false
                 }
                 if let format = criteria.format, model.format != format {
@@ -152,18 +150,25 @@ public class RegistryService: ModelRegistry {
         let format = detectFormatFromURL(url)
         let resolvedCategory = category ?? ModelCategory.from(framework: framework)
 
+        // Validate format compatibility with framework
+        if format != .unknown && !framework.supports(format: format) {
+            logger.warning(
+                "Model '\(name)' has format '\(format.rawValue)' which may not be supported by \(framework.displayName). " +
+                "Supported formats: \(framework.supportedFormats.map(\.rawValue).joined(separator: ", "))"
+            )
+        }
+
         let modelInfo = ModelInfo(
             id: modelId,
             name: name,
             category: resolvedCategory,
             format: format,
+            framework: framework,
             downloadURL: url,
             localPath: nil,
             artifactType: artifactType,
             downloadSize: nil,
             memoryRequired: estimatedSize ?? estimateMemoryFromURL(url),
-            compatibleFrameworks: [framework],
-            preferredFramework: framework,
             contextLength: resolvedCategory == .language ? 2048 : nil,
             supportsThinking: supportsThinking,
             tags: ["user-added", framework.rawValue.lowercased()],
@@ -229,17 +234,16 @@ public class RegistryService: ModelRegistry {
                 if let storageStrategy = ModuleRegistry.shared.storageStrategy(for: framework),
                    let (format, size) = storageStrategy.detectModel(in: modelFolder) {
                     let modelPath = storageStrategy.findModelPath(modelId: modelId, in: modelFolder) ?? modelFolder
-                    let category = ModelCategory.from(format: format, frameworks: [framework])
+                    let category = ModelCategory.from(framework: framework)
                     models.append(ModelInfo(
                         id: modelId,
                         name: generateModelName(from: modelFolder),
                         category: category,
                         format: format,
+                        framework: framework,
                         localPath: modelPath,
                         downloadSize: size,
                         memoryRequired: estimateMemoryUsage(fileSize: size, format: format),
-                        compatibleFrameworks: [framework],
-                        preferredFramework: framework,
                         contextLength: category == .language ? 2048 : nil,
                         supportsThinking: false,
                         tags: [],
@@ -261,25 +265,24 @@ public class RegistryService: ModelRegistry {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey]) else { return nil }
 
-        let modelExtensions = ["gguf", "ggml", "onnx", "mlmodel", "mlpackage", "tflite", "safetensors", "pte"]
+        let modelExtensions = ["gguf", "onnx", "ort", "bin"]
         for file in files {
             let ext = file.pathExtension.lowercased()
             guard modelExtensions.contains(ext), let format = detectFormatFromExtension(ext) else { continue }
 
             let fileSize = FileOperationsUtilities.fileSize(at: file) ?? 0
             let modelId = folder.lastPathComponent
-            let category = ModelCategory.from(format: format, frameworks: [framework])
+            let category = ModelCategory.from(framework: framework)
 
             return ModelInfo(
                 id: modelId,
                 name: generateModelName(from: folder),
                 category: category,
                 format: format,
+                framework: framework,
                 localPath: file,
                 downloadSize: fileSize,
                 memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
-                compatibleFrameworks: [framework],
-                preferredFramework: framework,
                 contextLength: category == .language ? 2048 : nil,
                 supportsThinking: false,
                 tags: [],
@@ -292,28 +295,27 @@ public class RegistryService: ModelRegistry {
     private func discoverBundleModels() -> [ModelInfo]? {
         var models: [ModelInfo] = []
         let bundle = Bundle.main
-        let modelExtensions = ["mlmodel", "mlmodelc", "mlpackage", "tflite", "onnx", "gguf"]
+        let modelExtensions = ["onnx", "ort", "gguf", "bin"]
 
         for ext in modelExtensions {
             guard let urls = bundle.urls(forResourcesWithExtension: ext, subdirectory: nil),
-                  let format = detectFormatFromExtension(ext) else { continue }
+                  let format = detectFormatFromExtension(ext),
+                  let framework = detectFramework(for: format) else { continue }
 
             for url in urls {
                 let fileSize = FileOperationsUtilities.fileSize(at: url) ?? 0
                 let modelId = url.deletingPathExtension().lastPathComponent
-                let frameworks = detectCompatibleFrameworks(for: format)
-                let category = ModelCategory.from(format: format, frameworks: frameworks)
+                let category = ModelCategory.from(framework: framework)
 
                 models.append(ModelInfo(
                     id: modelId,
                     name: generateModelName(from: url),
                     category: category,
                     format: format,
+                    framework: framework,
                     localPath: url,
                     downloadSize: fileSize,
                     memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
-                    compatibleFrameworks: frameworks,
-                    preferredFramework: frameworks.first,
                     contextLength: category == .language ? 2048 : nil,
                     supportsThinking: false,
                     tags: ["bundled"],
@@ -339,7 +341,7 @@ public class RegistryService: ModelRegistry {
 
     private func generateModelId(from url: URL) -> String {
         var filename = url.lastPathComponent
-        let knownExtensions = ["gz", "bz2", "tar", "zip", "gguf", "onnx", "mlmodel", "mlpackage", "tflite", "safetensors", "pte", "bin"]
+        let knownExtensions = ["gz", "bz2", "tar", "zip", "gguf", "onnx", "ort", "bin"]
         while let ext = filename.split(separator: ".").last, knownExtensions.contains(String(ext).lowercased()) {
             filename = String(filename.dropLast(ext.count + 1))
         }
@@ -358,33 +360,17 @@ public class RegistryService: ModelRegistry {
 
     private func detectFormatFromExtension(_ ext: String) -> ModelFormat? {
         switch ext {
-        case "mlmodel", "mlmodelc": return .mlmodel
-        case "mlpackage": return .mlpackage
-        case "tflite": return .tflite
         case "onnx": return .onnx
         case "ort": return .ort
         case "gguf": return .gguf
-        case "ggml": return .ggml
-        case "mlx": return .mlx
-        case "pte": return .pte
-        case "safetensors": return .safetensors
         case "bin": return .bin
-        case "weights": return .weights
-        case "checkpoint": return .checkpoint
         default: return nil
         }
     }
 
-    private func detectCompatibleFrameworks(for format: ModelFormat) -> [InferenceFramework] {
-        switch format {
-        case .mlmodel, .mlpackage: return [.coreML]
-        case .tflite: return [.tensorFlowLite]
-        case .onnx, .ort: return [.onnx]
-        case .safetensors: return [.mlx]
-        case .gguf, .ggml: return [.llamaCpp]
-        case .pte: return [.execuTorch]
-        default: return []
-        }
+    private func detectFramework(for format: ModelFormat) -> InferenceFramework? {
+        // Use centralized framework detection from InferenceFramework
+        InferenceFramework.framework(for: format)
     }
 
     private func estimateMemoryFromURL(_ url: URL) -> Int64 {
@@ -402,9 +388,8 @@ public class RegistryService: ModelRegistry {
 
     private func estimateMemoryUsage(fileSize: Int64, format: ModelFormat) -> Int64 {
         switch format {
-        case .gguf, .ggml, .tflite: return fileSize
-        case .mlmodel, .mlpackage: return Int64(Double(fileSize) * 1.5)
-        case .safetensors: return Int64(Double(fileSize) * 1.2)
+        case .gguf: return fileSize
+        case .onnx, .ort: return Int64(Double(fileSize) * 1.2)
         default: return Int64(Double(fileSize) * 1.5)
         }
     }

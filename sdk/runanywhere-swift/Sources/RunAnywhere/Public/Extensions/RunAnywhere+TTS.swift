@@ -20,7 +20,7 @@ public extension RunAnywhere {
     /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func loadTTSVoice(_ voiceId: String) async throws {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         try await serviceContainer.ttsCapability.loadVoice(voiceId)
@@ -30,7 +30,7 @@ public extension RunAnywhere {
     /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func unloadTTSVoice() async throws {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         try await serviceContainer.ttsCapability.unload()
@@ -63,7 +63,7 @@ public extension RunAnywhere {
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSOutput {
         guard isSDKInitialized else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         return try await serviceContainer.ttsCapability.synthesize(text, options: options)
@@ -80,7 +80,7 @@ public extension RunAnywhere {
     ) async -> AsyncThrowingStream<Data, Error> {
         guard isSDKInitialized else {
             return AsyncThrowingStream { continuation in
-                continuation.finish(throwing: RunAnywhereError.notInitialized)
+                continuation.finish(throwing: SDKError.general(.notInitialized, "SDK not initialized"))
             }
         }
 
@@ -90,5 +90,48 @@ public extension RunAnywhere {
     /// Stop current TTS synthesis
     static func stopSynthesis() async {
         await serviceContainer.ttsCapability.stop()
+    }
+
+    // MARK: - Speak (Simple API)
+
+    /// Speak text aloud - the simplest way to use TTS.
+    ///
+    /// The SDK handles audio synthesis and playback internally.
+    /// Just call this method and the text will be spoken through the device speakers.
+    ///
+    /// ## Example
+    /// ```swift
+    /// // Simple usage
+    /// try await RunAnywhere.speak("Hello world")
+    ///
+    /// // With options
+    /// let result = try await RunAnywhere.speak("Hello", options: TTSOptions(rate: 1.2))
+    /// print("Duration: \(result.duration)s")
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - text: Text to speak
+    ///   - options: Synthesis options (rate, pitch, voice, etc.)
+    /// - Returns: Result containing metadata about the spoken audio
+    /// - Throws: Error if synthesis or playback fails
+    static func speak(
+        _ text: String,
+        options: TTSOptions = TTSOptions()
+    ) async throws -> TTSSpeakResult {
+        guard isSDKInitialized else {
+            throw SDKError.general(.notInitialized, "SDK not initialized")
+        }
+
+        return try await serviceContainer.ttsCapability.speak(text, options: options)
+    }
+
+    /// Whether speech is currently playing
+    static var isSpeaking: Bool {
+        serviceContainer.ttsCapability.isSpeaking
+    }
+
+    /// Stop current speech playback
+    static func stopSpeaking() async {
+        await serviceContainer.ttsCapability.stopSpeaking()
     }
 }

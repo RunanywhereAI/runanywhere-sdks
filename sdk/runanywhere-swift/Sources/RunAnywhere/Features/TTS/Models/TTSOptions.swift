@@ -48,7 +48,7 @@ public struct TTSOptions: Sendable {
         pitch: Float = 1.0,
         volume: Float = 1.0,
         audioFormat: AudioFormat = .pcm,
-        sampleRate: Int = 16000,
+        sampleRate: Int = TTSConstants.defaultSampleRate,
         useSSML: Bool = false
     ) {
         self.voice = voice
@@ -72,7 +72,7 @@ public struct TTSOptions: Sendable {
             pitch: configuration.pitch,
             volume: configuration.volume,
             audioFormat: configuration.audioFormat,
-            sampleRate: configuration.audioFormat == .pcm ? 16000 : 44100,
+            sampleRate: configuration.audioFormat == .pcm ? TTSConstants.defaultSampleRate : TTSConstants.cdQualitySampleRate,
             useSSML: configuration.enableSSML
         )
     }

@@ -15,7 +15,6 @@ import Foundation
 /// Uses `ManagedLifecycle` to handle model loading/unloading with automatic analytics tracking.
 public actor STTCapability: ModelLoadableCapability {
     public typealias Configuration = STTConfiguration
-    public typealias Service = STTService
 
     // MARK: - State
 
@@ -52,7 +51,7 @@ public actor STTCapability: ModelLoadableCapability {
     }
 
     public var currentModelId: String? {
-        get async { await managedLifecycle.currentResourceId }
+        get async { await managedLifecycle.currentModelId }
     }
 
     /// Whether the service supports streaming transcription
@@ -87,7 +86,7 @@ public actor STTCapability: ModelLoadableCapability {
         options: STTOptions = STTOptions()
     ) async throws -> STTOutput {
         let service = try await managedLifecycle.requireService()
-        let modelId = await managedLifecycle.resourceIdOrUnknown()
+        let modelId = await managedLifecycle.modelIdOrUnknown()
 
         logger.info("Transcribing audio with model: \(modelId)")
 
@@ -100,9 +99,12 @@ public actor STTCapability: ModelLoadableCapability {
 
         // Start transcription tracking
         let transcriptionId = await analyticsService.startTranscription(
+            modelId: modelId,
             audioLengthMs: audioLengthMs,
             audioSizeBytes: audioSizeBytes,
             language: effectiveOptions.language,
+            isStreaming: false,
+            sampleRate: STTConstants.defaultSampleRate,
             framework: service.inferenceFramework
         )
 
@@ -114,17 +116,17 @@ public actor STTCapability: ModelLoadableCapability {
             logger.error("Transcription failed: \(error)")
             await analyticsService.trackTranscriptionFailed(
                 transcriptionId: transcriptionId,
-                errorMessage: error.localizedDescription
+                error: error
             )
             await managedLifecycle.trackOperationError(error, operation: "transcribe")
-            throw CapabilityError.operationFailed("Transcription", error)
+            throw SDKError.stt(.generationFailed, "Transcription failed: \(error.localizedDescription)", underlying: error)
         }
 
         // Complete transcription tracking
         await analyticsService.completeTranscription(
             transcriptionId: transcriptionId,
             text: result.transcript,
-            confidence: result.confidence ?? 0.9
+            confidence: result.confidence ?? STTConstants.defaultConfidence
         )
 
         let metrics = await analyticsService.getMetrics()
@@ -135,13 +137,13 @@ public actor STTCapability: ModelLoadableCapability {
         // Convert to output
         return STTOutput(
             text: result.transcript,
-            confidence: result.confidence ?? 0.9,
+            confidence: result.confidence ?? STTConstants.defaultConfidence,
             wordTimestamps: result.timestamps?.map { timestamp in
                 WordTimestamp(
                     word: timestamp.word,
                     startTime: timestamp.startTime,
                     endTime: timestamp.endTime,
-                    confidence: timestamp.confidence ?? 0.9
+                    confidence: timestamp.confidence ?? STTConstants.defaultConfidence
                 )
             },
             detectedLanguage: result.language,
@@ -187,18 +189,22 @@ public actor STTCapability: ModelLoadableCapability {
             Task {
                 guard let service = await self.managedLifecycle.currentService else {
                     continuation.finish(
-                        throwing: CapabilityError.resourceNotLoaded("STT model")
+                        throwing: SDKError.stt(.componentNotReady, "STT model not loaded")
                     )
                     return
                 }
 
                 let effectiveOptions = self.mergeOptions(options)
+                let modelId = await self.managedLifecycle.modelIdOrUnknown()
 
                 // Start transcription tracking (streaming mode - audio length unknown upfront)
                 let transcriptionId = await self.analyticsService.startTranscription(
+                    modelId: modelId,
                     audioLengthMs: 0,  // Unknown for streaming
                     audioSizeBytes: 0, // Unknown for streaming
                     language: effectiveOptions.language,
+                    isStreaming: true,
+                    sampleRate: STTConstants.defaultSampleRate,
                     framework: service.inferenceFramework
                 )
 
@@ -225,7 +231,7 @@ public actor STTCapability: ModelLoadableCapability {
                     await self.analyticsService.completeTranscription(
                         transcriptionId: transcriptionId,
                         text: result.transcript,
-                        confidence: result.confidence ?? 0.9
+                        confidence: result.confidence ?? STTConstants.defaultConfidence
                     )
 
                     // Yield final result
@@ -234,7 +240,7 @@ public actor STTCapability: ModelLoadableCapability {
                 } catch {
                     await self.analyticsService.trackTranscriptionFailed(
                         transcriptionId: transcriptionId,
-                        errorMessage: error.localizedDescription
+                        error: error
                     )
                     continuation.finish(throwing: error)
                 }
@@ -283,7 +289,7 @@ public actor STTCapability: ModelLoadableCapability {
         }
     }
 
-    private func estimateAudioLength(dataSize: Int, sampleRate: Int = 16000) -> TimeInterval {
+    private func estimateAudioLength(dataSize: Int, sampleRate: Int = STTConstants.defaultSampleRate) -> TimeInterval {
         let bytesPerSample = 2 // 16-bit PCM
         let samples = dataSize / bytesPerSample
         return TimeInterval(samples) / TimeInterval(sampleRate)

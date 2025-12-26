@@ -44,7 +44,7 @@ public struct VADConfiguration: ComponentConfiguration, Sendable {
 
     public init(
         energyThreshold: Float = 0.015,
-        sampleRate: Int = 16000,
+        sampleRate: Int = VADConstants.defaultSampleRate,
         frameLength: Float = 0.1,
         enableAutoCalibration: Bool = false,
         calibrationMultiplier: Float = 2.0
@@ -61,43 +61,49 @@ public struct VADConfiguration: ComponentConfiguration, Sendable {
     public func validate() throws {
         // Validate threshold range
         guard energyThreshold >= 0 && energyThreshold <= 1.0 else {
-            throw VADError.invalidConfiguration(
-                reason: "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05"
+            throw SDKError.vad(
+                .invalidConfiguration,
+                "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05"
             )
         }
 
         // Warn if threshold is too low
         if energyThreshold < 0.002 {
-            throw VADError.invalidConfiguration(
-                reason: "Energy threshold \(energyThreshold) is very low and may cause false positives. Recommended minimum: 0.002"
+            throw SDKError.vad(
+                .invalidConfiguration,
+                "Energy threshold \(energyThreshold) is very low and may cause false positives. Recommended minimum: 0.002"
             )
         }
 
         // Warn if threshold is too high
         if energyThreshold > 0.1 {
-            throw VADError.invalidConfiguration(
-                reason: "Energy threshold \(energyThreshold) is very high and may miss speech. Recommended maximum: 0.1"
+            throw SDKError.vad(
+                .invalidConfiguration,
+                "Energy threshold \(energyThreshold) is very high and may miss speech. Recommended maximum: 0.1"
             )
         }
 
         // Validate sample rate
         guard sampleRate > 0 && sampleRate <= 48000 else {
-            throw VADError.invalidConfiguration(
-                reason: "Sample rate must be between 1 and 48000 Hz"
+            throw SDKError.vad(
+                .invalidConfiguration,
+                "Sample rate must be between 1 and 48000 Hz"
             )
         }
 
         // Validate frame length
         guard frameLength > 0 && frameLength <= 1.0 else {
-            throw VADError.invalidConfiguration(
-                reason: "Frame length must be between 0 and 1 second"
+            throw SDKError.vad(
+                .invalidConfiguration,
+                "Frame length must be between 0 and 1 second"
             )
         }
 
         // Validate calibration multiplier
         guard calibrationMultiplier >= 1.5 && calibrationMultiplier <= 5.0 else {
-            throw VADError.invalidConfiguration(
-                reason: "Calibration multiplier must be between 1.5 and 5.0"
+            throw SDKError.vad(
+                .invalidConfiguration,
+                "Calibration multiplier must be between 1.5 and 5.0"
             )
         }
     }
@@ -114,7 +120,7 @@ extension VADConfiguration {
 
     public class Builder {
         private var energyThreshold: Float = 0.015
-        private var sampleRate: Int = 16000
+        private var sampleRate: Int = VADConstants.defaultSampleRate
         private var frameLength: Float = 0.1
         private var enableAutoCalibration: Bool = false
         private var calibrationMultiplier: Float = 2.0

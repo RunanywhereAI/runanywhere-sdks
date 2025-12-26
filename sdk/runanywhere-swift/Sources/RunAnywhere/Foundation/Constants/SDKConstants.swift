@@ -2,7 +2,6 @@ import Foundation
 
 /// SDK-wide constants (metadata only)
 /// Capability-specific constants are in their respective capabilities:
-/// - AnalyticsConstants (Analytics capability)
 /// - LLMConstants (LLM capability)
 /// - StorageConstants (FileManagement capability)
 /// - DownloadConstants (Download capability)
@@ -11,7 +10,7 @@ import Foundation
 public enum SDKConstants {
     /// SDK version - must match the VERSION file in the repository root
     /// Update this when bumping the SDK version
-    public static let version = "0.15.8"
+    public static let version = "0.16.0"
 
     /// SDK name
     public static let name = "RunAnywhere SDK"

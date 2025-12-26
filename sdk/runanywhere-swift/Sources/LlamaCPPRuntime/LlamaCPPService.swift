@@ -71,7 +71,7 @@ public class LlamaCPPService {
     // MARK: - Framework Identification
 
     /// LlamaCPP uses the llama.cpp inference framework
-    public var inferenceFramework: InferenceFrameworkType { .llamaCpp }
+    public var inferenceFramework: InferenceFramework { .llamaCpp }
 
     // MARK: - Properties
 
