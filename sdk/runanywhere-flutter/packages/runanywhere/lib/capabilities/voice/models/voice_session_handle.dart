@@ -165,7 +165,7 @@ class VoiceSessionHandle {
 
   /// Stop audio capture (used during processing/playback to prevent feedback)
   void _stopListening() {
-    _audioCapture.stopRecording();
+    unawaited(_audioCapture.stopRecording());
     _audioBuffer = Uint8List(0);
     _isSpeechActive = false;
     _lastSpeechTime = null;
@@ -225,7 +225,7 @@ class VoiceSessionHandle {
     _isProcessing = false;
 
     // Stop audio capture and playback
-    _audioCapture.stopRecording();
+    unawaited(_audioCapture.stopRecording());
     unawaited(_audioPlayback.stop());
 
     _audioBuffer = Uint8List(0);

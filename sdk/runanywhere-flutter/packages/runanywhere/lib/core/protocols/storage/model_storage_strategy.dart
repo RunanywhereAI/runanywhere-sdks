@@ -89,8 +89,7 @@ mixin DefaultModelStorageStrategy on DownloadStrategy
   }
 
   @override
-  (ModelFormat format, int size)? @override
-  Null detectModel(String modelFolder) {
+  (ModelFormat format, int size)? detectModel(String modelFolder) {
     // Default implementation would scan for known model file extensions
     // Mock: Return null
     return null;

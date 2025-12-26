@@ -161,7 +161,8 @@ class SDKInitParams {
   /// Uses Supabase for analytics, no authentication required
   /// Matches iOS SDKInitParams(forDevelopmentWithAPIKey:)
   factory SDKInitParams.forDevelopment({String apiKey = ''}) {
-    final supabaseConfig = SupabaseConfig.configuration(SDKEnvironment.development);
+    final supabaseConfig =
+        SupabaseConfig.configuration(SDKEnvironment.development);
     return SDKInitParams(
       apiKey: apiKey,
       baseURL: supabaseConfig?.projectURL ?? Uri.parse('http://localhost'),

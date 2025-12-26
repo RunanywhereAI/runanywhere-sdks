@@ -251,11 +251,11 @@ class VoiceAgentCapability extends BaseCapability<VoiceAgentService> {
         logger.warning('⚠️ TTS not available or no response to synthesize');
       }
 
-      final transcriptPreview = result.transcription ?? "(null)";
+      final transcriptPreview = result.transcription ?? '(null)';
       final responsePreview = result.response != null
           ? result.response!.substring(
               0, (result.response!.length > 30 ? 30 : result.response!.length))
-          : "(null)";
+          : '(null)';
       logger.info(
           '✅ VoiceAgent: Pipeline complete - speechDetected=${result.speechDetected}, transcription="$transcriptPreview", response="$responsePreview..."');
       return result;

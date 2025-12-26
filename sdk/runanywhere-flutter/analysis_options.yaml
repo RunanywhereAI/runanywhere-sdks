@@ -1,3 +1,7 @@
+# Include flutter_lints as base (available via package dependency in each package)
+# Note: When analyzing from monorepo root, this may show a warning since flutter_lints
+# is a dev_dependency in packages, not at root level. Run 'flutter analyze' from
+# individual package directories for clean output.
 include: package:flutter_lints/flutter.yaml
 
 linter:

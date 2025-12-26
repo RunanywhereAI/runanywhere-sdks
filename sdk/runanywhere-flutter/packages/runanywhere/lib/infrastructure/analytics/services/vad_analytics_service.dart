@@ -43,7 +43,8 @@ class VADAnalyticsService {
   }) {
     _currentFramework = framework;
     _lastEventTime = DateTime.now();
-    _logger.error('VAD initialization failed: $error (framework: $_currentFramework)');
+    _logger.error(
+        'VAD initialization failed: $error (framework: $_currentFramework)');
   }
 
   /// Track VAD cleanup

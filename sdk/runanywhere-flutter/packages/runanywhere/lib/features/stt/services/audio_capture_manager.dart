@@ -167,16 +167,16 @@ class AudioCaptureManager {
   }
 
   /// Stop recording
-  void stopRecording() {
+  Future<void> stopRecording() async {
     if (!_isRecording) return;
 
     try {
       // Cancel stream subscription
-      _audioStreamSubscription?.cancel();
+      await _audioStreamSubscription?.cancel();
       _audioStreamSubscription = null;
 
       // Stop the recorder
-      _recorder.stop();
+      await _recorder.stop();
 
       _isRecording = false;
       _audioLevel = 0.0;
@@ -250,7 +250,7 @@ class AudioCaptureManager {
 
   /// Dispose resources
   void dispose() {
-    stopRecording();
+    unawaited(stopRecording());
     unawaited(_recordingStateController.close());
     unawaited(_audioLevelController.close());
   }
