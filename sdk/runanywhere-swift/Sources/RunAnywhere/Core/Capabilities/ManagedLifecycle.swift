@@ -128,13 +128,10 @@ public actor ManagedLifecycle<ServiceType> {
         try await lifecycle.requireService()
     }
 
-    /// Track an operation error.
+    /// Track an operation error with full SDKError context.
     public func trackOperationError(_ error: Error, operation: String) {
-        EventPublisher.shared.track(ErrorEvent.error(
-            operation: operation,
-            message: error.localizedDescription,
-            code: (error as NSError).code
-        ))
+        let errorEvent = SDKErrorEvent.from(error, operation: operation)
+        EventPublisher.shared.track(errorEvent)
     }
 
     /// Get current model ID with fallback.
@@ -233,7 +230,7 @@ public actor ManagedLifecycle<ServiceType> {
         case .loadCompleted:
             return .modelLoadCompleted(modelId: modelId, durationMs: durationMs ?? 0, framework: framework)
         case .loadFailed:
-            return .modelLoadFailed(modelId: modelId, error: error?.localizedDescription ?? "Unknown error", framework: framework)
+            return .modelLoadFailed(modelId: modelId, error: SDKError.from(error, category: .llm), framework: framework)
         case .unloaded:
             return .modelUnloaded(modelId: modelId)
         }
@@ -252,7 +249,7 @@ public actor ManagedLifecycle<ServiceType> {
         case .loadCompleted:
             return .modelLoadCompleted(modelId: modelId, durationMs: durationMs ?? 0, framework: framework)
         case .loadFailed:
-            return .modelLoadFailed(modelId: modelId, error: error?.localizedDescription ?? "Unknown error", framework: framework)
+            return .modelLoadFailed(modelId: modelId, error: SDKError.from(error, category: .stt), framework: framework)
         case .unloaded:
             return .modelUnloaded(modelId: modelId)
         }
@@ -271,7 +268,7 @@ public actor ManagedLifecycle<ServiceType> {
         case .loadCompleted:
             return .modelLoadCompleted(modelId: modelId, durationMs: durationMs ?? 0, framework: framework)
         case .loadFailed:
-            return .modelLoadFailed(modelId: modelId, error: error?.localizedDescription ?? "Unknown error", framework: framework)
+            return .modelLoadFailed(modelId: modelId, error: SDKError.from(error, category: .tts), framework: framework)
         case .unloaded:
             return .modelUnloaded(modelId: modelId)
         }
@@ -289,7 +286,7 @@ public actor ManagedLifecycle<ServiceType> {
         case .loadCompleted:
             return .downloadCompleted(modelId: modelId, durationMs: durationMs ?? 0, sizeBytes: 0)
         case .loadFailed:
-            return .downloadFailed(modelId: modelId, error: error?.localizedDescription ?? "Unknown error")
+            return .downloadFailed(modelId: modelId, error: SDKError.from(error, category: .download))
         case .unloaded:
             return .deleted(modelId: modelId)
         }

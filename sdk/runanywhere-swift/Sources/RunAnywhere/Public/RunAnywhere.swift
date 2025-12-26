@@ -283,7 +283,7 @@ public enum RunAnywhere {
             logger.error("❌ Initialization failed: \(error.localizedDescription)")
             initParams = nil
             isInitialized = false
-            EventPublisher.shared.track(SDKLifecycleEvent.initFailed(error: error.localizedDescription))
+            EventPublisher.shared.track(SDKLifecycleEvent.initFailed(error: SDKError.from(error)))
             throw error
         }
     }

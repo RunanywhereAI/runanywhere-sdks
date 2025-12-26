@@ -22,7 +22,7 @@ public enum VADEvent: SDKEvent {
 
     /// VAD initialized (no model load for simple VAD, uses built-in algorithms)
     case initialized(framework: InferenceFramework = .builtIn)
-    case initializationFailed(error: String, framework: InferenceFramework = .builtIn)
+    case initializationFailed(error: SDKError, framework: InferenceFramework = .builtIn)
     case cleanedUp
 
     // MARK: - Model Lifecycle (for model-based VAD)
@@ -32,7 +32,7 @@ public enum VADEvent: SDKEvent {
     /// Model loading completed
     case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
     /// Model loading failed
-    case modelLoadFailed(modelId: String, error: String, framework: InferenceFramework = .unknown)
+    case modelLoadFailed(modelId: String, error: SDKError, framework: InferenceFramework = .unknown)
     /// Model unloaded
     case modelUnloaded(modelId: String)
 
@@ -85,10 +85,7 @@ public enum VADEvent: SDKEvent {
             return ["framework": framework.rawValue]
 
         case .initializationFailed(let error, let framework):
-            return [
-                "error": error,
-                "framework": framework.rawValue
-            ]
+            return ["framework": framework.rawValue].merging(error.telemetryProperties) { _, new in new }
 
         case .cleanedUp:
             return [:]
@@ -117,9 +114,8 @@ public enum VADEvent: SDKEvent {
         case .modelLoadFailed(let modelId, let error, let framework):
             return [
                 "model_id": modelId,
-                "error": error,
                 "framework": framework.rawValue
-            ]
+            ].merging(error.telemetryProperties) { _, new in new }
 
         case .modelUnloaded(let modelId):
             return ["model_id": modelId]

@@ -372,6 +372,22 @@ extension SDKError {
         )
     }
 
+    /// Converts an optional Error to an SDKError.
+    ///
+    /// If the error is nil, returns a generic "Unknown error" SDKError.
+    /// Otherwise, delegates to `from(_:category:)`.
+    public static func from(_ error: (any Error)?, category: ErrorCategory = .general) -> SDKError {
+        guard let error = error else {
+            return make(
+                code: .unknown,
+                message: "Unknown error",
+                category: category,
+                underlyingError: nil
+            )
+        }
+        return from(error, category: category)
+    }
+
     private static func fromURLError(_ nsError: NSError, category: ErrorCategory) -> SDKError {
         let code: ErrorCode
         switch nsError.code {
@@ -413,6 +429,26 @@ extension SDKError: Hashable {
         hasher.combine(code)
         hasher.combine(category)
         hasher.combine(message)
+    }
+}
+
+// MARK: - Telemetry Properties
+
+extension SDKError {
+
+    /// Lightweight properties for telemetry/analytics events.
+    ///
+    /// Use this for event serialization sent to the backend analytics service.
+    /// Only includes essential fields needed for metrics and dashboards.
+    ///
+    /// For full error details (stack traces, underlying errors), use `SDKLogger`
+    /// which routes to console and Sentry for debugging and error monitoring.
+    public var telemetryProperties: [String: String] {
+        [
+            "error_code": code.rawValue,
+            "error_category": category.rawValue,
+            "error_message": message
+        ]
     }
 }
 

@@ -31,7 +31,7 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
 
     case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
     case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
-    case modelLoadFailed(modelId: String, error: String, framework: InferenceFramework = .unknown)
+    case modelLoadFailed(modelId: String, error: SDKError, framework: InferenceFramework = .unknown)
     case modelUnloaded(modelId: String)
 
     // MARK: - Transcription
@@ -73,7 +73,7 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
         sampleRate: Int = STTConstants.defaultSampleRate,
         framework: InferenceFramework = .unknown
     )
-    case transcriptionFailed(transcriptionId: String, modelId: String, error: String)
+    case transcriptionFailed(transcriptionId: String, modelId: String, error: SDKError)
 
     // MARK: - Detection (Analytics Only)
 
@@ -135,9 +135,8 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
         case .modelLoadFailed(let modelId, let error, let framework):
             return [
                 "model_id": modelId,
-                "error": error,
                 "framework": framework.rawValue
-            ]
+            ].merging(error.telemetryProperties) { _, new in new }
 
         case .modelUnloaded(let modelId):
             return ["model_id": modelId]
@@ -211,9 +210,8 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
             return [
                 "transcription_id": id,
                 "model_id": modelId,
-                "error": error,
                 "success": "false"
-            ]
+            ].merging(error.telemetryProperties) { _, new in new }
 
         case .languageDetected(let language, let confidence):
             return [
@@ -250,7 +248,8 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
                 modelId: modelId,
                 framework: framework.rawValue,
                 success: false,
-                errorMessage: error
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
             )
 
         case .modelUnloaded(let modelId):
@@ -325,7 +324,8 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
             return EventProperties(
                 modelId: modelId,
                 success: false,
-                errorMessage: error,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue,
                 transcriptionId: id
             )
 

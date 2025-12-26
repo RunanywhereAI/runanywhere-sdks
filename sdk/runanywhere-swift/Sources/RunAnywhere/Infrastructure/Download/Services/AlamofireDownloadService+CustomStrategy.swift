@@ -125,10 +125,8 @@ extension AlamofireDownloadService {
                     return resultURL
                 } catch {
                     // Track download failed
-                    EventPublisher.shared.track(ModelEvent.downloadFailed(
-                        modelId: model.id,
-                        error: error.localizedDescription
-                    ))
+                    let sdkError = SDKError.from(error, category: .download)
+                    EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: sdkError))
 
                     progressContinuation.yield(DownloadProgress(
                         bytesDownloaded: 0,
