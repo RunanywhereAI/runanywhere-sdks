@@ -40,7 +40,7 @@ public actor TTSAnalyticsService {
 
     private struct SynthesisTracker {
         let startTime: Date
-        let voiceId: String
+        let modelId: String
         let characterCount: Int
         let sampleRate: Int
         let framework: InferenceFramework
@@ -70,7 +70,7 @@ public actor TTSAnalyticsService {
 
         activeSyntheses[id] = SynthesisTracker(
             startTime: Date(),
-            voiceId: voice,
+            modelId: voice,
             characterCount: characterCount,
             sampleRate: sampleRate,
             framework: framework
@@ -78,7 +78,7 @@ public actor TTSAnalyticsService {
 
         EventPublisher.shared.track(TTSEvent.synthesisStarted(
             synthesisId: id,
-            voiceId: voice,
+            modelId: voice,
             characterCount: characterCount,
             sampleRate: sampleRate,
             framework: framework
@@ -126,7 +126,7 @@ public actor TTSAnalyticsService {
 
         EventPublisher.shared.track(TTSEvent.synthesisCompleted(
             synthesisId: synthesisId,
-            voiceId: tracker.voiceId,
+            modelId: tracker.modelId,
             characterCount: characterCount,
             audioDurationMs: audioDurationMs,
             audioSizeBytes: audioSizeBytes,
@@ -137,7 +137,7 @@ public actor TTSAnalyticsService {
         ))
 
         let audioDurationFormatted = String(format: "%.1f", audioDurationMs)
-        logger.debug("Synthesis completed: \(synthesisId), voice: \(tracker.voiceId), audio: \(audioDurationFormatted)ms, \(audioSizeBytes) bytes")
+        logger.debug("Synthesis completed: \(synthesisId), voice: \(tracker.modelId), audio: \(audioDurationFormatted)ms, \(audioSizeBytes) bytes")
     }
 
     /// Track synthesis failure
@@ -150,7 +150,7 @@ public actor TTSAnalyticsService {
 
         EventPublisher.shared.track(TTSEvent.synthesisFailed(
             synthesisId: synthesisId,
-            voiceId: tracker?.voiceId ?? "unknown",
+            modelId: tracker?.modelId ?? "unknown",
             error: errorMessage
         ))
     }
