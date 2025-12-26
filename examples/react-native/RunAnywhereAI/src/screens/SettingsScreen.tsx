@@ -42,10 +42,10 @@ import {
   SETTINGS_CONSTRAINTS,
 } from '../types/settings';
 import type { StoredModel } from '../types/model';
-import { FrameworkDisplayNames } from '../types/model';
+import { LLMFramework, FrameworkDisplayNames } from '../types/model';
 
-// Import actual RunAnywhere SDK
-import { RunAnywhere, type ModelInfo } from 'runanywhere-react-native';
+// Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere, type ModelInfo } from '@runanywhere/core';
 
 // Default storage info
 const DEFAULT_STORAGE_INFO: StorageInfo = {
@@ -181,19 +181,23 @@ export const SettingsScreen: React.FC = () => {
         console.log('[Settings] Storage info:', storage);
         setStorageInfo({
           totalStorage: storage.deviceStorage.totalSpace,
-          usedStorage: storage.deviceStorage.usedSpace,
-          freeStorage: storage.deviceStorage.freeSpace,
-          modelStorage: storage.modelStorage.totalSize || 0,
-          cacheStorage: storage.cacheSize || 0,
+          appStorage: storage.appStorage.totalSize,
+          modelsStorage: storage.modelStorage.totalSize || 0,
+          cacheSize: storage.cacheSize || 0,
+          freeSpace: storage.deviceStorage.freeSpace,
         });
-        // Update storedModels from SDK storage info
-        const modelList = storage.storedModels || [];
+        // Update storedModels from downloaded models
+        const models = await RunAnywhere.getAvailableModels();
+        const downloaded = models.filter((m) => m.isDownloaded);
         setStoredModels(
-          modelList.map((m: { modelId?: string; id?: string; sizeBytes?: number; size?: number; localPath?: string; path?: string }) => ({
-            id: m.modelId || m.id || '',
-            name: m.modelId || m.id || '',
-            size: m.sizeBytes || m.size || 0,
-            path: m.localPath || m.path || '',
+          downloaded.map((m) => ({
+            id: m.id,
+            name: m.name,
+            framework:
+              (m.compatibleFrameworks?.[0] as unknown as LLMFramework) ||
+              LLMFramework.LlamaCpp,
+            sizeOnDisk: m.downloadSize || 0,
+            downloadedAt: new Date(),
           }))
         );
       } catch (err) {
@@ -287,9 +291,16 @@ export const SettingsScreen: React.FC = () => {
           text: 'Clear',
           style: 'destructive',
           onPress: async () => {
-            // In a real implementation, call SDK cache clear method
-            Alert.alert('Success', 'Cache cleared');
-            loadData();
+            try {
+              // Clear SDK cache using new Storage API
+              await RunAnywhere.clearCache();
+              await RunAnywhere.cleanTempFiles();
+              Alert.alert('Success', 'Cache cleared successfully');
+              loadData();
+            } catch (err) {
+              console.error('[Settings] Failed to clear cache:', err);
+              Alert.alert('Error', `Failed to clear cache: ${err}`);
+            }
           },
         },
       ]

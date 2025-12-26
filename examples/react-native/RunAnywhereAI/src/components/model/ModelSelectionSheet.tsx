@@ -34,13 +34,14 @@ import {
 } from '../../types/model';
 
 // Import SDK types and values
+// Import RunAnywhere SDK (Multi-Package Architecture)
 import {
   RunAnywhere,
   type ModelInfo as SDKModelInfo,
   LLMFramework as SDKLLMFramework,
   ModelCategory as SDKModelCategory,
   requireDeviceInfoModule,
-} from 'runanywhere-react-native';
+} from '@runanywhere/core';
 
 /**
  * Context for filtering frameworks and models based on the current experience/modality
