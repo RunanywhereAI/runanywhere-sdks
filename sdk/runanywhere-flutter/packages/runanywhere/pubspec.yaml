@@ -35,6 +35,12 @@ dependencies:
   archive: ^3.6.1
   # TTS fallback (system TTS)
   flutter_tts: ^3.8.0
+  # Audio recording for voice sessions
+  record: ^5.1.2
+  # Audio playback for TTS
+  audioplayers: ^6.0.0
+  # Permissions
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
