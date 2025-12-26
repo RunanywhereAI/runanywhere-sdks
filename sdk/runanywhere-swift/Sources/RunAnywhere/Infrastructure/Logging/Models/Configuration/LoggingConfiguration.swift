@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// Logging configuration for local debugging
+/// Logging configuration for the SDK
 public struct LoggingConfiguration: Sendable {
 
     // MARK: - Properties
@@ -22,26 +22,11 @@ public struct LoggingConfiguration: Sendable {
     public var includeDeviceMetadata: Bool
 
     /// Enable Sentry logging for crash reporting and error tracking
-    /// When enabled, logs at warning level and above are sent to Sentry
-    /// Default: true in development, false otherwise
     public var enableSentryLogging: Bool
 
     // MARK: - Initialization
 
     /// Initialize with default values
-    public init() {
-        self.enableLocalLogging = true
-        self.minLogLevel = .info
-        self.includeDeviceMetadata = true
-        self.enableSentryLogging = false
-    }
-
-    /// Initialize with custom values
-    /// - Parameters:
-    ///   - enableLocalLogging: Whether to enable local logging
-    ///   - minLogLevel: Minimum log level to capture
-    ///   - includeDeviceMetadata: Whether to include device metadata
-    ///   - enableSentryLogging: Whether to enable Sentry logging (default: false)
     public init(
         enableLocalLogging: Bool = true,
         minLogLevel: LogLevel = .info,
@@ -52,60 +37,6 @@ public struct LoggingConfiguration: Sendable {
         self.minLogLevel = minLogLevel
         self.includeDeviceMetadata = includeDeviceMetadata
         self.enableSentryLogging = enableSentryLogging
-    }
-
-    // MARK: - Validation
-
-    /// Validate the configuration
-    /// - Throws: LoggingError if configuration is invalid
-    public func validate() throws {
-        // Currently all configurations are valid
-        // Add validation rules here if needed in the future
-    }
-}
-
-// MARK: - Builder Pattern
-
-extension LoggingConfiguration {
-
-    /// Create configuration with builder pattern
-    /// - Returns: A new Builder instance
-    public static func builder() -> Builder {
-        Builder()
-    }
-
-    /// Builder for LoggingConfiguration
-    public class Builder {
-        private var config = LoggingConfiguration()
-
-        /// Set whether local logging is enabled
-        public func enableLocalLogging(_ enabled: Bool) -> Builder {
-            config.enableLocalLogging = enabled
-            return self
-        }
-
-        /// Set the minimum log level
-        public func minLogLevel(_ level: LogLevel) -> Builder {
-            config.minLogLevel = level
-            return self
-        }
-
-        /// Set whether to include device metadata
-        public func includeDeviceMetadata(_ include: Bool) -> Builder {
-            config.includeDeviceMetadata = include
-            return self
-        }
-
-        /// Set whether Sentry logging is enabled
-        public func enableSentryLogging(_ enabled: Bool) -> Builder {
-            config.enableSentryLogging = enabled
-            return self
-        }
-
-        /// Build the configuration
-        public func build() -> LoggingConfiguration {
-            config
-        }
     }
 }
 

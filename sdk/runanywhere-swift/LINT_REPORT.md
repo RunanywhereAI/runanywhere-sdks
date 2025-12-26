@@ -254,15 +254,11 @@ Logging metadata commonly uses `[String: Any]` for flexibility:
 | `LogEntry.swift` | 38 | `prefer_concrete_types`, `avoid_any_type` |
 | `LoggingService.swift` | 36 | `prefer_concrete_types`, `avoid_any_type` |
 
-### Legitimate - Database/Migrations (11)
+### Legitimate - Data Layer (2)
 
 | File | Lines | Rule | Reason |
 |------|-------|------|--------|
-| `Migration001_InitialSchema.swift` | 5 | `type_name` | Migration naming convention |
-| `Migration001_InitialSchema.swift` | 7 | `function_body_length` | SQL schema requires long function |
-| `Migration001_InitialSchema.swift` | 13, 42, 109, 126, 143, 176, 189 | `identifier_name` | SQL column/table names |
-| `LocalModelInfoDataSource.swift` | 199 | `identifier_name` | Database field naming |
-| `DataSource.swift` | 55 | `prefer_concrete_types`, `avoid_any_type` | Generic data source protocol |
+| `DataSource.swift` | Various | `prefer_concrete_types`, `avoid_any_type` | Generic data source protocol |
 | `SDKErrorProtocol.swift` | 105 | `prefer_concrete_types`, `avoid_any_type` | Error metadata |
 
 ---

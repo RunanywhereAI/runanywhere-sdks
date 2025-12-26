@@ -1,6 +1,6 @@
 # RunAnywhere Swift SDK – Developer Documentation
 
-> **SDK Version**: 1.0.0
+> **SDK Version**: 0.16.0
 > **Minimum Platform**: iOS 17+ / macOS 14+
 > **Swift Version**: 5.9+
 
@@ -222,7 +222,7 @@ Add RunAnywhere to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "1.0.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.16.0")
 ]
 ```
 

@@ -95,7 +95,7 @@ class ModelListViewModel: ObservableObject {
             print("Loaded \(availableModels.count) models from registry")
 
             for model in availableModels {
-                print("  - \(model.name) (\(model.framework?.displayName ?? "Unknown"))")
+                print("  - \(model.name) (\(model.framework.displayName))")
             }
 
             // Sync currentModel with SDK's current model state
@@ -169,10 +169,7 @@ class ModelListViewModel: ObservableObject {
     }
 
     func deleteModel(_ model: ModelInfo) async throws {
-        guard let framework = model.framework ?? model.compatibleFrameworks.first else {
-            throw RunAnywhereError.modelNotFound("Model has no associated framework")
-        }
-        try await RunAnywhere.deleteStoredModel(model.id, framework: framework)
+        try await RunAnywhere.deleteStoredModel(model.id, framework: model.framework)
         // Reload models after deletion
         await loadModelsFromRegistry()
     }

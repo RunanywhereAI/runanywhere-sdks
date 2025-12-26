@@ -2,9 +2,7 @@ import Foundation
 
 /// Remote data source for sending telemetry data to API server
 /// Routes to correct analytics endpoint based on environment
-public actor RemoteTelemetryDataSource: RemoteDataSource {
-    public typealias Entity = TelemetryData
-
+public actor RemoteTelemetryDataSource {
     private let apiClient: APIClient?
     private let environment: SDKEnvironment
     private let logger = SDKLogger(category: "RemoteTelemetryDataSource")
@@ -13,97 +11,15 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
     public init(apiClient: APIClient?, environment: SDKEnvironment = .development) {
         self.apiClient = apiClient
         self.environment = environment
-        // Note: Can't use logger in init since it's an actor
-        // Logging will happen when sendBatch is called
     }
 
-    // MARK: - DataSource Protocol
+    // MARK: - Availability Check
 
     public func isAvailable() async -> Bool {
-        guard apiClient != nil else {
-            return false
-        }
-
-        // Telemetry should work even if connection test fails
-        // We'll queue events locally
-        return true
+        apiClient != nil
     }
 
-    public func validateConfiguration() async throws {
-        guard apiClient != nil else {
-            throw DataSourceError.configurationInvalid("API client not configured")
-        }
-    }
-
-    // MARK: - RemoteDataSource Protocol
-
-    public func fetch(id _: String) async throws -> TelemetryData? {
-        // Telemetry is write-only to remote
-        throw DataSourceError.operationFailed(
-            NSError(domain: "RemoteTelemetryDataSource", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: "Remote telemetry fetch not supported"
-            ])
-        )
-    }
-
-    // swiftlint:disable:next prefer_concrete_types avoid_any_type
-    public func fetchAll(_: [String: Any]?) async throws -> [TelemetryData] {
-        // Telemetry is write-only to remote
-        return []
-    }
-
-    public func save(_ entity: TelemetryData) async throws -> TelemetryData {
-        guard apiClient != nil else {
-            throw DataSourceError.notAvailable
-        }
-
-        return try await operationHelper.withTimeout {
-            // Send telemetry event to API
-            // In real implementation, this would be:
-            // let response: TelemetryData = try await apiClient.post(
-            //     APIEndpoint.telemetry,
-            //     body: entity
-            // )
-            // return response
-
-            // For now, return the same entity
-            return entity
-        }
-    }
-
-    public func delete(id _: String) async throws {
-        // Telemetry deletion is typically not supported
-        throw DataSourceError.operationFailed(
-            NSError(domain: "RemoteTelemetryDataSource", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: "Remote telemetry delete not supported"
-            ])
-        )
-    }
-
-    // MARK: - Sync Support (Protocol Requirement)
-
-    /// Sync batch from TelemetryData - not used, telemetry sends directly via sendPayloads()
-    /// Required by RemoteDataSource protocol but never called for telemetry
-    public func syncBatch(_ batch: [TelemetryData]) async throws -> [String] {
-        // Telemetry doesn't use background sync - events are sent immediately via sendPayloads()
-        // This method exists only for RemoteDataSource protocol conformance
-        logger.warning("syncBatch called on TelemetryDataSource - this path is not used")
-        return batch.map { $0.id }
-    }
-
-    public func testConnection() async throws -> Bool {
-        guard apiClient != nil else {
-            return false
-        }
-
-        return try await operationHelper.withTimeout {
-            // Test telemetry endpoint availability
-            // let _: [String: Bool] = try await apiClient.get(APIEndpoint.telemetryHealth)
-            return true // Assume available for telemetry
-        }
-    }
-
-    // MARK: - Telemetry-specific methods
+    // MARK: - Telemetry Methods
 
     /// Send batch of typed telemetry payloads directly (preserves category → modality)
     public func sendPayloads(_ payloads: [TelemetryEventPayload]) async throws {

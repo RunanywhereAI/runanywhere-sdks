@@ -46,7 +46,7 @@ public actor GenerationAnalyticsService {
     private struct GenerationTracker {
         let startTime: Date
         let isStreaming: Bool
-        let framework: InferenceFrameworkType
+        let framework: InferenceFramework
         let modelId: String
         let temperature: Float?
         let maxTokens: Int?
@@ -70,7 +70,7 @@ public actor GenerationAnalyticsService {
     /// - Returns: A unique generation ID for tracking
     public func startGeneration(
         modelId: String,
-        framework: InferenceFrameworkType = .unknown,
+        framework: InferenceFramework = .unknown,
         temperature: Float? = nil,
         maxTokens: Int? = nil,
         contextLength: Int? = nil
@@ -108,7 +108,7 @@ public actor GenerationAnalyticsService {
     /// - Returns: A unique generation ID for tracking
     public func startStreamingGeneration(
         modelId: String,
-        framework: InferenceFrameworkType = .unknown,
+        framework: InferenceFramework = .unknown,
         temperature: Float? = nil,
         maxTokens: Int? = nil,
         contextLength: Int? = nil

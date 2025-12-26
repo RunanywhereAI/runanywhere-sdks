@@ -78,21 +78,12 @@ public enum WhisperKitBackend: RunAnywhereModule {
 
         let lowercased = modelId.lowercased()
 
-        // Check model info cache first
+        // Check model info cache first - framework is the single source of truth
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            if modelInfo.framework == .whisperKit && modelInfo.category == .speechRecognition {
-                return true
-            }
-            if modelInfo.compatibleFrameworks.contains(.whisperKit) && modelInfo.category == .speechRecognition {
-                return true
-            }
-            if modelInfo.framework == .onnx || modelInfo.format == .onnx {
-                return false
-            }
-            return false
+            return modelInfo.framework == .whisperKit && modelInfo.category == .speechRecognition
         }
 
-        // Fallback: Pattern-based matching
+        // Fallback: Pattern-based matching (exclude ONNX whisper models)
         if lowercased.contains("onnx") || lowercased.contains("glados") || lowercased.contains("distil") {
             return false
         }

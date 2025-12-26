@@ -21,18 +21,18 @@ public enum VADEvent: SDKEvent {
     // MARK: - Service Lifecycle
 
     /// VAD initialized (no model load for simple VAD, uses built-in algorithms)
-    case initialized(framework: InferenceFrameworkType = .builtIn)
-    case initializationFailed(error: String, framework: InferenceFrameworkType = .builtIn)
+    case initialized(framework: InferenceFramework = .builtIn)
+    case initializationFailed(error: String, framework: InferenceFramework = .builtIn)
     case cleanedUp
 
     // MARK: - Model Lifecycle (for model-based VAD)
 
     /// Model loading started (for model-based VAD like Silero VAD)
-    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
+    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
     /// Model loading completed
-    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
+    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
     /// Model loading failed
-    case modelLoadFailed(modelId: String, error: String, framework: InferenceFrameworkType = .unknown)
+    case modelLoadFailed(modelId: String, error: String, framework: InferenceFramework = .unknown)
     /// Model unloaded
     case modelUnloaded(modelId: String)
 
@@ -154,7 +154,7 @@ public struct VADMetrics: AnalyticsMetrics {
     public let totalSpeechSegments: Int
     public let totalSpeechDurationMs: Double
     public let averageSpeechDurationMs: Double
-    public let framework: InferenceFrameworkType
+    public let framework: InferenceFramework
 
     public init(
         totalEvents: Int = 0,
@@ -163,7 +163,7 @@ public struct VADMetrics: AnalyticsMetrics {
         totalSpeechSegments: Int = 0,
         totalSpeechDurationMs: Double = 0,
         averageSpeechDurationMs: Double = -1,  // -1 indicates N/A
-        framework: InferenceFrameworkType = .builtIn
+        framework: InferenceFramework = .builtIn
     ) {
         self.totalEvents = totalEvents
         self.startTime = startTime

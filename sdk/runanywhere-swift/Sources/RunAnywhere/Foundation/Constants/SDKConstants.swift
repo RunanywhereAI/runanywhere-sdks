@@ -2,7 +2,6 @@ import Foundation
 
 /// SDK-wide constants (metadata only)
 /// Capability-specific constants are in their respective capabilities:
-/// - AnalyticsConstants (Analytics capability)
 /// - LLMConstants (LLM capability)
 /// - StorageConstants (FileManagement capability)
 /// - DownloadConstants (Download capability)

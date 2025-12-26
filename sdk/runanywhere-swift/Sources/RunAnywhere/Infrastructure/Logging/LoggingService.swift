@@ -1,33 +1,46 @@
 //
-//  DefaultLoggingService.swift
+//  LoggingService.swift
 //  RunAnywhere SDK
 //
-//  Default implementation of the LoggingService protocol
-//  Manages log routing to registered destinations with filtering
+//  Production-ready logging service with destination routing.
+//  Thread-safe, supports multiple destinations (Pulse, Sentry).
 //
 
 import Foundation
 import os
 
-/// Default implementation of the LoggingService
-/// Manages log destinations and handles log filtering based on configuration
-public final class DefaultLoggingService: LoggingService {
+// MARK: - Logging
+
+/// Central logging service for the RunAnywhere SDK.
+/// Provides thread-safe logging with configurable destinations and filtering.
+///
+/// ## Usage
+/// ```swift
+/// // Log via SDKLogger (recommended)
+/// let logger = SDKLogger(category: "MyFeature")
+/// logger.info("Operation completed")
+///
+/// // Or directly via Logging
+/// Logging.shared.log(level: .info, category: "App", message: "Hello")
+/// ```
+public final class Logging: @unchecked Sendable {
+
+    // MARK: - Shared Instance
+
+    /// Shared singleton instance
+    public static let shared = Logging()
 
     // MARK: - Properties
 
-    /// Current logging configuration (protected by OSAllocatedUnfairLock - Swift 6 pattern)
+    /// Current logging configuration (thread-safe via OSAllocatedUnfairLock)
     private let _configuration: OSAllocatedUnfairLock<LoggingConfiguration>
 
     public var configuration: LoggingConfiguration {
-        get {
-            _configuration.withLock { $0 }
-        }
-        set {
-            _configuration.withLock { $0 = newValue }
-        }
+        get { _configuration.withLock { $0 } }
+        set { _configuration.withLock { $0 = newValue } }
     }
 
-    /// Registered log destinations (protected by OSAllocatedUnfairLock)
+    /// Registered log destinations (thread-safe via OSAllocatedUnfairLock)
     private let _destinations: OSAllocatedUnfairLock<[LogDestination]>
 
     public var destinations: [LogDestination] {
@@ -36,57 +49,84 @@ public final class DefaultLoggingService: LoggingService {
 
     // MARK: - Initialization
 
-    /// Initialize with default configuration
-    public init() {
-        self._configuration = OSAllocatedUnfairLock(initialState: LoggingConfiguration())
-        self._destinations = OSAllocatedUnfairLock(initialState: [])
+    private init() {
+        let environment = RunAnywhere.currentEnvironment ?? .production
+        let config = Self.configurationForEnvironment(environment)
 
-        // Add default Pulse destination
-        addDestination(PulseDestination())
-    }
-
-    /// Initialize with custom configuration
-    /// - Parameter configuration: The logging configuration to use
-    public init(configuration: LoggingConfiguration) {
-        self._configuration = OSAllocatedUnfairLock(initialState: configuration)
+        self._configuration = OSAllocatedUnfairLock(initialState: config)
         self._destinations = OSAllocatedUnfairLock(initialState: [])
 
         // Add default Pulse destination if local logging is enabled
-        if configuration.enableLocalLogging {
+        if config.enableLocalLogging {
             addDestination(PulseDestination())
         }
 
         // Add Sentry destination if Sentry logging is enabled
-        if configuration.enableSentryLogging {
+        if config.enableSentryLogging {
             setupSentryLogging()
         }
     }
 
-    /// Setup Sentry logging destination
-    /// Initializes SentryManager and adds SentryDestination
-    private func setupSentryLogging() {
-        let environment = RunAnywhere.currentEnvironment ?? .development
-        SentryManager.shared.initialize(environment: environment)
-        addDestination(SentryDestination())
-    }
+    // MARK: - Configuration
 
-    // MARK: - LoggingService
-
+    /// Update logging configuration
     public func configure(_ config: LoggingConfiguration) {
         _configuration.withLock { $0 = config }
     }
 
+    /// Enable or disable local logging
+    public func setLocalLoggingEnabled(_ enabled: Bool) {
+        var config = configuration
+        config.enableLocalLogging = enabled
+        configure(config)
+    }
+
+    /// Set the minimum log level
+    public func setMinLogLevel(_ level: LogLevel) {
+        var config = configuration
+        config.minLogLevel = level
+        configure(config)
+    }
+
+    /// Set whether to include device metadata in logs
+    public func setIncludeDeviceMetadata(_ include: Bool) {
+        var config = configuration
+        config.includeDeviceMetadata = include
+        configure(config)
+    }
+
+    /// Enable or disable Sentry logging for crash reporting
+    public func setSentryLoggingEnabled(_ enabled: Bool) {
+        var config = configuration
+        config.enableSentryLogging = enabled
+        configure(config)
+
+        if enabled {
+            let environment = RunAnywhere.currentEnvironment ?? .development
+            SentryManager.shared.initialize(environment: environment)
+            addDestination(SentryDestination())
+        } else {
+            if let sentryDest = destinations.first(where: { $0.identifier == "com.runanywhere.logging.sentry" }) {
+                removeDestination(sentryDest)
+            }
+        }
+    }
+
+    // MARK: - Core Logging
+
+    /// Log a message with the specified level and metadata
     public func log(
         level: LogLevel,
         category: String,
         message: String,
-        metadata: [String: Any]? // swiftlint:disable:this prefer_concrete_types avoid_any_type
+        metadata: [String: Any]? = nil // swiftlint:disable:this prefer_concrete_types avoid_any_type
     ) {
-        // Check against minimum log level
         let currentConfig = configuration
+
+        // Check against minimum log level
         guard level >= currentConfig.minLogLevel else { return }
 
-        // Check if any logging is enabled (local or Sentry)
+        // Check if any logging is enabled
         guard currentConfig.enableLocalLogging || currentConfig.enableSentryLogging else { return }
 
         // Sanitize metadata to prevent logging sensitive information
@@ -109,6 +149,9 @@ public final class DefaultLoggingService: LoggingService {
         }
     }
 
+    // MARK: - Destination Management
+
+    /// Add a log destination
     public func addDestination(_ destination: LogDestination) {
         _destinations.withLock { destinations in
             // Avoid duplicates
@@ -118,12 +161,14 @@ public final class DefaultLoggingService: LoggingService {
         }
     }
 
+    /// Remove a log destination
     public func removeDestination(_ destination: LogDestination) {
         _destinations.withLock { destinations in
             destinations.removeAll { $0.identifier == destination.identifier }
         }
     }
 
+    /// Force flush all pending logs to all destinations
     public func flush() {
         let currentDestinations = destinations
         for destination in currentDestinations {
@@ -132,6 +177,20 @@ public final class DefaultLoggingService: LoggingService {
     }
 
     // MARK: - Private Helpers
+
+    private func setupSentryLogging() {
+        let environment = RunAnywhere.currentEnvironment ?? .development
+        SentryManager.shared.initialize(environment: environment)
+        addDestination(SentryDestination())
+    }
+
+    private static func configurationForEnvironment(_ environment: SDKEnvironment) -> LoggingConfiguration {
+        switch environment {
+        case .development: return .development
+        case .staging: return .staging
+        case .production: return .production
+        }
+    }
 
     /// Keys that contain sensitive information and should be redacted
     private static let sensitiveKeys: Set<String> = [
@@ -146,8 +205,6 @@ public final class DefaultLoggingService: LoggingService {
     ]
 
     /// Sanitize metadata dictionary to redact sensitive values
-    /// - Parameter metadata: Original metadata dictionary
-    /// - Returns: Sanitized metadata with sensitive values redacted
     private func sanitizeMetadata(_ metadata: [String: Any]?) -> [String: Any]? { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         guard let metadata = metadata else { return nil }
 
@@ -171,22 +228,13 @@ public final class DefaultLoggingService: LoggingService {
     }
 }
 
-// MARK: - Environment Configuration
+// MARK: - Environment Configuration Extension
 
-extension DefaultLoggingService {
+extension Logging {
 
     /// Apply configuration based on SDK environment
-    /// - Parameter environment: The SDK environment
     public func applyEnvironmentConfiguration(_ environment: SDKEnvironment) {
-        let config: LoggingConfiguration
-        switch environment {
-        case .development:
-            config = .development
-        case .staging:
-            config = .staging
-        case .production:
-            config = .production
-        }
+        let config = Self.configurationForEnvironment(environment)
         configure(config)
 
         // Setup Sentry if enabled in the new configuration

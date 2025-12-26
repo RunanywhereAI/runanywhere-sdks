@@ -279,7 +279,7 @@ private actor StreamingMetricsCollector {
     private let modelId: String
     private let generationId: String
     private let analyticsService: GenerationAnalyticsService
-    private let framework: InferenceFrameworkType
+    private let framework: InferenceFramework
     private let promptLength: Int
 
     private var startTime: Date?
@@ -295,7 +295,7 @@ private actor StreamingMetricsCollector {
         modelId: String,
         generationId: String,
         analyticsService: GenerationAnalyticsService,
-        framework: InferenceFrameworkType,
+        framework: InferenceFramework,
         promptLength: Int
     ) {
         self.modelId = modelId

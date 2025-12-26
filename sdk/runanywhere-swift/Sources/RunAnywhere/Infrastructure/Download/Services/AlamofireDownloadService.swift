@@ -167,11 +167,8 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         downloadStartTime: Date,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        // Get destination folder (framework is required)
-        guard let framework = model.framework ?? model.compatibleFrameworks.first else {
-            logger.error("Model has no associated framework: \(model.id)")
-            throw DownloadError.invalidURL
-        }
+        // Get destination folder (framework is required - 1:1 mapping)
+        let framework = model.framework
         let fileManager = ServiceContainer.shared.fileManager
         let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
         let modelFolderURL = URL(fileURLWithPath: modelFolder.path)

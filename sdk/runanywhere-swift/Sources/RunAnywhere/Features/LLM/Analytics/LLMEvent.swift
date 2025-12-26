@@ -29,9 +29,9 @@ public enum LLMEvent: SDKEvent, TypedEventProperties {
 
     // MARK: - Model Lifecycle
 
-    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
-    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFrameworkType = .unknown)
-    case modelLoadFailed(modelId: String, error: String, framework: InferenceFrameworkType = .unknown)
+    case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
+    case modelLoadFailed(modelId: String, error: String, framework: InferenceFramework = .unknown)
     case modelUnloaded(modelId: String)
     case modelUnloadStarted(modelId: String)
 
@@ -45,11 +45,11 @@ public enum LLMEvent: SDKEvent, TypedEventProperties {
         modelId: String,
         prompt: String?,
         isStreaming: Bool = false,
-        framework: InferenceFrameworkType = .unknown
+        framework: InferenceFramework = .unknown
     )
 
     /// First token received (only applicable for streaming generation)
-    case firstToken(generationId: String, modelId: String, timeToFirstTokenMs: Double, framework: InferenceFrameworkType = .unknown)
+    case firstToken(generationId: String, modelId: String, timeToFirstTokenMs: Double, framework: InferenceFramework = .unknown)
 
     /// Streaming update (only applicable for streaming generation)
     case streamingUpdate(generationId: String, tokensGenerated: Int)
@@ -67,7 +67,7 @@ public enum LLMEvent: SDKEvent, TypedEventProperties {
         tokensPerSecond: Double,
         isStreaming: Bool = false,
         timeToFirstTokenMs: Double? = nil,
-        framework: InferenceFrameworkType = .unknown,
+        framework: InferenceFramework = .unknown,
         temperature: Float? = nil,
         maxTokens: Int? = nil,
         contextLength: Int? = nil

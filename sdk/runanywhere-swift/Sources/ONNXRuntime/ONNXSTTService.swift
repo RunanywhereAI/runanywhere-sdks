@@ -16,7 +16,7 @@ public class ONNXSTTService: STTService {
     // MARK: - Framework Identification
 
     /// ONNX Runtime inference framework
-    public let inferenceFramework: InferenceFrameworkType = .onnx
+    public let inferenceFramework: InferenceFramework = .onnx
 
     // MARK: - STTService Protocol
 

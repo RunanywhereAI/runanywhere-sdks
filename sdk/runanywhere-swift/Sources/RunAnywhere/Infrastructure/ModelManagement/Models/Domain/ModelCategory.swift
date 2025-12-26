@@ -41,33 +41,21 @@ public extension ModelCategory {
         case .llamaCpp, .mlx, .mlc, .execuTorch, .picoLLM, .foundationModels, .swiftTransformers:
             return .language
         case .coreML, .tensorFlowLite, .onnx, .mediaPipe:
-            // These are general frameworks that could be any category
-            // Default to multimodal since they can handle various types
+            // General-purpose frameworks - default to multimodal
             return .multimodal
         case .systemTTS:
             return .speechSynthesis
         case .fluidAudio:
             return .audio
+        case .builtIn, .none, .unknown:
+            // Services without models or unknown frameworks
+            return .audio
         }
     }
 
-    /// Determine category from format and frameworks
-    static func from(format: ModelFormat, frameworks: [InferenceFramework]) -> ModelCategory {
-        // First check if we have framework hints
-        if let firstFramework = frameworks.first {
-            return from(framework: firstFramework)
-        }
-
-        // Otherwise guess from format
-        switch format {
-        case .mlmodel, .mlpackage:
-            return .multimodal // Core ML models can be anything
-        case .gguf, .ggml, .safetensors, .bin:
-            return .language // Usually LLMs
-        case .tflite, .onnx:
-            return .multimodal // Could be anything
-        default:
-            return .language // Default to language
-        }
+    /// Determine category from format and framework
+    static func from(format: ModelFormat, framework: InferenceFramework) -> ModelCategory {
+        // Use framework as the primary hint (1:1 mapping)
+        return from(framework: framework)
     }
 }

@@ -32,14 +32,12 @@ import UIKit
 //   completeServicesInitialization()
 //     ├─ Setup API Client
 //     │    ├─ Development: Use Supabase
-//     │    └─ Production/Staging:  Authenticate with backend
+//     │    └─ Production/Staging: Authenticate with backend
 //     ├─ Create Core Services
-//     │    ├─ SyncCoordinator
-//     │    ├─ TelemetryRepository
 //     │    ├─ ModelInfoService
 //     │    └─ ModelAssignmentService
-//     ├─ Load Models (sync from remote + load from DB)
-//     ├─ Initialize Analytics & EventPublisher
+//     ├─ Load Models (from remote API)
+//     ├─ Initialize EventPublisher (telemetry → backend)
 //     └─ Register Device with Backend
 //
 // USAGE:
@@ -236,17 +234,20 @@ public enum RunAnywhere {
         guard !isInitialized else { return }
 
         let initStartTime = CFAbsoluteTimeGetCurrent()
-        let logger = SDKLogger(category: "RunAnywhere.Init")
 
+        // Step 1: Set environment FIRST so Logging.shared initializes with correct config
+        // This must happen before any SDKLogger usage to ensure logs appear correctly
+        currentEnvironment = params.environment
+        initParams = params
+
+        // Step 2: Apply environment-specific logging configuration
+        Logging.shared.applyEnvironmentConfiguration(params.environment)
+
+        // Now safe to create logger and track events
+        let logger = SDKLogger(category: "RunAnywhere.Init")
         EventPublisher.shared.track(SDKLifecycleEvent.initStarted)
 
         do {
-            // Step 1: Initialize logging system
-            RunAnywhere.setLogLevel(params.environment.defaultLogLevel)
-
-            // Step 2: Store parameters
-            initParams = params
-            currentEnvironment = params.environment
 
             // Step 3: Persist to Keychain (production/staging only)
             if params.environment != .development {
@@ -298,10 +299,9 @@ public enum RunAnywhere {
     ///
     /// This method:
     /// 1. Sets up API client (with authentication for production/staging)
-    /// 2. Creates core services (telemetry, models, sync)
-    /// 3. Loads model catalog from remote + local storage
-    /// 4. Initializes analytics pipeline
-    /// 5. Registers device with backend
+    /// 2. Loads model catalog from remote API
+    /// 3. Initializes EventPublisher for telemetry
+    /// 4. Registers device with backend
     public static func completeServicesInitialization() async throws {
         // Fast path: already completed
         if hasCompletedServicesInit {
@@ -326,7 +326,6 @@ public enum RunAnywhere {
             : serviceContainer.authenticationService == nil
 
         let apiClient: APIClient?
-        let telemetryRepo: TelemetryRepositoryImpl?
 
         if needsInit {
             logger.info("Initializing services for \(environment.description) mode...")
@@ -334,34 +333,21 @@ public enum RunAnywhere {
             // Step 1: Setup API client
             apiClient = try await setupAPIClient(params: params, environment: environment, logger: logger)
 
-            // Step 2: Create and inject core services
-            let (repo, modelInfoService) = await setupCoreServices(
-                apiClient: apiClient,
-                environment: environment,
-                logger: logger
-            )
-            telemetryRepo = repo
-
-            // Step 3: Load models
-            await loadModels(modelInfoService: modelInfoService, logger: logger)
+            // Step 2: Create model services
+            await setupModelServices(logger: logger)
         } else {
             apiClient = serviceContainer.apiClient
-            telemetryRepo = nil
         }
 
-        // Step 4: Initialize analytics
-        if let repo = telemetryRepo {
-            await initializeAnalytics(telemetryRepository: repo, apiKey: params.apiKey, logger: logger)
-        } else if let existingApiClient = apiClient ?? serviceContainer.apiClient {
-            let repo = TelemetryRepositoryImpl(
-                databaseManager: DatabaseManager.shared,
-                apiClient: existingApiClient,
-                environment: environment
-            )
-            await initializeAnalytics(telemetryRepository: repo, apiKey: params.apiKey, logger: logger)
-        } else {
-            logger.error("Cannot initialize analytics: No API client available")
+        // Step 3: Initialize telemetry (fire-and-forget to backend)
+        if let client = apiClient ?? serviceContainer.apiClient {
+            let remoteDataSource = RemoteTelemetryDataSource(apiClient: client, environment: environment)
+            EventPublisher.shared.initialize(remoteDataSource: remoteDataSource)
+            logger.debug("Telemetry initialized")
         }
+
+        // Step 4: Initialize model registry
+        await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
 
         // Step 5: Register device
         if let networkService = serviceContainer.networkService {
@@ -423,31 +409,12 @@ public enum RunAnywhere {
         return apiClient
     }
 
-    /// Create and inject core services
-    private static func setupCoreServices(
-        apiClient: APIClient?,
-        environment: SDKEnvironment,
-        logger: SDKLogger
-    ) async -> (TelemetryRepositoryImpl, ModelInfoService) {
-        logger.debug("Creating core services...")
+    /// Setup model services (in-memory)
+    private static func setupModelServices(logger: SDKLogger) async {
+        logger.debug("Setting up model services...")
 
-        let syncCoordinator = SyncCoordinator(enableAutoSync: false)
-        serviceContainer.setSyncCoordinator(syncCoordinator)
-
-        let telemetryRepo = TelemetryRepositoryImpl(
-            databaseManager: DatabaseManager.shared,
-            apiClient: apiClient,
-            environment: environment
-        )
-
-        let modelRepo = ModelInfoRepositoryImpl(
-            databaseManager: DatabaseManager.shared,
-            apiClient: apiClient
-        )
-        let modelInfoService = ModelInfoService(
-            modelInfoRepository: modelRepo,
-            syncCoordinator: syncCoordinator
-        )
+        // ModelInfoService works in-memory, models fetched via ModelAssignmentService
+        let modelInfoService = ModelInfoService()
         serviceContainer.setModelInfoService(modelInfoService)
 
         if let networkService = serviceContainer.networkService {
@@ -458,26 +425,6 @@ public enum RunAnywhere {
             serviceContainer.setModelAssignmentService(modelAssignmentService)
         }
 
-        logger.debug("Core services created")
-        return (telemetryRepo, modelInfoService)
-    }
-
-    /// Load models from storage
-    private static func loadModels(modelInfoService: ModelInfoService, logger: SDKLogger) async {
-        try? await modelInfoService.syncModelInfo()
-        _ = try? await modelInfoService.loadStoredModels()
-        logger.debug("Model catalog loaded")
-    }
-
-    /// Initialize analytics pipeline
-    private static func initializeAnalytics(
-        telemetryRepository: TelemetryRepositoryImpl,
-        apiKey: String,
-        logger: SDKLogger
-    ) async {
-        await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: apiKey)
-        await serviceContainer.analyticsQueueManager.initialize(telemetryRepository: telemetryRepository)
-        EventPublisher.shared.initialize(analyticsQueue: serviceContainer.analyticsQueueManager)
-        logger.debug("Analytics initialized")
+        logger.debug("Model services initialized")
     }
 }

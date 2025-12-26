@@ -193,26 +193,11 @@ public actor ManagedLifecycle<ServiceType> {
     }
 
     /// Look up the framework for a model from the registry
-    private func lookupFramework(for resourceId: String) -> InferenceFrameworkType {
+    private func lookupFramework(for resourceId: String) -> InferenceFramework {
         guard let modelInfo = ServiceContainer.shared.modelRegistry.getModel(by: resourceId) else {
             return .unknown
         }
-
-        // Get the framework from model info
-        let framework = modelInfo.framework ?? modelInfo.compatibleFrameworks.first
-        guard let framework = framework else {
-            return .unknown
-        }
-
-        // Try to match by case name (both enums use same case names like .onnx, .llamaCpp)
-        let caseName = String(describing: framework)
-        for frameworkType in InferenceFrameworkType.allCases {
-            if String(describing: frameworkType) == caseName {
-                return frameworkType
-            }
-        }
-
-        return .unknown
+        return modelInfo.framework
     }
 
     private func createEvent(
@@ -220,7 +205,7 @@ public actor ManagedLifecycle<ServiceType> {
         resourceId: String,
         durationMs: Double?,
         error: Error?,
-        framework: InferenceFrameworkType
+        framework: InferenceFramework
     ) -> any SDKEvent {
         switch resourceType {
         case .llmModel:
@@ -240,7 +225,7 @@ public actor ManagedLifecycle<ServiceType> {
         resourceId: String,
         durationMs: Double?,
         error: Error?,
-        framework: InferenceFrameworkType
+        framework: InferenceFramework
     ) -> LLMEvent {
         switch type {
         case .loadStarted:
@@ -259,7 +244,7 @@ public actor ManagedLifecycle<ServiceType> {
         resourceId: String,
         durationMs: Double?,
         error: Error?,
-        framework: InferenceFrameworkType
+        framework: InferenceFramework
     ) -> STTEvent {
         switch type {
         case .loadStarted:
@@ -278,7 +263,7 @@ public actor ManagedLifecycle<ServiceType> {
         resourceId: String,
         durationMs: Double?,
         error: Error?,
-        framework: InferenceFrameworkType
+        framework: InferenceFramework
     ) -> TTSEvent {
         switch type {
         case .loadStarted:

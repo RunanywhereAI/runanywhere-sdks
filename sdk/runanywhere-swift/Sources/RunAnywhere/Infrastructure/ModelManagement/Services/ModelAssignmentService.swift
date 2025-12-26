@@ -60,12 +60,12 @@ public actor ModelAssignmentService {
             cachedAssignments = modelInfos
             lastFetchTime = Date()
 
-            // Save to local database for offline access
+            // Save to in-memory storage
             for model in modelInfos {
                 try await modelInfoService.saveModel(model)
             }
 
-            logger.info("Model assignments cached and saved locally")
+            logger.info("Model assignments cached")
             return modelInfos
 
         } catch {
@@ -77,10 +77,10 @@ public actor ModelAssignmentService {
                 return cached
             }
 
-            // Last resort: load from local database
+            // Last resort: load from in-memory storage
             let localModels = try await modelInfoService.loadStoredModels()
             if !localModels.isEmpty {
-                logger.info("Using \(localModels.count) locally stored models as fallback")
+                logger.info("Using \(localModels.count) in-memory stored models as fallback")
                 cachedAssignments = localModels
                 return localModels
             }
@@ -92,7 +92,7 @@ public actor ModelAssignmentService {
     /// Get model assignments for a specific framework
     public func getModelsForFramework(_ framework: InferenceFramework) async throws -> [ModelInfo] {
         let allModels = try await fetchModelAssignments()
-        return allModels.filter { $0.compatibleFrameworks.contains(framework) }
+        return allModels.filter { $0.framework == framework }
     }
 
     /// Get model assignments for a specific category
@@ -185,9 +185,25 @@ extension ModelAssignment {
         // Convert string format to ModelFormat enum
         let modelFormat = ModelFormat(rawValue: format.lowercased()) ?? .gguf
 
-        // Convert string frameworks to InferenceFramework enum
-        let frameworks = compatibleFrameworks.compactMap { InferenceFramework(rawValue: $0.lowercased()) }
-        let preferred = framework.flatMap { InferenceFramework(rawValue: $0.lowercased()) }
+        // Convert string framework to InferenceFramework enum
+        // Use framework field from API, or infer from format as fallback
+        let modelFramework: InferenceFramework
+        if let fw = framework.flatMap({ InferenceFramework(rawValue: $0.lowercased()) }) {
+            modelFramework = fw
+        } else {
+            // Infer from format if framework not specified
+            let inferredFormat = ModelFormat(rawValue: format.lowercased()) ?? .unknown
+            switch inferredFormat {
+            case .gguf, .ggml:
+                modelFramework = .llamaCpp
+            case .onnx, .ort:
+                modelFramework = .onnx
+            case .mlmodel, .mlpackage:
+                modelFramework = .coreML
+            default:
+                modelFramework = .llamaCpp  // Default to llamaCpp for unknown formats
+            }
+        }
 
         // Extract tags and description from metadata
         let modelTags = metadata?.tags ?? []
@@ -201,12 +217,11 @@ extension ModelAssignment {
             name: name,
             category: modelCategory,
             format: modelFormat,
+            framework: modelFramework,
             downloadURL: downloadURL,
             localPath: nil,
             downloadSize: size,
             memoryRequired: memoryRequired,
-            compatibleFrameworks: frameworks,
-            framework: preferred,
             contextLength: contextLength,
             supportsThinking: supportsThinking,
             tags: modelTags,
@@ -214,7 +229,6 @@ extension ModelAssignment {
             source: .remote,
             createdAt: Date(),
             updatedAt: Date(),
-            syncPending: false,
             lastUsed: nil,
             usageCount: 0
         )

@@ -9,7 +9,7 @@ public class WhisperKitService: STTService {
     // MARK: - Framework Identification
 
     /// WhisperKit uses the WhisperKit inference framework (built on Core ML)
-    public let inferenceFramework: InferenceFrameworkType = .whisperKit
+    public let inferenceFramework: InferenceFramework = .whisperKit
 
     // MARK: - Properties
 

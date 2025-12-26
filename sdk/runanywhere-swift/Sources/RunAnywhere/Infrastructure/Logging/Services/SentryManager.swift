@@ -80,7 +80,7 @@ public final class SentryManager: @unchecked Sendable {
             // Add SDK version tag
             options.beforeSend = { event in
                 event.tags?["sdk_name"] = "RunAnywhere"
-                event.tags?["sdk_version"] = "0.1.0"
+                event.tags?["sdk_version"] = SDKConstants.version
                 return event
             }
         }

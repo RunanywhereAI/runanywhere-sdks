@@ -176,8 +176,7 @@ private struct SimplifiedModelRow: View {
     @State private var downloadProgress: Double = 0.0
 
     private var frameworkColor: Color {
-        guard let framework = model.framework else { return .gray }
-        switch framework {
+        switch model.framework {
         case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
@@ -187,13 +186,12 @@ private struct SimplifiedModelRow: View {
     }
 
     private var frameworkName: String {
-        guard let framework = model.framework else { return "Unknown" }
-        switch framework {
+        switch model.framework {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
         case .whisperKit: return "Whisper"
-        default: return framework.displayName
+        default: return model.framework.displayName
         }
     }
 

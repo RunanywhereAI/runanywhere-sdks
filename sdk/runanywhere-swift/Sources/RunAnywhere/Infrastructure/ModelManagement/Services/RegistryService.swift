@@ -53,10 +53,10 @@ public class RegistryService: ModelRegistry {
         }
 
         var updatedModel = model
-        if updatedModel.localPath == nil, let framework = model.framework ?? model.compatibleFrameworks.first {
+        if updatedModel.localPath == nil {
             let fileManager = ServiceContainer.shared.fileManager
-            if fileManager.modelFolderExists(modelId: model.id, framework: framework) {
-                if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: framework) {
+            if fileManager.modelFolderExists(modelId: model.id, framework: model.framework) {
+                if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: model.framework) {
                     updatedModel.localPath = resolveModelPath(in: folderURL)
                     logger.info("Found downloaded model \(model.id)")
                 }
@@ -69,7 +69,7 @@ public class RegistryService: ModelRegistry {
         ModelInfoCache.shared.cacheModels([updatedModel])
     }
 
-    /// Register model and save to database for persistence
+    /// Register model and save to in-memory storage
     public func registerModelPersistently(_ model: ModelInfo) async {
         guard !model.id.isEmpty else {
             logger.error("Attempted to register model with empty ID")
@@ -77,15 +77,13 @@ public class RegistryService: ModelRegistry {
         }
 
         var updatedModel = model
-        if let framework = model.framework ?? model.compatibleFrameworks.first {
-            let fileManager = ServiceContainer.shared.fileManager
-            if fileManager.modelFolderExists(modelId: model.id, framework: framework) {
-                if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: framework) {
-                    updatedModel.localPath = resolveModelPath(in: folderURL)
-                }
-            } else {
-                updatedModel.localPath = nil
+        let fileManager = ServiceContainer.shared.fileManager
+        if fileManager.modelFolderExists(modelId: model.id, framework: model.framework) {
+            if let folderURL = try? fileManager.getModelFolderURL(modelId: model.id, framework: model.framework) {
+                updatedModel.localPath = resolveModelPath(in: folderURL)
             }
+        } else {
+            updatedModel.localPath = nil
         }
 
         registerModel(updatedModel)
@@ -106,7 +104,7 @@ public class RegistryService: ModelRegistry {
     public func filterModels(by criteria: ModelCriteria) -> [ModelInfo] {
         accessQueue.sync {
             models.values.filter { model in
-                if let framework = criteria.framework, !model.compatibleFrameworks.contains(framework) {
+                if let framework = criteria.framework, model.framework != framework {
                     return false
                 }
                 if let format = criteria.format, model.format != format {
@@ -157,13 +155,12 @@ public class RegistryService: ModelRegistry {
             name: name,
             category: resolvedCategory,
             format: format,
+            framework: framework,
             downloadURL: url,
             localPath: nil,
             artifactType: artifactType,
             downloadSize: nil,
             memoryRequired: estimatedSize ?? estimateMemoryFromURL(url),
-            compatibleFrameworks: [framework],
-            framework: framework,
             contextLength: resolvedCategory == .language ? 2048 : nil,
             supportsThinking: supportsThinking,
             tags: ["user-added", framework.rawValue.lowercased()],
@@ -229,17 +226,16 @@ public class RegistryService: ModelRegistry {
                 if let storageStrategy = ModuleRegistry.shared.storageStrategy(for: framework),
                    let (format, size) = storageStrategy.detectModel(in: modelFolder) {
                     let modelPath = storageStrategy.findModelPath(modelId: modelId, in: modelFolder) ?? modelFolder
-                    let category = ModelCategory.from(format: format, frameworks: [framework])
+                    let category = ModelCategory.from(format: format, framework: framework)
                     models.append(ModelInfo(
                         id: modelId,
                         name: generateModelName(from: modelFolder),
                         category: category,
                         format: format,
+                        framework: framework,
                         localPath: modelPath,
                         downloadSize: size,
                         memoryRequired: estimateMemoryUsage(fileSize: size, format: format),
-                        compatibleFrameworks: [framework],
-                        framework: framework,
                         contextLength: category == .language ? 2048 : nil,
                         supportsThinking: false,
                         tags: [],
@@ -268,18 +264,17 @@ public class RegistryService: ModelRegistry {
 
             let fileSize = FileOperationsUtilities.fileSize(at: file) ?? 0
             let modelId = folder.lastPathComponent
-            let category = ModelCategory.from(format: format, frameworks: [framework])
+            let category = ModelCategory.from(format: format, framework: framework)
 
             return ModelInfo(
                 id: modelId,
                 name: generateModelName(from: folder),
                 category: category,
                 format: format,
+                framework: framework,
                 localPath: file,
                 downloadSize: fileSize,
                 memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
-                compatibleFrameworks: [framework],
-                framework: framework,
                 contextLength: category == .language ? 2048 : nil,
                 supportsThinking: false,
                 tags: [],
@@ -296,24 +291,23 @@ public class RegistryService: ModelRegistry {
 
         for ext in modelExtensions {
             guard let urls = bundle.urls(forResourcesWithExtension: ext, subdirectory: nil),
-                  let format = detectFormatFromExtension(ext) else { continue }
+                  let format = detectFormatFromExtension(ext),
+                  let framework = detectFramework(for: format) else { continue }
 
             for url in urls {
                 let fileSize = FileOperationsUtilities.fileSize(at: url) ?? 0
                 let modelId = url.deletingPathExtension().lastPathComponent
-                let frameworks = detectCompatibleFrameworks(for: format)
-                let category = ModelCategory.from(format: format, frameworks: frameworks)
+                let category = ModelCategory.from(format: format, framework: framework)
 
                 models.append(ModelInfo(
                     id: modelId,
                     name: generateModelName(from: url),
                     category: category,
                     format: format,
+                    framework: framework,
                     localPath: url,
                     downloadSize: fileSize,
                     memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
-                    compatibleFrameworks: frameworks,
-                    framework: frameworks.first,
                     contextLength: category == .language ? 2048 : nil,
                     supportsThinking: false,
                     tags: ["bundled"],
@@ -375,15 +369,15 @@ public class RegistryService: ModelRegistry {
         }
     }
 
-    private func detectCompatibleFrameworks(for format: ModelFormat) -> [InferenceFramework] {
+    private func detectFramework(for format: ModelFormat) -> InferenceFramework? {
         switch format {
-        case .mlmodel, .mlpackage: return [.coreML]
-        case .tflite: return [.tensorFlowLite]
-        case .onnx, .ort: return [.onnx]
-        case .safetensors: return [.mlx]
-        case .gguf, .ggml: return [.llamaCpp]
-        case .pte: return [.execuTorch]
-        default: return []
+        case .mlmodel, .mlpackage: return .coreML
+        case .tflite: return .tensorFlowLite
+        case .onnx, .ort: return .onnx
+        case .safetensors: return .mlx
+        case .gguf, .ggml: return .llamaCpp
+        case .pte: return .execuTorch
+        default: return nil
         }
     }
 
