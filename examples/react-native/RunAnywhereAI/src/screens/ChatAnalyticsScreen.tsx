@@ -155,8 +155,11 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
   // Extract analytics from messages
   const analyticsMessages = useMemo(() => {
     return messages
-      .filter((m) => m.analytics != null)
-      .map((m) => ({ message: m, analytics: m.analytics! }));
+      .filter(
+        (m): m is Message & { analytics: MessageAnalytics } =>
+          m.analytics != null
+      )
+      .map((m) => ({ message: m, analytics: m.analytics }));
   }, [messages]);
 
   // Computed metrics
@@ -206,9 +209,11 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       if (!modelGroups.has(modelName)) {
         modelGroups.set(modelName, { times: [], speeds: [] });
       }
-      const group = modelGroups.get(modelName)!;
-      group.times.push(analytics.totalGenerationTime);
-      group.speeds.push(analytics.averageTokensPerSecond || 0);
+      const group = modelGroups.get(modelName);
+      if (group) {
+        group.times.push(analytics.totalGenerationTime);
+        group.speeds.push(analytics.averageTokensPerSecond || 0);
+      }
     });
 
     const modelsUsed = new Map<
