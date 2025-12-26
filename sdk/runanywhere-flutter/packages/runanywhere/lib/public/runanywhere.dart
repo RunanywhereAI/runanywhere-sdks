@@ -979,9 +979,8 @@ class RunAnywhere {
       // Lazy device registration on first API call
       await _ensureDeviceRegistered();
 
-      // Create TTS configuration with the voiceId
-      // Note: voice defaults to 'system' but voiceId is what we need for path resolution
-      final ttsConfig = TTSConfiguration(modelId: voiceId);
+      // Create TTS configuration with the voiceId as both modelId and voice
+      final ttsConfig = TTSConfiguration(modelId: voiceId, voice: voiceId);
 
       // Create and initialize TTS capability
       final ttsCapability = TTSCapability(ttsConfiguration: ttsConfig);
@@ -1566,7 +1565,8 @@ class RunAnywhere {
         final size = await _calculateDirectorySize(modelDir);
 
         // Try to get model info from registry for display name
-        final registeredModel = serviceContainer.modelRegistry.getModel(modelId);
+        final registeredModel =
+            serviceContainer.modelRegistry.getModel(modelId);
         final displayName = registeredModel?.name ?? modelId;
 
         // Get directory stats for creation date
@@ -2011,7 +2011,7 @@ class RunAnywhere {
     EventBus.shared.publish(SDKVoiceEvent.pipelineStarted());
 
     try {
-      // Build config from model IDs
+      // Build config from model IDs - path resolution happens in capabilities via registry
       final config = VoiceAgentConfiguration(
         sttConfig: sttModelId.isNotEmpty
             ? STTConfiguration(modelId: sttModelId)
@@ -2020,7 +2020,7 @@ class RunAnywhere {
             ? LLMConfiguration(modelId: llmModelId)
             : LLMConfiguration(),
         ttsConfig: ttsVoice.isNotEmpty
-            ? TTSConfiguration(modelId: ttsVoice)
+            ? TTSConfiguration(modelId: ttsVoice, voice: ttsVoice)
             : const TTSConfiguration(),
       );
 
@@ -2058,15 +2058,18 @@ class RunAnywhere {
     EventBus.shared.publish(SDKVoiceEvent.pipelineStarted());
 
     try {
-      // Create config using existing loaded models
+      // Create config using existing loaded models - path resolution via registry
       final sttModelId = _loadedSTTCapability?.sttConfig.modelId ?? '';
       final llmModelId = currentModel?.id ?? '';
-      final ttsVoice = _loadedTTSCapability?.currentVoice ?? '';
+      // Use ttsConfiguration.modelId first, then currentVoice as fallback
+      final ttsVoice = _loadedTTSCapability?.ttsConfiguration.modelId ??
+          _loadedTTSCapability?.currentVoice ??
+          '';
 
       final config = VoiceAgentConfiguration(
         sttConfig: STTConfiguration(modelId: sttModelId),
         llmConfig: LLMConfiguration(modelId: llmModelId),
-        ttsConfig: TTSConfiguration(modelId: ttsVoice),
+        ttsConfig: TTSConfiguration(modelId: ttsVoice, voice: ttsVoice),
       );
 
       _voiceAgentCapability = VoiceAgentCapability(
