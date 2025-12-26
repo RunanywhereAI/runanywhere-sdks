@@ -31,7 +31,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
 
     case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
     case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
-    case modelLoadFailed(modelId: String, error: String, framework: InferenceFramework = .unknown)
+    case modelLoadFailed(modelId: String, error: SDKError, framework: InferenceFramework = .unknown)
     case modelUnloaded(modelId: String)
 
     // MARK: - Synthesis
@@ -69,7 +69,7 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
         sampleRate: Int = TTSConstants.defaultSampleRate,
         framework: InferenceFramework = .unknown
     )
-    case synthesisFailed(synthesisId: String, modelId: String, error: String)
+    case synthesisFailed(synthesisId: String, modelId: String, error: SDKError)
 
     // MARK: - SDKEvent Conformance
 
@@ -124,9 +124,8 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
         case .modelLoadFailed(let modelId, let error, let framework):
             return [
                 "model_id": modelId,
-                "error": error,
                 "framework": framework.rawValue
-            ]
+            ].merging(error.telemetryProperties) { _, new in new }
 
         case .modelUnloaded(let modelId):
             return ["model_id": modelId]
@@ -174,9 +173,8 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             return [
                 "synthesis_id": id,
                 "model_id": modelId,
-                "error": error,
                 "success": "false"
-            ]
+            ].merging(error.telemetryProperties) { _, new in new }
         }
     }
 
@@ -209,7 +207,8 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
                 modelId: modelId,
                 framework: framework.rawValue,
                 success: false,
-                errorMessage: error,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue,
                 voice: modelId
             )
 
@@ -264,7 +263,8 @@ public enum TTSEvent: SDKEvent, TypedEventProperties {
             return EventProperties(
                 modelId: modelId,
                 success: false,
-                errorMessage: error,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue,
                 voice: modelId,
                 synthesisId: id
             )

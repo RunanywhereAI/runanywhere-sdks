@@ -19,7 +19,7 @@ public struct APIResponse<T: Decodable>: Decodable {
     public let data: T?
 
     /// Error information (present on failure)
-    public let error: APIErrorResponse?
+    public let error: APIErrorInfo?
 
     /// HTTP status code
     public let statusCode: Int
@@ -48,182 +48,142 @@ public struct APIResponse<T: Decodable>: Decodable {
     }
 }
 
-// MARK: - API Error Response (Backend Format)
+// MARK: - API Error Info
 
-/// Error response structure matching FastAPI/Pydantic backend format
-public struct APIErrorResponse: Decodable, Sendable {
-    /// Error detail - can be a string or array of validation errors
-    public let detail: APIErrorDetail?
+/// Simplified error info from API responses.
+/// Captures the raw response for logging while extracting key fields for error construction.
+public struct APIErrorInfo: Decodable, Sendable {
+    /// The raw JSON response body (for logging/debugging)
+    public let rawBody: String?
 
-    /// Alternative error message field
+    /// Primary error message (extracted from detail, message, or error fields)
     public let message: String?
 
-    /// Alternative error field
-    public let error: String?
-
-    /// Error code from backend
+    /// Error code from backend (if provided)
     public let code: String?
 
-    /// Convert to SDKError
-    public func toSDKError(statusCode: Int) -> SDKError {
-        // Extract message from detail, message, or error fields
-        var errorMessage: String?
-        if let detail = detail {
-            switch detail {
-            case .message(let msg):
-                errorMessage = msg
-            case .validationErrors(let errors):
-                let messages = errors.map { $0.formattedMessage }
-                errorMessage = messages.joined(separator: "; ")
-            }
-        } else if let message = message {
-            errorMessage = message
-        } else if let error = error {
-            errorMessage = error
+    /// HTTP status code
+    public let statusCode: Int
+
+    /// The URL that was requested (for context)
+    public let requestURL: String?
+
+    // MARK: - Initialization
+
+    /// Create from raw response data
+    public init(data: Data?, statusCode: Int, requestURL: String? = nil) {
+        self.statusCode = statusCode
+        self.requestURL = requestURL
+
+        // Store raw body for logging
+        if let data = data {
+            self.rawBody = String(data: data, encoding: .utf8)
+        } else {
+            self.rawBody = nil
         }
 
-        // Map status code to appropriate SDKError
+        // Try to extract message and code from common response formats
+        var extractedMessage: String?
+        var extractedCode: String?
+
+        if let data = data {
+            // Try decoding as standard error response first
+            if let standardError = try? JSONDecoder().decode(StandardErrorResponse.self, from: data) {
+                extractedMessage = standardError.detail ?? standardError.message ?? standardError.error
+                extractedCode = standardError.code
+            }
+            // Try decoding as Pydantic validation error (array of validation messages)
+            else if let validationError = try? JSONDecoder().decode(ValidationErrorResponse.self, from: data) {
+                extractedMessage = validationError.detail.first?.msg
+            }
+        }
+
+        self.message = extractedMessage
+        self.code = extractedCode
+    }
+
+    /// Decode from JSON (for APIResponse parsing)
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // Try to decode common fields
+        let detail = try? container.decode(String.self, forKey: .detail)
+        let messageField = try? container.decode(String.self, forKey: .message)
+        let errorField = try? container.decode(String.self, forKey: .error)
+
+        self.message = detail ?? messageField ?? errorField
+        self.code = try? container.decode(String.self, forKey: .code)
+        self.rawBody = nil // Not available when decoding from Codable
+        self.statusCode = 0 // Set by APIResponse
+        self.requestURL = nil
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case detail, message, error, code
+    }
+
+    // MARK: - Error Conversion
+
+    /// Convert to SDKError with appropriate code based on status
+    public func toSDKError(statusCode: Int) -> SDKError {
+        let errorMessage = message ?? "HTTP \(statusCode)"
+
         switch statusCode {
         case 401:
-            return SDKError.network(.unauthorized, errorMessage ?? "Authentication required")
+            return SDKError.network(.unauthorized, errorMessage)
         case 403:
-            return SDKError.network(.forbidden, errorMessage ?? "Access denied")
+            return SDKError.network(.forbidden, errorMessage)
         case 404:
-            return SDKError.network(.invalidResponse, errorMessage ?? "Resource not found")
+            return SDKError.network(.invalidResponse, errorMessage)
         case 408, 504:
-            return SDKError.network(.timeout, errorMessage ?? "Request timed out")
+            return SDKError.network(.timeout, errorMessage)
         case 422:
-            return SDKError.network(.validationFailed, errorMessage ?? "Validation failed")
+            return SDKError.network(.validationFailed, errorMessage)
         case 400..<500:
-            return SDKError.network(.httpError, "Client error \(statusCode): \(errorMessage ?? "Unknown error")")
+            return SDKError.network(.httpError, "Client error \(statusCode): \(errorMessage)")
         case 500..<600:
-            return SDKError.network(.serverError, "Server error \(statusCode): \(errorMessage ?? "Unknown error")")
+            return SDKError.network(.serverError, "Server error \(statusCode): \(errorMessage)")
         default:
-            return SDKError.network(.unknown, errorMessage ?? "Unknown error with status code \(statusCode)")
+            return SDKError.network(.unknown, "\(errorMessage) (status: \(statusCode))")
         }
+    }
+
+    // MARK: - Debug Description
+
+    /// Full debug description for logging (includes raw body)
+    public var debugDescription: String {
+        var parts: [String] = ["HTTP \(statusCode)"]
+        if let url = requestURL {
+            parts.append("URL: \(url)")
+        }
+        if let message = message {
+            parts.append("Message: \(message)")
+        }
+        if let code = code {
+            parts.append("Code: \(code)")
+        }
+        if let body = rawBody {
+            parts.append("Body: \(body)")
+        }
+        return parts.joined(separator: " | ")
     }
 }
 
-// MARK: - Error Detail (Supports String or Validation Array)
+// MARK: - Error Response Types
 
-/// Error detail that can be either a simple string or Pydantic validation errors
-public enum APIErrorDetail: Decodable, Sendable {
-    case message(String)
-    case validationErrors([ValidationError])
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-
-        // Try parsing as string first
-        if let message = try? container.decode(String.self) {
-            self = .message(message)
-            return
-        }
-
-        // Try parsing as validation error array
-        if let errors = try? container.decode([ValidationError].self) {
-            self = .validationErrors(errors)
-            return
-        }
-
-        throw DecodingError.typeMismatch(
-            APIErrorDetail.self,
-            DecodingError.Context(
-                codingPath: decoder.codingPath,
-                debugDescription: "Expected String or [ValidationError]"
-            )
-        )
-    }
+/// Standard error response format from backend
+private struct StandardErrorResponse: Decodable {
+    let detail: String?
+    let message: String?
+    let error: String?
+    let code: String?
 }
 
-// MARK: - Pydantic Validation Error
+/// Pydantic validation error response format
+private struct ValidationErrorResponse: Decodable {
+    let detail: [ValidationDetail]
 
-/// Pydantic validation error structure
-public struct ValidationError: Decodable, Sendable {
-    /// Error message
-    public let msg: String
-
-    /// Location path (e.g., ["body", "events", 0, "id"])
-    public let loc: [LocationElement]
-
-    /// Error type (e.g., "value_error", "type_error")
-    public let type: String
-
-    /// Optional input that caused the error
-    public let input: AnyCodable?
-
-    /// Optional URL for more information
-    public let url: String?
-
-    enum CodingKeys: String, CodingKey {
-        case msg, loc, type, input, url
-    }
-
-    /// Format the field path from location array
-    public var fieldPath: String {
-        loc.dropFirst() // Skip "body"
-            .map { element -> String in
-                switch element {
-                case .string(let str): return str
-                case .int(let idx): return "[\(idx)]"
-                }
-            }
-            .joined(separator: ".")
-            .replacingOccurrences(of: ".\\[", with: "[", options: .regularExpression)
-    }
-
-    /// Format as human-readable string
-    public var formattedMessage: String {
-        let path = fieldPath
-        return path.isEmpty ? msg : "\(path): \(msg)"
-    }
-}
-
-// MARK: - Location Element (String or Int)
-
-/// Location element that can be either a string (field name) or int (array index)
-public enum LocationElement: Decodable, Sendable {
-    case string(String)
-    case int(Int)
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let intValue = try? container.decode(Int.self) {
-            self = .int(intValue)
-        } else if let stringValue = try? container.decode(String.self) {
-            self = .string(stringValue)
-        } else {
-            throw DecodingError.typeMismatch(
-                LocationElement.self,
-                DecodingError.Context(
-                    codingPath: decoder.codingPath,
-                    debugDescription: "Expected String or Int"
-                )
-            )
-        }
-    }
-}
-
-// MARK: - AnyCodable Helper
-
-/// Type-erased Codable wrapper for dynamic values
-public struct AnyCodable: Decodable, Sendable {
-    public let value: any Sendable
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let intValue = try? container.decode(Int.self) {
-            value = intValue
-        } else if let doubleValue = try? container.decode(Double.self) {
-            value = doubleValue
-        } else if let boolValue = try? container.decode(Bool.self) {
-            value = boolValue
-        } else if let stringValue = try? container.decode(String.self) {
-            value = stringValue
-        } else if container.decodeNil() {
-            value = NSNull()
-        } else {
-            value = "unknown"
-        }
+    struct ValidationDetail: Decodable {
+        let msg: String?
     }
 }

@@ -241,18 +241,21 @@ public actor GenerationAnalyticsService {
 
         EventPublisher.shared.track(LLMEvent.generationFailed(
             generationId: generationId,
-            error: error.localizedDescription
+            error: SDKError.from(error, category: .llm)
         ))
     }
 
-    /// Track an error during operations
-    public func trackError(_ error: Error, operation: String) {
+    /// Track an error during LLM operations with full SDKError context
+    public func trackError(_ error: Error, operation: String, modelId: String? = nil, generationId: String? = nil) {
         lastEventTime = Date()
-        EventPublisher.shared.track(ErrorEvent.error(
-            operation: operation,
-            message: error.localizedDescription,
-            code: (error as NSError).code
-        ))
+        let sdkError = SDKError.from(error, category: .llm)
+        let errorEvent = SDKErrorEvent.llmError(
+            error: sdkError,
+            modelId: modelId,
+            generationId: generationId,
+            operation: operation
+        )
+        EventPublisher.shared.track(errorEvent)
     }
 
     // MARK: - Metrics

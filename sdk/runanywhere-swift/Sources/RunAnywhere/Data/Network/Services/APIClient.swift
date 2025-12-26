@@ -7,6 +7,7 @@ public actor APIClient: NetworkService {
     private let apiKey: String
     private var authService: AuthenticationService?
     private let session: URLSession
+    private let logger = SDKLogger(category: "APIClient")
 
     // MARK: - Initialization
 
@@ -46,39 +47,15 @@ public actor APIClient: NetworkService {
         _ payload: Data,
         requiresAuth: Bool
     ) async throws -> Data {
-        let token: String
-
-        if requiresAuth {
-            if let authService = authService {
-                token = try await authService.getAccessToken()
-            } else {
-                // No auth service - use API key as bearer token (Supabase development mode)
-                token = apiKey
-            }
-        } else {
-            // For non-auth requests, still use API key as bearer for Supabase compatibility
-            token = apiKey
-        }
-
+        let token = try await resolveToken(requiresAuth: requiresAuth)
         let url = baseURL.appendingPathComponent(endpoint.path)
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = payload
-
-        // Set authorization header (always set for Supabase compatibility)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SDKError.network(.invalidResponse, "Invalid HTTP response")
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw Self.sdkErrorFromHTTPStatus(httpResponse.statusCode, data: data)
-        }
-
-        return data
+        return try await executeRequest(request, url: url)
     }
 
     /// Perform a raw GET request
@@ -86,79 +63,71 @@ public actor APIClient: NetworkService {
         _ endpoint: APIEndpoint,
         requiresAuth: Bool
     ) async throws -> Data {
-        let token: String
-        if requiresAuth {
-            if let authService = authService {
-                token = try await authService.getAccessToken()
-            } else {
-                // No auth service - use API key as bearer token (Supabase development mode)
-                token = apiKey
-            }
-        } else {
-            // For non-auth requests, still use API key as bearer for Supabase compatibility
-            token = apiKey
-        }
-
+        let token = try await resolveToken(requiresAuth: requiresAuth)
         let url = baseURL.appendingPathComponent(endpoint.path)
+
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-
-        // Set authorization header (always set for Supabase compatibility)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
+        return try await executeRequest(request, url: url)
+    }
+
+    // MARK: - Private Helpers
+
+    private func resolveToken(requiresAuth: Bool) async throws -> String {
+        if requiresAuth, let authService = authService {
+            return try await authService.getAccessToken()
+        }
+        // Use API key as bearer token (Supabase compatibility)
+        return apiKey
+    }
+
+    private func executeRequest(_ request: URLRequest, url: URL) async throws -> Data {
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw SDKError.network(.invalidResponse, "Invalid HTTP response")
+            let error = SDKError.network(.invalidResponse, "Invalid HTTP response")
+            emitErrorEvent(error: error, url: url, statusCode: nil, data: nil)
+            throw error
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            throw Self.sdkErrorFromHTTPStatus(httpResponse.statusCode, data: data)
+            let errorInfo = APIErrorInfo(
+                data: data,
+                statusCode: httpResponse.statusCode,
+                requestURL: url.absoluteString
+            )
+            let error = errorInfo.toSDKError(statusCode: httpResponse.statusCode)
+
+            // Emit error event with full context for consumer logging
+            emitErrorEvent(
+                error: error,
+                url: url,
+                statusCode: httpResponse.statusCode,
+                data: data
+            )
+
+            // Log detailed error info for debugging
+            logger.error("API request failed: \(errorInfo.debugDescription)")
+
+            throw error
         }
 
         return data
     }
 
-    // MARK: - Private Helpers
+    /// Emit an error event to both EventBus (for consumers) and analytics
+    private func emitErrorEvent(error: SDKError, url: URL, statusCode: Int?, data: Data?) {
+        let responseBody = data.flatMap { String(data: $0, encoding: .utf8) }
 
-    /// Convert HTTP status code and response data to SDKError
-    private static func sdkErrorFromHTTPStatus(_ statusCode: Int, data: Data?) -> SDKError {
-        // Try to parse error response for better message
-        var message: String?
-        if let data = data,
-           let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
-            if let detail = errorResponse.detail {
-                switch detail {
-                case .message(let msg):
-                    message = msg
-                case .validationErrors(let errors):
-                    let messages = errors.map { $0.formattedMessage }
-                    message = messages.joined(separator: "; ")
-                }
-            } else if let msg = errorResponse.message {
-                message = msg
-            } else if let err = errorResponse.error {
-                message = err
-            }
-        }
+        let errorEvent = SDKErrorEvent.networkError(
+            error: error,
+            url: url.absoluteString,
+            statusCode: statusCode,
+            responseBody: responseBody
+        )
 
-        switch statusCode {
-        case 401:
-            return SDKError.network(.unauthorized, message ?? "Authentication required")
-        case 403:
-            return SDKError.network(.forbidden, message ?? "Access denied")
-        case 404:
-            return SDKError.network(.invalidResponse, message ?? "Resource not found")
-        case 408, 504:
-            return SDKError.network(.timeout, message ?? "Request timed out")
-        case 422:
-            return SDKError.network(.validationFailed, message ?? "Validation failed")
-        case 400..<500:
-            return SDKError.network(.httpError, "Client error \(statusCode): \(message ?? "Unknown error")")
-        case 500..<600:
-            return SDKError.network(.serverError, "Server error \(statusCode): \(message ?? "Unknown error")")
-        default:
-            return SDKError.network(.unknown, message ?? "Unknown error with status code \(statusCode)")
-        }
+        EventPublisher.shared.track(errorEvent)
     }
 }

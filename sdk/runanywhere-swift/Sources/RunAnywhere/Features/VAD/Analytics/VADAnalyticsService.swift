@@ -45,11 +45,14 @@ public actor VADAnalyticsService {
     }
 
     /// Track VAD initialization failure
-    public func trackInitializationFailed(error: String, framework: InferenceFramework) {
+    public func trackInitializationFailed(error: Error, framework: InferenceFramework) {
         currentFramework = framework
         lastEventTime = Date()
 
-        EventPublisher.shared.track(VADEvent.initializationFailed(error: error, framework: framework))
+        EventPublisher.shared.track(VADEvent.initializationFailed(
+            error: SDKError.from(error, category: .vad),
+            framework: framework
+        ))
     }
 
     /// Track VAD cleanup
@@ -135,12 +138,12 @@ public actor VADAnalyticsService {
     }
 
     /// Track model load failed
-    public func trackModelLoadFailed(modelId: String, error: String) {
+    public func trackModelLoadFailed(modelId: String, error: Error) {
         lastEventTime = Date()
 
         EventPublisher.shared.track(VADEvent.modelLoadFailed(
             modelId: modelId,
-            error: error,
+            error: SDKError.from(error, category: .vad),
             framework: currentFramework
         ))
     }

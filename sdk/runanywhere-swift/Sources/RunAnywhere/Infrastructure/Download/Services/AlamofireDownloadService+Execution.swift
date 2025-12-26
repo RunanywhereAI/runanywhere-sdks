@@ -65,23 +65,18 @@ extension AlamofireDownloadService {
                     if let downloadedURL = downloadedURL {
                         continuation.resume(returning: downloadedURL)
                     } else {
-                        EventPublisher.shared.track(ModelEvent.downloadFailed(
-                            modelId: model.id,
-                            error: "Invalid response - no URL returned"
-                        ))
-                        continuation.resume(throwing: SDKError.download(.invalidResponse, "Invalid response - no URL returned"))
+                        let downloadError = SDKError.download(.invalidResponse, "Invalid response - no URL returned")
+                        EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: downloadError))
+                        continuation.resume(throwing: downloadError)
                     }
 
                 case .failure(let error):
                     let downloadError = self.mapAlamofireError(error)
-                    EventPublisher.shared.track(ModelEvent.downloadFailed(
-                        modelId: model.id,
-                        error: error.localizedDescription
-                    ))
+                    EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: downloadError))
                     self.logger.error("Download failed", metadata: [
                         "modelId": model.id,
                         "url": url.absoluteString,
-                        "error": error.localizedDescription,
+                        "error": downloadError.message,
                         "statusCode": response.response?.statusCode ?? 0
                     ])
                     continuation.resume(throwing: downloadError)
@@ -163,7 +158,7 @@ extension AlamofireDownloadService {
         } catch {
             EventPublisher.shared.track(ModelEvent.extractionFailed(
                 modelId: model.id,
-                error: error.localizedDescription
+                error: SDKError.from(error, category: .download)
             ))
             throw error
         }

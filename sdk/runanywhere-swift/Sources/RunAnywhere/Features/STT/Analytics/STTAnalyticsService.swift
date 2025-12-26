@@ -163,7 +163,7 @@ public actor STTAnalyticsService {
     /// Track transcription failure
     public func trackTranscriptionFailed(
         transcriptionId: String,
-        errorMessage: String
+        error: Error
     ) {
         let tracker = activeTranscriptions.removeValue(forKey: transcriptionId)
         lastEventTime = Date()
@@ -171,7 +171,7 @@ public actor STTAnalyticsService {
         EventPublisher.shared.track(STTEvent.transcriptionFailed(
             transcriptionId: transcriptionId,
             modelId: tracker?.modelId ?? "unknown",
-            error: errorMessage
+            error: SDKError.from(error, category: .stt)
         ))
     }
 
@@ -183,14 +183,17 @@ public actor STTAnalyticsService {
         ))
     }
 
-    /// Track an error during operations
-    public func trackError(_ error: Error, operation: String) {
+    /// Track an error during STT operations with full SDKError context
+    public func trackError(_ error: Error, operation: String, modelId: String? = nil, transcriptionId: String? = nil) {
         lastEventTime = Date()
-        EventPublisher.shared.track(ErrorEvent.error(
-            operation: operation,
-            message: error.localizedDescription,
-            code: (error as NSError).code
-        ))
+        let sdkError = SDKError.from(error, category: .stt)
+        let errorEvent = SDKErrorEvent.sttError(
+            error: sdkError,
+            modelId: modelId,
+            transcriptionId: transcriptionId,
+            operation: operation
+        )
+        EventPublisher.shared.track(errorEvent)
     }
 
     // MARK: - Metrics

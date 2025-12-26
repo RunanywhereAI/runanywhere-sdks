@@ -73,7 +73,7 @@ public actor DeviceRegistrationService {
 
         } catch {
             // Registration failure is non-critical - log and continue
-            EventPublisher.shared.track(DeviceEvent.registrationFailed(error: error.localizedDescription))
+            EventPublisher.shared.track(DeviceEvent.registrationFailed(error: SDKError.from(error, category: .network)))
             logger.warning("Device registration failed: \(error.localizedDescription)")
         }
     }

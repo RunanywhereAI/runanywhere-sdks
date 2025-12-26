@@ -143,7 +143,7 @@ public actor TTSAnalyticsService {
     /// Track synthesis failure
     public func trackSynthesisFailed(
         synthesisId: String,
-        errorMessage: String
+        error: Error
     ) {
         let tracker = activeSyntheses.removeValue(forKey: synthesisId)
         lastEventTime = Date()
@@ -151,18 +151,21 @@ public actor TTSAnalyticsService {
         EventPublisher.shared.track(TTSEvent.synthesisFailed(
             synthesisId: synthesisId,
             modelId: tracker?.modelId ?? "unknown",
-            error: errorMessage
+            error: SDKError.from(error, category: .tts)
         ))
     }
 
-    /// Track an error during operations
-    public func trackError(_ error: Error, operation: String) {
+    /// Track an error during TTS operations with full SDKError context
+    public func trackError(_ error: Error, operation: String, modelId: String? = nil, synthesisId: String? = nil) {
         lastEventTime = Date()
-        EventPublisher.shared.track(ErrorEvent.error(
-            operation: operation,
-            message: error.localizedDescription,
-            code: (error as NSError).code
-        ))
+        let sdkError = SDKError.from(error, category: .tts)
+        let errorEvent = SDKErrorEvent.ttsError(
+            error: sdkError,
+            modelId: modelId,
+            synthesisId: synthesisId,
+            operation: operation
+        )
+        EventPublisher.shared.track(errorEvent)
     }
 
     // MARK: - Metrics

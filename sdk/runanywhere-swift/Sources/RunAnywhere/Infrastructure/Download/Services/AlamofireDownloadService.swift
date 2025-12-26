@@ -113,8 +113,9 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     /// Download model using artifact-type-based approach
     func downloadModelWithArtifactType(_ model: ModelInfo) async throws -> DownloadTask {
         guard let downloadURL = model.downloadURL else {
-            EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: "Invalid download URL"))
-            throw SDKError.download(.invalidInput, "Invalid download URL for model: \(model.id)")
+            let downloadError = SDKError.download(.invalidInput, "Invalid download URL for model: \(model.id)")
+            EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: downloadError))
+            throw downloadError
         }
 
         // Track download started
@@ -318,7 +319,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         return progressHandler.calculateSpeed(progress: progress)
     }
 
-    func mapAlamofireError(_ error: AFError) -> Error {
+    func mapAlamofireError(_ error: AFError) -> SDKError {
         switch error {
         case .sessionTaskFailed(let underlyingError):
             let message = "Network error during download: \(underlyingError.localizedDescription)"

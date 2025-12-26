@@ -91,7 +91,7 @@ public actor VADCapability: ServiceBasedCapability {
         } catch {
             // Track initialization failure
             await analyticsService.trackInitializationFailed(
-                error: error.localizedDescription,
+                error: error,
                 framework: .builtIn
             )
             throw error

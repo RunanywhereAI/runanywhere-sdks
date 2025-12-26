@@ -31,7 +31,7 @@ public enum LLMEvent: SDKEvent, TypedEventProperties {
 
     case modelLoadStarted(modelId: String, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
     case modelLoadCompleted(modelId: String, durationMs: Double, modelSizeBytes: Int64 = 0, framework: InferenceFramework = .unknown)
-    case modelLoadFailed(modelId: String, error: String, framework: InferenceFramework = .unknown)
+    case modelLoadFailed(modelId: String, error: SDKError, framework: InferenceFramework = .unknown)
     case modelUnloaded(modelId: String)
     case modelUnloadStarted(modelId: String)
 
@@ -72,7 +72,7 @@ public enum LLMEvent: SDKEvent, TypedEventProperties {
         maxTokens: Int? = nil,
         contextLength: Int? = nil
     )
-    case generationFailed(generationId: String, error: String)
+    case generationFailed(generationId: String, error: SDKError)
 
     // MARK: - SDKEvent Conformance
 
@@ -130,10 +130,9 @@ public enum LLMEvent: SDKEvent, TypedEventProperties {
         case .modelLoadFailed(let modelId, let error, let framework):
             return [
                 "model_id": modelId,
-                "error_message": error,
                 "framework": framework.rawValue,
                 "success": "false"
-            ]
+            ].merging(error.telemetryProperties) { _, new in new }
 
         case .modelUnloaded(let modelId):
             return ["model_id": modelId]
@@ -211,9 +210,8 @@ public enum LLMEvent: SDKEvent, TypedEventProperties {
         case .generationFailed(let generationId, let error):
             return [
                 "generation_id": generationId,
-                "error_message": error,
                 "success": "false"
-            ]
+            ].merging(error.telemetryProperties) { _, new in new }
         }
     }
 
@@ -244,7 +242,8 @@ public enum LLMEvent: SDKEvent, TypedEventProperties {
                 modelId: modelId,
                 framework: framework.rawValue,
                 success: false,
-                errorMessage: error
+                errorMessage: error.message,
+                errorCode: error.code.rawValue
             )
 
         case .modelUnloaded(let modelId):
@@ -310,7 +309,8 @@ public enum LLMEvent: SDKEvent, TypedEventProperties {
         case .generationFailed(let generationId, let error):
             return EventProperties(
                 success: false,
-                errorMessage: error,
+                errorMessage: error.message,
+                errorCode: error.code.rawValue,
                 generationId: generationId
             )
         }

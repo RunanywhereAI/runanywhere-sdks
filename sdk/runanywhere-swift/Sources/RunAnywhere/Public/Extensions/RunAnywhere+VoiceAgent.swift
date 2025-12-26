@@ -94,7 +94,7 @@ public extension RunAnywhere {
             try await serviceContainer.voiceAgentCapability.initialize(config)
             EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
-            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
             throw error
         }
     }
@@ -128,7 +128,7 @@ public extension RunAnywhere {
             )
             EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
-            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
             throw error
         }
     }
@@ -165,7 +165,7 @@ public extension RunAnywhere {
             try await serviceContainer.voiceAgentCapability.initializeWithLoadedModels()
             EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
-            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
             throw error
         }
     }
@@ -190,7 +190,7 @@ public extension RunAnywhere {
             let result = try await serviceContainer.voiceAgentCapability.processVoiceTurn(audioData)
             return result
         } catch {
-            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: error.localizedDescription))
+            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
             throw error
         }
     }

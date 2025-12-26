@@ -136,7 +136,7 @@ public actor TTSCapability: ModelLoadableCapability {
             logger.error("Synthesis failed: \(error)")
             await analyticsService.trackSynthesisFailed(
                 synthesisId: synthesisId,
-                errorMessage: error.localizedDescription
+                error: error
             )
             await managedLifecycle.trackOperationError(error, operation: "synthesize")
             throw SDKError.tts(.generationFailed, "Synthesis failed: \(error.localizedDescription)", underlying: error)
@@ -234,7 +234,7 @@ public actor TTSCapability: ModelLoadableCapability {
                 } catch {
                     await self.analyticsService.trackSynthesisFailed(
                         synthesisId: synthesisId,
-                        errorMessage: error.localizedDescription
+                        error: error
                     )
                     continuation.finish(throwing: error)
                 }

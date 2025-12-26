@@ -116,7 +116,7 @@ public actor STTCapability: ModelLoadableCapability {
             logger.error("Transcription failed: \(error)")
             await analyticsService.trackTranscriptionFailed(
                 transcriptionId: transcriptionId,
-                errorMessage: error.localizedDescription
+                error: error
             )
             await managedLifecycle.trackOperationError(error, operation: "transcribe")
             throw SDKError.stt(.generationFailed, "Transcription failed: \(error.localizedDescription)", underlying: error)
@@ -240,7 +240,7 @@ public actor STTCapability: ModelLoadableCapability {
                 } catch {
                     await self.analyticsService.trackTranscriptionFailed(
                         transcriptionId: transcriptionId,
-                        errorMessage: error.localizedDescription
+                        error: error
                     )
                     continuation.finish(throwing: error)
                 }
