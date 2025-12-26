@@ -159,7 +159,7 @@ struct ChatInterfaceView: View {
                 await viewModel.checkModelStatus()
             }
         }
-        .alert("Debug Info", isPresented: $showDebugAlert) {
+        .alert("Details", isPresented: $showDebugAlert) {
             Button("OK") { }
         } message: {
             Text(debugMessage)
@@ -171,27 +171,71 @@ struct ChatInterfaceView: View {
             VStack(spacing: 0) {
                 ScrollView {
                     if viewModel.messages.isEmpty && !viewModel.isGenerating {
-                        // Empty state view
-                        VStack(spacing: 16) {
+                        // Empty state view - consumer-friendly welcome
+                        VStack(spacing: AppSpacing.xLarge) {
                             Spacer()
 
-                            Image(systemName: "message.circle")
-                                .font(AppTypography.system60)
-                                .foregroundColor(AppColors.textSecondary.opacity(0.6))
+                            // Friendly icon
+                            ZStack {
+                                Circle()
+                                    .fill(LinearGradient(
+                                        colors: [AppColors.primaryBlue.opacity(0.15), AppColors.primaryPurple.opacity(0.1)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ))
+                                    .frame(width: 100, height: 100)
 
-                            VStack(spacing: 8) {
-                                Text("Start a conversation")
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 44))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [AppColors.primaryBlue, AppColors.primaryPurple],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
+
+                            VStack(spacing: AppSpacing.smallMedium) {
+                                Text("Hi there! 👋")
                                     .font(AppTypography.title2Semibold)
                                     .foregroundColor(AppColors.textPrimary)
 
-                                Text("Type a message below to get started")
-                                    .font(AppTypography.subheadline)
+                                Text("I'm your private AI assistant.\nAsk me anything!")
+                                    .font(AppTypography.body)
                                     .foregroundColor(AppColors.textSecondary)
+                                    .multilineTextAlignment(.center)
                             }
+
+                            // Suggestion chips
+                            VStack(spacing: AppSpacing.smallMedium) {
+                                Text("Try asking:")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.textSecondary)
+
+                                HStack(spacing: AppSpacing.smallMedium) {
+                                    SuggestionChip(text: "Tell me a joke") {
+                                        viewModel.currentInput = "Tell me a joke"
+                                    }
+                                    SuggestionChip(text: "Explain AI") {
+                                        viewModel.currentInput = "Explain artificial intelligence in simple terms"
+                                    }
+                                }
+                                HStack(spacing: AppSpacing.smallMedium) {
+                                    SuggestionChip(text: "Write a poem") {
+                                        viewModel.currentInput = "Write a short poem about nature"
+                                    }
+                                    SuggestionChip(text: "Fun fact") {
+                                        viewModel.currentInput = "Tell me an interesting fun fact"
+                                    }
+                                }
+                            }
+                            .padding(.top, AppSpacing.medium)
 
                             Spacer()
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.horizontal, AppSpacing.large)
                     } else {
                         LazyVStack(spacing: AppSpacing.large) {
                             // Add spacer at top for better scrolling
@@ -339,7 +383,7 @@ struct ChatInterfaceView: View {
             // Info icon for chat details
             Button(action: { showingChatDetails = true }) {
                 Image(systemName: "info.circle")
-                    .foregroundColor(viewModel.messages.isEmpty ? .gray : .blue)
+                    .foregroundColor(viewModel.messages.isEmpty ? AppColors.statusGray : AppColors.primaryAccent)
             }
             .disabled(viewModel.messages.isEmpty)
             #if os(macOS)
@@ -480,7 +524,7 @@ struct TypingIndicatorView: View {
                 HStack(spacing: AppSpacing.xSmall) {
                     ForEach(0..<3) { index in
                         Circle()
-                            .fill(AppColors.primaryBlue.opacity(0.7))
+                            .fill(AppColors.typingIndicatorDots)
                             .frame(width: AppSpacing.iconSmall, height: AppSpacing.iconSmall)
                             .scaleEffect(animationPhase == index ? 1.3 : 0.8)
                             .animation(
@@ -754,9 +798,9 @@ struct MessageBubbleView: View {
             .padding(.vertical, 5)
             .background(
                 RoundedRectangle(cornerRadius: AppSpacing.regular)
-                    .fill(LinearGradient(colors: [AppColors.primaryBlue, AppColors.primaryBlue.opacity(0.8)],
+                    .fill(LinearGradient(colors: [AppColors.primaryAccent, AppColors.primaryAccent.opacity(0.8)],
                                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .shadow(color: AppColors.primaryBlue.opacity(0.3), radius: 2, x: 0, y: 1)
+                    .shadow(color: AppColors.shadowModelBadge, radius: 2, x: 0, y: 1)
                     .overlay(
                         RoundedRectangle(cornerRadius: AppSpacing.regular)
                             .strokeBorder(AppColors.textWhite.opacity(0.2), lineWidth: AppSpacing.strokeThin)
@@ -973,7 +1017,7 @@ struct ChatOverviewTab: View {
                     VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                         HStack {
                             Image(systemName: "message.circle")
-                                .foregroundColor(AppColors.primaryBlue)
+                                .foregroundColor(AppColors.primaryAccent)
                             Text(conversationSummary)
                                 .font(AppTypography.subheadline)
                         }
@@ -981,7 +1025,7 @@ struct ChatOverviewTab: View {
                         if let conversation = conversation {
                             HStack {
                                 Image(systemName: "clock")
-                                    .foregroundColor(AppColors.primaryBlue)
+                                    .foregroundColor(AppColors.primaryAccent)
                                 Text("Created \(conversation.createdAt, style: .relative)")
                                     .font(AppTypography.subheadline)
                             }
@@ -990,7 +1034,7 @@ struct ChatOverviewTab: View {
                         if !analyticsMessages.isEmpty {
                             HStack {
                                 Image(systemName: "cube")
-                                    .foregroundColor(AppColors.primaryBlue)
+                                    .foregroundColor(AppColors.primaryAccent)
                                 let models = Set(analyticsMessages.map { $0.modelName })
                                 Text("\(models.count) model\(models.count == 1 ? "" : "s") used")
                                     .font(AppTypography.subheadline)
@@ -1277,11 +1321,11 @@ struct PerformanceTab: View {
                                 VStack(alignment: .trailing, spacing: 4) {
                                     Text(String(format: "%.1fs avg", avgTime))
                                         .font(.caption)
-                                        .foregroundColor(.green)
+                                        .foregroundColor(AppColors.statusGreen)
 
                                     Text("\(Int(avgSpeed)) tok/s")
                                         .font(.caption)
-                                        .foregroundColor(AppColors.primaryBlue)
+                                        .foregroundColor(AppColors.primaryAccent)
                                 }
                             }
                             .padding(AppSpacing.large)
@@ -1304,7 +1348,7 @@ struct PerformanceTab: View {
 
                             HStack {
                                 Image(systemName: "lightbulb.min")
-                                    .foregroundColor(.purple)
+                                    .foregroundColor(AppColors.primaryPurple)
 
                                 Text("Used in \(thinkingMessages.count) messages (\(String(format: "%.0f", thinkingPercentage))%)")
                                     .font(AppTypography.subheadline)
@@ -1312,7 +1356,7 @@ struct PerformanceTab: View {
                             .padding(AppSpacing.large)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.purple.opacity(0.1))
+                                    .fill(AppColors.primaryPurple.opacity(0.1))
                             )
                         }
                     }
@@ -1322,5 +1366,33 @@ struct PerformanceTab: View {
             }
             .padding(AppSpacing.large)
         }
+    }
+}
+
+// MARK: - Suggestion Chip
+
+/// A tappable suggestion chip for quick conversation starters
+struct SuggestionChip: View {
+    let text: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .font(AppTypography.caption)
+                .fontWeight(.medium)
+                .foregroundColor(AppColors.primaryBlue)
+                .padding(.horizontal, AppSpacing.mediumLarge)
+                .padding(.vertical, AppSpacing.smallMedium)
+                .background(
+                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusLarge)
+                        .fill(AppColors.primaryBlue.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusLarge)
+                                .strokeBorder(AppColors.primaryBlue.opacity(0.3), lineWidth: 1)
+                        )
+                )
+        }
+        .buttonStyle(.plain)
     }
 }

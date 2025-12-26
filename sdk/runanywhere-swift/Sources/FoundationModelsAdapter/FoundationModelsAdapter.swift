@@ -7,9 +7,10 @@ import OSLog
 import FoundationModels
 #endif
 
-/// Adapter for Apple's native Foundation Models framework (iOS 18.0+, macOS 26.0+)
+/// Adapter for Apple's native Foundation Models framework (iOS 26.0+)
 /// Uses Apple's built-in language models without requiring external model files
-@available(iOS 18.0, macOS 26.0, *)
+/// Note: Foundation Models (Apple Intelligence) requires iOS 26.0+ or macOS 26.0+
+@available(iOS 26.0, *)
 public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
     public var framework: LLMFramework { .foundationModels }
     public let supportedModalities: Set<FrameworkModality> = [.textToText]
@@ -29,8 +30,8 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
         logger.info("📝 Registering Foundation Models adapter...")
         
         #if canImport(FoundationModels)
-        guard #available(iOS 18.0, macOS 26.0, *) else {
-            logger.warning("⚠️ Foundation Models not available: iOS 18.0+ or macOS 26.0+ required")
+        guard #available(iOS 26.0, macOS 26.0, *) else {
+            logger.warning("⚠️ Foundation Models not available: iOS 26.0+ (or macOS 26.0+) required")
             return
         }
         
@@ -44,8 +45,8 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
     public func canHandle(model: ModelInfo) -> Bool {
         // Foundation Models doesn't need external model files
         // It can handle any request as it uses Apple's built-in models
-        guard #available(iOS 18.0, macOS 26.0, *) else {
-            logger.debug("Foundation Models not available: iOS 18.0+ or macOS 26.0+ required")
+        guard #available(iOS 26.0, macOS 26.0, *) else {
+            logger.debug("Foundation Models not available: iOS 26.0+ (or macOS 26.0+) required")
             return false
         }
 
@@ -135,7 +136,7 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
                 metadata: ModelInfoMetadata(
                     author: "Apple",
                     license: "Apple EULA",
-                    description: "Apple's built-in on-device language model (requires iOS 18+ / macOS 26+ with Apple Intelligence enabled)"
+                    description: "Apple's built-in on-device language model (requires iOS 26.0+ or macOS 26.0+ with Apple Intelligence enabled)"
                 ),
                 source: .defaults  // Built-in, not from remote
             )

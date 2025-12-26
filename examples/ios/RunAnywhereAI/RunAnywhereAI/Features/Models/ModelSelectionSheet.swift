@@ -87,12 +87,8 @@ struct ModelSelectionSheet: View {
                 #if os(macOS)
                 Button("Open System Settings") {
                     // Open System Settings to Apple Intelligence & Siri
-                    // Try the modern System Settings URL first
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Intelligence") {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.Siri") {
                         NSWorkspace.shared.open(url)
-                    } else {
-                        // Fallback: open System Settings app
-                        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Library/PreferencePanes/Security.prefPane"))
                     }
                 }
                 #endif
@@ -189,8 +185,7 @@ struct ModelSelectionSheet: View {
         // Get framework availability (shows all frameworks, including unavailable ones)
         let allAvailability = RunAnywhere.getFrameworkAvailability()
         
-        // Filter frameworks based on context by checking if they have relevant models
-        // Only include available frameworks for actual use, but show unavailable ones too
+        // Filter frameworks based on context - only include available frameworks for actual use
         var filteredFrameworks = allAvailability
             .filter { availability in
                 availability.isAvailable && shouldShowFramework(availability.framework)
@@ -607,6 +602,8 @@ private struct SelectableModelRow: View {
 
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
+    @State private var showDownloadError = false
+    @State private var downloadErrorMessage: String = ""
 
     var body: some View {
         HStack {
@@ -692,9 +689,18 @@ private struct SelectableModelRow: View {
                                     .font(AppTypography.caption2)
                                     .foregroundColor(AppColors.textSecondary)
                             } else {
-                                Text("Available for download")
-                                    .font(AppTypography.caption2)
-                                    .foregroundColor(AppColors.statusBlue)
+                                HStack(spacing: AppSpacing.xSmall) {
+                                    Text("Available for download")
+                                        .font(AppTypography.caption2)
+                                        .foregroundColor(AppColors.statusBlue)
+                                    #if os(iOS)
+                                    if let downloadURL = model.downloadURL, downloadURL.contains(".tar.bz2") {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(AppTypography.caption2)
+                                            .foregroundColor(AppColors.statusOrange)
+                                    }
+                                    #endif
+                                }
                             }
                         }
                     } else {
@@ -760,6 +766,13 @@ private struct SelectableModelRow: View {
         }
         .padding(.vertical, AppSpacing.xSmall)
         .opacity(isLoading && !isSelected ? 0.6 : 1.0)
+        .alert("Download Failed", isPresented: $showDownloadError) {
+            Button("OK", role: .cancel) {
+                showDownloadError = false
+            }
+        } message: {
+            Text(downloadErrorMessage)
+        }
     }
 
     private func downloadModel() async {
@@ -794,7 +807,22 @@ private struct SelectableModelRow: View {
                     await MainActor.run {
                         self.downloadProgress = 0.0
                         self.isDownloading = false
-                        print("Download failed for \(model.name): \(error.localizedDescription)")
+                        
+                        // Check if this is a tar.bz2 extraction error on iOS
+                        let errorDescription = error.localizedDescription
+                        var userMessage = errorDescription
+                        
+                        #if os(iOS)
+                        if let downloadURL = model.downloadURL, downloadURL.contains(".tar.bz2") ||
+                           errorDescription.lowercased().contains("bz2") ||
+                           errorDescription.lowercased().contains("extraction") {
+                            userMessage = "This model uses .tar.bz2 format which cannot be extracted on iOS. Please use a different STT model format or try on macOS."
+                        }
+                        #endif
+                        
+                        self.downloadErrorMessage = "Failed to download \(model.name): \(userMessage)"
+                        self.showDownloadError = true
+                        print("Download failed for \(model.name): \(errorDescription)")
                     }
                     return
 
@@ -805,10 +833,25 @@ private struct SelectableModelRow: View {
             }
 
         } catch {
-            print("Download failed: \(error)")
             await MainActor.run {
                 downloadProgress = 0.0
                 isDownloading = false
+                
+                // Check if this is a tar.bz2 extraction error on iOS
+                let errorDescription = error.localizedDescription
+                var userMessage = errorDescription
+                
+                #if os(iOS)
+                if let downloadURL = model.downloadURL, downloadURL.contains(".tar.bz2") ||
+                   errorDescription.lowercased().contains("bz2") ||
+                   errorDescription.lowercased().contains("extraction") {
+                    userMessage = "This model uses .tar.bz2 format which cannot be extracted on iOS. Please use a different STT model format or try on macOS."
+                }
+                #endif
+                
+                downloadErrorMessage = "Failed to download \(model.name): \(userMessage)"
+                showDownloadError = true
+                print("Download failed: \(errorDescription)")
             }
         }
     }

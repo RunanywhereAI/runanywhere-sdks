@@ -7,8 +7,8 @@ import os
 import AppKit
 #endif
 
-/// Collection of funny sample texts for TTS demo
-private let funnyTTSSampleTexts: [String] = [
+/// Fun texts for text-to-speech
+private let sampleTTSTexts: [String] = [
     "I'm not saying I'm Batman, but have you ever seen me and Batman in the same room?",
     "According to my calculations, I should have been a millionaire by now. My calculations were wrong.",
     "I told my computer I needed a break, and now it won't stop sending me vacation ads.",
@@ -34,32 +34,25 @@ private let funnyTTSSampleTexts: [String] = [
     "My houseplants are thriving! Just kidding, they're plastic.",
     "I don't sweat, I sparkle. Aggressively. With visible discomfort.",
     "Plot twist: the hokey pokey really IS what it's all about.",
-    // RunAnywhere SDK promotional texts
-    "RunAnywhere: because your AI should work even when your WiFi doesn't.",
-    "We're a Y Combinator company now. Our moms are finally proud of us.",
-    "On-device AI means your voice data stays on your phone. Unlike your ex, we respect privacy.",
-    "RunAnywhere: Making cloud APIs jealous since 2024.",
-    "Our SDK is so fast, it finished processing before you finished reading this sentence.",
-    "Why pay per API call when you can run AI locally? Your wallet called, it says thank you.",
-    "RunAnywhere: We put the 'smart' in smartphone, and the 'savings' in your bank account.",
-    "Backed by Y Combinator. Powered by caffeine. Fueled by the dream of affordable AI.",
-    "Our on-device models are like introverts. They do great work without needing the cloud.",
-    "RunAnywhere SDK: Because latency is just a fancy word for 'too slow'.",
-    "Voice AI that runs offline? That's not magic, that's just good engineering. Okay, maybe a little magic.",
-    "We optimized our models so hard, they now run faster than your excuses for not exercising.",
-    "RunAnywhere: Where 'it works offline' isn't a bug, it's the whole feature.",
-    "Y Combinator believed in us. Your device believes in us. Now it's your turn.",
-    "On-device AI: All the intelligence, none of the monthly subscription fees.",
-    "Our SDK is like a good friend: fast, reliable, and doesn't share your secrets with big tech.",
-    "RunAnywhere makes voice AI accessible. Like, actually accessible. Not 'enterprise pricing' accessible."
+    // On-device AI fun facts
+    "Your AI assistant works even when your WiFi doesn't. How's that for independence?",
+    "On-device AI means your voice data stays on your phone. Privacy first, always.",
+    "Why wait for the cloud when your phone can think for itself?",
+    "This voice was generated entirely on your device. No internet required!",
+    "Your phone just became a lot smarter. And it didn't even need a software update.",
+    "On-device processing: All the intelligence, none of the monthly subscription fees.",
+    "Voice AI that runs offline? That's not magic, that's just good engineering.",
+    "Your data never leaves your device. That's a promise, not a policy.",
+    "Fast, private, and works anywhere. Even in airplane mode!",
+    "The future of AI is local. Welcome to the future."
 ]
 
 /// Dedicated Text-to-Speech view with text input and playback
 struct TextToSpeechView: View {
     @StateObject private var viewModel = TTSViewModel()
     @State private var showModelPicker = false
-    @State private var inputText: String = funnyTTSSampleTexts.randomElement()
-        ?? "Hello! This is a text to speech test."
+    @State private var inputText: String = sampleTTSTexts.randomElement()
+        ?? "Hello! Welcome to text to speech."
 
     private var hasModelSelected: Bool {
         viewModel.selectedModelName != nil
@@ -127,7 +120,7 @@ struct TextToSpeechView: View {
 
                             Button {
                                 withAnimation(.easeInOut(duration: 0.2)) {
-                                    inputText = funnyTTSSampleTexts.randomElement() ?? inputText
+                                    inputText = sampleTTSTexts.randomElement() ?? inputText
                                 }
                             } label: {
                                 HStack(spacing: 4) {
@@ -135,7 +128,7 @@ struct TextToSpeechView: View {
                                     Text("Surprise me!")
                                 }
                                 .font(.caption)
-                                .foregroundColor(.purple)
+                                .foregroundColor(AppColors.primaryAccent)
                             }
                         }
                     }
@@ -157,7 +150,7 @@ struct TextToSpeechView: View {
                                     .foregroundColor(.secondary)
                             }
                             Slider(value: $viewModel.speechRate, in: 0.5...2.0, step: 0.1)
-                                .tint(.blue)
+                                .tint(AppColors.primaryAccent)
                         }
 
                         // Pitch
@@ -171,7 +164,7 @@ struct TextToSpeechView: View {
                                     .foregroundColor(.secondary)
                             }
                             Slider(value: $viewModel.pitch, in: 0.5...2.0, step: 0.1)
-                                .tint(.purple)
+                                .tint(AppColors.primaryPurple)
                         }
                     }
                     .padding()
@@ -222,7 +215,7 @@ struct TextToSpeechView: View {
                             .foregroundColor(.secondary)
 
                         ProgressView(value: viewModel.playbackProgress)
-                            .tint(.purple)
+                            .tint(AppColors.primaryAccent)
 
                         Text(formatTime(viewModel.duration))
                             .font(.caption)
@@ -254,7 +247,7 @@ struct TextToSpeechView: View {
                         }
                         .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
                         .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
-                        .background(inputText.isEmpty || viewModel.selectedModelName == nil ? Color.gray : Color.purple)
+                        .background(inputText.isEmpty || viewModel.selectedModelName == nil ? AppColors.statusGray : AppColors.primaryAccent)
                         .foregroundColor(.white)
                         .cornerRadius(25)
                     }
@@ -274,7 +267,7 @@ struct TextToSpeechView: View {
                         }
                         .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
                         .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
-                        .background(viewModel.hasGeneratedAudio ? Color.green : Color.gray)
+                        .background(viewModel.hasGeneratedAudio ? AppColors.statusGreen : AppColors.statusGray)
                         .foregroundColor(.white)
                         .cornerRadius(25)
                     }
@@ -324,20 +317,20 @@ struct TextToSpeechView: View {
         .onChange(of: viewModel.selectedModelName) { oldValue, newValue in
             // Set a new random funny text when a model is loaded
             if oldValue == nil && newValue != nil {
-                inputText = funnyTTSSampleTexts.randomElement() ?? inputText
+                inputText = sampleTTSTexts.randomElement() ?? inputText
             }
         }
     }
 
     private var statusColor: Color {
         if viewModel.isGenerating {
-            return .orange
+            return AppColors.statusOrange
         } else if viewModel.isPlaying {
-            return .green
+            return AppColors.statusGreen
         } else if viewModel.selectedModelName != nil {
-            return .green
+            return AppColors.statusGreen
         } else {
-            return .gray
+            return AppColors.statusGray
         }
     }
 

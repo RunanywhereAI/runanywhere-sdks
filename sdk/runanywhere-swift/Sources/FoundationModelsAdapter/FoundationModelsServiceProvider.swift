@@ -8,12 +8,12 @@ import OSLog
 /// ```swift
 /// import FoundationModels
 ///
-/// // In your app initialization (iOS 18+ / macOS 26+ only):
-/// if #available(iOS 18.0, macOS 26.0, *) {
+/// // In your app initialization (iOS 26+ only):
+/// if #available(iOS 26.0, *) {
 ///     FoundationModelsServiceProvider.register()
 /// }
 /// ```
-@available(iOS 18.0, macOS 26.0, *)
+@available(iOS 26.0, *)
 public final class FoundationModelsServiceProvider: LLMServiceProvider {
     private let logger = Logger(subsystem: "com.runanywhere.FoundationModels", category: "FoundationModelsServiceProvider")
 
@@ -34,8 +34,8 @@ public final class FoundationModelsServiceProvider: LLMServiceProvider {
     }
 
     public func canHandle(modelId: String?) -> Bool {
-        // Check if we're running on iOS 18+ or macOS 26+
-        guard #available(iOS 18.0, macOS 26.0, *) else {
+        // Check if we're running on iOS 26.0+
+        guard #available(iOS 26.0, macOS 26.0, *) else {
             return false
         }
 
@@ -76,7 +76,7 @@ public final class FoundationModelsServiceProvider: LLMServiceProvider {
 // MARK: - Auto Registration Support
 
 /// Automatic registration when module is imported
-@available(iOS 18.0, macOS 26.0, *)
+@available(iOS 26.0, *)
 public enum FoundationModelsModule {
     /// Call this to automatically register Foundation Models with the SDK
     @MainActor

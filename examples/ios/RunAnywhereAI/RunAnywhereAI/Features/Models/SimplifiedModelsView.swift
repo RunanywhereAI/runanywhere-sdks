@@ -234,6 +234,8 @@ private struct ModelRow: View {
 
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
+    @State private var showDownloadError = false
+    @State private var downloadErrorMessage: String = ""
 
     var body: some View {
         HStack {
@@ -311,9 +313,18 @@ private struct ModelRow: View {
                                     .font(AppTypography.caption2)
                                     .foregroundColor(AppColors.textSecondary)
                             } else {
-                                Text("Available for download")
-                                    .font(AppTypography.caption2)
-                                    .foregroundColor(AppColors.statusBlue)
+                                HStack(spacing: AppSpacing.xSmall) {
+                                    Text("Available for download")
+                                        .font(AppTypography.caption2)
+                                        .foregroundColor(AppColors.statusBlue)
+                                    #if os(iOS)
+                                    if let downloadURL = model.downloadURL, downloadURL.contains(".tar.bz2") {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(AppTypography.caption2)
+                                            .foregroundColor(AppColors.statusOrange)
+                                    }
+                                    #endif
+                                }
                             }
                         }
                     } else {
@@ -377,6 +388,13 @@ private struct ModelRow: View {
             }
         }
         .padding(.vertical, AppSpacing.xSmall)
+        .alert("Download Failed", isPresented: $showDownloadError) {
+            Button("OK", role: .cancel) {
+                showDownloadError = false
+            }
+        } message: {
+            Text(downloadErrorMessage)
+        }
     }
 
     private func downloadModel() async {
@@ -411,7 +429,22 @@ private struct ModelRow: View {
                     await MainActor.run {
                         self.downloadProgress = 0.0
                         self.isDownloading = false
-                        print("Download failed for \(model.name): \(error.localizedDescription)")
+                        
+                        // Check if this is a tar.bz2 extraction error on iOS
+                        let errorDescription = error.localizedDescription
+                        var userMessage = errorDescription
+                        
+                        #if os(iOS)
+                        if let downloadURL = model.downloadURL, downloadURL.contains(".tar.bz2") ||
+                           errorDescription.lowercased().contains("bz2") ||
+                           errorDescription.lowercased().contains("extraction") {
+                            userMessage = "This model uses .tar.bz2 format which cannot be extracted on iOS. Please use a different STT model format or try on macOS."
+                        }
+                        #endif
+                        
+                        self.downloadErrorMessage = "Failed to download \(model.name): \(userMessage)"
+                        self.showDownloadError = true
+                        print("Download failed for \(model.name): \(errorDescription)")
                     }
                     return
 
@@ -422,10 +455,25 @@ private struct ModelRow: View {
             }
 
         } catch {
-            print("Download failed: \(error)")
             await MainActor.run {
                 downloadProgress = 0.0
                 isDownloading = false
+                
+                // Check if this is a tar.bz2 extraction error on iOS
+                let errorDescription = error.localizedDescription
+                var userMessage = errorDescription
+                
+                #if os(iOS)
+                if let downloadURL = model.downloadURL, downloadURL.contains(".tar.bz2") ||
+                   errorDescription.lowercased().contains("bz2") ||
+                   errorDescription.lowercased().contains("extraction") {
+                    userMessage = "This model uses .tar.bz2 format which cannot be extracted on iOS. Please use a different STT model format or try on macOS."
+                }
+                #endif
+                
+                downloadErrorMessage = "Failed to download \(model.name): \(userMessage)"
+                showDownloadError = true
+                print("Download failed: \(errorDescription)")
             }
         }
     }
