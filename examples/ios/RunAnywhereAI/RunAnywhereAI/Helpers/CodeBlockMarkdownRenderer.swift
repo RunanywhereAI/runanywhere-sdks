@@ -47,12 +47,14 @@ struct RichMarkdownText: View {
         let lines = content.components(separatedBy: .newlines)
 
         for line in lines {
-            // Detect code block start (```swift or ```)
-            if line.hasPrefix("```") {
+            // Detect code block markers - must be at start of line (trimmed)
+            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmedLine.hasPrefix("```") {
                 if inCodeBlock {
-                    // End of code block
+                    // End of code block - only if it's exactly ``` (or ```language on same line as start)
                     if !currentCode.isEmpty {
-                        blocks.append(.codeBlock(currentCode.trimmingCharacters(in: .whitespacesAndNewlines), currentLanguage))
+                        blocks.append(.codeBlock(currentCode, currentLanguage))
                         currentCode = ""
                         currentLanguage = nil
                     }
@@ -63,8 +65,8 @@ struct RichMarkdownText: View {
                         blocks.append(.text(currentText))
                         currentText = ""
                     }
-                    // Extract language if specified
-                    let langPart = line.dropFirst(3).trimmingCharacters(in: .whitespaces)
+                    // Extract language if specified (everything after ```)
+                    let langPart = trimmedLine.dropFirst(3).trimmingCharacters(in: .whitespaces)
                     currentLanguage = langPart.isEmpty ? nil : langPart
                     inCodeBlock = true
                 }
@@ -77,12 +79,14 @@ struct RichMarkdownText: View {
             }
         }
 
-        // Add remaining content
+        // Add remaining content (handle unclosed blocks gracefully)
         if !currentText.isEmpty {
             blocks.append(.text(currentText))
         }
         if !currentCode.isEmpty {
-            blocks.append(.codeBlock(currentCode.trimmingCharacters(in: .whitespacesAndNewlines), currentLanguage))
+            // Trim only trailing newlines, preserve code formatting
+            let trimmedCode = currentCode.trimmingCharacters(in: .newlines)
+            blocks.append(.codeBlock(trimmedCode, currentLanguage))
         }
 
         return blocks
