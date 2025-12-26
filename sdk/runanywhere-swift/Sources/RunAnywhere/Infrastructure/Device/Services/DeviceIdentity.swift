@@ -21,6 +21,12 @@ public enum DeviceIdentity {
     private static let logger = SDKLogger(category: "DeviceIdentity")
 
     /// Lock for thread-safe UUID initialization (read-check-write atomicity)
+    ///
+    /// Note: Using NSLock instead of Swift Actor because `persistentUUID` must be
+    /// synchronously accessible from non-async contexts (telemetry payloads, batch requests).
+    /// Actors require `await` which would break the synchronous API contract.
+    /// NSLock provides equivalent thread-safety with synchronous access.
+    /// Consider migrating to `OSAllocatedUnfairLock` when dropping iOS 15 support.
     private static let initLock = NSLock()
 
     /// Cached UUID to avoid repeated keychain lookups after first access
