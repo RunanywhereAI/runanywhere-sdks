@@ -54,13 +54,17 @@ class MarkdownDetector {
             }.count
         analysis.headingCount = headingCount
 
-        // Detect bold (**text**)
-        let boldParts = content.components(separatedBy: "**")
-        analysis.boldCount = max(0, (boldParts.count - 1) / 2)
+        // Detect bold (**text**) - use regex to match proper pairs
+        let boldPattern = "\\*\\*[^*]+\\*\\*"
+        let boldRegex = try? NSRegularExpression(pattern: boldPattern)
+        let boldMatches = boldRegex?.matches(in: content, range: NSRange(content.startIndex..., in: content)) ?? []
+        analysis.boldCount = boldMatches.count
 
-        // Detect inline code (`code`)
-        let codeParts = content.components(separatedBy: "`")
-        analysis.inlineCodeCount = max(0, (codeParts.count - 1) / 2)
+        // Detect inline code (`code`) - use regex to match proper pairs
+        let codePattern = "`[^`]+`"
+        let codeRegex = try? NSRegularExpression(pattern: codePattern)
+        let codeMatches = codeRegex?.matches(in: content, range: NSRange(content.startIndex..., in: content)) ?? []
+        analysis.inlineCodeCount = codeMatches.count
 
         // Detect lists (only count lines that start with list markers after trimming leading spaces)
         let listCount = content.components(separatedBy: .newlines)
