@@ -291,3 +291,19 @@ public enum ErrorCode: String, Sendable, CaseIterable {
     /// Unknown error
     case unknown
 }
+
+// MARK: - Error Classification
+
+extension ErrorCode {
+
+    /// Whether this error is expected/routine and shouldn't be logged as an error.
+    /// Examples: user cancellation, stream cancellation
+    public var isExpected: Bool {
+        switch self {
+        case .cancelled, .streamCancelled:
+            return true
+        default:
+            return false
+        }
+    }
+}

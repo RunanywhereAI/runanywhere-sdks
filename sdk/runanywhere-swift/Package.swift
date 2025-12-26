@@ -76,7 +76,6 @@ let package = Package(
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.57.1"),
-        .package(url: "https://github.com/kean/Pulse", from: "4.0.0"),
         // SWCompression for pure Swift tar.bz2/tar.gz extraction (replaces native C dependency)
         .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
 
@@ -95,7 +94,6 @@ let package = Package(
                 .product(name: "Files", package: "Files"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
-                .product(name: "Pulse", package: "Pulse"),
                 // SWCompression for pure Swift tar.bz2/tar.gz extraction
                 .product(name: "SWCompression", package: "SWCompression"),
                 // Sentry for crash reporting and error tracking

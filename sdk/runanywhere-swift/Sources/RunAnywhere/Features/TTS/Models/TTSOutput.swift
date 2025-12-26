@@ -120,3 +120,57 @@ public struct TTSPhonemeTimestamp: Sendable {
         self.endTime = endTime
     }
 }
+
+// MARK: - Speak Result
+
+/// Result from `speak()` - contains metadata only, no audio data.
+///
+/// The SDK handles audio playback internally when using `speak()`.
+/// This struct provides information about what was spoken for display purposes.
+///
+/// ## Example
+/// ```swift
+/// let result = try await RunAnywhere.speak("Hello world")
+/// print("Duration: \(result.duration)s")
+/// print("Voice: \(result.metadata.voice)")
+/// ```
+public struct TTSSpeakResult: Sendable {
+
+    /// Duration of the spoken audio in seconds
+    public let duration: TimeInterval
+
+    /// Audio format used
+    public let format: AudioFormat
+
+    /// Audio size in bytes (0 for system TTS which plays directly)
+    public let audioSizeBytes: Int
+
+    /// Synthesis metadata (voice, language, processing time, etc.)
+    public let metadata: TTSSynthesisMetadata
+
+    /// Timestamp when speech completed
+    public let timestamp: Date
+
+    public init(
+        duration: TimeInterval,
+        format: AudioFormat,
+        audioSizeBytes: Int,
+        metadata: TTSSynthesisMetadata,
+        timestamp: Date = Date()
+    ) {
+        self.duration = duration
+        self.format = format
+        self.audioSizeBytes = audioSizeBytes
+        self.metadata = metadata
+        self.timestamp = timestamp
+    }
+
+    /// Create from TTSOutput (internal use)
+    internal init(from output: TTSOutput) {
+        self.duration = output.duration
+        self.format = output.format
+        self.audioSizeBytes = output.audioSizeBytes
+        self.metadata = output.metadata
+        self.timestamp = output.timestamp
+    }
+}

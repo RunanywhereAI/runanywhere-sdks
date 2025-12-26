@@ -2,42 +2,34 @@
 //  SentryDestination.swift
 //  RunAnywhere SDK
 //
-//  Log destination that sends logs to Sentry for crash reporting and error tracking
+//  Log destination that sends logs to Sentry for error tracking
 //
 
 import Foundation
 import Sentry
 
-/// Log destination that sends logs to Sentry for crash reporting and error tracking
-/// Only logs at warning level and above are sent to Sentry
-public final class SentryDestination: LogDestination {
+/// Log destination that sends warning+ logs to Sentry
+public final class SentryDestination: LogDestination, @unchecked Sendable {
 
     // MARK: - LogDestination
 
-    public let identifier: String = "com.runanywhere.logging.sentry"
-    public let name: String = "Sentry"
+    public static let destinationID = "com.runanywhere.logging.sentry"
+
+    public let identifier: String = SentryDestination.destinationID
 
     public var isAvailable: Bool {
         SentryManager.shared.isInitialized
     }
 
-    // MARK: - Properties
-
-    /// Minimum log level to send to Sentry (warning and above)
+    /// Only send warning level and above to Sentry
     private let minSentryLevel: LogLevel = .warning
 
-    // MARK: - Initialization
-
-    public init() {
-        // SentryDestination relies on SentryManager being initialized separately
-    }
+    public init() {}
 
     // MARK: - LogDestination Operations
 
     public func write(_ entry: LogEntry) {
-        // Only send warning level and above to Sentry
-        guard entry.level >= minSentryLevel else { return }
-        guard isAvailable else { return }
+        guard entry.level >= minSentryLevel, isAvailable else { return }
 
         // Add as breadcrumb for context trail
         addBreadcrumb(for: entry)
@@ -71,23 +63,18 @@ public final class SentryDestination: LogDestination {
         let event = Event(level: convertToSentryLevel(entry.level))
         event.message = SentryMessage(formatted: entry.message)
         event.timestamp = entry.timestamp
-
-        // Set tags
         event.tags = [
             "category": entry.category,
             "log_level": entry.level.description
         ]
 
-        // Add metadata as extra context
         if let metadata = entry.metadata {
             event.extra = metadata
         }
 
-        // Add device info if available
         if let deviceInfo = entry.deviceInfo {
             var extra = event.extra ?? [:]
-            extra["device_model"] = deviceInfo.modelName
-            extra["device_id"] = deviceInfo.deviceId
+            extra["device_model"] = deviceInfo.deviceModel
             extra["os_version"] = deviceInfo.osVersion
             extra["platform"] = deviceInfo.platform
             event.extra = extra

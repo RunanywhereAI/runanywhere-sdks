@@ -99,21 +99,13 @@ public enum ONNX: RunAnywhereModule {
     private static func canHandleSTT(_ modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
 
-        let lowercased = modelId.lowercased()
-
-        // Check model info cache first - framework is the single source of truth
+        // Framework from model info is the single source of truth
+        // Models must be registered with the SDK via addModel() to be handled
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
             return modelInfo.framework == .onnx && modelInfo.category == .speechRecognition
         }
 
-        // Fallback: Pattern-based matching
-        if lowercased.contains("onnx") || lowercased.hasSuffix(".onnx") {
-            return true
-        }
-        if lowercased.contains("zipformer") || lowercased.contains("sherpa") {
-            return true
-        }
-
+        // Model is not registered - cannot handle unknown models
         return false
     }
 
@@ -145,24 +137,13 @@ public enum ONNX: RunAnywhereModule {
     private static func canHandleTTS(_ modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
 
-        let lowercased = modelId.lowercased()
-
-        // Check model info cache first - framework is the single source of truth
+        // Framework from model info is the single source of truth
+        // Models must be registered with the SDK via addModel() to be handled
         if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
             return modelInfo.framework == .onnx && modelInfo.category == .speechSynthesis
         }
 
-        // Fallback: Pattern-based matching
-        if lowercased.contains("piper") {
-            return true
-        }
-        if lowercased.contains("vits") {
-            return true
-        }
-        if lowercased.contains("tts") && lowercased.contains("onnx") {
-            return true
-        }
-
+        // Model is not registered - cannot handle unknown models
         return false
     }
 

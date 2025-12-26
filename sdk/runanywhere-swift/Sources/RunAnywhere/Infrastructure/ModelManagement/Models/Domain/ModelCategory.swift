@@ -50,10 +50,4 @@ public extension ModelCategory {
             return .audio
         }
     }
-
-    /// Determine category from format and framework
-    static func from(format _: ModelFormat, framework: InferenceFramework) -> ModelCategory {
-        // Use framework as the primary hint (1:1 mapping)
-        return from(framework: framework)
-    }
 }

@@ -1,5 +1,4 @@
 import Foundation
-import Pulse
 
 /// Service container for dependency injection
 /// Provides centralized access to all SDK capabilities and services

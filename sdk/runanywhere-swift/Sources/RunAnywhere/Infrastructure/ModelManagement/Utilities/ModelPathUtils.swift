@@ -57,14 +57,6 @@ public struct ModelPathUtils {
             .appendingPathComponent(modelId, isDirectory: true)
     }
 
-    /// Get the folder for a model (legacy path without framework)
-    /// - Parameter modelId: The model identifier
-    /// - Returns: URL to `Documents/RunAnywhere/Models/{modelId}/`
-    /// - Throws: If models directory cannot be accessed
-    public static func getModelFolder(modelId: String) throws -> URL {
-        return try getModelsDirectory().appendingPathComponent(modelId, isDirectory: true)
-    }
-
     // MARK: - Model File Paths
 
     /// Get the full path to a model file
@@ -77,18 +69,6 @@ public struct ModelPathUtils {
     public static func getModelFilePath(modelId: String, framework: InferenceFramework, format: ModelFormat) throws -> URL {
         let fileName = "\(modelId).\(format.rawValue)"
         return try getModelFolder(modelId: modelId, framework: framework)
-            .appendingPathComponent(fileName, isDirectory: false)
-    }
-
-    /// Get the full path to a model file (legacy path without framework)
-    /// - Parameters:
-    ///   - modelId: The model identifier
-    ///   - format: The model file format
-    /// - Returns: URL to `Documents/RunAnywhere/Models/{modelId}/{modelId}.{format.rawValue}`
-    /// - Throws: If model folder cannot be accessed
-    public static func getModelFilePath(modelId: String, format: ModelFormat) throws -> URL {
-        let fileName = "\(modelId).\(format.rawValue)"
-        return try getModelFolder(modelId: modelId)
             .appendingPathComponent(fileName, isDirectory: false)
     }
 
@@ -106,22 +86,16 @@ public struct ModelPathUtils {
     /// Get the expected model path from components
     /// - Parameters:
     ///   - modelId: The model identifier
-    ///   - framework: The ML framework (optional)
+    ///   - framework: The ML framework
     ///   - format: The model file format
     /// - Returns: URL to the expected model path
     /// - Throws: If model folder cannot be accessed
-    public static func getExpectedModelPath(modelId: String, framework: InferenceFramework?, format: ModelFormat) throws -> URL {
-        if let framework = framework {
-            if format.isDirectoryBased {
-                return try getModelFolder(modelId: modelId, framework: framework)
-            }
-            return try getModelFilePath(modelId: modelId, framework: framework, format: format)
-        } else {
-            if format.isDirectoryBased {
-                return try getModelFolder(modelId: modelId)
-            }
-            return try getModelFilePath(modelId: modelId, format: format)
+    public static func getExpectedModelPath(modelId: String, framework: InferenceFramework, format: ModelFormat) throws -> URL {
+        // Use framework's directory-based setting (single source of truth)
+        if framework.usesDirectoryBasedModels {
+            return try getModelFolder(modelId: modelId, framework: framework)
         }
+        return try getModelFilePath(modelId: modelId, framework: framework, format: format)
     }
 
     // MARK: - Other Directories
@@ -197,15 +171,5 @@ public struct ModelPathUtils {
     /// - Returns: true if the path is within the models directory
     public static func isModelPath(_ path: URL) -> Bool {
         return path.pathComponents.contains("Models")
-    }
-}
-
-// MARK: - ModelFormat Extensions
-
-public extension ModelFormat {
-    /// Whether this format represents a directory-based model
-    var isDirectoryBased: Bool {
-        // All supported formats are single-file based
-        return false
     }
 }

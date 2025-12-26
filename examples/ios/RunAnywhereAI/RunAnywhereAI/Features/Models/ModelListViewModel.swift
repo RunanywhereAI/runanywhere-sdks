@@ -150,7 +150,7 @@ class ModelListViewModel: ObservableObject {
         // Get the model info and use the Download service
         let allModels = try await RunAnywhere.availableModels()
         guard let modelInfo = allModels.first(where: { $0.id == model.id }) else {
-            throw RunAnywhereError.modelNotFound(model.id)
+            throw SDKError.general(.modelNotFound, "Model not found: \(model.id)")
         }
 
         // Use the SDK's download mechanism via the Download class

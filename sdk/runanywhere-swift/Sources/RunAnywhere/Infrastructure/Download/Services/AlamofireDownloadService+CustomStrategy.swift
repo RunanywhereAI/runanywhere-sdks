@@ -144,11 +144,7 @@ extension AlamofireDownloadService {
     }
 
     /// Helper to get destination folder for a model
-    func getDestinationFolder(for modelId: String, framework: InferenceFramework? = nil) throws -> URL {
-        if let framework = framework {
-            return try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
-        } else {
-            return try ModelPathUtils.getModelFolder(modelId: modelId)
-        }
+    func getDestinationFolder(for modelId: String, framework: InferenceFramework) throws -> URL {
+        return try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
     }
 }
