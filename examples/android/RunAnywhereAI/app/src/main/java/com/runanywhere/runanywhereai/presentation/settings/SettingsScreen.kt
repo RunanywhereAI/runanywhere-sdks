@@ -170,10 +170,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     Modifier
                         .fillMaxWidth()
                         .clickable {
-                            val intent = Intent(
-                                Intent.ACTION_VIEW,
-                                Uri.parse("https://github.com/RunanywhereAI/runanywhere-sdks/")
-                            )
+                            val intent =
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://github.com/RunanywhereAI/runanywhere-sdks/"),
+                                )
                             context.startActivity(intent)
                         }
                         .padding(vertical = 8.dp),

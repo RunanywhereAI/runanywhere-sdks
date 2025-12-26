@@ -816,12 +816,16 @@ class KtorDownloadService(
      */
     fun isHealthy(): Boolean {
         // Check if HTTP client is still open and functional
-        val clientHealthy = try {
-            !httpClient.engine.config.proxy.toString().isEmpty() || true
-        } catch (e: Exception) {
-            // Client may be closed or in error state
-            false
-        }
+        val clientHealthy =
+            try {
+                !httpClient.engine.config.proxy
+                    .toString()
+                    .isEmpty() ||
+                    true
+            } catch (e: Exception) {
+                // Client may be closed or in error state
+                false
+            }
 
         // Check if we're not overloaded with downloads
         val notOverloaded = activeDownloadTasks.size <= configuration.maxConcurrentDownloads

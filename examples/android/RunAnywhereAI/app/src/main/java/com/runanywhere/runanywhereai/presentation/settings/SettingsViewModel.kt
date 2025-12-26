@@ -6,8 +6,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.infrastructure.events.EventBus
 import com.runanywhere.sdk.infrastructure.events.SDKModelEvent
-import com.runanywhere.sdk.`public`.extensions.clearCache
 import com.runanywhere.sdk.`public`.extensions.cleanTempFiles
+import com.runanywhere.sdk.`public`.extensions.clearCache
 import com.runanywhere.sdk.`public`.extensions.deleteModel
 import com.runanywhere.sdk.`public`.extensions.getStorageInfo
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -98,13 +98,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 val storageInfo = getStorageInfo()
 
                 // Map stored models to UI model
-                val storedModels = storageInfo.storedModels.map { model ->
-                    StoredModelInfo(
-                        id = model.id,
-                        name = model.name,
-                        size = model.size,
-                    )
-                }
+                val storedModels =
+                    storageInfo.storedModels.map { model ->
+                        StoredModelInfo(
+                            id = model.id,
+                            name = model.name,
+                            size = model.size,
+                        )
+                    }
 
                 Log.d(TAG, "Storage info received:")
                 Log.d(TAG, "  - Total space: ${storageInfo.deviceStorage.totalSpace}")

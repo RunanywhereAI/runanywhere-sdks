@@ -203,7 +203,7 @@ class ModelSelectionViewModel(
                 // Call SDK download API (suspend function)
                 _uiState.update { it.copy(loadingProgress = "Downloading...") }
                 android.util.Log.d("ModelSelectionVM", "📥 Calling SDK downloadModel for $modelId")
-                downloadModel(modelId)  // This now correctly calls the SDK extension function
+                downloadModel(modelId) // This now correctly calls the SDK extension function
                 android.util.Log.d("ModelSelectionVM", "✅ SDK downloadModel returned for $modelId")
 
                 // Small delay to ensure registry update propagates
