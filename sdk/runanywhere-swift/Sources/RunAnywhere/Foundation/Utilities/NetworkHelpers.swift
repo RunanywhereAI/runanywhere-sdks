@@ -8,8 +8,11 @@ public struct RemoteOperationHelper: Sendable {
         self.timeout = timeout
     }
 
-    public func withTimeout<R>(_ operation: @escaping () async throws -> R) async throws -> R {
-        return try await withThrowingTaskGroup(of: R.self) { group in
+    /// Execute operation with timeout (Swift 6 compliant)
+    public func withTimeout<R: Sendable>(
+        _ operation: @escaping @Sendable () async throws -> R
+    ) async throws -> R {
+        try await withThrowingTaskGroup(of: R.self) { group in
             // Add main operation
             group.addTask {
                 try await operation()
@@ -21,13 +24,8 @@ public struct RemoteOperationHelper: Sendable {
                 throw DataSourceError.networkUnavailable
             }
 
-            // Return first completed task
-            guard let result = try await group.next() else {
-                throw DataSourceError.operationFailed(
-                    NSError(domain: "RemoteOperationHelper", code: -1)
-                )
-            }
-
+            // First completed task wins - guaranteed non-nil with 2 tasks
+            let result = try await group.next()!
             group.cancelAll()
             return result
         }
