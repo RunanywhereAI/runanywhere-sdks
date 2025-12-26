@@ -174,8 +174,6 @@ kotlin {
                 implementation(libs.android.vad.webrtc)
                 implementation(libs.prdownloader)
                 implementation(libs.androidx.work.runtime.ktx)
-                implementation(libs.androidx.room.runtime)
-                implementation(libs.androidx.room.ktx)
                 implementation(libs.androidx.security.crypto)
                 implementation(libs.retrofit)
                 implementation(libs.retrofit.gson)
