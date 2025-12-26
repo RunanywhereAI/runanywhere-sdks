@@ -9,8 +9,8 @@ let package = Package(
     name: "RunAnywhereAI",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v17),      // Minimum iOS 17 (required by FluidAudio)
-        .macOS(.v14)     // Minimum macOS 14 (required by FluidAudio)
+        .iOS(.v17),
+        .macOS(.v14)
     ],
     products: [
         // The main app library
@@ -43,7 +43,6 @@ let package = Package(
         // - Pulse 4.2.7 (logging)
         //
         // Via Optional Modules:
-        // - FluidAudio (via RunAnywhereFluidAudio)
         // - ONNX Runtime binary (via RunAnywhereONNX)
         // - LlamaCPP binary (via RunAnywhereLlamaCPP)
         // ===================================
@@ -58,7 +57,6 @@ let package = Package(
                 // Optional modules - pick what you need:
                 .product(name: "RunAnywhereONNX", package: "runanywhere-swift"),           // ONNX STT/TTS/VAD
                 .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-swift"),       // LlamaCPP LLM (runanywhere-core backend)
-                .product(name: "RunAnywhereFluidAudio", package: "runanywhere-swift"),     // Speaker Diarization
                 .product(name: "RunAnywhereAppleAI", package: "runanywhere-swift"),        // Apple Intelligence (iOS 26+)
             ],
             path: "RunAnywhereAI",

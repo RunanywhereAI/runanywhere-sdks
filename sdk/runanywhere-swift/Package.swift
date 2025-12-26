@@ -25,7 +25,6 @@ let package = Package(
     // Core SDK (RunAnywhere) has availability annotations for iOS 14+ / macOS 12+
     // Optional modules have higher requirements:
     //   - LlamaCPPRuntime: iOS 16+ / macOS 13+
-    //   - FluidAudio: iOS 17+ / macOS 14+
     //   - AppleAI: iOS 26+ runtime (builds on iOS 16+)
     platforms: [
         .iOS(.v17),
@@ -68,13 +67,6 @@ let package = Package(
             targets: ["FoundationModelsAdapter"]
         ),
 
-        // =================================================================
-        // FluidAudio - Speaker Diarization (iOS 17+)
-        // =================================================================
-        .library(
-            name: "RunAnywhereFluidAudio",
-            targets: ["FluidAudioDiarization"]
-        ),
     ],
     dependencies: [
         // Core SDK dependencies
@@ -87,9 +79,6 @@ let package = Package(
         .package(url: "https://github.com/kean/Pulse", from: "4.0.0"),
         // SWCompression for pure Swift tar.bz2/tar.gz extraction (replaces native C dependency)
         .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
-
-        // FluidAudio dependency
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", branch: "main"),
 
         // Sentry for crash reporting and error tracking
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
@@ -194,18 +183,6 @@ let package = Package(
             path: "Sources/FoundationModelsAdapter"
         ),
 
-        // =================================================================
-        // FluidAudio Diarization (iOS 17+, macOS 14+)
-        // Provides: Speaker diarization
-        // =================================================================
-        .target(
-            name: "FluidAudioDiarization",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "FluidAudio", package: "FluidAudio"),
-            ],
-            path: "Sources/FluidAudioDiarization"
-        ),
     ] + binaryTargets()
 )
 

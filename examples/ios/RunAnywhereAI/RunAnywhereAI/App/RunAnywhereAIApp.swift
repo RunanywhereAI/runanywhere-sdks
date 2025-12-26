@@ -9,7 +9,6 @@ import SwiftUI
 import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
-import FluidAudioDiarization
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -180,10 +179,6 @@ struct RunAnywhereAIApp: App {
                       artifactType: .tarGzArchive(structure: .nestedDirectory),
                       memoryRequirement: 65_000_000)
         logger.info("✅ ONNX module registered with STT/TTS models")
-
-        // FluidAudio module (no models - provides speaker diarization service)
-        FluidAudio.register()
-        logger.info("✅ FluidAudio module registered (Speaker Diarization)")
 
         // Foundation Models for iOS 26+ and macOS 26+
         // Built-in model is automatically registered by the module

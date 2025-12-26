@@ -22,9 +22,6 @@ public typealias TTSServiceFactory = @Sendable (TTSConfiguration) async throws -
 /// Factory closure for creating VAD services
 public typealias VADServiceFactory = @Sendable (VADConfiguration) async throws -> VADService
 
-/// Factory closure for creating Speaker Diarization services
-public typealias SpeakerDiarizationServiceFactory = @Sendable (SpeakerDiarizationConfiguration) async throws -> SpeakerDiarizationService
-
 // MARK: - Service Registration
 
 /// Registration info for a service factory
@@ -84,7 +81,6 @@ public final class ServiceRegistry {
     private var llmRegistrations: [ServiceRegistration<LLMServiceFactory>] = []
     private var ttsRegistrations: [ServiceRegistration<TTSServiceFactory>] = []
     private var vadRegistrations: [ServiceRegistration<VADServiceFactory>] = []
-    private var speakerDiarizationRegistrations: [ServiceRegistration<SpeakerDiarizationServiceFactory>] = []
 
     private let logger = SDKLogger(category: "ServiceRegistry")
 
@@ -221,42 +217,6 @@ public final class ServiceRegistry {
     /// Check if any VAD service is registered
     public var hasVAD: Bool { !vadRegistrations.isEmpty }
 
-    // MARK: - Speaker Diarization Registration
-
-    /// Register a Speaker Diarization service factory
-    public func registerSpeakerDiarization(
-        name: String,
-        priority: Int = 100,
-        canHandle: @escaping @Sendable (String?) -> Bool = { _ in true },
-        factory: @escaping SpeakerDiarizationServiceFactory
-    ) {
-        let registration = ServiceRegistration(
-            name: name,
-            priority: priority,
-            canHandle: canHandle,
-            factory: factory
-        )
-        speakerDiarizationRegistrations.append(registration)
-        speakerDiarizationRegistrations.sort { $0.priority > $1.priority }
-        logger.info("Registered Speaker Diarization service: \(name) (priority: \(priority))")
-    }
-
-    /// Create a Speaker Diarization service
-    public func createSpeakerDiarization(
-        for modelId: String? = nil,
-        config: SpeakerDiarizationConfiguration
-    ) async throws -> SpeakerDiarizationService {
-        guard let registration = speakerDiarizationRegistrations.first(where: { $0.canHandle(modelId) }) else {
-            throw CapabilityError.providerNotFound("Speaker Diarization service")
-        }
-
-        logger.info("Creating Speaker Diarization service: \(registration.name)")
-        return try await registration.factory(config)
-    }
-
-    /// Check if any Speaker Diarization service is registered
-    public var hasSpeakerDiarization: Bool { !speakerDiarizationRegistrations.isEmpty }
-
     // MARK: - Availability
 
     /// List of registered service types
@@ -266,7 +226,6 @@ public final class ServiceRegistry {
         if hasLLM { services.append("LLM") }
         if hasTTS { services.append("TTS") }
         if hasVAD { services.append("VAD") }
-        if hasSpeakerDiarization { services.append("SpeakerDiarization") }
         return services
     }
 
@@ -278,7 +237,6 @@ public final class ServiceRegistry {
         llmRegistrations.removeAll()
         ttsRegistrations.removeAll()
         vadRegistrations.removeAll()
-        speakerDiarizationRegistrations.removeAll()
         logger.info("Service registry reset")
     }
 }
