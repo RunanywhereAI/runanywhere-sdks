@@ -65,9 +65,6 @@ public protocol Capability: Actor {
 /// Protocol for capabilities that load models/resources
 /// Provides a standardized interface for model lifecycle management
 public protocol ModelLoadableCapability: Capability {
-    /// The type of service this capability uses
-    associatedtype Service
-
     /// Whether a model is currently loaded
     var isModelLoaded: Bool { get async }
 
@@ -87,9 +84,6 @@ public protocol ModelLoadableCapability: Capability {
 /// Protocol for capabilities that initialize a service without model loading
 /// (e.g., VAD, Speaker Diarization)
 public protocol ServiceBasedCapability: Capability {
-    /// The type of service this capability uses
-    associatedtype Service
-
     /// Whether the capability is ready to use
     var isReady: Bool { get }
 

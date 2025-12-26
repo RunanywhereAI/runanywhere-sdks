@@ -12,7 +12,7 @@ import Foundation
 
 /// The error domain for all RunAnywhere SDK errors.
 /// Used by crash reporters (Sentry, Crashlytics) and NSError bridging.
-public let RunAnywhereErrorDomain = "com.runanywhere.sdk"
+public let runAnywhereErrorDomain = "com.runanywhere.sdk"
 
 // MARK: - RunAnywhereError
 
@@ -163,7 +163,7 @@ public enum RunAnywhereError: LocalizedError, CustomNSError, Equatable, Sendable
     // MARK: - CustomNSError (for Crash Reporters)
 
     /// The error domain for NSError bridging.
-    public static var errorDomain: String { RunAnywhereErrorDomain }
+    public static var errorDomain: String { runAnywhereErrorDomain }
 
     /// Machine-readable error code for programmatic handling and crash reports.
     public var errorCode: Int {
@@ -227,8 +227,8 @@ public enum RunAnywhereError: LocalizedError, CustomNSError, Equatable, Sendable
     }
 
     /// Additional user info for NSError bridging.
-    public var errorUserInfo: [String: Any] {
-        var userInfo: [String: Any] = [:]
+    public var errorUserInfo: [String: any Sendable] {
+        var userInfo: [String: any Sendable] = [:]
 
         if let description = errorDescription {
             userInfo[NSLocalizedDescriptionKey] = description
@@ -300,7 +300,9 @@ public enum RunAnywhereError: LocalizedError, CustomNSError, Equatable, Sendable
         // Storage
         case .insufficientStorage(let required, let available):
             let formatter = ByteCountFormatter()
-            return "Insufficient storage: \(formatter.string(fromByteCount: required)) required, \(formatter.string(fromByteCount: available)) available."
+            let requiredStr = formatter.string(fromByteCount: required)
+            let availableStr = formatter.string(fromByteCount: available)
+            return "Insufficient storage: \(requiredStr) required, \(availableStr) available."
         case .storageFull:
             return "Device storage is full."
         case .storageError(let reason):

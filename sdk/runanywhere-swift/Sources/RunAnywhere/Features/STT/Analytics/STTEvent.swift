@@ -142,7 +142,16 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
         case .modelUnloaded(let modelId):
             return ["model_id": modelId]
 
-        case .transcriptionStarted(let id, let modelId, let audioLengthMs, let audioSizeBytes, let language, let isStreaming, let sampleRate, let framework):
+        case .transcriptionStarted(
+            let id,
+            let modelId,
+            let audioLengthMs,
+            let audioSizeBytes,
+            let language,
+            let isStreaming,
+            let sampleRate,
+            let framework
+        ):
             return [
                 "transcription_id": id,
                 "model_id": modelId,
@@ -247,7 +256,16 @@ public enum STTEvent: SDKEvent, TypedEventProperties {
         case .modelUnloaded(let modelId):
             return EventProperties(modelId: modelId)
 
-        case .transcriptionStarted(let id, let modelId, let audioLengthMs, let audioSizeBytes, let language, let isStreaming, let sampleRate, let framework):
+        case .transcriptionStarted(
+            let id,
+            let modelId,
+            let audioLengthMs,
+            let audioSizeBytes,
+            let language,
+            let isStreaming,
+            let sampleRate,
+            let framework
+        ):
             return EventProperties(
                 modelId: modelId,
                 framework: framework.rawValue,

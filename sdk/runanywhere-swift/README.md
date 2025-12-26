@@ -28,7 +28,7 @@ The **RunAnywhere Swift SDK** enables developers to run AI models directly on Ap
 The SDK provides a unified interface to multiple AI capabilities—including large language models (LLMs), speech-to-text (STT), text-to-speech (TTS), voice activity detection (VAD), and speaker diarization—through pluggable backend modules. Whether you're building a voice assistant, transcription app, or AI-powered productivity tool, RunAnywhere handles the complexity of model management, hardware optimization, and streaming inference.
 
 Key differentiators:
-- **Multi-backend architecture**: Choose from LlamaCPP (GGUF models), ONNX Runtime, WhisperKit, or Apple's Foundation Models
+- **Multi-backend architecture**: Choose from LlamaCPP (GGUF models), ONNX Runtime, or Apple's Foundation Models
 - **Metal acceleration**: GPU-accelerated inference on Apple Silicon
 - **Event-driven design**: Subscribe to SDK events for reactive UI updates
 - **Production-ready**: Built-in analytics, logging, device registration, and model lifecycle management
@@ -100,7 +100,6 @@ Key differentiators:
 
 > **Note:** Some optional modules have higher requirements:
 > - Apple Foundation Models (`RunAnywhereAppleAI`): iOS 26+ / macOS 26+ at runtime
-> - WhisperKit: iOS 16+ / macOS 13+ (temporarily disabled pending API updates)
 
 ---
 

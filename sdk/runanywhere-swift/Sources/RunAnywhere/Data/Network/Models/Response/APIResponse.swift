@@ -189,7 +189,7 @@ public enum LocationElement: Decodable, Sendable {
 
 /// Type-erased Codable wrapper for dynamic values
 public struct AnyCodable: Decodable, Sendable {
-    public let value: Any
+    public let value: any Sendable
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()

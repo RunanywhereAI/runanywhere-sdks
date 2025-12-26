@@ -13,12 +13,20 @@ class ConversationStore: ObservableObject {
     @Published var conversations: [Conversation] = []
     @Published var currentConversation: Conversation?
 
-    private let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+    private let documentsDirectory: URL
+
+    private static func getDocumentsDirectory() -> URL {
+        guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            fatalError("Unable to access documents directory")
+        }
+        return url
+    }
     private let conversationsDirectory: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
     private init() {
+        documentsDirectory = Self.getDocumentsDirectory()
         conversationsDirectory = documentsDirectory.appendingPathComponent("Conversations")
 
         // Create conversations directory if it doesn't exist
@@ -234,12 +242,15 @@ struct PerformanceSummary: Codable {
         let analyticsMessages = messages.compactMap { $0.analytics }
 
         if !analyticsMessages.isEmpty {
-            averageResponseTime = analyticsMessages.compactMap { $0.totalGenerationTime }.reduce(0, +) / Double(analyticsMessages.count)
+            let count = Double(analyticsMessages.count)
+            let totalTime = analyticsMessages.compactMap { $0.totalGenerationTime }.reduce(0, +)
+            averageResponseTime = totalTime / count
             totalTokens = analyticsMessages.reduce(0) { $0 + $1.inputTokens + $1.outputTokens }
             mainModel = analyticsMessages.first?.modelName
             let completed = analyticsMessages.filter { $0.completionStatus == .complete }.count
-            completionRate = Double(completed) / Double(analyticsMessages.count)
-            averageTokensPerSecond = analyticsMessages.compactMap { $0.averageTokensPerSecond }.reduce(0, +) / Double(analyticsMessages.count)
+            completionRate = Double(completed) / count
+            let totalTPS = analyticsMessages.compactMap { $0.averageTokensPerSecond }.reduce(0, +)
+            averageTokensPerSecond = totalTPS / count
         } else {
             averageResponseTime = 0
             totalTokens = 0
@@ -257,7 +268,11 @@ struct ConversationListView: View {
     @State private var searchQuery = ""
     @State private var showingDeleteConfirmation = false
     @State private var conversationToDelete: Conversation?
-    @Environment(\.dismiss) private var dismiss
+
+    @Environment(\.dismiss)
+    private var dismiss
+
+    private static let conversationSelectedNotification = Notification.Name("ConversationSelected")
 
     var filteredConversations: [Conversation] {
         store.searchConversations(query: searchQuery)
@@ -270,7 +285,10 @@ struct ConversationListView: View {
                     ConversationRow(conversation: conversation)
                         .onTapGesture {
                             store.loadConversation(conversation.id)
-                            NotificationCenter.default.post(name: Notification.Name("ConversationSelected"), object: conversation)
+                            NotificationCenter.default.post(
+                                name: Self.conversationSelectedNotification,
+                                object: conversation
+                            )
                             dismiss()
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -297,14 +315,18 @@ struct ConversationListView: View {
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        let newConversation = store.createConversation()
-                        // Notify ChatViewModel about the new conversation
-                        NotificationCenter.default.post(name: Notification.Name("ConversationSelected"), object: newConversation)
-                        dismiss()
-                    }) {
-                        Image(systemName: "plus")
-                    }
+                    Button(
+                        action: {
+                            let newConversation = store.createConversation()
+                            // Notify ChatViewModel about the new conversation
+                            let name = Notification.Name("ConversationSelected")
+                            NotificationCenter.default.post(name: name, object: newConversation)
+                            dismiss()
+                        },
+                        label: {
+                            Image(systemName: "plus")
+                        }
+                    )
                 }
                 #else
                 ToolbarItem(placement: .cancellationAction) {
@@ -314,14 +336,18 @@ struct ConversationListView: View {
                 }
 
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: {
-                        let newConversation = store.createConversation()
-                        // Notify ChatViewModel about the new conversation
-                        NotificationCenter.default.post(name: Notification.Name("ConversationSelected"), object: newConversation)
-                        dismiss()
-                    }) {
-                        Image(systemName: "plus")
-                    }
+                    Button(
+                        action: {
+                            let newConversation = store.createConversation()
+                            // Notify ChatViewModel about the new conversation
+                            let name = Notification.Name("ConversationSelected")
+                            NotificationCenter.default.post(name: name, object: newConversation)
+                            dismiss()
+                        },
+                        label: {
+                            Image(systemName: "plus")
+                        }
+                    )
                 }
                 #endif
             }

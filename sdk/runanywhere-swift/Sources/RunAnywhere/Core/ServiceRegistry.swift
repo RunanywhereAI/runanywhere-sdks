@@ -63,12 +63,12 @@ public struct ServiceRegistration<Factory>: Sendable where Factory: Sendable {
 ///
 /// // Register your service
 /// ServiceRegistry.shared.registerSTT(
-///     name: "WhisperKit",
+///     name: "MySTTService",
 ///     canHandle: { modelId in
 ///         modelId?.contains("whisper") ?? false
 ///     },
 ///     factory: { config in
-///         let service = WhisperKitSTT()
+///         let service = MySTTService()
 ///         try await service.initialize(modelPath: config.modelId)
 ///         return service
 ///     }

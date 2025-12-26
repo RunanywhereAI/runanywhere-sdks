@@ -75,8 +75,11 @@ struct SimplifiedModelsView: View {
         Group {
             deviceInfoRow(label: "Model", systemImage: "iphone", value: device.modelName)
             deviceInfoRow(label: "Chip", systemImage: "cpu", value: device.chipName)
-            deviceInfoRow(label: "Memory", systemImage: "memorychip",
-                         value: ByteCountFormatter.string(fromByteCount: device.totalMemory, countStyle: .memory))
+            deviceInfoRow(
+                label: "Memory",
+                systemImage: "memorychip",
+                value: ByteCountFormatter.string(fromByteCount: device.totalMemory, countStyle: .memory)
+            )
 
             if device.neuralEngineAvailable {
                 neuralEngineRow
@@ -180,7 +183,6 @@ private struct SimplifiedModelRow: View {
         case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
-        case .whisperKit: return .green
         default: return .gray
         }
     }
@@ -190,7 +192,6 @@ private struct SimplifiedModelRow: View {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
-        case .whisperKit: return "Whisper"
         default: return model.framework.displayName
         }
     }
@@ -244,7 +245,10 @@ private struct SimplifiedModelRow: View {
                             Image(systemName: isReady ? "checkmark.circle.fill" : "arrow.down.circle")
                                 .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                                 .font(AppTypography.caption2)
-                            Text(model.framework == .foundationModels ? "Built-in" : (model.localPath != nil ? "Ready" : "Download"))
+                            let statusText = model.framework == .foundationModels
+                                ? "Built-in"
+                                : (model.localPath != nil ? "Ready" : "Download")
+                            Text(statusText)
                                 .font(AppTypography.caption2)
                                 .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                         }
@@ -356,7 +360,6 @@ private struct SimplifiedModelRow: View {
                 self.isDownloading = false
                 onDownloadCompleted()
             }
-
         } catch {
             await MainActor.run {
                 downloadProgress = 0.0

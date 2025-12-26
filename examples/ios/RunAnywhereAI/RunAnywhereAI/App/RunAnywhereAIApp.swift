@@ -123,7 +123,7 @@ struct RunAnywhereAIApp: App {
     /// Register modules with their associated models
     /// Each module explicitly owns its models - the framework is determined by the module
     @MainActor
-    private func registerModulesAndModels() async {
+    private func registerModulesAndModels() async { // swiftlint:disable:this function_body_length
         logger.info("📦 Registering modules with their models...")
 
         // LlamaCPP module with LLM models

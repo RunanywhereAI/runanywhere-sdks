@@ -36,12 +36,10 @@ public extension ModelCategory {
     /// Determine category from a framework
     static func from(framework: InferenceFramework) -> ModelCategory {
         switch framework {
-        case .whisperKit, .openAIWhisper:
-            return .speechRecognition
-        case .llamaCpp, .mlx, .mlc, .execuTorch, .picoLLM, .foundationModels, .swiftTransformers:
+        case .llamaCpp, .foundationModels:
             return .language
-        case .coreML, .tensorFlowLite, .onnx, .mediaPipe:
-            // General-purpose frameworks - default to multimodal
+        case .onnx:
+            // General-purpose framework - default to multimodal
             return .multimodal
         case .systemTTS:
             return .speechSynthesis
@@ -54,7 +52,7 @@ public extension ModelCategory {
     }
 
     /// Determine category from format and framework
-    static func from(format: ModelFormat, framework: InferenceFramework) -> ModelCategory {
+    static func from(format _: ModelFormat, framework: InferenceFramework) -> ModelCategory {
         // Use framework as the primary hint (1:1 mapping)
         return from(framework: framework)
     }

@@ -7,7 +7,7 @@ import Foundation
 /// ```
 /// Documents/RunAnywhere/
 ///   Models/
-///     {framework}/          # e.g., "onnx", "llamacpp", "whisperkit"
+///     {framework}/          # e.g., "onnx", "llamacpp"
 ///       {modelId}/          # e.g., "sherpa-onnx-whisper-tiny.en"
 ///         [model files]     # Single file or directory with multiple files
 ///   Cache/

@@ -53,7 +53,7 @@ public enum APIError: LocalizedError, Sendable {
     public static func from(
         statusCode: Int,
         data: Data?,
-        underlyingError: Error? = nil
+        underlyingError _: Error? = nil
     ) -> APIError {
         // Try to parse error response
         if let data = data,

@@ -12,7 +12,6 @@ import Foundation
 /// Owns the VAD service lifecycle and provides thread-safe access
 public actor VADCapability: ServiceBasedCapability {
     public typealias Configuration = VADConfiguration
-    public typealias Service = VADService
 
     // MARK: - State
 

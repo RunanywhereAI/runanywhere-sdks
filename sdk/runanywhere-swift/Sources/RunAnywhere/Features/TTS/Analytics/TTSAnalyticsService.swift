@@ -136,7 +136,8 @@ public actor TTSAnalyticsService {
             framework: tracker.framework
         ))
 
-        logger.debug("Synthesis completed: \(synthesisId), voice: \(tracker.voiceId), audio: \(String(format: "%.1f", audioDurationMs))ms, \(audioSizeBytes) bytes")
+        let audioDurationFormatted = String(format: "%.1f", audioDurationMs)
+        logger.debug("Synthesis completed: \(synthesisId), voice: \(tracker.voiceId), audio: \(audioDurationFormatted)ms, \(audioSizeBytes) bytes")
     }
 
     /// Track synthesis failure

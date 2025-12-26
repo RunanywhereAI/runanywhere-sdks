@@ -15,7 +15,6 @@ import Foundation
 /// Uses `ManagedLifecycle` to handle model loading/unloading with automatic analytics tracking.
 public actor STTCapability: ModelLoadableCapability {
     public typealias Configuration = STTConfiguration
-    public typealias Service = STTService
 
     // MARK: - State
 

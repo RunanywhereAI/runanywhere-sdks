@@ -23,7 +23,7 @@ public enum CapabilityType: String, CaseIterable, Sendable {
 
 /// Protocol for RunAnywhere modules that provide AI services.
 ///
-/// External modules (ONNX, LlamaCPP, WhisperKit, etc.) conform to this protocol
+/// External modules (ONNX, LlamaCPP, etc.) conform to this protocol
 /// to register their services with the SDK in a standardized way.
 ///
 /// ## Implementing a Module
@@ -47,7 +47,7 @@ public enum CapabilityType: String, CaseIterable, Sendable {
 /// LlamaCPP.addModel(name: "Llama 2 7B", url: "...", memoryRequirement: 4_000_000_000)
 /// ```
 public protocol RunAnywhereModule {
-    /// Unique identifier for this module (e.g., "onnx", "llamacpp", "whisperkit")
+    /// Unique identifier for this module (e.g., "onnx", "llamacpp")
     static var moduleId: String { get }
 
     /// Human-readable display name (e.g., "ONNX Runtime", "LlamaCPP")
@@ -67,7 +67,7 @@ public protocol RunAnywhereModule {
     static var storageStrategy: ModelStorageStrategy? { get }
 
     /// Optional download strategy for custom download handling
-    /// Modules with special download requirements (like WhisperKit) should provide this
+    /// Modules with special download requirements should provide this
     static var downloadStrategy: DownloadStrategy? { get }
 
     /// Register all services provided by this module with the ServiceRegistry

@@ -6,8 +6,8 @@
 //  Combines audio capture and streaming transcription into a single abstraction.
 //
 
-import Foundation
 import Combine
+import Foundation
 
 // MARK: - Live Transcription Session
 

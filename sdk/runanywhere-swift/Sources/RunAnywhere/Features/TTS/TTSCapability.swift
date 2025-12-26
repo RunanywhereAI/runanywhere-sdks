@@ -14,7 +14,6 @@ import Foundation
 /// Uses `ManagedLifecycle` to handle voice loading/unloading with automatic analytics tracking.
 public actor TTSCapability: ModelLoadableCapability {
     public typealias Configuration = TTSConfiguration
-    public typealias Service = TTSService
 
     // MARK: - State
 

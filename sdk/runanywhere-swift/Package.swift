@@ -24,7 +24,7 @@ let package = Package(
     // NOTE: Platform minimums are set to support all modules.
     // Core SDK (RunAnywhere) has availability annotations for iOS 14+ / macOS 12+
     // Optional modules have higher requirements:
-    //   - WhisperKit, LlamaCPPRuntime: iOS 16+ / macOS 13+
+    //   - LlamaCPPRuntime: iOS 16+ / macOS 13+
     //   - FluidAudio: iOS 17+ / macOS 14+
     //   - AppleAI: iOS 26+ runtime (builds on iOS 16+)
     platforms: [
@@ -61,14 +61,6 @@ let package = Package(
         ),
 
         // =================================================================
-        // WhisperKit Backend - CoreML-based STT (iOS 16+)
-        // =================================================================
-        .library(
-            name: "RunAnywhereWhisperKit",
-            targets: ["WhisperKitTranscription"]
-        ),
-
-        // =================================================================
         // Apple Foundation Models - Apple Intelligence (iOS 26+)
         // =================================================================
         .library(
@@ -95,9 +87,6 @@ let package = Package(
         .package(url: "https://github.com/kean/Pulse", from: "4.0.0"),
         // SWCompression for pure Swift tar.bz2/tar.gz extraction (replaces native C dependency)
         .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
-
-        // WhisperKit dependency
-        .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.13.1"),
 
         // FluidAudio dependency
         .package(url: "https://github.com/FluidInference/FluidAudio.git", branch: "main"),
@@ -191,19 +180,6 @@ let package = Package(
                 .linkedFramework("MetalKit"),
                 .unsafeFlags(["-ObjC", "-all_load"])
             ]
-        ),
-
-        // =================================================================
-        // WhisperKit Backend (iOS 16+, macOS 13+)
-        // Provides: CoreML-based Speech-to-Text
-        // =================================================================
-        .target(
-            name: "WhisperKitTranscription",
-            dependencies: [
-                "RunAnywhere",
-                "WhisperKit",
-            ],
-            path: "Sources/WhisperKitTranscription"
         ),
 
         // =================================================================

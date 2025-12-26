@@ -58,9 +58,8 @@ struct TextToSpeechView: View {
                 ModelStatusBanner(
                     framework: viewModel.selectedFramework,
                     modelName: viewModel.selectedModelName,
-                    isLoading: viewModel.isGenerating && viewModel.selectedModelName == nil,
-                    onSelectModel: { showModelPicker = true }
-                )
+                    isLoading: viewModel.isGenerating && viewModel.selectedModelName == nil
+                ) { showModelPicker = true }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
 
@@ -79,9 +78,8 @@ struct TextToSpeechView: View {
             // Overlay when no model is selected
             if !hasModelSelected && !viewModel.isGenerating {
                 ModelRequiredOverlay(
-                    modality: .tts,
-                    onSelectModel: { showModelPicker = true }
-                )
+                    modality: .tts
+                ) { showModelPicker = true }
             }
         }
         .sheet(isPresented: $showModelPicker) {
@@ -303,49 +301,55 @@ struct TextToSpeechView: View {
     private var actionButtonsView: some View {
         HStack(spacing: 20) {
             // Generate/Speak button
-            Button(action: {
-                Task {
-                    await viewModel.generateSpeech(text: inputText)
-                }
-            }) {
-                HStack {
-                    if viewModel.isGenerating {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "waveform.circle.fill")
-                            .font(.system(size: 20))
+            Button(
+                action: {
+                    Task {
+                        await viewModel.generateSpeech(text: inputText)
                     }
-                    Text("Generate")
-                        .fontWeight(.semibold)
+                },
+                label: {
+                    HStack {
+                        if viewModel.isGenerating {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "waveform.circle.fill")
+                                .font(.system(size: 20))
+                        }
+                        Text("Generate")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
+                    .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
+                    .background(generateButtonColor)
+                    .foregroundColor(.white)
+                    .cornerRadius(25)
                 }
-                .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
-                .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
-                .background(generateButtonColor)
-                .foregroundColor(.white)
-                .cornerRadius(25)
-            }
+            )
             .disabled(inputText.isEmpty || viewModel.selectedModelName == nil || viewModel.isGenerating)
 
             // Play/Stop button
-            Button(action: {
-                Task {
-                    await viewModel.togglePlayback()
+            Button(
+                action: {
+                    Task {
+                        await viewModel.togglePlayback()
+                    }
+                },
+                label: {
+                    HStack {
+                        Image(systemName: viewModel.isPlaying ? "stop.fill" : "play.fill")
+                            .font(.system(size: 20))
+                        Text(viewModel.isPlaying ? "Stop" : "Play")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
+                    .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
+                    .background(playButtonColor)
+                    .foregroundColor(.white)
+                    .cornerRadius(25)
                 }
-            }) {
-                HStack {
-                    Image(systemName: viewModel.isPlaying ? "stop.fill" : "play.fill")
-                        .font(.system(size: 20))
-                    Text(viewModel.isPlaying ? "Stop" : "Play")
-                        .fontWeight(.semibold)
-                }
-                .frame(minWidth: 120, idealWidth: DeviceFormFactor.current == .desktop ? 160 : 140, maxWidth: 180)
-                .frame(height: DeviceFormFactor.current == .desktop ? 56 : 50)
-                .background(playButtonColor)
-                .foregroundColor(.white)
-                .cornerRadius(25)
-            }
+            )
             .disabled(!viewModel.hasGeneratedAudio)
         }
     }

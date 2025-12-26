@@ -99,11 +99,7 @@ public struct ModelPathUtils {
     public static func getModelPath(modelInfo: ModelInfo) throws -> URL {
         // Use the model's framework directly (1:1 mapping)
         let framework = modelInfo.framework
-        // For directory-based models (e.g., WhisperKit, CoreML packages), return the folder
-        if modelInfo.format.isDirectoryBased {
-            return try getModelFolder(modelId: modelInfo.id, framework: framework)
-        }
-        // For single-file models, return the full file path
+        // All supported formats are single-file models
         return try getModelFilePath(modelId: modelInfo.id, framework: framework, format: modelInfo.format)
     }
 
@@ -209,11 +205,7 @@ public struct ModelPathUtils {
 public extension ModelFormat {
     /// Whether this format represents a directory-based model
     var isDirectoryBased: Bool {
-        switch self {
-        case .mlmodel, .mlpackage:
-            return true
-        default:
-            return false
-        }
+        // All supported formats are single-file based
+        return false
     }
 }
