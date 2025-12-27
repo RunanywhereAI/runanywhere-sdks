@@ -1,183 +1,147 @@
 import Foundation
 
-// MARK: - Model Management Extensions (Event-Based)
+// MARK: - Model Management
 
-public extension RunAnywhere {
+extension RunAnywhere {
 
-    /// Load a model by identifier and return model info
-    /// - Parameter modelIdentifier: The model to load
-    /// - Returns: Information about the loaded model
-    @discardableResult
-    static func loadModelWithInfo(_ modelIdentifier: String) async throws -> ModelInfo {
-        events.publish(SDKModelEvent.loadStarted(modelId: modelIdentifier))
+    /// Load an LLM model by ID
+    /// - Parameter modelId: The model identifier
+    /// - Note: Events are automatically dispatched to both EventBus (for apps) and Analytics (for telemetry)
+    public static func loadModel(_ modelId: String) async throws {
+        // Ensure initialized
+        guard isInitialized else {
+            throw SDKError.general(.notInitialized, "SDK not initialized")
+        }
 
-        do {
-            // Use existing service logic directly
-            let loadedModel = try await RunAnywhere.serviceContainer.modelLoadingService.loadModel(modelIdentifier)
+        // Ensure services are ready (O(1) after first call)
+        try await ensureServicesReady()
 
-            // IMPORTANT: Set the loaded model in the generation service
-            RunAnywhere.serviceContainer.generationService.setCurrentModel(loadedModel)
+        // LLMCapability handles all event tracking automatically
+        try await serviceContainer.llmCapability.loadModel(modelId)
+    }
 
-            events.publish(SDKModelEvent.loadCompleted(modelId: modelIdentifier))
-            return loadedModel.model
-        } catch {
-            events.publish(SDKModelEvent.loadFailed(modelId: modelIdentifier, error: error))
-            throw error
+    /// Unload the currently loaded LLM model
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
+    public static func unloadModel() async throws {
+        guard isInitialized else {
+            throw SDKError.general(.notInitialized, "SDK not initialized")
+        }
+
+        // LLMCapability handles all event tracking automatically
+        try await serviceContainer.llmCapability.unload()
+    }
+
+    /// Check if an LLM model is loaded
+    public static var isModelLoaded: Bool {
+        get async {
+            await serviceContainer.llmCapability.isModelLoaded
         }
     }
 
-    /// Unload the currently loaded model
-    static func unloadModel() async throws {
-        events.publish(SDKModelEvent.unloadStarted)
-
-        do {
-            // Get the current model ID from generation service
-            if let currentModel = RunAnywhere.serviceContainer.generationService.getCurrentModel() {
-                let modelId = currentModel.model.id
-
-                // Unload through model loading service
-                try await RunAnywhere.serviceContainer.modelLoadingService.unloadModel(modelId)
-
-                // Clear from generation service
-                RunAnywhere.serviceContainer.generationService.setCurrentModel(nil)
-            }
-
-            events.publish(SDKModelEvent.unloadCompleted)
-        } catch {
-            events.publish(SDKModelEvent.unloadFailed(error))
-            throw error
+    /// Check if the currently loaded LLM model supports streaming generation
+    ///
+    /// Some models (like Apple Foundation Models) don't support streaming and require
+    /// non-streaming generation via `generate()` instead of `generateStream()`.
+    ///
+    /// - Returns: `true` if streaming is supported, `false` if you should use `generate()` instead
+    /// - Note: Returns `false` if no model is loaded
+    public static var supportsLLMStreaming: Bool {
+        get async {
+            await serviceContainer.llmCapability.supportsStreaming
         }
     }
 
-    /// List all available models
+    /// Load an STT (Speech-to-Text) model by ID
+    /// This loads the model into the STT capability
+    /// - Parameter modelId: The model identifier (e.g., "whisper-base")
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
+    public static func loadSTTModel(_ modelId: String) async throws {
+        // Ensure initialized
+        guard isInitialized else {
+            throw SDKError.general(.notInitialized, "SDK not initialized")
+        }
+
+        // Ensure services are ready (O(1) after first call)
+        try await ensureServicesReady()
+
+        // STTCapability handles all event tracking automatically
+        try await serviceContainer.sttCapability.loadModel(modelId)
+    }
+
+    /// Load a TTS (Text-to-Speech) voice by ID
+    /// This loads the voice into the TTS capability
+    /// - Parameter voiceId: The voice identifier
+    /// - Note: Events are automatically dispatched to both EventBus and Analytics
+    public static func loadTTSModel(_ voiceId: String) async throws {
+        // Ensure initialized
+        guard isInitialized else {
+            throw SDKError.general(.notInitialized, "SDK not initialized")
+        }
+
+        // Ensure services are ready (O(1) after first call)
+        try await ensureServicesReady()
+
+        // TTSCapability handles all event tracking automatically
+        try await serviceContainer.ttsCapability.loadVoice(voiceId)
+    }
+
+    /// Get available models
     /// - Returns: Array of available models
-    static func listAvailableModels() async throws -> [ModelInfo] {
-        events.publish(SDKModelEvent.listRequested)
-
-        // Use model registry to discover models
-        let models = await RunAnywhere.serviceContainer.modelRegistry.discoverModels()
-        events.publish(SDKModelEvent.listCompleted(models: models))
-        return models
+    public static func availableModels() async throws -> [ModelInfo] {
+        guard isInitialized else { throw SDKError.general(.notInitialized, "SDK not initialized") }
+        return await serviceContainer.modelRegistry.discoverModels()
     }
 
-    /// Download a model
-    /// - Parameter modelIdentifier: The model to download
-    static func downloadModel(_ modelIdentifier: String) async throws {
-        events.publish(SDKModelEvent.downloadStarted(modelId: modelIdentifier))
+    /// Get currently loaded LLM model ID
+    /// - Returns: Currently loaded model ID if any
+    public static func getCurrentModelId() async -> String? {
+        guard isInitialized else { return nil }
+        return await serviceContainer.llmCapability.currentModelId
+    }
 
-        do {
-            // Get the model info first
-            let modelService = await serviceContainer.modelInfoService
-
-            // Log available models for debugging
-            let allModels = try await modelService.loadStoredModels()
-            print("[DEBUG] Available models in database: \(allModels.map { $0.id })")
-            print("[DEBUG] Looking for model: \(modelIdentifier)")
-
-            guard let modelInfo = try await modelService.getModel(by: modelIdentifier) else {
-                print("[ERROR] Model not found in database: \(modelIdentifier)")
-                // Try to find in registry as fallback
-                if let registryModel = serviceContainer.modelRegistry.getModel(by: modelIdentifier) {
-                    print("[DEBUG] Found model in registry, saving to database")
-                    try await modelService.saveModel(registryModel)
-                    // Now try again
-                    guard let savedModel = try await modelService.getModel(by: modelIdentifier) else {
-                        throw SDKError.modelNotFound(modelIdentifier)
-                    }
-                    // Use the saved model
-                    let downloadService = serviceContainer.downloadService
-                    let downloadTask = try await downloadService.downloadModel(savedModel)
-                    let localPath = try await downloadTask.result.value
-                    try await modelService.updateDownloadStatus(modelIdentifier, isDownloaded: true, localPath: localPath)
-                    if let updatedModel = try await modelService.getModel(by: modelIdentifier) {
-                        serviceContainer.modelRegistry.updateModel(updatedModel)
-                    }
-                    events.publish(SDKModelEvent.downloadCompleted(modelId: modelIdentifier))
-                    return
-                }
-                throw SDKError.modelNotFound(modelIdentifier)
-            }
-
-            // Use the download service to download the model
-            let downloadService = serviceContainer.downloadService
-            let downloadTask = try await downloadService.downloadModel(modelInfo)
-
-            // Wait for download completion and get the local path
-            let localPath = try await downloadTask.result.value
-
-            // Update model info with local path after successful download
-            try await modelService.updateDownloadStatus(modelIdentifier, isDownloaded: true, localPath: localPath)
-
-            // Also update the model in the registry with the new local path
-            if let updatedModel = try await modelService.getModel(by: modelIdentifier) {
-                serviceContainer.modelRegistry.updateModel(updatedModel)
-            }
-
-            events.publish(SDKModelEvent.downloadCompleted(modelId: modelIdentifier))
-        } catch {
-            events.publish(SDKModelEvent.downloadFailed(modelId: modelIdentifier, error: error))
-            throw error
+    /// Get the currently loaded LLM model as ModelInfo
+    ///
+    /// This is a convenience property that combines `getCurrentModelId()` with
+    /// a lookup in the available models registry.
+    ///
+    /// - Returns: The currently loaded ModelInfo, or nil if no model is loaded
+    public static var currentLLMModel: ModelInfo? {
+        get async {
+            guard let modelId = await getCurrentModelId() else { return nil }
+            let models = (try? await availableModels()) ?? []
+            return models.first { $0.id == modelId }
         }
     }
 
-    /// Delete a model
-    /// - Parameter modelIdentifier: The model to delete
-    static func deleteModel(_ modelIdentifier: String) async throws {
-        events.publish(SDKModelEvent.deleteStarted(modelId: modelIdentifier))
-
-        do {
-            // Use file manager to delete model
-            let fileManager = RunAnywhere.serviceContainer.fileManager
-            try fileManager.deleteModel(modelId: modelIdentifier)
-            events.publish(SDKModelEvent.deleteCompleted(modelId: modelIdentifier))
-        } catch {
-            events.publish(SDKModelEvent.deleteFailed(modelId: modelIdentifier, error: error))
-            throw error
+    /// Get the currently loaded STT model as ModelInfo
+    ///
+    /// - Returns: The currently loaded STT ModelInfo, or nil if no STT model is loaded
+    public static var currentSTTModel: ModelInfo? {
+        get async {
+            guard isInitialized else { return nil }
+            guard let modelId = await serviceContainer.sttCapability.currentModelId else { return nil }
+            let models = (try? await availableModels()) ?? []
+            return models.first { $0.id == modelId }
         }
     }
 
-    /// Add a custom model from URL (simplified implementation)
-    /// - Parameters:
-    ///   - url: URL to the model
-    ///   - name: Display name for the model
-    ///   - type: Model type
-    /// - Returns: Model information
-    static func addModelFromURL(
-        _ url: URL,
-        name: String,
-        type: String
-    ) async -> ModelInfo {
-        events.publish(SDKModelEvent.customModelAdded(name: name, url: url.absoluteString))
-
-        // Create basic model info (this would need proper implementation)
-        let modelInfo = ModelInfo(
-            id: UUID().uuidString,
-            name: name,
-            category: .language, // Default to language model
-            format: ModelFormat.gguf, // Default
-            downloadURL: url,
-            localPath: nil,
-            downloadSize: nil,
-            memoryRequired: Int64(1024 * 1024 * 1024), // Default 1GB
-            compatibleFrameworks: [.llamaCpp],
-            preferredFramework: .llamaCpp,
-            contextLength: 4096,
-            supportsThinking: false,
-            metadata: nil
-        )
-
-        // Register the model
-        RunAnywhere.serviceContainer.modelRegistry.registerModel(modelInfo)
-
-        return modelInfo
+    /// Get the currently loaded TTS voice ID
+    ///
+    /// Note: TTS uses voices (not models), so this returns the voice identifier string.
+    /// - Returns: The TTS voice ID if one is loaded, nil otherwise
+    public static var currentTTSVoiceId: String? {
+        get async {
+            guard isInitialized else { return nil }
+            return await serviceContainer.ttsCapability.currentVoiceId
+        }
     }
 
-    /// Register a built-in model
-    /// - Parameter model: The model to register
-    static func registerBuiltInModel(_ model: ModelInfo) async {
-        // Register the model in the model registry
-        RunAnywhere.serviceContainer.modelRegistry.registerModel(model)
-
-        events.publish(SDKModelEvent.builtInModelRegistered(modelId: model.id))
+    /// Cancel the current text generation
+    ///
+    /// Use this to stop an ongoing generation when the user navigates away
+    /// or explicitly requests cancellation.
+    public static func cancelGeneration() async {
+        guard isInitialized else { return }
+        await serviceContainer.llmCapability.cancel()
     }
 }

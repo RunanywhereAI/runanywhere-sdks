@@ -25,8 +25,9 @@ import Foundation
 /// ```
 public enum LlamaCPPRuntime {
     /// Current version of the LlamaCPP Runtime module
-    public static let version = "1.0.0"
+    /// Note: Should be kept in sync with SDK version in VERSION file
+    public static let version = "0.16.0"
 
-    /// LlamaCPP library version
+    /// LlamaCPP library version (underlying C++ library)
     public static let llamaCppVersion = "b5390"
 }

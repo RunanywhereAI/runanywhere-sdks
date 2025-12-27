@@ -32,4 +32,3 @@ export interface WakeWordService {
    */
   cleanup(): Promise<void>;
 }
-

@@ -1,0 +1,314 @@
+//
+//  TelemetryEventProperties.swift
+//  RunAnywhere SDK
+//
+//  Strongly typed telemetry event properties protocol.
+//  Events conforming to this protocol are sent to the telemetry backend.
+//  This avoids string conversion/parsing and enables compile-time type checking.
+//
+
+import Foundation
+
+// MARK: - Telemetry Event Properties Protocol
+
+/// Protocol for events that provide strongly typed properties for telemetry.
+///
+/// Events conforming to this protocol:
+/// - Are sent to the telemetry backend (not `.publicOnly` destination)
+/// - Provide typed data directly via `telemetryProperties`
+/// - Skip string conversion/parsing entirely
+///
+/// Note: Events with `.publicOnly` destination should NOT conform to this protocol
+/// since they are never sent to telemetry.
+public protocol TelemetryEventProperties: SDKEvent {
+    /// Typed properties that map directly to TelemetryEventPayload fields.
+    /// These values are used directly without string parsing.
+    var telemetryProperties: TelemetryProperties { get }
+}
+
+// MARK: - Telemetry Properties Container
+
+/// Strongly typed container for telemetry event properties.
+/// All fields are optional - only set what's relevant for the event.
+///
+/// Note: This struct only contains fields that are sent to the telemetry backend.
+/// Fields for `.publicOnly` events (like download progress) are not included here.
+public struct TelemetryProperties: Sendable {
+    // MARK: - Model Info
+
+    public var modelId: String?
+    public var modelName: String?
+    public var framework: String?
+
+    // MARK: - Common Metrics
+
+    public var processingTimeMs: Double?
+    public var durationMs: Double?
+    public var success: Bool?
+    public var errorMessage: String?
+    public var errorCode: String?
+
+    // MARK: - LLM Fields
+
+    public var inputTokens: Int?
+    public var outputTokens: Int?
+    public var totalTokens: Int?
+    public var tokensPerSecond: Double?
+    public var timeToFirstTokenMs: Double?
+    public var promptEvalTimeMs: Double?
+    public var generationTimeMs: Double?
+    public var contextLength: Int?
+    public var temperature: Double?
+    public var maxTokens: Int?
+    public var isStreaming: Bool?
+    public var generationId: String?
+
+    // MARK: - STT Fields
+
+    public var audioDurationMs: Double?
+    public var realTimeFactor: Double?
+    public var wordCount: Int?
+    public var confidence: Double?
+    public var language: String?
+    public var segmentIndex: Int?
+    public var transcriptionId: String?
+
+    // MARK: - TTS Fields
+
+    public var characterCount: Int?
+    public var charactersPerSecond: Double?
+    public var audioSizeBytes: Int?
+    public var sampleRate: Int?
+    public var voice: String?
+    public var outputDurationMs: Double?
+    public var synthesisId: String?
+
+    // MARK: - Model Lifecycle (telemetry-bound events only)
+
+    public var modelSizeBytes: Int64?
+    public var archiveType: String?
+
+    // MARK: - VAD Fields
+
+    public var speechDurationMs: Double?
+
+    // MARK: - SDK Lifecycle Fields
+
+    public var count: Int?
+
+    // MARK: - Storage Fields
+
+    public var freedBytes: Int64?
+
+    // MARK: - Network Fields
+
+    public var isOnline: Bool?
+
+    // MARK: - Initialization
+
+    public init(
+        modelId: String? = nil,
+        modelName: String? = nil,
+        framework: String? = nil,
+        processingTimeMs: Double? = nil,
+        durationMs: Double? = nil,
+        success: Bool? = nil,
+        errorMessage: String? = nil,
+        errorCode: String? = nil,
+        inputTokens: Int? = nil,
+        outputTokens: Int? = nil,
+        totalTokens: Int? = nil,
+        tokensPerSecond: Double? = nil,
+        timeToFirstTokenMs: Double? = nil,
+        promptEvalTimeMs: Double? = nil,
+        generationTimeMs: Double? = nil,
+        contextLength: Int? = nil,
+        temperature: Double? = nil,
+        maxTokens: Int? = nil,
+        isStreaming: Bool? = nil,
+        generationId: String? = nil,
+        audioDurationMs: Double? = nil,
+        realTimeFactor: Double? = nil,
+        wordCount: Int? = nil,
+        confidence: Double? = nil,
+        language: String? = nil,
+        segmentIndex: Int? = nil,
+        transcriptionId: String? = nil,
+        characterCount: Int? = nil,
+        charactersPerSecond: Double? = nil,
+        audioSizeBytes: Int? = nil,
+        sampleRate: Int? = nil,
+        voice: String? = nil,
+        outputDurationMs: Double? = nil,
+        synthesisId: String? = nil,
+        modelSizeBytes: Int64? = nil,
+        archiveType: String? = nil,
+        speechDurationMs: Double? = nil,
+        count: Int? = nil,
+        freedBytes: Int64? = nil,
+        isOnline: Bool? = nil
+    ) {
+        self.modelId = modelId
+        self.modelName = modelName
+        self.framework = framework
+        self.processingTimeMs = processingTimeMs
+        self.durationMs = durationMs
+        self.success = success
+        self.errorMessage = errorMessage
+        self.errorCode = errorCode
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.totalTokens = totalTokens
+        self.tokensPerSecond = tokensPerSecond
+        self.timeToFirstTokenMs = timeToFirstTokenMs
+        self.promptEvalTimeMs = promptEvalTimeMs
+        self.generationTimeMs = generationTimeMs
+        self.contextLength = contextLength
+        self.temperature = temperature
+        self.maxTokens = maxTokens
+        self.isStreaming = isStreaming
+        self.generationId = generationId
+        self.audioDurationMs = audioDurationMs
+        self.realTimeFactor = realTimeFactor
+        self.wordCount = wordCount
+        self.confidence = confidence
+        self.language = language
+        self.segmentIndex = segmentIndex
+        self.transcriptionId = transcriptionId
+        self.characterCount = characterCount
+        self.charactersPerSecond = charactersPerSecond
+        self.audioSizeBytes = audioSizeBytes
+        self.sampleRate = sampleRate
+        self.voice = voice
+        self.outputDurationMs = outputDurationMs
+        self.synthesisId = synthesisId
+        self.modelSizeBytes = modelSizeBytes
+        self.archiveType = archiveType
+        self.speechDurationMs = speechDurationMs
+        self.count = count
+        self.freedBytes = freedBytes
+        self.isOnline = isOnline
+    }
+}
+
+// MARK: - Validation
+
+extension TelemetryProperties {
+    /// Validate telemetry properties for data quality guardrails.
+    /// - Throws: ValidationError if any values are invalid
+    public func validate() throws {
+        try validateTokenCounts()
+        try validatePerformanceMetrics()
+        try validateDurations()
+        try validateByteCounts()
+        try validateCountFields()
+        try validateRateFields()
+    }
+
+    // MARK: - Private Validation Helpers
+
+    private func validateTokenCounts() throws {
+        if let tokens = inputTokens, tokens < 0 {
+            throw TelemetryValidationError.invalidValue(field: "inputTokens", reason: "must be >= 0")
+        }
+        if let tokens = outputTokens, tokens < 0 {
+            throw TelemetryValidationError.invalidValue(field: "outputTokens", reason: "must be >= 0")
+        }
+        // Total tokens should equal input + output if all are present
+        if let input = inputTokens, let output = outputTokens, let total = totalTokens {
+            if total != input + output {
+                throw TelemetryValidationError.invalidValue(
+                    field: "totalTokens",
+                    reason: "must equal inputTokens + outputTokens (\(input) + \(output) = \(input + output), got \(total))"
+                )
+            }
+        }
+    }
+
+    private func validatePerformanceMetrics() throws {
+        if let tps = tokensPerSecond, tps < 0 {
+            throw TelemetryValidationError.invalidValue(field: "tokensPerSecond", reason: "must be >= 0")
+        }
+        if let time = processingTimeMs, time < 0 {
+            throw TelemetryValidationError.invalidValue(field: "processingTimeMs", reason: "must be >= 0")
+        }
+        if let ttft = timeToFirstTokenMs, ttft < 0 {
+            throw TelemetryValidationError.invalidValue(field: "timeToFirstTokenMs", reason: "must be >= 0")
+        }
+        // Confidence must be 0-1
+        if let conf = confidence, conf < 0 || conf > 1 {
+            throw TelemetryValidationError.invalidValue(field: "confidence", reason: "must be between 0 and 1")
+        }
+    }
+
+    private func validateDurations() throws {
+        if let duration = durationMs, duration < 0 {
+            throw TelemetryValidationError.invalidValue(field: "durationMs", reason: "must be >= 0")
+        }
+        if let duration = speechDurationMs, duration < 0 {
+            throw TelemetryValidationError.invalidValue(field: "speechDurationMs", reason: "must be >= 0")
+        }
+        if let duration = audioDurationMs, duration < 0 {
+            throw TelemetryValidationError.invalidValue(field: "audioDurationMs", reason: "must be >= 0")
+        }
+        if let duration = outputDurationMs, duration < 0 {
+            throw TelemetryValidationError.invalidValue(field: "outputDurationMs", reason: "must be >= 0")
+        }
+        if let duration = generationTimeMs, duration < 0 {
+            throw TelemetryValidationError.invalidValue(field: "generationTimeMs", reason: "must be >= 0")
+        }
+    }
+
+    private func validateByteCounts() throws {
+        if let bytes = modelSizeBytes, bytes < 0 {
+            throw TelemetryValidationError.invalidValue(field: "modelSizeBytes", reason: "must be >= 0")
+        }
+        if let bytes = freedBytes, bytes < 0 {
+            throw TelemetryValidationError.invalidValue(field: "freedBytes", reason: "must be >= 0")
+        }
+        if let bytes = audioSizeBytes, bytes < 0 {
+            throw TelemetryValidationError.invalidValue(field: "audioSizeBytes", reason: "must be >= 0")
+        }
+    }
+
+    private func validateCountFields() throws {
+        if let countValue = count, countValue < 0 {
+            throw TelemetryValidationError.invalidValue(field: "count", reason: "must be >= 0")
+        }
+        if let words = wordCount, words < 0 {
+            throw TelemetryValidationError.invalidValue(field: "wordCount", reason: "must be >= 0")
+        }
+        if let chars = characterCount, chars < 0 {
+            throw TelemetryValidationError.invalidValue(field: "characterCount", reason: "must be >= 0")
+        }
+    }
+
+    private func validateRateFields() throws {
+        if let rate = realTimeFactor, rate < 0 {
+            throw TelemetryValidationError.invalidValue(field: "realTimeFactor", reason: "must be >= 0")
+        }
+        if let rate = charactersPerSecond, rate < 0 {
+            throw TelemetryValidationError.invalidValue(field: "charactersPerSecond", reason: "must be >= 0")
+        }
+        if let rate = sampleRate, rate <= 0 {
+            throw TelemetryValidationError.invalidValue(field: "sampleRate", reason: "must be > 0")
+        }
+    }
+}
+
+// MARK: - Validation Error
+
+/// Error thrown when telemetry properties fail validation
+public enum TelemetryValidationError: LocalizedError {
+    case invalidValue(field: String, reason: String)
+    case missingRequiredField(field: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidValue(let field, let reason):
+            return "Invalid value for '\(field)': \(reason)"
+        case .missingRequiredField(let field):
+            return "Missing required field: '\(field)'"
+        }
+    }
+}

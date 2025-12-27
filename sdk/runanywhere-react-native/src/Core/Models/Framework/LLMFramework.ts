@@ -185,4 +185,3 @@ export function supportsImageProcessing(framework: LLMFramework): boolean {
     modalities.has(FrameworkModality.TextToImage)
   );
 }
-

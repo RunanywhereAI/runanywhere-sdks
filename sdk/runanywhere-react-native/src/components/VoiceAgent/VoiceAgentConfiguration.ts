@@ -66,4 +66,3 @@ export class VoiceAgentConfigurationImpl implements VoiceAgentConfiguration {
     }
   }
 }
-

@@ -31,4 +31,3 @@ export interface TTSServiceProvider {
    */
   readonly version: string;
 }
-

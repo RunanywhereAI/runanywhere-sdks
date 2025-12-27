@@ -28,4 +28,3 @@ export interface SpeakerDiarizationServiceProvider {
    */
   readonly name: string;
 }
-

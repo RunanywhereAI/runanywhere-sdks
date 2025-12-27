@@ -33,4 +33,3 @@ extension ComponentStateExtension on ComponentState {
     }
   }
 }
-

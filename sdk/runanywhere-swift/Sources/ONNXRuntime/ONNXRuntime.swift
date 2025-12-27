@@ -46,8 +46,9 @@ import Foundation
 /// ```
 public enum ONNXRuntime {
     /// Current version of the ONNX Runtime module
-    public static let version = "1.0.0"
+    /// Note: Should be kept in sync with SDK version in VERSION file
+    public static let version = "0.16.0"
 
-    /// ONNX Runtime library version
+    /// ONNX Runtime library version (underlying C library)
     public static let onnxRuntimeVersion = "1.23.2"
 }

@@ -57,4 +57,3 @@ export function getFrameworkModalityIconName(modality: FrameworkModality): strin
       return 'sparkles';
   }
 }
-

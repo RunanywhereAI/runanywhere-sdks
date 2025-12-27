@@ -55,12 +55,12 @@ function calculateAudioLevel(base64Data: string): number {
   try {
     // Decode base64 to bytes
     const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-    
+
     // Convert to 16-bit signed integers
     const samples = new Int16Array(bytes.buffer);
-    
+
     if (samples.length === 0) return -60;
-    
+
     // Calculate RMS
     let sumSquares = 0;
     for (let i = 0; i < samples.length; i++) {
@@ -68,7 +68,7 @@ function calculateAudioLevel(base64Data: string): number {
       sumSquares += normalized * normalized;
     }
     const rms = Math.sqrt(sumSquares / samples.length);
-    
+
     // Convert to dB (with floor at -60 dB)
     const db = rms > 0 ? 20 * Math.log10(rms) : -60;
     return Math.max(-60, Math.min(0, db));
@@ -97,7 +97,7 @@ export async function requestAudioPermission(): Promise<boolean> {
       return false;
     }
   }
-  
+
   // iOS: Permissions are requested automatically when starting recording
   return true;
 }
@@ -112,18 +112,18 @@ export interface RecordingCallbacks {
 function createWavHeader(dataLength: number): ArrayBuffer {
   const buffer = new ArrayBuffer(44);
   const view = new DataView(buffer);
-  
+
   const sampleRate = SAMPLE_RATE;
   const numChannels = CHANNELS;
   const bitsPerSample = BITS_PER_SAMPLE;
   const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
   const blockAlign = numChannels * (bitsPerSample / 8);
-  
+
   // "RIFF" chunk descriptor
   writeString(view, 0, 'RIFF');
   view.setUint32(4, 36 + dataLength, true); // File size - 8
   writeString(view, 8, 'WAVE');
-  
+
   // "fmt " sub-chunk
   writeString(view, 12, 'fmt ');
   view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
@@ -133,11 +133,11 @@ function createWavHeader(dataLength: number): ArrayBuffer {
   view.setUint32(28, byteRate, true);
   view.setUint16(32, blockAlign, true);
   view.setUint16(34, bitsPerSample, true);
-  
+
   // "data" sub-chunk
   writeString(view, 36, 'data');
   view.setUint32(40, dataLength, true);
-  
+
   return buffer;
 }
 
@@ -159,7 +159,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 /**
  * Start recording audio
  * Returns the URI where the audio will be saved
- * 
+ *
  * Platform support:
  * - iOS: NativeAudioModule (AVFoundation)
  * - Android: react-native-live-audio-stream (raw PCM for STT WAV format)
@@ -170,22 +170,22 @@ export async function startRecording(callbacks?: RecordingCallbacks): Promise<st
       // iOS: Use native audio module
       if (Platform.OS === 'ios') {
         console.log('[AudioService] iOS: Starting native recording...');
-        
+
         if (!NativeAudioModule) {
           console.error('[AudioService] iOS: NativeAudioModule not available');
           reject(new Error('Native audio module not available on iOS'));
           return;
         }
-        
+
         try {
           const result = await NativeAudioModule.startRecording();
           console.log('[AudioService] iOS: Recording started:', result);
-          
+
           isRecording = true;
           recordingStartTime = Date.now();
           currentRecordPath = result.path;
           progressCallback = callbacks?.onProgress || null;
-          
+
           // Poll for audio levels on iOS
           if (progressCallback) {
             audioLevelInterval = setInterval(async () => {
@@ -202,7 +202,7 @@ export async function startRecording(callbacks?: RecordingCallbacks): Promise<st
               }
             }, 100);
           }
-          
+
           resolve(result.path);
         } catch (error: any) {
           console.error('[AudioService] iOS: Failed to start recording:', error);
@@ -210,22 +210,22 @@ export async function startRecording(callbacks?: RecordingCallbacks): Promise<st
         }
         return;
       }
-      
+
       // Android: Use LiveAudioStream for raw PCM
       console.log('[AudioService] Android: Starting live audio stream...');
-      
+
       const fileName = `recording_${Date.now()}.wav`;
       const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
       currentRecordPath = filePath;
       audioChunks = [];
-      
+
       const audioStream = getLiveAudioStream();
-      
+
       if (!audioStream) {
         reject(new Error('Audio stream not available'));
         return;
       }
-      
+
       // Initialize live audio stream
       audioStream.init({
         sampleRate: SAMPLE_RATE,
@@ -241,7 +241,7 @@ export async function startRecording(callbacks?: RecordingCallbacks): Promise<st
       // Listen for audio data
       audioStream.on('data', (data: string) => {
         audioChunks.push(data);
-        
+
         if (progressCallback) {
           const elapsed = Date.now() - recordingStartTime;
           const audioLevel = calculateAudioLevel(data);
@@ -277,28 +277,28 @@ export async function stopRecording(): Promise<{ uri: string; durationMs: number
       clearInterval(audioLevelInterval);
       audioLevelInterval = null;
     }
-    
+
     // iOS: Use native audio module
     if (Platform.OS === 'ios' && NativeAudioModule) {
       console.log('[AudioService] iOS: Stopping native recording...');
-      
+
       const result = await NativeAudioModule.stopRecording();
       const durationMs = Date.now() - recordingStartTime;
-      
+
       isRecording = false;
       progressCallback = null;
-      
+
       console.log('[AudioService] iOS: Recording stopped:', result);
       return { uri: result.path, durationMs };
     }
-    
+
     // Android: Stop LiveAudioStream
     const audioStream = getLiveAudioStream();
     if (audioStream) {
       audioStream.stop();
     }
     isRecording = false;
-    
+
     const durationMs = Date.now() - recordingStartTime;
     const uri = currentRecordPath || '';
 
@@ -307,7 +307,7 @@ export async function stopRecording(): Promise<{ uri: string; durationMs: number
     // Combine all audio chunks into PCM data
     let totalLength = 0;
     const decodedChunks: Uint8Array[] = [];
-    
+
     for (const chunk of audioChunks) {
       const decoded = Uint8Array.from(atob(chunk), c => c.charCodeAt(0));
       decodedChunks.push(decoded);
@@ -364,7 +364,7 @@ export async function cancelRecording(): Promise<void> {
     clearInterval(audioLevelInterval);
     audioLevelInterval = null;
   }
-  
+
   if (isRecording) {
     try {
       // iOS: Use native audio module
@@ -376,7 +376,7 @@ export async function cancelRecording(): Promise<void> {
         if (audioStream) {
           audioStream.stop();
         }
-        
+
         // Delete the partial recording file
         if (currentRecordPath) {
           try {
@@ -408,23 +408,23 @@ let playbackCallbacks: PlaybackCallbacks | null = null;
 
 /**
  * Play audio from URI
- * 
+ *
  * Platform support:
  * - iOS: NativeAudioModule (AVAudioPlayer)
  * - Android: react-native-sound (if available)
  */
 export async function playAudio(uri: string, callbacks?: PlaybackCallbacks): Promise<void> {
   console.log('[AudioService] Playing audio:', uri);
-  
+
   // iOS: Use native audio module
   if (Platform.OS === 'ios' && NativeAudioModule) {
     try {
       playbackCallbacks = callbacks || null;
       const result = await NativeAudioModule.playAudio(uri);
       isPlaying = true;
-      
+
       const duration = (result.duration || 0) * 1000; // Convert to ms
-      
+
       // Poll for playback progress
       if (callbacks?.onProgress || callbacks?.onComplete) {
         playbackProgressInterval = setInterval(async () => {
@@ -435,14 +435,14 @@ export async function playAudio(uri: string, callbacks?: PlaybackCallbacks): Pro
             }
             return;
           }
-          
+
           try {
             const status = await NativeAudioModule.getPlaybackStatus();
             const currentTimeMs = (status.currentTime || 0) * 1000;
             const durationMs = (status.duration || 0) * 1000;
-            
+
             callbacks?.onProgress?.(currentTimeMs, durationMs);
-            
+
             if (!status.isPlaying && currentTimeMs >= durationMs - 100) {
               isPlaying = false;
               if (playbackProgressInterval) {
@@ -456,7 +456,7 @@ export async function playAudio(uri: string, callbacks?: PlaybackCallbacks): Pro
           }
         }, 100);
       }
-      
+
       console.log('[AudioService] iOS: Playback started, duration:', duration);
     } catch (error) {
       console.error('[AudioService] iOS: Failed to play audio:', error);
@@ -464,13 +464,13 @@ export async function playAudio(uri: string, callbacks?: PlaybackCallbacks): Pro
     }
     return;
   }
-  
+
   // Android: Use react-native-sound if available
   console.log('[AudioService] Android: Playback via react-native-sound');
   try {
     const Sound = require('react-native-sound').default;
     Sound.setCategory('Playback');
-    
+
     return new Promise((resolve, reject) => {
       const sound = new Sound(uri, '', (error: any) => {
         if (error) {
@@ -478,11 +478,11 @@ export async function playAudio(uri: string, callbacks?: PlaybackCallbacks): Pro
           reject(error);
           return;
         }
-        
+
         const duration = sound.getDuration() * 1000;
         isPlaying = true;
         playbackCallbacks = callbacks || null;
-        
+
         // Progress polling
         if (callbacks?.onProgress) {
           playbackProgressInterval = setInterval(() => {
@@ -491,14 +491,14 @@ export async function playAudio(uri: string, callbacks?: PlaybackCallbacks): Pro
             });
           }, 100);
         }
-        
+
         sound.play((success: boolean) => {
           isPlaying = false;
           if (playbackProgressInterval) {
             clearInterval(playbackProgressInterval);
             playbackProgressInterval = null;
           }
-          
+
           if (success) {
             callbacks?.onComplete?.();
             resolve();
@@ -523,10 +523,10 @@ export async function stopPlayback(): Promise<void> {
     clearInterval(playbackProgressInterval);
     playbackProgressInterval = null;
   }
-  
+
   isPlaying = false;
   playbackCallbacks = null;
-  
+
   if (Platform.OS === 'ios' && NativeAudioModule) {
     try {
       await NativeAudioModule.stopPlayback();

@@ -7,6 +7,77 @@ on:
     branches: [ main ]
 
 jobs:
+  swiftlint:
+    name: SwiftLint
+    runs-on: macos-14
+    continue-on-error: true  # Don't block other jobs initially
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache SwiftLint
+      uses: actions/cache@v3
+      with:
+        path: /opt/homebrew/bin/swiftlint
+        key: ${{ runner.os }}-swiftlint-${{ hashFiles('.swiftlint.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-swiftlint-
+
+    - name: Install SwiftLint
+      env:
+        SWIFTLINT_VERSION: "0.57.1"
+      run: |
+        # Pin SwiftLint version for consistency with .pre-commit-config.yaml
+        INSTALLED_VERSION=$(swiftlint version 2>/dev/null || echo "none")
+        if [ "$INSTALLED_VERSION" != "$SWIFTLINT_VERSION" ]; then
+          echo "Installing SwiftLint $SWIFTLINT_VERSION..."
+          brew install swiftlint@$SWIFTLINT_VERSION 2>/dev/null || brew install swiftlint
+          echo "Installed: $(swiftlint version)"
+        else
+          echo "SwiftLint $SWIFTLINT_VERSION already installed"
+        fi
+
+    - name: Run SwiftLint
+      run: |
+        swiftlint --reporter github-actions-logging
+
+  swiftlint-analyze:
+    name: SwiftLint Analyzer
+    runs-on: macos-14
+    continue-on-error: true  # Analyzer rules are advisory initially
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Select Xcode
+      run: sudo xcode-select -s /Applications/Xcode_15.2.app
+
+    - name: Install SwiftLint
+      env:
+        SWIFTLINT_VERSION: "0.57.1"
+      run: |
+        brew install swiftlint 2>/dev/null || true
+
+    - name: Build for analyzer
+      run: |
+        # Build and capture compiler log for analyzer rules
+        xcodebuild build \
+          -scheme RunAnywhere \
+          -destination "platform=macOS" \
+          -configuration Debug \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          2>&1 | tee xcodebuild.log
+
+    - name: Run SwiftLint Analyzer
+      run: |
+        # Run analyzer rules (unused_import, unused_declaration, typesafe_array_init)
+        swiftlint analyze \
+          --compiler-log-path xcodebuild.log \
+          --reporter github-actions-logging || true
+
   test:
     name: Test on macOS
     runs-on: macos-14
@@ -47,16 +118,6 @@ jobs:
         file: ./coverage.lcov
         flags: unittests
         name: codecov-umbrella
-
-    - name: SwiftLint
-      run: |
-        if which swiftlint >/dev/null; then
-          swiftlint --strict
-        else
-          echo "SwiftLint not installed, downloading..."
-          brew install swiftlint
-          swiftlint --strict
-        fi
 
   build-platforms:
     name: Build for ${{ matrix.platform }}

@@ -1,6 +1,6 @@
+import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 import Foundation
 import RunAnywhere
-import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 
 /// Error types for LlamaCPP operations
 public enum LlamaCPPError: Error, LocalizedError {
@@ -68,14 +68,19 @@ public class LlamaCPPService {
     private var _isReady: Bool = false
     private var _currentModel: String?
 
+    // MARK: - Framework Identification
+
+    /// LlamaCPP uses the llama.cpp inference framework
+    public var inferenceFramework: InferenceFramework { .llamaCpp }
+
     // MARK: - Properties
 
     public var isReady: Bool {
-        return _isReady && backendHandle != nil
+        _isReady && backendHandle != nil
     }
 
     public var currentModel: String? {
-        return _currentModel
+        _currentModel
     }
 
     /// Whether a model is currently loaded
@@ -135,7 +140,7 @@ public class LlamaCPPService {
             throw LlamaCPPError.invalidHandle
         }
 
-        logger.info("Loading model: \(path)")
+        logger.info("Loading model from: \(path)")
 
         let status = ra_text_load_model(backend, path, config)
         guard status == RA_SUCCESS else {
@@ -196,11 +201,38 @@ public class LlamaCPPService {
             throw LlamaCPPError.generationFailed(errorMsg)
         }
 
-        let result = String(cString: resultPtr)
+        let rawResult = String(cString: resultPtr)
         ra_free_string(resultPtr)
 
-        logger.info("Generated \(result.count) characters")
-        return result
+        // The C function returns JSON with format: {"text": "...", "finish_reason": "...", ...}
+        // Parse the JSON and extract the "text" field
+        let generatedText = extractTextFromJSON(rawResult)
+
+        logger.info("Generated \(generatedText.count) characters")
+        return generatedText
+    }
+
+    /// Extract the "text" field from JSON result returned by ra_text_generate
+    /// Falls back to raw result if parsing fails
+    private func extractTextFromJSON(_ jsonString: String) -> String {
+        // Try to parse as JSON and extract "text" field
+        guard let data = jsonString.data(using: .utf8) else {
+            logger.warning("Failed to convert result to data, returning raw result")
+            return jsonString
+        }
+
+        do {
+            // swiftlint:disable:next avoid_any_type
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let text = json["text"] as? String {
+                return text
+            }
+        } catch {
+            logger.warning("Failed to parse JSON result: \(error.localizedDescription)")
+        }
+
+        // Return raw result as fallback (may already be plain text in some cases)
+        return jsonString
     }
 
     /// Generate text with streaming output
@@ -214,66 +246,86 @@ public class LlamaCPPService {
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
-                guard self.isReady, let backend = self.backendHandle else {
-                    continuation.finish(throwing: LlamaCPPError.invalidHandle)
-                    return
-                }
-
-                guard self.isModelLoaded else {
-                    continuation.finish(throwing: LlamaCPPError.generationFailed("No model loaded"))
-                    return
-                }
-
-                self.logger.info("Starting streaming generation for prompt: \(prompt.prefix(50))...")
-
-                // Create a wrapper class to pass to the C callback
-                class CallbackContext {
-                    let continuation: AsyncThrowingStream<String, Error>.Continuation
-                    var isCancelled = false
-
-                    init(continuation: AsyncThrowingStream<String, Error>.Continuation) {
-                        self.continuation = continuation
-                    }
-                }
-
-                let context = CallbackContext(continuation: continuation)
-                let contextPtr = Unmanaged.passRetained(context).toOpaque()
-
-                let callback: ra_text_stream_callback = { tokenCStr, userData in
-                    guard let userData = userData else { return false }
-                    let context = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
-
-                    if context.isCancelled {
-                        return false
-                    }
-
-                    if let tokenCStr = tokenCStr {
-                        let token = String(cString: tokenCStr)
-                        context.continuation.yield(token)
-                    }
-                    return true
-                }
-
-                let status = ra_text_generate_stream(
-                    backend,
-                    prompt,
-                    config.systemPrompt,
-                    Int32(config.maxTokens),
-                    config.temperature,
-                    callback,
-                    contextPtr
-                )
-
-                // Release the context
-                Unmanaged<CallbackContext>.fromOpaque(contextPtr).release()
-
-                if status == RA_SUCCESS || status == RA_ERROR_CANCELLED {
-                    continuation.finish()
-                } else {
-                    let errorMsg = String(cString: ra_get_last_error())
-                    continuation.finish(throwing: LlamaCPPError.generationFailed(errorMsg))
+                do {
+                    try await self.performStreamGeneration(
+                        prompt: prompt,
+                        config: config,
+                        continuation: continuation
+                    )
+                } catch {
+                    continuation.finish(throwing: error)
                 }
             }
+        }
+    }
+
+    /// Performs the actual streaming generation logic
+    private func performStreamGeneration(
+        prompt: String,
+        config: LlamaCPPGenerationConfig,
+        continuation: AsyncThrowingStream<String, Error>.Continuation
+    ) async throws {
+        guard self.isReady, let backend = self.backendHandle else {
+            continuation.finish(throwing: LlamaCPPError.invalidHandle)
+            return
+        }
+
+        guard self.isModelLoaded else {
+            continuation.finish(throwing: LlamaCPPError.generationFailed("No model loaded"))
+            return
+        }
+
+        self.logger.info("Starting streaming generation for prompt: \(prompt.prefix(50))...")
+
+        let context = CallbackContext(continuation: continuation)
+        let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+        let status = ra_text_generate_stream(
+            backend,
+            prompt,
+            config.systemPrompt,
+            Int32(config.maxTokens),
+            config.temperature,
+            self.streamCallback,
+            contextPtr
+        )
+
+        // Release the context
+        Unmanaged<CallbackContext>.fromOpaque(contextPtr).release()
+
+        if status == RA_SUCCESS || status == RA_ERROR_CANCELLED {
+            continuation.finish()
+        } else {
+            let errorMsg = String(cString: ra_get_last_error())
+            continuation.finish(throwing: LlamaCPPError.generationFailed(errorMsg))
+        }
+    }
+
+    /// Callback for streaming token generation
+    private var streamCallback: ra_text_stream_callback {
+        { tokenCStr, userData in
+            guard let userData = userData else { return false }
+            let context = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
+
+            if context.isCancelled {
+                return false
+            }
+
+            if let tokenCStr = tokenCStr {
+                let token = String(cString: tokenCStr)
+                context.continuation.yield(token)
+            }
+            return true
+        }
+    }
+
+    /// Wrapper class for callback context
+    private class CallbackContext {
+        let continuation: AsyncThrowingStream<String, Error>.Continuation
+        var isCancelled = false
+
+        init(continuation: AsyncThrowingStream<String, Error>.Continuation) {
+            self.continuation = continuation
         }
     }
 
@@ -282,17 +334,5 @@ public class LlamaCPPService {
         guard let backend = backendHandle else { return }
         ra_text_cancel(backend)
         logger.info("Generation cancelled")
-    }
-
-    // MARK: - Model Info
-
-    /// Get information about the loaded model
-    /// - Returns: JSON string with model information
-    public func getModelInfo() -> String? {
-        guard let backend = backendHandle else { return nil }
-        guard let infoPtr = ra_get_backend_info(backend) else { return nil }
-        let info = String(cString: infoPtr)
-        ra_free_string(infoPtr)
-        return info
     }
 }

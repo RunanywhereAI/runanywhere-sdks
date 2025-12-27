@@ -94,4 +94,3 @@ export class PerformanceMetricsImpl implements PerformanceMetrics {
     this.firstResponseTokenTimeMs = options.firstResponseTokenTimeMs ?? null;
   }
 }
-

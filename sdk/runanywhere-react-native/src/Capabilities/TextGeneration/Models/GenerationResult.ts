@@ -58,4 +58,3 @@ export interface GenerationResult {
   /** Number of tokens in the actual response content (excluding thinking) */
   readonly responseTokens: number;
 }
-

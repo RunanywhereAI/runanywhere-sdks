@@ -96,7 +96,7 @@ class HybridRunAnywhereDeviceInfo : HybridRunAnywhereDeviceInfoSpec() {
         } catch (e: Exception) {
             false
         }
-        
+
         // Most Android devices have some GPU
         hasVulkan || Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
     }
@@ -113,7 +113,7 @@ class HybridRunAnywhereDeviceInfo : HybridRunAnywhereDeviceInfoSpec() {
             } else {
                 ""
             }
-            
+
             listOf(
                 "qcom",      // Qualcomm (Hexagon DSP)
                 "exynos",    // Samsung (NPU)

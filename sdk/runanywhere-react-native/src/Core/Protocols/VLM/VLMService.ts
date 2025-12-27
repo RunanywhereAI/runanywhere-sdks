@@ -42,4 +42,3 @@ export interface VLMService {
    */
   cleanup(): Promise<void>;
 }
-

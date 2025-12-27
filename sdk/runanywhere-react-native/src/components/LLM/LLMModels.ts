@@ -149,4 +149,3 @@ export interface LLMStreamResult {
   /** Promise that resolves to final output with metrics */
   readonly result: Promise<LLMOutput>;
 }
-

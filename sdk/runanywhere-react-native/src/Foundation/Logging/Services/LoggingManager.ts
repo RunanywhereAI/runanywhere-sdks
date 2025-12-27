@@ -74,4 +74,3 @@ function getLogLevelDescription(level: LogLevel): string {
       return 'FAULT';
   }
 }
-

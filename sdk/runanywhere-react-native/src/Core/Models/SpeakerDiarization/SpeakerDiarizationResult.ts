@@ -24,4 +24,3 @@ export interface SpeakerInfo {
   confidence?: number | null;
   embedding?: number[] | null;
 }
-

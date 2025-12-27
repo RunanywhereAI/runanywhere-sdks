@@ -155,4 +155,3 @@ export class GenerationOptionsResolver {
     return sequences.filter((seq, index) => sequences.indexOf(seq) === index);
   }
 }
-

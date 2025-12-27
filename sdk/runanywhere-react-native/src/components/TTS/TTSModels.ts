@@ -81,4 +81,3 @@ export interface SynthesisMetadata {
   readonly characterCount: number;
   readonly charactersPerSecond: number;
 }
-

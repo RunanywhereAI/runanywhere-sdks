@@ -59,7 +59,7 @@ class EventBus {
   /// Generic event publisher - dispatches to appropriate stream
   void publish(SDKEvent event) {
     _allEventsController.add(event);
-    
+
     if (event is SDKInitializationEvent) {
       _initializationController.add(event);
     } else if (event is SDKConfigurationEvent) {
@@ -98,4 +98,3 @@ class EventBus {
     await _allEventsController.close();
   }
 }
-

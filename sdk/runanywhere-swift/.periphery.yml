@@ -1,0 +1,34 @@
+# Periphery configuration for RunAnywhere Swift SDK
+# Detects unused code: types, functions, properties, protocols, etc.
+
+# SPM Project configuration (no Xcode project/schemes needed)
+format: xcode
+skip_build: false
+clean_build: false
+
+# Targets to analyze (main SDK and backend modules)
+targets:
+  - RunAnywhere
+  - ONNXRuntime
+  - LlamaCPPRuntime
+  - FoundationModelsAdapter
+  - FluidAudioDiarization
+
+# Retain patterns - don't flag these as unused
+retain_public: true
+retain_objc_accessible: true
+retain_codable_properties: true
+retain_swift_ui_previews: true
+retain_assign_only_property_types:
+  - Encoder
+  - Decoder
+
+# Exclude directories from indexing
+index_exclude:
+  - ".build/**/*"
+  - "DerivedData/**/*"
+  - "Tests/**/*"
+
+# Exclude from results (but still index)
+report_exclude:
+  - "Tests/**/*"

@@ -9,4 +9,3 @@ export interface LLMConfiguration {
   temperature?: number;
   // Add all other properties from iOS LLMConfiguration
 }
-

@@ -1,6 +1,6 @@
+import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 import Foundation
 import RunAnywhere
-import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 
 /// ONNX Runtime implementation of STTService for speech-to-text
 /// Uses the unified RunAnywhere backend API
@@ -12,6 +12,11 @@ public class ONNXSTTService: STTService {
     private var _isReady: Bool = false
     private var _currentModel: String?
     private var _supportsStreaming: Bool = false
+
+    // MARK: - Framework Identification
+
+    /// ONNX Runtime inference framework
+    public let inferenceFramework: InferenceFramework = .onnx
 
     // MARK: - STTService Protocol
 
@@ -54,7 +59,7 @@ public class ONNXSTTService: STTService {
         backendHandle = ra_create_backend("onnx")
         guard backendHandle != nil else {
             logger.error("Failed to create ONNX backend")
-            throw ONNXError.initializationFailed
+            throw SDKError.runtime(.initializationFailed, "Failed to create ONNX backend")
         }
 
         // Initialize backend
@@ -63,7 +68,7 @@ public class ONNXSTTService: STTService {
             logger.error("Failed to initialize ONNX backend: \(initStatus.rawValue)")
             ra_destroy(backendHandle)
             backendHandle = nil
-            throw ONNXError.from(code: Int32(initStatus.rawValue))
+            throw SDKError.fromONNXCode(Int32(initStatus.rawValue))
         }
 
         // Load STT model if path provided
@@ -81,33 +86,11 @@ public class ONNXSTTService: STTService {
                 modelDir = (modelPath as NSString).deletingLastPathComponent
             }
 
-            // Handle tar.bz2 archives using platform-native ArchiveUtility
-            if modelPath.hasSuffix(".tar.bz2") {
-                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                let pathNS = modelPath as NSString
-                let modelName = ((pathNS.deletingPathExtension as NSString).deletingPathExtension as NSString).lastPathComponent
-                let extractURL = documentsPath.appendingPathComponent("sherpa-models/\(modelName)")
-
-                logger.info("Extracting model archive to: \(extractURL.path)")
-
-                do {
-                    try ArchiveUtility.extractTarBz2Archive(
-                        from: URL(fileURLWithPath: modelPath),
-                        to: extractURL
-                    )
-                } catch {
-                    logger.error("Failed to extract model archive: \(error.localizedDescription)")
-                    throw ONNXError.modelLoadFailed("Failed to extract archive: \(error.localizedDescription)")
-                }
-
-                modelDir = extractURL.path
-            }
-
             // Load STT model
             let loadStatus = ra_stt_load_model(backendHandle, modelDir, modelType, nil)
             guard loadStatus == RA_SUCCESS else {
                 logger.error("Failed to load STT model: \(loadStatus.rawValue)")
-                throw ONNXError.modelLoadFailed(modelPath)
+                throw SDKError.runtime(.modelLoadFailed, "Failed to load STT model from: \(modelPath)")
             }
 
             _currentModel = modelPath
@@ -121,7 +104,7 @@ public class ONNXSTTService: STTService {
 
     public func transcribe(audioData: Data, options: STTOptions) async throws -> STTTranscriptionResult {
         guard isReady, let backend = backendHandle else {
-            throw ONNXError.invalidHandle
+            throw SDKError.runtime(.invalidState, "Invalid ONNX handle: service not ready")
         }
 
         logger.info("Transcribing audio: \(audioData.count) bytes, input sample rate: \(options.sampleRate)Hz")
@@ -131,7 +114,7 @@ public class ONNXSTTService: STTService {
         let samples = try convertToFloat32Samples(audioData: audioData, inputSampleRate: options.sampleRate)
         let sampleRate: Int32 = 16000
 
-        var resultPtr: UnsafeMutablePointer<CChar>? = nil
+        var resultPtr: UnsafeMutablePointer<CChar>?
 
         // Call STT transcribe
         let status = samples.withUnsafeBufferPointer { buffer in
@@ -147,7 +130,7 @@ public class ONNXSTTService: STTService {
 
         guard status == RA_SUCCESS, let resultPtr = resultPtr else {
             logger.error("Transcription failed with status: \(status.rawValue)")
-            throw ONNXError.from(code: Int32(status.rawValue))
+            throw SDKError.fromONNXCode(Int32(status.rawValue))
         }
 
         defer {
@@ -165,149 +148,27 @@ public class ONNXSTTService: STTService {
         audioStream: S,
         options: STTOptions,
         onPartial: @escaping (String) -> Void
-    ) async throws -> STTTranscriptionResult where S : AsyncSequence, S.Element == Data {
+    ) async throws -> STTTranscriptionResult where S: AsyncSequence, S.Element == Data {
         guard isReady, let backend = backendHandle else {
-            throw ONNXError.invalidHandle
+            throw SDKError.runtime(.invalidState, "Invalid ONNX handle: service not ready")
         }
 
         guard supportsStreaming else {
             logger.warning("Stream transcribe not supported, using periodic batch transcription")
-
-            // For batch-only models, process audio in periodic chunks
-            // This provides a more responsive "live" experience
-            var allAudioData = Data()
-            var accumulatedTranscript = ""
-            var lastProcessedSize = 0
-            let batchThreshold = 48000 * 2 * 3  // ~3 seconds of audio at 48kHz Int16 (288KB)
-
-            for try await chunk in audioStream {
-                allAudioData.append(chunk)
-
-                // Process periodically when we have enough new audio
-                let newDataSize = allAudioData.count - lastProcessedSize
-                if newDataSize >= batchThreshold {
-                    logger.info("Processing batch chunk: \(allAudioData.count) bytes total")
-
-                    do {
-                        let result = try await transcribe(audioData: allAudioData, options: options)
-                        if !result.transcript.isEmpty {
-                            accumulatedTranscript = result.transcript
-                            onPartial(accumulatedTranscript)
-                            logger.debug("Partial transcription: \(accumulatedTranscript)")
-                        }
-                    } catch {
-                        logger.error("Periodic batch transcription failed: \(error.localizedDescription)")
-                    }
-
-                    lastProcessedSize = allAudioData.count
-                }
-            }
-
-            // Final transcription with all audio
-            logger.info("Final batch transcription: \(allAudioData.count) bytes")
-            let result = try await transcribe(audioData: allAudioData, options: options)
-            if !result.transcript.isEmpty {
-                onPartial(result.transcript)
-            }
-            return result
+            return try await performBatchTranscription(
+                audioStream: audioStream,
+                options: options,
+                onPartial: onPartial
+            )
         }
 
         logger.info("Using streaming transcription")
 
-        // Create streaming session
-        guard let stream = ra_stt_create_stream(backend, nil) else {
-            logger.error("Failed to create STT stream")
-            throw ONNXError.initializationFailed
-        }
-
-        streamHandle = stream
-        defer {
-            ra_stt_destroy_stream(backend, stream)
-            streamHandle = nil
-        }
-
-        let sampleRate: Int32 = 16000
-        var lastResult = ""
-        var chunkCount = 0
-
-        logger.info("Starting to process audio stream...")
-
-        // Process audio chunks as they arrive
-        for try await audioChunk in audioStream {
-            chunkCount += 1
-            logger.debug("Received audio chunk #\(chunkCount), size: \(audioChunk.count) bytes")
-
-            // Convert chunk to float32 samples (use sample rate from options)
-            let samples = try convertToFloat32Samples(audioData: audioChunk, inputSampleRate: options.sampleRate)
-
-            // Feed audio to stream
-            let feedStatus = samples.withUnsafeBufferPointer { buffer in
-                ra_stt_feed_audio(
-                    backend,
-                    stream,
-                    buffer.baseAddress,
-                    buffer.count,
-                    sampleRate
-                )
-            }
-
-            if feedStatus != RA_SUCCESS {
-                logger.error("Failed to feed audio: \(feedStatus.rawValue)")
-                continue
-            }
-
-            // Decode if ready
-            if ra_stt_is_ready(backend, stream) {
-                var resultPtr: UnsafeMutablePointer<CChar>? = nil
-                let decodeStatus = ra_stt_decode(backend, stream, &resultPtr)
-
-                if decodeStatus == RA_SUCCESS, let resultPtr = resultPtr {
-                    defer { ra_free_string(resultPtr) }
-                    let partialJSON = String(cString: resultPtr)
-
-                    // Parse partial result
-                    if let data = partialJSON.data(using: .utf8),
-                       let json = try? JSONDecoder().decode(PartialResult.self, from: data),
-                       !json.text.isEmpty, json.text != lastResult {
-                        lastResult = json.text
-                        onPartial(json.text)
-                        logger.debug("Partial result: \(json.text)")
-                    }
-                }
-            }
-
-            // Check for endpoint detection
-            if ra_stt_is_endpoint(backend, stream) {
-                logger.info("Endpoint detected")
-                break
-            }
-        }
-
-        // Signal input finished
-        ra_stt_input_finished(backend, stream)
-
-        // Final decode
-        while ra_stt_is_ready(backend, stream) {
-            var resultPtr: UnsafeMutablePointer<CChar>? = nil
-            if ra_stt_decode(backend, stream, &resultPtr) == RA_SUCCESS, let resultPtr = resultPtr {
-                defer { ra_free_string(resultPtr) }
-                let finalJSON = String(cString: resultPtr)
-                if let data = finalJSON.data(using: .utf8),
-                   let json = try? JSONDecoder().decode(PartialResult.self, from: data),
-                   !json.text.isEmpty {
-                    lastResult = json.text
-                }
-            }
-        }
-
-        logger.info("Final transcription: \(lastResult)")
-
-        return STTTranscriptionResult(
-            transcript: lastResult,
-            confidence: 1.0,
-            timestamps: nil,
-            language: options.language,
-            alternatives: nil
+        return try await performStreamingTranscription(
+            backend: backend,
+            audioStream: audioStream,
+            options: options,
+            onPartial: onPartial
         )
     }
 
@@ -350,7 +211,10 @@ public class ONNXSTTService: STTService {
             }
 
             // Whisper detection
-            if contents.contains(where: { $0.contains("whisper") || ($0.contains("encoder") && contents.contains(where: { $0.contains("decoder") })) }) {
+            let hasWhisper = contents.contains(where: { $0.contains("whisper") })
+            let hasEncoder = contents.contains(where: { $0.contains("encoder") })
+            let hasDecoder = contents.contains(where: { $0.contains("decoder") })
+            if hasWhisper || (hasEncoder && hasDecoder) {
                 return "whisper"
             }
 
@@ -360,20 +224,13 @@ public class ONNXSTTService: STTService {
             }
         }
 
-        // Archive detection
-        if path.hasSuffix(".tar.bz2") {
-            if path.contains("zipformer") || path.contains("sherpa") {
-                return "zipformer"
-            }
-        }
-
         // Default to whisper
         return "whisper"
     }
 
     private func parseTranscriptionResult(json: String, language: String?) throws -> STTTranscriptionResult {
         guard let jsonData = json.data(using: .utf8) else {
-            throw ONNXError.transcriptionFailed("Invalid JSON encoding")
+            throw SDKError.runtime(.generationFailed, "Transcription failed: Invalid JSON encoding")
         }
 
         let result = try JSONDecoder().decode(TranscriptionResult.self, from: jsonData)
@@ -396,17 +253,17 @@ public class ONNXSTTService: STTService {
         // Validate input parameters
         guard !audioData.isEmpty else {
             logger.error("Audio data is empty")
-            throw ONNXError.invalidParameters
+            throw SDKError.runtime(.invalidInput, "Invalid ONNX parameters: audio data is empty")
         }
 
         guard inputSampleRate > 0 else {
             logger.error("Invalid input sample rate: \(inputSampleRate)")
-            throw ONNXError.invalidParameters
+            throw SDKError.runtime(.invalidInput, "Invalid ONNX parameters: invalid sample rate \(inputSampleRate)")
         }
 
-        guard audioData.count % MemoryLayout<Int16>.size == 0 else {
+        guard audioData.count.isMultiple(of: MemoryLayout<Int16>.size) else {
             logger.error("Audio data size (\(audioData.count) bytes) is not a multiple of Int16 size")
-            throw ONNXError.invalidParameters
+            throw SDKError.runtime(.invalidInput, "Invalid ONNX parameters: audio data size is not a multiple of Int16 size")
         }
 
         let targetSampleRate = 16000
@@ -440,8 +297,197 @@ public class ONNXSTTService: STTService {
             }
         }
 
-        logger.debug("Converted \(int16Count) samples at \(inputSampleRate)Hz to \(samples.count) samples at \(targetSampleRate)Hz (factor: \(downsampleFactor))")
+        logger.debug(
+            "Converted \(int16Count) samples at \(inputSampleRate)Hz to " +
+            "\(samples.count) samples at \(targetSampleRate)Hz (factor: \(downsampleFactor))"
+        )
         return samples
+    }
+
+    /// Perform streaming transcription for models that support it
+    private func performStreamingTranscription<S>(
+        backend: ra_backend_handle,
+        audioStream: S,
+        options: STTOptions,
+        onPartial: @escaping (String) -> Void
+    ) async throws -> STTTranscriptionResult where S: AsyncSequence, S.Element == Data {
+        // Create streaming session
+        guard let stream = ra_stt_create_stream(backend, nil) else {
+            logger.error("Failed to create STT stream")
+            throw SDKError.runtime(.initializationFailed, "Failed to create STT streaming session")
+        }
+
+        streamHandle = stream
+        defer {
+            ra_stt_destroy_stream(backend, stream)
+            streamHandle = nil
+        }
+
+        let sampleRate: Int32 = 16000
+        var lastResult = ""
+
+        logger.info("Starting to process audio stream...")
+
+        // Process audio chunks as they arrive
+        lastResult = try await processAudioStream(
+            audioStream: audioStream,
+            backend: backend,
+            stream: stream,
+            options: options,
+            onPartial: onPartial
+        )
+
+        // Signal input finished and get final result
+        ra_stt_input_finished(backend, stream)
+        lastResult = decodeFinalResult(backend: backend, stream: stream, currentResult: lastResult)
+
+        logger.info("Final transcription: \(lastResult)")
+
+        return STTTranscriptionResult(
+            transcript: lastResult,
+            confidence: 1.0,
+            timestamps: nil,
+            language: options.language,
+            alternatives: nil
+        )
+    }
+
+    /// Process audio stream chunks
+    private func processAudioStream<S>(
+        audioStream: S,
+        backend: ra_backend_handle,
+        stream: ra_stream_handle,
+        options: STTOptions,
+        onPartial: @escaping (String) -> Void
+    ) async throws -> String where S: AsyncSequence, S.Element == Data {
+        let sampleRate: Int32 = 16000
+        var result = ""
+        var chunkCount = 0
+
+        for try await audioChunk in audioStream {
+            chunkCount += 1
+            logger.debug("Received audio chunk #\(chunkCount), size: \(audioChunk.count) bytes")
+
+            // Convert and feed audio
+            let samples = try convertToFloat32Samples(audioData: audioChunk, inputSampleRate: options.sampleRate)
+            let feedStatus = samples.withUnsafeBufferPointer { buffer in
+                ra_stt_feed_audio(backend, stream, buffer.baseAddress, buffer.count, sampleRate)
+            }
+
+            guard feedStatus == RA_SUCCESS else {
+                logger.error("Failed to feed audio: \(feedStatus.rawValue)")
+                continue
+            }
+
+            // Decode if ready
+            if ra_stt_is_ready(backend, stream) {
+                if let newResult = decodePartialResult(backend: backend, stream: stream), newResult != result {
+                    result = newResult
+                    onPartial(newResult)
+                    logger.debug("Partial result: \(newResult)")
+                }
+            }
+
+            // Check for endpoint detection
+            if ra_stt_is_endpoint(backend, stream) {
+                logger.info("Endpoint detected")
+                break
+            }
+        }
+
+        return result
+    }
+
+    /// Perform batch transcription for models that don't support streaming
+    private func performBatchTranscription<S>(
+        audioStream: S,
+        options: STTOptions,
+        onPartial: @escaping (String) -> Void
+    ) async throws -> STTTranscriptionResult where S: AsyncSequence, S.Element == Data {
+        var allAudioData = Data()
+        var accumulatedTranscript = ""
+        var lastProcessedSize = 0
+        let batchThreshold = 48000 * 2 * 3  // ~3 seconds of audio at 48kHz Int16 (288KB)
+
+        for try await chunk in audioStream {
+            allAudioData.append(chunk)
+
+            // Process periodically when we have enough new audio
+            let newDataSize = allAudioData.count - lastProcessedSize
+            if newDataSize >= batchThreshold {
+                logger.info("Processing batch chunk: \(allAudioData.count) bytes total")
+
+                do {
+                    let result = try await transcribe(audioData: allAudioData, options: options)
+                    if !result.transcript.isEmpty {
+                        accumulatedTranscript = result.transcript
+                        onPartial(accumulatedTranscript)
+                        logger.debug("Partial transcription: \(accumulatedTranscript)")
+                    }
+                } catch {
+                    logger.error("Periodic batch transcription failed: \(error.localizedDescription)")
+                }
+
+                lastProcessedSize = allAudioData.count
+            }
+        }
+
+        // Final transcription with all audio
+        logger.info("Final batch transcription: \(allAudioData.count) bytes")
+        let result = try await transcribe(audioData: allAudioData, options: options)
+        if !result.transcript.isEmpty {
+            onPartial(result.transcript)
+        }
+        return result
+    }
+
+    /// Decode partial result from streaming session
+    private func decodePartialResult(
+        backend: ra_backend_handle,
+        stream: ra_stream_handle
+    ) -> String? {
+        var resultPtr: UnsafeMutablePointer<CChar>?
+        let decodeStatus = ra_stt_decode(backend, stream, &resultPtr)
+
+        guard decodeStatus == RA_SUCCESS, let resultPtr = resultPtr else {
+            return nil
+        }
+
+        defer { ra_free_string(resultPtr) }
+        let partialJSON = String(cString: resultPtr)
+
+        // Parse partial result
+        guard let data = partialJSON.data(using: .utf8),
+              let json = try? JSONDecoder().decode(PartialResult.self, from: data),
+              !json.text.isEmpty else {
+            return nil
+        }
+
+        return json.text
+    }
+
+    /// Decode final result from streaming session
+    private func decodeFinalResult(
+        backend: ra_backend_handle,
+        stream: ra_stream_handle,
+        currentResult: String
+    ) -> String {
+        var lastResult = currentResult
+
+        while ra_stt_is_ready(backend, stream) {
+            var resultPtr: UnsafeMutablePointer<CChar>?
+            if ra_stt_decode(backend, stream, &resultPtr) == RA_SUCCESS, let resultPtr = resultPtr {
+                defer { ra_free_string(resultPtr) }
+                let finalJSON = String(cString: resultPtr)
+                if let data = finalJSON.data(using: .utf8),
+                   let json = try? JSONDecoder().decode(PartialResult.self, from: data),
+                   !json.text.isEmpty {
+                    lastResult = json.text
+                }
+            }
+        }
+
+        return lastResult
     }
 }
 
@@ -451,27 +497,8 @@ private struct TranscriptionResult: Codable {
     let text: String
     let confidence: Double?
     let language: String?
-    let metadata: Metadata?
-
-    struct Metadata: Codable {
-        let processingTimeMs: Double?
-        let audioDurationMs: Double?
-        let realTimeFactor: Double?
-
-        enum CodingKeys: String, CodingKey {
-            case processingTimeMs = "processing_time_ms"
-            case audioDurationMs = "audio_duration_ms"
-            case realTimeFactor = "real_time_factor"
-        }
-    }
 }
 
 private struct PartialResult: Codable {
     let text: String
-    let isFinal: Bool?
-
-    enum CodingKeys: String, CodingKey {
-        case text
-        case isFinal = "is_final"
-    }
 }

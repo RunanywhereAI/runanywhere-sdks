@@ -26,4 +26,4 @@ Please add the appropriate label(s):
 - [ ] Documentation updated (if needed)
 
 ## Screenshots - Attach all the relevant UI changes screenshots for iOS/Android and MacOS/Tablet/large screen sizes
-- 
+-

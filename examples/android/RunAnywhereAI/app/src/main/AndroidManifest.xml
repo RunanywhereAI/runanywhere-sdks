@@ -23,7 +23,16 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RunAnywhereAI"
         android:largeHeap="true"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="false"
+        tools:targetApi="35">
+
+        <!-- 16KB page size support for Android 15+
+             Our native libraries are built with 16KB ELF alignment, so we properly
+             support 16KB page sizes. This property is informational only - the real
+             support comes from the native library linker flags. -->
+        <property
+            android:name="android.content.PROPERTY_SUPPORTS_16KB_PAGE_SIZE"
+            android:value="true" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

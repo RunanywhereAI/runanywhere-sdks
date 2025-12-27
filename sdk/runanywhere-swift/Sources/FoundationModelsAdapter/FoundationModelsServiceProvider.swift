@@ -1,86 +1,137 @@
-import Foundation
-import RunAnywhere
-import OSLog
+//
+//  FoundationModelsServiceProvider.swift
+//  FoundationModelsAdapter Module
+//
+//  Apple Foundation Models module providing LLM capabilities via Apple Intelligence.
+//
 
-/// Foundation Models provider for Language Model services (Apple's built-in LLM)
+import Foundation
+import OSLog
+import RunAnywhere
+
+// MARK: - Foundation Models Module
+
+/// Apple Foundation Models module for LLM text generation.
 ///
-/// Usage:
+/// Provides large language model capabilities using Apple's
+/// built-in Foundation Models (Apple Intelligence) on iOS 26+ / macOS 26+.
+///
+/// ## Registration
+///
 /// ```swift
-/// import FoundationModels
+/// import FoundationModelsAdapter
 ///
-/// // In your app initialization (iOS 26+ / macOS 26+ only):
+/// // Only available on iOS 26+ / macOS 26+
 /// if #available(iOS 26.0, macOS 26.0, *) {
-///     FoundationModelsServiceProvider.register()
+///     // Option 1: Direct registration
+///     AppleAI.register()
+///
+///     // Option 2: Via ModuleRegistry
+///     ModuleRegistry.shared.register(AppleAI.self)
+///
+///     // Option 3: Via RunAnywhere
+///     RunAnywhere.register(AppleAI.self)
 /// }
 /// ```
 @available(iOS 26.0, macOS 26.0, *)
-public final class FoundationModelsServiceProvider: LLMServiceProvider {
-    private let logger = Logger(subsystem: "com.runanywhere.FoundationModels", category: "FoundationModelsServiceProvider")
+public enum AppleAI: RunAnywhereModule {
+    private static let logger = Logger(
+        subsystem: "com.runanywhere.FoundationModels",
+        category: "FoundationModels"
+    )
 
-    // MARK: - Singleton for easy registration
+    // MARK: - RunAnywhereModule Conformance
 
-    public static let shared = FoundationModelsServiceProvider()
+    public static let moduleId = "appleai"
+    public static let moduleName = "Apple Foundation Models"
+    public static let capabilities: Set<CapabilityType> = [.llm]
+    public static let defaultPriority: Int = 50 // Lower priority - prefer local models
 
-    /// Super simple registration - just call this in your app
+    /// Apple AI uses the Foundation Models inference framework
+    public static let inferenceFramework: InferenceFramework = .foundationModels
+
+    /// Register Foundation Models LLM service with the SDK
     @MainActor
-    public static func register() {
-        ModuleRegistry.shared.registerLLM(shared)
+    public static func register(priority: Int) {
+        ServiceRegistry.shared.registerLLM(
+            name: moduleName,
+            priority: priority,
+            canHandle: { modelId in
+                canHandleModel(modelId)
+            },
+            factory: { config in
+                try await createService(config: config)
+            }
+        )
+        logger.info("Foundation Models LLM registered")
+
+        // Register the built-in Foundation Models as a model entry so it appears in model lists
+        registerBuiltInModel()
     }
 
-    // MARK: - LLMServiceProvider Protocol
+    /// Register the built-in Foundation Models as a model entry
+    @MainActor
+    private static func registerBuiltInModel() {
+        let modelInfo = ModelInfo(
+            id: "foundation-models-default",
+            name: "Apple Intelligence (Foundation Models)",
+            category: .language,
+            format: .unknown,
+            framework: .foundationModels,
+            downloadURL: nil,
+            localPath: URL(string: "builtin://foundation-models"),  // Special builtin scheme
+            artifactType: .builtIn,
+            downloadSize: nil,
+            memoryRequired: nil,  // System managed
+            contextLength: 4096,
+            supportsThinking: false,
+            tags: ["apple", "foundation-models", "built-in", "on-device"],
+            description: """
+                Apple's built-in Foundation Models powered by Apple Intelligence. \
+                Requires iOS 26+ / macOS 26+ and an Apple Intelligence capable device.
+                """
+        )
 
-    public var name: String {
-        "Apple Foundation Models"
+        ServiceContainer.shared.modelRegistry.registerModel(modelInfo)
+        logger.info("Foundation Models model entry registered: \(modelInfo.id)")
     }
 
-    public func canHandle(modelId: String?) -> Bool {
-        // Check if we're running on iOS 26+ or macOS 26+
+    // MARK: - Private Helpers
+
+    private static func canHandleModel(_ modelId: String?) -> Bool {
         guard #available(iOS 26.0, macOS 26.0, *) else {
             return false
         }
 
-        // Accept nil or empty modelId (will use default Foundation Model)
         guard let modelId = modelId, !modelId.isEmpty else {
-            return false // Don't claim nil/empty - let other providers handle those
+            return false
         }
 
-        // Handle Foundation Models specific identifiers
         let lowercasedId = modelId.lowercased()
-        return lowercasedId.contains("foundation") ||
-               lowercasedId.contains("apple") ||
-               modelId == "foundation-models-default" ||
-               modelId == "foundation-models-native"
+        return lowercasedId.contains("foundation")
+            || lowercasedId.contains("apple")
+            || lowercasedId == "foundation-models-default"
+            || lowercasedId == "foundation-models-native"
     }
 
-    public func createLLMService(configuration: LLMConfiguration) async throws -> LLMService {
+    private static func createService(config _: LLMConfiguration) async throws -> LLMService {
         logger.info("Creating Foundation Models service")
 
-        // Create the service
-        let service = FoundationModelsService(hardwareConfig: nil)
-
-        // Initialize the service (Foundation Models doesn't need a model path)
-        logger.info("Initializing Foundation Models service")
+        let service = FoundationModelsService()
         try await service.initialize(modelPath: "built-in")
 
         logger.info("Foundation Models service created successfully")
         return service
     }
-
-    // MARK: - Private initializer to enforce singleton
-
-    private init() {
-        logger.info("FoundationModelsServiceProvider initialized")
-    }
 }
 
-// MARK: - Auto Registration Support
+// MARK: - Auto-Discovery Registration
 
-/// Automatic registration when module is imported
 @available(iOS 26.0, macOS 26.0, *)
-public enum FoundationModelsModule {
-    /// Call this to automatically register Foundation Models with the SDK
-    @MainActor
-    public static func autoRegister() {
-        FoundationModelsServiceProvider.register()
-    }
+extension AppleAI {
+    /// Enable auto-discovery for this module.
+    /// Access this property to trigger registration.
+    public static let autoRegister: Void = {
+        ModuleDiscovery.register(AppleAI.self)
+    }()
 }

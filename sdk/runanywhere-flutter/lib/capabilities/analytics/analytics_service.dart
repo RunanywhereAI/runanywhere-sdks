@@ -60,7 +60,7 @@ class AnalyticsService {
       String? hostAppIdentifier;
       String? hostAppName;
       String? hostAppVersion;
-      
+
       // Try to get package info if available
       // Note: This requires package_info_plus dependency
       // try {
@@ -219,5 +219,3 @@ class PerformanceMetrics {
     required this.peakMemoryUsage,
   });
 }
-
-

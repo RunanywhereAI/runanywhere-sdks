@@ -96,4 +96,3 @@ export interface BoundingBox {
   readonly width: number;
   readonly height: number;
 }
-

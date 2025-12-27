@@ -236,7 +236,7 @@ npm run nitrogen
 Nitrogen is the code generator for [NitroModules](https://github.com/margelo/react-native-nitro-modules) - a high-performance native module system for React Native. It generates:
 
 - **C++ bridge code** - Type-safe bindings between JS and native
-- **Swift/Kotlin code** - Platform-specific implementations  
+- **Swift/Kotlin code** - Platform-specific implementations
 - **Autolinking files** - For CocoaPods and Gradle integration
 
 The generated files are in `nitrogen/generated/` and are gitignored (auto-generated on each machine).
@@ -259,7 +259,7 @@ pod install
 cd ..
 npx react-native run-ios
 
-# Android  
+# Android
 cd examples/react-native/RunAnywhereAI
 npx react-native run-android
 ```

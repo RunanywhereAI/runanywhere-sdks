@@ -32,4 +32,3 @@ export class CostCalculator {
     return tokenCount * 0.001;
   }
 }
-

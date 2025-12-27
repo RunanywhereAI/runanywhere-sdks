@@ -11,14 +11,43 @@ import RunAnywhere
 import AppKit
 #endif
 
+// MARK: - Model Load State (Local UI type)
+
+/// Simple enum to track model loading state in the UI
+enum ModelLoadState: Equatable {
+    case notLoaded
+    case loading
+    case loaded
+    case error(String)
+
+    var isLoaded: Bool {
+        if case .loaded = self { return true }
+        return false
+    }
+
+    var isLoading: Bool {
+        if case .loading = self { return true }
+        return false
+    }
+}
+
 // MARK: - Model Status Banner
 
 /// A banner that shows the current model status (framework + model name) or prompts to select a model
 struct ModelStatusBanner: View {
-    let framework: LLMFramework?
+    let framework: InferenceFramework?
     let modelName: String?
     let isLoading: Bool
+    let supportsStreaming: Bool
     let onSelectModel: () -> Void
+
+    init(framework: InferenceFramework?, modelName: String?, isLoading: Bool, supportsStreaming: Bool = true, onSelectModel: @escaping () -> Void) {
+        self.framework = framework
+        self.modelName = modelName
+        self.isLoading = isLoading
+        self.supportsStreaming = supportsStreaming
+        self.onSelectModel = onSelectModel
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -38,10 +67,20 @@ struct ModelStatusBanner: View {
                         .foregroundColor(.green)
                         .font(.system(size: 14, weight: .semibold))
 
-                    Text(modelName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(framework.displayName)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+
+                            // Streaming mode indicator
+                            streamingModeIndicator
+                        }
+                        Text(modelName)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .lineLimit(1)
+                    }
 
                     Spacer()
 
@@ -51,6 +90,7 @@ struct ModelStatusBanner: View {
                             .fontWeight(.medium)
                     }
                     .buttonStyle(.bordered)
+                    .tint(AppColors.primaryAccent)
                     .controlSize(.small)
                 }
             } else {
@@ -74,6 +114,7 @@ struct ModelStatusBanner: View {
                         .fontWeight(.semibold)
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primaryAccent)
                     .controlSize(.small)
                 }
             }
@@ -88,20 +129,35 @@ struct ModelStatusBanner: View {
         .cornerRadius(12)
     }
 
-    private func frameworkIcon(for framework: LLMFramework) -> String {
+    /// Streaming mode indicator badge
+    @ViewBuilder private var streamingModeIndicator: some View {
+        HStack(spacing: 3) {
+            Image(systemName: supportsStreaming ? "bolt.fill" : "square.fill")
+                .font(.system(size: 8))
+            Text(supportsStreaming ? "Streaming" : "Batch")
+                .font(.system(size: 9, weight: .medium))
+        }
+        .foregroundColor(supportsStreaming ? .green : .orange)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 2)
+        .background(
+            Capsule()
+                .fill(supportsStreaming ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+        )
+    }
+
+    private func frameworkIcon(for framework: InferenceFramework) -> String {
         switch framework {
         case .llamaCpp: return "cpu"
-        case .whisperKit: return "waveform"
         case .onnx: return "square.stack.3d.up"
         case .foundationModels: return "apple.logo"
         default: return "cube"
         }
     }
 
-    private func frameworkColor(for framework: LLMFramework) -> Color {
+    private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
-        case .llamaCpp: return .blue
-        case .whisperKit: return .green
+        case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
         default: return .gray
@@ -197,10 +253,10 @@ struct ModelRequiredOverlay: View {
 
     private var modalityColor: Color {
         switch modality {
-        case .llm: return AppColors.primaryBlue
+        case .llm: return AppColors.primaryAccent
         case .stt: return .green
         case .tts: return AppColors.primaryPurple
-        case .voice: return .orange
+        case .voice: return AppColors.primaryAccent
         }
     }
 
@@ -227,9 +283,9 @@ struct ModelRequiredOverlay: View {
 
 /// A setup view specifically for Voice Assistant which requires 3 models
 struct VoicePipelineSetupView: View {
-    @Binding var sttModel: (framework: LLMFramework, name: String)?
-    @Binding var llmModel: (framework: LLMFramework, name: String)?
-    @Binding var ttsModel: (framework: LLMFramework, name: String)?
+    @Binding var sttModel: SelectedModelInfo?
+    @Binding var llmModel: SelectedModelInfo?
+    @Binding var ttsModel: SelectedModelInfo?
 
     // Model loading states from SDK lifecycle tracker
     var sttLoadState: ModelLoadState = .notLoaded
@@ -255,7 +311,7 @@ struct VoicePipelineSetupView: View {
             VStack(spacing: 8) {
                 Image(systemName: "mic.circle.fill")
                     .font(.system(size: 48))
-                    .foregroundColor(.blue)
+                    .foregroundColor(AppColors.primaryAccent)
 
                 Text("Voice Assistant Setup")
                     .font(.title2)
@@ -288,7 +344,7 @@ struct VoicePipelineSetupView: View {
                     title: "Language Model",
                     subtitle: "Processes and responds to your input",
                     icon: "brain",
-                    color: .blue,
+                    color: AppColors.primaryAccent,
                     selectedFramework: llmModel?.framework,
                     selectedModel: llmModel?.name,
                     loadState: llmLoadState,
@@ -323,6 +379,7 @@ struct VoicePipelineSetupView: View {
                 .padding(.vertical, 16)
             }
             .buttonStyle(.borderedProminent)
+            .tint(AppColors.primaryAccent)
             .disabled(!allModelsLoaded)
             .padding(.horizontal)
             .padding(.bottom, 20)
@@ -356,7 +413,7 @@ struct ModelSetupCard: View {
     let subtitle: String
     let icon: String
     let color: Color
-    let selectedFramework: LLMFramework?
+    let selectedFramework: InferenceFramework?
     let selectedModel: String?
     var loadState: ModelLoadState = .notLoaded
     let onSelect: () -> Void
@@ -453,7 +510,7 @@ struct ModelSetupCard: View {
                 } else if isConfigured {
                     Text("Change")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primaryAccent)
                 } else {
                     HStack(spacing: 4) {
                         Text("Select")
@@ -461,7 +518,7 @@ struct ModelSetupCard: View {
                     }
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundColor(.blue)
+                    .foregroundColor(AppColors.primaryAccent)
                 }
             }
             .padding(16)
@@ -508,7 +565,7 @@ struct ModelSetupCard: View {
 
 /// A compact indicator showing current model status for use in navigation bars
 struct CompactModelIndicator: View {
-    let framework: LLMFramework?
+    let framework: InferenceFramework?
     let modelName: String?
     let isLoading: Bool
     let onTap: () -> Void
@@ -536,16 +593,15 @@ struct CompactModelIndicator: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(framework != nil ? Color.blue.opacity(0.1) : Color.orange.opacity(0.1))
-            .foregroundColor(framework != nil ? .blue : .orange)
+            .background(framework != nil ? AppColors.primaryAccent.opacity(0.1) : AppColors.primaryAccent.opacity(0.2))
+            .foregroundColor(AppColors.primaryAccent)
             .cornerRadius(8)
         }
     }
 
-    private func frameworkColor(for framework: LLMFramework) -> Color {
+    private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
-        case .llamaCpp: return .blue
-        case .whisperKit: return .green
+        case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
         default: return .gray
@@ -560,27 +616,24 @@ struct CompactModelIndicator: View {
         ModelStatusBanner(
             framework: .llamaCpp,
             modelName: "SmolLM2-135M",
-            isLoading: false,
-            onSelectModel: {}
-        )
+            isLoading: false
+        ) {}
 
         ModelStatusBanner(
             framework: nil,
             modelName: nil,
-            isLoading: false,
-            onSelectModel: {}
-        )
+            isLoading: false
+        ) {}
 
         ModelStatusBanner(
-            framework: .whisperKit,
-            modelName: "Tiny",
-            isLoading: true,
-            onSelectModel: {}
-        )
+            framework: .onnx,
+            modelName: "whisper-tiny",
+            isLoading: true
+        ) {}
     }
     .padding()
 }
 
 #Preview("Model Required Overlay") {
-    ModelRequiredOverlay(modality: .stt, onSelectModel: {})
+    ModelRequiredOverlay(modality: .stt) {}
 }

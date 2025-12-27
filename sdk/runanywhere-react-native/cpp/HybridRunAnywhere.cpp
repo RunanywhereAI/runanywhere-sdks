@@ -68,18 +68,18 @@ bool readWavFile(const char* filePath, float** samples, size_t* numSamples, int*
   // Read header
   WavHeader header;
   file.read(reinterpret_cast<char*>(&header), sizeof(WavHeader));
-  
+
   // Verify RIFF/WAVE format
   if (strncmp(header.riff, "RIFF", 4) != 0 || strncmp(header.wave, "WAVE", 4) != 0) {
     printf("[WAV Reader] Not a valid WAV file\n");
     return false;
   }
-  
+
   // Skip extra format bytes if present
   if (header.fmtSize > 16) {
     file.seekg(header.fmtSize - 16, std::ios::cur);
   }
-  
+
   // Find data chunk
   char chunkId[4];
   uint32_t chunkSize;
@@ -89,26 +89,26 @@ bool readWavFile(const char* filePath, float** samples, size_t* numSamples, int*
     }
     file.seekg(chunkSize, std::ios::cur);
   }
-  
+
   if (strncmp(chunkId, "data", 4) != 0) {
     printf("[WAV Reader] No data chunk found\n");
     return false;
   }
-  
+
   // Calculate number of samples
   int bytesPerSample = header.bitsPerSample / 8;
   size_t totalSamples = chunkSize / bytesPerSample / header.numChannels;
-  
+
   // Allocate output buffer
   *samples = new float[totalSamples];
   *numSamples = totalSamples;
   *sampleRate = header.sampleRate;
-  
+
   // Read and convert samples
   if (header.bitsPerSample == 16) {
     std::vector<int16_t> buffer(chunkSize / 2);
     file.read(reinterpret_cast<char*>(buffer.data()), chunkSize);
-    
+
     for (size_t i = 0; i < totalSamples; i++) {
       // Mix channels to mono if needed
       float sum = 0;
@@ -136,7 +136,7 @@ bool readWavFile(const char* filePath, float** samples, size_t* numSamples, int*
     *samples = nullptr;
     return false;
   }
-  
+
   printf("[WAV Reader] Read %zu samples at %d Hz\n", *numSamples, *sampleRate);
   return true;
 }
@@ -440,7 +440,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::generate(
     if (optionsJson.has_value()) {
       maxTokens = extractIntValue(*optionsJson, "max_tokens", 256);
       temperature = extractFloatValue(*optionsJson, "temperature", 0.7f);
-      
+
       // Extract system_prompt string
       size_t sysStart = optionsJson->find("\"system_prompt\":");
       if (sysStart != std::string::npos) {
@@ -976,7 +976,7 @@ void HybridRunAnywhere::setLastError(const std::string& error) {
 std::string HybridRunAnywhere::extractArchiveIfNeeded(
     const std::string& archivePath) {
   LOGD("extractArchiveIfNeeded called with: %s", archivePath.c_str());
-  
+
   bool isTarBz2 =
       endsWith(archivePath, ".tar.bz2") || endsWith(archivePath, ".bz2");
   bool isTarGz =
@@ -986,7 +986,7 @@ std::string HybridRunAnywhere::extractArchiveIfNeeded(
     LOGD("Not an archive, returning path as-is");
     return archivePath;
   }
-  
+
   LOGI("Detected archive format: %s", isTarBz2 ? "tar.bz2" : "tar.gz");
 
   std::string modelName;

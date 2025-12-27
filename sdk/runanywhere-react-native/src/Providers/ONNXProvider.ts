@@ -231,4 +231,3 @@ export function registerONNXProviders(): void {
   ONNXTTSProvider.register();
   console.log('[ONNXProvider] All ONNX providers registered');
 }
-

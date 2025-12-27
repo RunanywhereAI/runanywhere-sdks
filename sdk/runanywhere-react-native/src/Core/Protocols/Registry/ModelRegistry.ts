@@ -63,4 +63,3 @@ export interface ModelRegistry {
    */
   removeModel(id: string): void;
 }
-

@@ -84,7 +84,7 @@ class JSDownloadServiceImpl {
    */
   async ensureModelsDirectory(): Promise<void> {
     const dir = this.getModelsDirectory();
-    
+
     if (RNFetchBlob) {
       const exists = await RNFetchBlob.fs.isDir(dir);
       if (!exists) {
@@ -231,7 +231,7 @@ class JSDownloadServiceImpl {
       task
         .then(async (res: any) => {
           const status = res.info().status;
-          
+
           if (status === 200) {
             console.log('[JSDownloadService] Download completed:', destPath);
 

@@ -27,9 +27,37 @@ jobs:
     - name: Install SwiftLint
       run: brew install swiftlint
 
+    - name: Install Periphery
+      run: brew install peripheryapp/periphery/periphery
+
+    - name: SwiftLint AutoFix
+      working-directory: ./sdk/runanywhere-swift
+      run: swiftlint --fix --quiet 2>/dev/null || true
+
     - name: Run SwiftLint
       working-directory: ./sdk/runanywhere-swift
-      run: swiftlint
+      run: swiftlint --strict
+
+    - name: Run Periphery (Unused Code Detection)
+      working-directory: ./sdk/runanywhere-swift
+      run: |
+        # Run Periphery and filter out known false positives (associatedtype in protocols)
+        OUTPUT=$(periphery scan \
+          --targets RunAnywhere \
+          --targets ONNXRuntime \
+          --targets LlamaCPPRuntime \
+          --targets FoundationModelsAdapter \
+          --targets FluidAudioDiarization 2>&1) || true
+
+        # Filter warnings, excluding associatedtype (protocol design pattern)
+        WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused" || true)
+
+        if [ -n "$WARNINGS" ]; then
+          echo "Periphery found unused code:"
+          echo "$WARNINGS"
+          exit 1
+        fi
+        echo "Periphery check passed (no unused code found)"
 
     - name: Build Swift Package
       working-directory: ./sdk/runanywhere-swift

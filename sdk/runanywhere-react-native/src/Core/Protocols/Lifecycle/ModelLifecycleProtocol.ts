@@ -140,4 +140,3 @@ export class ModelLifecycleError extends Error {
     return new ModelLifecycleError(`Invalid state: ${reason}`, undefined, undefined, reason);
   }
 }
-

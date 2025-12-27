@@ -9,7 +9,7 @@ import SwiftUI
 import RunAnywhere
 
 struct FrameworkRow: View {
-    let framework: LLMFramework
+    let framework: InferenceFramework
     let isExpanded: Bool
     let onTap: () -> Void
 
@@ -43,8 +43,12 @@ struct FrameworkRow: View {
         switch framework {
         case .foundationModels:
             return "apple.logo"
-        case .mediaPipe:
-            return "brain.filled.head.profile"
+        case .llamaCpp:
+            return "cpu"
+        case .onnx:
+            return "brain"
+        case .fluidAudio:
+            return "waveform"
         default:
             return "cpu"
         }
@@ -54,8 +58,10 @@ struct FrameworkRow: View {
         switch framework {
         case .foundationModels:
             return AppColors.textPrimary
-        case .mediaPipe:
-            return AppColors.statusBlue
+        case .llamaCpp:
+            return AppColors.primaryAccent
+        case .onnx:
+            return AppColors.statusGray
         default:
             return AppColors.statusGray
         }
@@ -65,8 +71,12 @@ struct FrameworkRow: View {
         switch framework {
         case .foundationModels:
             return "Apple's pre-installed system models"
-        case .mediaPipe:
-            return "Google's cross-platform ML framework"
+        case .llamaCpp:
+            return "Efficient LLM inference with GGUF models"
+        case .onnx:
+            return "ONNX Runtime for STT/TTS models"
+        case .fluidAudio:
+            return "Speaker diarization"
         default:
             return "Machine learning framework"
         }

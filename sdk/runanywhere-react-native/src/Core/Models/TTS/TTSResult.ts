@@ -10,4 +10,3 @@ export interface TTSResult {
   duration: number;
   // Add all other properties from iOS TTSResult
 }
-

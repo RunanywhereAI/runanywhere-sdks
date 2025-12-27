@@ -38,4 +38,3 @@ export function isComponentTransitioning(state: ComponentState): boolean {
     state === ComponentState.Initializing
   );
 }
-

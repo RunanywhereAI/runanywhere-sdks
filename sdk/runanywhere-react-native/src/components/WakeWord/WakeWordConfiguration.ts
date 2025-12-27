@@ -77,4 +77,3 @@ export class WakeWordConfigurationImpl implements WakeWordConfiguration {
     }
   }
 }
-

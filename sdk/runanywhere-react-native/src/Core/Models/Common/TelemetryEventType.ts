@@ -41,4 +41,3 @@ export enum TelemetryEventType {
   Memory = 'memory',
   Custom = 'custom',
 }
-

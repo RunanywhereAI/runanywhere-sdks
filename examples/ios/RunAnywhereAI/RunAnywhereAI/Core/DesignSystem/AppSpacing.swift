@@ -9,7 +9,6 @@ import SwiftUI
 
 // MARK: - App Spacing (gathered from existing usage)
 struct AppSpacing {
-
     // MARK: - Padding values (from existing usage)
     static let xxSmall: CGFloat = 2
     static let xSmall: CGFloat = 4
@@ -84,7 +83,6 @@ struct AppSpacing {
 
 // MARK: - Layout Constants (from existing usage)
 struct AppLayout {
-
     // macOS specific
     static let macOSMinWidth: CGFloat = 400
     static let macOSIdealWidth: CGFloat = 600

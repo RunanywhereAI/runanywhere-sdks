@@ -1,5 +1,4 @@
 import Foundation
-import Pulse
 
 /// Production API client for backend operations
 /// Implements NetworkService protocol for real network calls
@@ -23,15 +22,14 @@ public actor APIClient: NetworkService {
             "Content-Type": "application/json",
             "X-SDK-Client": "RunAnywhereSDK",
             "X-SDK-Version": SDKConstants.version,
-            "X-Platform": SDKConstants.platform
+            "X-Platform": SDKConstants.platform,
+            // Supabase-compatible headers (also works with standard backends)
+            "apikey": apiKey,
+            // Supabase: Request to return the created/updated row
+            "Prefer": "return=representation"
         ]
 
-        // Configure URLSession with Pulse proxy for automatic network logging
-        self.session = URLSession(
-            configuration: config,
-            delegate: URLSessionProxyDelegate(),
-            delegateQueue: nil
-        )
+        self.session = URLSession(configuration: config)
     }
 
     // MARK: - Public Methods
@@ -49,56 +47,15 @@ public actor APIClient: NetworkService {
         _ payload: Data,
         requiresAuth: Bool
     ) async throws -> Data {
-        let token: String?
-        if requiresAuth {
-            guard let authService = authService else {
-                throw SDKError.notInitialized
-            }
-            token = try await authService.getAccessToken()
-        } else {
-            token = nil
-        }
-
+        let token = try await resolveToken(requiresAuth: requiresAuth)
         let url = baseURL.appendingPathComponent(endpoint.path)
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = payload
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        // Set authorization header
-        if let token = token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        } else if endpoint == .authenticate {
-            // For authentication endpoint, API key is in the request body, not header
-            // No authorization header needed for authentication endpoint
-        }
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw RepositoryError.syncFailure("Invalid response")
-        }
-
-        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
-            // Try to parse error response
-            var errorMessage = "HTTP \(httpResponse.statusCode)"
-
-            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                if let detail = errorData["detail"] as? String {
-                    errorMessage = detail
-                } else if let detail = errorData["detail"] as? [[String: Any]] {
-                    let errors = detail.compactMap { $0["msg"] as? String }.joined(separator: ", ")
-                    errorMessage = errors.isEmpty ? errorMessage : errors
-                } else if let message = errorData["message"] as? String {
-                    errorMessage = message
-                } else if let error = errorData["error"] as? String {
-                    errorMessage = error
-                }
-            }
-
-            throw RepositoryError.syncFailure(errorMessage)
-        }
-
-        return data
+        return try await executeRequest(request, url: url)
     }
 
     /// Perform a raw GET request
@@ -106,46 +63,71 @@ public actor APIClient: NetworkService {
         _ endpoint: APIEndpoint,
         requiresAuth: Bool
     ) async throws -> Data {
-        let token: String?
-        if requiresAuth {
-            guard let authService = authService else {
-                throw SDKError.notInitialized
-            }
-            token = try await authService.getAccessToken()
-        } else {
-            token = nil
-        }
-
+        let token = try await resolveToken(requiresAuth: requiresAuth)
         let url = baseURL.appendingPathComponent(endpoint.path)
+
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        // Set authorization header
-        if let token = token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return try await executeRequest(request, url: url)
+    }
+
+    // MARK: - Private Helpers
+
+    private func resolveToken(requiresAuth: Bool) async throws -> String {
+        if requiresAuth, let authService = authService {
+            return try await authService.getAccessToken()
         }
+        // Use API key as bearer token (Supabase compatibility)
+        return apiKey
+    }
 
+    private func executeRequest(_ request: URLRequest, url: URL) async throws -> Data {
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw RepositoryError.syncFailure("Invalid response")
+            let error = SDKError.network(.invalidResponse, "Invalid HTTP response")
+            emitErrorEvent(error: error, url: url, statusCode: nil, data: nil)
+            throw error
         }
 
-        guard httpResponse.statusCode == 200 else {
-            // Try to parse error response
-            var errorMessage = "HTTP \(httpResponse.statusCode)"
-            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                if let detail = errorData["detail"] as? String {
-                    errorMessage = detail
-                } else if let detail = errorData["detail"] as? [[String: Any]] {
-                    let errors = detail.compactMap { $0["msg"] as? String }.joined(separator: ", ")
-                    errorMessage = errors.isEmpty ? errorMessage : errors
-                }
-            }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorInfo = APIErrorInfo(
+                data: data,
+                statusCode: httpResponse.statusCode,
+                requestURL: url.absoluteString
+            )
+            let error = errorInfo.toSDKError(statusCode: httpResponse.statusCode)
 
-            throw RepositoryError.syncFailure(errorMessage)
+            // Emit error event with full context for consumer logging
+            emitErrorEvent(
+                error: error,
+                url: url,
+                statusCode: httpResponse.statusCode,
+                data: data
+            )
+
+            // Log detailed error info for debugging
+            logger.error("API request failed: \(errorInfo.debugDescription)")
+
+            throw error
         }
 
         return data
+    }
+
+    /// Emit an error event to both EventBus (for consumers) and analytics
+    private func emitErrorEvent(error: SDKError, url: URL, statusCode: Int?, data: Data?) {
+        let responseBody = data.flatMap { String(data: $0, encoding: .utf8) }
+
+        let errorEvent = SDKErrorEvent.networkError(
+            error: error,
+            url: url.absoluteString,
+            statusCode: statusCode,
+            responseBody: responseBody
+        )
+
+        EventPublisher.shared.track(errorEvent)
     }
 }

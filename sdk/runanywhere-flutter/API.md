@@ -296,4 +296,3 @@ class QuizQuestion implements Generatable {
   ''';
 }
 ```
-

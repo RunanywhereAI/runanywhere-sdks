@@ -26,4 +26,3 @@ export interface WakeWordServiceProvider {
    */
   readonly name: string;
 }
-

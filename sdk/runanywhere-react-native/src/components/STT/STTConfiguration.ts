@@ -80,4 +80,3 @@ export class STTConfigurationImpl implements STTConfiguration {
     }
   }
 }
-

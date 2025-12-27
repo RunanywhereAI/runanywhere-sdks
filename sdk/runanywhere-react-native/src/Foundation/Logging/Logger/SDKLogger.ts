@@ -65,4 +65,3 @@ export class SDKLogger {
     LoggingManager.shared.log(level, this.category, message, metadata);
   }
 }
-

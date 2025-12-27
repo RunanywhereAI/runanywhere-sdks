@@ -414,7 +414,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         setDownloadingModels(prev => ({ ...prev, [model.id]: progress.progress }));
         console.log(`[Download] ${model.id}: ${Math.round(progress.progress * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`);
       });
-      
+
       // Refresh models after download
       await loadData();
     } catch (error) {
@@ -502,10 +502,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               <Icon name="cube-outline" size={18} color={Colors.textSecondary} />
               <Text style={styles.infoLabelText}>GPU</Text>
             </View>
-            <Icon 
-              name={deviceInfo.hasGPU ? "checkmark-circle" : "close-circle"} 
-              size={20} 
-              color={deviceInfo.hasGPU ? Colors.statusGreen : Colors.statusRed} 
+            <Icon
+              name={deviceInfo.hasGPU ? "checkmark-circle" : "close-circle"}
+              size={20}
+              color={deviceInfo.hasGPU ? Colors.statusGreen : Colors.statusRed}
             />
           </View>
 
@@ -514,10 +514,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               <Icon name="flash-outline" size={18} color={Colors.textSecondary} />
               <Text style={styles.infoLabelText}>NPU/Neural Engine</Text>
             </View>
-            <Icon 
-              name={deviceInfo.hasNeuralEngine ? "checkmark-circle" : "close-circle"} 
-              size={20} 
-              color={deviceInfo.hasNeuralEngine ? Colors.statusGreen : Colors.statusRed} 
+            <Icon
+              name={deviceInfo.hasNeuralEngine ? "checkmark-circle" : "close-circle"}
+              size={20}
+              color={deviceInfo.hasNeuralEngine ? Colors.statusGreen : Colors.statusRed}
             />
           </View>
         </View>
@@ -666,11 +666,11 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                 </View>
                 {/* Progress bar */}
                 <View style={styles.progressBarBackground}>
-                  <View 
+                  <View
                     style={[
-                      styles.progressBarFill, 
+                      styles.progressBarFill,
                       { width: `${Math.round(downloadProgress * 100)}%` }
-                    ]} 
+                    ]}
                   />
                 </View>
               </View>

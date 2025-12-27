@@ -30,8 +30,8 @@ android {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.0"
+        versionCode = 11
+        versionName = "0.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -145,6 +145,9 @@ android {
         jniLibs {
             // Use legacy packaging to extract libraries to filesystem
             // This helps with symbol resolution for transitive dependencies
+            // CRITICAL: useLegacyPackaging = true is REQUIRED for 16KB page size support
+            // when using AGP < 8.5.1. With AGP 8.5.1+, this ensures proper extraction
+            // and 16KB alignment during packaging.
             useLegacyPackaging = true
             // NOTE: pickFirsts no longer needed!
             // All native libraries now come from the unified runanywhere-core-native module,

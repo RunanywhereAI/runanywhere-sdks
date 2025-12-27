@@ -9,7 +9,6 @@ import SwiftUI
 
 // MARK: - App Typography (gathered from existing usage)
 struct AppTypography {
-
     // MARK: - Existing font usage in the app
 
     // Large titles and displays

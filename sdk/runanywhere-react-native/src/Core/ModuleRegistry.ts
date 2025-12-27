@@ -366,4 +366,3 @@ export class ModuleRegistry {
     this.wakeWordProviders = [];
   }
 }
-

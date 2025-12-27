@@ -79,5 +79,3 @@ export interface RunAnywhereDeviceInfo
    */
   isLowPowerMode(): Promise<boolean>;
 }
-
-

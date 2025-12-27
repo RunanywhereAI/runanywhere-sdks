@@ -34,4 +34,3 @@ export function getLogLevelDescription(level: LogLevel): string {
       return 'fault';
   }
 }
-

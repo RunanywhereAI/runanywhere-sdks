@@ -63,4 +63,3 @@ export class ModelInfoMetadataImpl implements ModelInfoMetadata {
     this.minMemory = options.minMemory ?? null;
   }
 }
-
