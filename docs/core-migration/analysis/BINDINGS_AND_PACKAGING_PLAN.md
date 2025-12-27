@@ -1,5 +1,18 @@
 # Bindings and Packaging Plan
 
+> **⚠️ SUPERSEDED BY MODULAR APPROACH**
+>
+> This document describes the **original unified packaging** strategy with a single `RunAnywhereCore.xcframework`.
+>
+> **For the current implementation plan**, see [`implementation/`](./implementation/) which uses a **modular multi-XCFramework** approach:
+> - `RACommons.xcframework` - Core commons layer (~1MB)
+> - `RABackendLlamaCPP.xcframework` - LlamaCpp backend (~15MB)
+> - `RABackendONNX.xcframework` - ONNX backend (~50MB)
+> - `RABackendWhisperCPP.xcframework` - WhisperCpp backend (~8MB)
+>
+> The modular approach allows consumers to include only the backends they need, significantly reducing binary size.
+> This document is retained for reference on build scripts, podspec patterns, and Android AAR structure.
+
 ## Overview
 
 This document outlines the concrete packaging strategy for distributing the shared RunAnywhere Core to all platform SDKs.
