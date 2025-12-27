@@ -18,8 +18,8 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { Spacing, BorderRadius, Padding, Layout } from '../../theme/spacing';
-import { Message, MessageRole } from '../../types/chat';
-import { FrameworkDisplayNames } from '../../types/model';
+import type { Message } from '../../types/chat';
+import { MessageRole } from '../../types/chat';
 
 interface MessageBubbleProps {
   message: Message;
@@ -79,14 +79,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         ]}
       >
         {/* Model Info Badge (for assistant messages) */}
-        {isAssistant && message.modelInfo && message.modelInfo.frameworkDisplayName && (
-          <View style={styles.modelBadge}>
-            <Icon name="cube-outline" size={10} color={Colors.primaryBlue} />
-            <Text style={styles.modelBadgeText}>
-              {message.modelInfo.frameworkDisplayName}
-            </Text>
-          </View>
-        )}
+        {isAssistant &&
+          message.modelInfo &&
+          message.modelInfo.frameworkDisplayName && (
+            <View style={styles.modelBadge}>
+              <Icon name="cube-outline" size={10} color={Colors.primaryBlue} />
+              <Text style={styles.modelBadgeText}>
+                {message.modelInfo.frameworkDisplayName}
+              </Text>
+            </View>
+          )}
 
         {/* Thinking Section (expandable) */}
         {hasThinking && (
@@ -144,13 +146,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Text>
 
           {/* Analytics (for assistant messages) */}
-          {isAssistant && message.analytics && message.analytics.averageTokensPerSecond != null && message.analytics.averageTokensPerSecond > 0 && (
-            <View style={styles.analytics}>
-              <Text style={styles.analyticsText}>
-                {formatTPS(message.analytics.averageTokensPerSecond)}
-              </Text>
-            </View>
-          )}
+          {isAssistant &&
+            message.analytics &&
+            message.analytics.averageTokensPerSecond != null &&
+            message.analytics.averageTokensPerSecond > 0 && (
+              <View style={styles.analytics}>
+                <Text style={styles.analyticsText}>
+                  {formatTPS(message.analytics.averageTokensPerSecond)}
+                </Text>
+              </View>
+            )}
         </View>
       </View>
     </View>

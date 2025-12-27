@@ -4,7 +4,8 @@
  * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Design/AppTypography.swift
  */
 
-import { TextStyle, Platform } from 'react-native';
+import type { TextStyle } from 'react-native';
+import { Platform } from 'react-native';
 
 const fontFamily = Platform.select({
   ios: 'System',
@@ -142,7 +143,10 @@ export const Typography = {
 /**
  * Create a text style with a specific size
  */
-export function fontSize(size: number, weight: keyof typeof FontWeight = 'regular'): TextStyle {
+export function fontSize(
+  size: number,
+  weight: keyof typeof FontWeight = 'regular'
+): TextStyle {
   return {
     fontSize: size,
     fontWeight: FontWeight[weight],

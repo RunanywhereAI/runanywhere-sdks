@@ -1,0 +1,46 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "App.tsx",
+    "index.js",
+    "src/theme/index.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}"
+  ],
+  "ignore": [
+    "node_modules/**",
+    "android/**",
+    "ios/**",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ],
+  "ignoreDependencies": [
+    "@react-native-community/cli",
+    "@react-native-community/cli-platform-android",
+    "@react-native-community/cli-platform-ios",
+    "@react-native/typescript-config",
+    "react-native-monorepo-config",
+    "@babel/runtime",
+    "react-native-nitro-modules",
+    "runanywhere-react-native",
+    "rn-fetch-blob",
+    "@react-navigation/native-stack",
+    "react-native-audio-recorder-player"
+  ],
+  "ignoreBinaries": [
+    "jest",
+    "pod",
+    "watchman"
+  ],
+  "rules": {
+    "files": "error",
+    "exports": "warn",
+    "types": "warn",
+    "unlisted": "off",
+    "binaries": "off",
+    "unresolved": "off",
+    "duplicates": "off"
+  }
+}
