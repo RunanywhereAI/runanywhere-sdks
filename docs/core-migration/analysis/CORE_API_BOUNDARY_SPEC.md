@@ -1,5 +1,12 @@
 # Core API Boundary Specification
 
+> **⚠️ Future API Specification**
+>
+> This document defines a **future/target C API** for a fully migrated core. The `implementation/` folder contains the **current implementation plan** which uses a more incremental "wrap, don't replace" approach:
+> - The existing `runanywhere_bridge.h` API (`ra_create_backend()`, `ra_text_*`, `ra_stt_*`, etc.) remains unchanged
+> - The new `runanywhere-commons` layer adds orchestration APIs (`ra_module_*`, `ra_service_*`, `ra_event_*`) on top
+> - See `implementation/README.md` for the current implementation strategy
+
 ## Overview
 
 This document defines the concrete C API boundary that all platform SDKs (iOS, Android/KMP, Flutter, React Native) will use to interface with the shared RunAnywhere Core.
