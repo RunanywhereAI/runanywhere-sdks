@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import 'model_types.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// AddModelFromURLView (mirroring iOS AddModelFromURLView.swift)
 ///

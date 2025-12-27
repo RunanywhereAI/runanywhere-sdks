@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -5,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:runanywhere/runanywhere.dart' show MessageRole;
 
-import '../models/app_types.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
 
 /// ConversationStore (mirroring iOS ConversationStore.swift)
 ///
@@ -14,7 +15,7 @@ class ConversationStore extends ChangeNotifier {
   static final ConversationStore shared = ConversationStore._();
 
   ConversationStore._() {
-    _initialize();
+    unawaited(_initialize());
   }
 
   List<Conversation> _conversations = [];
@@ -48,7 +49,7 @@ class ConversationStore extends ChangeNotifier {
 
     _conversations.insert(0, conversation);
     _currentConversation = conversation;
-    _saveConversation(conversation);
+    unawaited(_saveConversation(conversation));
     notifyListeners();
 
     return conversation;
@@ -65,7 +66,7 @@ class ConversationStore extends ChangeNotifier {
         _currentConversation = updated;
       }
 
-      _saveConversation(updated);
+      unawaited(_saveConversation(updated));
       notifyListeners();
     }
   }
@@ -78,7 +79,7 @@ class ConversationStore extends ChangeNotifier {
       _currentConversation = _conversations.isNotEmpty ? _conversations.first : null;
     }
 
-    _deleteConversationFile(conversation.id);
+    unawaited(_deleteConversationFile(conversation.id));
     notifyListeners();
   }
 
@@ -103,7 +104,7 @@ class ConversationStore extends ChangeNotifier {
   Conversation? loadConversation(String id) {
     final existing = _conversations.firstWhere(
       (c) => c.id == id,
-      orElse: () => Conversation.empty(),
+      orElse: Conversation.empty,
     );
 
     if (existing.id.isNotEmpty) {

@@ -1,18 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
-import 'package:runanywhere/runanywhere.dart' hide LLMFramework;
+import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/services/conversation_store.dart';
+import 'package:runanywhere_ai/core/services/model_manager.dart';
+import 'package:runanywhere_ai/core/utilities/constants.dart';
+import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
+import 'package:runanywhere_ai/features/models/model_status_components.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/services/conversation_store.dart';
-import '../../core/services/model_manager.dart';
-import '../../core/utilities/constants.dart';
-import '../models/model_selection_sheet.dart';
-import '../models/model_status_components.dart';
-import '../models/model_types.dart';
 
 /// ChatInterfaceView (mirroring iOS ChatInterfaceView.swift)
 ///
@@ -32,8 +33,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   // Messages
   final List<ChatMessage> _messages = [];
   String _currentStreamingContent = '';
-  // TODO: Use when SDK supports thinking content in streaming
-  // ignore:unused_field
   String _currentThinkingContent = '';
 
   // State
@@ -49,7 +48,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    unawaited(_loadSettings());
   }
 
   @override
@@ -101,10 +100,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       final prefs = await SharedPreferences.getInstance();
       final temperature =
           prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
-      final maxTokens =
-          prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
+      final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
 
-      final options = RunAnywhereGenerationOptions(
+      final options = sdk.RunAnywhereGenerationOptions(
         maxTokens: maxTokens,
         temperature: temperature,
       );
@@ -124,7 +122,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   Future<void> _generateStreaming(
     String prompt,
-    RunAnywhereGenerationOptions options,
+    sdk.RunAnywhereGenerationOptions options,
   ) async {
     // Capture model name before async gap to avoid context issues
     final modelName = context.read<ModelManager>().loadedModelName;
@@ -142,25 +140,21 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     });
 
     final messageIndex = _messages.length - 1;
+    final contentBuffer = StringBuffer();
 
     try {
-      // TODO: Use RunAnywhere.generateStream with thinking support
-      // final stream = RunAnywhere.generateStream(prompt, options: options);
-      // await for (final token in stream) { ... }
-
-      // Placeholder streaming simulation
-      final stream = RunAnywhere.generateStream(prompt, options: options);
+      final stream = sdk.RunAnywhere.generateStream(prompt, options: options);
 
       await for (final token in stream) {
         if (_timeToFirstToken == null && _generationStartTime != null) {
-          _timeToFirstToken = DateTime.now()
-                  .difference(_generationStartTime!)
-                  .inMilliseconds /
-              1000.0;
+          _timeToFirstToken =
+              DateTime.now().difference(_generationStartTime!).inMilliseconds /
+                  1000.0;
         }
 
         _tokenCount++;
-        _currentStreamingContent += token;
+        contentBuffer.write(token);
+        _currentStreamingContent = contentBuffer.toString();
 
         setState(() {
           _messages[messageIndex] = _messages[messageIndex].copyWith(
@@ -189,6 +183,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       if (!mounted) return;
       setState(() {
         _messages[messageIndex] = _messages[messageIndex].copyWith(
+          thinkingContent: _currentThinkingContent.isNotEmpty
+              ? _currentThinkingContent
+              : null,
           analytics: analytics,
         );
         _isGenerating = false;
@@ -205,24 +202,29 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   Future<void> _generateNonStreaming(
     String prompt,
-    RunAnywhereGenerationOptions options,
+    sdk.RunAnywhereGenerationOptions options,
   ) async {
     // Capture model name before async gap to avoid context issues
     final modelName = context.read<ModelManager>().loadedModelName;
 
     try {
-      final result = await RunAnywhere.generate(prompt, options: options);
+      final result = await sdk.RunAnywhere.generate(prompt, options: options);
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
               1000.0
           : 0.0;
 
+      // Extract token counts from SDK result
+      final outputTokens = result.tokensUsed;
+      final tokensPerSecond = result.performanceMetrics.tokensPerSecond;
+
       final analytics = MessageAnalytics(
         messageId: DateTime.now().millisecondsSinceEpoch.toString(),
         modelName: modelName,
         totalGenerationTime: totalTime,
-        // TODO: Extract token counts from result
+        outputTokens: outputTokens,
+        tokensPerSecond: tokensPerSecond,
       );
 
       setState(() {
@@ -230,6 +232,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           role: MessageRole.assistant,
           content: result.text,
+          thinkingContent: result.thinkingContent,
           timestamp: DateTime.now(),
           analytics: analytics,
         ));
@@ -248,11 +251,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
+        unawaited(_scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: AppLayout.animationFast,
           curve: Curves.easeOut,
-        );
+        ));
       }
     });
   }
@@ -280,13 +283,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
               onPressed: _clearChat,
               tooltip: 'Clear chat',
             ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              // TODO: Show chat settings
-            },
-            tooltip: 'Settings',
-          ),
         ],
       ),
       body: Column(
@@ -317,26 +313,48 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   }
 
   void _showModelSelectionSheet() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (sheetContext) => ModelSelectionSheet(
         context: ModelSelectionContext.llm,
         onModelSelected: (model) async {
-          // TODO: Load model via RunAnywhere SDK
-          // await context.read<ModelManager>().loadModel(model.id);
+          // Model is loaded by ModelSelectionSheet via SDK
+          // UI will update via ModelManager listener
         },
       ),
-    );
+    ));
+  }
+
+  /// Map SDK framework enum to app framework enum
+  LLMFramework _mapSdkFramework(sdk.LLMFramework? sdkFramework) {
+    if (sdkFramework == null) return LLMFramework.llamaCpp;
+    switch (sdkFramework) {
+      case sdk.LLMFramework.llamaCpp:
+        return LLMFramework.llamaCpp;
+      case sdk.LLMFramework.foundationModels:
+        return LLMFramework.foundationModels;
+      case sdk.LLMFramework.mediaPipe:
+        return LLMFramework.mediaPipe;
+      case sdk.LLMFramework.onnx:
+        return LLMFramework.onnxRuntime;
+      case sdk.LLMFramework.systemTTS:
+        return LLMFramework.systemTTS;
+      case sdk.LLMFramework.whisperKit:
+        return LLMFramework.whisperKit;
+      default:
+        return LLMFramework.llamaCpp;
+    }
   }
 
   Widget _buildModelStatusBanner(ModelManager modelManager) {
     // Map ModelManager state to LLMFramework for the shared component
     LLMFramework? framework;
-    if (modelManager.isModelLoaded) {
-      // TODO: Get actual framework from ModelManager when SDK provides it
-      framework = LLMFramework.llamaCpp;
+    if (modelManager.isModelLoaded && modelManager.currentModel != null) {
+      // Get framework from the current model's preferred framework
+      framework =
+          _mapSdkFramework(modelManager.currentModel!.preferredFramework);
     }
 
     return Padding(
@@ -485,6 +503,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   }
 }
 
+/// Message role enum
+enum MessageRole { system, user, assistant }
+
 /// Chat message model
 class ChatMessage {
   final String id;
@@ -570,7 +591,8 @@ class _MessageBubbleState extends State<_MessageBubble> {
                       )
                     : null,
                 color: isUser ? null : AppColors.backgroundGray5(context),
-                borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+                borderRadius:
+                    BorderRadius.circular(AppSpacing.cornerRadiusBubble),
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.shadowLight,
@@ -649,7 +671,8 @@ class _MessageBubbleState extends State<_MessageBubble> {
               padding: const EdgeInsets.all(AppSpacing.mediumLarge),
               decoration: BoxDecoration(
                 color: AppColors.modelThinkingBg,
-                borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+                borderRadius:
+                    BorderRadius.circular(AppSpacing.cornerRadiusRegular),
               ),
               child: Text(
                 widget.message.thinkingContent!,

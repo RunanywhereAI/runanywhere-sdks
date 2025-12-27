@@ -2,15 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
-
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/services/permission_service.dart';
-import '../../core/services/audio_recording_service.dart';
-import '../models/model_selection_sheet.dart';
-import '../models/model_status_components.dart';
-import '../models/model_types.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/services/audio_recording_service.dart';
+import 'package:runanywhere_ai/core/services/permission_service.dart';
+import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
+import 'package:runanywhere_ai/features/models/model_status_components.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// STTMode enumeration (matching iOS STTMode)
 enum STTMode {
@@ -85,12 +84,12 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   @override
   void initState() {
     super.initState();
-    _checkMicrophonePermission();
+    unawaited(_checkMicrophonePermission());
   }
 
   @override
   void dispose() {
-    _audioLevelSubscription?.cancel();
+    unawaited(_audioLevelSubscription?.cancel());
     super.dispose();
   }
 
@@ -105,7 +104,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   }
 
   void _showModelSelectionSheet() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -115,7 +114,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
           await _loadModel(model);
         },
       ),
-    );
+    ));
   }
 
   /// Load STT model using RunAnywhere SDK
@@ -216,9 +215,9 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     final (audioData, _) = await _recordingService.stopRecording();
 
     if (audioData == null || audioData.isEmpty) {
-        setState(() {
+      setState(() {
         _errorMessage = 'No audio data recorded';
-        });
+      });
       return;
     }
 
@@ -236,8 +235,8 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Transcribing ${audioData.length} bytes of audio...');
 
-      // Get the STT component from SDK
-      final sttComponent = sdk.RunAnywhere.loadedSTTComponent;
+      // Get the STT capability from SDK
+      final sttComponent = sdk.RunAnywhere.loadedSTTCapability;
 
       if (sttComponent == null) {
         throw Exception('STT component not loaded');
@@ -246,10 +245,10 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       // Transcribe using the SDK component
       final output = await sttComponent.transcribe(audioData);
 
-        setState(() {
+      setState(() {
         _transcribedText = output.text;
-          _isTranscribing = false;
-        });
+        _isTranscribing = false;
+      });
 
       debugPrint('✅ Transcription complete: ${output.text}');
       debugPrint('📊 Confidence: ${output.confidence}');
