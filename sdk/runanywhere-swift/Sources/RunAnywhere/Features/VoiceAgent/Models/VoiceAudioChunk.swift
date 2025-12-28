@@ -1,3 +1,4 @@
+import CRACommons
 import Foundation
 
 /// A chunk of audio data for streaming processing
@@ -23,7 +24,7 @@ public struct VoiceAudioChunk {
     public init(
         samples: [Float],
         timestamp: TimeInterval,
-        sampleRate: Int = VoiceAgentConstants.inputSampleRate,
+        sampleRate: Int = Int(RAC_STT_DEFAULT_SAMPLE_RATE),
         channels: Int = 1,
         sequenceNumber: Int = 0,
         isFinal: Bool = false

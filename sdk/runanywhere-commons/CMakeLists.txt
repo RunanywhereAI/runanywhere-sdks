@@ -144,6 +144,8 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_analytics.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
+    # Result memory management (weak symbols, can be overridden by backends)
+    src/features/result_free.cpp
 )
 
 # Combine all sources

@@ -89,63 +89,13 @@ public enum VADEvent: SDKEvent, TelemetryEventProperties {
     }
 
     public var properties: [String: String] {
+        // Use derived properties from telemetryProperties for consistency
+        // This eliminates duplicate property conversion logic
         switch self {
-        case .initialized(let framework):
-            return ["framework": framework.rawValue]
-
-        case .initializationFailed(let error, let framework):
-            return ["framework": framework.rawValue].merging(error.telemetryProperties) { _, new in new }
-
-        case .cleanedUp:
-            return [:]
-
-        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
-            var props = [
-                "model_id": modelId,
-                "framework": framework.rawValue
-            ]
-            if modelSizeBytes > 0 {
-                props["model_size_bytes"] = String(modelSizeBytes)
-            }
-            return props
-
-        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
-            var props = [
-                "model_id": modelId,
-                "duration_ms": String(format: "%.1f", durationMs),
-                "framework": framework.rawValue
-            ]
-            if modelSizeBytes > 0 {
-                props["model_size_bytes"] = String(modelSizeBytes)
-            }
-            return props
-
-        case .modelLoadFailed(let modelId, let error, let framework):
-            return [
-                "model_id": modelId,
-                "framework": framework.rawValue
-            ].merging(error.telemetryProperties) { _, new in new }
-
-        case .modelUnloaded(let modelId):
-            return ["model_id": modelId]
-
-        case .started:
-            return [:]
-
-        case .stopped:
-            return [:]
-
-        case .speechStarted:
-            return [:]
-
-        case .speechEnded(let durationMs):
-            return ["duration_ms": String(format: "%.1f", durationMs)]
-
-        case .paused:
-            return [:]
-
-        case .resumed:
-            return [:]
+        case .initialized, .initializationFailed, .cleanedUp,
+             .modelLoadStarted, .modelLoadCompleted, .modelLoadFailed, .modelUnloaded,
+             .started, .stopped, .speechStarted, .speechEnded, .paused, .resumed:
+            return telemetryProperties.toDictionary()
         }
     }
 

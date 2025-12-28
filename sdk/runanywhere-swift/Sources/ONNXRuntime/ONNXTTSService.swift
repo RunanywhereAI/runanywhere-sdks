@@ -9,6 +9,7 @@
 import CRABackendONNX
 import CRACommons
 import Foundation
+import os
 import RunAnywhere
 
 /// ONNX-based TTS service for text-to-speech synthesis.
@@ -34,8 +35,8 @@ public final class ONNXTTSService: TTSService, @unchecked Sendable {
     /// Native handle to the C++ ONNX TTS service
     private var handle: rac_handle_t?
 
-    /// Lock for thread-safe access to handle
-    private let lock = NSLock()
+    /// Lock for thread-safe access to handle (async-safe)
+    private let lock = OSAllocatedUnfairLock()
 
     /// Logger for this service
     private let logger = SDKLogger(category: "ONNXTTSService")
@@ -53,9 +54,9 @@ public final class ONNXTTSService: TTSService, @unchecked Sendable {
 
     /// Whether synthesis is currently in progress
     public var isSynthesizing: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return _isSynthesizing
+        lock.withLock {
+            return _isSynthesizing
+        }
     }
 
     /// Available voices (model-dependent)
@@ -72,20 +73,19 @@ public final class ONNXTTSService: TTSService, @unchecked Sendable {
     }
 
     deinit {
-        lock.lock()
-        if let handle = handle {
-            rac_tts_onnx_destroy(handle)
+        lock.withLock {
+            if let handle = handle {
+                rac_tts_onnx_destroy(handle)
+            }
         }
-        lock.unlock()
     }
 
     /// Initialize the service and load the model.
     public func initialize() async throws {
         logger.info("Initializing ONNXTTSService with model: \(modelPath)")
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            lock.lock()
-
+        // Perform initialization under lock
+        let initResult: Result<Void, Error> = lock.withLock {
             // Clean up existing handle if any
             if let existingHandle = handle {
                 rac_tts_onnx_destroy(existingHandle)
@@ -105,15 +105,21 @@ public final class ONNXTTSService: TTSService, @unchecked Sendable {
 
             if result == RAC_SUCCESS {
                 handle = newHandle
-                lock.unlock()
-                logger.info("ONNXTTSService initialized successfully")
-                continuation.resume()
+                return .success(())
             } else {
-                lock.unlock()
-                let error = CommonsErrorMapping.toSDKError(result) ?? SDKError.tts(.initializationFailed, "Failed to initialize ONNX TTS service")
-                logger.error("Failed to initialize ONNXTTSService: \(error)")
-                continuation.resume(throwing: error)
+                let error = CommonsErrorMapping.toSDKError(result)
+                    ?? SDKError.tts(.initializationFailed, "Failed to initialize ONNX TTS service")
+                return .failure(error)
             }
+        }
+
+        // Handle result outside of lock
+        switch initResult {
+        case .success:
+            logger.info("ONNXTTSService initialized successfully")
+        case .failure(let error):
+            logger.error("Failed to initialize ONNXTTSService: \(error)")
+            throw error
         }
     }
 
@@ -128,52 +134,47 @@ public final class ONNXTTSService: TTSService, @unchecked Sendable {
     public func synthesize(text: String, options: TTSOptions) async throws -> Data {
         logger.debug("Synthesize called for text: \(text.prefix(50))...")
 
-        return try await withCheckedThrowingContinuation { continuation in
-            lock.lock()
-
-            guard let handle = handle else {
-                lock.unlock()
-                continuation.resume(throwing: SDKError.tts(.serviceNotAvailable, "Service not initialized"))
-                return
-            }
-
+        // Get handle under lock and set synthesizing flag
+        let lockedHandle = lock.withLock { () -> rac_handle_t? in
             _isSynthesizing = true
-            lock.unlock()
+            return handle
+        }
+        guard let handle = lockedHandle else {
+            lock.withLock { _isSynthesizing = false }
+            throw SDKError.tts(.serviceNotAvailable, "Service not initialized")
+        }
 
-            defer {
-                lock.lock()
-                _isSynthesizing = false
-                lock.unlock()
+        defer {
+            lock.withLock { _isSynthesizing = false }
+        }
+
+        // Convert Swift options to C options
+        var cOptions = rac_tts_options_t()
+        cOptions.sample_rate = Int32(options.sampleRate)
+        cOptions.rate = options.rate
+
+        var cResult = rac_tts_result_t()
+
+        let synthesizeResult = text.withCString { textPtr in
+            rac_tts_onnx_synthesize(handle, textPtr, &cOptions, &cResult)
+        }
+
+        if synthesizeResult == RAC_SUCCESS {
+            // Convert audio data to Data
+            var audioData = Data()
+            if let dataPtr = cResult.audio_data, cResult.audio_size > 0 {
+                // Audio data is already in the correct format
+                audioData = Data(bytes: dataPtr, count: cResult.audio_size)
+                // Free the C-allocated data
+                dataPtr.deallocate()
             }
 
-            // Convert Swift options to C options
-            var cOptions = rac_tts_options_t()
-            cOptions.sample_rate = Int32(options.sampleRate)
-            cOptions.rate = options.rate
-
-            var cResult = rac_tts_result_t()
-
-            let synthesizeResult = text.withCString { textPtr in
-                rac_tts_onnx_synthesize(handle, textPtr, &cOptions, &cResult)
-            }
-
-            if synthesizeResult == RAC_SUCCESS {
-                // Convert audio data to Data
-                var audioData = Data()
-                if let dataPtr = cResult.audio_data, cResult.audio_size > 0 {
-                    // Audio data is already in the correct format
-                    audioData = Data(bytes: dataPtr, count: cResult.audio_size)
-                    // Free the C-allocated data
-                    dataPtr.deallocate()
-                }
-
-                logger.debug("Synthesis complete: \(cResult.audio_size) bytes")
-                continuation.resume(returning: audioData)
-            } else {
-                let error = CommonsErrorMapping.toSDKError(synthesizeResult) ?? SDKError.tts(.generationFailed, "Synthesis failed")
-                logger.error("Synthesis failed: \(error)")
-                continuation.resume(throwing: error)
-            }
+            logger.debug("Synthesis complete: \(cResult.audio_size) bytes")
+            return audioData
+        } else {
+            let error = CommonsErrorMapping.toSDKError(synthesizeResult) ?? SDKError.tts(.generationFailed, "Synthesis failed")
+            logger.error("Synthesis failed: \(error)")
+            throw error
         }
     }
 
@@ -204,29 +205,23 @@ public final class ONNXTTSService: TTSService, @unchecked Sendable {
 
     /// Stop current synthesis
     public func stop() {
-        lock.lock()
-        if let handle = handle {
-            rac_tts_onnx_stop(handle)
-            logger.debug("Synthesis stopped")
+        lock.withLock {
+            if let handle = handle {
+                rac_tts_onnx_stop(handle)
+                logger.debug("Synthesis stopped")
+            }
+            _isSynthesizing = false
         }
-        _isSynthesizing = false
-        lock.unlock()
     }
 
     /// Clean up resources
     public func cleanup() async {
-        // Use synchronous cleanup to avoid NSLock in async context issues
-        cleanupSync()
-    }
-
-    /// Synchronous cleanup helper
-    private func cleanupSync() {
-        lock.lock()
-        if let handle = handle {
-            rac_tts_onnx_destroy(handle)
-            self.handle = nil
-            logger.info("ONNXTTSService cleaned up")
+        lock.withLock {
+            if let handle = handle {
+                rac_tts_onnx_destroy(handle)
+                self.handle = nil
+                logger.info("ONNXTTSService cleaned up")
+            }
         }
-        lock.unlock()
     }
 }

@@ -25,6 +25,7 @@ option(RAC_LLAMACPP_ENABLE_METAL "Enable Metal GPU support (Apple)" ON)
 set(LLAMACPP_SOURCES
     src/rac_llm_llamacpp.cpp
     src/rac_backend_llamacpp_register.cpp
+    src/rac_llm_service_impl.cpp
 )
 
 set(LLAMACPP_HEADERS

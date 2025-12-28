@@ -2,13 +2,9 @@
 //  TTSAnalyticsService.swift
 //  RunAnywhere SDK
 //
-//  TTS analytics service.
-//  Tracks synthesis operations and metrics.
-//  Lifecycle events are handled by ManagedLifecycle.
-//
-//  NOTE: ⚠️ Audio duration estimation assumes 16-bit PCM @ 22050Hz (standard for TTS).
-//  Formula: audioDurationMs = (bytes / 2) / 22050 * 1000
-//  Actual sample rates may vary depending on the TTS model/voice configuration.
+//  TTS analytics service - THIN WRAPPER over C++ rac_tts_analytics_*.
+//  Delegates all state management and metrics calculation to C++.
+//  Swift handles: type conversion, event emission, logging.
 //
 
 import CRACommons
@@ -17,80 +13,93 @@ import Foundation
 // MARK: - TTS Analytics Service
 
 /// TTS analytics service for tracking synthesis operations.
-/// Model lifecycle events (load/unload) are handled by ManagedLifecycle.
+/// Thin wrapper over C++ rac_tts_analytics_* functions.
 public actor TTSAnalyticsService {
 
     // MARK: - Properties
 
     private let logger = SDKLogger(category: "TTSAnalytics")
-
-    /// Active synthesis operations
-    private var activeSyntheses: [String: SynthesisTracker] = [:]
-
-    /// Metrics
-    private var synthesisCount = 0
-    private var totalCharacters = 0
-    private var totalProcessingTimeMs: Double = 0
-    private var totalAudioDurationMs: Double = 0
-    private var totalAudioSizeBytes: Int64 = 0
-    private var totalCharactersPerSecond: Double = 0
-    private let startTime = Date()
-    private var lastEventTime: Date?
-
-    // MARK: - Types
-
-    private struct SynthesisTracker {
-        let startTime: Date
-        let modelId: String
-        let characterCount: Int
-        let sampleRate: Int
-        let framework: InferenceFramework
-    }
+    private var handle: rac_tts_analytics_handle_t?
 
     // MARK: - Initialization
 
-    public init() {}
+    public init() {
+        var analyticsHandle: rac_tts_analytics_handle_t?
+        let result = rac_tts_analytics_create(&analyticsHandle)
+        if result == RAC_SUCCESS {
+            self.handle = analyticsHandle
+        } else {
+            logger.error("Failed to create TTS analytics handle: \(result)")
+        }
+    }
+
+    deinit {
+        if let analyticsHandle = handle {
+            rac_tts_analytics_destroy(analyticsHandle)
+        }
+    }
 
     // MARK: - Synthesis Tracking
 
     /// Start tracking a synthesis
-    /// - Parameters:
-    ///   - text: The text to synthesize
-    ///   - voice: The voice ID being used
-    ///   - sampleRate: Audio sample rate in Hz (default: RAC_TTS_DEFAULT_SAMPLE_RATE)
-    ///   - framework: The inference framework being used
-    /// - Returns: A unique synthesis ID for tracking
     public func startSynthesis(
         text: String,
         voice: String,
         sampleRate: Int = Int(RAC_TTS_DEFAULT_SAMPLE_RATE),
         framework: InferenceFramework = .unknown
     ) -> String {
-        let id = UUID().uuidString
+        guard let analyticsHandle = handle else {
+            logger.error("Analytics handle not initialized")
+            return UUID().uuidString
+        }
+
+        var synthesisIdPtr: UnsafeMutablePointer<CChar>?
+        let cFramework = framework.toCFramework()
         let characterCount = text.count
 
-        activeSyntheses[id] = SynthesisTracker(
-            startTime: Date(),
-            modelId: voice,
-            characterCount: characterCount,
-            sampleRate: sampleRate,
-            framework: framework
-        )
+        let result = text.withCString { textPtr in
+            voice.withCString { voicePtr in
+                rac_tts_analytics_start_synthesis(
+                    analyticsHandle,
+                    textPtr,
+                    voicePtr,
+                    Int32(sampleRate),
+                    cFramework,
+                    &synthesisIdPtr
+                )
+            }
+        }
 
+        let synthesisId: String
+        if result == RAC_SUCCESS, let ptr = synthesisIdPtr {
+            synthesisId = String(cString: ptr)
+            rac_free(ptr)
+        } else {
+            synthesisId = UUID().uuidString
+            logger.error("Failed to start synthesis in C++: \(result)")
+        }
+
+        // Emit Swift event
         EventPublisher.shared.track(TTSEvent.synthesisStarted(
-            synthesisId: id,
+            synthesisId: synthesisId,
             modelId: voice,
             characterCount: characterCount,
             sampleRate: sampleRate,
             framework: framework
         ))
 
-        logger.debug("Synthesis started: \(id), voice: \(voice), \(characterCount) characters")
-        return id
+        logger.debug("Synthesis started: \(synthesisId), voice: \(voice), \(characterCount) characters")
+        return synthesisId
     }
 
     /// Track synthesis chunk (analytics only, for streaming synthesis)
     public func trackSynthesisChunk(synthesisId: String, chunkSize: Int) {
+        guard let analyticsHandle = handle else { return }
+
+        _ = synthesisId.withCString { idPtr in
+            rac_tts_analytics_track_synthesis_chunk(analyticsHandle, idPtr, Int32(chunkSize))
+        }
+
         EventPublisher.shared.track(TTSEvent.synthesisChunk(
             synthesisId: synthesisId,
             chunkSize: chunkSize
@@ -98,47 +107,31 @@ public actor TTSAnalyticsService {
     }
 
     /// Complete a synthesis
-    /// - Parameters:
-    ///   - synthesisId: The synthesis ID from startSynthesis
-    ///   - audioDurationMs: Duration of the generated audio in milliseconds
-    ///   - audioSizeBytes: Size of the generated audio in bytes
     public func completeSynthesis(
         synthesisId: String,
         audioDurationMs: Double,
         audioSizeBytes: Int
     ) {
-        guard let tracker = activeSyntheses.removeValue(forKey: synthesisId) else { return }
+        guard let analyticsHandle = handle else { return }
 
-        let endTime = Date()
-        let processingTimeMs = endTime.timeIntervalSince(tracker.startTime) * 1000
-        let characterCount = tracker.characterCount
+        _ = synthesisId.withCString { idPtr in
+            rac_tts_analytics_complete_synthesis(analyticsHandle, idPtr, audioDurationMs, Int32(audioSizeBytes))
+        }
 
-        // Calculate characters per second (synthesis speed)
-        let charsPerSecond = processingTimeMs > 0 ? Double(characterCount) / (processingTimeMs / 1000.0) : 0
+        logger.debug("Synthesis completed: \(synthesisId)")
 
-        // Update metrics
-        synthesisCount += 1
-        totalCharacters += characterCount
-        totalProcessingTimeMs += processingTimeMs
-        totalAudioDurationMs += audioDurationMs
-        totalAudioSizeBytes += Int64(audioSizeBytes)
-        totalCharactersPerSecond += charsPerSecond
-        lastEventTime = endTime
-
+        // Emit Swift event with basic info (C++ tracks detailed metrics)
         EventPublisher.shared.track(TTSEvent.synthesisCompleted(
             synthesisId: synthesisId,
-            modelId: tracker.modelId,
-            characterCount: characterCount,
+            modelId: "",  // C++ tracks this
+            characterCount: 0,  // C++ tracks this
             audioDurationMs: audioDurationMs,
             audioSizeBytes: audioSizeBytes,
-            processingDurationMs: processingTimeMs,
-            charactersPerSecond: charsPerSecond,
-            sampleRate: tracker.sampleRate,
-            framework: tracker.framework
+            processingDurationMs: 0,  // C++ calculates
+            charactersPerSecond: 0,  // C++ calculates
+            sampleRate: Int(RAC_TTS_DEFAULT_SAMPLE_RATE),
+            framework: .unknown
         ))
-
-        let audioDurationFormatted = String(format: "%.1f", audioDurationMs)
-        logger.debug("Synthesis completed: \(synthesisId), voice: \(tracker.modelId), audio: \(audioDurationFormatted)ms, \(audioSizeBytes) bytes")
     }
 
     /// Track synthesis failure
@@ -146,20 +139,44 @@ public actor TTSAnalyticsService {
         synthesisId: String,
         error: Error
     ) {
-        let tracker = activeSyntheses.removeValue(forKey: synthesisId)
-        lastEventTime = Date()
+        guard let analyticsHandle = handle else { return }
+
+        let sdkError = SDKError.from(error, category: .tts)
+        let errorCode = CommonsErrorMapping.fromSDKError(sdkError)
+
+        _ = synthesisId.withCString { idPtr in
+            sdkError.message.withCString { msgPtr in
+                rac_tts_analytics_track_synthesis_failed(analyticsHandle, idPtr, errorCode, msgPtr)
+            }
+        }
 
         EventPublisher.shared.track(TTSEvent.synthesisFailed(
             synthesisId: synthesisId,
-            modelId: tracker?.modelId ?? "unknown",
-            error: SDKError.from(error, category: .tts)
+            modelId: "unknown",
+            error: sdkError
         ))
     }
 
-    /// Track an error during TTS operations with full SDKError context
+    /// Track an error during TTS operations
     public func trackError(_ error: Error, operation: String, modelId: String? = nil, synthesisId: String? = nil) {
-        lastEventTime = Date()
+        guard let analyticsHandle = handle else { return }
+
         let sdkError = SDKError.from(error, category: .tts)
+        let errorCode = CommonsErrorMapping.fromSDKError(sdkError)
+
+        _ = operation.withCString { opPtr in
+            sdkError.message.withCString { msgPtr in
+                rac_tts_analytics_track_error(
+                    analyticsHandle,
+                    errorCode,
+                    msgPtr,
+                    opPtr,
+                    modelId,
+                    synthesisId
+                )
+            }
+        }
+
         let errorEvent = SDKErrorEvent.ttsError(
             error: sdkError,
             modelId: modelId,
@@ -172,16 +189,30 @@ public actor TTSAnalyticsService {
     // MARK: - Metrics
 
     public func getMetrics() -> TTSMetrics {
-        TTSMetrics(
-            totalEvents: synthesisCount,
-            startTime: startTime,
-            lastEventTime: lastEventTime,
-            totalSyntheses: synthesisCount,
-            averageCharactersPerSecond: synthesisCount > 0 ? totalCharactersPerSecond / Double(synthesisCount) : 0,
-            averageProcessingTimeMs: synthesisCount > 0 ? totalProcessingTimeMs / Double(synthesisCount) : 0,
-            averageAudioDurationMs: synthesisCount > 0 ? totalAudioDurationMs / Double(synthesisCount) : 0,
-            totalCharactersProcessed: totalCharacters,
-            totalAudioSizeBytes: totalAudioSizeBytes
+        guard let analyticsHandle = handle else {
+            return TTSMetrics()
+        }
+
+        var cMetrics = rac_tts_metrics_t()
+        let result = rac_tts_analytics_get_metrics(analyticsHandle, &cMetrics)
+
+        guard result == RAC_SUCCESS else {
+            logger.error("Failed to get metrics: \(result)")
+            return TTSMetrics()
+        }
+
+        return TTSMetrics(
+            totalEvents: Int(cMetrics.total_events),
+            startTime: Date(timeIntervalSince1970: Double(cMetrics.start_time_ms) / 1000.0),
+            lastEventTime: cMetrics.last_event_time_ms > 0
+                ? Date(timeIntervalSince1970: Double(cMetrics.last_event_time_ms) / 1000.0)
+                : nil,
+            totalSyntheses: Int(cMetrics.total_syntheses),
+            averageCharactersPerSecond: cMetrics.average_characters_per_second,
+            averageProcessingTimeMs: cMetrics.average_processing_time_ms,
+            averageAudioDurationMs: cMetrics.average_audio_duration_ms,
+            totalCharactersProcessed: Int(cMetrics.total_characters_processed),
+            totalAudioSizeBytes: cMetrics.total_audio_size_bytes
         )
     }
 }

@@ -2,72 +2,46 @@
 //  GenerationAnalyticsService.swift
 //  RunAnywhere SDK
 //
-//  LLM Generation analytics service.
-//  Tracks generation operations and metrics.
-//  Lifecycle events are handled by ManagedLifecycle.
-//
-//  NOTE: ⚠️ Token estimation uses ~4 chars/token (approximation, not exact tokenizer count).
-//  Actual token counts may vary depending on the model's tokenizer and input content.
+//  LLM Generation analytics service - THIN WRAPPER over C++ rac_llm_analytics_*.
+//  Delegates all state management and metrics calculation to C++.
+//  Swift handles: type conversion, event emission, logging.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - Generation Analytics Service
 
 /// LLM analytics service for tracking generation operations.
-/// Model lifecycle events (load/unload) are handled by ManagedLifecycle.
-///
-/// Supports two generation modes:
-/// - **Non-streaming** (`generate()`): Synchronous generation, no TTFT tracking
-/// - **Streaming** (`generateStream()`): Asynchronous token-by-token generation with TTFT tracking
+/// Thin wrapper over C++ rac_llm_analytics_* functions.
 public actor GenerationAnalyticsService {
 
     // MARK: - Properties
 
     private let logger = SDKLogger(category: "GenerationAnalytics")
-
-    /// Active generation operations
-    private var activeGenerations: [String: GenerationTracker] = [:]
-
-    /// Metrics - separated by mode
-    private var totalGenerations = 0
-    private var streamingGenerations = 0
-    private var nonStreamingGenerations = 0
-    private var totalTimeToFirstToken: TimeInterval = 0
-    private var streamingTTFTCount = 0  // Only count TTFT for streaming generations
-    private var totalTokensPerSecond: Double = 0
-    private var totalInputTokens = 0
-    private var totalOutputTokens = 0
-    private let startTime = Date()
-    private var lastEventTime: Date?
-
-    // MARK: - Types
-
-    private struct GenerationTracker {
-        let startTime: Date
-        let isStreaming: Bool
-        let framework: InferenceFramework
-        let modelId: String
-        let temperature: Float?
-        let maxTokens: Int?
-        let contextLength: Int?
-        var firstTokenTime: Date?
-    }
+    private var handle: rac_llm_analytics_handle_t?
 
     // MARK: - Initialization
 
-    public init() {}
+    public init() {
+        var analyticsHandle: rac_llm_analytics_handle_t?
+        let result = rac_llm_analytics_create(&analyticsHandle)
+        if result == RAC_SUCCESS {
+            self.handle = analyticsHandle
+        } else {
+            logger.error("Failed to create LLM analytics handle: \(result)")
+        }
+    }
+
+    deinit {
+        if let analyticsHandle = handle {
+            rac_llm_analytics_destroy(analyticsHandle)
+        }
+    }
 
     // MARK: - Generation Tracking
 
     /// Start tracking a non-streaming generation (generate())
-    /// - Parameters:
-    ///   - modelId: The model ID being used
-    ///   - framework: The inference framework type
-    ///   - temperature: Generation temperature
-    ///   - maxTokens: Maximum tokens to generate
-    ///   - contextLength: Context window size
-    /// - Returns: A unique generation ID for tracking
     public func startGeneration(
         modelId: String,
         framework: InferenceFramework = .unknown,
@@ -75,37 +49,48 @@ public actor GenerationAnalyticsService {
         maxTokens: Int? = nil,
         contextLength: Int? = nil
     ) -> String {
-        let id = UUID().uuidString
-        activeGenerations[id] = GenerationTracker(
-            startTime: Date(),
-            isStreaming: false,
-            framework: framework,
+        guard let analyticsHandle = handle else {
+            logger.error("Analytics handle not initialized")
+            return UUID().uuidString
+        }
+
+        var generationIdPtr: UnsafeMutablePointer<CChar>?
+        let cFramework = framework.toCFramework()
+
+        let result = callStartGeneration(
+            handle: analyticsHandle,
             modelId: modelId,
+            framework: cFramework,
             temperature: temperature,
             maxTokens: maxTokens,
-            contextLength: contextLength
+            contextLength: contextLength,
+            streaming: false,
+            generationIdPtr: &generationIdPtr
         )
 
+        let generationId: String
+        if result == RAC_SUCCESS, let ptr = generationIdPtr {
+            generationId = String(cString: ptr)
+            rac_free(ptr)
+        } else {
+            generationId = UUID().uuidString
+            logger.error("Failed to start generation in C++: \(result)")
+        }
+
+        // Emit Swift event
         EventPublisher.shared.track(LLMEvent.generationStarted(
-            generationId: id,
+            generationId: generationId,
             modelId: modelId,
             prompt: nil,
             isStreaming: false,
             framework: framework
         ))
 
-        logger.debug("Non-streaming generation started: \(id)")
-        return id
+        logger.debug("Non-streaming generation started: \(generationId)")
+        return generationId
     }
 
     /// Start tracking a streaming generation (generateStream())
-    /// - Parameters:
-    ///   - modelId: The model ID being used
-    ///   - framework: The inference framework type
-    ///   - temperature: Generation temperature
-    ///   - maxTokens: Maximum tokens to generate
-    ///   - contextLength: Context window size
-    /// - Returns: A unique generation ID for tracking
     public func startStreamingGeneration(
         modelId: String,
         framework: InferenceFramework = .unknown,
@@ -113,61 +98,162 @@ public actor GenerationAnalyticsService {
         maxTokens: Int? = nil,
         contextLength: Int? = nil
     ) -> String {
-        let id = UUID().uuidString
-        activeGenerations[id] = GenerationTracker(
-            startTime: Date(),
-            isStreaming: true,
-            framework: framework,
+        guard let analyticsHandle = handle else {
+            logger.error("Analytics handle not initialized")
+            return UUID().uuidString
+        }
+
+        var generationIdPtr: UnsafeMutablePointer<CChar>?
+        let cFramework = framework.toCFramework()
+
+        let result = callStartGeneration(
+            handle: analyticsHandle,
             modelId: modelId,
+            framework: cFramework,
             temperature: temperature,
             maxTokens: maxTokens,
-            contextLength: contextLength
+            contextLength: contextLength,
+            streaming: true,
+            generationIdPtr: &generationIdPtr
         )
 
+        let generationId: String
+        if result == RAC_SUCCESS, let ptr = generationIdPtr {
+            generationId = String(cString: ptr)
+            rac_free(ptr)
+        } else {
+            generationId = UUID().uuidString
+            logger.error("Failed to start streaming generation in C++: \(result)")
+        }
+
+        // Emit Swift event
         EventPublisher.shared.track(LLMEvent.generationStarted(
-            generationId: id,
+            generationId: generationId,
             modelId: modelId,
             prompt: nil,
             isStreaming: true,
             framework: framework
         ))
 
-        logger.debug("Streaming generation started: \(id)")
-        return id
+        logger.debug("Streaming generation started: \(generationId)")
+        return generationId
+    }
+
+    /// Helper to call start generation with optional parameters
+    private func callStartGeneration(
+        handle: rac_llm_analytics_handle_t,
+        modelId: String,
+        framework: rac_inference_framework_t,
+        temperature: Float?,
+        maxTokens: Int?,
+        contextLength: Int?,
+        streaming: Bool,
+        generationIdPtr: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
+    ) -> rac_result_t {
+        return modelId.withCString { modelIdPtr in
+            // Helper closure to call C API with optional pointers
+            func callAPI(
+                tempPtr: UnsafePointer<Float>?,
+                maxTokPtr: UnsafePointer<Int32>?,
+                ctxPtr: UnsafePointer<Int32>?
+            ) -> rac_result_t {
+                if streaming {
+                    return rac_llm_analytics_start_streaming_generation(
+                        handle,
+                        modelIdPtr,
+                        framework,
+                        tempPtr,
+                        maxTokPtr,
+                        ctxPtr,
+                        generationIdPtr
+                    )
+                } else {
+                    return rac_llm_analytics_start_generation(
+                        handle,
+                        modelIdPtr,
+                        framework,
+                        tempPtr,
+                        maxTokPtr,
+                        ctxPtr,
+                        generationIdPtr
+                    )
+                }
+            }
+
+            // Handle optional temperature
+            if let temp = temperature {
+                var tempValue = temp
+                return withUnsafePointer(to: &tempValue) { tempPtr in
+                    // Handle optional maxTokens
+                    if let maxTok = maxTokens {
+                        var maxTokValue = Int32(maxTok)
+                        return withUnsafePointer(to: &maxTokValue) { maxTokPtr in
+                            // Handle optional contextLength
+                            if let ctx = contextLength {
+                                var ctxValue = Int32(ctx)
+                                return withUnsafePointer(to: &ctxValue) { ctxPtr in
+                                    callAPI(tempPtr: tempPtr, maxTokPtr: maxTokPtr, ctxPtr: ctxPtr)
+                                }
+                            } else {
+                                return callAPI(tempPtr: tempPtr, maxTokPtr: maxTokPtr, ctxPtr: nil)
+                            }
+                        }
+                    } else {
+                        if let ctx = contextLength {
+                            var ctxValue = Int32(ctx)
+                            return withUnsafePointer(to: &ctxValue) { ctxPtr in
+                                callAPI(tempPtr: tempPtr, maxTokPtr: nil, ctxPtr: ctxPtr)
+                            }
+                        } else {
+                            return callAPI(tempPtr: tempPtr, maxTokPtr: nil, ctxPtr: nil)
+                        }
+                    }
+                }
+            } else {
+                // No temperature
+                if let maxTok = maxTokens {
+                    var maxTokValue = Int32(maxTok)
+                    return withUnsafePointer(to: &maxTokValue) { maxTokPtr in
+                        if let ctx = contextLength {
+                            var ctxValue = Int32(ctx)
+                            return withUnsafePointer(to: &ctxValue) { ctxPtr in
+                                callAPI(tempPtr: nil, maxTokPtr: maxTokPtr, ctxPtr: ctxPtr)
+                            }
+                        } else {
+                            return callAPI(tempPtr: nil, maxTokPtr: maxTokPtr, ctxPtr: nil)
+                        }
+                    }
+                } else {
+                    if let ctx = contextLength {
+                        var ctxValue = Int32(ctx)
+                        return withUnsafePointer(to: &ctxValue) { ctxPtr in
+                            callAPI(tempPtr: nil, maxTokPtr: nil, ctxPtr: ctxPtr)
+                        }
+                    } else {
+                        return callAPI(tempPtr: nil, maxTokPtr: nil, ctxPtr: nil)
+                    }
+                }
+            }
+        }
     }
 
     /// Track first token for streaming generation (time-to-first-token metric)
-    /// - Note: Only applicable for streaming generations. Call is ignored for non-streaming.
     public func trackFirstToken(generationId: String) {
-        guard var tracker = activeGenerations[generationId], tracker.isStreaming else {
-            // TTFT is only tracked for streaming generations
-            return
+        guard let analyticsHandle = handle else { return }
+
+        _ = generationId.withCString { idPtr in
+            rac_llm_analytics_track_first_token(analyticsHandle, idPtr)
         }
 
-        // Only record if not already recorded
-        guard tracker.firstTokenTime == nil else { return }
-
-        let firstTokenTime = Date()
-        tracker.firstTokenTime = firstTokenTime
-        activeGenerations[generationId] = tracker
-
-        let timeToFirstTokenMs = firstTokenTime.timeIntervalSince(tracker.startTime) * 1000
-
-        EventPublisher.shared.track(LLMEvent.firstToken(
-            generationId: generationId,
-            modelId: tracker.modelId,
-            timeToFirstTokenMs: timeToFirstTokenMs,
-            framework: tracker.framework
-        ))
-
-        logger.debug("First token received for \(generationId): \(String(format: "%.1f", timeToFirstTokenMs))ms")
+        logger.debug("First token tracked for \(generationId)")
     }
 
     /// Track streaming update (analytics only)
-    /// - Note: Only applicable for streaming generations
     public func trackStreamingUpdate(generationId: String, tokensGenerated: Int) {
-        guard let tracker = activeGenerations[generationId], tracker.isStreaming else {
-            return
+        guard let analyticsHandle = handle else { return }
+
+        _ = generationId.withCString { idPtr in
+            rac_llm_analytics_track_streaming_update(analyticsHandle, idPtr, Int32(tokensGenerated))
         }
 
         EventPublisher.shared.track(LLMEvent.streamingUpdate(
@@ -177,78 +263,84 @@ public actor GenerationAnalyticsService {
     }
 
     /// Complete a generation (works for both streaming and non-streaming)
-    /// - Parameters:
-    ///   - generationId: The generation ID from startGeneration or startStreamingGeneration
-    ///   - inputTokens: Number of input tokens processed
-    ///   - outputTokens: Number of output tokens generated
-    ///   - modelId: The model ID used
     public func completeGeneration(
         generationId: String,
         inputTokens: Int,
         outputTokens: Int,
         modelId: String
     ) {
-        guard let tracker = activeGenerations.removeValue(forKey: generationId) else { return }
+        guard let analyticsHandle = handle else { return }
 
-        let endTime = Date()
-        let totalTime = endTime.timeIntervalSince(tracker.startTime)
-        let tokensPerSecond = totalTime > 0 ? Double(outputTokens) / totalTime : 0
-
-        // Calculate TTFT for streaming generations
-        var timeToFirstTokenMs: Double?
-        if tracker.isStreaming, let firstTokenTime = tracker.firstTokenTime {
-            let ttft = firstTokenTime.timeIntervalSince(tracker.startTime)
-            timeToFirstTokenMs = ttft * 1000
-            totalTimeToFirstToken += ttft
-            streamingTTFTCount += 1
+        _ = generationId.withCString { idPtr in
+            modelId.withCString { modelPtr in
+                rac_llm_analytics_complete_generation(
+                    analyticsHandle,
+                    idPtr,
+                    Int32(inputTokens),
+                    Int32(outputTokens),
+                    modelPtr
+                )
+            }
         }
 
-        // Update metrics
-        totalGenerations += 1
-        if tracker.isStreaming {
-            streamingGenerations += 1
-        } else {
-            nonStreamingGenerations += 1
-        }
-        totalTokensPerSecond += tokensPerSecond
-        totalInputTokens += inputTokens
-        totalOutputTokens += outputTokens
-        lastEventTime = endTime
+        logger.debug("Generation completed: \(generationId)")
 
+        // Emit Swift event
         EventPublisher.shared.track(LLMEvent.generationCompleted(
             generationId: generationId,
             modelId: modelId,
             inputTokens: inputTokens,
             outputTokens: outputTokens,
-            durationMs: totalTime * 1000,
-            tokensPerSecond: tokensPerSecond,
-            isStreaming: tracker.isStreaming,
-            timeToFirstTokenMs: timeToFirstTokenMs,
-            framework: tracker.framework,
-            temperature: tracker.temperature,
-            maxTokens: tracker.maxTokens,
-            contextLength: tracker.contextLength
+            durationMs: 0,  // C++ tracks this internally
+            tokensPerSecond: 0,  // C++ calculates this
+            isStreaming: false,
+            timeToFirstTokenMs: nil,
+            framework: .unknown,
+            temperature: nil,
+            maxTokens: nil,
+            contextLength: nil
         ))
-
-        let modeStr = tracker.isStreaming ? "streaming" : "non-streaming"
-        logger.debug("Generation completed (\(modeStr)): \(generationId)")
     }
 
     /// Track generation failure
     public func trackGenerationFailed(generationId: String, error: Error) {
-        activeGenerations.removeValue(forKey: generationId)
-        lastEventTime = Date()
+        guard let analyticsHandle = handle else { return }
+
+        let sdkError = SDKError.from(error, category: .llm)
+        let errorCode = CommonsErrorMapping.fromSDKError(sdkError)
+
+        _ = generationId.withCString { idPtr in
+            sdkError.message.withCString { msgPtr in
+                rac_llm_analytics_track_generation_failed(analyticsHandle, idPtr, errorCode, msgPtr)
+            }
+        }
 
         EventPublisher.shared.track(LLMEvent.generationFailed(
             generationId: generationId,
-            error: SDKError.from(error, category: .llm)
+            error: sdkError
         ))
     }
 
-    /// Track an error during LLM operations with full SDKError context
+    /// Track an error during LLM operations
     public func trackError(_ error: Error, operation: String, modelId: String? = nil, generationId: String? = nil) {
-        lastEventTime = Date()
+        guard let analyticsHandle = handle else { return }
+
         let sdkError = SDKError.from(error, category: .llm)
+        let errorCode = CommonsErrorMapping.fromSDKError(sdkError)
+
+        _ = operation.withCString { opPtr in
+            sdkError.message.withCString { msgPtr in
+                rac_llm_analytics_track_error(
+                    analyticsHandle,
+                    errorCode,
+                    msgPtr,
+                    opPtr,
+                    modelId,
+                    generationId
+                )
+            }
+        }
+
         let errorEvent = SDKErrorEvent.llmError(
             error: sdkError,
             modelId: modelId,
@@ -261,20 +353,31 @@ public actor GenerationAnalyticsService {
     // MARK: - Metrics
 
     public func getMetrics() -> GenerationMetrics {
-        // Average TTFT only counts streaming generations that had TTFT recorded
-        let avgTTFT = streamingTTFTCount > 0 ? totalTimeToFirstToken / Double(streamingTTFTCount) : 0
+        guard let analyticsHandle = handle else {
+            return GenerationMetrics()
+        }
+
+        var cMetrics = rac_generation_metrics_t()
+        let result = rac_llm_analytics_get_metrics(analyticsHandle, &cMetrics)
+
+        guard result == RAC_SUCCESS else {
+            logger.error("Failed to get metrics: \(result)")
+            return GenerationMetrics()
+        }
 
         return GenerationMetrics(
-            totalEvents: totalGenerations,
-            startTime: startTime,
-            lastEventTime: lastEventTime,
-            totalGenerations: totalGenerations,
-            streamingGenerations: streamingGenerations,
-            nonStreamingGenerations: nonStreamingGenerations,
-            averageTimeToFirstToken: avgTTFT,
-            averageTokensPerSecond: totalGenerations > 0 ? totalTokensPerSecond / Double(totalGenerations) : 0,
-            totalInputTokens: totalInputTokens,
-            totalOutputTokens: totalOutputTokens
+            totalEvents: Int(cMetrics.total_generations),
+            startTime: Date(timeIntervalSince1970: Double(cMetrics.start_time_ms) / 1000.0),
+            lastEventTime: cMetrics.last_event_time_ms > 0
+                ? Date(timeIntervalSince1970: Double(cMetrics.last_event_time_ms) / 1000.0)
+                : nil,
+            totalGenerations: Int(cMetrics.total_generations),
+            streamingGenerations: Int(cMetrics.streaming_generations),
+            nonStreamingGenerations: Int(cMetrics.non_streaming_generations),
+            averageTimeToFirstToken: cMetrics.average_ttft_ms / 1000.0,  // Convert ms to seconds
+            averageTokensPerSecond: cMetrics.average_tokens_per_second,
+            totalInputTokens: Int(cMetrics.total_input_tokens),
+            totalOutputTokens: Int(cMetrics.total_output_tokens)
         )
     }
 }
@@ -296,7 +399,6 @@ public struct GenerationMetrics: AnalyticsMetrics {
     public let nonStreamingGenerations: Int
 
     /// Average time to first token in seconds (only for streaming generations)
-    /// Returns 0 if no streaming generations have completed
     public let averageTimeToFirstToken: TimeInterval
 
     /// Average tokens per second across all generations
