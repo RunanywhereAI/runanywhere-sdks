@@ -394,16 +394,15 @@ rac_result_t rac_llm_analytics_get_metrics(
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    out_metrics->total_events = handle->total_generations;
-    out_metrics->start_time_ms = handle->start_time_ms;
-    out_metrics->last_event_time_ms =
-        handle->has_last_event_time ? handle->last_event_time_ms : 0;
     out_metrics->total_generations = handle->total_generations;
     out_metrics->streaming_generations = handle->streaming_generations;
     out_metrics->non_streaming_generations = handle->non_streaming_generations;
+    out_metrics->start_time_ms = handle->start_time_ms;
+    out_metrics->last_event_time_ms =
+        handle->has_last_event_time ? handle->last_event_time_ms : 0;
 
     // Average TTFT only counts streaming generations that had TTFT recorded
-    out_metrics->average_time_to_first_token_ms =
+    out_metrics->average_ttft_ms =
         handle->streaming_ttft_count > 0
             ? handle->total_time_to_first_token_ms / static_cast<double>(handle->streaming_ttft_count)
             : 0;

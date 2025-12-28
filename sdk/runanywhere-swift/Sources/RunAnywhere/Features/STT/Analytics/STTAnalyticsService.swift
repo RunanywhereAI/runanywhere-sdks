@@ -2,15 +2,9 @@
 //  STTAnalyticsService.swift
 //  RunAnywhere SDK
 //
-//  STT analytics service.
-//  Tracks transcription operations and metrics.
-//  Lifecycle events are handled by ManagedLifecycle.
-//
-//  NOTE: ⚠️ Audio length estimation assumes 16-bit PCM @ 16kHz (standard for STT).
-//  Formula: audioLengthMs = (bytes / 2) / 16000 * 1000
-//
-//  NOTE: ⚠️ Real-Time Factor (RTF) will be 0 or undefined for streaming transcription
-//  since audioLengthMs = 0 when audio is processed in chunks of unknown total length.
+//  STT analytics service - THIN WRAPPER over C++ rac_stt_analytics_*.
+//  Delegates all state management and metrics calculation to C++.
+//  Swift handles: type conversion, event emission, logging.
 //
 
 import CRACommons
@@ -19,54 +13,35 @@ import Foundation
 // MARK: - STT Analytics Service
 
 /// STT analytics service for tracking transcription operations.
-/// Model lifecycle events (load/unload) are handled by ManagedLifecycle.
+/// Thin wrapper over C++ rac_stt_analytics_* functions.
 public actor STTAnalyticsService {
 
     // MARK: - Properties
 
     private let logger = SDKLogger(category: "STTAnalytics")
-
-    /// Active transcription operations
-    private var activeTranscriptions: [String: TranscriptionTracker] = [:]
-
-    /// Metrics
-    private var transcriptionCount = 0
-    private var totalConfidence: Float = 0
-    private var totalLatency: TimeInterval = 0
-    private var totalAudioProcessed: Double = 0  // Total audio length in ms
-    private var totalRealTimeFactor: Double = 0
-    private let startTime = Date()
-    private var lastEventTime: Date?
-
-    // MARK: - Types
-
-    private struct TranscriptionTracker {
-        let startTime: Date
-        let modelId: String
-        let audioLengthMs: Double
-        let audioSizeBytes: Int
-        let language: String
-        let isStreaming: Bool
-        let sampleRate: Int
-        let framework: InferenceFramework
-    }
+    private var handle: rac_stt_analytics_handle_t?
 
     // MARK: - Initialization
 
-    public init() {}
+    public init() {
+        var analyticsHandle: rac_stt_analytics_handle_t?
+        let result = rac_stt_analytics_create(&analyticsHandle)
+        if result == RAC_SUCCESS {
+            self.handle = analyticsHandle
+        } else {
+            logger.error("Failed to create STT analytics handle: \(result)")
+        }
+    }
+
+    deinit {
+        if let analyticsHandle = handle {
+            rac_stt_analytics_destroy(analyticsHandle)
+        }
+    }
 
     // MARK: - Transcription Tracking
 
     /// Start tracking a transcription
-    /// - Parameters:
-    ///   - modelId: The STT model identifier
-    ///   - audioLengthMs: Duration of audio in milliseconds
-    ///   - audioSizeBytes: Size of audio data in bytes
-    ///   - language: Language code for transcription
-    ///   - isStreaming: Whether this is a streaming transcription
-    ///   - sampleRate: Audio sample rate in Hz (default: RAC_STT_DEFAULT_SAMPLE_RATE)
-    ///   - framework: The inference framework being used
-    /// - Returns: A unique transcription ID for tracking
     public func startTranscription(
         modelId: String,
         audioLengthMs: Double,
@@ -76,20 +51,42 @@ public actor STTAnalyticsService {
         sampleRate: Int = Int(RAC_STT_DEFAULT_SAMPLE_RATE),
         framework: InferenceFramework = .unknown
     ) -> String {
-        let id = UUID().uuidString
-        activeTranscriptions[id] = TranscriptionTracker(
-            startTime: Date(),
-            modelId: modelId,
-            audioLengthMs: audioLengthMs,
-            audioSizeBytes: audioSizeBytes,
-            language: language,
-            isStreaming: isStreaming,
-            sampleRate: sampleRate,
-            framework: framework
-        )
+        guard let analyticsHandle = handle else {
+            logger.error("Analytics handle not initialized")
+            return UUID().uuidString
+        }
 
+        var transcriptionIdPtr: UnsafeMutablePointer<CChar>?
+        let cFramework = framework.toCFramework()
+
+        let result = modelId.withCString { modelIdPtr in
+            language.withCString { langPtr in
+                rac_stt_analytics_start_transcription(
+                    analyticsHandle,
+                    modelIdPtr,
+                    audioLengthMs,
+                    Int32(audioSizeBytes),
+                    langPtr,
+                    isStreaming ? RAC_TRUE : RAC_FALSE,
+                    Int32(sampleRate),
+                    cFramework,
+                    &transcriptionIdPtr
+                )
+            }
+        }
+
+        let transcriptionId: String
+        if result == RAC_SUCCESS, let ptr = transcriptionIdPtr {
+            transcriptionId = String(cString: ptr)
+            rac_free(ptr)
+        } else {
+            transcriptionId = UUID().uuidString
+            logger.error("Failed to start transcription in C++: \(result)")
+        }
+
+        // Emit Swift event
         EventPublisher.shared.track(STTEvent.transcriptionStarted(
-            transcriptionId: id,
+            transcriptionId: transcriptionId,
             modelId: modelId,
             audioLengthMs: audioLengthMs,
             audioSizeBytes: audioSizeBytes,
@@ -99,66 +96,66 @@ public actor STTAnalyticsService {
             framework: framework
         ))
 
-        logger.debug("Transcription started: \(id), model: \(modelId), audio: \(String(format: "%.1f", audioLengthMs))ms, \(audioSizeBytes) bytes")
-        return id
+        logger.debug("Transcription started: \(transcriptionId), model: \(modelId)")
+        return transcriptionId
     }
 
     /// Track partial transcript (for streaming transcription)
     public func trackPartialTranscript(text: String) {
+        guard let analyticsHandle = handle else { return }
+
+        _ = text.withCString { textPtr in
+            rac_stt_analytics_track_partial_transcript(analyticsHandle, textPtr)
+        }
+
         let wordCount = text.split(separator: " ").count
         EventPublisher.shared.track(STTEvent.partialTranscript(text: text, wordCount: wordCount))
     }
 
     /// Track final transcript (for streaming transcription)
     public func trackFinalTranscript(text: String, confidence: Float) {
+        guard let analyticsHandle = handle else { return }
+
+        _ = text.withCString { textPtr in
+            rac_stt_analytics_track_final_transcript(analyticsHandle, textPtr, confidence)
+        }
+
         EventPublisher.shared.track(STTEvent.finalTranscript(text: text, confidence: confidence))
     }
 
     /// Complete a transcription
-    /// - Parameters:
-    ///   - transcriptionId: The transcription ID from startTranscription
-    ///   - text: The transcribed text
-    ///   - confidence: Confidence score (0.0 to 1.0)
     public func completeTranscription(
         transcriptionId: String,
         text: String,
         confidence: Float
     ) {
-        guard let tracker = activeTranscriptions.removeValue(forKey: transcriptionId) else { return }
+        guard let analyticsHandle = handle else { return }
 
-        let endTime = Date()
-        let processingTimeMs = endTime.timeIntervalSince(tracker.startTime) * 1000
+        _ = transcriptionId.withCString { idPtr in
+            text.withCString { textPtr in
+                rac_stt_analytics_complete_transcription(analyticsHandle, idPtr, textPtr, confidence)
+            }
+        }
+
+        logger.debug("Transcription completed: \(transcriptionId)")
+
+        // Emit Swift event with basic info (C++ tracks detailed metrics)
         let wordCount = text.split(separator: " ").count
-
-        // Calculate real-time factor (RTF): processing time / audio length
-        // RTF < 1.0 means faster than real-time
-        let realTimeFactor = tracker.audioLengthMs > 0 ? processingTimeMs / tracker.audioLengthMs : 0
-
-        // Update metrics
-        transcriptionCount += 1
-        totalConfidence += confidence
-        totalLatency += processingTimeMs / 1000.0
-        totalAudioProcessed += tracker.audioLengthMs
-        totalRealTimeFactor += realTimeFactor
-        lastEventTime = endTime
-
         EventPublisher.shared.track(STTEvent.transcriptionCompleted(
             transcriptionId: transcriptionId,
-            modelId: tracker.modelId,
+            modelId: "",  // C++ tracks this
             text: text,
             confidence: confidence,
-            durationMs: processingTimeMs,
-            audioLengthMs: tracker.audioLengthMs,
-            audioSizeBytes: tracker.audioSizeBytes,
+            durationMs: 0,  // C++ calculates
+            audioLengthMs: 0,  // C++ tracks
+            audioSizeBytes: 0,  // C++ tracks
             wordCount: wordCount,
-            realTimeFactor: realTimeFactor,
-            language: tracker.language,
-            isStreaming: tracker.isStreaming,
-            sampleRate: tracker.sampleRate,
-            framework: tracker.framework
+            realTimeFactor: 0,  // C++ calculates
+            language: "",  // C++ tracks
+            isStreaming: false,  // C++ tracks
+            sampleRate: Int(RAC_STT_DEFAULT_SAMPLE_RATE),
+            framework: .unknown
         ))
-
-        logger.debug("Transcription completed: \(transcriptionId), model: \(tracker.modelId), RTF: \(String(format: "%.3f", realTimeFactor))")
     }
 
     /// Track transcription failure
@@ -166,28 +163,58 @@ public actor STTAnalyticsService {
         transcriptionId: String,
         error: Error
     ) {
-        let tracker = activeTranscriptions.removeValue(forKey: transcriptionId)
-        lastEventTime = Date()
+        guard let analyticsHandle = handle else { return }
+
+        let sdkError = SDKError.from(error, category: .stt)
+        let errorCode = CommonsErrorMapping.fromSDKError(sdkError)
+
+        _ = transcriptionId.withCString { idPtr in
+            sdkError.message.withCString { msgPtr in
+                rac_stt_analytics_track_transcription_failed(analyticsHandle, idPtr, errorCode, msgPtr)
+            }
+        }
 
         EventPublisher.shared.track(STTEvent.transcriptionFailed(
             transcriptionId: transcriptionId,
-            modelId: tracker?.modelId ?? "unknown",
-            error: SDKError.from(error, category: .stt)
+            modelId: "unknown",
+            error: sdkError
         ))
     }
 
     /// Track language detection (analytics only)
     public func trackLanguageDetection(language: String, confidence: Float) {
+        guard let analyticsHandle = handle else { return }
+
+        _ = language.withCString { langPtr in
+            rac_stt_analytics_track_language_detection(analyticsHandle, langPtr, confidence)
+        }
+
         EventPublisher.shared.track(STTEvent.languageDetected(
             language: language,
             confidence: confidence
         ))
     }
 
-    /// Track an error during STT operations with full SDKError context
+    /// Track an error during STT operations
     public func trackError(_ error: Error, operation: String, modelId: String? = nil, transcriptionId: String? = nil) {
-        lastEventTime = Date()
+        guard let analyticsHandle = handle else { return }
+
         let sdkError = SDKError.from(error, category: .stt)
+        let errorCode = CommonsErrorMapping.fromSDKError(sdkError)
+
+        _ = operation.withCString { opPtr in
+            sdkError.message.withCString { msgPtr in
+                rac_stt_analytics_track_error(
+                    analyticsHandle,
+                    errorCode,
+                    msgPtr,
+                    opPtr,
+                    modelId,
+                    transcriptionId
+                )
+            }
+        }
+
         let errorEvent = SDKErrorEvent.sttError(
             error: sdkError,
             modelId: modelId,
@@ -200,18 +227,29 @@ public actor STTAnalyticsService {
     // MARK: - Metrics
 
     public func getMetrics() -> STTMetrics {
-        // Average RTF only if we have transcriptions
-        let avgRTF = transcriptionCount > 0 ? totalRealTimeFactor / Double(transcriptionCount) : 0
+        guard let analyticsHandle = handle else {
+            return STTMetrics()
+        }
+
+        var cMetrics = rac_stt_metrics_t()
+        let result = rac_stt_analytics_get_metrics(analyticsHandle, &cMetrics)
+
+        guard result == RAC_SUCCESS else {
+            logger.error("Failed to get metrics: \(result)")
+            return STTMetrics()
+        }
 
         return STTMetrics(
-            totalEvents: transcriptionCount,
-            startTime: startTime,
-            lastEventTime: lastEventTime,
-            totalTranscriptions: transcriptionCount,
-            averageConfidence: transcriptionCount > 0 ? totalConfidence / Float(transcriptionCount) : 0,
-            averageLatency: transcriptionCount > 0 ? totalLatency / Double(transcriptionCount) : 0,
-            averageRealTimeFactor: avgRTF,
-            totalAudioProcessedMs: totalAudioProcessed
+            totalEvents: Int(cMetrics.total_events),
+            startTime: Date(timeIntervalSince1970: Double(cMetrics.start_time_ms) / 1000.0),
+            lastEventTime: cMetrics.last_event_time_ms > 0
+                ? Date(timeIntervalSince1970: Double(cMetrics.last_event_time_ms) / 1000.0)
+                : nil,
+            totalTranscriptions: Int(cMetrics.total_transcriptions),
+            averageConfidence: cMetrics.average_confidence,
+            averageLatency: cMetrics.average_latency_ms / 1000.0,  // Convert ms to seconds
+            averageRealTimeFactor: cMetrics.average_real_time_factor,
+            totalAudioProcessedMs: cMetrics.total_audio_processed_ms
         )
     }
 }
@@ -231,7 +269,6 @@ public struct STTMetrics: AnalyticsMetrics {
     public let averageLatency: TimeInterval
 
     /// Average real-time factor (processing time / audio length)
-    /// - Note: Values < 1.0 indicate faster-than-real-time processing
     public let averageRealTimeFactor: Double
 
     /// Total audio processed in milliseconds

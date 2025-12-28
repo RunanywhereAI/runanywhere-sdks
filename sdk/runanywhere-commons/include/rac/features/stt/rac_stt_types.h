@@ -371,6 +371,17 @@ typedef struct rac_stt_output {
  */
 typedef rac_stt_output_t rac_stt_transcription_result_t;
 
+// =============================================================================
+// MEMORY MANAGEMENT
+// =============================================================================
+
+/**
+ * @brief Free STT result resources
+ *
+ * @param result Result to free (can be NULL)
+ */
+RAC_API void rac_stt_result_free(rac_stt_result_t* result);
+
 #ifdef __cplusplus
 }
 #endif

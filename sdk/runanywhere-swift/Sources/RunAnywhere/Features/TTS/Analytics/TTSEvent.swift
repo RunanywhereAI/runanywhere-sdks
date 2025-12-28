@@ -100,83 +100,9 @@ public enum TTSEvent: SDKEvent, TelemetryEventProperties {
     }
 
     public var properties: [String: String] {
-        switch self {
-        case .modelLoadStarted(let modelId, let modelSizeBytes, let framework):
-            var props = [
-                "model_id": modelId,
-                "framework": framework.rawValue
-            ]
-            if modelSizeBytes > 0 {
-                props["model_size_bytes"] = String(modelSizeBytes)
-            }
-            return props
-
-        case .modelLoadCompleted(let modelId, let durationMs, let modelSizeBytes, let framework):
-            var props = [
-                "model_id": modelId,
-                "duration_ms": String(format: "%.1f", durationMs),
-                "framework": framework.rawValue
-            ]
-            if modelSizeBytes > 0 {
-                props["model_size_bytes"] = String(modelSizeBytes)
-            }
-            return props
-
-        case .modelLoadFailed(let modelId, let error, let framework):
-            return [
-                "model_id": modelId,
-                "framework": framework.rawValue
-            ].merging(error.telemetryProperties) { _, new in new }
-
-        case .modelUnloaded(let modelId):
-            return ["model_id": modelId]
-
-        case .synthesisStarted(let id, let modelId, let characterCount, let sampleRate, let framework):
-            return [
-                "synthesis_id": id,
-                "model_id": modelId,
-                "character_count": String(characterCount),
-                "sample_rate": String(sampleRate),
-                "framework": framework.rawValue
-            ]
-
-        case .synthesisChunk(let id, let chunkSize):
-            return [
-                "synthesis_id": id,
-                "chunk_size": String(chunkSize)
-            ]
-
-        case .synthesisCompleted(
-            let id,
-            let modelId,
-            let charCount,
-            let audioDurationMs,
-            let audioSize,
-            let processingDurationMs,
-            let charsPerSecond,
-            let sampleRate,
-            let framework
-        ):
-            return [
-                "synthesis_id": id,
-                "model_id": modelId,
-                "character_count": String(charCount),
-                "audio_duration_ms": String(format: "%.1f", audioDurationMs),
-                "audio_size_bytes": String(audioSize),
-                "processing_duration_ms": String(format: "%.1f", processingDurationMs),
-                "chars_per_second": String(format: "%.2f", charsPerSecond),
-                "sample_rate": String(sampleRate),
-                "success": "true",
-                "framework": framework.rawValue
-            ]
-
-        case .synthesisFailed(let id, let modelId, let error):
-            return [
-                "synthesis_id": id,
-                "model_id": modelId,
-                "success": "false"
-            ].merging(error.telemetryProperties) { _, new in new }
-        }
+        // Use derived properties from telemetryProperties for consistency
+        // This eliminates duplicate property conversion logic
+        telemetryProperties.toDictionary()
     }
 
     // MARK: - TelemetryEventProperties Conformance

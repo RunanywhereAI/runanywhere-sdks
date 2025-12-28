@@ -9,6 +9,7 @@
 import CRABackendLlamaCPP
 import CRACommons
 import Foundation
+import os
 import RunAnywhere
 
 // MARK: - Memory Management Helper
@@ -47,8 +48,8 @@ public final class LlamaCPPService: LLMService, @unchecked Sendable {
     /// Native handle to the C++ LlamaCPP service
     private var handle: rac_handle_t?
 
-    /// Lock for thread-safe access to handle
-    private let lock = NSLock()
+    /// Lock for thread-safe access to handle (async-safe)
+    private let lock = OSAllocatedUnfairLock()
 
     /// Logger for this service
     private let logger = SDKLogger(category: "LlamaCPPService")
@@ -66,40 +67,40 @@ public final class LlamaCPPService: LLMService, @unchecked Sendable {
 
     /// Whether the service is ready for generation
     public var isReady: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let handle = handle else { return false }
-        return rac_llm_llamacpp_is_model_loaded(handle) == RAC_TRUE
+        lock.withLock {
+            guard let handle = handle else { return false }
+            return rac_llm_llamacpp_is_model_loaded(handle) == RAC_TRUE
+        }
     }
 
     /// Current model identifier
     public var currentModel: String? {
-        lock.lock()
-        defer { lock.unlock() }
-        return _modelPath
+        lock.withLock {
+            return _modelPath
+        }
     }
 
     /// Context length from the loaded model
     public var contextLength: Int? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let handle = handle else { return nil }
+        lock.withLock {
+            guard let handle = handle else { return nil }
 
-        var jsonPtr: UnsafeMutablePointer<CChar>?
-        let result = rac_llm_llamacpp_get_model_info(handle, &jsonPtr)
+            var jsonPtr: UnsafeMutablePointer<CChar>?
+            let result = rac_llm_llamacpp_get_model_info(handle, &jsonPtr)
 
-        guard result == RAC_SUCCESS, let json = jsonPtr else { return nil }
-        defer { freeRACMemory(json) }
+            guard result == RAC_SUCCESS, let json = jsonPtr else { return nil }
+            defer { freeRACMemory(json) }
 
-        // Parse JSON to extract context length
-        if let data = String(cString: json).data(using: .utf8),
-           let parsed = try? JSONSerialization.jsonObject(with: data),
-           // swiftlint:disable:next avoid_any_type
-           let dict = parsed as? [String: Any],
-           let ctxLen = dict["context_length"] as? Int {
-            return ctxLen
+            // Parse JSON to extract context length
+            if let data = String(cString: json).data(using: .utf8),
+               let parsed = try? JSONSerialization.jsonObject(with: data),
+               // swiftlint:disable:next avoid_any_type
+               let dict = parsed as? [String: Any],
+               let ctxLen = dict["context_length"] as? Int {
+                return ctxLen
+            }
+            return nil
         }
-        return nil
     }
 
     /// LlamaCPP supports true streaming generation
@@ -112,11 +113,11 @@ public final class LlamaCPPService: LLMService, @unchecked Sendable {
     }
 
     deinit {
-        lock.lock()
-        if let handle = handle {
-            rac_llm_llamacpp_destroy(handle)
+        lock.withLock {
+            if let handle = handle {
+                rac_llm_llamacpp_destroy(handle)
+            }
         }
-        lock.unlock()
     }
 
     /// Initialize the service with an optional model path.
@@ -126,9 +127,8 @@ public final class LlamaCPPService: LLMService, @unchecked Sendable {
     public func initialize(modelPath: String?) async throws {
         logger.info("Initializing LlamaCPPService with model: \(modelPath ?? "none")")
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            lock.lock()
-
+        // Perform initialization under lock
+        let initResult: Result<Void, Error> = lock.withLock {
             // Clean up existing handle if any
             if let existingHandle = handle {
                 rac_llm_llamacpp_destroy(existingHandle)
@@ -151,15 +151,19 @@ public final class LlamaCPPService: LLMService, @unchecked Sendable {
 
             if result == RAC_SUCCESS {
                 handle = newHandle
-                lock.unlock()
-                logger.info("LlamaCPPService initialized successfully")
-                continuation.resume()
+                return .success(())
             } else {
-                lock.unlock()
-                let error = CommonsErrorMapping.mapCommonsError(result)
-                logger.error("Failed to initialize LlamaCPPService: \(error)")
-                continuation.resume(throwing: error)
+                return .failure(CommonsErrorMapping.mapCommonsError(result))
             }
+        }
+
+        // Handle result outside of lock
+        switch initResult {
+        case .success:
+            logger.info("LlamaCPPService initialized successfully")
+        case .failure(let error):
+            logger.error("Failed to initialize LlamaCPPService: \(error)")
+            throw error
         }
     }
 
@@ -174,39 +178,33 @@ public final class LlamaCPPService: LLMService, @unchecked Sendable {
     public func generate(prompt: String, options: LLMGenerationOptions) async throws -> String {
         logger.debug("Generate called with prompt length: \(prompt.count)")
 
-        return try await withCheckedThrowingContinuation { continuation in
-            lock.lock()
+        // Get handle under lock
+        let lockedHandle = lock.withLock { handle }
+        guard let handle = lockedHandle else {
+            throw SDKError.llm(.serviceNotAvailable, "Service not initialized")
+        }
 
-            guard let handle = handle else {
-                lock.unlock()
-                continuation.resume(throwing: SDKError.llm(.serviceNotAvailable, "Service not initialized"))
-                return
+        // Convert Swift options to C options
+        var cOptions = createCOptions(from: options, prompt: prompt)
+
+        var result = rac_llm_result_t()
+
+        let generateResult = prompt.withCString { promptPtr in
+            return rac_llm_llamacpp_generate(handle, promptPtr, &cOptions, &result)
+        }
+
+        if generateResult == RAC_SUCCESS {
+            var generatedText = ""
+            if let textPtr = result.text {
+                generatedText = String(cString: textPtr)
+                freeRACMemory(textPtr)
             }
-
-            lock.unlock()
-
-            // Convert Swift options to C options
-            var cOptions = createCOptions(from: options, prompt: prompt)
-
-            var result = rac_llm_result_t()
-
-            let generateResult = prompt.withCString { promptPtr in
-                return rac_llm_llamacpp_generate(handle, promptPtr, &cOptions, &result)
-            }
-
-            if generateResult == RAC_SUCCESS {
-                var generatedText = ""
-                if let textPtr = result.text {
-                    generatedText = String(cString: textPtr)
-                    freeRACMemory(textPtr)
-                }
-                logger.debug("Generation complete: \(result.completion_tokens) tokens")
-                continuation.resume(returning: generatedText)
-            } else {
-                let error = CommonsErrorMapping.mapCommonsError(generateResult)
-                logger.error("Generation failed: \(error)")
-                continuation.resume(throwing: error)
-            }
+            logger.debug("Generation complete: \(result.completion_tokens) tokens")
+            return generatedText
+        } else {
+            let error = CommonsErrorMapping.mapCommonsError(generateResult)
+            logger.error("Generation failed: \(error)")
+            throw error
         }
     }
 
@@ -223,17 +221,13 @@ public final class LlamaCPPService: LLMService, @unchecked Sendable {
     ) async throws {
         logger.debug("Stream generate called with prompt length: \(prompt.count)")
 
+        // Get handle under lock
+        let lockedHandle = lock.withLock { handle }
+        guard let handle = lockedHandle else {
+            throw SDKError.llm(.serviceNotAvailable, "Service not initialized")
+        }
+
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            lock.lock()
-
-            guard let handle = handle else {
-                lock.unlock()
-                continuation.resume(throwing: SDKError.llm(.serviceNotAvailable, "Service not initialized"))
-                return
-            }
-
-            lock.unlock()
-
             // Create context for callback
             let context = StreamContext(onToken: onToken, continuation: continuation)
             let contextPtr = Unmanaged.passRetained(context).toOpaque()
@@ -281,24 +275,24 @@ public final class LlamaCPPService: LLMService, @unchecked Sendable {
 
     /// Cancel ongoing generation
     public func cancel() async {
-        lock.lock()
-        if let handle = handle {
-            rac_llm_llamacpp_cancel(handle)
-            logger.debug("Generation cancelled")
+        lock.withLock {
+            if let handle = handle {
+                rac_llm_llamacpp_cancel(handle)
+                logger.debug("Generation cancelled")
+            }
         }
-        lock.unlock()
     }
 
     /// Clean up resources
     public func cleanup() async {
-        lock.lock()
-        if let handle = handle {
-            rac_llm_llamacpp_destroy(handle)
-            self.handle = nil
-            logger.info("LlamaCPPService cleaned up")
+        lock.withLock {
+            if let handle = handle {
+                rac_llm_llamacpp_destroy(handle)
+                self.handle = nil
+                logger.info("LlamaCPPService cleaned up")
+            }
+            _modelPath = nil
         }
-        _modelPath = nil
-        lock.unlock()
     }
 
     // MARK: - Private Helpers

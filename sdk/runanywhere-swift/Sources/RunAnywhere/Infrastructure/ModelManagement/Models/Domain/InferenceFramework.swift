@@ -161,6 +161,40 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     }
 }
 
+// MARK: - C Interop
+
+import CRACommons
+
+public extension InferenceFramework {
+    /// Convert Swift InferenceFramework to C rac_inference_framework_t
+    func toCFramework() -> rac_inference_framework_t {
+        switch self {
+        case .onnx: return RAC_FRAMEWORK_ONNX
+        case .llamaCpp: return RAC_FRAMEWORK_LLAMACPP
+        case .foundationModels: return RAC_FRAMEWORK_FOUNDATION_MODELS
+        case .systemTTS: return RAC_FRAMEWORK_SYSTEM_TTS
+        case .fluidAudio: return RAC_FRAMEWORK_FLUID_AUDIO
+        case .builtIn: return RAC_FRAMEWORK_BUILTIN
+        case .none: return RAC_FRAMEWORK_NONE
+        case .unknown: return RAC_FRAMEWORK_UNKNOWN
+        }
+    }
+
+    /// Create Swift InferenceFramework from C rac_inference_framework_t
+    static func fromCFramework(_ cFramework: rac_inference_framework_t) -> InferenceFramework {
+        switch cFramework {
+        case RAC_FRAMEWORK_ONNX: return .onnx
+        case RAC_FRAMEWORK_LLAMACPP: return .llamaCpp
+        case RAC_FRAMEWORK_FOUNDATION_MODELS: return .foundationModels
+        case RAC_FRAMEWORK_SYSTEM_TTS: return .systemTTS
+        case RAC_FRAMEWORK_FLUID_AUDIO: return .fluidAudio
+        case RAC_FRAMEWORK_BUILTIN: return .builtIn
+        case RAC_FRAMEWORK_NONE: return .none
+        default: return .unknown
+        }
+    }
+}
+
 // MARK: - Case-Insensitive Initialization
 
 public extension InferenceFramework {

@@ -26,6 +26,25 @@ extern "C" {
 #endif
 
 // =============================================================================
+// CONSTANTS - Voice Agent Timing Defaults
+// =============================================================================
+
+/** Default timeout for waiting for speech input (seconds) */
+#define RAC_VOICE_AGENT_DEFAULT_SPEECH_TIMEOUT_SEC 10.0
+
+/** Default maximum recording duration (seconds) */
+#define RAC_VOICE_AGENT_DEFAULT_MAX_RECORDING_DURATION_SEC 30.0
+
+/** Default pause duration to end recording (seconds) */
+#define RAC_VOICE_AGENT_DEFAULT_END_OF_SPEECH_PAUSE_SEC 1.5
+
+/** Maximum time to wait for LLM response (seconds) */
+#define RAC_VOICE_AGENT_LLM_RESPONSE_TIMEOUT_SEC 30.0
+
+/** Maximum time to wait for TTS synthesis (seconds) */
+#define RAC_VOICE_AGENT_TTS_RESPONSE_TIMEOUT_SEC 15.0
+
+// =============================================================================
 // TYPES - Mirrors Swift's VoiceAgentConfiguration and VoiceAgentResult
 // =============================================================================
 

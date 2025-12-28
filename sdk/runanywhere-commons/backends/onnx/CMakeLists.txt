@@ -27,6 +27,10 @@ set(ONNX_SOURCES
     src/rac_tts_onnx.cpp
     src/rac_vad_onnx.cpp
     src/rac_backend_onnx_register.cpp
+    # Generic service implementations that delegate to ONNX-specific functions
+    src/rac_stt_service_impl.cpp
+    src/rac_tts_service_impl.cpp
+    src/rac_vad_service_impl.cpp
 )
 
 set(ONNX_HEADERS

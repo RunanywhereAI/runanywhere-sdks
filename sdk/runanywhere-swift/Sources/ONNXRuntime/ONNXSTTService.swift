@@ -9,6 +9,7 @@
 import CRABackendONNX
 import CRACommons
 import Foundation
+import os
 import RunAnywhere
 
 /// ONNX-based STT service for speech-to-text transcription.
@@ -35,8 +36,8 @@ public final class ONNXSTTService: STTService, @unchecked Sendable {
     /// Native handle to the C++ ONNX STT service
     private var handle: rac_handle_t?
 
-    /// Lock for thread-safe access to handle
-    private let lock = NSLock()
+    /// Lock for thread-safe access to handle (async-safe)
+    private let lock = OSAllocatedUnfairLock()
 
     /// Logger for this service
     private let logger = SDKLogger(category: "ONNXSTTService")
@@ -51,24 +52,24 @@ public final class ONNXSTTService: STTService, @unchecked Sendable {
 
     /// Whether the service is ready for transcription
     public var isReady: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return handle != nil
+        lock.withLock {
+            return handle != nil
+        }
     }
 
     /// Current model identifier
     public var currentModel: String? {
-        lock.lock()
-        defer { lock.unlock() }
-        return _modelPath
+        lock.withLock {
+            return _modelPath
+        }
     }
 
     /// ONNX STT supports streaming transcription
     public var supportsStreaming: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let handle = handle else { return false }
-        return rac_stt_onnx_supports_streaming(handle) == RAC_TRUE
+        lock.withLock {
+            guard let handle = handle else { return false }
+            return rac_stt_onnx_supports_streaming(handle) == RAC_TRUE
+        }
     }
 
     // MARK: - Initialization
@@ -78,11 +79,11 @@ public final class ONNXSTTService: STTService, @unchecked Sendable {
     }
 
     deinit {
-        lock.lock()
-        if let handle = handle {
-            rac_stt_onnx_destroy(handle)
+        lock.withLock {
+            if let handle = handle {
+                rac_stt_onnx_destroy(handle)
+            }
         }
-        lock.unlock()
     }
 
     /// Initialize the service with an optional model path.
@@ -92,9 +93,8 @@ public final class ONNXSTTService: STTService, @unchecked Sendable {
     public func initialize(modelPath: String?) async throws {
         logger.info("Initializing ONNXSTTService with model: \(modelPath ?? "none")")
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            lock.lock()
-
+        // Perform initialization under lock
+        let initResult: Result<Void, Error> = lock.withLock {
             // Clean up existing handle if any
             if let existingHandle = handle {
                 rac_stt_onnx_destroy(existingHandle)
@@ -121,15 +121,21 @@ public final class ONNXSTTService: STTService, @unchecked Sendable {
 
             if result == RAC_SUCCESS {
                 handle = newHandle
-                lock.unlock()
-                logger.info("ONNXSTTService initialized successfully")
-                continuation.resume()
+                return .success(())
             } else {
-                lock.unlock()
-                let error = CommonsErrorMapping.toSDKError(result) ?? SDKError.stt(.initializationFailed, "Failed to initialize ONNX STT service")
-                logger.error("Failed to initialize ONNXSTTService: \(error)")
-                continuation.resume(throwing: error)
+                let error = CommonsErrorMapping.toSDKError(result)
+                    ?? SDKError.stt(.initializationFailed, "Failed to initialize ONNX STT service")
+                return .failure(error)
             }
+        }
+
+        // Handle result outside of lock
+        switch initResult {
+        case .success:
+            logger.info("ONNXSTTService initialized successfully")
+        case .failure(let error):
+            logger.error("Failed to initialize ONNXSTTService: \(error)")
+            throw error
         }
     }
 
@@ -144,68 +150,62 @@ public final class ONNXSTTService: STTService, @unchecked Sendable {
     public func transcribe(audioData: Data, options: STTOptions) async throws -> STTTranscriptionResult {
         logger.debug("Transcribe called with \(audioData.count) bytes")
 
-        return try await withCheckedThrowingContinuation { continuation in
-            lock.lock()
+        // Get handle under lock
+        let lockedHandle = lock.withLock { handle }
+        guard let handle = lockedHandle else {
+            throw SDKError.stt(.serviceNotAvailable, "Service not initialized")
+        }
 
-            guard let handle = handle else {
-                lock.unlock()
-                continuation.resume(throwing: SDKError.stt(.serviceNotAvailable, "Service not initialized"))
-                return
-            }
+        // Convert Swift options to C options
+        var cOptions = rac_stt_options_t()
+        cOptions.sample_rate = Int32(options.sampleRate)
+        cOptions.enable_timestamps = options.enableTimestamps ? RAC_TRUE : RAC_FALSE
 
-            lock.unlock()
+        // Convert audio data to float samples
+        let floatSamples = audioData.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) -> [Float] in
+            let int16Buffer = rawBuffer.bindMemory(to: Int16.self)
+            return int16Buffer.map { Float($0) / 32768.0 }
+        }
 
-            // Convert Swift options to C options
-            var cOptions = rac_stt_options_t()
-            cOptions.sample_rate = Int32(options.sampleRate)
-            cOptions.enable_timestamps = options.enableTimestamps ? RAC_TRUE : RAC_FALSE
+        var cResult = rac_stt_result_t()
 
-            // Convert audio data to float samples
-            let floatSamples = audioData.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) -> [Float] in
-                let int16Buffer = rawBuffer.bindMemory(to: Int16.self)
-                return int16Buffer.map { Float($0) / 32768.0 }
-            }
-
-            var cResult = rac_stt_result_t()
-
-            // Set language - use withCString to ensure proper lifetime
-            let transcribeResult = options.language.withCString { langPtr in
-                cOptions.language = langPtr
-                return floatSamples.withUnsafeBufferPointer { samplesBuffer in
-                    rac_stt_onnx_transcribe(
-                        handle,
-                        samplesBuffer.baseAddress,
-                        samplesBuffer.count,
-                        &cOptions,
-                        &cResult
-                    )
-                }
-            }
-
-            if transcribeResult == RAC_SUCCESS {
-                // Extract transcription text
-                var text = ""
-                if let textPtr = cResult.text {
-                    text = String(cString: textPtr)
-                    // Free the C-allocated string
-                    textPtr.deallocate()
-                }
-
-                let result = STTTranscriptionResult(
-                    transcript: text,
-                    confidence: cResult.confidence > 0 ? cResult.confidence : nil,
-                    timestamps: nil,
-                    language: options.language.isEmpty ? nil : options.language,
-                    alternatives: nil
+        // Set language - use withCString to ensure proper lifetime
+        let transcribeResult = options.language.withCString { langPtr in
+            cOptions.language = langPtr
+            return floatSamples.withUnsafeBufferPointer { samplesBuffer in
+                rac_stt_onnx_transcribe(
+                    handle,
+                    samplesBuffer.baseAddress,
+                    samplesBuffer.count,
+                    &cOptions,
+                    &cResult
                 )
-
-                logger.debug("Transcription complete: \(text.prefix(50))...")
-                continuation.resume(returning: result)
-            } else {
-                let error = CommonsErrorMapping.toSDKError(transcribeResult) ?? SDKError.stt(.generationFailed, "Transcription failed")
-                logger.error("Transcription failed: \(error)")
-                continuation.resume(throwing: error)
             }
+        }
+
+        if transcribeResult == RAC_SUCCESS {
+            // Extract transcription text
+            var text = ""
+            if let textPtr = cResult.text {
+                text = String(cString: textPtr)
+                // Free the C-allocated string
+                textPtr.deallocate()
+            }
+
+            let result = STTTranscriptionResult(
+                transcript: text,
+                confidence: cResult.confidence > 0 ? cResult.confidence : nil,
+                timestamps: nil,
+                language: options.language.isEmpty ? nil : options.language,
+                alternatives: nil
+            )
+
+            logger.debug("Transcription complete: \(text.prefix(50))...")
+            return result
+        } else {
+            let error = CommonsErrorMapping.toSDKError(transcribeResult) ?? SDKError.stt(.generationFailed, "Transcription failed")
+            logger.error("Transcription failed: \(error)")
+            throw error
         }
     }
 
@@ -223,15 +223,11 @@ public final class ONNXSTTService: STTService, @unchecked Sendable {
     ) async throws -> STTTranscriptionResult where S.Element == Data {
         logger.debug("Stream transcribe started")
 
-        // Synchronous handle check
-        let serviceHandle: rac_handle_t = try {
-            lock.lock()
-            defer { lock.unlock() }
-            guard let handleValue = handle else {
-                throw SDKError.stt(.serviceNotAvailable, "Service not initialized")
-            }
-            return handleValue
-        }()
+        // Get handle under lock
+        let lockedHandle = lock.withLock { handle }
+        guard let serviceHandle = lockedHandle else {
+            throw SDKError.stt(.serviceNotAvailable, "Service not initialized")
+        }
 
         // Create streaming session
         var streamHandle: rac_handle_t?
@@ -323,13 +319,13 @@ public final class ONNXSTTService: STTService, @unchecked Sendable {
 
     /// Synchronous cleanup helper
     private func cleanupSync() {
-        lock.lock()
-        if let handle = handle {
-            rac_stt_onnx_destroy(handle)
-            self.handle = nil
-            logger.info("ONNXSTTService cleaned up")
+        lock.withLock {
+            if let handle = handle {
+                rac_stt_onnx_destroy(handle)
+                self.handle = nil
+                logger.info("ONNXSTTService cleaned up")
+            }
+            _modelPath = nil
         }
-        _modelPath = nil
-        lock.unlock()
     }
 }
