@@ -90,9 +90,13 @@ public actor TTSCapability: ModelLoadableCapability {
             throw SDKError.tts(.modelLoadFailed, "No TTS component handle")
         }
 
-        // Load voice
-        let result = voiceId.withCString { voiceIdPtr in
-            rac_tts_component_load_voice(handle, voiceIdPtr)
+        // Resolve voice ID to local file path
+        let voicePath = try await resolveModelPath(voiceId)
+        logger.info("Loading TTS voice from path: \(voicePath)")
+
+        // Load voice using resolved path
+        let result = voicePath.withCString { pathPtr in
+            rac_tts_component_load_voice(handle, pathPtr)
         }
 
         guard result == RAC_SUCCESS else {
@@ -101,6 +105,21 @@ public actor TTSCapability: ModelLoadableCapability {
 
         loadedVoice = voiceId
         logger.info("Voice loaded: \(voiceId)")
+    }
+
+    /// Resolve a model/voice ID to its local file path
+    private func resolveModelPath(_ modelId: String) async throws -> String {
+        let allModels = try await RunAnywhere.availableModels()
+
+        guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
+            throw SDKError.tts(.modelNotFound, "Voice '\(modelId)' not found in registry")
+        }
+
+        guard let localPath = modelInfo.localPath else {
+            throw SDKError.tts(.modelNotFound, "Voice '\(modelId)' is not downloaded. Please download the model first.")
+        }
+
+        return localPath.path
     }
 
     public func unload() async throws {
