@@ -41,7 +41,7 @@ public enum AppleAI: RunAnywhereModule {
 
     public static let moduleId = "appleai"
     public static let moduleName = "Apple Foundation Models"
-    public static let capabilities: Set<CapabilityType> = [.llm]
+    public static let capabilities: Set<SDKComponent> = [.llm]
     public static let defaultPriority: Int = 50 // Lower priority - prefer local models
 
     /// Apple AI uses the Foundation Models inference framework

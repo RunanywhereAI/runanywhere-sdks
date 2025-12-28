@@ -9,6 +9,7 @@
 //  This avoids string conversion/parsing and enables compile-time type checking.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - STT Event
@@ -41,7 +42,7 @@ public enum STTEvent: SDKEvent, TelemetryEventProperties {
     ///   - audioLengthMs: Duration of audio in milliseconds
     ///   - audioSizeBytes: Size of audio data in bytes
     ///   - isStreaming: Whether this is a streaming transcription
-    ///   - sampleRate: Audio sample rate in Hz (default: STTConstants.defaultSampleRate)
+    ///   - sampleRate: Audio sample rate in Hz (default: RAC_STT_DEFAULT_SAMPLE_RATE)
     case transcriptionStarted(
         transcriptionId: String,
         modelId: String,
@@ -49,7 +50,7 @@ public enum STTEvent: SDKEvent, TelemetryEventProperties {
         audioSizeBytes: Int,
         language: String,
         isStreaming: Bool = false,
-        sampleRate: Int = STTConstants.defaultSampleRate,
+        sampleRate: Int = Int(RAC_STT_DEFAULT_SAMPLE_RATE),
         framework: InferenceFramework = .unknown
     )
     case partialTranscript(text: String, wordCount: Int)
@@ -70,7 +71,7 @@ public enum STTEvent: SDKEvent, TelemetryEventProperties {
         realTimeFactor: Double,
         language: String,
         isStreaming: Bool = false,
-        sampleRate: Int = STTConstants.defaultSampleRate,
+        sampleRate: Int = Int(RAC_STT_DEFAULT_SAMPLE_RATE),
         framework: InferenceFramework = .unknown
     )
     case transcriptionFailed(transcriptionId: String, modelId: String, error: SDKError)

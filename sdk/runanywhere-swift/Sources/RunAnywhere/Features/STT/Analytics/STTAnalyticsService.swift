@@ -13,6 +13,7 @@
 //  since audioLengthMs = 0 when audio is processed in chunks of unknown total length.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - STT Analytics Service
@@ -63,7 +64,7 @@ public actor STTAnalyticsService {
     ///   - audioSizeBytes: Size of audio data in bytes
     ///   - language: Language code for transcription
     ///   - isStreaming: Whether this is a streaming transcription
-    ///   - sampleRate: Audio sample rate in Hz (default: STTConstants.defaultSampleRate)
+    ///   - sampleRate: Audio sample rate in Hz (default: RAC_STT_DEFAULT_SAMPLE_RATE)
     ///   - framework: The inference framework being used
     /// - Returns: A unique transcription ID for tracking
     public func startTranscription(
@@ -72,7 +73,7 @@ public actor STTAnalyticsService {
         audioSizeBytes: Int,
         language: String,
         isStreaming: Bool = false,
-        sampleRate: Int = STTConstants.defaultSampleRate,
+        sampleRate: Int = Int(RAC_STT_DEFAULT_SAMPLE_RATE),
         framework: InferenceFramework = .unknown
     ) -> String {
         let id = UUID().uuidString

@@ -32,7 +32,7 @@ public enum SystemTTS: RunAnywhereModule {
 
     public static let moduleId = "system-tts"
     public static let moduleName = "System TTS"
-    public static let capabilities: Set<CapabilityType> = [.tts]
+    public static let capabilities: Set<SDKComponent> = [.tts]
     public static let defaultPriority: Int = 10  // Low priority - fallback only
 
     /// System TTS uses Apple's built-in speech synthesis

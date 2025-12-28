@@ -5,6 +5,7 @@
 //  Configuration for STT component
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - STT Configuration
@@ -29,7 +30,7 @@ public struct STTConfiguration: ComponentConfiguration, Sendable {
     public init(
         modelId: String? = nil,
         language: String = "en-US",
-        sampleRate: Int = STTConstants.defaultSampleRate,
+        sampleRate: Int = Int(RAC_STT_DEFAULT_SAMPLE_RATE),
         enablePunctuation: Bool = true,
         enableDiarization: Bool = false,
         vocabularyList: [String] = [],

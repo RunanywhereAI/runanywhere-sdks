@@ -44,10 +44,10 @@ public extension RunAnywhere {
     }
 
     /// Get all registered frameworks for a specific capability
-    /// - Parameter capability: The capability type to filter by
+    /// - Parameter capability: The capability/component type to filter by
     /// - Returns: Array of frameworks that provide the specified capability
     @MainActor
-    static func getFrameworks(for capability: CapabilityType) -> [InferenceFramework] {
+    static func getFrameworks(for capability: SDKComponent) -> [InferenceFramework] {
         let allModels = serviceContainer.modelRegistry.filterModels(by: ModelCriteria())
         var frameworks: Set<InferenceFramework> = []
 
@@ -62,6 +62,11 @@ public extension RunAnywhere {
             relevantCategories = [.speechSynthesis]
         case .vad:
             relevantCategories = [.audio]
+        case .voice:
+            relevantCategories = [.language, .speechRecognition, .speechSynthesis]
+        case .embedding:
+            // Embedding models could be language or multimodal
+            relevantCategories = [.language, .multimodal]
         }
 
         for model in allModels where relevantCategories.contains(model.category) {

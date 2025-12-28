@@ -22,20 +22,33 @@ extern "C" {
 #endif
 
 // =============================================================================
-// CONSTANTS - Mirrors Swift's VADConstants
+// CONSTANTS - Single Source of Truth for VAD
+// Swift references these via CRACommons import
 // =============================================================================
 
-/** Default sample rate for VAD processing (16kHz) */
+// Audio Format Constants
 #define RAC_VAD_DEFAULT_SAMPLE_RATE 16000
+#define RAC_VAD_MAX_SAMPLE_RATE 48000
+#define RAC_VAD_MIN_SAMPLE_RATE 8000
 
-/** Default energy threshold for voice detection */
+// Energy Thresholds
 #define RAC_VAD_DEFAULT_ENERGY_THRESHOLD 0.015f
+#define RAC_VAD_MIN_ENERGY_THRESHOLD 0.001f
+#define RAC_VAD_MAX_ENERGY_THRESHOLD 0.5f
 
-/** Default frame length in seconds */
+// Frame Processing
 #define RAC_VAD_DEFAULT_FRAME_LENGTH 0.1f
+#define RAC_VAD_MIN_FRAME_LENGTH 0.02f
+#define RAC_VAD_MAX_FRAME_LENGTH 0.5f
 
-/** Default calibration multiplier */
+// Calibration
 #define RAC_VAD_DEFAULT_CALIBRATION_MULTIPLIER 2.0f
+#define RAC_VAD_MIN_CALIBRATION_MULTIPLIER 1.2f
+#define RAC_VAD_MAX_CALIBRATION_MULTIPLIER 5.0f
+
+// Speech Detection
+#define RAC_VAD_MIN_SPEECH_DURATION_MS 100
+#define RAC_VAD_MIN_SILENCE_DURATION_MS 300
 
 // =============================================================================
 // CONFIGURATION - Mirrors Swift's VADConfiguration

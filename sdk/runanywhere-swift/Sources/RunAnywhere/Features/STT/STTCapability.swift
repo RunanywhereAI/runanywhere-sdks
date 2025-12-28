@@ -226,13 +226,13 @@ public actor STTCapability: ModelLoadableCapability {
         )
     }
 
-    /// Start streaming transcription
-    public func startStreamingTranscription(
+    /// Start streaming transcription with audio data
+    /// Uses the C++ rac_stt_component_transcribe_stream API with callback bridging
+    public func transcribeStream(
+        audioData: Data,
         options: STTOptions = STTOptions(),
-        onPartialResult: @escaping (STTTranscriptionResult) -> Void,
-        onFinalResult: @escaping (STTOutput) -> Void,
-        onError: @escaping (Error) -> Void
-    ) async throws {
+        onPartialResult: @escaping (STTTranscriptionResult) -> Void
+    ) async throws -> STTOutput {
         guard let handle = handle else {
             throw SDKError.stt(.notInitialized, "STT not initialized")
         }
@@ -241,11 +241,92 @@ public actor STTCapability: ModelLoadableCapability {
             throw SDKError.stt(.notInitialized, "STT model not loaded")
         }
 
-        logger.info("Starting streaming transcription")
+        guard rac_stt_component_supports_streaming(handle) == RAC_TRUE else {
+            throw SDKError.stt(.streamingNotSupported, "Model does not support streaming")
+        }
 
-        // For now, streaming transcription would need to be implemented
-        // via the C++ streaming callback mechanism
-        throw SDKError.stt(.streamingNotSupported, "Streaming transcription not yet implemented in wrapper")
+        let modelId = loadedModelId ?? "unknown"
+        logger.info("Starting streaming transcription with model: \(modelId)")
+
+        let startTime = Date()
+
+        // Create context for callback bridging
+        let context = StreamingContext(onPartialResult: onPartialResult)
+        let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+        // Build C options
+        var cOptions = rac_stt_options_t()
+        cOptions.language = (options.language as NSString).utf8String
+
+        // Stream transcription with callback
+        let result = audioData.withUnsafeBytes { audioPtr in
+            rac_stt_component_transcribe_stream(
+                handle,
+                audioPtr.baseAddress,
+                audioData.count,
+                &cOptions,
+                { partialText, isFinal, userData in
+                    guard let userData = userData else { return }
+                    let ctx = Unmanaged<StreamingContext>.fromOpaque(userData).takeUnretainedValue()
+
+                    let text = partialText.map { String(cString: $0) } ?? ""
+                    let partialResult = STTTranscriptionResult(
+                        transcript: text,
+                        confidence: nil,
+                        timestamps: nil,
+                        language: nil,
+                        alternatives: nil
+                    )
+
+                    ctx.onPartialResult(partialResult)
+
+                    if isFinal == RAC_TRUE {
+                        ctx.finalText = text
+                    }
+                },
+                contextPtr
+            )
+        }
+
+        // Release context
+        let finalContext = Unmanaged<StreamingContext>.fromOpaque(contextPtr).takeRetainedValue()
+
+        guard result == RAC_SUCCESS else {
+            throw SDKError.stt(.processingFailed, "Streaming transcription failed: \(result)")
+        }
+
+        let endTime = Date()
+        let processingTimeSec = endTime.timeIntervalSince(startTime)
+        let audioLengthSec = estimateAudioLength(dataSize: audioData.count)
+
+        let metadata = TranscriptionMetadata(
+            modelId: modelId,
+            processingTime: processingTimeSec,
+            audioLength: audioLengthSec
+        )
+
+        logger.info("Streaming transcription completed in \(Int(processingTimeSec * 1000))ms")
+
+        return STTOutput(
+            text: finalContext.finalText,
+            confidence: 0.0,
+            wordTimestamps: nil,
+            detectedLanguage: nil,
+            alternatives: nil,
+            metadata: metadata
+        )
+    }
+
+    /// Legacy streaming interface - calls transcribeStream internally
+    @available(*, deprecated, message: "Use transcribeStream(audioData:options:onPartialResult:) instead")
+    public func startStreamingTranscription(
+        options: STTOptions = STTOptions(),
+        onPartialResult: @escaping (STTTranscriptionResult) -> Void,
+        onFinalResult: @escaping (STTOutput) -> Void,
+        onError: @escaping (Error) -> Void
+    ) async throws {
+        logger.warning("startStreamingTranscription is deprecated - use transcribeStream instead")
+        throw SDKError.stt(.streamingNotSupported, "Use transcribeStream(audioData:options:onPartialResult:) instead")
     }
 
     /// Process audio samples for streaming transcription
@@ -296,5 +377,18 @@ public actor STTCapability: ModelLoadableCapability {
         let sampleRate = 16000.0
         let samples = Double(dataSize) / Double(bytesPerSample)
         return samples / sampleRate
+    }
+}
+
+// MARK: - Streaming Context Helper
+
+/// Context class for bridging C callbacks to Swift closures
+/// This is used internally by STTCapability for streaming transcription
+private final class StreamingContext: @unchecked Sendable {
+    let onPartialResult: (STTTranscriptionResult) -> Void
+    var finalText: String = ""
+
+    init(onPartialResult: @escaping (STTTranscriptionResult) -> Void) {
+        self.onPartialResult = onPartialResult
     }
 }

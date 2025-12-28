@@ -5,6 +5,7 @@
 //  Configuration for Voice Activity Detection operations
 //
 
+import CRACommons
 import Foundation
 
 /// Configuration for Voice Activity Detection operations
@@ -44,7 +45,7 @@ public struct VADConfiguration: ComponentConfiguration, Sendable {
 
     public init(
         energyThreshold: Float = 0.015,
-        sampleRate: Int = VADConstants.defaultSampleRate,
+        sampleRate: Int = Int(RAC_VAD_DEFAULT_SAMPLE_RATE),
         frameLength: Float = 0.1,
         enableAutoCalibration: Bool = false,
         calibrationMultiplier: Float = 2.0
@@ -120,7 +121,7 @@ extension VADConfiguration {
 
     public class Builder {
         private var energyThreshold: Float = 0.015
-        private var sampleRate: Int = VADConstants.defaultSampleRate
+        private var sampleRate = Int(RAC_VAD_DEFAULT_SAMPLE_RATE)
         private var frameLength: Float = 0.1
         private var enableAutoCalibration: Bool = false
         private var calibrationMultiplier: Float = 2.0

@@ -128,12 +128,21 @@ set(RAC_INFRASTRUCTURE_SOURCES
 
 # Feature sources (maps to Swift Features/)
 set(RAC_FEATURES_SOURCES
+    # LLM
     src/features/llm/llm_component.cpp
     src/features/llm/streaming_metrics.cpp
+    src/features/llm/llm_analytics.cpp
+    # STT
     src/features/stt/stt_component.cpp
+    src/features/stt/stt_analytics.cpp
+    # TTS
     src/features/tts/tts_component.cpp
+    src/features/tts/tts_analytics.cpp
+    # VAD
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
+    src/features/vad/vad_analytics.cpp
+    # Voice Agent
     src/features/voice_agent/voice_agent.cpp
 )
 
