@@ -37,12 +37,7 @@ public class ServiceContainer {
 
     /// Voice Agent capability - composes STT, LLM, TTS, VAD for full voice pipeline
     private(set) lazy var voiceAgentCapability: VoiceAgentCapability = {
-        VoiceAgentCapability(
-            llm: llmCapability,
-            stt: sttCapability,
-            tts: ttsCapability,
-            vad: vadCapability
-        )
+        VoiceAgentCapability()
     }()
 
     // MARK: - Infrastructure Services

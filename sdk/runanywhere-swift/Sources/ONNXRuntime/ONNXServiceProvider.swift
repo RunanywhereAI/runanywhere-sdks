@@ -23,11 +23,8 @@ import RunAnywhere
 /// // Option 1: Direct registration
 /// ONNX.register()
 ///
-/// // Option 2: Via ModuleRegistry
-/// ModuleRegistry.shared.register(ONNX.self)
-///
-/// // Option 3: Via RunAnywhere
-/// RunAnywhere.register(ONNX.self)
+/// // Option 2: Import module for auto-registration
+/// import ONNXRuntime // Auto-registers via ModuleDiscovery
 /// ```
 ///
 /// ## Usage

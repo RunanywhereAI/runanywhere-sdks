@@ -26,11 +26,8 @@ import RunAnywhere
 ///     // Option 1: Direct registration
 ///     AppleAI.register()
 ///
-///     // Option 2: Via ModuleRegistry
-///     ModuleRegistry.shared.register(AppleAI.self)
-///
-///     // Option 3: Via RunAnywhere
-///     RunAnywhere.register(AppleAI.self)
+///     // Option 2: Import module for auto-registration
+///     import FoundationModelsAdapter // Auto-registers via ModuleDiscovery
 /// }
 /// ```
 @available(iOS 26.0, macOS 26.0, *)

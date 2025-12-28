@@ -73,18 +73,18 @@ public extension RunAnywhere {
     /// - Parameters:
     ///   - text: Text to synthesize
     ///   - options: Synthesis options
-    /// - Returns: Async stream of audio data chunks
+    ///   - onAudioChunk: Callback for each audio chunk
+    /// - Returns: TTS output with full audio data
     static func synthesizeStream(
         _ text: String,
-        options: TTSOptions = TTSOptions()
-    ) async -> AsyncThrowingStream<Data, Error> {
+        options: TTSOptions = TTSOptions(),
+        onAudioChunk: @escaping (Data) -> Void
+    ) async throws -> TTSOutput {
         guard isSDKInitialized else {
-            return AsyncThrowingStream { continuation in
-                continuation.finish(throwing: SDKError.general(.notInitialized, "SDK not initialized"))
-            }
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        return await serviceContainer.ttsCapability.synthesizeStream(text, options: options)
+        return try await serviceContainer.ttsCapability.synthesizeStream(text, options: options, onAudioChunk: onAudioChunk)
     }
 
     /// Stop current TTS synthesis
@@ -127,7 +127,9 @@ public extension RunAnywhere {
 
     /// Whether speech is currently playing
     static var isSpeaking: Bool {
-        serviceContainer.ttsCapability.isSpeaking
+        get async {
+            await serviceContainer.ttsCapability.isSpeaking
+        }
     }
 
     /// Stop current speech playback

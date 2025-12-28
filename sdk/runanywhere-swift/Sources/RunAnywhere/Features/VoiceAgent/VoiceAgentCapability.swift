@@ -2,26 +2,33 @@
 //  VoiceAgentCapability.swift
 //  RunAnywhere SDK
 //
-//  Simplified actor-based Voice Agent capability that composes STT, LLM, TTS, and VAD
+//  Thin Swift wrapper over rac_voice_agent_* C API.
+//  All business logic is in the C++ layer; this is just a Swift interface.
+//
+//  ⚠️ WARNING: This is a direct wrapper. Do NOT add custom logic here.
+//  The C++ layer (runanywhere-commons) is the source of truth.
 //
 
+import CRACommons
 import Foundation
 
-/// Actor-based Voice Agent capability that provides a full voice conversation pipeline
-/// Composes STT, LLM, TTS, and VAD capabilities for end-to-end voice processing
-public actor VoiceAgentCapability: CompositeCapability {
+/// Actor-based Voice Agent capability that orchestrates STT, LLM, TTS, and VAD.
+/// This is a thin wrapper over the C++ rac_voice_agent API.
+public actor VoiceAgentCapability {
 
     // MARK: - State
 
-    /// Whether the voice agent is initialized
-    private var isConfigured = false
+    /// Handle to the C++ voice agent
+    private var handle: rac_voice_agent_handle_t?
 
-    // MARK: - Composed Capabilities
+    /// Component handles
+    private var llmHandle: rac_handle_t?
+    private var sttHandle: rac_handle_t?
+    private var ttsHandle: rac_handle_t?
+    private var vadHandle: rac_handle_t?
 
-    private let llm: LLMCapability
-    private let stt: STTCapability
-    private let tts: TTSCapability
-    private let vad: VADCapability
+    /// Current configuration
+    private var config: VoiceAgentConfiguration?
 
     // MARK: - Dependencies
 
@@ -29,366 +36,277 @@ public actor VoiceAgentCapability: CompositeCapability {
 
     // MARK: - Initialization
 
-    public init(
-        llm: LLMCapability,
-        stt: STTCapability,
-        tts: TTSCapability,
-        vad: VADCapability
-    ) {
-        self.llm = llm
-        self.stt = stt
-        self.tts = tts
-        self.vad = vad
-    }
+    public init() {}
 
-    // MARK: - CompositeCapability Protocol
-
-    public var isReady: Bool {
-        isConfigured
-    }
-
-    public func cleanup() async {
-        logger.info("Cleaning up Voice Agent")
-
-        await llm.cleanup()
-        await stt.cleanup()
-        await tts.cleanup()
-        await vad.cleanup()
-
-        isConfigured = false
+    deinit {
+        if let handle = handle {
+            rac_voice_agent_destroy(handle)
+        }
     }
 
     // MARK: - Configuration
 
+    public func configure(_ config: VoiceAgentConfiguration) {
+        self.config = config
+    }
+
+    // MARK: - Lifecycle
+
+    public var isReady: Bool {
+        get async {
+            guard let handle = handle else { return false }
+            var ready: rac_bool_t = RAC_FALSE
+            let result = rac_voice_agent_is_ready(handle, &ready)
+            return result == RAC_SUCCESS && ready == RAC_TRUE
+        }
+    }
+
     /// Initialize the voice agent with configuration
-    /// - Parameter config: Voice agent configuration
-    ///
-    /// This method is smart about reusing already-loaded models:
-    /// - If a model is already loaded with the same ID, it will be reused
-    /// - If a different model is loaded, it will be replaced
-    /// - If no model is loaded, the specified model will be loaded
     public func initialize(_ config: VoiceAgentConfiguration) async throws {
-        logger.info("Initializing Voice Agent")
+        self.config = config
 
-        try await initializeVAD(config.vadConfig)
-        try await initializeSTTModel(config.sttConfig)
-        try await initializeLLMModel(config.llmConfig)
-        try await initializeTTSVoice(config.ttsConfig)
-        try await verifyAllComponentsReady()
-
-        self.isConfigured = true
-        logger.info("Voice Agent initialized successfully - all components ready")
-    }
-
-    // MARK: - Private Helper Methods
-
-    /// Initialize VAD component
-    private func initializeVAD(_ vadConfig: VADConfiguration) async throws {
-        do {
-            try await vad.initialize(vadConfig)
-        } catch {
-            throw SDKError.voiceAgent(.initializationFailed, "VAD component failed: \(error.localizedDescription)", underlying: error)
+        // Create component handles if needed
+        if llmHandle == nil {
+            var newLLMHandle: rac_handle_t?
+            rac_llm_component_create(&newLLMHandle)
+            llmHandle = newLLMHandle
         }
-    }
-
-    /// Initialize STT model with smart reuse logic
-    private func initializeSTTModel(_ sttConfig: STTConfiguration) async throws {
-        guard let sttModelId = sttConfig.modelId, !sttModelId.isEmpty else {
-            return try await handleMissingSTTModel()
+        if sttHandle == nil {
+            var newSTTHandle: rac_handle_t?
+            rac_stt_component_create(&newSTTHandle)
+            sttHandle = newSTTHandle
+        }
+        if ttsHandle == nil {
+            var newTTSHandle: rac_handle_t?
+            rac_tts_component_create(&newTTSHandle)
+            ttsHandle = newTTSHandle
+        }
+        if vadHandle == nil {
+            var newVADHandle: rac_handle_t?
+            rac_vad_component_create(&newVADHandle)
+            vadHandle = newVADHandle
         }
 
-        let currentModelId = await stt.currentModelId
-        let isLoaded = await stt.isModelLoaded
-
-        guard !isLoaded || currentModelId != sttModelId else {
-            logger.info("STT model already loaded: \(sttModelId) - reusing")
-            return
-        }
-
-        logger.info("Loading STT model: \(sttModelId)")
-        do {
-            try await stt.loadModel(sttModelId)
-        } catch {
-            throw SDKError.voiceAgent(.initializationFailed, "STT component failed: \(error.localizedDescription)", underlying: error)
-        }
-    }
-
-    /// Handle case when no STT model is specified
-    private func handleMissingSTTModel() async throws {
-        let isLoaded = await stt.isModelLoaded
-        if isLoaded {
-            logger.info("Using already loaded STT model")
-        } else {
-            logger.warning("No STT model specified and none loaded - STT will not work")
-        }
-    }
-
-    /// Initialize LLM model with smart reuse logic
-    private func initializeLLMModel(_ llmConfig: LLMConfiguration) async throws {
-        guard let llmModelId = llmConfig.modelId, !llmModelId.isEmpty else {
-            return try await handleMissingLLMModel()
-        }
-
-        let currentModelId = await llm.currentModelId
-        let isLoaded = await llm.isModelLoaded
-
-        guard !isLoaded || currentModelId != llmModelId else {
-            logger.info("LLM model already loaded: \(llmModelId) - reusing")
-            return
-        }
-
-        logger.info("Loading LLM model: \(llmModelId)")
-        do {
-            try await llm.loadModel(llmModelId)
-        } catch {
-            throw SDKError.voiceAgent(.initializationFailed, "LLM component failed: \(error.localizedDescription)", underlying: error)
-        }
-    }
-
-    /// Handle case when no LLM model is specified
-    private func handleMissingLLMModel() async throws {
-        let isLoaded = await llm.isModelLoaded
-        if isLoaded {
-            logger.info("Using already loaded LLM model")
-        } else {
-            logger.warning("No LLM model specified and none loaded - LLM will not work")
-        }
-    }
-
-    /// Initialize TTS voice with smart reuse logic
-    private func initializeTTSVoice(_ ttsConfig: TTSConfiguration) async throws {
-        let ttsVoice = ttsConfig.voice
-        guard !ttsVoice.isEmpty else {
-            return try await handleMissingTTSVoice()
-        }
-
-        let currentVoiceId = await tts.currentVoiceId
-        let isLoaded = await tts.isVoiceLoaded
-
-        guard !isLoaded || currentVoiceId != ttsVoice else {
-            logger.info("TTS voice already loaded: \(ttsVoice) - reusing")
-            return
-        }
-
-        logger.info("Loading TTS voice: \(ttsVoice)")
-        do {
-            try await tts.loadVoice(ttsVoice)
-        } catch {
-            throw SDKError.voiceAgent(.initializationFailed, "TTS component failed: \(error.localizedDescription)", underlying: error)
-        }
-    }
-
-    /// Handle case when no TTS voice is specified
-    private func handleMissingTTSVoice() async throws {
-        let isLoaded = await tts.isVoiceLoaded
-        if isLoaded {
-            logger.info("Using already loaded TTS voice")
-        } else {
-            logger.warning("No TTS voice specified and none loaded - TTS will not work")
-        }
-    }
-
-    /// Verify all required components are ready
-    private func verifyAllComponentsReady() async throws {
-        let sttReady = await stt.isModelLoaded
-        let llmReady = await llm.isModelLoaded
-        let ttsReady = await tts.isVoiceLoaded
-
-        guard sttReady else {
-            throw SDKError.voiceAgent(.componentNotReady, "STT model not loaded")
-        }
-
-        guard llmReady else {
-            throw SDKError.voiceAgent(.componentNotReady, "LLM model not loaded")
-        }
-
-        guard ttsReady else {
-            throw SDKError.voiceAgent(.componentNotReady, "TTS voice not loaded")
-        }
-    }
-
-    /// Initialize using already-loaded models (no model IDs needed)
-    ///
-    /// Use this when models are already loaded via the individual capability APIs
-    /// (e.g., RunAnywhere.loadModel(), RunAnywhere.loadSTTModel(), RunAnywhere.loadTTSVoice())
-    ///
-    /// This will verify all required components are loaded and mark the voice agent as ready.
-    public func initializeWithLoadedModels() async throws {
-        logger.info("Initializing Voice Agent with already-loaded models")
-
-        // Initialize VAD
-        do {
-            try await vad.initialize(VADConfiguration())
-        } catch {
-            throw SDKError.voiceAgent(.initializationFailed, "VAD component failed: \(error.localizedDescription)", underlying: error)
-        }
-
-        // Verify all components are ready
-        let sttReady = await stt.isModelLoaded
-        let llmReady = await llm.isModelLoaded
-        let ttsReady = await tts.isVoiceLoaded
-
-        guard sttReady else {
-            throw SDKError.voiceAgent(.componentNotReady, "No STT model loaded. Load one first via RunAnywhere.loadSTTModel()")
-        }
-        guard llmReady else {
-            throw SDKError.voiceAgent(.componentNotReady, "No LLM model loaded. Load one first via RunAnywhere.loadModel()")
-        }
-        guard ttsReady else {
-            throw SDKError.voiceAgent(.componentNotReady, "No TTS voice loaded. Load one first via RunAnywhere.loadTTSVoice()")
-        }
-
-        self.isConfigured = true
-        logger.info("Voice Agent initialized with pre-loaded models - all components ready")
-    }
-
-    /// Initialize with individual model IDs (convenience)
-    /// - Parameters:
-    ///   - sttModelId: STT model identifier (pass empty string to use already-loaded model)
-    ///   - llmModelId: LLM model identifier (pass empty string to use already-loaded model)
-    ///   - ttsVoice: TTS voice identifier (pass empty string to use already-loaded voice)
-    public func initialize(
-        sttModelId: String,
-        llmModelId: String,
-        ttsVoice: String = ""
-    ) async throws {
-        let config = VoiceAgentConfiguration(
-            vadConfig: VADConfiguration(),
-            sttConfig: STTConfiguration(modelId: sttModelId.isEmpty ? nil : sttModelId),
-            llmConfig: LLMConfiguration(modelId: llmModelId.isEmpty ? nil : llmModelId),
-            ttsConfig: TTSConfiguration(voice: ttsVoice)
+        // Create voice agent
+        var newHandle: rac_voice_agent_handle_t?
+        let createResult = rac_voice_agent_create(
+            llmHandle,
+            sttHandle,
+            ttsHandle,
+            vadHandle,
+            &newHandle
         )
-        try await initialize(config)
+
+        guard createResult == RAC_SUCCESS, let createdHandle = newHandle else {
+            throw SDKError.voiceAgent(.initializationFailed, "Failed to create voice agent: \(createResult)")
+        }
+
+        handle = createdHandle
+
+        // Build C config
+        var cConfig = rac_voice_agent_config_t()
+
+        // VAD config
+        cConfig.vad_config.sample_rate = Int32(config.vadConfig.sampleRate)
+        cConfig.vad_config.frame_length = Float(config.vadConfig.frameLength)
+        cConfig.vad_config.energy_threshold = Float(config.vadConfig.energyThreshold)
+
+        // Initialize
+        let result = rac_voice_agent_initialize(handle, &cConfig)
+        guard result == RAC_SUCCESS else {
+            throw SDKError.voiceAgent(.initializationFailed, "Voice agent initialization failed: \(result)")
+        }
+
+        logger.info("Voice agent initialized")
+    }
+
+    /// Initialize using already-loaded models
+    public func initializeWithLoadedModels() async throws {
+        guard let handle = handle else {
+            throw SDKError.voiceAgent(.notInitialized, "Voice agent not created")
+        }
+
+        let result = rac_voice_agent_initialize_with_loaded_models(handle)
+        guard result == RAC_SUCCESS else {
+            throw SDKError.voiceAgent(.initializationFailed, "Failed to initialize with loaded models: \(result)")
+        }
+
+        logger.info("Voice agent initialized with loaded models")
+    }
+
+    public func cleanup() async {
+        if let handle = handle {
+            rac_voice_agent_cleanup(handle)
+            rac_voice_agent_destroy(handle)
+        }
+        handle = nil
+
+        // Clean up component handles
+        if let llm = llmHandle { rac_llm_component_destroy(llm) }
+        if let stt = sttHandle { rac_stt_component_destroy(stt) }
+        if let tts = ttsHandle { rac_tts_component_destroy(tts) }
+        if let vad = vadHandle { rac_vad_component_destroy(vad) }
+
+        llmHandle = nil
+        sttHandle = nil
+        ttsHandle = nil
+        vadHandle = nil
     }
 
     // MARK: - Voice Processing
 
     /// Process a complete voice turn: audio → transcription → LLM response → synthesized speech
-    /// - Parameter audioData: Audio data from user
-    /// - Returns: Voice agent result with all intermediate outputs
     public func processVoiceTurn(_ audioData: Data) async throws -> VoiceAgentResult {
-        guard isConfigured else {
-            throw SDKError.voiceAgent(.notInitialized, "Voice Agent is not initialized")
+        guard let handle = handle else {
+            throw SDKError.voiceAgent(.notInitialized, "Voice agent not initialized")
         }
 
-        let metrics = CapabilityMetrics(resourceId: "voice-agent")
+        var isReady: rac_bool_t = RAC_FALSE
+        rac_voice_agent_is_ready(handle, &isReady)
+        guard isReady == RAC_TRUE else {
+            throw SDKError.voiceAgent(.notInitialized, "Voice agent not ready")
+        }
+
         logger.info("Processing voice turn")
 
-        // Step 1: Transcribe audio
-        logger.debug("Step 1: Transcribing audio")
-        let transcriptionOutput = try await stt.transcribe(audioData)
-        let transcription = transcriptionOutput.text
-
-        if transcription.isEmpty {
-            logger.warning("Empty transcription, skipping processing")
-            throw SDKError.voiceAgent(.emptyInput, "No speech detected in audio")
+        var cResult = rac_voice_agent_result_t()
+        let result = audioData.withUnsafeBytes { audioPtr in
+            rac_voice_agent_process_voice_turn(
+                handle,
+                audioPtr.baseAddress,
+                audioData.count,
+                &cResult
+            )
         }
 
-        logger.info("Transcription: \(transcription)")
+        guard result == RAC_SUCCESS else {
+            throw SDKError.voiceAgent(.processingFailed, "Voice turn processing failed: \(result)")
+        }
 
-        // Step 2: Generate LLM response
-        logger.debug("Step 2: Generating LLM response")
-        let llmResult = try await llm.generate(transcription)
-        let response = llmResult.text
+        // Extract results
+        let speechDetected = cResult.speech_detected == RAC_TRUE
+        let transcription: String?
+        if let transcriptionPtr = cResult.transcription {
+            transcription = String(cString: transcriptionPtr)
+        } else {
+            transcription = nil
+        }
+        let response: String?
+        if let responsePtr = cResult.response {
+            response = String(cString: responsePtr)
+        } else {
+            response = nil
+        }
 
-        logger.info("LLM Response: \(response.prefix(100))...")
+        var synthesizedAudio: Data?
+        if let audioPtr = cResult.synthesized_audio, cResult.synthesized_audio_size > 0 {
+            synthesizedAudio = Data(bytes: audioPtr, count: cResult.synthesized_audio_size)
+        }
 
-        // Step 3: Synthesize speech
-        logger.debug("Step 3: Synthesizing speech")
-        let ttsOutput = try await tts.synthesize(response)
+        // Free C result
+        rac_voice_agent_result_free(&cResult)
 
-        logger.info("Voice turn completed in \(Int(metrics.elapsedMs))ms")
+        logger.info("Voice turn completed")
 
         return VoiceAgentResult(
-            speechDetected: true,
+            speechDetected: speechDetected,
             transcription: transcription,
             response: response,
-            synthesizedAudio: ttsOutput.audioData
+            synthesizedAudio: synthesizedAudio
         )
-    }
-
-    /// Process audio stream for continuous conversation
-    /// - Parameter audioStream: Async stream of audio data chunks
-    /// - Returns: Async stream of voice agent events
-    public func processStream(_ audioStream: AsyncStream<Data>) -> AsyncThrowingStream<VoiceAgentEvent, Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                guard self.isConfigured else {
-                    continuation.finish(
-                        throwing: SDKError.voiceAgent(.notInitialized, "Voice Agent is not initialized")
-                    )
-                    return
-                }
-
-                // Collect audio chunks
-                var audioBuffer = Data()
-                for await chunk in audioStream {
-                    audioBuffer.append(chunk)
-                }
-
-                // Process the complete audio
-                do {
-                    // Transcribe
-                    let transcription = try await self.stt.transcribe(audioBuffer)
-                    continuation.yield(.transcriptionAvailable(transcription.text))
-
-                    // Generate response
-                    let llmResult = try await self.llm.generate(transcription.text)
-                    continuation.yield(.responseGenerated(llmResult.text))
-
-                    // Synthesize
-                    let ttsOutput = try await self.tts.synthesize(llmResult.text)
-                    continuation.yield(.audioSynthesized(ttsOutput.audioData))
-
-                    // Yield final result
-                    let result = VoiceAgentResult(
-                        speechDetected: true,
-                        transcription: transcription.text,
-                        response: llmResult.text,
-                        synthesizedAudio: ttsOutput.audioData
-                    )
-                    continuation.yield(.processed(result))
-                    continuation.finish()
-                } catch {
-                    continuation.yield(.error(error))
-                    continuation.finish(throwing: error)
-                }
-            }
-        }
     }
 
     // MARK: - Individual Component Access
 
     /// Transcribe audio only (without LLM/TTS)
     public func transcribe(_ audioData: Data) async throws -> String {
-        guard isConfigured else {
-            throw SDKError.voiceAgent(.notInitialized, "Voice Agent is not initialized")
+        guard let handle = handle else {
+            throw SDKError.voiceAgent(.notInitialized, "Voice agent not initialized")
         }
-        let output = try await stt.transcribe(audioData)
-        return output.text
+
+        var transcriptionPtr: UnsafeMutablePointer<CChar>?
+        let result = audioData.withUnsafeBytes { audioPtr in
+            rac_voice_agent_transcribe(
+                handle,
+                audioPtr.baseAddress,
+                audioData.count,
+                &transcriptionPtr
+            )
+        }
+
+        guard result == RAC_SUCCESS, let ptr = transcriptionPtr else {
+            throw SDKError.voiceAgent(.processingFailed, "Transcription failed: \(result)")
+        }
+
+        let transcription = String(cString: ptr)
+        free(ptr)
+
+        return transcription
     }
 
     /// Generate LLM response only
     public func generateResponse(_ prompt: String) async throws -> String {
-        guard isConfigured else {
-            throw SDKError.voiceAgent(.notInitialized, "Voice Agent is not initialized")
+        guard let handle = handle else {
+            throw SDKError.voiceAgent(.notInitialized, "Voice agent not initialized")
         }
-        let result = try await llm.generate(prompt)
-        return result.text
+
+        var responsePtr: UnsafeMutablePointer<CChar>?
+        let result = prompt.withCString { promptPtr in
+            rac_voice_agent_generate_response(handle, promptPtr, &responsePtr)
+        }
+
+        guard result == RAC_SUCCESS, let ptr = responsePtr else {
+            throw SDKError.voiceAgent(.processingFailed, "Response generation failed: \(result)")
+        }
+
+        let response = String(cString: ptr)
+        free(ptr)
+
+        return response
     }
 
     /// Synthesize speech only
     public func synthesizeSpeech(_ text: String) async throws -> Data {
-        guard isConfigured else {
-            throw SDKError.voiceAgent(.notInitialized, "Voice Agent is not initialized")
+        guard let handle = handle else {
+            throw SDKError.voiceAgent(.notInitialized, "Voice agent not initialized")
         }
-        let output = try await tts.synthesize(text)
-        return output.audioData
+
+        var audioPtr: UnsafeMutableRawPointer?
+        var audioSize: Int = 0
+        let result = text.withCString { textPtr in
+            rac_voice_agent_synthesize_speech(handle, textPtr, &audioPtr, &audioSize)
+        }
+
+        guard result == RAC_SUCCESS, let ptr = audioPtr, audioSize > 0 else {
+            throw SDKError.voiceAgent(.processingFailed, "Speech synthesis failed: \(result)")
+        }
+
+        let audioData = Data(bytes: ptr, count: audioSize)
+        free(ptr)
+
+        return audioData
     }
 
     /// Check if VAD detects speech
     public func detectSpeech(_ samples: [Float]) async throws -> Bool {
-        let output = try await vad.detectSpeech(in: samples)
-        return output.isSpeechDetected
+        guard let handle = handle else {
+            throw SDKError.voiceAgent(.notInitialized, "Voice agent not initialized")
+        }
+
+        var detected: rac_bool_t = RAC_FALSE
+        let result = samples.withUnsafeBufferPointer { buffer in
+            rac_voice_agent_detect_speech(
+                handle,
+                buffer.baseAddress,
+                buffer.count,
+                &detected
+            )
+        }
+
+        guard result == RAC_SUCCESS else {
+            throw SDKError.voiceAgent(.processingFailed, "Speech detection failed: \(result)")
+        }
+
+        return detected == RAC_TRUE
     }
 }

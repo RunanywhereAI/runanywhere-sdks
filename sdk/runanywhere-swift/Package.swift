@@ -14,9 +14,9 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 // =============================================================================
 // BINARY TARGET CONFIGURATION
 // =============================================================================
-// Set to `true` to use local XCFramework from Binaries/ directory (for local development/testing)
-// Set to `false` to use remote XCFramework from GitHub releases (default for production use)
-let testLocal = false
+// Set to `true` to use local XCFrameworks from Binaries/ directory (for local development/testing)
+// Set to `false` to use remote XCFrameworks from GitHub releases (default for production use)
+let testLocal = true  // Default to local for development during migration
 // =============================================================================
 
 let package = Package(
@@ -43,7 +43,6 @@ let package = Package(
 
         // =================================================================
         // ONNX Runtime Backend - adds STT/TTS/VAD capabilities
-        // Includes ~70MB binary download
         // =================================================================
         .library(
             name: "RunAnywhereONNX",
@@ -75,14 +74,50 @@ let package = Package(
         .package(url: "https://github.com/JohnSundell/Files.git", from: "4.3.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
-        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.57.1"),
-        // SWCompression for pure Swift tar.bz2/tar.gz extraction (replaces native C dependency)
+        // Temporarily disabled to debug build issues
+        // .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.57.1"),
+        // SWCompression for pure Swift tar.bz2/tar.gz extraction
         .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
-
         // Sentry for crash reporting and error tracking
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
     ],
     targets: [
+        // =================================================================
+        // C Bridge Modules - Expose runanywhere-commons C APIs to Swift
+        // =================================================================
+
+        // CRACommons - Core commons C API bridge
+        .target(
+            name: "CRACommons",
+            dependencies: ["RACommonsBinary"],
+            path: "Sources/CRACommons",
+            publicHeadersPath: "include"
+        ),
+
+        // CRABackendLlamaCPP - LlamaCPP backend C API bridge
+        .target(
+            name: "CRABackendLlamaCPP",
+            dependencies: ["RABackendLlamaCPPBinary"],
+            path: "Sources/CRABackendLlamaCPP",
+            publicHeadersPath: "include"
+        ),
+
+        // CRABackendONNX - ONNX backend C API bridge
+        .target(
+            name: "CRABackendONNX",
+            dependencies: ["RABackendONNXBinary", "ONNXRuntimeBinary"],
+            path: "Sources/CRABackendONNX",
+            publicHeadersPath: "include"
+        ),
+
+        // CRABackendWhisperCPP - WhisperCPP backend C API bridge
+        .target(
+            name: "CRABackendWhisperCPP",
+            dependencies: ["RABackendWhisperCPPBinary"],
+            path: "Sources/CRABackendWhisperCPP",
+            publicHeadersPath: "include"
+        ),
+
         // =================================================================
         // Core SDK
         // =================================================================
@@ -94,52 +129,40 @@ let package = Package(
                 .product(name: "Files", package: "Files"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
-                // SWCompression for pure Swift tar.bz2/tar.gz extraction
                 .product(name: "SWCompression", package: "SWCompression"),
-                // Sentry for crash reporting and error tracking
                 .product(name: "Sentry", package: "sentry-cocoa"),
+                // Link to new commons C bridge (RACommonsBinary is transitive via CRACommons)
+                "CRACommons",
             ],
             path: "Sources/RunAnywhere",
             swiftSettings: [
                 .define("SWIFT_PACKAGE")
+            ],
+            linkerSettings: [
+                .linkedLibrary("c++"),
             ]
         ),
 
         // =================================================================
-        // C Bridge Module - Exposes unified xcframework C APIs to Swift
-        // =================================================================
-        .target(
-            name: "CRunAnywhereCore",
-            dependencies: ["RunAnywhereCoreBinary"],
-            path: "Sources/CRunAnywhereCore",
-            publicHeadersPath: "include"
-        ),
-
-        // =================================================================
         // ONNX Runtime Backend
-        // Provides: STT (streaming), TTS, VAD, Speaker Diarization
-        // NOTE: For macOS, ONNX Runtime is dynamically linked (not in xcframework).
-        //       For development: brew install onnxruntime
-        //       For production: embed Binaries/onnxruntime-macos/libonnxruntime.dylib
-        //                       in YourApp.app/Contents/Frameworks/
+        // Provides: STT (streaming), TTS, VAD
         // =================================================================
         .target(
             name: "ONNXRuntime",
             dependencies: [
                 "RunAnywhere",
-                "CRunAnywhereCore",
-                "RunAnywhereCoreBinary",
+                "CRABackendONNX",
             ],
             path: "Sources/ONNXRuntime",
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
+                .linkedFramework("CoreML"),
                 .linkedLibrary("archive"),
                 .linkedLibrary("bz2"),
-                .unsafeFlags(["-ObjC", "-all_load"]),
+                // Use -ObjC instead of -all_load for smaller binary size
+                .unsafeFlags(["-ObjC"]),
                 // macOS requires linking against ONNX Runtime dylib (not statically included)
-                // The bundled dylib in Binaries/onnxruntime-macos/ includes CoreML provider
-                // For production: embed libonnxruntime.dylib in YourApp.app/Contents/Frameworks/
                 .unsafeFlags([
                     "-L\(onnxRuntimeMacOSPath)",
                     "-lonnxruntime",
@@ -156,8 +179,7 @@ let package = Package(
             name: "LlamaCPPRuntime",
             dependencies: [
                 "RunAnywhere",
-                "CRunAnywhereCore",
-                "RunAnywhereCoreBinary",
+                "CRABackendLlamaCPP",
             ],
             path: "Sources/LlamaCPPRuntime",
             linkerSettings: [
@@ -165,7 +187,8 @@ let package = Package(
                 .linkedFramework("Accelerate"),
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
-                .unsafeFlags(["-ObjC", "-all_load"])
+                // Use -ObjC instead of -all_load for smaller binary size
+                .unsafeFlags(["-ObjC"])
             ]
         ),
 
@@ -187,26 +210,73 @@ let package = Package(
 // =============================================================================
 // BINARY TARGET SELECTION
 // =============================================================================
-// This function returns the appropriate binary target based on testLocal setting
+// This function returns the appropriate binary targets based on testLocal setting
 func binaryTargets() -> [Target] {
     if testLocal {
-        // Local development mode: Use XCFramework from Binaries/ directory
-        // NOTE: You must manually place RunAnywhereCore.xcframework in Binaries/
-        // to use this mode (download from runanywhere-binaries releases)
+        // Local development mode: Use XCFrameworks from Binaries/ directory
+        // NOTE: You must build XCFrameworks using runanywhere-commons build scripts
+        // or download from releases to use this mode
         return [
+            // Core commons library (~1-2MB)
             .binaryTarget(
-                name: "RunAnywhereCoreBinary",
-                path: "Binaries/RunAnywhereCore.xcframework"
-            )
+                name: "RACommonsBinary",
+                path: "Binaries/RACommons.xcframework"
+            ),
+            // LlamaCPP backend (~30MB with all llama.cpp dependencies)
+            .binaryTarget(
+                name: "RABackendLlamaCPPBinary",
+                path: "Binaries/RABackendLlamaCPP.xcframework"
+            ),
+            // ONNX backend wrapper (~400KB - links against ONNX Runtime)
+            .binaryTarget(
+                name: "RABackendONNXBinary",
+                path: "Binaries/RABackendONNX.xcframework"
+            ),
+            // ONNX Runtime (~48MB - required for ONNX backend)
+            .binaryTarget(
+                name: "ONNXRuntimeBinary",
+                path: "Binaries/onnxruntime.xcframework"
+            ),
+            // WhisperCPP backend (~8-10MB)
+            .binaryTarget(
+                name: "RABackendWhisperCPPBinary",
+                path: "Binaries/RABackendWhisperCPP.xcframework"
+            ),
         ]
     } else {
         // Production mode (default): Download from GitHub releases
+        // NOTE: Update URLs and checksums when new releases are published
         return [
+            // Core commons library
             .binaryTarget(
-                name: "RunAnywhereCoreBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.e6b7a2f/RunAnywhereCore.xcframework.zip",
-                checksum: "0786d494553226820a3a19ba5ee573d4bedf4096b9ebfae9010b621952bb617b"
-            )
+                name: "RACommonsBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/RACommons.xcframework.zip",
+                checksum: "PLACEHOLDER_CHECKSUM_RACommons"
+            ),
+            // LlamaCPP backend
+            .binaryTarget(
+                name: "RABackendLlamaCPPBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/RABackendLlamaCPP.xcframework.zip",
+                checksum: "PLACEHOLDER_CHECKSUM_RABackendLlamaCPP"
+            ),
+            // ONNX backend wrapper
+            .binaryTarget(
+                name: "RABackendONNXBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/RABackendONNX.xcframework.zip",
+                checksum: "PLACEHOLDER_CHECKSUM_RABackendONNX"
+            ),
+            // ONNX Runtime (required for ONNX backend)
+            .binaryTarget(
+                name: "ONNXRuntimeBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/onnxruntime.xcframework.zip",
+                checksum: "PLACEHOLDER_CHECKSUM_ONNXRuntime"
+            ),
+            // WhisperCPP backend
+            .binaryTarget(
+                name: "RABackendWhisperCPPBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/RABackendWhisperCPP.xcframework.zip",
+                checksum: "PLACEHOLDER_CHECKSUM_RABackendWhisperCPP"
+            ),
         ]
     }
 }

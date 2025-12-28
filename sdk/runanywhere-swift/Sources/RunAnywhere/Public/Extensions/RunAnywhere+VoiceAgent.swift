@@ -99,40 +99,6 @@ public extension RunAnywhere {
         }
     }
 
-    /// Initialize voice agent with individual model IDs
-    ///
-    /// Pass empty strings to reuse already-loaded models for that component.
-    ///
-    /// - Parameters:
-    ///   - sttModelId: STT model ID (empty string = use already loaded STT model)
-    ///   - llmModelId: LLM model ID (empty string = use already loaded LLM model)
-    ///   - ttsVoice: TTS voice ID (empty string = use already loaded TTS voice)
-    static func initializeVoiceAgent(
-        sttModelId: String = "",
-        llmModelId: String = "",
-        ttsVoice: String = ""
-    ) async throws {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
-        }
-
-        try await ensureServicesReady()
-
-        EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
-
-        do {
-            try await serviceContainer.voiceAgentCapability.initialize(
-                sttModelId: sttModelId,
-                llmModelId: llmModelId,
-                ttsVoice: ttsVoice
-            )
-            EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
-        } catch {
-            EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
-            throw error
-        }
-    }
-
     /// Initialize voice agent using already-loaded models
     ///
     /// Use this when you've already loaded STT, LLM, and TTS models via the individual APIs:
@@ -193,17 +159,6 @@ public extension RunAnywhere {
             EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
             throw error
         }
-    }
-
-    /// Process audio stream for continuous conversation
-    static func processVoiceStream(_ audioStream: AsyncStream<Data>) async -> AsyncThrowingStream<VoiceAgentEvent, Error> {
-        guard isSDKInitialized else {
-            return AsyncThrowingStream { continuation in
-                continuation.finish(throwing: SDKError.general(.notInitialized, "SDK not initialized"))
-            }
-        }
-
-        return await serviceContainer.voiceAgentCapability.processStream(audioStream)
     }
 
     // MARK: - Individual Operations

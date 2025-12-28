@@ -132,7 +132,7 @@ extension RunAnywhere {
     public static var currentTTSVoiceId: String? {
         get async {
             guard isInitialized else { return nil }
-            return await serviceContainer.ttsCapability.currentVoiceId
+            return await serviceContainer.ttsCapability.currentModelId
         }
     }
 

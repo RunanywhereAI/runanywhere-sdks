@@ -295,6 +295,7 @@ public actor ManagedLifecycle<ServiceType> {
 
 // MARK: - Factory Extensions
 
+@MainActor
 extension ManagedLifecycle where ServiceType == LLMService {
     public static func forLLM() -> ManagedLifecycle<LLMService> {
         ManagedLifecycle(
@@ -305,6 +306,7 @@ extension ManagedLifecycle where ServiceType == LLMService {
     }
 }
 
+@MainActor
 extension ManagedLifecycle where ServiceType == STTService {
     public static func forSTT() -> ManagedLifecycle<STTService> {
         ManagedLifecycle(
@@ -315,6 +317,7 @@ extension ManagedLifecycle where ServiceType == STTService {
     }
 }
 
+@MainActor
 extension ManagedLifecycle where ServiceType == TTSService {
     public static func forTTS() -> ManagedLifecycle<TTSService> {
         ManagedLifecycle(

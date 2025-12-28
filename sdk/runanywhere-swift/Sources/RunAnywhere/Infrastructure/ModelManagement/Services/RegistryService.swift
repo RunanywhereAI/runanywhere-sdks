@@ -230,29 +230,7 @@ public class RegistryService: ModelRegistry {
 
                 let modelId = modelFolder.lastPathComponent
 
-                // Try framework-specific storage strategy first
-                if let storageStrategy = ModuleRegistry.shared.storageStrategy(for: framework),
-                   let (format, size) = storageStrategy.detectModel(in: modelFolder) {
-                    let modelPath = storageStrategy.findModelPath(modelId: modelId, in: modelFolder) ?? modelFolder
-                    let category = ModelCategory.from(framework: framework)
-                    models.append(ModelInfo(
-                        id: modelId,
-                        name: generateModelName(from: modelFolder),
-                        category: category,
-                        format: format,
-                        framework: framework,
-                        localPath: modelPath,
-                        downloadSize: size,
-                        memoryRequired: estimateMemoryUsage(fileSize: size, format: format),
-                        contextLength: category == .language ? 2048 : nil,
-                        supportsThinking: false,
-                        tags: [],
-                        source: .local  // Discovered locally on disk
-                    ))
-                    continue
-                }
-
-                // Fallback: Generic detection for single-file models
+                // Generic detection for models (storage strategies are registered per-module)
                 if let modelInfo = detectModelInFolder(modelFolder, framework: framework) {
                     models.append(modelInfo)
                 }

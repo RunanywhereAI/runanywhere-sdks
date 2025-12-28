@@ -1,0 +1,323 @@
+# RACommons Symbol Exports
+# Symbols to export from the RACommons XCFramework
+# These are the public C API functions that Swift will call
+# Generated from librac_commons.a symbols
+
+# =============================================================================
+# CORE API
+# =============================================================================
+
+_rac_init
+_rac_shutdown
+_rac_is_initialized
+_rac_get_version
+
+# Platform Adapter API
+_rac_set_platform_adapter
+_rac_get_platform_adapter
+_rac_log
+_rac_get_current_time_ms
+_rac_http_download
+_rac_http_download_cancel
+_rac_extract_archive
+
+# Error API
+_rac_error_message
+_rac_error_get_details
+_rac_error_set_details
+_rac_error_clear_details
+_rac_error_is_commons_error
+_rac_error_is_core_error
+_rac_error_is_expected
+
+# Memory API
+_rac_free
+_rac_strdup
+
+# Component Types API
+_rac_sdk_component_display_name
+_rac_sdk_component_raw_value
+_rac_capability_resource_type_raw_value
+_rac_component_to_resource_type
+_rac_resource_type_to_component
+_rac_resource_type_name
+
+# =============================================================================
+# INFRASTRUCTURE API
+# =============================================================================
+
+# Module Registry API
+_rac_module_register
+_rac_module_unregister
+_rac_module_list
+_rac_modules_for_capability
+_rac_module_get_info
+
+# Service Registry API
+_rac_service_register_provider
+_rac_service_unregister_provider
+_rac_service_create
+_rac_service_list_providers
+
+# Event API
+_rac_event_subscribe
+_rac_event_subscribe_all
+_rac_event_unsubscribe
+_rac_event_publish
+_rac_event_track
+_rac_event_category_name
+
+# Download Manager API
+_rac_download_manager_create
+_rac_download_manager_destroy
+_rac_download_manager_start
+_rac_download_manager_cancel
+_rac_download_manager_pause_all
+_rac_download_manager_resume_all
+_rac_download_manager_get_progress
+_rac_download_manager_get_active_tasks
+_rac_download_manager_is_healthy
+_rac_download_manager_update_progress
+_rac_download_manager_mark_complete
+_rac_download_manager_mark_failed
+_rac_download_task_free
+_rac_download_task_ids_free
+_rac_download_stage_display_name
+_rac_download_stage_progress_range
+
+# =============================================================================
+# MODEL MANAGEMENT API
+# =============================================================================
+
+# Model Registry API
+_rac_model_registry_create
+_rac_model_registry_destroy
+_rac_model_registry_save
+_rac_model_registry_get
+_rac_model_registry_get_all
+_rac_model_registry_get_by_frameworks
+_rac_model_registry_update_last_used
+_rac_model_registry_remove
+_rac_model_registry_get_downloaded
+_rac_model_registry_update_download_status
+
+# Model Info API
+_rac_model_info_alloc
+_rac_model_info_free
+_rac_model_info_array_free
+_rac_model_info_copy
+_rac_model_info_is_downloaded
+
+# Model Types API
+_rac_model_category_requires_context_length
+_rac_model_category_supports_thinking
+_rac_model_category_from_framework
+_rac_model_infer_artifact_type
+_rac_model_format_extension
+_rac_model_file_descriptors_alloc
+_rac_model_file_descriptors_free
+_rac_expected_model_files_alloc
+_rac_expected_model_files_free
+_rac_archive_type_extension
+_rac_archive_type_from_path
+_rac_artifact_infer_from_url
+_rac_artifact_requires_download
+_rac_artifact_requires_extraction
+
+# Framework API
+_rac_framework_raw_value
+_rac_framework_display_name
+_rac_framework_analytics_key
+_rac_framework_supports_format
+_rac_framework_supports_llm
+_rac_framework_supports_stt
+_rac_framework_supports_tts
+_rac_framework_uses_directory_based_models
+_rac_framework_get_supported_formats
+
+# Model Paths API
+_rac_model_paths_get_base_dir
+_rac_model_paths_set_base_dir
+_rac_model_paths_get_base_directory
+_rac_model_paths_get_framework_directory
+_rac_model_paths_get_model_folder
+_rac_model_paths_get_model_path
+_rac_model_paths_get_expected_model_path
+_rac_model_paths_get_model_file_path
+_rac_model_paths_get_models_directory
+_rac_model_paths_get_cache_directory
+_rac_model_paths_get_temp_directory
+_rac_model_paths_get_downloads_directory
+_rac_model_paths_extract_model_id
+_rac_model_paths_extract_framework
+_rac_model_paths_is_model_path
+
+# =============================================================================
+# CAPABILITY LIFECYCLE API
+# =============================================================================
+
+_rac_lifecycle_create
+_rac_lifecycle_destroy
+_rac_lifecycle_load
+_rac_lifecycle_unload
+_rac_lifecycle_reset
+_rac_lifecycle_get_state
+_rac_lifecycle_state_name
+_rac_lifecycle_is_loaded
+_rac_lifecycle_get_model_id
+_rac_lifecycle_get_service
+_rac_lifecycle_require_service
+_rac_lifecycle_get_metrics
+_rac_lifecycle_track_error
+
+# =============================================================================
+# LLM COMPONENT API
+# =============================================================================
+
+_rac_llm_component_create
+_rac_llm_component_destroy
+_rac_llm_component_configure
+_rac_llm_component_load_model
+_rac_llm_component_unload
+_rac_llm_component_cleanup
+_rac_llm_component_is_loaded
+_rac_llm_component_get_model_id
+_rac_llm_component_get_state
+_rac_llm_component_get_metrics
+_rac_llm_component_generate
+_rac_llm_component_generate_stream
+_rac_llm_component_supports_streaming
+_rac_llm_component_cancel
+
+# =============================================================================
+# STT COMPONENT API
+# =============================================================================
+
+_rac_stt_component_create
+_rac_stt_component_destroy
+_rac_stt_component_configure
+_rac_stt_component_load_model
+_rac_stt_component_unload
+_rac_stt_component_cleanup
+_rac_stt_component_is_loaded
+_rac_stt_component_get_model_id
+_rac_stt_component_get_state
+_rac_stt_component_get_metrics
+_rac_stt_component_transcribe
+_rac_stt_component_transcribe_stream
+_rac_stt_component_supports_streaming
+
+# =============================================================================
+# TTS COMPONENT API
+# =============================================================================
+
+_rac_tts_component_create
+_rac_tts_component_destroy
+_rac_tts_component_configure
+_rac_tts_component_load_voice
+_rac_tts_component_unload
+_rac_tts_component_cleanup
+_rac_tts_component_is_loaded
+_rac_tts_component_get_voice_id
+_rac_tts_component_get_state
+_rac_tts_component_get_metrics
+_rac_tts_component_synthesize
+_rac_tts_component_synthesize_stream
+_rac_tts_component_stop
+
+# =============================================================================
+# VAD COMPONENT API
+# =============================================================================
+
+_rac_vad_component_create
+_rac_vad_component_destroy
+_rac_vad_component_configure
+_rac_vad_component_initialize
+_rac_vad_component_cleanup
+_rac_vad_component_is_initialized
+_rac_vad_component_get_state
+_rac_vad_component_get_metrics
+_rac_vad_component_start
+_rac_vad_component_stop
+_rac_vad_component_reset
+_rac_vad_component_process
+_rac_vad_component_is_speech_active
+_rac_vad_component_get_energy_threshold
+_rac_vad_component_set_energy_threshold
+_rac_vad_component_set_activity_callback
+_rac_vad_component_set_audio_callback
+
+# =============================================================================
+# ENERGY VAD API
+# =============================================================================
+
+_rac_energy_vad_create
+_rac_energy_vad_destroy
+_rac_energy_vad_initialize
+_rac_energy_vad_start
+_rac_energy_vad_stop
+_rac_energy_vad_reset
+_rac_energy_vad_pause
+_rac_energy_vad_resume
+_rac_energy_vad_process_audio
+_rac_energy_vad_calculate_rms
+_rac_energy_vad_start_calibration
+_rac_energy_vad_is_calibrating
+_rac_energy_vad_set_calibration_multiplier
+_rac_energy_vad_notify_tts_start
+_rac_energy_vad_notify_tts_finish
+_rac_energy_vad_set_tts_multiplier
+_rac_energy_vad_is_speech_active
+_rac_energy_vad_get_threshold
+_rac_energy_vad_set_threshold
+_rac_energy_vad_get_statistics
+_rac_energy_vad_get_sample_rate
+_rac_energy_vad_get_frame_length_samples
+_rac_energy_vad_set_speech_callback
+_rac_energy_vad_set_audio_callback
+
+# =============================================================================
+# VOICE AGENT API
+# =============================================================================
+
+_rac_voice_agent_create
+_rac_voice_agent_destroy
+_rac_voice_agent_initialize
+_rac_voice_agent_initialize_with_loaded_models
+_rac_voice_agent_cleanup
+_rac_voice_agent_is_ready
+_rac_voice_agent_process_voice_turn
+_rac_voice_agent_process_stream
+_rac_voice_agent_transcribe
+_rac_voice_agent_generate_response
+_rac_voice_agent_synthesize_speech
+_rac_voice_agent_detect_speech
+_rac_voice_agent_result_free
+
+# =============================================================================
+# STREAMING METRICS API
+# =============================================================================
+
+_rac_streaming_metrics_create
+_rac_streaming_metrics_destroy
+_rac_streaming_metrics_mark_start
+_rac_streaming_metrics_record_token
+_rac_streaming_metrics_mark_complete
+_rac_streaming_metrics_mark_failed
+_rac_streaming_metrics_get_result
+_rac_streaming_metrics_get_ttft
+_rac_streaming_metrics_get_token_count
+_rac_streaming_metrics_get_text
+_rac_streaming_result_free
+
+# Generation Analytics API
+_rac_generation_analytics_create
+_rac_generation_analytics_destroy
+_rac_generation_analytics_start
+_rac_generation_analytics_start_streaming
+_rac_generation_analytics_track_first_token
+_rac_generation_analytics_track_streaming_update
+_rac_generation_analytics_complete
+_rac_generation_analytics_track_failed
+_rac_generation_analytics_get_metrics
+_rac_generation_analytics_reset

@@ -2,241 +2,278 @@
 //  ServiceRegistry.swift
 //  RunAnywhere SDK
 //
-//  Unified registry for all AI service implementations.
-//  Simple, clean architecture: Module → Service → Capability → Public API
+//  Central registry for service providers.
+//  Manages registration and creation of AI services (LLM, STT, TTS, VAD).
 //
 
 import Foundation
 
-// MARK: - Service Factory Types
+// MARK: - Service Provider Types
 
-/// Factory closure for creating STT services
-public typealias STTServiceFactory = @Sendable (STTConfiguration) async throws -> STTService
-
-/// Factory closure for creating LLM services
+/// Typealias for LLM service factory
 public typealias LLMServiceFactory = @Sendable (LLMConfiguration) async throws -> LLMService
 
-/// Factory closure for creating TTS services
+/// Typealias for STT service factory
+public typealias STTServiceFactory = @Sendable (STTConfiguration) async throws -> STTService
+
+/// Typealias for TTS service factory
 public typealias TTSServiceFactory = @Sendable (TTSConfiguration) async throws -> TTSService
 
-/// Factory closure for creating VAD services
+/// Typealias for VAD service factory
 public typealias VADServiceFactory = @Sendable (VADConfiguration) async throws -> VADService
 
-// MARK: - Service Registration
+/// Typealias for can-handle predicate (takes optional model/voice ID)
+public typealias CanHandlePredicate = @Sendable (String?) -> Bool
 
-/// Registration info for a service factory
-public struct ServiceRegistration<Factory>: Sendable where Factory: Sendable {
-    public let name: String
-    public let priority: Int
-    public let canHandle: @Sendable (String?) -> Bool
-    public let factory: Factory
+// MARK: - Provider Structs
 
-    public init(
-        name: String,
-        priority: Int = 100,
-        canHandle: @escaping @Sendable (String?) -> Bool,
-        factory: Factory
-    ) {
-        self.name = name
-        self.priority = priority
-        self.canHandle = canHandle
-        self.factory = factory
-    }
+/// LLM Service Provider registration
+private struct LLMProvider: Sendable {
+    let name: String
+    let priority: Int
+    let canHandle: CanHandlePredicate
+    let factory: LLMServiceFactory
 }
 
-// MARK: - Service Registry
+/// STT Service Provider registration
+private struct STTProvider: Sendable {
+    let name: String
+    let priority: Int
+    let canHandle: CanHandlePredicate
+    let factory: STTServiceFactory
+}
 
-/// Unified registry for all AI services
+/// TTS Service Provider registration
+private struct TTSProvider: Sendable {
+    let name: String
+    let priority: Int
+    let canHandle: CanHandlePredicate
+    let factory: TTSServiceFactory
+}
+
+/// VAD Service Provider registration
+private struct VADProvider: Sendable {
+    let name: String
+    let priority: Int
+    let canHandle: CanHandlePredicate
+    let factory: VADServiceFactory
+}
+
+// MARK: - ServiceRegistry
+
+/// Central registry for AI service providers.
 ///
-/// This is the single source of truth for service registration.
-/// External modules register their factory closures here, and
-/// capabilities use this registry to create service instances.
+/// The ServiceRegistry manages registration and creation of AI services.
+/// Providers register themselves with a priority and a `canHandle` predicate
+/// that determines if they can handle a specific model/voice ID request.
 ///
 /// ## Usage
 ///
-/// ### Registering a Service (in your module)
 /// ```swift
-/// import RunAnywhere
-///
-/// // Register your service
-/// ServiceRegistry.shared.registerSTT(
-///     name: "MySTTService",
-///     canHandle: { modelId in
-///         modelId?.contains("whisper") ?? false
-///     },
-///     factory: { config in
-///         let service = MySTTService()
-///         try await service.initialize(modelPath: config.modelId)
-///         return service
-///     }
+/// // Register a provider
+/// ServiceRegistry.shared.registerLLM(
+///     name: "LlamaCPP",
+///     priority: 100,
+///     canHandle: { modelId in modelId?.contains("gguf") == true },
+///     factory: { config in try await LlamaCPPService(config: config) }
 /// )
+///
+/// // Create a service (finds best matching provider)
+/// let service = try await ServiceRegistry.shared.createLLM(config: .init(modelId: "my-model.gguf"))
 /// ```
 @MainActor
 public final class ServiceRegistry {
+
+    // MARK: - Singleton
+
+    /// Shared instance
     public static let shared = ServiceRegistry()
 
-    // MARK: - Storage
+    // MARK: - Private State
 
-    private var sttRegistrations: [ServiceRegistration<STTServiceFactory>] = []
-    private var llmRegistrations: [ServiceRegistration<LLMServiceFactory>] = []
-    private var ttsRegistrations: [ServiceRegistration<TTSServiceFactory>] = []
-    private var vadRegistrations: [ServiceRegistration<VADServiceFactory>] = []
+    private var llmProviders: [LLMProvider] = []
+    private var sttProviders: [STTProvider] = []
+    private var ttsProviders: [TTSProvider] = []
+    private var vadProviders: [VADProvider] = []
 
     private let logger = SDKLogger(category: "ServiceRegistry")
 
     private init() {}
 
-    // MARK: - STT Registration
+    // MARK: - Public State
 
-    /// Register an STT service factory
-    public func registerSTT(
-        name: String,
-        priority: Int = 100,
-        canHandle: @escaping @Sendable (String?) -> Bool,
-        factory: @escaping STTServiceFactory
-    ) {
-        let registration = ServiceRegistration(
-            name: name,
-            priority: priority,
-            canHandle: canHandle,
-            factory: factory
-        )
-        sttRegistrations.append(registration)
-        sttRegistrations.sort { $0.priority > $1.priority }
-        logger.info("Registered STT service: \(name) (priority: \(priority))")
-    }
+    /// Whether any LLM provider is registered
+    public var hasLLM: Bool { !llmProviders.isEmpty }
 
-    /// Create an STT service for the given model
-    public func createSTT(for modelId: String?, config: STTConfiguration) async throws -> STTService {
-        guard let registration = sttRegistrations.first(where: { $0.canHandle(modelId) }) else {
-            throw SDKError.stt(.serviceNotAvailable, "STT service for model: \(modelId ?? "default") not found")
-        }
+    /// Whether any STT provider is registered
+    public var hasSTT: Bool { !sttProviders.isEmpty }
 
-        logger.info("Creating STT service: \(registration.name) for model: \(modelId ?? "default")")
-        return try await registration.factory(config)
-    }
+    /// Whether any TTS provider is registered
+    public var hasTTS: Bool { !ttsProviders.isEmpty }
 
-    /// Check if any STT service is registered
-    public var hasSTT: Bool { !sttRegistrations.isEmpty }
+    /// Whether any VAD provider is registered
+    public var hasVAD: Bool { !vadProviders.isEmpty }
 
     // MARK: - LLM Registration
 
-    /// Register an LLM service factory
+    /// Register an LLM service provider.
+    ///
+    /// - Parameters:
+    ///   - name: Provider name for logging/debugging
+    ///   - priority: Higher priority providers are tried first
+    ///   - canHandle: Predicate to check if provider can handle a model ID
+    ///   - factory: Factory function to create the service
     public func registerLLM(
         name: String,
-        priority: Int = 100,
-        canHandle: @escaping @Sendable (String?) -> Bool,
-        factory: @escaping LLMServiceFactory
+        priority: Int,
+        canHandle: @Sendable @escaping (String?) -> Bool,
+        factory: @Sendable @escaping (LLMConfiguration) async throws -> LLMService
     ) {
-        let registration = ServiceRegistration(
-            name: name,
-            priority: priority,
-            canHandle: canHandle,
-            factory: factory
-        )
-        llmRegistrations.append(registration)
-        llmRegistrations.sort { $0.priority > $1.priority }
-        logger.info("Registered LLM service: \(name) (priority: \(priority))")
+        let provider = LLMProvider(name: name, priority: priority, canHandle: canHandle, factory: factory)
+        llmProviders.append(provider)
+        llmProviders.sort { $0.priority > $1.priority }
+        logger.info("Registered LLM provider: \(name) (priority: \(priority))")
     }
 
-    /// Create an LLM service for the given model
-    public func createLLM(for modelId: String?, config: LLMConfiguration) async throws -> LLMService {
-        guard let registration = llmRegistrations.first(where: { $0.canHandle(modelId) }) else {
-            throw SDKError.llm(.serviceNotAvailable, "LLM service for model: \(modelId ?? "default") not found")
+    /// Create an LLM service for the given configuration.
+    ///
+    /// - Parameter config: LLM configuration
+    /// - Returns: Configured LLM service
+    /// - Throws: SDKError if no provider can handle the request
+    public func createLLM(config: LLMConfiguration) async throws -> LLMService {
+        logger.debug("Creating LLM service for model: \(config.modelId ?? "nil")")
+
+        // Find provider that can handle this model
+        if let provider = llmProviders.first(where: { $0.canHandle(config.modelId) }) {
+            logger.debug("Using LLM provider: \(provider.name)")
+            return try await provider.factory(config)
         }
 
-        logger.info("Creating LLM service: \(registration.name) for model: \(modelId ?? "default")")
-        return try await registration.factory(config)
+        // No provider found
+        throw SDKError.llm(.serviceNotAvailable, "No LLM provider can handle model: \(config.modelId ?? "nil")")
     }
 
-    /// Check if any LLM service is registered
-    public var hasLLM: Bool { !llmRegistrations.isEmpty }
+    // MARK: - STT Registration
+
+    /// Register an STT service provider.
+    ///
+    /// - Parameters:
+    ///   - name: Provider name for logging/debugging
+    ///   - priority: Higher priority providers are tried first
+    ///   - canHandle: Predicate to check if provider can handle a model ID
+    ///   - factory: Factory function to create the service
+    public func registerSTT(
+        name: String,
+        priority: Int,
+        canHandle: @Sendable @escaping (String?) -> Bool,
+        factory: @Sendable @escaping (STTConfiguration) async throws -> STTService
+    ) {
+        let provider = STTProvider(name: name, priority: priority, canHandle: canHandle, factory: factory)
+        sttProviders.append(provider)
+        sttProviders.sort { $0.priority > $1.priority }
+        logger.info("Registered STT provider: \(name) (priority: \(priority))")
+    }
+
+    /// Create an STT service for the given configuration.
+    ///
+    /// - Parameter config: STT configuration
+    /// - Returns: Configured STT service
+    /// - Throws: SDKError if no provider can handle the request
+    public func createSTT(config: STTConfiguration) async throws -> STTService {
+        logger.debug("Creating STT service for model: \(config.modelId ?? "nil")")
+
+        if let provider = sttProviders.first(where: { $0.canHandle(config.modelId) }) {
+            logger.debug("Using STT provider: \(provider.name)")
+            return try await provider.factory(config)
+        }
+
+        throw SDKError.stt(.serviceNotAvailable, "No STT provider can handle model: \(config.modelId ?? "nil")")
+    }
 
     // MARK: - TTS Registration
 
-    /// Register a TTS service factory
+    /// Register a TTS service provider.
+    ///
+    /// - Parameters:
+    ///   - name: Provider name for logging/debugging
+    ///   - priority: Higher priority providers are tried first
+    ///   - canHandle: Predicate to check if provider can handle a voice ID
+    ///   - factory: Factory function to create the service
     public func registerTTS(
         name: String,
-        priority: Int = 100,
-        canHandle: @escaping @Sendable (String?) -> Bool,
-        factory: @escaping TTSServiceFactory
+        priority: Int,
+        canHandle: @Sendable @escaping (String?) -> Bool,
+        factory: @Sendable @escaping (TTSConfiguration) async throws -> TTSService
     ) {
-        let registration = ServiceRegistration(
-            name: name,
-            priority: priority,
-            canHandle: canHandle,
-            factory: factory
-        )
-        ttsRegistrations.append(registration)
-        ttsRegistrations.sort { $0.priority > $1.priority }
-        logger.info("Registered TTS service: \(name) (priority: \(priority))")
+        let provider = TTSProvider(name: name, priority: priority, canHandle: canHandle, factory: factory)
+        ttsProviders.append(provider)
+        ttsProviders.sort { $0.priority > $1.priority }
+        logger.info("Registered TTS provider: \(name) (priority: \(priority))")
     }
 
-    /// Create a TTS service for the given voice
-    public func createTTS(for voiceId: String?, config: TTSConfiguration) async throws -> TTSService {
-        guard let registration = ttsRegistrations.first(where: { $0.canHandle(voiceId) }) else {
-            throw SDKError.tts(.serviceNotAvailable, "TTS service for voice: \(voiceId ?? "default") not found")
+    /// Create a TTS service for the given configuration.
+    ///
+    /// - Parameter config: TTS configuration
+    /// - Returns: Configured TTS service
+    /// - Throws: SDKError if no provider can handle the request
+    public func createTTS(config: TTSConfiguration) async throws -> TTSService {
+        logger.debug("Creating TTS service for voice: \(config.voice)")
+
+        if let provider = ttsProviders.first(where: { $0.canHandle(config.modelId) }) {
+            logger.debug("Using TTS provider: \(provider.name)")
+            return try await provider.factory(config)
         }
 
-        logger.info("Creating TTS service: \(registration.name) for voice: \(voiceId ?? "default")")
-        return try await registration.factory(config)
+        throw SDKError.tts(.serviceNotAvailable, "No TTS provider can handle voice: \(config.voice)")
     }
-
-    /// Check if any TTS service is registered
-    public var hasTTS: Bool { !ttsRegistrations.isEmpty }
 
     // MARK: - VAD Registration
 
-    /// Register a VAD service factory
+    /// Register a VAD service provider.
+    ///
+    /// - Parameters:
+    ///   - name: Provider name for logging/debugging
+    ///   - priority: Higher priority providers are tried first
+    ///   - canHandle: Predicate to check if provider can handle the request
+    ///   - factory: Factory function to create the service
     public func registerVAD(
         name: String,
-        priority: Int = 100,
-        factory: @escaping VADServiceFactory
+        priority: Int,
+        canHandle: @Sendable @escaping (String?) -> Bool,
+        factory: @Sendable @escaping (VADConfiguration) async throws -> VADService
     ) {
-        let registration = ServiceRegistration<VADServiceFactory>(
-            name: name,
-            priority: priority,
-            canHandle: { _ in true },
-            factory: factory
-        )
-        vadRegistrations.append(registration)
-        vadRegistrations.sort { $0.priority > $1.priority }
-        logger.info("Registered VAD service: \(name) (priority: \(priority))")
+        let provider = VADProvider(name: name, priority: priority, canHandle: canHandle, factory: factory)
+        vadProviders.append(provider)
+        vadProviders.sort { $0.priority > $1.priority }
+        logger.info("Registered VAD provider: \(name) (priority: \(priority))")
     }
 
-    /// Create a VAD service
+    /// Create a VAD service for the given configuration.
+    ///
+    /// - Parameter config: VAD configuration
+    /// - Returns: Configured VAD service
+    /// - Throws: SDKError if no provider can handle the request
     public func createVAD(config: VADConfiguration) async throws -> VADService {
-        guard let registration = vadRegistrations.first else {
-            throw SDKError.vad(.serviceNotAvailable, "VAD service not found")
+        logger.debug("Creating VAD service")
+
+        if let provider = vadProviders.first(where: { $0.canHandle(config.modelId) }) {
+            logger.debug("Using VAD provider: \(provider.name)")
+            return try await provider.factory(config)
         }
 
-        logger.info("Creating VAD service: \(registration.name)")
-        return try await registration.factory(config)
-    }
-
-    /// Check if any VAD service is registered
-    public var hasVAD: Bool { !vadRegistrations.isEmpty }
-
-    // MARK: - Availability
-
-    /// List of registered service types
-    public var registeredServices: [String] {
-        var services: [String] = []
-        if hasSTT { services.append("STT") }
-        if hasLLM { services.append("LLM") }
-        if hasTTS { services.append("TTS") }
-        if hasVAD { services.append("VAD") }
-        return services
+        throw SDKError.vad(.serviceNotAvailable, "No VAD provider available")
     }
 
     // MARK: - Reset
 
-    /// Reset all registrations
-    public func reset() {
-        sttRegistrations.removeAll()
-        llmRegistrations.removeAll()
-        ttsRegistrations.removeAll()
-        vadRegistrations.removeAll()
-        logger.info("Service registry reset")
+    /// Reset the registry, removing all providers.
+    ///
+    /// - Important: This should only be called by `RunAnywhere.reset()`.
+    internal func reset() {
+        llmProviders.removeAll()
+        sttProviders.removeAll()
+        ttsProviders.removeAll()
+        vadProviders.removeAll()
+        logger.info("ServiceRegistry reset")
     }
 }

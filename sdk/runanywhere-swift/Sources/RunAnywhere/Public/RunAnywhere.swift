@@ -317,7 +317,7 @@ public enum RunAnywhere {
         // Register all discovered modules with ServiceRegistry (SystemTTS, etc.)
         // This must happen before any capability usage
         await MainActor.run {
-            ModuleRegistry.shared.registerDiscoveredModules()
+            ModuleDiscovery.registerPendingModules()
         }
 
         // Check if services need initialization

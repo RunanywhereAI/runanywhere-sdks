@@ -23,16 +23,11 @@ extension AlamofireDownloadService {
     }
 
     /// Find a custom strategy for the model
-    /// Checks both manually registered strategies and ModuleRegistry strategies
+    /// Checks manually registered strategies (module strategies are now registered via `registerStrategy`)
     @MainActor
     func findCustomStrategy(for model: ModelInfo) -> DownloadStrategy? {
-        // First check manually registered custom strategies (host app priority)
+        // Check manually registered custom strategies (host app and module priority)
         for strategy in customStrategies where strategy.canHandle(model: model) {
-            return strategy
-        }
-
-        // Then check ModuleRegistry for module-provided strategies
-        if let strategy = ModuleRegistry.shared.downloadStrategy(for: model) {
             return strategy
         }
 

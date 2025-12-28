@@ -23,11 +23,8 @@ import RunAnywhere
 /// // Option 1: Direct registration
 /// LlamaCPP.register()
 ///
-/// // Option 2: Via ModuleRegistry
-/// ModuleRegistry.shared.register(LlamaCPP.self)
-///
-/// // Option 3: Via RunAnywhere
-/// RunAnywhere.register(LlamaCPP.self)
+/// // Option 2: Import module for auto-registration
+/// import LlamaCPPRuntime // Auto-registers via ModuleDiscovery
 /// ```
 ///
 /// ## Usage

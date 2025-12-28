@@ -2,101 +2,147 @@
 //  EventPublisher.swift
 //  RunAnywhere SDK
 //
-//  Simple event router. Call track(event) and it handles the rest.
+//  Central event publishing system for the SDK.
+//  Routes events to public subscribers and/or analytics based on destination.
 //
 
 import Foundation
 
-// MARK: - Event Publisher
-
-/// Simple event router for the SDK.
+/// Central event publisher for the SDK.
 ///
-/// Just call `track(event)` - the router decides where to send it
-/// based on the event's `destination` property.
+/// Receives events from SDK components and routes them to:
+/// - Public subscribers (app developers via `subscribe`)
+/// - Analytics/telemetry backend
 ///
-/// Usage:
+/// ## Usage
+///
 /// ```swift
-/// EventPublisher.shared.track(LLMEvent.generationCompleted(...))
+/// // Track an event
+/// EventPublisher.shared.track(LLMEvent.generationStarted(...))
+///
+/// // Subscribe to events
+/// EventPublisher.shared.subscribe { event in
+///     print("Event: \(event.type)")
+/// }
 /// ```
 public final class EventPublisher: @unchecked Sendable {
 
     // MARK: - Singleton
 
+    /// Shared instance
     public static let shared = EventPublisher()
 
-    // MARK: - Dependencies
+    // MARK: - Private State
 
-    private let eventBus: EventBus
-    private var remoteDataSource: RemoteTelemetryDataSource?
+    private let lock = NSLock()
+    private var subscribers: [UUID: (any SDKEvent) -> Void] = [:]
+    private var analyticsHandler: ((any SDKEvent) -> Void)?
     private let logger = SDKLogger(category: "EventPublisher")
 
-    // MARK: - Initialization
+    private init() {}
 
-    private init(eventBus: EventBus = .shared) {
-        self.eventBus = eventBus
-    }
+    // MARK: - Publishing
 
-    /// Initialize with remote data source (call during SDK startup)
-    public func initialize(remoteDataSource: RemoteTelemetryDataSource) {
-        self.remoteDataSource = remoteDataSource
-    }
-
-    // MARK: - Track
-
-    /// Track an event. Routes automatically based on event.destination.
+    /// Track an event.
+    ///
+    /// Routes the event based on its `destination` property.
+    ///
+    /// - Parameter event: The event to publish
     public func track(_ event: any SDKEvent) {
-        let destination = event.destination
+        lock.lock()
+        let subs = subscribers
+        let analytics = analyticsHandler
+        lock.unlock()
 
-        // Route to EventBus (public)
-        if destination != .analyticsOnly {
-            eventBus.publish(event)
+        switch event.destination {
+        case .publicOnly:
+            notifySubscribers(event, subscribers: subs)
+
+        case .analyticsOnly:
+            analytics?(event)
+
+        case .all:
+            notifySubscribers(event, subscribers: subs)
+            analytics?(event)
         }
+    }
 
-        // Route to Analytics (telemetry) - fire and forget
-        if destination != .publicOnly {
+    /// Alias for `track` for semantic clarity.
+    public func publish(_ event: any SDKEvent) {
+        track(event)
+    }
+
+    // MARK: - Subscribing
+
+    /// Subscribe to all public events.
+    ///
+    /// - Parameter handler: Callback invoked for each event
+    /// - Returns: Subscription ID for unsubscribing
+    @discardableResult
+    public func subscribe(handler: @escaping (any SDKEvent) -> Void) -> UUID {
+        let id = UUID()
+        lock.lock()
+        subscribers[id] = handler
+        lock.unlock()
+        logger.debug("Added subscriber: \(id)")
+        return id
+    }
+
+    /// Unsubscribe from events.
+    ///
+    /// - Parameter id: The subscription ID returned from `subscribe`
+    public func unsubscribe(_ id: UUID) {
+        lock.lock()
+        subscribers.removeValue(forKey: id)
+        lock.unlock()
+        logger.debug("Removed subscriber: \(id)")
+    }
+
+    // MARK: - Analytics Integration
+
+    /// Set the analytics handler.
+    ///
+    /// - Important: This should only be called by SDK initialization code.
+    ///
+    /// - Parameter handler: Handler for analytics events
+    internal func setAnalyticsHandler(_ handler: @escaping (any SDKEvent) -> Void) {
+        lock.lock()
+        analyticsHandler = handler
+        lock.unlock()
+    }
+
+    /// Initialize the event publisher with a remote telemetry data source.
+    ///
+    /// - Important: This should only be called by SDK initialization code.
+    ///
+    /// - Parameter remoteDataSource: The data source for sending events to the backend
+    internal func initialize(remoteDataSource: RemoteTelemetryDataSource) {
+        setAnalyticsHandler { event in
             Task {
-                await sendToRemote(event)
+                await remoteDataSource.sendEvent(event)
             }
         }
+        logger.info("EventPublisher initialized with remote telemetry")
     }
 
-    /// Track an event asynchronously (for use in async contexts)
-    public func trackAsync(_ event: any SDKEvent) async {
-        let destination = event.destination
+    // MARK: - Reset
 
-        // Route to EventBus (public)
-        if destination != .analyticsOnly {
-            eventBus.publish(event)
-        }
-
-        // Route to Analytics (telemetry) - fire and forget
-        if destination != .publicOnly {
-            await sendToRemote(event)
-        }
+    /// Reset the publisher, removing all subscribers.
+    ///
+    /// - Important: This should only be called by `RunAnywhere.reset()`.
+    internal func reset() {
+        lock.lock()
+        subscribers.removeAll()
+        analyticsHandler = nil
+        lock.unlock()
+        logger.info("EventPublisher reset")
     }
 
-    // MARK: - Private
+    // MARK: - Private Helpers
 
-    private func sendToRemote(_ event: any SDKEvent) async {
-        guard let remoteDataSource = remoteDataSource else {
-            // Not initialized yet - events before SDK init are dropped
-            return
-        }
-
-        // Create payload directly from event (preserves category → modality)
-        let payload: TelemetryEventPayload
-        if let telemetryEvent = event as? (any TelemetryEventProperties) {
-            payload = TelemetryEventPayload(from: event, telemetryProperties: telemetryEvent.telemetryProperties)
-        } else {
-            payload = TelemetryEventPayload(from: event)
-        }
-
-        // Fire and forget - backend handles failures
-        do {
-            try await remoteDataSource.sendPayloads([payload])
-        } catch {
-            // Log but don't fail - telemetry is non-critical
-            logger.debug("Telemetry send failed (non-critical): \(error.localizedDescription)")
+    private func notifySubscribers(_ event: any SDKEvent, subscribers: [UUID: (any SDKEvent) -> Void]) {
+        for (_, handler) in subscribers {
+            handler(event)
         }
     }
 }

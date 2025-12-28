@@ -1,338 +1,334 @@
-import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
+//
+//  LlamaCPPService.swift
+//  LlamaCPPRuntime
+//
+//  LLM service implementation using runanywhere-commons LlamaCPP backend.
+//  This is a thin Swift wrapper around the rac_llm_llamacpp_* C APIs.
+//
+
+import CRABackendLlamaCPP
+import CRACommons
 import Foundation
 import RunAnywhere
 
-/// Error types for LlamaCPP operations
-public enum LlamaCPPError: Error, LocalizedError {
-    case initializationFailed
-    case modelLoadFailed(String)
-    case generationFailed(String)
-    case invalidHandle
-    case cancelled
+// MARK: - Memory Management Helper
 
-    public var errorDescription: String? {
-        switch self {
-        case .initializationFailed:
-            return "Failed to initialize LlamaCPP backend"
-        case .modelLoadFailed(let path):
-            return "Failed to load model: \(path)"
-        case .generationFailed(let message):
-            return "Text generation failed: \(message)"
-        case .invalidHandle:
-            return "Invalid backend handle"
-        case .cancelled:
-            return "Operation was cancelled"
-        }
-    }
-
-    static func from(code: Int32) -> LlamaCPPError {
-        switch ra_result_code(rawValue: code) {
-        case RA_ERROR_INIT_FAILED:
-            return .initializationFailed
-        case RA_ERROR_MODEL_LOAD_FAILED:
-            return .modelLoadFailed("Unknown")
-        case RA_ERROR_INFERENCE_FAILED:
-            return .generationFailed("Inference failed")
-        case RA_ERROR_INVALID_HANDLE:
-            return .invalidHandle
-        case RA_ERROR_CANCELLED:
-            return .cancelled
-        default:
-            return .generationFailed("Unknown error: \(code)")
-        }
+/// Helper to free C memory allocated by RAC functions.
+/// Uses standard free() since rac_free wraps it.
+private func freeRACMemory(_ ptr: UnsafeMutableRawPointer?) {
+    if let ptr = ptr {
+        free(ptr)
     }
 }
 
-/// Text generation configuration
-public struct LlamaCPPGenerationConfig {
-    public var maxTokens: Int
-    public var temperature: Float
-    public var systemPrompt: String?
-
-    public init(
-        maxTokens: Int = 256,
-        temperature: Float = 0.8,  // Match LLM.swift default
-        systemPrompt: String? = nil
-    ) {
-        self.maxTokens = maxTokens
-        self.temperature = temperature
-        self.systemPrompt = systemPrompt
-    }
-}
-
-/// LlamaCPP implementation for text generation using GGUF models
-public class LlamaCPPService {
-    private let logger = SDKLogger(category: "LlamaCPPService")
-
-    private var backendHandle: ra_backend_handle?
-    private var _isReady: Bool = false
-    private var _currentModel: String?
-
-    // MARK: - Framework Identification
-
-    /// LlamaCPP uses the llama.cpp inference framework
-    public var inferenceFramework: InferenceFramework { .llamaCpp }
+/// LlamaCPP-based LLM service for text generation using GGUF models.
+///
+/// This service wraps the runanywhere-commons C++ LlamaCPP backend,
+/// providing Swift-friendly APIs for text generation with Metal acceleration.
+///
+/// ## Usage
+///
+/// ```swift
+/// let service = LlamaCPPService()
+/// try await service.initialize(modelPath: "/path/to/model.gguf")
+///
+/// // Synchronous generation
+/// let result = try await service.generate(prompt: "Hello!", options: .init())
+///
+/// // Streaming generation
+/// try await service.streamGenerate(prompt: "Tell me a story", options: .init()) { token in
+///     print(token, terminator: "")
+/// }
+/// ```
+public final class LlamaCPPService: LLMService, @unchecked Sendable {
 
     // MARK: - Properties
 
+    /// Native handle to the C++ LlamaCPP service
+    private var handle: rac_handle_t?
+
+    /// Lock for thread-safe access to handle
+    private let lock = NSLock()
+
+    /// Logger for this service
+    private let logger = SDKLogger(category: "LlamaCPPService")
+
+    /// Current model path
+    private var _modelPath: String?
+
+    /// Configuration used for initialization
+    private var config: rac_llm_llamacpp_config_t = RAC_LLM_LLAMACPP_CONFIG_DEFAULT
+
+    // MARK: - LLMService Protocol
+
+    /// The inference framework (always llama.cpp)
+    public var inferenceFramework: InferenceFramework { .llamaCpp }
+
+    /// Whether the service is ready for generation
     public var isReady: Bool {
-        _isReady && backendHandle != nil
+        lock.lock()
+        defer { lock.unlock() }
+        guard let handle = handle else { return false }
+        return rac_llm_llamacpp_is_model_loaded(handle) == RAC_TRUE
     }
 
+    /// Current model identifier
     public var currentModel: String? {
-        _currentModel
+        lock.lock()
+        defer { lock.unlock() }
+        return _modelPath
     }
 
-    /// Whether a model is currently loaded
-    public var isModelLoaded: Bool {
-        guard let backend = backendHandle else { return false }
-        return ra_text_is_model_loaded(backend)
+    /// Context length from the loaded model
+    public var contextLength: Int? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let handle = handle else { return nil }
+
+        var jsonPtr: UnsafeMutablePointer<CChar>?
+        let result = rac_llm_llamacpp_get_model_info(handle, &jsonPtr)
+
+        guard result == RAC_SUCCESS, let json = jsonPtr else { return nil }
+        defer { freeRACMemory(json) }
+
+        // Parse JSON to extract context length
+        if let data = String(cString: json).data(using: .utf8),
+           let parsed = try? JSONSerialization.jsonObject(with: data),
+           // swiftlint:disable:next avoid_any_type
+           let dict = parsed as? [String: Any],
+           let ctxLen = dict["context_length"] as? Int {
+            return ctxLen
+        }
+        return nil
+    }
+
+    /// LlamaCPP supports true streaming generation
+    public var supportsStreaming: Bool { true }
+
+    // MARK: - Initialization
+
+    public init() {
+        logger.debug("LlamaCPPService instance created")
+    }
+
+    deinit {
+        lock.lock()
+        if let handle = handle {
+            rac_llm_llamacpp_destroy(handle)
+        }
+        lock.unlock()
+    }
+
+    /// Initialize the service with an optional model path.
+    ///
+    /// - Parameter modelPath: Path to a GGUF model file. If nil, the service
+    ///   is created but no model is loaded yet.
+    public func initialize(modelPath: String?) async throws {
+        logger.info("Initializing LlamaCPPService with model: \(modelPath ?? "none")")
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            lock.lock()
+
+            // Clean up existing handle if any
+            if let existingHandle = handle {
+                rac_llm_llamacpp_destroy(existingHandle)
+                handle = nil
+            }
+
+            var newHandle: rac_handle_t?
+            let result: rac_result_t
+
+            if let path = modelPath {
+                // Create service with model
+                result = path.withCString { pathPtr in
+                    rac_llm_llamacpp_create(pathPtr, &config, &newHandle)
+                }
+                _modelPath = path
+            } else {
+                // Create service without model
+                result = rac_llm_llamacpp_create(nil, &config, &newHandle)
+            }
+
+            if result == RAC_SUCCESS {
+                handle = newHandle
+                lock.unlock()
+                logger.info("LlamaCPPService initialized successfully")
+                continuation.resume()
+            } else {
+                lock.unlock()
+                let error = CommonsErrorMapping.mapCommonsError(result)
+                logger.error("Failed to initialize LlamaCPPService: \(error)")
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    // MARK: - Generation
+
+    /// Generate text from a prompt.
+    ///
+    /// - Parameters:
+    ///   - prompt: The input prompt text
+    ///   - options: Generation options (temperature, max tokens, etc.)
+    /// - Returns: The generated text
+    public func generate(prompt: String, options: LLMGenerationOptions) async throws -> String {
+        logger.debug("Generate called with prompt length: \(prompt.count)")
+
+        return try await withCheckedThrowingContinuation { continuation in
+            lock.lock()
+
+            guard let handle = handle else {
+                lock.unlock()
+                continuation.resume(throwing: SDKError.llm(.serviceNotAvailable, "Service not initialized"))
+                return
+            }
+
+            lock.unlock()
+
+            // Convert Swift options to C options
+            var cOptions = createCOptions(from: options, prompt: prompt)
+
+            var result = rac_llm_result_t()
+
+            let generateResult = prompt.withCString { promptPtr in
+                return rac_llm_llamacpp_generate(handle, promptPtr, &cOptions, &result)
+            }
+
+            if generateResult == RAC_SUCCESS {
+                var generatedText = ""
+                if let textPtr = result.text {
+                    generatedText = String(cString: textPtr)
+                    freeRACMemory(textPtr)
+                }
+                logger.debug("Generation complete: \(result.completion_tokens) tokens")
+                continuation.resume(returning: generatedText)
+            } else {
+                let error = CommonsErrorMapping.mapCommonsError(generateResult)
+                logger.error("Generation failed: \(error)")
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    /// Stream text generation token by token.
+    ///
+    /// - Parameters:
+    ///   - prompt: The input prompt text
+    ///   - options: Generation options
+    ///   - onToken: Callback invoked for each generated token
+    public func streamGenerate(
+        prompt: String,
+        options: LLMGenerationOptions,
+        onToken: @escaping (String) -> Void
+    ) async throws {
+        logger.debug("Stream generate called with prompt length: \(prompt.count)")
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            lock.lock()
+
+            guard let handle = handle else {
+                lock.unlock()
+                continuation.resume(throwing: SDKError.llm(.serviceNotAvailable, "Service not initialized"))
+                return
+            }
+
+            lock.unlock()
+
+            // Create context for callback
+            let context = StreamContext(onToken: onToken, continuation: continuation)
+            let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+            // Convert Swift options to C options
+            var cOptions = createCOptions(from: options, prompt: prompt)
+
+            let streamResult = prompt.withCString { promptPtr in
+                return rac_llm_llamacpp_generate_stream(
+                    handle,
+                    promptPtr,
+                    &cOptions,
+                    { token, isFinal, userData -> rac_bool_t in
+                        guard let userData = userData else { return RAC_FALSE }
+                        let ctx = Unmanaged<StreamContext>.fromOpaque(userData).takeUnretainedValue()
+
+                        if let tokenPtr = token {
+                            let tokenStr = String(cString: tokenPtr)
+                            ctx.onToken(tokenStr)
+                        }
+
+                        if isFinal == RAC_TRUE {
+                            // Release the context and resume continuation
+                            _ = Unmanaged<StreamContext>.fromOpaque(userData).takeRetainedValue()
+                            ctx.continuation.resume()
+                        }
+
+                        return RAC_TRUE
+                    },
+                    contextPtr
+                )
+            }
+
+            if streamResult != RAC_SUCCESS {
+                // Release context on error
+                _ = Unmanaged<StreamContext>.fromOpaque(contextPtr).takeRetainedValue()
+                let error = CommonsErrorMapping.mapCommonsError(streamResult)
+                logger.error("Stream generation failed: \(error)")
+                continuation.resume(throwing: error)
+            }
+        }
     }
 
     // MARK: - Lifecycle
 
-    public init() {
-        logger.info("LlamaCPPService initialized")
-    }
-
-    deinit {
-        if let backend = backendHandle {
-            ra_destroy(backend)
-        }
-        logger.info("LlamaCPPService deallocated")
-    }
-
-    /// Initialize the LlamaCPP backend
-    /// - Parameter modelPath: Optional path to a GGUF model file
-    public func initialize(modelPath: String? = nil) async throws {
-        logger.info("Initializing LlamaCPP Runtime with model: \(modelPath ?? "none")")
-
-        // Create LlamaCPP backend
-        backendHandle = ra_create_backend("llamacpp")
-        guard backendHandle != nil else {
-            logger.error("Failed to create LlamaCPP backend")
-            throw LlamaCPPError.initializationFailed
-        }
-
-        // Initialize backend
-        let initStatus = ra_initialize(backendHandle, nil)
-        guard initStatus == RA_SUCCESS else {
-            logger.error("Failed to initialize LlamaCPP backend: \(initStatus.rawValue)")
-            ra_destroy(backendHandle)
-            backendHandle = nil
-            throw LlamaCPPError.from(code: Int32(initStatus.rawValue))
-        }
-
-        // Load model if path provided
-        if let modelPath = modelPath {
-            try await loadModel(path: modelPath)
-        }
-
-        _isReady = true
-        logger.info("LlamaCPP Runtime initialized successfully")
-    }
-
-    /// Load a GGUF model
-    /// - Parameter path: Path to the GGUF model file
-    /// - Parameter config: Optional JSON configuration
-    public func loadModel(path: String, config: String? = nil) async throws {
-        guard let backend = backendHandle else {
-            throw LlamaCPPError.invalidHandle
-        }
-
-        logger.info("Loading model from: \(path)")
-
-        let status = ra_text_load_model(backend, path, config)
-        guard status == RA_SUCCESS else {
-            logger.error("Failed to load model: \(status.rawValue)")
-            throw LlamaCPPError.modelLoadFailed(path)
-        }
-
-        _currentModel = path
-        logger.info("Model loaded successfully")
-    }
-
-    /// Unload the current model
-    public func unloadModel() async throws {
-        guard let backend = backendHandle else {
-            throw LlamaCPPError.invalidHandle
-        }
-
-        logger.info("Unloading model")
-        _ = ra_text_unload_model(backend)
-        _currentModel = nil
-    }
-
-    // MARK: - Text Generation
-
-    /// Generate text completion
-    /// - Parameters:
-    ///   - prompt: The input prompt
-    ///   - config: Generation configuration
-    /// - Returns: Generated text
-    public func generate(
-        prompt: String,
-        config: LlamaCPPGenerationConfig = LlamaCPPGenerationConfig()
-    ) async throws -> String {
-        guard isReady, let backend = backendHandle else {
-            throw LlamaCPPError.invalidHandle
-        }
-
-        guard isModelLoaded else {
-            throw LlamaCPPError.generationFailed("No model loaded")
-        }
-
-        logger.info("Generating text for prompt: \(prompt.prefix(50))...")
-
-        var resultPtr: UnsafeMutablePointer<CChar>?
-
-        let status = ra_text_generate(
-            backend,
-            prompt,
-            config.systemPrompt,
-            Int32(config.maxTokens),
-            config.temperature,
-            &resultPtr
-        )
-
-        guard status == RA_SUCCESS, let resultPtr = resultPtr else {
-            let errorMsg = String(cString: ra_get_last_error())
-            logger.error("Generation failed: \(errorMsg)")
-            throw LlamaCPPError.generationFailed(errorMsg)
-        }
-
-        let rawResult = String(cString: resultPtr)
-        ra_free_string(resultPtr)
-
-        // The C function returns JSON with format: {"text": "...", "finish_reason": "...", ...}
-        // Parse the JSON and extract the "text" field
-        let generatedText = extractTextFromJSON(rawResult)
-
-        logger.info("Generated \(generatedText.count) characters")
-        return generatedText
-    }
-
-    /// Extract the "text" field from JSON result returned by ra_text_generate
-    /// Falls back to raw result if parsing fails
-    private func extractTextFromJSON(_ jsonString: String) -> String {
-        // Try to parse as JSON and extract "text" field
-        guard let data = jsonString.data(using: .utf8) else {
-            logger.warning("Failed to convert result to data, returning raw result")
-            return jsonString
-        }
-
-        do {
-            // swiftlint:disable:next avoid_any_type
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let text = json["text"] as? String {
-                return text
-            }
-        } catch {
-            logger.warning("Failed to parse JSON result: \(error.localizedDescription)")
-        }
-
-        // Return raw result as fallback (may already be plain text in some cases)
-        return jsonString
-    }
-
-    /// Generate text with streaming output
-    /// - Parameters:
-    ///   - prompt: The input prompt
-    ///   - config: Generation configuration
-    /// - Returns: AsyncStream of generated tokens
-    public func generateStream(
-        prompt: String,
-        config: LlamaCPPGenerationConfig = LlamaCPPGenerationConfig()
-    ) -> AsyncThrowingStream<String, Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    try await self.performStreamGeneration(
-                        prompt: prompt,
-                        config: config,
-                        continuation: continuation
-                    )
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-        }
-    }
-
-    /// Performs the actual streaming generation logic
-    private func performStreamGeneration(
-        prompt: String,
-        config: LlamaCPPGenerationConfig,
-        continuation: AsyncThrowingStream<String, Error>.Continuation
-    ) async throws {
-        guard self.isReady, let backend = self.backendHandle else {
-            continuation.finish(throwing: LlamaCPPError.invalidHandle)
-            return
-        }
-
-        guard self.isModelLoaded else {
-            continuation.finish(throwing: LlamaCPPError.generationFailed("No model loaded"))
-            return
-        }
-
-        self.logger.info("Starting streaming generation for prompt: \(prompt.prefix(50))...")
-
-        let context = CallbackContext(continuation: continuation)
-        let contextPtr = Unmanaged.passRetained(context).toOpaque()
-
-        let status = ra_text_generate_stream(
-            backend,
-            prompt,
-            config.systemPrompt,
-            Int32(config.maxTokens),
-            config.temperature,
-            self.streamCallback,
-            contextPtr
-        )
-
-        // Release the context
-        Unmanaged<CallbackContext>.fromOpaque(contextPtr).release()
-
-        if status == RA_SUCCESS || status == RA_ERROR_CANCELLED {
-            continuation.finish()
-        } else {
-            let errorMsg = String(cString: ra_get_last_error())
-            continuation.finish(throwing: LlamaCPPError.generationFailed(errorMsg))
-        }
-    }
-
-    /// Callback for streaming token generation
-    private var streamCallback: ra_text_stream_callback {
-        { tokenCStr, userData in
-            guard let userData = userData else { return false }
-            let context = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
-
-            if context.isCancelled {
-                return false
-            }
-
-            if let tokenCStr = tokenCStr {
-                let token = String(cString: tokenCStr)
-                context.continuation.yield(token)
-            }
-            return true
-        }
-    }
-
-    /// Wrapper class for callback context
-    private class CallbackContext {
-        let continuation: AsyncThrowingStream<String, Error>.Continuation
-        var isCancelled = false
-
-        init(continuation: AsyncThrowingStream<String, Error>.Continuation) {
-            self.continuation = continuation
-        }
-    }
-
     /// Cancel ongoing generation
-    public func cancel() {
-        guard let backend = backendHandle else { return }
-        ra_text_cancel(backend)
-        logger.info("Generation cancelled")
+    public func cancel() async {
+        lock.lock()
+        if let handle = handle {
+            rac_llm_llamacpp_cancel(handle)
+            logger.debug("Generation cancelled")
+        }
+        lock.unlock()
+    }
+
+    /// Clean up resources
+    public func cleanup() async {
+        lock.lock()
+        if let handle = handle {
+            rac_llm_llamacpp_destroy(handle)
+            self.handle = nil
+            logger.info("LlamaCPPService cleaned up")
+        }
+        _modelPath = nil
+        lock.unlock()
+    }
+
+    // MARK: - Private Helpers
+
+    /// Convert Swift LLMGenerationOptions to C rac_llm_options_t
+    private func createCOptions(from options: LLMGenerationOptions, prompt: String) -> rac_llm_options_t {
+        var cOptions = RAC_LLM_OPTIONS_DEFAULT
+
+        cOptions.max_tokens = Int32(options.maxTokens)
+        cOptions.temperature = options.temperature
+        cOptions.top_p = options.topP
+        cOptions.streaming_enabled = options.streamingEnabled ? RAC_TRUE : RAC_FALSE
+
+        // Note: system_prompt and stop_sequences require pointer management
+        // For now, these fields would need to be set separately with proper lifetime management
+        // The pointers must remain valid for the duration of the API call
+
+        return cOptions
+    }
+}
+
+// MARK: - Stream Context
+
+/// Context object for streaming callbacks
+private final class StreamContext {
+    let onToken: (String) -> Void
+    let continuation: CheckedContinuation<Void, Error>
+
+    init(onToken: @escaping (String) -> Void, continuation: CheckedContinuation<Void, Error>) {
+        self.onToken = onToken
+        self.continuation = continuation
     }
 }

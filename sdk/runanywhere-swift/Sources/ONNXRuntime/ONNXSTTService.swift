@@ -1,504 +1,335 @@
-import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
+//
+//  ONNXSTTService.swift
+//  ONNXRuntime
+//
+//  STT service implementation using runanywhere-commons ONNX backend.
+//  This is a thin Swift wrapper around the rac_stt_onnx_* C APIs.
+//
+
+import CRABackendONNX
+import CRACommons
 import Foundation
 import RunAnywhere
 
-/// ONNX Runtime implementation of STTService for speech-to-text
-/// Uses the unified RunAnywhere backend API
-public class ONNXSTTService: STTService {
+/// ONNX-based STT service for speech-to-text transcription.
+///
+/// This service wraps the runanywhere-commons C++ ONNX backend,
+/// providing Swift-friendly APIs for audio transcription.
+///
+/// ## Usage
+///
+/// ```swift
+/// let service = ONNXSTTService()
+/// try await service.initialize(modelPath: "/path/to/whisper-model")
+///
+/// let result = try await service.transcribe(
+///     audioData: audioData,
+///     options: STTOptions(sampleRate: 16000)
+/// )
+/// print("Transcribed: \(result.transcript)")
+/// ```
+public final class ONNXSTTService: STTService, @unchecked Sendable {
+
+    // MARK: - Properties
+
+    /// Native handle to the C++ ONNX STT service
+    private var handle: rac_handle_t?
+
+    /// Lock for thread-safe access to handle
+    private let lock = NSLock()
+
+    /// Logger for this service
     private let logger = SDKLogger(category: "ONNXSTTService")
 
-    private var backendHandle: ra_backend_handle?
-    private var streamHandle: ra_stream_handle?
-    private var _isReady: Bool = false
-    private var _currentModel: String?
-    private var _supportsStreaming: Bool = false
-
-    // MARK: - Framework Identification
-
-    /// ONNX Runtime inference framework
-    public let inferenceFramework: InferenceFramework = .onnx
+    /// Current model path
+    private var _modelPath: String?
 
     // MARK: - STTService Protocol
 
+    /// The inference framework (always ONNX)
+    public var inferenceFramework: InferenceFramework { .onnx }
+
+    /// Whether the service is ready for transcription
     public var isReady: Bool {
-        return _isReady && backendHandle != nil
+        lock.lock()
+        defer { lock.unlock() }
+        return handle != nil
     }
 
+    /// Current model identifier
     public var currentModel: String? {
-        return _currentModel
+        lock.lock()
+        defer { lock.unlock() }
+        return _modelPath
     }
 
-    /// Whether this service supports live/streaming transcription
-    /// ONNX Whisper models are offline/batch only, so this returns false
+    /// ONNX STT supports streaming transcription
     public var supportsStreaming: Bool {
-        return _supportsStreaming
+        lock.lock()
+        defer { lock.unlock() }
+        guard let handle = handle else { return false }
+        return rac_stt_onnx_supports_streaming(handle) == RAC_TRUE
     }
+
+    // MARK: - Initialization
 
     public init() {
-        logger.info("ONNXSTTService initialized")
+        logger.debug("ONNXSTTService instance created")
     }
 
     deinit {
-        // Clean up stream
-        if let stream = streamHandle, let backend = backendHandle {
-            ra_stt_destroy_stream(backend, stream)
+        lock.lock()
+        if let handle = handle {
+            rac_stt_onnx_destroy(handle)
         }
-
-        // Clean up backend
-        if let backend = backendHandle {
-            ra_destroy(backend)
-        }
-
-        logger.info("ONNXSTTService deallocated")
+        lock.unlock()
     }
 
+    /// Initialize the service with an optional model path.
+    ///
+    /// - Parameter modelPath: Path to an ONNX model directory. If nil, the service
+    ///   is created but no model is loaded yet.
     public func initialize(modelPath: String?) async throws {
-        logger.info("Initializing ONNX Runtime with model: \(modelPath ?? "none")")
+        logger.info("Initializing ONNXSTTService with model: \(modelPath ?? "none")")
 
-        // Create ONNX backend
-        backendHandle = ra_create_backend("onnx")
-        guard backendHandle != nil else {
-            logger.error("Failed to create ONNX backend")
-            throw SDKError.runtime(.initializationFailed, "Failed to create ONNX backend")
-        }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            lock.lock()
 
-        // Initialize backend
-        let initStatus = ra_initialize(backendHandle, nil)
-        guard initStatus == RA_SUCCESS else {
-            logger.error("Failed to initialize ONNX backend: \(initStatus.rawValue)")
-            ra_destroy(backendHandle)
-            backendHandle = nil
-            throw SDKError.fromONNXCode(Int32(initStatus.rawValue))
-        }
-
-        // Load STT model if path provided
-        if let modelPath = modelPath {
-            // Detect model type
-            let modelType = detectModelType(path: modelPath)
-            logger.info("Detected model type: \(modelType)")
-
-            // Prepare model directory path
-            var modelDir = modelPath
-            let fileManager = FileManager.default
-            var isDirectory: ObjCBool = false
-
-            if fileManager.fileExists(atPath: modelPath, isDirectory: &isDirectory) && !isDirectory.boolValue {
-                modelDir = (modelPath as NSString).deletingLastPathComponent
+            // Clean up existing handle if any
+            if let existingHandle = handle {
+                rac_stt_onnx_destroy(existingHandle)
+                handle = nil
             }
 
-            // Load STT model
-            let loadStatus = ra_stt_load_model(backendHandle, modelDir, modelType, nil)
-            guard loadStatus == RA_SUCCESS else {
-                logger.error("Failed to load STT model: \(loadStatus.rawValue)")
-                throw SDKError.runtime(.modelLoadFailed, "Failed to load STT model from: \(modelPath)")
-            }
+            var newHandle: rac_handle_t?
+            let result: rac_result_t
 
-            _currentModel = modelPath
-            _supportsStreaming = ra_stt_supports_streaming(backendHandle)
-            logger.info("STT model loaded, streaming supported: \(self.supportsStreaming)")
-        }
+            if let path = modelPath {
+                // Create config with default values
+                var config = rac_stt_onnx_config_t()
+                config.num_threads = 4
 
-        _isReady = true
-        logger.info("ONNX Runtime initialized successfully")
-    }
-
-    public func transcribe(audioData: Data, options: STTOptions) async throws -> STTTranscriptionResult {
-        guard isReady, let backend = backendHandle else {
-            throw SDKError.runtime(.invalidState, "Invalid ONNX handle: service not ready")
-        }
-
-        logger.info("Transcribing audio: \(audioData.count) bytes, input sample rate: \(options.sampleRate)Hz")
-
-        // Convert audio data to float32 samples at 16kHz (STT model requirement)
-        // Use the sample rate from options to determine if resampling is needed
-        let samples = try convertToFloat32Samples(audioData: audioData, inputSampleRate: options.sampleRate)
-        let sampleRate: Int32 = 16000
-
-        var resultPtr: UnsafeMutablePointer<CChar>?
-
-        // Call STT transcribe
-        let status = samples.withUnsafeBufferPointer { buffer in
-            ra_stt_transcribe(
-                backend,
-                buffer.baseAddress,
-                buffer.count,
-                sampleRate,
-                options.language,
-                &resultPtr
-            )
-        }
-
-        guard status == RA_SUCCESS, let resultPtr = resultPtr else {
-            logger.error("Transcription failed with status: \(status.rawValue)")
-            throw SDKError.fromONNXCode(Int32(status.rawValue))
-        }
-
-        defer {
-            ra_free_string(resultPtr)
-        }
-
-        // Parse JSON result
-        let resultJSON = String(cString: resultPtr)
-        logger.debug("Transcription result JSON: \(resultJSON)")
-
-        return try parseTranscriptionResult(json: resultJSON, language: options.language)
-    }
-
-    public func streamTranscribe<S>(
-        audioStream: S,
-        options: STTOptions,
-        onPartial: @escaping (String) -> Void
-    ) async throws -> STTTranscriptionResult where S: AsyncSequence, S.Element == Data {
-        guard isReady, let backend = backendHandle else {
-            throw SDKError.runtime(.invalidState, "Invalid ONNX handle: service not ready")
-        }
-
-        guard supportsStreaming else {
-            logger.warning("Stream transcribe not supported, using periodic batch transcription")
-            return try await performBatchTranscription(
-                audioStream: audioStream,
-                options: options,
-                onPartial: onPartial
-            )
-        }
-
-        logger.info("Using streaming transcription")
-
-        return try await performStreamingTranscription(
-            backend: backend,
-            audioStream: audioStream,
-            options: options,
-            onPartial: onPartial
-        )
-    }
-
-    public func cleanup() async {
-        logger.info("Cleaning up ONNX Runtime")
-
-        // Clean up stream
-        if let stream = streamHandle, let backend = backendHandle {
-            ra_stt_destroy_stream(backend, stream)
-            streamHandle = nil
-        }
-
-        // Clean up backend
-        if let backend = backendHandle {
-            ra_destroy(backend)
-            backendHandle = nil
-        }
-
-        _isReady = false
-        _currentModel = nil
-        _supportsStreaming = false
-    }
-
-    // MARK: - Private Helpers
-
-    private func detectModelType(path: String) -> String {
-        let fileManager = FileManager.default
-        var isDirectory: ObjCBool = false
-
-        var modelDir = path
-        if fileManager.fileExists(atPath: path, isDirectory: &isDirectory) && !isDirectory.boolValue {
-            modelDir = (path as NSString).deletingLastPathComponent
-        }
-
-        // Check for model files
-        if let contents = try? fileManager.contentsOfDirectory(atPath: modelDir) {
-            // Zipformer detection
-            if contents.contains(where: { $0.contains("encoder-epoch") && $0.hasSuffix(".onnx") }) {
-                return "zipformer"
-            }
-
-            // Whisper detection
-            let hasWhisper = contents.contains(where: { $0.contains("whisper") })
-            let hasEncoder = contents.contains(where: { $0.contains("encoder") })
-            let hasDecoder = contents.contains(where: { $0.contains("decoder") })
-            if hasWhisper || (hasEncoder && hasDecoder) {
-                return "whisper"
-            }
-
-            // Paraformer detection
-            if contents.contains(where: { $0.contains("paraformer") }) {
-                return "paraformer"
-            }
-        }
-
-        // Default to whisper
-        return "whisper"
-    }
-
-    private func parseTranscriptionResult(json: String, language: String?) throws -> STTTranscriptionResult {
-        guard let jsonData = json.data(using: .utf8) else {
-            throw SDKError.runtime(.generationFailed, "Transcription failed: Invalid JSON encoding")
-        }
-
-        let result = try JSONDecoder().decode(TranscriptionResult.self, from: jsonData)
-
-        return STTTranscriptionResult(
-            transcript: result.text,
-            confidence: Float(result.confidence ?? 1.0),
-            timestamps: nil,
-            language: result.language ?? language,
-            alternatives: nil
-        )
-    }
-
-    /// Convert Int16 PCM audio data to Float32 samples at 16kHz
-    /// - Parameters:
-    ///   - audioData: Raw Int16 PCM audio data
-    ///   - inputSampleRate: Sample rate of the input audio (default: 48000Hz for device recordings)
-    /// - Returns: Float32 samples resampled to 16kHz
-    private func convertToFloat32Samples(audioData: Data, inputSampleRate: Int = 48000) throws -> [Float] {
-        // Validate input parameters
-        guard !audioData.isEmpty else {
-            logger.error("Audio data is empty")
-            throw SDKError.runtime(.invalidInput, "Invalid ONNX parameters: audio data is empty")
-        }
-
-        guard inputSampleRate > 0 else {
-            logger.error("Invalid input sample rate: \(inputSampleRate)")
-            throw SDKError.runtime(.invalidInput, "Invalid ONNX parameters: invalid sample rate \(inputSampleRate)")
-        }
-
-        guard audioData.count.isMultiple(of: MemoryLayout<Int16>.size) else {
-            logger.error("Audio data size (\(audioData.count) bytes) is not a multiple of Int16 size")
-            throw SDKError.runtime(.invalidInput, "Invalid ONNX parameters: audio data size is not a multiple of Int16 size")
-        }
-
-        let targetSampleRate = 16000
-        let int16Count = audioData.count / MemoryLayout<Int16>.size
-
-        // Calculate downsampling factor based on input sample rate
-        // If input is already at 16kHz, no downsampling needed (factor = 1)
-        // If input is at 48kHz, downsample by 3 (factor = 3)
-        let downsampleFactor = max(1, inputSampleRate / targetSampleRate)
-
-        var samples: [Float] = []
-        samples.reserveCapacity(int16Count / downsampleFactor)
-
-        audioData.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-            let int16Buffer = bytes.bindMemory(to: Int16.self)
-
-            if downsampleFactor == 1 {
-                // No downsampling needed - input is already at target sample rate
-                for i in 0..<int16Count {
-                    let normalized = Float(int16Buffer[i]) / Float(Int16.max)
-                    samples.append(normalized)
+                // Create service with model
+                result = path.withCString { pathPtr in
+                    rac_stt_onnx_create(pathPtr, &config, &newHandle)
                 }
+                _modelPath = path
             } else {
-                // Downsample by taking every Nth sample
-                var i = 0
-                while i < int16Count {
-                    let normalized = Float(int16Buffer[i]) / Float(Int16.max)
-                    samples.append(normalized)
-                    i += downsampleFactor
-                }
+                // Create service without model
+                result = rac_stt_onnx_create(nil, nil, &newHandle)
+            }
+
+            if result == RAC_SUCCESS {
+                handle = newHandle
+                lock.unlock()
+                logger.info("ONNXSTTService initialized successfully")
+                continuation.resume()
+            } else {
+                lock.unlock()
+                let error = CommonsErrorMapping.toSDKError(result) ?? SDKError.stt(.initializationFailed, "Failed to initialize ONNX STT service")
+                logger.error("Failed to initialize ONNXSTTService: \(error)")
+                continuation.resume(throwing: error)
             }
         }
-
-        logger.debug(
-            "Converted \(int16Count) samples at \(inputSampleRate)Hz to " +
-            "\(samples.count) samples at \(targetSampleRate)Hz (factor: \(downsampleFactor))"
-        )
-        return samples
     }
 
-    /// Perform streaming transcription for models that support it
-    private func performStreamingTranscription<S>(
-        backend: ra_backend_handle,
+    // MARK: - Transcription
+
+    /// Transcribe audio data (batch mode).
+    ///
+    /// - Parameters:
+    ///   - audioData: Audio data to transcribe
+    ///   - options: Transcription options
+    /// - Returns: Transcription result
+    public func transcribe(audioData: Data, options: STTOptions) async throws -> STTTranscriptionResult {
+        logger.debug("Transcribe called with \(audioData.count) bytes")
+
+        return try await withCheckedThrowingContinuation { continuation in
+            lock.lock()
+
+            guard let handle = handle else {
+                lock.unlock()
+                continuation.resume(throwing: SDKError.stt(.serviceNotAvailable, "Service not initialized"))
+                return
+            }
+
+            lock.unlock()
+
+            // Convert Swift options to C options
+            var cOptions = rac_stt_options_t()
+            cOptions.sample_rate = Int32(options.sampleRate)
+            cOptions.enable_timestamps = options.enableTimestamps ? RAC_TRUE : RAC_FALSE
+
+            // Convert audio data to float samples
+            let floatSamples = audioData.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) -> [Float] in
+                let int16Buffer = rawBuffer.bindMemory(to: Int16.self)
+                return int16Buffer.map { Float($0) / 32768.0 }
+            }
+
+            var cResult = rac_stt_result_t()
+
+            // Set language - use withCString to ensure proper lifetime
+            let transcribeResult = options.language.withCString { langPtr in
+                cOptions.language = langPtr
+                return floatSamples.withUnsafeBufferPointer { samplesBuffer in
+                    rac_stt_onnx_transcribe(
+                        handle,
+                        samplesBuffer.baseAddress,
+                        samplesBuffer.count,
+                        &cOptions,
+                        &cResult
+                    )
+                }
+            }
+
+            if transcribeResult == RAC_SUCCESS {
+                // Extract transcription text
+                var text = ""
+                if let textPtr = cResult.text {
+                    text = String(cString: textPtr)
+                    // Free the C-allocated string
+                    textPtr.deallocate()
+                }
+
+                let result = STTTranscriptionResult(
+                    transcript: text,
+                    confidence: cResult.confidence > 0 ? cResult.confidence : nil,
+                    timestamps: nil,
+                    language: options.language.isEmpty ? nil : options.language,
+                    alternatives: nil
+                )
+
+                logger.debug("Transcription complete: \(text.prefix(50))...")
+                continuation.resume(returning: result)
+            } else {
+                let error = CommonsErrorMapping.toSDKError(transcribeResult) ?? SDKError.stt(.generationFailed, "Transcription failed")
+                logger.error("Transcription failed: \(error)")
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    /// Stream transcription for real-time processing.
+    ///
+    /// - Parameters:
+    ///   - audioStream: Async stream of audio data chunks
+    ///   - options: Transcription options
+    ///   - onPartial: Callback for partial results
+    /// - Returns: Final transcription result
+    public func streamTranscribe<S: AsyncSequence>(
         audioStream: S,
         options: STTOptions,
         onPartial: @escaping (String) -> Void
-    ) async throws -> STTTranscriptionResult where S: AsyncSequence, S.Element == Data {
+    ) async throws -> STTTranscriptionResult where S.Element == Data {
+        logger.debug("Stream transcribe started")
+
+        // Synchronous handle check
+        let serviceHandle: rac_handle_t = try {
+            lock.lock()
+            defer { lock.unlock() }
+            guard let handleValue = handle else {
+                throw SDKError.stt(.serviceNotAvailable, "Service not initialized")
+            }
+            return handleValue
+        }()
+
         // Create streaming session
-        guard let stream = ra_stt_create_stream(backend, nil) else {
-            logger.error("Failed to create STT stream")
-            throw SDKError.runtime(.initializationFailed, "Failed to create STT streaming session")
+        var streamHandle: rac_handle_t?
+        let createResult = rac_stt_onnx_create_stream(serviceHandle, &streamHandle)
+        guard createResult == RAC_SUCCESS, let stream = streamHandle else {
+            throw CommonsErrorMapping.toSDKError(createResult) ?? SDKError.stt(.streamingNotSupported, "Failed to create streaming session")
         }
 
-        streamHandle = stream
-        defer {
-            ra_stt_destroy_stream(backend, stream)
-            streamHandle = nil
+        var fullText = ""
+
+        do {
+            for try await chunk in audioStream {
+                // Convert audio data to float samples
+                let floatSamples = chunk.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) -> [Float] in
+                    let int16Buffer = rawBuffer.bindMemory(to: Int16.self)
+                    return int16Buffer.map { Float($0) / 32768.0 }
+                }
+
+                // Feed audio to stream
+                let feedResult = floatSamples.withUnsafeBufferPointer { samplesBuffer in
+                    rac_stt_onnx_feed_audio(
+                        serviceHandle,
+                        stream,
+                        samplesBuffer.baseAddress,
+                        samplesBuffer.count
+                    )
+                }
+
+                guard feedResult == RAC_SUCCESS else {
+                    continue
+                }
+
+                // Check if stream is ready for decoding
+                if rac_stt_onnx_stream_is_ready(serviceHandle, stream) == RAC_TRUE {
+                    var partialTextPtr: UnsafeMutablePointer<CChar>?
+                    let decodeResult = rac_stt_onnx_decode_stream(serviceHandle, stream, &partialTextPtr)
+
+                    if decodeResult == RAC_SUCCESS, let textPtr = partialTextPtr {
+                        let partialText = String(cString: textPtr)
+                        textPtr.deallocate()
+                        if !partialText.isEmpty {
+                            onPartial(partialText)
+                            fullText = partialText
+                        }
+                    }
+                }
+            }
+
+            // Signal end of input
+            rac_stt_onnx_input_finished(serviceHandle, stream)
+
+            // Get final result
+            if rac_stt_onnx_stream_is_ready(serviceHandle, stream) == RAC_TRUE {
+                var finalTextPtr: UnsafeMutablePointer<CChar>?
+                let finalDecodeResult = rac_stt_onnx_decode_stream(serviceHandle, stream, &finalTextPtr)
+
+                if finalDecodeResult == RAC_SUCCESS, let textPtr = finalTextPtr {
+                    fullText = String(cString: textPtr)
+                    textPtr.deallocate()
+                }
+            }
+
+            // Cleanup stream
+            rac_stt_onnx_destroy_stream(serviceHandle, stream)
+
+        } catch {
+            // Cancel streaming on error
+            rac_stt_onnx_destroy_stream(serviceHandle, stream)
+            throw error
         }
 
-        let sampleRate: Int32 = 16000
-        var lastResult = ""
-
-        logger.info("Starting to process audio stream...")
-
-        // Process audio chunks as they arrive
-        lastResult = try await processAudioStream(
-            audioStream: audioStream,
-            backend: backend,
-            stream: stream,
-            options: options,
-            onPartial: onPartial
-        )
-
-        // Signal input finished and get final result
-        ra_stt_input_finished(backend, stream)
-        lastResult = decodeFinalResult(backend: backend, stream: stream, currentResult: lastResult)
-
-        logger.info("Final transcription: \(lastResult)")
-
+        logger.debug("Stream transcription complete")
         return STTTranscriptionResult(
-            transcript: lastResult,
-            confidence: 1.0,
+            transcript: fullText,
+            confidence: nil,
             timestamps: nil,
-            language: options.language,
+            language: options.language.isEmpty ? nil : options.language,
             alternatives: nil
         )
     }
 
-    /// Process audio stream chunks
-    private func processAudioStream<S>(
-        audioStream: S,
-        backend: ra_backend_handle,
-        stream: ra_stream_handle,
-        options: STTOptions,
-        onPartial: @escaping (String) -> Void
-    ) async throws -> String where S: AsyncSequence, S.Element == Data {
-        let sampleRate: Int32 = 16000
-        var result = ""
-        var chunkCount = 0
+    // MARK: - Lifecycle
 
-        for try await audioChunk in audioStream {
-            chunkCount += 1
-            logger.debug("Received audio chunk #\(chunkCount), size: \(audioChunk.count) bytes")
-
-            // Convert and feed audio
-            let samples = try convertToFloat32Samples(audioData: audioChunk, inputSampleRate: options.sampleRate)
-            let feedStatus = samples.withUnsafeBufferPointer { buffer in
-                ra_stt_feed_audio(backend, stream, buffer.baseAddress, buffer.count, sampleRate)
-            }
-
-            guard feedStatus == RA_SUCCESS else {
-                logger.error("Failed to feed audio: \(feedStatus.rawValue)")
-                continue
-            }
-
-            // Decode if ready
-            if ra_stt_is_ready(backend, stream) {
-                if let newResult = decodePartialResult(backend: backend, stream: stream), newResult != result {
-                    result = newResult
-                    onPartial(newResult)
-                    logger.debug("Partial result: \(newResult)")
-                }
-            }
-
-            // Check for endpoint detection
-            if ra_stt_is_endpoint(backend, stream) {
-                logger.info("Endpoint detected")
-                break
-            }
-        }
-
-        return result
+    /// Clean up resources
+    public func cleanup() async {
+        // Use synchronous cleanup to avoid NSLock in async context issues
+        cleanupSync()
     }
 
-    /// Perform batch transcription for models that don't support streaming
-    private func performBatchTranscription<S>(
-        audioStream: S,
-        options: STTOptions,
-        onPartial: @escaping (String) -> Void
-    ) async throws -> STTTranscriptionResult where S: AsyncSequence, S.Element == Data {
-        var allAudioData = Data()
-        var accumulatedTranscript = ""
-        var lastProcessedSize = 0
-        let batchThreshold = 48000 * 2 * 3  // ~3 seconds of audio at 48kHz Int16 (288KB)
-
-        for try await chunk in audioStream {
-            allAudioData.append(chunk)
-
-            // Process periodically when we have enough new audio
-            let newDataSize = allAudioData.count - lastProcessedSize
-            if newDataSize >= batchThreshold {
-                logger.info("Processing batch chunk: \(allAudioData.count) bytes total")
-
-                do {
-                    let result = try await transcribe(audioData: allAudioData, options: options)
-                    if !result.transcript.isEmpty {
-                        accumulatedTranscript = result.transcript
-                        onPartial(accumulatedTranscript)
-                        logger.debug("Partial transcription: \(accumulatedTranscript)")
-                    }
-                } catch {
-                    logger.error("Periodic batch transcription failed: \(error.localizedDescription)")
-                }
-
-                lastProcessedSize = allAudioData.count
-            }
+    /// Synchronous cleanup helper
+    private func cleanupSync() {
+        lock.lock()
+        if let handle = handle {
+            rac_stt_onnx_destroy(handle)
+            self.handle = nil
+            logger.info("ONNXSTTService cleaned up")
         }
-
-        // Final transcription with all audio
-        logger.info("Final batch transcription: \(allAudioData.count) bytes")
-        let result = try await transcribe(audioData: allAudioData, options: options)
-        if !result.transcript.isEmpty {
-            onPartial(result.transcript)
-        }
-        return result
+        _modelPath = nil
+        lock.unlock()
     }
-
-    /// Decode partial result from streaming session
-    private func decodePartialResult(
-        backend: ra_backend_handle,
-        stream: ra_stream_handle
-    ) -> String? {
-        var resultPtr: UnsafeMutablePointer<CChar>?
-        let decodeStatus = ra_stt_decode(backend, stream, &resultPtr)
-
-        guard decodeStatus == RA_SUCCESS, let resultPtr = resultPtr else {
-            return nil
-        }
-
-        defer { ra_free_string(resultPtr) }
-        let partialJSON = String(cString: resultPtr)
-
-        // Parse partial result
-        guard let data = partialJSON.data(using: .utf8),
-              let json = try? JSONDecoder().decode(PartialResult.self, from: data),
-              !json.text.isEmpty else {
-            return nil
-        }
-
-        return json.text
-    }
-
-    /// Decode final result from streaming session
-    private func decodeFinalResult(
-        backend: ra_backend_handle,
-        stream: ra_stream_handle,
-        currentResult: String
-    ) -> String {
-        var lastResult = currentResult
-
-        while ra_stt_is_ready(backend, stream) {
-            var resultPtr: UnsafeMutablePointer<CChar>?
-            if ra_stt_decode(backend, stream, &resultPtr) == RA_SUCCESS, let resultPtr = resultPtr {
-                defer { ra_free_string(resultPtr) }
-                let finalJSON = String(cString: resultPtr)
-                if let data = finalJSON.data(using: .utf8),
-                   let json = try? JSONDecoder().decode(PartialResult.self, from: data),
-                   !json.text.isEmpty {
-                    lastResult = json.text
-                }
-            }
-        }
-
-        return lastResult
-    }
-}
-
-// MARK: - Supporting Types
-
-private struct TranscriptionResult: Codable {
-    let text: String
-    let confidence: Double?
-    let language: String?
-}
-
-private struct PartialResult: Codable {
-    let text: String
 }
