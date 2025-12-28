@@ -85,9 +85,13 @@ public actor STTCapability: ModelLoadableCapability {
             throw SDKError.stt(.modelLoadFailed, "No STT component handle")
         }
 
-        // Load model
-        let result = modelId.withCString { modelIdPtr in
-            rac_stt_component_load_model(handle, modelIdPtr)
+        // Resolve model ID to local file path
+        let modelPath = try await resolveModelPath(modelId)
+        logger.info("Loading STT model from path: \(modelPath)")
+
+        // Load model using resolved path
+        let result = modelPath.withCString { pathPtr in
+            rac_stt_component_load_model(handle, pathPtr)
         }
 
         guard result == RAC_SUCCESS else {
@@ -96,6 +100,21 @@ public actor STTCapability: ModelLoadableCapability {
 
         loadedModelId = modelId
         logger.info("Model loaded: \(modelId)")
+    }
+
+    /// Resolve a model ID to its local file path
+    private func resolveModelPath(_ modelId: String) async throws -> String {
+        let allModels = try await RunAnywhere.availableModels()
+
+        guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
+            throw SDKError.stt(.modelNotFound, "Model '\(modelId)' not found in registry")
+        }
+
+        guard let localPath = modelInfo.localPath else {
+            throw SDKError.stt(.modelNotFound, "Model '\(modelId)' is not downloaded. Please download the model first.")
+        }
+
+        return localPath.path
     }
 
     public func unload() async throws {

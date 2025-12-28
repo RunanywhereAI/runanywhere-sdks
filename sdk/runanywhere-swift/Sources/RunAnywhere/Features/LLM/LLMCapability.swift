@@ -79,9 +79,13 @@ public actor LLMCapability: ModelLoadableCapability {
             throw SDKError.llm(.modelLoadFailed, "No LLM component handle")
         }
 
-        // Load model
-        let result = modelId.withCString { modelIdPtr in
-            rac_llm_component_load_model(handle, modelIdPtr)
+        // Resolve model ID to local file path
+        let modelPath = try await resolveModelPath(modelId)
+        logger.info("Loading model from path: \(modelPath)")
+
+        // Load model using resolved path
+        let result = modelPath.withCString { pathPtr in
+            rac_llm_component_load_model(handle, pathPtr)
         }
 
         guard result == RAC_SUCCESS else {
@@ -90,6 +94,24 @@ public actor LLMCapability: ModelLoadableCapability {
 
         loadedModelId = modelId
         logger.info("Model loaded: \(modelId)")
+    }
+
+    /// Resolve a model ID to its local file path
+    private func resolveModelPath(_ modelId: String) async throws -> String {
+        // Get all available models from the registry
+        let allModels = try await RunAnywhere.availableModels()
+
+        // Find the model info for this ID
+        guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
+            throw SDKError.llm(.modelNotFound, "Model '\(modelId)' not found in registry")
+        }
+
+        // Check if model is downloaded
+        guard let localPath = modelInfo.localPath else {
+            throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded. Please download the model first.")
+        }
+
+        return localPath.path
     }
 
     public func unload() async throws {
