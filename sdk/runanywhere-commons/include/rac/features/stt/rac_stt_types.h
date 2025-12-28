@@ -23,11 +23,28 @@ extern "C" {
 #endif
 
 // =============================================================================
-// CONSTANTS - Mirrors Swift's STTConstants
+// CONSTANTS - Single Source of Truth for STT
+// Swift references these via CRACommons import
 // =============================================================================
 
-/** Default sample rate for STT (16kHz) */
+// Audio Format Constants
 #define RAC_STT_DEFAULT_SAMPLE_RATE 16000
+#define RAC_STT_MAX_SAMPLE_RATE 48000
+#define RAC_STT_MIN_SAMPLE_RATE 8000
+#define RAC_STT_BYTES_PER_SAMPLE 2
+#define RAC_STT_CHANNELS 1
+
+// Confidence Scores
+#define RAC_STT_DEFAULT_CONFIDENCE 0.9f
+#define RAC_STT_MIN_ACCEPTABLE_CONFIDENCE 0.5f
+
+// Streaming Constants
+#define RAC_STT_DEFAULT_STREAMING_CHUNK_MS 100
+#define RAC_STT_MIN_STREAMING_CHUNK_MS 50
+#define RAC_STT_MAX_STREAMING_CHUNK_MS 1000
+
+// Language
+#define RAC_STT_DEFAULT_LANGUAGE "en"
 
 // =============================================================================
 // AUDIO FORMAT - Mirrors Swift's AudioFormat
@@ -35,13 +52,15 @@ extern "C" {
 
 /**
  * @brief Audio format enumeration
+ * Mirrors Swift's AudioFormat from AudioTypes.swift
  */
 typedef enum rac_audio_format_enum {
     RAC_AUDIO_FORMAT_PCM = 0,
     RAC_AUDIO_FORMAT_WAV = 1,
     RAC_AUDIO_FORMAT_MP3 = 2,
     RAC_AUDIO_FORMAT_OPUS = 3,
-    RAC_AUDIO_FORMAT_FLAC = 4
+    RAC_AUDIO_FORMAT_AAC = 4,
+    RAC_AUDIO_FORMAT_FLAC = 5
 } rac_audio_format_enum_t;
 
 // =============================================================================

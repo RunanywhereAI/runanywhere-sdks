@@ -20,7 +20,7 @@ import Foundation
 /// public enum MyModule: RunAnywhereModule {
 ///     public static let moduleId = "my-module"
 ///     public static let moduleName = "My Module"
-///     public static let capabilities: Set<CapabilityType> = [.llm]
+///     public static let capabilities: Set<SDKComponent> = [.llm]
 ///     public static let defaultPriority: Int = 100
 ///     public static let inferenceFramework: InferenceFramework = .onnx
 ///
@@ -55,7 +55,7 @@ public protocol RunAnywhereModule {
     static var moduleName: String { get }
 
     /// Set of capabilities this module provides
-    static var capabilities: Set<CapabilityType> { get }
+    static var capabilities: Set<SDKComponent> { get }
 
     /// Default priority for service registration (higher = preferred)
     static var defaultPriority: Int { get }

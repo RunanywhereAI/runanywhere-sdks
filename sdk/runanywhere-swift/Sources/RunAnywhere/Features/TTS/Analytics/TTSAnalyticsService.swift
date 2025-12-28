@@ -11,6 +11,7 @@
 //  Actual sample rates may vary depending on the TTS model/voice configuration.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - TTS Analytics Service
@@ -56,13 +57,13 @@ public actor TTSAnalyticsService {
     /// - Parameters:
     ///   - text: The text to synthesize
     ///   - voice: The voice ID being used
-    ///   - sampleRate: Audio sample rate in Hz (default: TTSConstants.defaultSampleRate)
+    ///   - sampleRate: Audio sample rate in Hz (default: RAC_TTS_DEFAULT_SAMPLE_RATE)
     ///   - framework: The inference framework being used
     /// - Returns: A unique synthesis ID for tracking
     public func startSynthesis(
         text: String,
         voice: String,
-        sampleRate: Int = TTSConstants.defaultSampleRate,
+        sampleRate: Int = Int(RAC_TTS_DEFAULT_SAMPLE_RATE),
         framework: InferenceFramework = .unknown
     ) -> String {
         let id = UUID().uuidString

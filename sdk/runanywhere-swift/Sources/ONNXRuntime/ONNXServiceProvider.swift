@@ -40,7 +40,7 @@ public enum ONNX: RunAnywhereModule {
 
     public static let moduleId = "onnx"
     public static let moduleName = "ONNX Runtime"
-    public static let capabilities: Set<CapabilityType> = [.stt, .tts]
+    public static let capabilities: Set<SDKComponent> = [.stt, .tts]
     public static let defaultPriority: Int = 100
 
     /// ONNX uses the ONNX Runtime inference framework

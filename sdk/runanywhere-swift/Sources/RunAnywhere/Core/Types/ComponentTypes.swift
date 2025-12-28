@@ -39,24 +39,42 @@ public protocol ComponentOutput: Sendable {
 
 // MARK: - SDK Component Enum
 
-/// SDK component types for identification
-public enum SDKComponent: String, CaseIterable, Sendable {
-    case llm
-    case stt
-    case tts
-    case vad
-    case voice
-    case embedding
+/// SDK component types for identification.
+///
+/// This enum consolidates what was previously `CapabilityType` and provides
+/// a unified type for all AI capabilities in the SDK.
+///
+/// ## Usage
+///
+/// ```swift
+/// // Check what capabilities a module provides
+/// let capabilities = MyModule.capabilities
+/// if capabilities.contains(.llm) {
+///     // Module provides LLM services
+/// }
+/// ```
+public enum SDKComponent: String, CaseIterable, Codable, Sendable, Hashable {
+    case llm = "LLM"
+    case stt = "STT"
+    case tts = "TTS"
+    case vad = "VAD"
+    case voice = "VOICE"
+    case embedding = "EMBEDDING"
 
     /// Human-readable display name
     public var displayName: String {
         switch self {
-        case .llm: return "LLM"
-        case .stt: return "Speech-to-Text"
-        case .tts: return "Text-to-Speech"
+        case .llm: return "Language Model"
+        case .stt: return "Speech to Text"
+        case .tts: return "Text to Speech"
         case .vad: return "Voice Activity Detection"
         case .voice: return "Voice Agent"
         case .embedding: return "Embedding"
         }
+    }
+
+    /// Analytics key for the component (lowercase)
+    public var analyticsKey: String {
+        rawValue.lowercased()
     }
 }

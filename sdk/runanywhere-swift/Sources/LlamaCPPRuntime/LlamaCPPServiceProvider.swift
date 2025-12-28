@@ -40,7 +40,7 @@ public enum LlamaCPP: RunAnywhereModule {
 
     public static let moduleId = "llamacpp"
     public static let moduleName = "LlamaCPP"
-    public static let capabilities: Set<CapabilityType> = [.llm]
+    public static let capabilities: Set<SDKComponent> = [.llm]
     public static let defaultPriority: Int = 100
 
     /// LlamaCPP uses the llama.cpp inference framework

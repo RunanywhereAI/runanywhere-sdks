@@ -23,14 +23,25 @@ extern "C" {
 #endif
 
 // =============================================================================
-// CONSTANTS - Mirrors Swift's TTSConstants
+// CONSTANTS - Single Source of Truth for TTS
+// Swift references these via CRACommons import
 // =============================================================================
 
-/** Default sample rate for TTS (22050 Hz) */
+// Audio Format Constants
 #define RAC_TTS_DEFAULT_SAMPLE_RATE 22050
-
-/** CD quality sample rate (44100 Hz) */
+#define RAC_TTS_HIGH_QUALITY_SAMPLE_RATE 24000
 #define RAC_TTS_CD_QUALITY_SAMPLE_RATE 44100
+#define RAC_TTS_MAX_SAMPLE_RATE 48000
+#define RAC_TTS_BYTES_PER_SAMPLE 2
+#define RAC_TTS_CHANNELS 1
+
+// Speaking Rate Constants
+#define RAC_TTS_DEFAULT_SPEAKING_RATE 1.0f
+#define RAC_TTS_MIN_SPEAKING_RATE 0.5f
+#define RAC_TTS_MAX_SPEAKING_RATE 2.0f
+
+// Streaming Constants
+#define RAC_TTS_DEFAULT_STREAMING_CHUNK_BYTES 4096
 
 // =============================================================================
 // CONFIGURATION - Mirrors Swift's TTSConfiguration

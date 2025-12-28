@@ -5,6 +5,7 @@
 //  Options for text-to-speech synthesis operations
 //
 
+import CRACommons
 import Foundation
 
 /// Options for text-to-speech synthesis
@@ -48,7 +49,7 @@ public struct TTSOptions: Sendable {
         pitch: Float = 1.0,
         volume: Float = 1.0,
         audioFormat: AudioFormat = .pcm,
-        sampleRate: Int = TTSConstants.defaultSampleRate,
+        sampleRate: Int = Int(RAC_TTS_DEFAULT_SAMPLE_RATE),
         useSSML: Bool = false
     ) {
         self.voice = voice
@@ -72,7 +73,7 @@ public struct TTSOptions: Sendable {
             pitch: configuration.pitch,
             volume: configuration.volume,
             audioFormat: configuration.audioFormat,
-            sampleRate: configuration.audioFormat == .pcm ? TTSConstants.defaultSampleRate : TTSConstants.cdQualitySampleRate,
+            sampleRate: configuration.audioFormat == .pcm ? Int(RAC_TTS_DEFAULT_SAMPLE_RATE) : Int(RAC_TTS_CD_QUALITY_SAMPLE_RATE),
             useSSML: configuration.enableSSML
         )
     }

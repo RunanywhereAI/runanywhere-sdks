@@ -9,6 +9,7 @@
 //  This avoids string conversion/parsing and enables compile-time type checking.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - TTS Event
@@ -39,12 +40,12 @@ public enum TTSEvent: SDKEvent, TelemetryEventProperties {
     /// Synthesis started event
     /// - Parameters:
     ///   - characterCount: Number of characters in the text to synthesize
-    ///   - sampleRate: Audio sample rate in Hz (default: TTSConstants.defaultSampleRate)
+    ///   - sampleRate: Audio sample rate in Hz (default: RAC_TTS_DEFAULT_SAMPLE_RATE)
     case synthesisStarted(
         synthesisId: String,
         modelId: String,
         characterCount: Int,
-        sampleRate: Int = TTSConstants.defaultSampleRate,
+        sampleRate: Int = Int(RAC_TTS_DEFAULT_SAMPLE_RATE),
         framework: InferenceFramework = .unknown
     )
 
@@ -66,7 +67,7 @@ public enum TTSEvent: SDKEvent, TelemetryEventProperties {
         audioSizeBytes: Int,
         processingDurationMs: Double,
         charactersPerSecond: Double,
-        sampleRate: Int = TTSConstants.defaultSampleRate,
+        sampleRate: Int = Int(RAC_TTS_DEFAULT_SAMPLE_RATE),
         framework: InferenceFramework = .unknown
     )
     case synthesisFailed(synthesisId: String, modelId: String, error: SDKError)

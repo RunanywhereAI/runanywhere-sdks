@@ -5,6 +5,7 @@
 //  Options for speech-to-text transcription
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - STT Options
@@ -50,7 +51,7 @@ public struct STTOptions: Sendable {
         enableTimestamps: Bool = true,
         vocabularyFilter: [String] = [],
         audioFormat: AudioFormat = .pcm,
-        sampleRate: Int = STTConstants.defaultSampleRate,
+        sampleRate: Int = Int(RAC_STT_DEFAULT_SAMPLE_RATE),
         preferredFramework: InferenceFramework? = nil
     ) {
         self.language = language

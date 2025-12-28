@@ -315,9 +315,16 @@ public actor TTSCapability: ModelLoadableCapability {
         get async { loadedVoice }
     }
 
-    /// Available voices (currently returns empty array - needs model catalog integration)
+    /// Available voices from the model registry
+    /// Returns TTS model IDs that can be used for synthesis
     public var availableVoices: [String] {
-        get async { [] }
+        get async {
+            // Query model registry for TTS models
+            // Filter models that can support TTS (ONNX-based frameworks)
+            let criteria = ModelCriteria(framework: .onnx)
+            let ttsModels = ServiceContainer.shared.modelRegistry.filterModels(by: criteria)
+            return ttsModels.map { $0.id }
+        }
     }
 
     /// Whether TTS is currently speaking (not implemented in C++ layer)
