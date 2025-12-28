@@ -114,17 +114,14 @@ public class SimplifiedFileManager: FileManagementService {
     /// Check if a specific model is downloaded
     @MainActor
     public func isModelDownloaded(modelId: String, framework: InferenceFramework) -> Bool {
-        // First check if the folder exists and has contents
+        // Check if the folder exists and has contents
         guard let folderURL = try? ModelPathUtils.getModelFolder(modelId: modelId, framework: framework),
               folderExistsAndHasContents(at: folderURL) else {
             return false
         }
 
-        // Use storage strategy if available for more accurate detection
-        if let strategy = ModuleRegistry.shared.storageStrategy(for: framework) {
-            return strategy.isValidModelStorage(at: folderURL)
-        }
-
+        // Folder exists with contents - model is downloaded
+        // Module-specific validation can be done by the service when loading
         return true
     }
 

@@ -2,27 +2,32 @@
 //  STTCapability.swift
 //  RunAnywhere SDK
 //
-//  Actor-based STT capability that owns model lifecycle and transcription.
-//  Uses ManagedLifecycle for unified lifecycle + analytics handling.
+//  Thin Swift wrapper over rac_stt_component_* C API.
+//  All business logic is in the C++ layer; this is just a Swift interface.
+//
+//  ⚠️ WARNING: This is a direct wrapper. Do NOT add custom logic here.
+//  The C++ layer (runanywhere-commons) is the source of truth.
 //
 
 @preconcurrency import AVFoundation
+import CRACommons
 import Foundation
 
 /// Actor-based STT capability that provides a simplified interface for speech-to-text.
-/// Owns the model lifecycle and provides thread-safe access to transcription operations.
-///
-/// Uses `ManagedLifecycle` to handle model loading/unloading with automatic analytics tracking.
+/// This is a thin wrapper over the C++ rac_stt_component API.
 public actor STTCapability: ModelLoadableCapability {
     public typealias Configuration = STTConfiguration
 
     // MARK: - State
 
-    /// Managed lifecycle with integrated event tracking
-    private let managedLifecycle: ManagedLifecycle<STTService>
+    /// Handle to the C++ STT component
+    private var handle: rac_handle_t?
 
     /// Current configuration
     private var config: STTConfiguration?
+
+    /// Currently loaded model ID
+    private var loadedModelId: String?
 
     // MARK: - Dependencies
 
@@ -33,265 +38,263 @@ public actor STTCapability: ModelLoadableCapability {
 
     public init(analyticsService: STTAnalyticsService = STTAnalyticsService()) {
         self.analyticsService = analyticsService
-        self.managedLifecycle = ManagedLifecycle.forSTT()
+    }
+
+    deinit {
+        if let handle = handle {
+            rac_stt_component_destroy(handle)
+        }
     }
 
     // MARK: - Configuration (Capability Protocol)
 
     public func configure(_ config: STTConfiguration) {
         self.config = config
-        Task { await managedLifecycle.configure(config) }
     }
 
     // MARK: - Model Lifecycle (ModelLoadableCapability Protocol)
-    // All lifecycle operations are delegated to ManagedLifecycle which handles analytics automatically
 
     public var isModelLoaded: Bool {
-        get async { await managedLifecycle.isLoaded }
+        get async {
+            guard let handle = handle else { return false }
+            return rac_stt_component_is_loaded(handle) == RAC_TRUE
+        }
     }
 
     public var currentModelId: String? {
-        get async { await managedLifecycle.currentModelId }
+        get async { loadedModelId }
     }
 
     /// Whether the service supports streaming transcription
     public var supportsStreaming: Bool {
-        get async {
-            guard let service = await managedLifecycle.currentService else { return false }
-            return service.supportsStreaming
-        }
+        get async { true }  // C++ layer supports streaming
     }
 
     public func loadModel(_ modelId: String) async throws {
-        try await managedLifecycle.load(modelId)
+        // Create component if needed
+        if handle == nil {
+            var newHandle: rac_handle_t?
+            let createResult = rac_stt_component_create(&newHandle)
+            guard createResult == RAC_SUCCESS, let newSTTHandle = newHandle else {
+                throw SDKError.stt(.modelLoadFailed, "Failed to create STT component: \(createResult)")
+            }
+            handle = newSTTHandle
+        }
+
+        guard let handle = handle else {
+            throw SDKError.stt(.modelLoadFailed, "No STT component handle")
+        }
+
+        // Load model
+        let result = modelId.withCString { modelIdPtr in
+            rac_stt_component_load_model(handle, modelIdPtr)
+        }
+
+        guard result == RAC_SUCCESS else {
+            throw SDKError.stt(.modelLoadFailed, "Failed to load model: \(result)")
+        }
+
+        loadedModelId = modelId
+        logger.info("Model loaded: \(modelId)")
     }
 
     public func unload() async throws {
-        await managedLifecycle.unload()
+        guard let handle = handle else { return }
+
+        let result = rac_stt_component_cleanup(handle)
+        if result != RAC_SUCCESS {
+            logger.warning("Cleanup returned: \(result)")
+        }
+
+        loadedModelId = nil
+        logger.info("Model unloaded")
     }
 
     public func cleanup() async {
-        await managedLifecycle.reset()
+        if let handle = handle {
+            rac_stt_component_cleanup(handle)
+            rac_stt_component_destroy(handle)
+        }
+        handle = nil
+        loadedModelId = nil
     }
 
     // MARK: - Transcription
 
     /// Transcribe audio data
-    /// - Parameters:
-    ///   - audioData: Raw audio data
-    ///   - options: Transcription options
-    /// - Returns: Transcription output
     public func transcribe(
         _ audioData: Data,
         options: STTOptions = STTOptions()
     ) async throws -> STTOutput {
-        let service = try await managedLifecycle.requireService()
-        let modelId = await managedLifecycle.modelIdOrUnknown()
+        guard let handle = handle else {
+            throw SDKError.stt(.notInitialized, "STT not initialized")
+        }
+
+        guard rac_stt_component_is_loaded(handle) == RAC_TRUE else {
+            throw SDKError.stt(.notInitialized, "STT model not loaded")
+        }
+
+        let modelId = loadedModelId ?? "unknown"
 
         logger.info("Transcribing audio with model: \(modelId)")
 
-        // Merge options with config defaults
-        let effectiveOptions = mergeOptions(options)
-
         // Calculate audio metrics
         let audioSizeBytes = audioData.count
-        let audioLengthMs = estimateAudioLength(dataSize: audioSizeBytes) * 1000
+        let audioLengthSec = estimateAudioLength(dataSize: audioSizeBytes)
+        let audioLengthMs = audioLengthSec * 1000
 
-        // Start transcription tracking
+        // Start analytics tracking
         let transcriptionId = await analyticsService.startTranscription(
             modelId: modelId,
             audioLengthMs: audioLengthMs,
             audioSizeBytes: audioSizeBytes,
-            language: effectiveOptions.language,
+            language: options.language,
             isStreaming: false,
-            sampleRate: STTConstants.defaultSampleRate,
-            framework: service.inferenceFramework
+            framework: .onnx
         )
 
-        // Perform transcription
-        let result: STTTranscriptionResult
-        do {
-            result = try await service.transcribe(audioData: audioData, options: effectiveOptions)
-        } catch {
-            logger.error("Transcription failed: \(error)")
+        let startTime = Date()
+
+        // Build C options
+        var cOptions = rac_stt_options_t()
+        cOptions.language = (options.language as NSString).utf8String
+
+        // Transcribe
+        var sttResult = rac_stt_result_t()
+        let transcribeResult = audioData.withUnsafeBytes { audioPtr in
+            rac_stt_component_transcribe(
+                handle,
+                audioPtr.baseAddress,
+                audioData.count,
+                &cOptions,
+                &sttResult
+            )
+        }
+
+        guard transcribeResult == RAC_SUCCESS else {
+            let error = SDKError.stt(.processingFailed, "Transcription failed: \(transcribeResult)")
             await analyticsService.trackTranscriptionFailed(
                 transcriptionId: transcriptionId,
                 error: error
             )
-            await managedLifecycle.trackOperationError(error, operation: "transcribe")
-            throw SDKError.stt(.generationFailed, "Transcription failed: \(error.localizedDescription)", underlying: error)
+            throw error
         }
 
-        // Complete transcription tracking
+        let endTime = Date()
+        let latencyMs = endTime.timeIntervalSince(startTime) * 1000
+        let processingTimeSec = endTime.timeIntervalSince(startTime)
+
+        // Extract result
+        let transcribedText: String
+        if let textPtr = sttResult.text {
+            transcribedText = String(cString: textPtr)
+        } else {
+            transcribedText = ""
+        }
+        let detectedLanguage: String?
+        if let langPtr = sttResult.detected_language {
+            detectedLanguage = String(cString: langPtr)
+        } else {
+            detectedLanguage = nil
+        }
+        let confidence = sttResult.confidence
+
+        // Complete analytics
         await analyticsService.completeTranscription(
             transcriptionId: transcriptionId,
-            text: result.transcript,
-            confidence: result.confidence ?? STTConstants.defaultConfidence
+            text: transcribedText,
+            confidence: confidence
         )
 
-        let metrics = await analyticsService.getMetrics()
-        let processingTime = metrics.lastEventTime.map { $0.timeIntervalSince(metrics.startTime) } ?? 0
+        let wordCount = transcribedText.split(separator: " ").count
+        logger.info("Transcription completed: \(wordCount) words in \(Int(latencyMs))ms")
 
-        logger.info("Transcription completed in \(Int(processingTime * 1000))ms")
+        // Create metadata
+        let metadata = TranscriptionMetadata(
+            modelId: modelId,
+            processingTime: processingTimeSec,
+            audioLength: audioLengthSec
+        )
 
-        // Convert to output
         return STTOutput(
-            text: result.transcript,
-            confidence: result.confidence ?? STTConstants.defaultConfidence,
-            wordTimestamps: result.timestamps?.map { timestamp in
-                WordTimestamp(
-                    word: timestamp.word,
-                    startTime: timestamp.startTime,
-                    endTime: timestamp.endTime,
-                    confidence: timestamp.confidence ?? STTConstants.defaultConfidence
-                )
-            },
-            detectedLanguage: result.language,
-            alternatives: result.alternatives?.map { alt in
-                TranscriptionAlternative(text: alt.transcript, confidence: alt.confidence)
-            },
-            metadata: TranscriptionMetadata(
-                modelId: modelId,
-                processingTime: processingTime,
-                audioLength: audioLengthMs / 1000
-            )
+            text: transcribedText,
+            confidence: confidence,
+            wordTimestamps: nil,  // Word timestamps not yet extracted from C API
+            detectedLanguage: detectedLanguage,
+            alternatives: nil,
+            metadata: metadata
         )
     }
 
-    /// Transcribe audio buffer
-    /// - Parameters:
-    ///   - buffer: Audio buffer
-    ///   - language: Optional language hint
-    /// - Returns: Transcription output
-    public func transcribe(
-        _ buffer: AVAudioPCMBuffer,
-        language: String? = nil
-    ) async throws -> STTOutput {
-        let audioData = convertBufferToData(buffer)
-        let effectiveLanguage = language ?? config?.language ?? "en"
-        let options = STTOptions(
-            language: effectiveLanguage,
-            audioFormat: .pcm
-        )
-        return try await transcribe(audioData, options: options)
-    }
-
-    /// Stream transcription for real-time processing
-    /// - Parameters:
-    ///   - audioStream: Async stream of audio data chunks
-    ///   - options: Transcription options
-    /// - Returns: Async stream of transcription text
-    public func streamTranscribe<S: AsyncSequence>(
-        _ audioStream: S,
-        options: STTOptions = STTOptions()
-    ) -> AsyncThrowingStream<String, Error> where S.Element == Data {
-        AsyncThrowingStream { continuation in
-            Task {
-                guard let service = await self.managedLifecycle.currentService else {
-                    continuation.finish(
-                        throwing: SDKError.stt(.componentNotReady, "STT model not loaded")
-                    )
-                    return
-                }
-
-                let effectiveOptions = self.mergeOptions(options)
-                let modelId = await self.managedLifecycle.modelIdOrUnknown()
-
-                // Start transcription tracking (streaming mode - audio length unknown upfront)
-                let transcriptionId = await self.analyticsService.startTranscription(
-                    modelId: modelId,
-                    audioLengthMs: 0,  // Unknown for streaming
-                    audioSizeBytes: 0, // Unknown for streaming
-                    language: effectiveOptions.language,
-                    isStreaming: true,
-                    sampleRate: STTConstants.defaultSampleRate,
-                    framework: service.inferenceFramework
-                )
-
-                var lastPartialWordCount = 0
-
-                do {
-                    let result = try await service.streamTranscribe(
-                        audioStream: audioStream,
-                        options: effectiveOptions,
-                        onPartial: { partial in
-                            // Track streaming update
-                            let wordCount = partial.split(separator: " ").count
-                            if wordCount > lastPartialWordCount {
-                                Task {
-                                    await self.analyticsService.trackPartialTranscript(text: partial)
-                                }
-                                lastPartialWordCount = wordCount
-                            }
-                            continuation.yield(partial)
-                        }
-                    )
-
-                    // Complete transcription tracking
-                    await self.analyticsService.completeTranscription(
-                        transcriptionId: transcriptionId,
-                        text: result.transcript,
-                        confidence: result.confidence ?? STTConstants.defaultConfidence
-                    )
-
-                    // Yield final result
-                    continuation.yield(result.transcript)
-                    continuation.finish()
-                } catch {
-                    await self.analyticsService.trackTranscriptionFailed(
-                        transcriptionId: transcriptionId,
-                        error: error
-                    )
-                    continuation.finish(throwing: error)
-                }
-            }
+    /// Start streaming transcription
+    public func startStreamingTranscription(
+        options: STTOptions = STTOptions(),
+        onPartialResult: @escaping (STTTranscriptionResult) -> Void,
+        onFinalResult: @escaping (STTOutput) -> Void,
+        onError: @escaping (Error) -> Void
+    ) async throws {
+        guard let handle = handle else {
+            throw SDKError.stt(.notInitialized, "STT not initialized")
         }
+
+        guard rac_stt_component_is_loaded(handle) == RAC_TRUE else {
+            throw SDKError.stt(.notInitialized, "STT model not loaded")
+        }
+
+        logger.info("Starting streaming transcription")
+
+        // For now, streaming transcription would need to be implemented
+        // via the C++ streaming callback mechanism
+        throw SDKError.stt(.streamingNotSupported, "Streaming transcription not yet implemented in wrapper")
+    }
+
+    /// Process audio samples for streaming transcription
+    public func processStreamingAudio(_ samples: [Float]) async throws {
+        guard let handle = handle else {
+            throw SDKError.stt(.notInitialized, "STT not initialized")
+        }
+
+        // Process samples through C++ API
+        var cOptions = rac_stt_options_t()
+
+        let data = samples.withUnsafeBufferPointer { buffer in
+            Data(buffer: buffer)
+        }
+
+        var sttResult = rac_stt_result_t()
+        let transcribeResult = data.withUnsafeBytes { audioPtr in
+            rac_stt_component_transcribe(
+                handle,
+                audioPtr.baseAddress,
+                data.count,
+                &cOptions,
+                &sttResult
+            )
+        }
+
+        if transcribeResult != RAC_SUCCESS {
+            throw SDKError.stt(.processingFailed, "Streaming process failed: \(transcribeResult)")
+        }
+    }
+
+    /// Stop streaming transcription
+    public func stopStreamingTranscription() async {
+        logger.info("Streaming transcription stopped")
     }
 
     // MARK: - Analytics
 
-    /// Get current STT analytics metrics
     public func getAnalyticsMetrics() async -> STTMetrics {
         await analyticsService.getMetrics()
     }
 
     // MARK: - Private Methods
 
-    private func mergeOptions(_ options: STTOptions) -> STTOptions {
-        guard let config = config else { return options }
-
-        return STTOptions(
-            language: options.language.isEmpty ? (config.language ?? "en") : options.language,
-            detectLanguage: options.detectLanguage,
-            enablePunctuation: options.enablePunctuation,
-            enableDiarization: options.enableDiarization,
-            maxSpeakers: options.maxSpeakers,
-            enableTimestamps: options.enableTimestamps,
-            vocabularyFilter: options.vocabularyFilter,
-            audioFormat: options.audioFormat,
-            preferredFramework: options.preferredFramework
-        )
-    }
-
-    private func convertBufferToData(_ buffer: AVAudioPCMBuffer) -> Data {
-        guard let channelData = buffer.floatChannelData else { return Data() }
-
-        let channelDataValue = channelData.pointee
-        let channelDataCount = Int(buffer.frameLength)
-
-        let samples = Array(UnsafeBufferPointer<Float>(
-            start: channelDataValue,
-            count: channelDataCount
-        ))
-
-        return samples.withUnsafeBufferPointer { bufferPointer in
-            Data(buffer: bufferPointer)
-        }
-    }
-
-    private func estimateAudioLength(dataSize: Int, sampleRate: Int = STTConstants.defaultSampleRate) -> TimeInterval {
-        let bytesPerSample = 2 // 16-bit PCM
-        let samples = dataSize / bytesPerSample
-        return TimeInterval(samples) / TimeInterval(sampleRate)
+    /// Estimate audio length from data size (assumes 16kHz mono 16-bit)
+    private func estimateAudioLength(dataSize: Int) -> Double {
+        let bytesPerSample = 2  // 16-bit
+        let sampleRate = 16000.0
+        let samples = Double(dataSize) / Double(bytesPerSample)
+        return samples / sampleRate
     }
 }

@@ -2,172 +2,135 @@
 //  ModelLifecycleManager.swift
 //  RunAnywhere SDK
 //
-//  Unified model lifecycle management for all capabilities
-//  Handles loading, unloading, and downloading of models/resources
+//  Generic model lifecycle manager for capability services.
 //
 
 import Foundation
 
+// MARK: - Loading State
+
+/// State of a capability's model loading
+public enum CapabilityLoadingState: Sendable {
+    case idle
+    case loading(modelId: String)
+    case loaded(modelId: String)
+    case error(Error)
+
+    public var isLoaded: Bool {
+        if case .loaded = self { return true }
+        return false
+    }
+}
+
 // MARK: - Model Lifecycle Manager
 
-/// Unified actor for managing model/resource lifecycle across all capabilities
-/// Handles loading, unloading, state tracking, and concurrent access
+/// Generic actor for managing model lifecycle with type-safe service instances.
+///
+/// This provides common lifecycle operations for capabilities:
+/// - Load/unload models
+/// - Track current state
+/// - Provide access to active service instances
 public actor ModelLifecycleManager<ServiceType> {
-    // MARK: - State
 
-    /// The currently loaded service
-    private var service: ServiceType?
+    // MARK: - Properties
 
-    /// The ID of the currently loaded resource
-    private var loadedResourceId: String?
-
-    /// In-flight loading task
-    private var inflightTask: Task<ServiceType, Error>?
-
-    /// Configuration for loading
-    private var configuration: (any ComponentConfiguration)?
-
-    // MARK: - Dependencies
-
-    private let logger: SDKLogger
-    private let loadResource: @Sendable (String, (any ComponentConfiguration)?) async throws -> ServiceType
-    private let unloadResource: @Sendable (ServiceType) async -> Void
+    private var _state: CapabilityLoadingState = .idle
+    private var _currentService: ServiceType?
+    private var _currentResourceId: String?
+    private var _configuration: (any ComponentConfiguration)?
+    private let serviceFactory: (String) async throws -> ServiceType
+    private let serviceCleanup: (ServiceType) async -> Void
 
     // MARK: - Initialization
 
-    /// Initialize with resource loading closures
-    /// - Parameters:
-    ///   - category: Logger category
-    ///   - loadResource: Closure to load a resource
-    ///   - unloadResource: Closure to unload a resource
     public init(
-        category: String,
-        loadResource: @escaping @Sendable (String, (any ComponentConfiguration)?) async throws -> ServiceType,
-        unloadResource: @escaping @Sendable (ServiceType) async -> Void
+        serviceFactory: @escaping (String) async throws -> ServiceType,
+        serviceCleanup: @escaping (ServiceType) async -> Void = { _ in }
     ) {
-        self.logger = SDKLogger(category: category)
-        self.loadResource = loadResource
-        self.unloadResource = unloadResource
+        self.serviceFactory = serviceFactory
+        self.serviceCleanup = serviceCleanup
     }
 
-    // MARK: - State Properties
+    // MARK: - State Accessors
 
-    /// Whether a resource is currently loaded
-    public var isLoaded: Bool {
-        service != nil
-    }
-
-    /// The currently loaded resource ID
-    public var currentResourceId: String? {
-        loadedResourceId
-    }
-
-    /// The currently loaded service
-    public var currentService: ServiceType? {
-        service
-    }
-
-    /// Current loading state
     public var state: CapabilityLoadingState {
-        if let resourceId = loadedResourceId {
-            return .loaded(resourceId: resourceId)
-        }
-        if inflightTask != nil {
-            return .loading(resourceId: "")
-        }
-        return .idle
+        _state
+    }
+
+    public var isLoaded: Bool {
+        _state.isLoaded
+    }
+
+    public var currentResourceId: String? {
+        _currentResourceId
+    }
+
+    public var currentService: ServiceType? {
+        _currentService
     }
 
     // MARK: - Configuration
 
-    /// Set configuration for loading
     public func configure(_ config: (any ComponentConfiguration)?) {
-        self.configuration = config
+        _configuration = config
     }
 
     // MARK: - Lifecycle Operations
 
-    /// Load a resource by ID
-    /// - Parameter resourceId: The resource identifier
-    /// - Returns: The loaded service
+    /// Load a model and create its service instance
     @discardableResult
     public func load(_ resourceId: String) async throws -> ServiceType {
-        // Check if already loaded with same ID
-        if loadedResourceId == resourceId, let service = service {
-            logger.info("Resource already loaded: \(resourceId)")
+        // Already loaded with same ID?
+        if _currentResourceId == resourceId, let service = _currentService {
             return service
         }
 
-        // Wait for existing load to complete
-        if let existingTask = inflightTask {
-            logger.info("Load in progress, waiting...")
-            let result = try await existingTask.value
-
-            // Check if the completed load was for our resource
-            if loadedResourceId == resourceId {
-                return result
-            }
+        // Unload previous
+        if _currentService != nil {
+            await unload()
         }
 
-        // Unload current if different
-        if let currentService = service, loadedResourceId != resourceId {
-            logger.info("Unloading current resource before loading new one")
-            await unloadResource(currentService)
-            service = nil
-            loadedResourceId = nil
-        }
-
-        // Create loading task
-        let config = configuration
-        let loadTask = Task<ServiceType, Error> {
-            try await loadResource(resourceId, config)
-        }
-
-        inflightTask = loadTask
+        _state = .loading(modelId: resourceId)
 
         do {
-            let loadedService = try await loadTask.value
-            service = loadedService
-            loadedResourceId = resourceId
-            inflightTask = nil
-            logger.info("Resource loaded successfully: \(resourceId)")
-            return loadedService
+            let service = try await serviceFactory(resourceId)
+            _currentService = service
+            _currentResourceId = resourceId
+            _state = .loaded(modelId: resourceId)
+            return service
         } catch {
-            inflightTask = nil
-            logger.error("Failed to load resource: \(error)")
-            throw SDKError.general(.modelLoadFailed, "Failed to load \(resourceId): \(error.localizedDescription)", underlying: error)
+            _state = .error(error)
+            throw error
         }
     }
 
-    /// Unload the currently loaded resource
+    /// Unload the current model
     public func unload() async {
-        guard let currentService = service else { return }
-
-        logger.info("Unloading resource: \(loadedResourceId ?? "unknown")")
-        await unloadResource(currentService)
-        service = nil
-        loadedResourceId = nil
-        logger.info("Resource unloaded successfully")
+        if let service = _currentService {
+            await serviceCleanup(service)
+        }
+        _currentService = nil
+        _currentResourceId = nil
+        _state = .idle
     }
 
-    /// Reset all state
+    /// Reset the manager
     public func reset() async {
-        inflightTask?.cancel()
-        inflightTask = nil
+        await unload()
+        _configuration = nil
+    }
 
-        if let currentService = service {
-            await unloadResource(currentService)
-        }
-
-        service = nil
-        loadedResourceId = nil
-        configuration = nil
+    /// Track an operation error
+    public func trackOperationError(_ error: Error, operation: String) {
+        // Could log or track the error here
+        // For now, just update state
+        _state = .error(error)
     }
 
     /// Get service or throw if not loaded
     public func requireService() throws -> ServiceType {
-        guard let service = service else {
-            throw SDKError.general(.componentNotReady, "Resource not loaded")
+        guard let service = _currentService else {
+            throw SDKError.general(.notInitialized, "No service is currently loaded")
         }
         return service
     }
@@ -175,81 +138,48 @@ public actor ModelLifecycleManager<ServiceType> {
 
 // MARK: - Factory Methods
 
+@MainActor
 extension ModelLifecycleManager where ServiceType == LLMService {
-    /// Create a lifecycle manager for LLM capabilities
+    /// Create a lifecycle manager for LLM services
     public static func forLLM() -> ModelLifecycleManager<LLMService> {
         ModelLifecycleManager<LLMService>(
-            category: "LLM.Lifecycle",
-            loadResource: { resourceId, config in
-                let logger = SDKLogger(category: "LLM.Loader")
-                logger.info("Loading LLM model: \(resourceId)")
-
-                let llmConfig = config as? LLMConfiguration ?? LLMConfiguration(modelId: resourceId)
-
-                let service = try await MainActor.run {
-                    Task {
-                        try await ServiceRegistry.shared.createLLM(for: resourceId, config: llmConfig)
-                    }
-                }.value
-
-                logger.info("LLM model loaded successfully: \(resourceId)")
-                return service
+            serviceFactory: { modelId in
+                let config = LLMConfiguration(modelId: modelId)
+                return try await ServiceRegistry.shared.createLLM(config: config)
             },
-            unloadResource: { service in
+            serviceCleanup: { service in
                 await service.cleanup()
             }
         )
     }
 }
 
+@MainActor
 extension ModelLifecycleManager where ServiceType == STTService {
-    /// Create a lifecycle manager for STT capabilities
+    /// Create a lifecycle manager for STT services
     public static func forSTT() -> ModelLifecycleManager<STTService> {
         ModelLifecycleManager<STTService>(
-            category: "STT.Lifecycle",
-            loadResource: { resourceId, config in
-                let logger = SDKLogger(category: "STT.Loader")
-                logger.info("Loading STT model: \(resourceId)")
-
-                let sttConfig = config as? STTConfiguration ?? STTConfiguration(modelId: resourceId)
-
-                let service = try await MainActor.run {
-                    Task {
-                        try await ServiceRegistry.shared.createSTT(for: resourceId, config: sttConfig)
-                    }
-                }.value
-
-                logger.info("STT model loaded successfully: \(resourceId)")
-                return service
+            serviceFactory: { modelId in
+                let config = STTConfiguration(modelId: modelId)
+                return try await ServiceRegistry.shared.createSTT(config: config)
             },
-            unloadResource: { service in
+            serviceCleanup: { service in
                 await service.cleanup()
             }
         )
     }
 }
 
+@MainActor
 extension ModelLifecycleManager where ServiceType == TTSService {
-    /// Create a lifecycle manager for TTS capabilities
+    /// Create a lifecycle manager for TTS services
     public static func forTTS() -> ModelLifecycleManager<TTSService> {
         ModelLifecycleManager<TTSService>(
-            category: "TTS.Lifecycle",
-            loadResource: { resourceId, config in
-                let logger = SDKLogger(category: "TTS.Loader")
-                logger.info("Loading TTS voice: \(resourceId)")
-
-                let ttsConfig = config as? TTSConfiguration ?? TTSConfiguration(voice: resourceId)
-
-                let service = try await MainActor.run {
-                    Task {
-                        try await ServiceRegistry.shared.createTTS(for: resourceId, config: ttsConfig)
-                    }
-                }.value
-
-                logger.info("TTS voice loaded successfully: \(resourceId)")
-                return service
+            serviceFactory: { voiceId in
+                let config = TTSConfiguration(voice: voiceId)
+                return try await ServiceRegistry.shared.createTTS(config: config)
             },
-            unloadResource: { service in
+            serviceCleanup: { service in
                 await service.cleanup()
             }
         )

@@ -2,325 +2,351 @@
 //  TTSCapability.swift
 //  RunAnywhere SDK
 //
-//  Actor-based TTS capability that owns voice lifecycle and synthesis.
-//  Uses ManagedLifecycle for unified lifecycle + analytics handling.
+//  Thin Swift wrapper over rac_tts_component_* C API.
+//  All business logic is in the C++ layer; this is just a Swift interface.
+//
+//  ⚠️ WARNING: This is a direct wrapper. Do NOT add custom logic here.
+//  The C++ layer (runanywhere-commons) is the source of truth.
 //
 
+@preconcurrency import AVFoundation
+import CRACommons
 import Foundation
 
 /// Actor-based TTS capability that provides a simplified interface for text-to-speech.
-/// Owns the voice lifecycle and provides thread-safe access to synthesis operations.
-///
-/// Uses `ManagedLifecycle` to handle voice loading/unloading with automatic analytics tracking.
+/// This is a thin wrapper over the C++ rac_tts_component API.
 public actor TTSCapability: ModelLoadableCapability {
     public typealias Configuration = TTSConfiguration
 
     // MARK: - State
 
-    /// Managed lifecycle with integrated event tracking
-    private let managedLifecycle: ManagedLifecycle<TTSService>
+    /// Handle to the C++ TTS component
+    private var handle: rac_handle_t?
 
     /// Current configuration
     private var config: TTSConfiguration?
+
+    /// Currently loaded voice
+    private var loadedVoice: String?
 
     // MARK: - Dependencies
 
     private let logger = SDKLogger(category: "TTSCapability")
     private let analyticsService: TTSAnalyticsService
 
-    /// Audio playback manager for speak() API
-    private let playbackManager = AudioPlaybackManager()
-
     // MARK: - Initialization
 
     public init(analyticsService: TTSAnalyticsService = TTSAnalyticsService()) {
         self.analyticsService = analyticsService
-        self.managedLifecycle = ManagedLifecycle.forTTS()
+    }
+
+    deinit {
+        if let handle = handle {
+            rac_tts_component_destroy(handle)
+        }
     }
 
     // MARK: - Configuration (Capability Protocol)
 
     public func configure(_ config: TTSConfiguration) {
         self.config = config
-        Task { await managedLifecycle.configure(config) }
     }
 
-    // MARK: - Voice Lifecycle (ModelLoadableCapability Protocol)
-    // All lifecycle operations are delegated to ManagedLifecycle which handles analytics automatically
+    // MARK: - Model Lifecycle (ModelLoadableCapability Protocol)
 
     public var isModelLoaded: Bool {
-        get async { await managedLifecycle.isLoaded }
-    }
-
-    /// Alias for voice-specific naming
-    public var isVoiceLoaded: Bool {
-        get async { await managedLifecycle.isLoaded }
+        get async {
+            guard let handle = handle else { return false }
+            return rac_tts_component_is_loaded(handle) == RAC_TRUE
+        }
     }
 
     public var currentModelId: String? {
-        get async { await managedLifecycle.currentModelId }
+        get async { loadedVoice }
     }
 
-    /// Alias for voice-specific naming
-    public var currentVoiceId: String? {
-        get async { await managedLifecycle.currentModelId }
-    }
-
-    /// Get available voices
-    public var availableVoices: [String] {
-        get async {
-            guard let service = await managedLifecycle.currentService else { return [] }
-            return service.availableVoices
-        }
-    }
-
-    /// Whether currently synthesizing
-    public var isSynthesizing: Bool {
-        get async {
-            guard let service = await managedLifecycle.currentService else { return false }
-            return service.isSynthesizing
-        }
+    /// Whether the service supports streaming synthesis
+    public var supportsStreaming: Bool {
+        get async { true }  // C++ layer supports streaming
     }
 
     public func loadModel(_ modelId: String) async throws {
         try await loadVoice(modelId)
     }
 
-    /// Load a voice by ID
-    /// - Parameter voiceId: The voice identifier
-    /// - Throws: Error if loading fails
+    /// Load a voice for synthesis
     public func loadVoice(_ voiceId: String) async throws {
-        try await managedLifecycle.load(voiceId)
+        // Create component if needed
+        if handle == nil {
+            var newHandle: rac_handle_t?
+            let createResult = rac_tts_component_create(&newHandle)
+            guard createResult == RAC_SUCCESS, let newTTSHandle = newHandle else {
+                throw SDKError.tts(.modelLoadFailed, "Failed to create TTS component: \(createResult)")
+            }
+            handle = newTTSHandle
+        }
+
+        guard let handle = handle else {
+            throw SDKError.tts(.modelLoadFailed, "No TTS component handle")
+        }
+
+        // Load voice
+        let result = voiceId.withCString { voiceIdPtr in
+            rac_tts_component_load_voice(handle, voiceIdPtr)
+        }
+
+        guard result == RAC_SUCCESS else {
+            throw SDKError.tts(.modelLoadFailed, "Failed to load voice: \(result)")
+        }
+
+        loadedVoice = voiceId
+        logger.info("Voice loaded: \(voiceId)")
     }
 
     public func unload() async throws {
-        await managedLifecycle.unload()
+        guard let handle = handle else { return }
+
+        let result = rac_tts_component_cleanup(handle)
+        if result != RAC_SUCCESS {
+            logger.warning("Cleanup returned: \(result)")
+        }
+
+        loadedVoice = nil
+        logger.info("Voice unloaded")
     }
 
     public func cleanup() async {
-        await managedLifecycle.reset()
+        if let handle = handle {
+            rac_tts_component_cleanup(handle)
+            rac_tts_component_destroy(handle)
+        }
+        handle = nil
+        loadedVoice = nil
     }
 
     // MARK: - Synthesis
 
-    /// Synthesize text to speech
-    /// - Parameters:
-    ///   - text: The text to synthesize
-    ///   - options: Synthesis options
-    /// - Returns: TTS output with audio data
+    /// Synthesize speech from text
     public func synthesize(
         _ text: String,
         options: TTSOptions = TTSOptions()
     ) async throws -> TTSOutput {
-        let service = try await managedLifecycle.requireService()
-        let modelId = await managedLifecycle.modelIdOrUnknown()
-
-        logger.info("Synthesizing text with model: \(modelId)")
-
-        // Merge options with config defaults
-        let effectiveOptions = mergeOptions(options)
-
-        // Start synthesis tracking
-        let synthesisId = await analyticsService.startSynthesis(
-            text: text,
-            voice: effectiveOptions.voice ?? modelId,
-            sampleRate: effectiveOptions.sampleRate,
-            framework: service.inferenceFramework
-        )
-
-        // Perform synthesis
-        let audioData: Data
-        do {
-            audioData = try await service.synthesize(text: text, options: effectiveOptions)
-        } catch {
-            logger.error("Synthesis failed: \(error)")
-            await analyticsService.trackSynthesisFailed(
-                synthesisId: synthesisId,
-                error: error
-            )
-            await managedLifecycle.trackOperationError(error, operation: "synthesize")
-            throw SDKError.tts(.generationFailed, "Synthesis failed: \(error.localizedDescription)", underlying: error)
+        guard let handle = handle else {
+            throw SDKError.tts(.notInitialized, "TTS not initialized")
         }
 
-        // Calculate audio duration from the generated audio data
-        let audioDurationSeconds = estimateAudioDuration(dataSize: audioData.count, sampleRate: effectiveOptions.sampleRate)
-        let audioDurationMs = audioDurationSeconds * 1000
+        guard rac_tts_component_is_loaded(handle) == RAC_TRUE else {
+            throw SDKError.tts(.notInitialized, "TTS voice not loaded")
+        }
 
-        // Complete synthesis tracking
+        let voiceId = loadedVoice ?? "unknown"
+
+        logger.info("Synthesizing speech with voice: \(voiceId)")
+
+        // Start analytics tracking
+        let synthesisId = await analyticsService.startSynthesis(
+            text: text,
+            voice: voiceId,
+            framework: .onnx
+        )
+
+        let startTime = Date()
+
+        // Build C options
+        var cOptions = rac_tts_options_t()
+        cOptions.rate = options.rate
+        cOptions.pitch = options.pitch
+        cOptions.volume = options.volume
+        cOptions.sample_rate = Int32(options.sampleRate)
+
+        // Synthesize
+        var ttsResult = rac_tts_result_t()
+        let synthesizeResult = text.withCString { textPtr in
+            rac_tts_component_synthesize(handle, textPtr, &cOptions, &ttsResult)
+        }
+
+        guard synthesizeResult == RAC_SUCCESS else {
+            let error = SDKError.tts(.processingFailed, "Synthesis failed: \(synthesizeResult)")
+            await analyticsService.trackSynthesisFailed(synthesisId: synthesisId, error: error)
+            throw error
+        }
+
+        let endTime = Date()
+        let processingTime = endTime.timeIntervalSince(startTime)
+
+        // Extract audio data
+        let audioData: Data
+        if let audioPtr = ttsResult.audio_data, ttsResult.audio_size > 0 {
+            audioData = Data(bytes: audioPtr, count: ttsResult.audio_size)
+        } else {
+            audioData = Data()
+        }
+
+        let sampleRate = Int(ttsResult.sample_rate)
+        let durationSec = Double(audioData.count) / Double(sampleRate * 2)  // 16-bit audio
+        let durationMs = durationSec * 1000
+
+        // Complete analytics
         await analyticsService.completeSynthesis(
             synthesisId: synthesisId,
-            audioDurationMs: audioDurationMs,
+            audioDurationMs: durationMs,
             audioSizeBytes: audioData.count
         )
 
-        let metrics = await analyticsService.getMetrics()
-        let processingTime = metrics.lastEventTime.map { $0.timeIntervalSince(metrics.startTime) } ?? 0
+        logger.info("Synthesis completed: \(Int(durationMs))ms audio in \(Int(processingTime * 1000))ms")
 
-        logger.info("Synthesis completed in \(Int(processingTime * 1000))ms, \(audioData.count) bytes")
-
+        // Create metadata
         let metadata = TTSSynthesisMetadata(
-            voice: effectiveOptions.voice ?? modelId,
-            language: effectiveOptions.language,
+            voice: voiceId,
+            language: options.language,
             processingTime: processingTime,
             characterCount: text.count
         )
 
         return TTSOutput(
             audioData: audioData,
-            format: effectiveOptions.audioFormat,
-            duration: audioDurationSeconds,
+            format: options.audioFormat,
+            duration: durationSec,
             phonemeTimestamps: nil,
             metadata: metadata
         )
     }
 
-    /// Stream synthesis for long text
-    /// - Parameters:
-    ///   - text: The text to synthesize
-    ///   - options: Synthesis options
-    /// - Returns: Async stream of audio data chunks
+    /// Synthesize speech with streaming output
     public func synthesizeStream(
         _ text: String,
-        options: TTSOptions = TTSOptions()
-    ) -> AsyncThrowingStream<Data, Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                guard let service = await self.managedLifecycle.currentService else {
-                    continuation.finish(
-                        throwing: SDKError.tts(.componentNotReady, "TTS voice not loaded")
-                    )
-                    return
-                }
-
-                let modelId = await self.managedLifecycle.modelIdOrUnknown()
-                let effectiveOptions = self.mergeOptions(options)
-
-                // Start synthesis tracking
-                let synthesisId = await self.analyticsService.startSynthesis(
-                    text: text,
-                    voice: effectiveOptions.voice ?? modelId,
-                    sampleRate: effectiveOptions.sampleRate,
-                    framework: service.inferenceFramework
-                )
-
-                var totalBytes = 0
-
-                do {
-                    try await service.synthesizeStream(
-                        text: text,
-                        options: effectiveOptions,
-                        onChunk: { chunk in
-                            totalBytes += chunk.count
-                            Task {
-                                await self.analyticsService.trackSynthesisChunk(
-                                    synthesisId: synthesisId,
-                                    chunkSize: chunk.count
-                                )
-                            }
-                            continuation.yield(chunk)
-                        }
-                    )
-
-                    // Complete synthesis tracking
-                    let audioDurationSeconds = self.estimateAudioDuration(dataSize: totalBytes, sampleRate: effectiveOptions.sampleRate)
-                    let audioDurationMs = audioDurationSeconds * 1000
-                    await self.analyticsService.completeSynthesis(
-                        synthesisId: synthesisId,
-                        audioDurationMs: audioDurationMs,
-                        audioSizeBytes: totalBytes
-                    )
-
-                    continuation.finish()
-                } catch {
-                    await self.analyticsService.trackSynthesisFailed(
-                        synthesisId: synthesisId,
-                        error: error
-                    )
-                    continuation.finish(throwing: error)
-                }
-            }
+        options: TTSOptions = TTSOptions(),
+        onAudioChunk: @escaping (Data) -> Void
+    ) async throws -> TTSOutput {
+        guard let handle = handle else {
+            throw SDKError.tts(.notInitialized, "TTS not initialized")
         }
+
+        guard rac_tts_component_is_loaded(handle) == RAC_TRUE else {
+            throw SDKError.tts(.notInitialized, "TTS voice not loaded")
+        }
+
+        let voiceId = loadedVoice ?? "unknown"
+
+        logger.info("Starting streaming synthesis with voice: \(voiceId)")
+
+        let startTime = Date()
+        var totalAudioData = Data()
+
+        // Build C options
+        var cOptions = rac_tts_options_t()
+        cOptions.rate = options.rate
+        cOptions.pitch = options.pitch
+        cOptions.volume = options.volume
+        cOptions.sample_rate = Int32(options.sampleRate)
+
+        // Create callback context
+        let context = TTSStreamContext(onChunk: onAudioChunk, totalData: &totalAudioData)
+        let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+        let streamResult = text.withCString { textPtr in
+            rac_tts_component_synthesize_stream(
+                handle,
+                textPtr,
+                &cOptions,
+                { audioPtr, audioSize, userData in
+                    guard let audioPtr = audioPtr, let userData = userData else { return }
+                    let ctx = Unmanaged<TTSStreamContext>.fromOpaque(userData).takeUnretainedValue()
+                    let chunk = Data(bytes: audioPtr, count: audioSize)
+                    ctx.onChunk(chunk)
+                    ctx.totalData.pointee.append(chunk)
+                },
+                contextPtr
+            )
+        }
+
+        Unmanaged<TTSStreamContext>.fromOpaque(contextPtr).release()
+
+        guard streamResult == RAC_SUCCESS else {
+            throw SDKError.tts(.processingFailed, "Streaming synthesis failed: \(streamResult)")
+        }
+
+        let endTime = Date()
+        let processingTime = endTime.timeIntervalSince(startTime)
+        let sampleRate = options.sampleRate
+        let durationSec = Double(totalAudioData.count) / Double(sampleRate * 2)
+
+        logger.info("Streaming synthesis completed: \(Int(durationSec * 1000))ms audio")
+
+        // Create metadata
+        let metadata = TTSSynthesisMetadata(
+            voice: voiceId,
+            language: options.language,
+            processingTime: processingTime,
+            characterCount: text.count
+        )
+
+        return TTSOutput(
+            audioData: totalAudioData,
+            format: options.audioFormat,
+            duration: durationSec,
+            phonemeTimestamps: nil,
+            metadata: metadata
+        )
     }
 
     /// Stop current synthesis
     public func stop() async {
-        logger.info("Stopping synthesis")
-        await managedLifecycle.currentService?.stop()
-    }
-
-    // MARK: - Speak (Synthesis + Playback)
-
-    /// Speak text aloud - synthesizes and plays audio internally.
-    ///
-    /// This is the simplest way to use TTS. The SDK handles all audio playback internally.
-    /// Returns metadata about what was spoken for display purposes.
-    ///
-    /// ## Example
-    /// ```swift
-    /// let result = try await RunAnywhere.speak("Hello world")
-    /// print("Duration: \(result.duration)s")
-    /// ```
-    ///
-    /// - Parameters:
-    ///   - text: The text to speak
-    ///   - options: Synthesis options (rate, pitch, voice, etc.)
-    /// - Returns: Result containing metadata about the spoken audio
-    /// - Throws: Error if synthesis or playback fails
-    public func speak(
-        _ text: String,
-        options: TTSOptions = TTSOptions()
-    ) async throws -> TTSSpeakResult {
-        // Synthesize the text
-        let output = try await synthesize(text, options: options)
-
-        // Play the audio if we have audio data (neural TTS)
-        // System TTS plays directly through AVSpeechSynthesizer, so audioData is empty
-        if !output.audioData.isEmpty {
-            logger.info("Playing synthesized audio (\(output.audioData.count) bytes)")
-            try await playbackManager.play(output.audioData)
-            logger.info("Playback completed")
-        }
-
-        return TTSSpeakResult(from: output)
-    }
-
-    /// Whether audio is currently playing from a speak() call
-    public nonisolated var isSpeaking: Bool {
-        playbackManager.isPlaying
-    }
-
-    /// Stop current speech playback
-    public func stopSpeaking() {
-        logger.info("Stopping speech playback")
-        playbackManager.stop()
+        guard let handle = handle else { return }
+        rac_tts_component_stop(handle)
+        logger.info("Synthesis stopped")
     }
 
     // MARK: - Analytics
 
-    /// Get current TTS analytics metrics
     public func getAnalyticsMetrics() async -> TTSMetrics {
         await analyticsService.getMetrics()
     }
 
-    // MARK: - Private Methods
+    // MARK: - Public API Compatibility
 
-    private func mergeOptions(_ options: TTSOptions) -> TTSOptions {
-        guard let config = config else { return options }
-
-        return TTSOptions(
-            voice: options.voice ?? config.voice,
-            language: options.language,
-            rate: options.rate,
-            pitch: options.pitch,
-            volume: options.volume,
-            audioFormat: options.audioFormat,
-            sampleRate: options.sampleRate
-        )
+    /// Whether a voice is currently loaded
+    public var isVoiceLoaded: Bool {
+        get async { await isModelLoaded }
     }
 
-    private func estimateAudioDuration(dataSize: Int, sampleRate: Int = TTSConstants.defaultSampleRate) -> TimeInterval {
-        let bytesPerSample = 2 // 16-bit PCM
-        let samples = dataSize / bytesPerSample
-        return TimeInterval(samples) / TimeInterval(sampleRate)
+    /// Current voice ID (alias for currentModelId)
+    public var currentVoiceId: String? {
+        get async { loadedVoice }
+    }
+
+    /// Available voices (currently returns empty array - needs model catalog integration)
+    public var availableVoices: [String] {
+        get async { [] }
+    }
+
+    /// Whether TTS is currently speaking (not implemented in C++ layer)
+    public var isSpeaking: Bool {
+        get async { false }
+    }
+
+    /// Speak text using system audio (synthesize + play)
+    public func speak(_ text: String, options: TTSOptions = TTSOptions()) async throws -> TTSSpeakResult {
+        let output = try await synthesize(text, options: options)
+        // Audio playback would be handled here by platform-specific code
+        // For now, just return the result without actually playing
+        return TTSSpeakResult(from: output)
+    }
+
+    /// Stop speaking
+    public func stopSpeaking() async {
+        await stop()
+    }
+}
+
+// MARK: - Streaming Context
+
+private final class TTSStreamContext: @unchecked Sendable {
+    let onChunk: (Data) -> Void
+    var totalData: UnsafeMutablePointer<Data>
+
+    init(onChunk: @escaping (Data) -> Void, totalData: UnsafeMutablePointer<Data>) {
+        self.onChunk = onChunk
+        self.totalData = totalData
     }
 }

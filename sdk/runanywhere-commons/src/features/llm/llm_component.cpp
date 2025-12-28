@@ -1,0 +1,523 @@
+/**
+ * @file llm_component.cpp
+ * @brief LLM Capability Component Implementation
+ *
+ * C++ port of Swift's LLMCapability.swift
+ * Swift Source: Sources/RunAnywhere/Features/LLM/LLMCapability.swift
+ *
+ * IMPORTANT: This is a direct translation of the Swift implementation.
+ * Do NOT add features not present in the Swift code.
+ */
+
+#include <chrono>
+#include <cstdlib>
+#include <cstring>
+#include <mutex>
+#include <string>
+
+#include "rac/core/capabilities/rac_lifecycle.h"
+#include "rac/core/rac_platform_adapter.h"
+#include "rac/features/llm/rac_llm_component.h"
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/infrastructure/events/rac_events.h"
+
+// =============================================================================
+// INTERNAL STRUCTURES
+// =============================================================================
+
+/**
+ * Internal LLM component state.
+ * Mirrors Swift's LLMCapability actor state.
+ */
+struct rac_llm_component {
+    /** Lifecycle manager handle */
+    rac_handle_t lifecycle;
+
+    /** Current configuration */
+    rac_llm_config_t config;
+
+    /** Default generation options based on config */
+    rac_llm_options_t default_options;
+
+    /** Mutex for thread safety */
+    std::mutex mtx;
+
+    rac_llm_component() : lifecycle(nullptr) {
+        // Initialize with defaults - matches rac_llm_types.h rac_llm_config_t
+        config = RAC_LLM_CONFIG_DEFAULT;
+
+        default_options = RAC_LLM_OPTIONS_DEFAULT;
+    }
+};
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Simple token estimation (~4 chars per token).
+ * Mirrors Swift's token estimation in LLMCapability.
+ */
+static int32_t estimate_tokens(const char* text) {
+    if (!text)
+        return 1;
+    size_t len = strlen(text);
+    int32_t tokens = static_cast<int32_t>((len + 3) / 4);
+    return tokens > 0 ? tokens : 1;  // Minimum 1 token
+}
+
+/**
+ * Log helper.
+ */
+static void log_info(const char* category, const char* msg) {
+    rac_log(RAC_LOG_INFO, category, msg);
+}
+
+static void log_error(const char* category, const char* msg) {
+    rac_log(RAC_LOG_ERROR, category, msg);
+}
+
+// =============================================================================
+// LIFECYCLE CALLBACKS
+// =============================================================================
+
+/**
+ * Service creation callback for lifecycle manager.
+ * Creates and initializes the LLM service.
+ */
+static rac_result_t llm_create_service(const char* model_id, void* user_data,
+                                       rac_handle_t* out_service) {
+    (void)user_data;
+
+    log_info("LLM.Component", "Creating LLM service");
+
+    // Create LLM service
+    rac_result_t result = rac_llm_create(model_id, out_service);
+    if (result != RAC_SUCCESS) {
+        log_error("LLM.Component", "Failed to create LLM service");
+        return result;
+    }
+
+    // Initialize with model path
+    result = rac_llm_initialize(*out_service, model_id);
+    if (result != RAC_SUCCESS) {
+        log_error("LLM.Component", "Failed to initialize LLM service");
+        rac_llm_destroy(*out_service);
+        *out_service = nullptr;
+        return result;
+    }
+
+    log_info("LLM.Component", "LLM service created successfully");
+    return RAC_SUCCESS;
+}
+
+/**
+ * Service destruction callback for lifecycle manager.
+ * Cleans up the LLM service.
+ */
+static void llm_destroy_service(rac_handle_t service, void* user_data) {
+    (void)user_data;
+
+    if (service) {
+        log_info("LLM.Component", "Destroying LLM service");
+        rac_llm_cleanup(service);
+        rac_llm_destroy(service);
+    }
+}
+
+// =============================================================================
+// LIFECYCLE API
+// =============================================================================
+
+extern "C" rac_result_t rac_llm_component_create(rac_handle_t* out_handle) {
+    if (!out_handle) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    auto* component = new (std::nothrow) rac_llm_component();
+    if (!component) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    // Create lifecycle manager
+    rac_lifecycle_config_t lifecycle_config = {};
+    lifecycle_config.resource_type = RAC_RESOURCE_TYPE_LLM_MODEL;
+    lifecycle_config.logger_category = "LLM.Lifecycle";
+    lifecycle_config.user_data = component;
+
+    rac_result_t result = rac_lifecycle_create(&lifecycle_config, llm_create_service,
+                                               llm_destroy_service, &component->lifecycle);
+
+    if (result != RAC_SUCCESS) {
+        delete component;
+        return result;
+    }
+
+    *out_handle = reinterpret_cast<rac_handle_t>(component);
+
+    log_info("LLM.Component", "LLM component created");
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_llm_component_configure(rac_handle_t handle,
+                                                    const rac_llm_config_t* config) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!config)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Copy configuration
+    // Mirrors Swift's: self.config = config
+    component->config = *config;
+
+    // Update default options based on config
+    if (config->max_tokens > 0) {
+        component->default_options.max_tokens = config->max_tokens;
+    }
+    if (config->system_prompt) {
+        component->default_options.system_prompt = config->system_prompt;
+    }
+
+    log_info("LLM.Component", "LLM component configured");
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_bool_t rac_llm_component_is_loaded(rac_handle_t handle) {
+    if (!handle)
+        return RAC_FALSE;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    return rac_lifecycle_is_loaded(component->lifecycle);
+}
+
+extern "C" const char* rac_llm_component_get_model_id(rac_handle_t handle) {
+    if (!handle)
+        return nullptr;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    return rac_lifecycle_get_model_id(component->lifecycle);
+}
+
+extern "C" void rac_llm_component_destroy(rac_handle_t handle) {
+    if (!handle)
+        return;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+
+    // Destroy lifecycle manager (will cleanup service if loaded)
+    if (component->lifecycle) {
+        rac_lifecycle_destroy(component->lifecycle);
+    }
+
+    log_info("LLM.Component", "LLM component destroyed");
+
+    delete component;
+}
+
+// =============================================================================
+// MODEL LIFECYCLE
+// =============================================================================
+
+extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const char* model_id) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Delegate to lifecycle manager
+    rac_handle_t service = nullptr;
+    return rac_lifecycle_load(component->lifecycle, model_id, &service);
+}
+
+extern "C" rac_result_t rac_llm_component_unload(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    return rac_lifecycle_unload(component->lifecycle);
+}
+
+extern "C" rac_result_t rac_llm_component_cleanup(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Mirrors Swift's: await managedLifecycle.reset()
+    return rac_lifecycle_reset(component->lifecycle);
+}
+
+// =============================================================================
+// GENERATION API
+// =============================================================================
+
+extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const char* prompt,
+                                                   const rac_llm_options_t* options,
+                                                   rac_llm_result_t* out_result) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!prompt)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    if (!out_result)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Get service from lifecycle manager
+    rac_handle_t service = nullptr;
+    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+    if (result != RAC_SUCCESS) {
+        log_error("LLM.Component", "No model loaded - cannot generate");
+        return result;
+    }
+
+    log_info("LLM.Component", "Generating (non-streaming)");
+
+    // Use provided options or defaults
+    const rac_llm_options_t* effective_options = options ? options : &component->default_options;
+
+    auto start_time = std::chrono::steady_clock::now();
+
+    // Perform generation
+    result = rac_llm_generate(service, prompt, effective_options, out_result);
+
+    if (result != RAC_SUCCESS) {
+        log_error("LLM.Component", "Generation failed");
+        rac_lifecycle_track_error(component->lifecycle, result, "generate");
+        return result;
+    }
+
+    auto end_time = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    int64_t total_time_ms = duration.count();
+
+    // Update result metrics
+    out_result->prompt_tokens = estimate_tokens(prompt);
+    out_result->completion_tokens = estimate_tokens(out_result->text);
+    out_result->total_tokens = out_result->prompt_tokens + out_result->completion_tokens;
+    out_result->total_time_ms = total_time_ms;
+    out_result->time_to_first_token_ms = 0;  // Non-streaming: no TTFT
+
+    if (total_time_ms > 0) {
+        out_result->tokens_per_second = static_cast<float>(out_result->completion_tokens) /
+                                        (static_cast<float>(total_time_ms) / 1000.0f);
+    }
+
+    log_info("LLM.Component", "Generation completed");
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_bool_t rac_llm_component_supports_streaming(rac_handle_t handle) {
+    if (!handle)
+        return RAC_FALSE;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        return RAC_FALSE;
+    }
+
+    rac_llm_info_t info;
+    rac_result_t result = rac_llm_get_info(service, &info);
+    if (result != RAC_SUCCESS) {
+        return RAC_FALSE;
+    }
+
+    return info.supports_streaming;
+}
+
+/**
+ * Internal structure for streaming context.
+ */
+struct llm_stream_context {
+    rac_llm_component_token_callback_fn token_callback;
+    rac_llm_component_complete_callback_fn complete_callback;
+    rac_llm_component_error_callback_fn error_callback;
+    void* user_data;
+
+    // Metrics tracking
+    std::chrono::steady_clock::time_point start_time;
+    std::chrono::steady_clock::time_point first_token_time;
+    bool first_token_recorded;
+    std::string full_text;
+    int32_t prompt_tokens;
+};
+
+/**
+ * Internal token callback that wraps user callback and tracks metrics.
+ */
+static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) {
+    auto* ctx = reinterpret_cast<llm_stream_context*>(user_data);
+
+    // Track first token time
+    if (!ctx->first_token_recorded) {
+        ctx->first_token_recorded = true;
+        ctx->first_token_time = std::chrono::steady_clock::now();
+    }
+
+    // Accumulate text
+    if (token) {
+        ctx->full_text += token;
+    }
+
+    // Call user callback
+    if (ctx->token_callback) {
+        return ctx->token_callback(token, ctx->user_data);
+    }
+
+    return RAC_TRUE;  // Continue by default
+}
+
+extern "C" rac_result_t rac_llm_component_generate_stream(
+    rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
+    rac_llm_component_token_callback_fn token_callback,
+    rac_llm_component_complete_callback_fn complete_callback,
+    rac_llm_component_error_callback_fn error_callback, void* user_data) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!prompt)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Get service from lifecycle manager
+    rac_handle_t service = nullptr;
+    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+    if (result != RAC_SUCCESS) {
+        log_error("LLM.Component", "No model loaded - cannot generate stream");
+        if (error_callback) {
+            error_callback(result, "No model loaded", user_data);
+        }
+        return result;
+    }
+
+    // Check if streaming is supported
+    rac_llm_info_t info;
+    result = rac_llm_get_info(service, &info);
+    if (result != RAC_SUCCESS || (info.supports_streaming == 0)) {
+        log_error("LLM.Component", "Streaming not supported");
+        if (error_callback) {
+            error_callback(RAC_ERROR_NOT_SUPPORTED, "Streaming not supported", user_data);
+        }
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    log_info("LLM.Component", "Starting streaming generation");
+
+    // Use provided options or defaults
+    const rac_llm_options_t* effective_options = options ? options : &component->default_options;
+
+    // Setup streaming context
+    llm_stream_context ctx;
+    ctx.token_callback = token_callback;
+    ctx.complete_callback = complete_callback;
+    ctx.error_callback = error_callback;
+    ctx.user_data = user_data;
+    ctx.start_time = std::chrono::steady_clock::now();
+    ctx.first_token_recorded = false;
+    ctx.prompt_tokens = estimate_tokens(prompt);
+
+    // Perform streaming generation
+    result = rac_llm_generate_stream(service, prompt, effective_options, llm_stream_token_callback,
+                                     &ctx);
+
+    if (result != RAC_SUCCESS) {
+        log_error("LLM.Component", "Streaming generation failed");
+        rac_lifecycle_track_error(component->lifecycle, result, "generateStream");
+        if (error_callback) {
+            error_callback(result, "Streaming generation failed", user_data);
+        }
+        return result;
+    }
+
+    // Build final result for completion callback
+    if (complete_callback) {
+        auto end_time = std::chrono::steady_clock::now();
+        auto total_duration =
+            std::chrono::duration_cast<std::chrono::milliseconds>(end_time - ctx.start_time);
+
+        rac_llm_result_t final_result = {};
+        final_result.text = strdup(ctx.full_text.c_str());
+        final_result.prompt_tokens = ctx.prompt_tokens;
+        final_result.completion_tokens = estimate_tokens(ctx.full_text.c_str());
+        final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
+        final_result.total_time_ms = total_duration.count();
+
+        // Calculate TTFT
+        if (ctx.first_token_recorded) {
+            auto ttft_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                ctx.first_token_time - ctx.start_time);
+            final_result.time_to_first_token_ms = ttft_duration.count();
+        }
+
+        // Calculate tokens per second
+        if (final_result.total_time_ms > 0) {
+            final_result.tokens_per_second =
+                static_cast<float>(final_result.completion_tokens) /
+                (static_cast<float>(final_result.total_time_ms) / 1000.0f);
+        }
+
+        complete_callback(&final_result, user_data);
+
+        // Free the duplicated text
+        free(final_result.text);
+    }
+
+    log_info("LLM.Component", "Streaming generation completed");
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (service) {
+        rac_llm_cancel(service);
+    }
+
+    log_info("LLM.Component", "Generation cancellation requested");
+
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
+// STATE QUERY API
+// =============================================================================
+
+extern "C" rac_lifecycle_state_t rac_llm_component_get_state(rac_handle_t handle) {
+    if (!handle)
+        return RAC_LIFECYCLE_STATE_IDLE;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    return rac_lifecycle_get_state(component->lifecycle);
+}
+
+extern "C" rac_result_t rac_llm_component_get_metrics(rac_handle_t handle,
+                                                      rac_lifecycle_metrics_t* out_metrics) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!out_metrics)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    return rac_lifecycle_get_metrics(component->lifecycle, out_metrics);
+}

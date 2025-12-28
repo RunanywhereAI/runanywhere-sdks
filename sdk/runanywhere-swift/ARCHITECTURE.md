@@ -2,50 +2,99 @@
 
 ## 1. Overview
 
-The RunAnywhere Swift SDK is a production-grade, on-device AI SDK designed to provide modular, low-latency AI capabilities for Apple platforms (iOS, macOS, tvOS, watchOS). The SDK follows a capability-based architecture where external runtime modules (ONNX, LlamaCPP, Apple Foundation Models, FluidAudio) register themselves with a central service registry, and the core SDK orchestrates model lifecycle, configuration, analytics, and public API access.
+The RunAnywhere Swift SDK is a production-grade, on-device AI SDK designed to provide modular, low-latency AI capabilities for Apple platforms (iOS, macOS, tvOS, watchOS). The SDK follows a capability-based architecture with a new **modular backend design** using `runanywhere-commons` (C++) for shared functionality.
 
 The architecture emphasizes:
-- **Modularity**: Optional backend modules can be included based on app requirements (STT, TTS, LLM, VAD, Speaker Diarization)
+- **Modular Backends**: Separate XCFrameworks for each backend (LlamaCPP, ONNX, WhisperCPP) - only include what you need
+- **C++ Commons Layer**: Shared C++ library (`runanywhere-commons`) handles backend registration, events, and common APIs
+- **Swift Orchestration**: Swift SDK remains the orchestrator for service creation and capability routing
 - **Low Latency**: All inference runs on-device with Metal acceleration support
 - **Lazy Initialization**: Network services and device registration happen lazily on first API call
-- **Actor-Based Concurrency**: Swift actors ensure thread-safe access to capabilities and services
-- **Event-Driven Design**: A unified event system supports both public subscriptions and internal analytics
+- **Event-Driven Design**: Dual event system - C++ publishes events, Swift bridges them to app consumers
 
 ---
 
-## 2. Project Structure
+## 2. New Modular Architecture
 
-### 2.1 Top-Level Layout
+### 2.1 Layer Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Your Application                            │
+├─────────────────────────────────────────────────────────────────┤
+│                    RunAnywhere Swift SDK                         │
+│  ┌─────────────┐  ┌────────────────┐  ┌─────────────────────┐  │
+│  │ServiceRegistry│  │ModuleDiscovery│  │   EventPublisher    │  │
+│  └─────────────┘  └────────────────┘  └─────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                 C Bridge Modules (CRACommons, etc.)              │
+├─────────────────────────────────────────────────────────────────┤
+│                  runanywhere-commons (C++)                       │
+│  ┌─────────────┐  ┌────────────────┐  ┌─────────────────────┐  │
+│  │ModuleRegistry│  │ServiceRegistry │  │   EventPublisher    │  │
+│  └─────────────┘  └────────────────┘  └─────────────────────┘  │
+├────────────┬─────────────┬──────────────┬────────────────────────┤
+│  LlamaCPP  │    ONNX     │  WhisperCPP  │  (Other Backends...)   │
+│  Backend   │   Backend   │   Backend    │                        │
+└────────────┴─────────────┴──────────────┴────────────────────────┘
+```
+
+### 2.2 XCFramework Composition
+
+| Framework | Size Target | Provides |
+|-----------|-------------|----------|
+| `RACommons.xcframework` | ~2MB | Core C++ commons, registries, events |
+| `RABackendLlamaCPP.xcframework` | ~15-25MB | LLM capability (GGUF models) |
+| `RABackendONNX.xcframework` | ~50-70MB | STT, TTS, VAD (ONNX models) |
+| `RABackendWhisperCPP.xcframework` | ~8MB | STT (Whisper models) |
+
+### 2.3 Binary Size Savings
+
+| App Configuration | Old Monolithic | New Modular | Savings |
+|-------------------|----------------|-------------|---------|
+| LLM only | ~95MB | ~17MB | 82% |
+| STT only (ONNX) | ~95MB | ~52MB | 45% |
+| LLM + STT + TTS | ~95MB | ~87MB | 8% |
+| Full (all backends) | ~95MB | ~95MB | 0% |
+
+---
+
+## 3. Project Structure
+
+### 3.1 Top-Level Layout
 
 ```
 runanywhere-swift/
 ├── Package.swift                 # Swift Package Manager manifest
 ├── Sources/
-│   ├── RunAnywhere/              # Core SDK module (~131 files)
-│   ├── ONNXRuntime/              # ONNX backend for STT/TTS (~6 files)
-│   ├── LlamaCPPRuntime/          # LlamaCPP backend for LLM (~4 files)
-│   ├── FoundationModelsAdapter/  # Apple Intelligence integration (~2 files)
-│   ├── FluidAudioDiarization/    # Speaker diarization (~2 files)
-│   └── CRunAnywhereCore/         # C bridge to unified xcframework
-├── Binaries/                     # Binary dependencies (xcframework, dylibs)
+│   ├── RunAnywhere/              # Core SDK module
+│   ├── ONNXRuntime/              # ONNX backend for STT/TTS/VAD
+│   ├── LlamaCPPRuntime/          # LlamaCPP backend for LLM
+│   ├── FoundationModelsAdapter/  # Apple Intelligence integration
+│   ├── FluidAudioDiarization/    # Speaker diarization
+│   ├── CRACommons/               # C bridge to runanywhere-commons
+│   ├── CRABackendLlamaCPP/       # C bridge to LlamaCPP backend
+│   ├── CRABackendONNX/           # C bridge to ONNX backend
+│   └── CRABackendWhisperCPP/     # C bridge to WhisperCPP backend
+├── Binaries/                     # Binary dependencies (xcframeworks)
 ├── Docs/                         # Architecture and design documentation
 └── scripts/                      # Build and setup scripts
 ```
 
-### 2.2 Core SDK Structure (`Sources/RunAnywhere/`)
+### 3.2 Core SDK Structure (`Sources/RunAnywhere/`)
 
 ```
 RunAnywhere/
 ├── Public/                       # Public API surface
 │   ├── RunAnywhere.swift         # Main entry point (static enum)
 │   ├── Configuration/            # SDKEnvironment
-│   ├── Errors/                   # RunAnywhereError
+│   ├── Errors/                   # SDKError
 │   ├── Events/                   # EventBus for public event subscriptions
 │   └── Extensions/               # Public API extensions (LLM, STT, TTS, etc.)
 │
 ├── Core/                         # Core SDK infrastructure
-│   ├── Module/                   # ModuleRegistry, RunAnywhereModule protocol
-│   ├── Capabilities/             # Capability protocols, ManagedLifecycle
+│   ├── Module/                   # RunAnywhereModule protocol, ModuleDiscovery
+│   ├── Capabilities/             # CapabilityType, ManagedLifecycle
 │   ├── ServiceRegistry.swift     # Central service factory registry
 │   └── Types/                    # Shared type definitions
 │
@@ -59,6 +108,10 @@ RunAnywhere/
 │
 ├── Infrastructure/               # Cross-cutting concerns
 │   ├── Analytics/                # Telemetry and event tracking
+│   ├── Commons/                  # C++ commons integration
+│   │   ├── SwiftPlatformAdapter.swift  # Platform adapter for C++ callbacks
+│   │   ├── CommonsErrorMapping.swift   # RAC_ERROR_* to SDKError mapping
+│   │   └── EventBridge.swift           # C++ events → Swift EventPublisher
 │   ├── Configuration/            # Remote configuration service
 │   ├── Device/                   # Device registration and fingerprinting
 │   ├── Download/                 # Model download with Alamofire

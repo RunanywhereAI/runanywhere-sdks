@@ -19,6 +19,19 @@ public actor RemoteTelemetryDataSource {
         apiClient != nil
     }
 
+    // MARK: - Single Event Methods
+
+    /// Send a single SDK event to the backend
+    /// - Parameter event: The event to send
+    public func sendEvent(_ event: any SDKEvent) async {
+        let payload = TelemetryEventPayload(from: event)
+        do {
+            try await sendPayloads([payload])
+        } catch {
+            logger.warning("Failed to send event: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Telemetry Methods
 
     /// Send batch of typed telemetry payloads directly (preserves category → modality)

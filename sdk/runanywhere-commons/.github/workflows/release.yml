@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'commons-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  COMMONS_DIR: sdks/sdk/runanywhere-commons
+
+jobs:
+  build-release:
+    name: Build Release
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/commons-v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.2'
+
+      - name: Install CMake
+        run: brew install cmake ninja
+
+      - name: Build runanywhere-core
+        run: |
+          cd runanywhere-core
+          mkdir -p build && cd build
+          cmake .. -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DRA_BUILD_MODULAR=ON
+          ninja
+
+      - name: Build iOS XCFrameworks
+        run: |
+          cd ${{ env.COMMONS_DIR }}
+          chmod +x scripts/build-ios.sh
+          ./scripts/build-ios.sh
+
+      - name: Package release
+        run: |
+          cd ${{ env.COMMONS_DIR }}
+          chmod +x scripts/package-release.sh
+          ./scripts/package-release.sh ${{ steps.version.outputs.version }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/*.zip
+            ${{ env.COMMONS_DIR }}/dist/*.sha256
+            ${{ env.COMMONS_DIR }}/dist/MANIFEST.md
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-${{ needs.build-release.outputs.version }}
+          path: dist
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: RunAnywhere Commons v${{ needs.build-release.outputs.version }}
+          tag_name: commons-v${{ needs.build-release.outputs.version }}
+          draft: true
+          files: |
+            dist/*.zip
+            dist/*.sha256
+          body_path: dist/MANIFEST.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

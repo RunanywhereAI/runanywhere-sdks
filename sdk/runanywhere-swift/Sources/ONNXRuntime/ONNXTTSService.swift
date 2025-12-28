@@ -1,321 +1,232 @@
-import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
+//
+//  ONNXTTSService.swift
+//  ONNXRuntime
+//
+//  TTS service implementation using runanywhere-commons ONNX backend.
+//  This is a thin Swift wrapper around the rac_tts_onnx_* C APIs.
+//
+
+import CRABackendONNX
+import CRACommons
 import Foundation
 import RunAnywhere
 
-/// ONNX Runtime implementation of TTSService for text-to-speech
-/// Uses the unified RunAnywhere backend API with Sherpa-ONNX VITS/Piper models
-public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
+/// ONNX-based TTS service for text-to-speech synthesis.
+///
+/// This service wraps the runanywhere-commons C++ ONNX backend,
+/// providing Swift-friendly APIs for speech synthesis using models like Piper.
+///
+/// ## Usage
+///
+/// ```swift
+/// let service = ONNXTTSService(modelPath: "/path/to/piper-model")
+/// try await service.initialize()
+///
+/// let audioData = try await service.synthesize(
+///     text: "Hello, world!",
+///     options: TTSOptions(rate: 1.0)
+/// )
+/// ```
+public final class ONNXTTSService: TTSService, @unchecked Sendable {
+
+    // MARK: - Properties
+
+    /// Native handle to the C++ ONNX TTS service
+    private var handle: rac_handle_t?
+
+    /// Lock for thread-safe access to handle
+    private let lock = NSLock()
+
+    /// Logger for this service
     private let logger = SDKLogger(category: "ONNXTTSService")
 
-    private var backendHandle: ra_backend_handle?
-    private var modelPath: String?
-    private var _isSynthesizing: Bool = false
-    private var _isReady: Bool = false
+    /// Model path for this service
+    private let modelPath: String
 
-    // MARK: - Framework Identification
-
-    /// ONNX Runtime inference framework
-    public let inferenceFramework: InferenceFramework = .onnx
-
-    // MARK: - Initialization
-
-    public override init() {
-        super.init()
-        logger.info("ONNXTTSService initialized")
-    }
-
-    /// Initialize with a specific model directory path
-    public init(modelPath: String) {
-        self.modelPath = modelPath
-        super.init()
-        logger.info("ONNXTTSService initialized with model path: \(modelPath)")
-    }
-
-    deinit {
-        // Clean up backend
-        if let backend = backendHandle {
-            ra_tts_unload_model(backend)
-            ra_destroy(backend)
-        }
-        logger.info("ONNXTTSService deallocated")
-    }
+    /// Whether synthesis is currently in progress
+    private var _isSynthesizing = false
 
     // MARK: - TTSService Protocol
 
+    /// The inference framework (always ONNX)
+    public var inferenceFramework: InferenceFramework { .onnx }
+
+    /// Whether synthesis is currently in progress
+    public var isSynthesizing: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return _isSynthesizing
+    }
+
+    /// Available voices (model-dependent)
+    public var availableVoices: [String] {
+        // For ONNX/Piper models, the model itself is the "voice"
+        return [modelPath]
+    }
+
+    // MARK: - Initialization
+
+    public init(modelPath: String) {
+        self.modelPath = modelPath
+        logger.debug("ONNXTTSService instance created for model: \(modelPath)")
+    }
+
+    deinit {
+        lock.lock()
+        if let handle = handle {
+            rac_tts_onnx_destroy(handle)
+        }
+        lock.unlock()
+    }
+
+    /// Initialize the service and load the model.
     public func initialize() async throws {
-        guard let modelPath = modelPath else {
-            logger.error("No model path provided for ONNX TTS")
-            throw SDKError.runtime(.modelNotFound, "No model path provided for ONNX TTS")
+        logger.info("Initializing ONNXTTSService with model: \(modelPath)")
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            lock.lock()
+
+            // Clean up existing handle if any
+            if let existingHandle = handle {
+                rac_tts_onnx_destroy(existingHandle)
+                handle = nil
+            }
+
+            var newHandle: rac_handle_t?
+
+            // Create config with default values
+            var config = rac_tts_onnx_config_t()
+            config.num_threads = 4
+
+            // Create service with model
+            let result = modelPath.withCString { pathPtr in
+                rac_tts_onnx_create(pathPtr, &config, &newHandle)
+            }
+
+            if result == RAC_SUCCESS {
+                handle = newHandle
+                lock.unlock()
+                logger.info("ONNXTTSService initialized successfully")
+                continuation.resume()
+            } else {
+                lock.unlock()
+                let error = CommonsErrorMapping.toSDKError(result) ?? SDKError.tts(.initializationFailed, "Failed to initialize ONNX TTS service")
+                logger.error("Failed to initialize ONNXTTSService: \(error)")
+                continuation.resume(throwing: error)
+            }
         }
-
-        logger.info("Initializing ONNX TTS with model at: \(modelPath)")
-        verifyModelExists(at: modelPath)
-        logAvailableBackends()
-
-        try createAndInitializeBackend()
-
-        let modelDir = try prepareModelDirectory(from: modelPath)
-        try loadTTSModel(from: modelDir, originalPath: modelPath)
-
-        _isReady = true
-        logger.info("ONNX TTS initialized successfully")
     }
 
+    // MARK: - Synthesis
+
+    /// Synthesize text to audio.
+    ///
+    /// - Parameters:
+    ///   - text: The text to synthesize
+    ///   - options: Synthesis options
+    /// - Returns: Audio data (16-bit PCM)
     public func synthesize(text: String, options: TTSOptions) async throws -> Data {
-        guard _isReady, let backend = backendHandle else {
-            throw SDKError.runtime(.notInitialized, "ONNX TTS not initialized")
+        logger.debug("Synthesize called for text: \(text.prefix(50))...")
+
+        return try await withCheckedThrowingContinuation { continuation in
+            lock.lock()
+
+            guard let handle = handle else {
+                lock.unlock()
+                continuation.resume(throwing: SDKError.tts(.serviceNotAvailable, "Service not initialized"))
+                return
+            }
+
+            _isSynthesizing = true
+            lock.unlock()
+
+            defer {
+                lock.lock()
+                _isSynthesizing = false
+                lock.unlock()
+            }
+
+            // Convert Swift options to C options
+            var cOptions = rac_tts_options_t()
+            cOptions.sample_rate = Int32(options.sampleRate)
+            cOptions.rate = options.rate
+
+            var cResult = rac_tts_result_t()
+
+            let synthesizeResult = text.withCString { textPtr in
+                rac_tts_onnx_synthesize(handle, textPtr, &cOptions, &cResult)
+            }
+
+            if synthesizeResult == RAC_SUCCESS {
+                // Convert audio data to Data
+                var audioData = Data()
+                if let dataPtr = cResult.audio_data, cResult.audio_size > 0 {
+                    // Audio data is already in the correct format
+                    audioData = Data(bytes: dataPtr, count: cResult.audio_size)
+                    // Free the C-allocated data
+                    dataPtr.deallocate()
+                }
+
+                logger.debug("Synthesis complete: \(cResult.audio_size) bytes")
+                continuation.resume(returning: audioData)
+            } else {
+                let error = CommonsErrorMapping.toSDKError(synthesizeResult) ?? SDKError.tts(.generationFailed, "Synthesis failed")
+                logger.error("Synthesis failed: \(error)")
+                continuation.resume(throwing: error)
+            }
         }
-
-        _isSynthesizing = true
-        defer { _isSynthesizing = false }
-
-        logger.info("Synthesizing: \"\(text.prefix(50))...\"")
-
-        // Prepare output variables
-        var samples: UnsafeMutablePointer<Float>?
-        var numSamples: Int = 0
-        var sampleRate: Int32 = 0
-
-        // Parse voice ID (speaker ID for multi-speaker models, default to 0)
-        let voiceId = options.voice ?? "0"
-
-        // Speed: options.rate where 1.0 = normal
-        let speed = options.rate
-
-        // Pitch shift
-        let pitch = options.pitch
-
-        // Generate speech using the C API
-        let result = ra_tts_synthesize(
-            backend,
-            text,
-            voiceId,
-            speed,
-            pitch,
-            &samples,
-            &numSamples,
-            &sampleRate
-        )
-
-        guard result == RA_SUCCESS, let samples = samples, numSamples > 0 else {
-            logger.error("Failed to synthesize speech. Error code: \(result.rawValue)")
-            throw SDKError.runtime(.generationFailed, "Failed to synthesize speech from ONNX TTS")
-        }
-
-        defer {
-            ra_free_audio(samples)
-        }
-
-        logger.info("Generated \(numSamples) samples at \(sampleRate) Hz")
-
-        // Convert float samples to audio data (16-bit PCM WAV)
-        let audioData = convertToPCMData(samples: samples, count: numSamples, sampleRate: Int(sampleRate))
-
-        logger.info("Audio data size: \(audioData.count) bytes")
-
-        return audioData
     }
 
+    /// Stream synthesis for long text.
+    ///
+    /// Note: ONNX TTS backend does not support streaming synthesis.
+    /// This method synthesizes the full text and returns it as a single chunk.
+    ///
+    /// - Parameters:
+    ///   - text: The text to synthesize
+    ///   - options: Synthesis options
+    ///   - onChunk: Callback for each audio chunk
     public func synthesizeStream(
         text: String,
         options: TTSOptions,
         onChunk: @escaping (Data) -> Void
     ) async throws {
-        // VITS/Piper doesn't natively support streaming, so we synthesize the whole thing
-        // and return it as a single chunk
+        logger.debug("Stream synthesize called for text: \(text.prefix(50))...")
+
+        // ONNX TTS doesn't support streaming - synthesize full audio and return as single chunk
         let audioData = try await synthesize(text: text, options: options)
         onChunk(audioData)
+
+        logger.debug("Stream synthesis complete (non-streaming fallback)")
     }
 
+    // MARK: - Lifecycle
+
+    /// Stop current synthesis
     public func stop() {
+        lock.lock()
+        if let handle = handle {
+            rac_tts_onnx_stop(handle)
+            logger.debug("Synthesis stopped")
+        }
         _isSynthesizing = false
-        if let backend = backendHandle {
-            ra_tts_cancel(backend)
-        }
+        lock.unlock()
     }
 
-    public var isSynthesizing: Bool {
-        _isSynthesizing
-    }
-
-    public var availableVoices: [String] {
-        guard _isReady, let backend = backendHandle else { return [] }
-
-        // Get available voices from the backend
-        if let voicesPtr = ra_tts_get_voices(backend) {
-            defer { ra_free_string(voicesPtr) }
-            let voicesJSON = String(cString: voicesPtr)
-
-            // Try to parse as JSON array
-            if let data = voicesJSON.data(using: .utf8),
-               let voices = try? JSONDecoder().decode([String].self, from: data) {
-                return voices
-            }
-
-            // If not JSON, return as single voice
-            return [voicesJSON]
-        }
-
-        // Default: return speaker ID 0 for single-speaker models
-        return ["0"]
-    }
-
+    /// Clean up resources
     public func cleanup() async {
-        logger.info("Cleaning up ONNX TTS")
-
-        if let backend = backendHandle {
-            ra_tts_unload_model(backend)
-            ra_destroy(backend)
-            backendHandle = nil
-        }
-
-        _isReady = false
-        _isSynthesizing = false
+        // Use synchronous cleanup to avoid NSLock in async context issues
+        cleanupSync()
     }
 
-    // MARK: - Private Helpers - Initialization
-
-    private func verifyModelExists(at path: String) {
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: path) {
-            logger.info("Model file exists at path")
-        } else {
-            logger.error("Model file does NOT exist at path: \(path)")
+    /// Synchronous cleanup helper
+    private func cleanupSync() {
+        lock.lock()
+        if let handle = handle {
+            rac_tts_onnx_destroy(handle)
+            self.handle = nil
+            logger.info("ONNXTTSService cleaned up")
         }
-    }
-
-    private func logAvailableBackends() {
-        var backendCount: Int32 = 0
-        if let backends = ra_get_available_backends(&backendCount) {
-            var availableBackends: [String] = []
-            for i in 0..<Int(backendCount) {
-                if let backendName = backends[i] {
-                    availableBackends.append(String(cString: backendName))
-                }
-            }
-            logger.info("Available backends (\(backendCount)): \(availableBackends)")
-        } else {
-            logger.warning("ra_get_available_backends returned nil")
-        }
-    }
-
-    private func createAndInitializeBackend() throws {
-        // Create ONNX backend
-        logger.info("Creating ONNX backend via ra_create_backend('onnx')...")
-        backendHandle = ra_create_backend("onnx")
-        if let handle = backendHandle {
-            logger.info("Backend handle created successfully: \(handle)")
-        } else {
-            // Get the last error message
-            if let lastError = ra_get_last_error() {
-                let errorStr = String(cString: lastError)
-                logger.error("ra_create_backend('onnx') returned nil - Last error: \(errorStr)")
-            } else {
-                logger.error("ra_create_backend('onnx') returned nil - No error message available")
-            }
-            throw SDKError.runtime(.initializationFailed, "Failed to create ONNX backend")
-        }
-
-        // Initialize backend
-        logger.info("Initializing backend via ra_initialize()...")
-        let initStatus = ra_initialize(backendHandle, nil)
-        logger.info("ra_initialize() returned status: \(initStatus.rawValue) (RA_SUCCESS=\(RA_SUCCESS.rawValue))")
-        guard initStatus == RA_SUCCESS else {
-            if let lastError = ra_get_last_error() {
-                let errorStr = String(cString: lastError)
-                let statusMessage = "Failed to initialize ONNX backend: status=\(initStatus.rawValue), error: \(errorStr)"
-                logger.error(statusMessage)
-            } else {
-                logger.error("Failed to initialize ONNX backend: status=\(initStatus.rawValue)")
-            }
-            ra_destroy(backendHandle)
-            backendHandle = nil
-            throw SDKError.fromONNXCode(Int32(initStatus.rawValue))
-        }
-        logger.info("Backend initialized successfully")
-    }
-
-    private func prepareModelDirectory(from modelPath: String) throws -> String {
-        let fileManager = FileManager.default
-        var modelDir = modelPath
-        var isDirectory: ObjCBool = false
-
-        // Note: Archive extraction is handled by the SDK during download based on artifactType.
-        // Models should already be extracted when they reach this point.
-        if fileManager.fileExists(atPath: modelPath, isDirectory: &isDirectory) && !isDirectory.boolValue {
-            modelDir = (modelPath as NSString).deletingLastPathComponent
-        }
-
-        return modelDir
-    }
-
-    private func loadTTSModel(from modelDir: String, originalPath: String) throws {
-        logger.info("Loading TTS model from directory: \(modelDir)")
-        logger.info("Model type: vits")
-
-        // List directory contents for debugging
-        let fileManager = FileManager.default
-        if let contents = try? fileManager.contentsOfDirectory(atPath: modelDir) {
-            logger.info("Model directory contents: \(contents)")
-        } else {
-            logger.warning("Could not list model directory contents")
-        }
-
-        let loadStatus = ra_tts_load_model(backendHandle, modelDir, "vits", nil)
-        logger.info("ra_tts_load_model() returned status: \(loadStatus.rawValue)")
-        guard loadStatus == RA_SUCCESS else {
-            if let lastError = ra_get_last_error() {
-                let errorStr = String(cString: lastError)
-                let statusMessage = "Failed to load TTS model: status=\(loadStatus.rawValue), " +
-                                  "modelDir=\(modelDir), error: \(errorStr)"
-                logger.error(statusMessage)
-            } else {
-                logger.error("Failed to load TTS model: status=\(loadStatus.rawValue), modelDir=\(modelDir)")
-            }
-            throw SDKError.runtime(.modelLoadFailed, "Failed to load TTS model from: \(originalPath)")
-        }
-    }
-
-    // MARK: - Private Helpers - Audio Conversion
-
-    /// Convert float samples [-1, 1] to 16-bit PCM WAV data
-    private func convertToPCMData(samples: UnsafePointer<Float>, count: Int, sampleRate: Int) -> Data {
-        // Create WAV header + PCM data
-        let bytesPerSample = 2  // 16-bit
-        let numChannels = 1
-        let dataSize = count * bytesPerSample
-        let fileSize = 44 + dataSize  // WAV header is 44 bytes
-
-        var data = Data(capacity: fileSize)
-
-        // WAV Header
-        data.append(contentsOf: "RIFF".utf8)
-        data.append(contentsOf: withUnsafeBytes(of: UInt32(fileSize - 8).littleEndian) { Array($0) })
-        data.append(contentsOf: "WAVE".utf8)
-
-        // Format chunk
-        data.append(contentsOf: "fmt ".utf8)
-        data.append(contentsOf: withUnsafeBytes(of: UInt32(16).littleEndian) { Array($0) })  // Chunk size
-        data.append(contentsOf: withUnsafeBytes(of: UInt16(1).littleEndian) { Array($0) })   // Audio format (PCM)
-        data.append(contentsOf: withUnsafeBytes(of: UInt16(numChannels).littleEndian) { Array($0) })  // Channels
-        data.append(contentsOf: withUnsafeBytes(of: UInt32(sampleRate).littleEndian) { Array($0) })  // Sample rate
-        data.append(contentsOf: withUnsafeBytes(of: UInt32(sampleRate * numChannels * bytesPerSample).littleEndian) { Array($0) })  // Byte rate
-        data.append(contentsOf: withUnsafeBytes(of: UInt16(numChannels * bytesPerSample).littleEndian) { Array($0) })  // Block align
-        data.append(contentsOf: withUnsafeBytes(of: UInt16(bytesPerSample * 8).littleEndian) { Array($0) })  // Bits per sample
-
-        // Data chunk
-        data.append(contentsOf: "data".utf8)
-        data.append(contentsOf: withUnsafeBytes(of: UInt32(dataSize).littleEndian) { Array($0) })
-
-        // Convert float samples to 16-bit PCM
-        for i in 0..<count {
-            let sample = samples[i]
-            // Clamp to [-1, 1] and convert to Int16
-            let clampedSample = max(-1.0, min(1.0, sample))
-            let int16Sample = Int16(clampedSample * Float(Int16.max))
-            data.append(contentsOf: withUnsafeBytes(of: int16Sample.littleEndian) { Array($0) })
-        }
-
-        return data
+        lock.unlock()
     }
 }

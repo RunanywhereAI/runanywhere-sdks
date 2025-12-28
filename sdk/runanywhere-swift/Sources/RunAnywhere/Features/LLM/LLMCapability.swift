@@ -2,27 +2,31 @@
 //  LLMCapability.swift
 //  RunAnywhere SDK
 //
-//  Actor-based LLM capability that owns model lifecycle and generation.
-//  Uses ManagedLifecycle for unified lifecycle + analytics handling.
+//  Thin Swift wrapper over rac_llm_component_* C API.
+//  All business logic is in the C++ layer; this is just a Swift interface.
+//
+//  ⚠️ WARNING: This is a direct wrapper. Do NOT add custom logic here.
+//  The C++ layer (runanywhere-commons) is the source of truth.
 //
 
+import CRACommons
 import Foundation
 
 /// Actor-based LLM capability that provides a simplified interface for text generation.
-/// Owns the model lifecycle and provides thread-safe access to LLM operations.
-///
-/// Uses `ManagedLifecycle` to handle model loading/unloading with automatic analytics tracking,
-/// eliminating duplicate lifecycle management code.
+/// This is a thin wrapper over the C++ rac_llm_component API.
 public actor LLMCapability: ModelLoadableCapability {
     public typealias Configuration = LLMConfiguration
 
     // MARK: - State
 
-    /// Managed lifecycle with integrated event tracking
-    private let managedLifecycle: ManagedLifecycle<LLMService>
+    /// Handle to the C++ LLM component
+    private var handle: rac_handle_t?
 
     /// Current configuration
     private var config: LLMConfiguration?
+
+    /// Currently loaded model ID
+    private var loadedModelId: String?
 
     // MARK: - Dependencies
 
@@ -33,104 +37,156 @@ public actor LLMCapability: ModelLoadableCapability {
 
     public init(analyticsService: GenerationAnalyticsService = GenerationAnalyticsService()) {
         self.analyticsService = analyticsService
-        self.managedLifecycle = ManagedLifecycle.forLLM()
+    }
+
+    deinit {
+        if let handle = handle {
+            rac_llm_component_destroy(handle)
+        }
     }
 
     // MARK: - Configuration (Capability Protocol)
 
     public func configure(_ config: LLMConfiguration) {
         self.config = config
-        Task { await managedLifecycle.configure(config) }
     }
 
     // MARK: - Model Lifecycle (ModelLoadableCapability Protocol)
-    // All lifecycle operations are delegated to ManagedLifecycle which handles analytics automatically
 
     public var isModelLoaded: Bool {
-        get async { await managedLifecycle.isLoaded }
+        get async {
+            guard let handle = handle else { return false }
+            return rac_llm_component_is_loaded(handle) == RAC_TRUE
+        }
     }
 
     public var currentModelId: String? {
-        get async { await managedLifecycle.currentModelId }
+        get async { loadedModelId }
     }
 
     public func loadModel(_ modelId: String) async throws {
-        try await managedLifecycle.load(modelId)
+        // Create component if needed
+        if handle == nil {
+            var newHandle: rac_handle_t?
+            let createResult = rac_llm_component_create(&newHandle)
+            guard createResult == RAC_SUCCESS, let newLLMHandle = newHandle else {
+                throw SDKError.llm(.modelLoadFailed, "Failed to create LLM component: \(createResult)")
+            }
+            handle = newLLMHandle
+        }
+
+        guard let handle = handle else {
+            throw SDKError.llm(.modelLoadFailed, "No LLM component handle")
+        }
+
+        // Load model
+        let result = modelId.withCString { modelIdPtr in
+            rac_llm_component_load_model(handle, modelIdPtr)
+        }
+
+        guard result == RAC_SUCCESS else {
+            throw SDKError.llm(.modelLoadFailed, "Failed to load model: \(result)")
+        }
+
+        loadedModelId = modelId
+        logger.info("Model loaded: \(modelId)")
     }
 
     public func unload() async throws {
-        await managedLifecycle.unload()
+        guard let handle = handle else { return }
+
+        let result = rac_llm_component_cleanup(handle)
+        if result != RAC_SUCCESS {
+            logger.warning("Cleanup returned: \(result)")
+        }
+
+        loadedModelId = nil
+        logger.info("Model unloaded")
     }
 
     public func cleanup() async {
-        await managedLifecycle.reset()
+        if let handle = handle {
+            rac_llm_component_cleanup(handle)
+            rac_llm_component_destroy(handle)
+        }
+        handle = nil
+        loadedModelId = nil
     }
 
     /// Cancel the current generation operation
-    /// - Note: This is a best-effort cancellation; some backends may not support mid-generation cancellation
     public func cancel() async {
-        // Get the current service if available
-        if let service = await managedLifecycle.currentService {
-            // Try to cancel if the service supports it
-            await service.cancel()
-        }
+        guard let handle = handle else { return }
+        rac_llm_component_cancel(handle)
         logger.info("Generation cancellation requested")
     }
 
     // MARK: - Generation
 
     /// Generate text from a prompt (non-streaming)
-    /// - Parameters:
-    ///   - prompt: The input prompt
-    ///   - options: Generation options
-    /// - Returns: Generation result with text and metrics
-    /// - Note: This is a non-streaming generation. Time-to-first-token (TTFT) is not tracked
-    ///         since the entire response is returned at once. Use `generateStream()` for TTFT metrics.
     public func generate(
         _ prompt: String,
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) async throws -> LLMGenerationResult {
-        let service = try await managedLifecycle.requireService()
-        let modelId = await managedLifecycle.modelIdOrUnknown()
+        guard let handle = handle else {
+            throw SDKError.llm(.notInitialized, "LLM not initialized")
+        }
+
+        guard rac_llm_component_is_loaded(handle) == RAC_TRUE else {
+            throw SDKError.llm(.notInitialized, "LLM model not loaded")
+        }
+
+        let modelId = loadedModelId ?? "unknown"
+        let effectiveOptions = mergeOptions(options)
 
         logger.info("Generating with model: \(modelId) (non-streaming)")
 
-        // Apply configuration defaults if not specified in options
-        let effectiveOptions = mergeOptions(options)
+        // Start analytics tracking
+        let generationId = await analyticsService.startGeneration(
+            modelId: modelId,
+            framework: .llamaCpp,  // Default, will be updated when we get actual info
+            temperature: effectiveOptions.temperature,
+            maxTokens: effectiveOptions.maxTokens,
+            contextLength: config?.contextLength
+        )
 
         let startTime = Date()
 
-        // Start generation tracking (non-streaming mode)
-        // Use service's actual context length, fallback to config if not available
-        let contextLength = service.contextLength ?? config?.contextLength
-        let generationId = await analyticsService.startGeneration(
-            modelId: modelId,
-            framework: service.inferenceFramework,
-            temperature: effectiveOptions.temperature,
-            maxTokens: effectiveOptions.maxTokens,
-            contextLength: contextLength
-        )
+        // Build C options
+        var cOptions = rac_llm_options_t()
+        cOptions.max_tokens = Int32(effectiveOptions.maxTokens)
+        cOptions.temperature = effectiveOptions.temperature
+        cOptions.top_p = effectiveOptions.topP
+        cOptions.streaming_enabled = RAC_FALSE
 
-        // Generate text
-        let generatedText: String
-        do {
-            generatedText = try await service.generate(prompt: prompt, options: effectiveOptions)
-        } catch {
-            logger.error("Generation failed: \(error)")
+        // Generate
+        var llmResult = rac_llm_result_t()
+        let generateResult = prompt.withCString { promptPtr in
+            rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+        }
+
+        guard generateResult == RAC_SUCCESS else {
+            let error = SDKError.llm(.generationFailed, "Generation failed: \(generateResult)")
             await analyticsService.trackGenerationFailed(generationId: generationId, error: error)
-            await managedLifecycle.trackOperationError(error, operation: "generate")
-            throw SDKError.llm(.generationFailed, "Generation failed: \(error.localizedDescription)", underlying: error)
+            throw error
         }
 
         let endTime = Date()
         let totalTimeMs = endTime.timeIntervalSince(startTime) * 1000
 
-        // Simple token estimation (~4 chars per token)
-        let inputTokens = max(1, prompt.count / 4)
-        let outputTokens = max(1, generatedText.count / 4)
-        let tokensPerSecond = totalTimeMs > 0 ? Double(outputTokens) / (totalTimeMs / 1000.0) : 0
+        // Extract result
+        let generatedText: String
+        if let textPtr = llmResult.text {
+            generatedText = String(cString: textPtr)
+        } else {
+            generatedText = ""
+        }
+        let inputTokens = Int(llmResult.prompt_tokens)
+        let outputTokens = Int(llmResult.completion_tokens)
+        let tokensPerSecond = llmResult.tokens_per_second > 0 ? Double(llmResult.tokens_per_second) : 0
 
-        // Complete generation tracking
+        // No explicit free needed - llmResult is a stack-allocated struct
+
+        // Complete analytics
         await analyticsService.completeGeneration(
             generationId: generationId,
             inputTokens: inputTokens,
@@ -147,70 +203,61 @@ public actor LLMCapability: ModelLoadableCapability {
             tokensUsed: outputTokens,
             modelUsed: modelId,
             latencyMs: totalTimeMs,
-            framework: service.inferenceFramework.rawValue,
+            framework: "llamacpp",
             tokensPerSecond: tokensPerSecond,
-            timeToFirstTokenMs: nil,  // Non-streaming: no TTFT
+            timeToFirstTokenMs: nil,
             thinkingTokens: 0,
             responseTokens: outputTokens
         )
     }
 
     /// Whether the currently loaded service supports true streaming generation
-    /// - Returns: `true` if streaming is supported, `false` otherwise
-    /// - Note: Returns `false` if no model is loaded
     public var supportsStreaming: Bool {
-        get async {
-            guard let service = await managedLifecycle.currentService else {
-                return false
-            }
-            return service.supportsStreaming
-        }
+        get async { true }  // C++ layer supports streaming
     }
 
     /// Generate text with streaming (token-by-token)
-    /// - Parameters:
-    ///   - prompt: The input prompt
-    ///   - options: Generation options
-    /// - Returns: Streaming result with token stream and final metrics
-    /// - Throws: `SDKError.llm(.streamingNotSupported, ...)` if the service doesn't support streaming
-    /// - Note: Time-to-first-token (TTFT) is tracked for streaming generations
-    public func generateStream(
+    public func generateStream( // swiftlint:disable:this function_body_length
         _ prompt: String,
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) async throws -> LLMStreamingResult {
-        let service = try await managedLifecycle.requireService()
-
-        // Check if streaming is supported by this service
-        guard service.supportsStreaming else {
-            logger.error("Streaming not supported by current service")
-            throw SDKError.llm(.streamingNotSupported, "Streaming generation is not supported by this service")
+        guard let handle = handle else {
+            throw SDKError.llm(.notInitialized, "LLM not initialized")
         }
 
-        let modelId = await managedLifecycle.modelIdOrUnknown()
+        guard rac_llm_component_is_loaded(handle) == RAC_TRUE else {
+            throw SDKError.llm(.notInitialized, "LLM model not loaded")
+        }
+
+        let modelId = loadedModelId ?? "unknown"
         let effectiveOptions = mergeOptions(options)
-        let framework = service.inferenceFramework
 
         logger.info("Starting streaming generation with model: \(modelId)")
 
-        // Start streaming generation tracking
-        // Use service's actual context length, fallback to config if not available
-        let contextLength = service.contextLength ?? config?.contextLength
+        // Start streaming analytics
         let generationId = await analyticsService.startStreamingGeneration(
             modelId: modelId,
-            framework: framework,
+            framework: .llamaCpp,
             temperature: effectiveOptions.temperature,
             maxTokens: effectiveOptions.maxTokens,
-            contextLength: contextLength
+            contextLength: config?.contextLength
         )
 
-        // Create metrics collector
+        // Create collector for metrics
         let collector = StreamingMetricsCollector(
             modelId: modelId,
             generationId: generationId,
             analyticsService: analyticsService,
-            framework: framework,
+            framework: .llamaCpp,
             promptLength: prompt.count
         )
+
+        // Build C options
+        var cOptions = rac_llm_options_t()
+        cOptions.max_tokens = Int32(effectiveOptions.maxTokens)
+        cOptions.temperature = effectiveOptions.temperature
+        cOptions.top_p = effectiveOptions.topP
+        cOptions.streaming_enabled = RAC_TRUE
 
         // Create the token stream
         let stream = AsyncThrowingStream<String, Error> { continuation in
@@ -218,19 +265,72 @@ public actor LLMCapability: ModelLoadableCapability {
                 do {
                     await collector.markStart()
 
-                    try await service.streamGenerate(
-                        prompt: prompt,
-                        options: effectiveOptions,
-                        onToken: { token in
-                            Task {
-                                await collector.recordToken(token)
-                                continuation.yield(token)
-                            }
-                        }
+                    // Create callback context
+                    let context = StreamCallbackContext(
+                        continuation: continuation,
+                        collector: collector
                     )
+                    let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
-                    continuation.finish()
-                    await collector.markComplete()
+                    // Token callback
+                    let tokenCallback: rac_llm_component_token_callback_fn = { tokenPtr, userData -> rac_bool_t in
+                        guard let tokenPtr = tokenPtr, let userData = userData else { return RAC_TRUE }
+                        let ctx = Unmanaged<StreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
+                        let token = String(cString: tokenPtr)
+                        Task {
+                            await ctx.collector.recordToken(token)
+                            ctx.continuation.yield(token)
+                        }
+                        return RAC_TRUE  // Continue streaming
+                    }
+
+                    // Complete callback
+                    let completeCallback: rac_llm_component_complete_callback_fn = { _, userData in
+                        guard let userData = userData else { return }
+                        let ctx = Unmanaged<StreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
+                        ctx.continuation.finish()
+                        Task {
+                            await ctx.collector.markComplete()
+                        }
+                    }
+
+                    // Error callback
+                    let errorCallback: rac_llm_component_error_callback_fn = { _, errorMsg, userData in
+                        guard let userData = userData else { return }
+                        let ctx = Unmanaged<StreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
+                        let message: String
+                        if let msgPtr = errorMsg {
+                            message = String(cString: msgPtr)
+                        } else {
+                            message = "Unknown error"
+                        }
+                        let error = SDKError.llm(.generationFailed, message)
+                        ctx.continuation.finish(throwing: error)
+                        Task {
+                            await ctx.collector.markFailed(error)
+                        }
+                    }
+
+                    let streamResult = prompt.withCString { promptPtr in
+                        rac_llm_component_generate_stream(
+                            handle,
+                            promptPtr,
+                            &cOptions,
+                            tokenCallback,
+                            completeCallback,
+                            errorCallback,
+                            contextPtr
+                        )
+                    }
+
+                    // Release context after completion is handled by callbacks
+                    // Note: we need to manage memory more carefully here
+                    if streamResult != RAC_SUCCESS {
+                        Unmanaged<StreamCallbackContext>.fromOpaque(contextPtr).release()
+                        let error = SDKError.llm(.generationFailed, "Stream generation failed: \(streamResult)")
+                        continuation.finish(throwing: error)
+                        await collector.markFailed(error)
+                    }
                 } catch {
                     continuation.finish(throwing: error)
                     await collector.markFailed(error)
@@ -238,7 +338,6 @@ public actor LLMCapability: ModelLoadableCapability {
             }
         }
 
-        // Create result task that waits for metrics
         let resultTask = Task<LLMGenerationResult, Error> {
             try await collector.waitForResult()
         }
@@ -248,7 +347,6 @@ public actor LLMCapability: ModelLoadableCapability {
 
     // MARK: - Analytics
 
-    /// Get current generation analytics metrics
     public func getAnalyticsMetrics() async -> GenerationMetrics {
         await analyticsService.getMetrics()
     }
@@ -268,6 +366,18 @@ public actor LLMCapability: ModelLoadableCapability {
             structuredOutput: options.structuredOutput,
             systemPrompt: options.systemPrompt ?? config.systemPrompt
         )
+    }
+}
+
+// MARK: - Streaming Callback Context
+
+private final class StreamCallbackContext: @unchecked Sendable {
+    let continuation: AsyncThrowingStream<String, Error>.Continuation
+    let collector: StreamingMetricsCollector
+
+    init(continuation: AsyncThrowingStream<String, Error>.Continuation, collector: StreamingMetricsCollector) {
+        self.continuation = continuation
+        self.collector = collector
     }
 }
 
@@ -312,7 +422,6 @@ private actor StreamingMetricsCollector {
         fullText += token
         tokenCount += 1
 
-        // Track first token for TTFT metric
         if !firstTokenRecorded {
             firstTokenRecorded = true
             firstTokenTime = Date()
@@ -323,7 +432,6 @@ private actor StreamingMetricsCollector {
     func markComplete() async {
         isComplete = true
 
-        // Simple token estimation (~4 chars per token)
         let inputTokens = max(1, promptLength / 4)
         let outputTokens = max(1, fullText.count / 4)
 
@@ -368,13 +476,11 @@ private actor StreamingMetricsCollector {
         let endTime = Date()
         let latencyMs = (startTime.map { endTime.timeIntervalSince($0) } ?? 0) * 1000
 
-        // Calculate TTFT for streaming
         var timeToFirstTokenMs: Double?
         if let start = startTime, let firstToken = firstTokenTime {
             timeToFirstTokenMs = firstToken.timeIntervalSince(start) * 1000
         }
 
-        // Simple token estimation (~4 chars per token)
         let inputTokens = max(1, promptLength / 4)
         let outputTokens = max(1, fullText.count / 4)
         let tokensPerSecond = latencyMs > 0 ? Double(outputTokens) / (latencyMs / 1000.0) : 0
