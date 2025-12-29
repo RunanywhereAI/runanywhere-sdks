@@ -1,7 +1,11 @@
 import CRABackendLlamaCPP
 import CRACommons
 import Foundation
+import os.log
 import RunAnywhere
+
+/// Logger for LlamaCPP Runtime debug output
+private let logger = Logger(subsystem: "ai.runanywhere.LlamaCPPRuntime", category: "Registration")
 
 /// LlamaCPP Runtime module for RunAnywhere SDK
 ///
@@ -49,17 +53,36 @@ public enum LlamaCPPRuntime {
     ///
     /// - Throws: SDKError if registration fails
     public static func registerBackend() throws {
-        guard !isBackendRegistered else { return }
+        logger.info("🚀 [LlamaCPP] registerBackend() - START")
+        print("🚀 [LlamaCPP-Swift] registerBackend() - checking if already registered")
+
+        guard !isBackendRegistered else {
+            logger.info("✅ [LlamaCPP] Already registered, returning")
+            print("✅ [LlamaCPP-Swift] Already registered, returning early")
+            return
+        }
+
+        logger.info("📞 [LlamaCPP] Calling rac_backend_llamacpp_register()...")
+        print("📞 [LlamaCPP-Swift] About to call rac_backend_llamacpp_register()")
 
         let result = rac_backend_llamacpp_register()
+
+        logger.info("📬 [LlamaCPP] rac_backend_llamacpp_register() returned: \(result)")
+        print("📬 [LlamaCPP-Swift] rac_backend_llamacpp_register() returned: \(result)")
+
         if result != RAC_SUCCESS {
+            let errorMsg = String(cString: rac_error_message(result))
+            logger.error("❌ [LlamaCPP] Registration failed: \(errorMsg)")
+            print("❌ [LlamaCPP-Swift] Registration failed: \(errorMsg)")
             throw SDKError.general(
                 .initializationFailed,
-                "Failed to register LlamaCPP backend: \(String(cString: rac_error_message(result)))"
+                "Failed to register LlamaCPP backend: \(errorMsg)"
             )
         }
 
         isBackendRegistered = true
+        logger.info("✅ [LlamaCPP] registerBackend() - SUCCESS")
+        print("✅ [LlamaCPP-Swift] registerBackend() - SUCCESS")
     }
 
     /// Unregister the LlamaCPP backend from C++ commons.

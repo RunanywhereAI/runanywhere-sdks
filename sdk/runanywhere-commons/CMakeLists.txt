@@ -41,6 +41,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Add cmake modules path
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+# Load versions from VERSIONS file (single source of truth)
+include(LoadVersions)
+
+# Make project version available to subdirectories (for backend CMakeLists.txt)
+set(RAC_PROJECT_VERSION "${RAC_VERSION}" CACHE STRING "Project version for subdirectories" FORCE)
+
 # =============================================================================
 # PLATFORM DETECTION
 # =============================================================================
@@ -111,6 +117,7 @@ set(RAC_CORE_SOURCES
     src/core/rac_error.cpp
     src/core/rac_time.cpp
     src/core/rac_memory.cpp
+    src/core/rac_logger.cpp
     src/core/component_types.cpp
     src/core/capabilities/lifecycle_manager.cpp
 )

@@ -110,14 +110,6 @@ let package = Package(
             publicHeadersPath: "include"
         ),
 
-        // CRABackendWhisperCPP - WhisperCPP backend C API bridge
-        .target(
-            name: "CRABackendWhisperCPP",
-            dependencies: ["RABackendWhisperCPPBinary"],
-            path: "Sources/CRABackendWhisperCPP",
-            publicHeadersPath: "include"
-        ),
-
         // =================================================================
         // Core SDK
         // =================================================================
@@ -237,11 +229,6 @@ func binaryTargets() -> [Target] {
                 name: "ONNXRuntimeBinary",
                 path: "Binaries/onnxruntime.xcframework"
             ),
-            // WhisperCPP backend (~8-10MB)
-            .binaryTarget(
-                name: "RABackendWhisperCPPBinary",
-                path: "Binaries/RABackendWhisperCPP.xcframework"
-            ),
         ]
     } else {
         // Production mode (default): Download from GitHub releases
@@ -270,12 +257,6 @@ func binaryTargets() -> [Target] {
                 name: "ONNXRuntimeBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/onnxruntime.xcframework.zip",
                 checksum: "PLACEHOLDER_CHECKSUM_ONNXRuntime"
-            ),
-            // WhisperCPP backend
-            .binaryTarget(
-                name: "RABackendWhisperCPPBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/RABackendWhisperCPP.xcframework.zip",
-                checksum: "PLACEHOLDER_CHECKSUM_RABackendWhisperCPP"
             ),
         ]
     }

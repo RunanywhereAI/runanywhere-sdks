@@ -7,6 +7,9 @@
  * - Service provider registration with priority
  * - canHandle-style service creation (matches Swift pattern)
  * - Priority-based provider selection
+ *
+ * Uses function-local statics to avoid static initialization order issues
+ * when called from Swift.
  */
 
 #include <algorithm>
@@ -18,10 +21,14 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 
+// Category for logging
+static const char* LOG_CAT = "ServiceRegistry";
+
 // =============================================================================
-// INTERNAL STORAGE
+// INTERNAL STORAGE - Using function-local statics for safe initialization
 // =============================================================================
 
 namespace {
@@ -36,10 +43,26 @@ struct ProviderEntry {
     void* user_data;
 };
 
-std::mutex g_registry_mutex;
+/**
+ * Service registry state using function-local static to ensure proper initialization.
+ * This avoids the "static initialization order fiasco" when Swift calls
+ * into C++ code before global statics are initialized.
+ */
+struct ServiceRegistryState {
+    std::mutex mutex;
+    // Providers grouped by capability
+    std::unordered_map<rac_capability_t, std::vector<ProviderEntry>> providers;
+};
 
-// Providers grouped by capability
-std::unordered_map<rac_capability_t, std::vector<ProviderEntry>> g_providers;
+/**
+ * Get the service registry state singleton using Meyers' singleton pattern.
+ * Function-local static guarantees thread-safe initialization on first use.
+ * NOTE: No logging here - this is called during static initialization
+ */
+ServiceRegistryState& get_state() {
+    static ServiceRegistryState state;
+    return state;
+}
 
 }  // namespace
 
@@ -50,16 +73,23 @@ std::unordered_map<rac_capability_t, std::vector<ProviderEntry>> g_providers;
 extern "C" {
 
 rac_result_t rac_service_register_provider(const rac_service_provider_t* provider) {
+    RAC_LOG_DEBUG(LOG_CAT, "rac_service_register_provider() - ENTRY");
+
     if (provider == nullptr || provider->name == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "NULL pointer error");
         return RAC_ERROR_NULL_POINTER;
     }
 
+    RAC_LOG_DEBUG(LOG_CAT, "Registering provider: %s", provider->name);
+
     if (provider->can_handle == nullptr || provider->create == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "can_handle or create is NULL for provider: %s", provider->name);
         rac_error_set_details("can_handle and create functions are required");
         return RAC_ERROR_NULL_POINTER;
     }
 
-    std::lock_guard<std::mutex> lock(g_registry_mutex);
+    auto& state = get_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
 
     ProviderEntry entry;
     entry.name = provider->name;
@@ -69,31 +99,32 @@ rac_result_t rac_service_register_provider(const rac_service_provider_t* provide
     entry.create = provider->create;
     entry.user_data = provider->user_data;
 
-    g_providers[provider->capability].push_back(std::move(entry));
+    state.providers[provider->capability].push_back(std::move(entry));
 
     // Sort by priority (higher first) - matches Swift's sorted(by: { $0.priority > $1.priority })
-    auto& providers = g_providers[provider->capability];
+    auto& providers = state.providers[provider->capability];
     std::sort(
         providers.begin(), providers.end(),
         [](const ProviderEntry& a, const ProviderEntry& b) { return a.priority > b.priority; });
 
-    rac_log(RAC_LOG_INFO, "ServiceRegistry",
-            ("Registered provider: " + entry.name + " for capability " +
-             std::to_string(static_cast<int>(provider->capability)))
-                .c_str());
-
+    RAC_LOG_INFO(LOG_CAT, "Registered provider: %s for capability %d",
+                 provider->name, static_cast<int>(provider->capability));
     return RAC_SUCCESS;
 }
 
 rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t capability) {
+    RAC_LOG_DEBUG(LOG_CAT, "rac_service_unregister_provider() - name=%s", name ? name : "NULL");
+
     if (name == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
 
-    std::lock_guard<std::mutex> lock(g_registry_mutex);
+    auto& state = get_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
 
-    auto it = g_providers.find(capability);
-    if (it == g_providers.end()) {
+    auto it = state.providers.find(capability);
+    if (it == state.providers.end()) {
+        RAC_LOG_WARNING(LOG_CAT, "Provider not found for capability %d", static_cast<int>(capability));
         return RAC_ERROR_PROVIDER_NOT_FOUND;
     }
 
@@ -109,9 +140,10 @@ rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t 
     providers.erase(remove_it, providers.end());
 
     if (providers.empty()) {
-        g_providers.erase(it);
+        state.providers.erase(it);
     }
 
+    RAC_LOG_INFO(LOG_CAT, "Provider unregistered: %s", name);
     return RAC_SUCCESS;
 }
 
@@ -121,10 +153,11 @@ rac_result_t rac_service_create(rac_capability_t capability, const rac_service_r
         return RAC_ERROR_NULL_POINTER;
     }
 
-    std::lock_guard<std::mutex> lock(g_registry_mutex);
+    auto& state = get_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
 
-    auto it = g_providers.find(capability);
-    if (it == g_providers.end() || it->second.empty()) {
+    auto it = state.providers.find(capability);
+    if (it == state.providers.end() || it->second.empty()) {
         rac_error_set_details("No providers registered for capability");
         return RAC_ERROR_NO_CAPABLE_PROVIDER;
     }
@@ -153,7 +186,8 @@ rac_result_t rac_service_list_providers(rac_capability_t capability, const char*
         return RAC_ERROR_NULL_POINTER;
     }
 
-    std::lock_guard<std::mutex> lock(g_registry_mutex);
+    auto& state = get_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
 
     // Static storage for names (valid until next call)
     static std::vector<const char*> s_name_ptrs;
@@ -162,8 +196,8 @@ rac_result_t rac_service_list_providers(rac_capability_t capability, const char*
     s_names.clear();
     s_name_ptrs.clear();
 
-    auto it = g_providers.find(capability);
-    if (it != g_providers.end()) {
+    auto it = state.providers.find(capability);
+    if (it != state.providers.end()) {
         for (const auto& provider : it->second) {
             s_names.push_back(provider.name);
         }
@@ -189,8 +223,10 @@ rac_result_t rac_service_list_providers(rac_capability_t capability, const char*
 namespace rac_internal {
 
 void reset_service_registry() {
-    std::lock_guard<std::mutex> lock(g_registry_mutex);
-    g_providers.clear();
+    RAC_LOG_DEBUG(LOG_CAT, "reset_service_registry()");
+    auto& state = get_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    state.providers.clear();
 }
 
 }  // namespace rac_internal

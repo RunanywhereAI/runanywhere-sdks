@@ -243,13 +243,17 @@ public enum RunAnywhere {
         // Step 2: Apply environment-specific logging configuration
         Logging.shared.applyEnvironmentConfiguration(params.environment)
 
+        // Step 3: Register platform adapter for C++ → Swift log bridge
+        // This must happen early so all C++ logs (from runanywhere-core) route to SDKLogger
+        SwiftPlatformAdapter.shared.register()
+
         // Now safe to create logger and track events
         let logger = SDKLogger(category: "RunAnywhere.Init")
         EventPublisher.shared.track(SDKLifecycleEvent.initStarted)
 
         do {
 
-            // Step 3: Persist to Keychain (production/staging only)
+            // Step 4: Persist to Keychain (production/staging only)
             if params.environment != .development {
                 try KeychainManager.shared.storeSDKParams(params)
             }

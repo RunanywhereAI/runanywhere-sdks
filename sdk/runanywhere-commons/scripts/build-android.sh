@@ -14,6 +14,9 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BUILD_DIR="${PROJECT_ROOT}/build/android"
 DIST_DIR="${PROJECT_ROOT}/dist/android"
 
+# Load versions from VERSIONS file (single source of truth)
+source "${SCRIPT_DIR}/load-versions.sh"
+
 # Configuration
 ANDROID_MIN_SDK="${ANDROID_MIN_SDK:-24}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
