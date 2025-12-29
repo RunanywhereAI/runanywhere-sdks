@@ -84,10 +84,8 @@ RAC_API void rac_vad_analytics_destroy(rac_vad_analytics_handle_t handle);
  * @param framework The inference framework being used
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_analytics_track_initialized(
-    rac_vad_analytics_handle_t handle,
-    rac_inference_framework_t framework
-);
+RAC_API rac_result_t rac_vad_analytics_track_initialized(rac_vad_analytics_handle_t handle,
+                                                         rac_inference_framework_t framework);
 
 /**
  * @brief Track VAD initialization failure
@@ -99,11 +97,8 @@ RAC_API rac_result_t rac_vad_analytics_track_initialized(
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_vad_analytics_track_initialization_failed(
-    rac_vad_analytics_handle_t handle,
-    rac_result_t error_code,
-    const char* error_message,
-    rac_inference_framework_t framework
-);
+    rac_vad_analytics_handle_t handle, rac_result_t error_code, const char* error_message,
+    rac_inference_framework_t framework);
 
 /**
  * @brief Track VAD cleanup
@@ -179,11 +174,8 @@ RAC_API rac_result_t rac_vad_analytics_track_resumed(rac_vad_analytics_handle_t 
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_vad_analytics_track_model_load_started(
-    rac_vad_analytics_handle_t handle,
-    const char* model_id,
-    int64_t model_size_bytes,
-    rac_inference_framework_t framework
-);
+    rac_vad_analytics_handle_t handle, const char* model_id, int64_t model_size_bytes,
+    rac_inference_framework_t framework);
 
 /**
  * @brief Track model load completed
@@ -194,12 +186,10 @@ RAC_API rac_result_t rac_vad_analytics_track_model_load_started(
  * @param model_size_bytes Size of the model in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_analytics_track_model_load_completed(
-    rac_vad_analytics_handle_t handle,
-    const char* model_id,
-    double duration_ms,
-    int64_t model_size_bytes
-);
+RAC_API rac_result_t rac_vad_analytics_track_model_load_completed(rac_vad_analytics_handle_t handle,
+                                                                  const char* model_id,
+                                                                  double duration_ms,
+                                                                  int64_t model_size_bytes);
 
 /**
  * @brief Track model load failed
@@ -210,12 +200,10 @@ RAC_API rac_result_t rac_vad_analytics_track_model_load_completed(
  * @param error_message Error message
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_analytics_track_model_load_failed(
-    rac_vad_analytics_handle_t handle,
-    const char* model_id,
-    rac_result_t error_code,
-    const char* error_message
-);
+RAC_API rac_result_t rac_vad_analytics_track_model_load_failed(rac_vad_analytics_handle_t handle,
+                                                               const char* model_id,
+                                                               rac_result_t error_code,
+                                                               const char* error_message);
 
 /**
  * @brief Track model unloaded
@@ -224,10 +212,8 @@ RAC_API rac_result_t rac_vad_analytics_track_model_load_failed(
  * @param model_id The model identifier
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_analytics_track_model_unloaded(
-    rac_vad_analytics_handle_t handle,
-    const char* model_id
-);
+RAC_API rac_result_t rac_vad_analytics_track_model_unloaded(rac_vad_analytics_handle_t handle,
+                                                            const char* model_id);
 
 // =============================================================================
 // METRICS
@@ -240,10 +226,8 @@ RAC_API rac_result_t rac_vad_analytics_track_model_unloaded(
  * @param out_metrics Output: Metrics structure
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_analytics_get_metrics(
-    rac_vad_analytics_handle_t handle,
-    rac_vad_metrics_t* out_metrics
-);
+RAC_API rac_result_t rac_vad_analytics_get_metrics(rac_vad_analytics_handle_t handle,
+                                                   rac_vad_metrics_t* out_metrics);
 
 #ifdef __cplusplus
 }
