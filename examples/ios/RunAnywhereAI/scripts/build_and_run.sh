@@ -315,9 +315,9 @@ fi
 if [ "$BUILD_CPP" = true ]; then
     print_status "Building C++ layer (runanywhere-core + runanywhere-commons)..."
 
-    CORE_PATH="../../../../../runanywhere-core"
-    COMMONS_PATH="../../../../sdk/runanywhere-commons"
-    SWIFT_SDK_PATH="../../../../sdk/runanywhere-swift"
+    CORE_PATH="../../../../runanywhere-core"
+    COMMONS_PATH="../../../sdk/runanywhere-commons"
+    SWIFT_SDK_PATH="../../../sdk/runanywhere-swift"
 
     # =========================================================================
     # Step 1: Build runanywhere-core iOS XCFramework
@@ -448,7 +448,7 @@ fi
 # Build SDK if requested
 if [ "$BUILD_SDK" = true ]; then
     print_status "Building RunAnywhere SDK..."
-    SDK_PATH="../../../../sdk/runanywhere-swift"
+    SDK_PATH="../../../sdk/runanywhere-swift"
     if [ -d "$SDK_PATH" ]; then
         pushd "$SDK_PATH" > /dev/null
         if swift build -Xswiftc -suppress-warnings 2>&1 | tee /tmp/sdk_build.log; then

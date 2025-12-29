@@ -6,9 +6,6 @@
  * Swift Source: Sources/RunAnywhere/Features/LLM/Analytics/GenerationAnalyticsService.swift
  */
 
-#include "rac/features/llm/rac_llm_analytics.h"
-#include "rac/core/rac_log.h"
-
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -17,6 +14,9 @@
 #include <random>
 #include <sstream>
 #include <string>
+
+#include "rac/core/rac_log.h"
+#include "rac/features/llm/rac_llm_analytics.h"
 
 // =============================================================================
 // INTERNAL TYPES - Mirrors Swift's GenerationTracker
@@ -53,16 +53,21 @@ std::string generate_uuid() {
     std::stringstream ss;
     ss << std::hex;
 
-    for (int i = 0; i < 8; i++) ss << dis(gen);
+    for (int i = 0; i < 8; i++)
+        ss << dis(gen);
     ss << "-";
-    for (int i = 0; i < 4; i++) ss << dis(gen);
+    for (int i = 0; i < 4; i++)
+        ss << dis(gen);
     ss << "-4";  // Version 4 UUID
-    for (int i = 0; i < 3; i++) ss << dis(gen);
+    for (int i = 0; i < 3; i++)
+        ss << dis(gen);
     ss << "-";
     ss << (8 + dis(gen) % 4);  // Variant
-    for (int i = 0; i < 3; i++) ss << dis(gen);
+    for (int i = 0; i < 3; i++)
+        ss << dis(gen);
     ss << "-";
-    for (int i = 0; i < 12; i++) ss << dis(gen);
+    for (int i = 0; i < 12; i++)
+        ss << dis(gen);
 
     return ss.str();
 }
@@ -91,17 +96,17 @@ struct rac_llm_analytics_s {
     bool has_last_event_time;
 
     rac_llm_analytics_s()
-        : total_generations(0)
-        , streaming_generations(0)
-        , non_streaming_generations(0)
-        , total_time_to_first_token_ms(0)
-        , streaming_ttft_count(0)
-        , total_tokens_per_second(0)
-        , total_input_tokens(0)
-        , total_output_tokens(0)
-        , start_time_ms(get_current_time_ms())
-        , last_event_time_ms(0)
-        , has_last_event_time(false) {}
+        : total_generations(0),
+          streaming_generations(0),
+          non_streaming_generations(0),
+          total_time_to_first_token_ms(0),
+          streaming_ttft_count(0),
+          total_tokens_per_second(0),
+          total_input_tokens(0),
+          total_output_tokens(0),
+          start_time_ms(get_current_time_ms()),
+          last_event_time_ms(0),
+          has_last_event_time(false) {}
 };
 
 // =============================================================================
@@ -131,15 +136,12 @@ void rac_llm_analytics_destroy(rac_llm_analytics_handle_t handle) {
     }
 }
 
-rac_result_t rac_llm_analytics_start_generation(
-    rac_llm_analytics_handle_t handle,
-    const char* model_id,
-    rac_inference_framework_t framework,
-    const float* temperature,
-    const int32_t* max_tokens,
-    const int32_t* context_length,
-    char** out_generation_id
-) {
+rac_result_t rac_llm_analytics_start_generation(rac_llm_analytics_handle_t handle,
+                                                const char* model_id,
+                                                rac_inference_framework_t framework,
+                                                const float* temperature, const int32_t* max_tokens,
+                                                const int32_t* context_length,
+                                                char** out_generation_id) {
     if (!handle || !model_id || !out_generation_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -176,14 +178,9 @@ rac_result_t rac_llm_analytics_start_generation(
 }
 
 rac_result_t rac_llm_analytics_start_streaming_generation(
-    rac_llm_analytics_handle_t handle,
-    const char* model_id,
-    rac_inference_framework_t framework,
-    const float* temperature,
-    const int32_t* max_tokens,
-    const int32_t* context_length,
-    char** out_generation_id
-) {
+    rac_llm_analytics_handle_t handle, const char* model_id, rac_inference_framework_t framework,
+    const float* temperature, const int32_t* max_tokens, const int32_t* context_length,
+    char** out_generation_id) {
     if (!handle || !model_id || !out_generation_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -219,10 +216,8 @@ rac_result_t rac_llm_analytics_start_streaming_generation(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_llm_analytics_track_first_token(
-    rac_llm_analytics_handle_t handle,
-    const char* generation_id
-) {
+rac_result_t rac_llm_analytics_track_first_token(rac_llm_analytics_handle_t handle,
+                                                 const char* generation_id) {
     if (!handle || !generation_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -258,11 +253,9 @@ rac_result_t rac_llm_analytics_track_first_token(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_llm_analytics_track_streaming_update(
-    rac_llm_analytics_handle_t handle,
-    const char* generation_id,
-    int32_t tokens_generated
-) {
+rac_result_t rac_llm_analytics_track_streaming_update(rac_llm_analytics_handle_t handle,
+                                                      const char* generation_id,
+                                                      int32_t tokens_generated) {
     if (!handle || !generation_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -285,13 +278,9 @@ rac_result_t rac_llm_analytics_track_streaming_update(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_llm_analytics_complete_generation(
-    rac_llm_analytics_handle_t handle,
-    const char* generation_id,
-    int32_t input_tokens,
-    int32_t output_tokens,
-    const char* model_id
-) {
+rac_result_t rac_llm_analytics_complete_generation(rac_llm_analytics_handle_t handle,
+                                                   const char* generation_id, int32_t input_tokens,
+                                                   int32_t output_tokens, const char* model_id) {
     if (!handle || !generation_id || !model_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -307,8 +296,7 @@ rac_result_t rac_llm_analytics_complete_generation(
     handle->active_generations.erase(it);
 
     int64_t end_time_ms = get_current_time_ms();
-    double total_time_sec =
-        static_cast<double>(end_time_ms - tracker.start_time_ms) / 1000.0;
+    double total_time_sec = static_cast<double>(end_time_ms - tracker.start_time_ms) / 1000.0;
     double tokens_per_second =
         total_time_sec > 0 ? static_cast<double>(output_tokens) / total_time_sec : 0;
 
@@ -338,12 +326,10 @@ rac_result_t rac_llm_analytics_complete_generation(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_llm_analytics_track_generation_failed(
-    rac_llm_analytics_handle_t handle,
-    const char* generation_id,
-    rac_result_t error_code,
-    const char* error_message
-) {
+rac_result_t rac_llm_analytics_track_generation_failed(rac_llm_analytics_handle_t handle,
+                                                       const char* generation_id,
+                                                       rac_result_t error_code,
+                                                       const char* error_message) {
     if (!handle || !generation_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -360,14 +346,10 @@ rac_result_t rac_llm_analytics_track_generation_failed(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_llm_analytics_track_error(
-    rac_llm_analytics_handle_t handle,
-    rac_result_t error_code,
-    const char* error_message,
-    const char* operation,
-    const char* model_id,
-    const char* generation_id
-) {
+rac_result_t rac_llm_analytics_track_error(rac_llm_analytics_handle_t handle,
+                                           rac_result_t error_code, const char* error_message,
+                                           const char* operation, const char* model_id,
+                                           const char* generation_id) {
     if (!handle) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -384,10 +366,8 @@ rac_result_t rac_llm_analytics_track_error(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_llm_analytics_get_metrics(
-    rac_llm_analytics_handle_t handle,
-    rac_generation_metrics_t* out_metrics
-) {
+rac_result_t rac_llm_analytics_get_metrics(rac_llm_analytics_handle_t handle,
+                                           rac_generation_metrics_t* out_metrics) {
     if (!handle || !out_metrics) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -398,14 +378,13 @@ rac_result_t rac_llm_analytics_get_metrics(
     out_metrics->streaming_generations = handle->streaming_generations;
     out_metrics->non_streaming_generations = handle->non_streaming_generations;
     out_metrics->start_time_ms = handle->start_time_ms;
-    out_metrics->last_event_time_ms =
-        handle->has_last_event_time ? handle->last_event_time_ms : 0;
+    out_metrics->last_event_time_ms = handle->has_last_event_time ? handle->last_event_time_ms : 0;
 
     // Average TTFT only counts streaming generations that had TTFT recorded
-    out_metrics->average_ttft_ms =
-        handle->streaming_ttft_count > 0
-            ? handle->total_time_to_first_token_ms / static_cast<double>(handle->streaming_ttft_count)
-            : 0;
+    out_metrics->average_ttft_ms = handle->streaming_ttft_count > 0
+                                       ? handle->total_time_to_first_token_ms /
+                                             static_cast<double>(handle->streaming_ttft_count)
+                                       : 0;
 
     out_metrics->average_tokens_per_second =
         handle->total_generations > 0

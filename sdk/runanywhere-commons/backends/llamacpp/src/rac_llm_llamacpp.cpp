@@ -171,22 +171,16 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
 
 rac_result_t rac_llm_llamacpp_load_model(rac_handle_t handle, const char* model_path,
                                          const rac_llm_llamacpp_config_t* config) {
-    if (handle == nullptr || model_path == nullptr) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    // LlamaCPP loads model during create, so we need to destroy and recreate
-    // This matches Swift's pattern where loadModel creates a new handle internally
-    rac_llm_llamacpp_destroy(handle);
-
-    rac_handle_t new_handle = nullptr;
-    rac_result_t result = rac_llm_llamacpp_create(model_path, config, &new_handle);
-    if (result != RAC_SUCCESS) {
-        return result;
-    }
-
-    // Note: The handle value changes, caller should use the result of create instead
-    // This is a limitation of the C API - in Swift we have objects with internal state
+    // LlamaCPP loads model during rac_llm_llamacpp_create(), so this is a no-op.
+    // This matches the pattern used by ONNX backends (STT/TTS) where initialize is a no-op.
+    //
+    // The previous implementation had a critical bug: it destroyed the input handle
+    // and created a new one, but the new handle was lost (stored in a local variable).
+    // This caused use-after-free crashes when the lifecycle manager tried to use
+    // the dangling pointer.
+    (void)handle;
+    (void)model_path;
+    (void)config;
     return RAC_SUCCESS;
 }
 

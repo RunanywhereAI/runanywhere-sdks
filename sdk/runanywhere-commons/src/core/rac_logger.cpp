@@ -7,12 +7,13 @@
  */
 
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_platform_adapter.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+
+#include "rac/core/rac_platform_adapter.h"
 
 // =============================================================================
 // INTERNAL STATE
@@ -37,19 +38,27 @@ LoggerState& state() {
 // Level to string
 const char* level_to_string(rac_log_level_t level) {
     switch (level) {
-        case RAC_LOG_TRACE:   return "TRACE";
-        case RAC_LOG_DEBUG:   return "DEBUG";
-        case RAC_LOG_INFO:    return "INFO";
-        case RAC_LOG_WARNING: return "WARN";
-        case RAC_LOG_ERROR:   return "ERROR";
-        case RAC_LOG_FATAL:   return "FATAL";
-        default:              return "???";
+        case RAC_LOG_TRACE:
+            return "TRACE";
+        case RAC_LOG_DEBUG:
+            return "DEBUG";
+        case RAC_LOG_INFO:
+            return "INFO";
+        case RAC_LOG_WARNING:
+            return "WARN";
+        case RAC_LOG_ERROR:
+            return "ERROR";
+        case RAC_LOG_FATAL:
+            return "FATAL";
+        default:
+            return "???";
     }
 }
 
 // Extract filename from path
 const char* filename_from_path(const char* path) {
-    if (!path) return nullptr;
+    if (!path)
+        return nullptr;
     const char* last_slash = strrchr(path, '/');
     const char* last_backslash = strrchr(path, '\\');
     const char* last_sep = last_slash > last_backslash ? last_slash : last_backslash;
@@ -57,9 +66,8 @@ const char* filename_from_path(const char* path) {
 }
 
 // Format message with metadata for platform adapter
-void format_message_with_metadata(char* buffer, size_t buffer_size,
-                                   const char* message,
-                                   const rac_log_metadata_t* metadata) {
+void format_message_with_metadata(char* buffer, size_t buffer_size, const char* message,
+                                  const rac_log_metadata_t* metadata) {
     if (!metadata) {
         snprintf(buffer, buffer_size, "%s", message);
         return;
@@ -74,67 +82,51 @@ void format_message_with_metadata(char* buffer, size_t buffer_size,
     if (metadata->file && pos < buffer_size) {
         const char* filename = filename_from_path(metadata->file);
         if (filename) {
-            pos += snprintf(buffer + pos, buffer_size - pos,
-                            "%s file=%s:%d",
-                            has_meta ? "," : " |",
+            pos += snprintf(buffer + pos, buffer_size - pos, "%s file=%s:%d", has_meta ? "," : " |",
                             filename, metadata->line);
             has_meta = true;
         }
     }
 
     if (metadata->function && pos < buffer_size) {
-        pos += snprintf(buffer + pos, buffer_size - pos,
-                        "%s func=%s",
-                        has_meta ? "," : " |",
+        pos += snprintf(buffer + pos, buffer_size - pos, "%s func=%s", has_meta ? "," : " |",
                         metadata->function);
         has_meta = true;
     }
 
     if (metadata->error_code != 0 && pos < buffer_size) {
-        pos += snprintf(buffer + pos, buffer_size - pos,
-                        "%s error_code=%d",
-                        has_meta ? "," : " |",
+        pos += snprintf(buffer + pos, buffer_size - pos, "%s error_code=%d", has_meta ? "," : " |",
                         metadata->error_code);
         has_meta = true;
     }
 
     if (metadata->error_msg && pos < buffer_size) {
-        pos += snprintf(buffer + pos, buffer_size - pos,
-                        "%s error=%s",
-                        has_meta ? "," : " |",
+        pos += snprintf(buffer + pos, buffer_size - pos, "%s error=%s", has_meta ? "," : " |",
                         metadata->error_msg);
         has_meta = true;
     }
 
     if (metadata->model_id && pos < buffer_size) {
-        pos += snprintf(buffer + pos, buffer_size - pos,
-                        "%s model=%s",
-                        has_meta ? "," : " |",
+        pos += snprintf(buffer + pos, buffer_size - pos, "%s model=%s", has_meta ? "," : " |",
                         metadata->model_id);
         has_meta = true;
     }
 
     if (metadata->framework && pos < buffer_size) {
-        pos += snprintf(buffer + pos, buffer_size - pos,
-                        "%s framework=%s",
-                        has_meta ? "," : " |",
+        pos += snprintf(buffer + pos, buffer_size - pos, "%s framework=%s", has_meta ? "," : " |",
                         metadata->framework);
         has_meta = true;
     }
 
     // Custom key-value pairs
     if (metadata->custom_key1 && metadata->custom_value1 && pos < buffer_size) {
-        pos += snprintf(buffer + pos, buffer_size - pos,
-                        "%s %s=%s",
-                        has_meta ? "," : " |",
+        pos += snprintf(buffer + pos, buffer_size - pos, "%s %s=%s", has_meta ? "," : " |",
                         metadata->custom_key1, metadata->custom_value1);
         has_meta = true;
     }
 
     if (metadata->custom_key2 && metadata->custom_value2 && pos < buffer_size) {
-        snprintf(buffer + pos, buffer_size - pos,
-                 "%s %s=%s",
-                 has_meta ? "," : " |",
+        snprintf(buffer + pos, buffer_size - pos, "%s %s=%s", has_meta ? "," : " |",
                  metadata->custom_key2, metadata->custom_value2);
     }
 }
@@ -176,7 +168,7 @@ void log_to_stderr(rac_log_level_t level, const char* category, const char* mess
     fflush(stream);
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // =============================================================================
 // PUBLIC API IMPLEMENTATION
@@ -218,8 +210,10 @@ void rac_logger_set_stderr_always(rac_bool_t enabled) {
 
 void rac_logger_log(rac_log_level_t level, const char* category, const char* message,
                     const rac_log_metadata_t* metadata) {
-    if (!message) return;
-    if (!category) category = "RAC";
+    if (!message)
+        return;
+    if (!category)
+        category = "RAC";
 
     // Get state configuration (with lock)
     rac_log_level_t min_level;
@@ -233,11 +227,12 @@ void rac_logger_log(rac_log_level_t level, const char* category, const char* mes
     }
 
     // Check min level
-    if (level < min_level) return;
+    if (level < min_level)
+        return;
 
     // ALWAYS log to stderr first if enabled (safe during static initialization)
     // This ensures we can debug crashes even before platform adapter is ready
-    if (stderr_always) {
+    if (stderr_always != 0) {
         log_to_stderr(level, category, message, metadata);
     }
 
@@ -248,7 +243,7 @@ void rac_logger_log(rac_log_level_t level, const char* category, const char* mes
         char formatted[2048];
         format_message_with_metadata(formatted, sizeof(formatted), message, metadata);
         adapter->log(level, category, formatted, adapter->user_data);
-    } else if (!stderr_always && stderr_fallback) {
+    } else if (stderr_always == 0 && stderr_fallback != 0) {
         // Fallback to stderr only if we haven't already logged there
         log_to_stderr(level, category, message, metadata);
     }
@@ -256,7 +251,8 @@ void rac_logger_log(rac_log_level_t level, const char* category, const char* mes
 
 void rac_logger_logf(rac_log_level_t level, const char* category,
                      const rac_log_metadata_t* metadata, const char* format, ...) {
-    if (!format) return;
+    if (!format)
+        return;
 
     va_list args;
     va_start(args, format);
@@ -266,7 +262,8 @@ void rac_logger_logf(rac_log_level_t level, const char* category,
 
 void rac_logger_logv(rac_log_level_t level, const char* category,
                      const rac_log_metadata_t* metadata, const char* format, va_list args) {
-    if (!format) return;
+    if (!format)
+        return;
 
     // Format the message
     char buffer[2048];
@@ -275,4 +272,4 @@ void rac_logger_logv(rac_log_level_t level, const char* category,
     rac_logger_log(level, category, buffer, metadata);
 }
 
-} // extern "C"
+}  // extern "C"

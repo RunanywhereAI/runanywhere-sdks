@@ -50,9 +50,9 @@ extern "C" {
  */
 typedef struct rac_log_metadata {
     // Source location (auto-populated by macros)
-    const char* file;      /**< Source file name (use __FILE__) */
-    int32_t line;          /**< Source line number (use __LINE__) */
-    const char* function;  /**< Function name (use __func__) */
+    const char* file;     /**< Source file name (use __FILE__) */
+    int32_t line;         /**< Source line number (use __LINE__) */
+    const char* function; /**< Function name (use __func__) */
 
     // Error context
     int32_t error_code;    /**< Error code if applicable (0 = none) */
@@ -70,8 +70,10 @@ typedef struct rac_log_metadata {
 } rac_log_metadata_t;
 
 /** Default empty metadata */
-#define RAC_LOG_METADATA_EMPTY \
-    (rac_log_metadata_t) { NULL, 0, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
+#define RAC_LOG_METADATA_EMPTY                                     \
+    (rac_log_metadata_t) {                                         \
+        NULL, 0, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL \
+    }
 
 // =============================================================================
 // CORE LOGGING API
@@ -176,69 +178,71 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
 /**
  * Helper to create metadata with source location.
  */
-#define RAC_LOG_META_HERE() \
-    (rac_log_metadata_t) { __FILE__, __LINE__, __func__, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
+#define RAC_LOG_META_HERE()                                                       \
+    (rac_log_metadata_t) {                                                        \
+        __FILE__, __LINE__, __func__, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL \
+    }
 
 /**
  * Helper to create metadata with source location and error code.
  */
-#define RAC_LOG_META_ERROR(code, msg)                                         \
-    (rac_log_metadata_t) {                                                    \
+#define RAC_LOG_META_ERROR(code, msg)                                                   \
+    (rac_log_metadata_t) {                                                              \
         __FILE__, __LINE__, __func__, (code), (msg), NULL, NULL, NULL, NULL, NULL, NULL \
     }
 
 /**
  * Helper to create metadata with model context.
  */
-#define RAC_LOG_META_MODEL(mid, fw)                                           \
-    (rac_log_metadata_t) {                                                    \
+#define RAC_LOG_META_MODEL(mid, fw)                                                \
+    (rac_log_metadata_t) {                                                         \
         __FILE__, __LINE__, __func__, 0, NULL, (mid), (fw), NULL, NULL, NULL, NULL \
     }
 
 // --- Level-specific logging macros with automatic source location ---
 
-#define RAC_LOG_TRACE(category, ...)                                        \
-    do {                                                                    \
-        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                     \
-        rac_logger_logf(RAC_LOG_TRACE, category, &_meta, __VA_ARGS__);      \
+#define RAC_LOG_TRACE(category, ...)                                   \
+    do {                                                               \
+        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                \
+        rac_logger_logf(RAC_LOG_TRACE, category, &_meta, __VA_ARGS__); \
     } while (0)
 
-#define RAC_LOG_DEBUG(category, ...)                                        \
-    do {                                                                    \
-        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                     \
-        rac_logger_logf(RAC_LOG_DEBUG, category, &_meta, __VA_ARGS__);      \
+#define RAC_LOG_DEBUG(category, ...)                                   \
+    do {                                                               \
+        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                \
+        rac_logger_logf(RAC_LOG_DEBUG, category, &_meta, __VA_ARGS__); \
     } while (0)
 
-#define RAC_LOG_INFO(category, ...)                                         \
-    do {                                                                    \
-        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                     \
-        rac_logger_logf(RAC_LOG_INFO, category, &_meta, __VA_ARGS__);       \
+#define RAC_LOG_INFO(category, ...)                                   \
+    do {                                                              \
+        rac_log_metadata_t _meta = RAC_LOG_META_HERE();               \
+        rac_logger_logf(RAC_LOG_INFO, category, &_meta, __VA_ARGS__); \
     } while (0)
 
-#define RAC_LOG_WARNING(category, ...)                                      \
-    do {                                                                    \
-        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                     \
-        rac_logger_logf(RAC_LOG_WARNING, category, &_meta, __VA_ARGS__);    \
+#define RAC_LOG_WARNING(category, ...)                                   \
+    do {                                                                 \
+        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                  \
+        rac_logger_logf(RAC_LOG_WARNING, category, &_meta, __VA_ARGS__); \
     } while (0)
 
-#define RAC_LOG_ERROR(category, ...)                                        \
-    do {                                                                    \
-        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                     \
-        rac_logger_logf(RAC_LOG_ERROR, category, &_meta, __VA_ARGS__);      \
+#define RAC_LOG_ERROR(category, ...)                                   \
+    do {                                                               \
+        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                \
+        rac_logger_logf(RAC_LOG_ERROR, category, &_meta, __VA_ARGS__); \
     } while (0)
 
-#define RAC_LOG_FATAL(category, ...)                                        \
-    do {                                                                    \
-        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                     \
-        rac_logger_logf(RAC_LOG_FATAL, category, &_meta, __VA_ARGS__);      \
+#define RAC_LOG_FATAL(category, ...)                                   \
+    do {                                                               \
+        rac_log_metadata_t _meta = RAC_LOG_META_HERE();                \
+        rac_logger_logf(RAC_LOG_FATAL, category, &_meta, __VA_ARGS__); \
     } while (0)
 
 // --- Error logging with code ---
 
-#define RAC_LOG_ERROR_CODE(category, code, ...)                             \
-    do {                                                                    \
-        rac_log_metadata_t _meta = RAC_LOG_META_ERROR(code, NULL);          \
-        rac_logger_logf(RAC_LOG_ERROR, category, &_meta, __VA_ARGS__);      \
+#define RAC_LOG_ERROR_CODE(category, code, ...)                        \
+    do {                                                               \
+        rac_log_metadata_t _meta = RAC_LOG_META_ERROR(code, NULL);     \
+        rac_logger_logf(RAC_LOG_ERROR, category, &_meta, __VA_ARGS__); \
     } while (0)
 
 // --- Model context logging ---
@@ -307,7 +311,7 @@ namespace rac {
  *   log.error("Failed with code %d", error_code);
  */
 class Logger {
-public:
+   public:
     explicit Logger(const char* category) : category_(category) {}
     explicit Logger(const std::string& category) : category_(category.c_str()) {}
 
@@ -375,8 +379,8 @@ public:
         va_end(args);
     }
 
-    void modelError(const char* model_id, const char* framework, int32_t code,
-                    const char* format, ...) const {
+    void modelError(const char* model_id, const char* framework, int32_t code, const char* format,
+                    ...) const {
         rac_log_metadata_t meta = RAC_LOG_METADATA_EMPTY;
         meta.model_id = model_id;
         meta.framework = framework;
@@ -388,7 +392,7 @@ public:
         va_end(args);
     }
 
-private:
+   private:
     const char* category_;
 };
 
@@ -403,10 +407,10 @@ inline Logger llamacpp("LlamaCpp");
 inline Logger download("Download");
 inline Logger models("Models");
 inline Logger core("Core");
-} // namespace log
+}  // namespace log
 
-} // namespace rac
+}  // namespace rac
 
-#endif // __cplusplus
+#endif  // __cplusplus
 
 #endif /* RAC_LOGGER_H */

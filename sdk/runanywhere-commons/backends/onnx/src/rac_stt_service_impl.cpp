@@ -5,12 +5,13 @@
  * Implements the generic STT service API by delegating to ONNX functions.
  */
 
-#include "rac/features/stt/rac_stt_service.h"
 #include "rac_stt_onnx.h"
 
 #include <cstdint>
 #include <cstdlib>
 #include <vector>
+
+#include "rac/features/stt/rac_stt_service.h"
 
 // =============================================================================
 // AUDIO FORMAT CONVERSION
@@ -54,9 +55,8 @@ rac_result_t rac_stt_initialize(rac_handle_t handle, const char* model_path) {
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_transcribe(rac_handle_t handle, const void* audio_data,
-                                size_t audio_size, const rac_stt_options_t* options,
-                                rac_stt_result_t* out_result) {
+rac_result_t rac_stt_transcribe(rac_handle_t handle, const void* audio_data, size_t audio_size,
+                                const rac_stt_options_t* options, rac_stt_result_t* out_result) {
     // Convert Int16 PCM to Float32 (Swift sends Int16, Sherpa-ONNX expects Float32)
     std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
 
@@ -91,7 +91,8 @@ rac_result_t rac_stt_transcribe_stream(rac_handle_t handle, const void* audio_da
     }
 
     rac_stt_onnx_destroy_stream(handle, stream);
-    if (text) free(text);
+    if (text)
+        free(text);
 
     (void)options;
     return result;
