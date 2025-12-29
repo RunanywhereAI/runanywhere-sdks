@@ -55,8 +55,8 @@ extern "C" {
  * @endcode
  */
 RAC_API rac_result_t rac_audio_float32_to_wav(const void* pcm_data, size_t pcm_size,
-                                               int32_t sample_rate, void** out_wav_data,
-                                               size_t* out_wav_size);
+                                              int32_t sample_rate, void** out_wav_data,
+                                              size_t* out_wav_size);
 
 /**
  * @brief Convert Int16 PCM samples to WAV format
@@ -71,8 +71,8 @@ RAC_API rac_result_t rac_audio_float32_to_wav(const void* pcm_data, size_t pcm_s
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_audio_int16_to_wav(const void* pcm_data, size_t pcm_size,
-                                             int32_t sample_rate, void** out_wav_data,
-                                             size_t* out_wav_size);
+                                            int32_t sample_rate, void** out_wav_data,
+                                            size_t* out_wav_size);
 
 /**
  * @brief Get WAV header size in bytes

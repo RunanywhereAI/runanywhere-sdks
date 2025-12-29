@@ -6,12 +6,13 @@
  */
 
 #include "rac/core/rac_audio_utils.h"
-#include "rac/core/rac_error.h"
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+
+#include "rac/core/rac_error.h"
 
 // WAV file constants
 static constexpr size_t WAV_HEADER_SIZE = 44;
@@ -105,7 +106,7 @@ static void build_wav_header(uint8_t* header, int32_t sample_rate, uint32_t data
 }
 
 rac_result_t rac_audio_float32_to_wav(const void* pcm_data, size_t pcm_size, int32_t sample_rate,
-                                       void** out_wav_data, size_t* out_wav_size) {
+                                      void** out_wav_data, size_t* out_wav_size) {
     // Validate arguments
     if (!pcm_data || pcm_size == 0 || !out_wav_data || !out_wav_size) {
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -155,7 +156,7 @@ rac_result_t rac_audio_float32_to_wav(const void* pcm_data, size_t pcm_size, int
 }
 
 rac_result_t rac_audio_int16_to_wav(const void* pcm_data, size_t pcm_size, int32_t sample_rate,
-                                     void** out_wav_data, size_t* out_wav_size) {
+                                    void** out_wav_data, size_t* out_wav_size) {
     // Validate arguments
     if (!pcm_data || pcm_size == 0 || !out_wav_data || !out_wav_size) {
         return RAC_ERROR_INVALID_ARGUMENT;

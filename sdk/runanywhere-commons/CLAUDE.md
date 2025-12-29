@@ -1,5 +1,22 @@
 # CLAUDE.md - AI Context for runanywhere-commons
 
+## Core Principles
+
+- Focus on **SIMPLICITY**, following Clean SOLID principles. Reusability, clean architecture, clear separation of concerns.
+- Do NOT write ANY MOCK IMPLEMENTATION unless specified otherwise.
+- DO NOT PLAN or WRITE any unit tests unless specified otherwise.
+- Always use **structured types**, never use strings directly for consistency and scalability.
+- When fixing issues focus on **SIMPLICITY** - do not add complicated logic unless necessary.
+- Don't over plan it, always think **MVP**.
+
+## C++ Specific Rules
+
+- C++17 standard required
+- Google C++ Style Guide with project customizations (see `.clang-format`)
+- Run `./scripts/lint-cpp.sh` before committing
+- Use `./scripts/lint-cpp.sh --fix` to auto-fix formatting issues
+- All public symbols prefixed with `rac_` (RunAnywhere Commons)
+
 ## Project Overview
 
 `runanywhere-commons` is a C/C++ library that provides shared infrastructure for the RunAnywhere SDK. It bridges `runanywhere-core` (the AI inference engine) with platform SDKs (Swift, Kotlin).

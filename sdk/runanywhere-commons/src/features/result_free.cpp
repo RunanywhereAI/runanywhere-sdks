@@ -14,8 +14,7 @@
 
 extern "C" {
 
-__attribute__((weak))
-void rac_llm_result_free(rac_llm_result_t* result) {
+__attribute__((weak)) void rac_llm_result_free(rac_llm_result_t* result) {
     if (result) {
         if (result->text) {
             free(const_cast<char*>(result->text));
@@ -24,8 +23,7 @@ void rac_llm_result_free(rac_llm_result_t* result) {
     }
 }
 
-__attribute__((weak))
-void rac_stt_result_free(rac_stt_result_t* result) {
+__attribute__((weak)) void rac_stt_result_free(rac_stt_result_t* result) {
     if (result) {
         if (result->text) {
             free(const_cast<char*>(result->text));
@@ -49,8 +47,7 @@ void rac_stt_result_free(rac_stt_result_t* result) {
     }
 }
 
-__attribute__((weak))
-void rac_tts_result_free(rac_tts_result_t* result) {
+__attribute__((weak)) void rac_tts_result_free(rac_tts_result_t* result) {
     if (result) {
         if (result->audio_data) {
             free(result->audio_data);

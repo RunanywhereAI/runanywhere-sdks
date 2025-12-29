@@ -44,12 +44,89 @@ struct rac_voice_agent {
     // Thread safety
     std::mutex mutex;
 
-    rac_voice_agent() : is_configured(false), owns_components(false),
-                        llm_handle(nullptr), stt_handle(nullptr),
-                        tts_handle(nullptr), vad_handle(nullptr) {}
+    rac_voice_agent()
+        : is_configured(false),
+          owns_components(false),
+          llm_handle(nullptr),
+          stt_handle(nullptr),
+          tts_handle(nullptr),
+          vad_handle(nullptr) {}
 };
 
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp
+
+// =============================================================================
+// DEFENSIVE VALIDATION HELPERS
+// =============================================================================
+
+/**
+ * @brief Validate that a component is ready for use
+ *
+ * Performs defensive checks:
+ * 1. Handle is non-null
+ * 2. Component is in LOADED state
+ *
+ * This provides early failure with clear error messages instead of
+ * cryptic crashes from dangling pointers or uninitialized components.
+ *
+ * @param component_name Human-readable name for error messages
+ * @param handle Component handle
+ * @param get_state_fn Function to get component lifecycle state
+ * @return RAC_SUCCESS if valid, error code otherwise
+ */
+static rac_result_t validate_component_ready(const char* component_name, rac_handle_t handle,
+                                             rac_lifecycle_state_t (*get_state_fn)(rac_handle_t)) {
+    if (handle == nullptr) {
+        rac_log(RAC_LOG_ERROR, "VoiceAgent",
+                (std::string(component_name) + " handle is null").c_str());
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    rac_lifecycle_state_t state = get_state_fn(handle);
+    if (state != RAC_LIFECYCLE_STATE_LOADED) {
+        rac_log(RAC_LOG_ERROR, "VoiceAgent",
+                (std::string(component_name) +
+                 " is not loaded (state: " + rac_lifecycle_state_name(state) + ")")
+                    .c_str());
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    return RAC_SUCCESS;
+}
+
+/**
+ * @brief Validate all voice agent components are ready for processing
+ *
+ * Checks STT, LLM, and TTS components are properly loaded before
+ * attempting voice processing. This provides early failure with clear
+ * error messages instead of cryptic crashes from dangling pointers.
+ *
+ * @param handle Voice agent handle
+ * @return RAC_SUCCESS if all components ready, error code otherwise
+ */
+static rac_result_t validate_all_components_ready(rac_voice_agent_handle_t handle) {
+    rac_result_t result;
+
+    // Validate STT component
+    result = validate_component_ready("STT", handle->stt_handle, rac_stt_component_get_state);
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+
+    // Validate LLM component
+    result = validate_component_ready("LLM", handle->llm_handle, rac_llm_component_get_state);
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+
+    // Validate TTS component
+    result = validate_component_ready("TTS", handle->tts_handle, rac_tts_component_get_state);
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+
+    return RAC_SUCCESS;
+}
 
 // =============================================================================
 // LIFECYCLE API
@@ -145,10 +222,14 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     // If we own the components, destroy them
     if (handle->owns_components) {
         rac_log(RAC_LOG_DEBUG, "VoiceAgent", "Destroying owned component handles");
-        if (handle->vad_handle) rac_vad_component_destroy(handle->vad_handle);
-        if (handle->tts_handle) rac_tts_component_destroy(handle->tts_handle);
-        if (handle->stt_handle) rac_stt_component_destroy(handle->stt_handle);
-        if (handle->llm_handle) rac_llm_component_destroy(handle->llm_handle);
+        if (handle->vad_handle)
+            rac_vad_component_destroy(handle->vad_handle);
+        if (handle->tts_handle)
+            rac_tts_component_destroy(handle->tts_handle);
+        if (handle->stt_handle)
+            rac_stt_component_destroy(handle->stt_handle);
+        if (handle->llm_handle)
+            rac_llm_component_destroy(handle->llm_handle);
     }
 
     delete handle;
@@ -159,8 +240,7 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
 // MODEL LOADING API
 // =============================================================================
 
-rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
-                                             const char* model_id) {
+rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle, const char* model_id) {
     if (!handle || !model_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -171,8 +251,7 @@ rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
     return rac_stt_component_load_model(handle->stt_handle, model_id);
 }
 
-rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
-                                             const char* model_id) {
+rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle, const char* model_id) {
     if (!handle || !model_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -183,8 +262,7 @@ rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
     return rac_llm_component_load_model(handle->llm_handle, model_id);
 }
 
-rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
-                                             const char* voice_id) {
+rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle, const char* voice_id) {
     if (!handle || !voice_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -196,7 +274,7 @@ rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
 }
 
 rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t handle,
-                                            rac_bool_t* out_loaded) {
+                                           rac_bool_t* out_loaded) {
     if (!handle || !out_loaded) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -206,7 +284,7 @@ rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t handle,
 }
 
 rac_result_t rac_voice_agent_is_llm_loaded(rac_voice_agent_handle_t handle,
-                                            rac_bool_t* out_loaded) {
+                                           rac_bool_t* out_loaded) {
     if (!handle || !out_loaded) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -216,7 +294,7 @@ rac_result_t rac_voice_agent_is_llm_loaded(rac_voice_agent_handle_t handle,
 }
 
 rac_result_t rac_voice_agent_is_tts_loaded(rac_voice_agent_handle_t handle,
-                                            rac_bool_t* out_loaded) {
+                                           rac_bool_t* out_loaded) {
     if (!handle || !out_loaded) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -226,17 +304,20 @@ rac_result_t rac_voice_agent_is_tts_loaded(rac_voice_agent_handle_t handle,
 }
 
 const char* rac_voice_agent_get_stt_model_id(rac_voice_agent_handle_t handle) {
-    if (!handle) return nullptr;
+    if (!handle)
+        return nullptr;
     return rac_stt_component_get_model_id(handle->stt_handle);
 }
 
 const char* rac_voice_agent_get_llm_model_id(rac_voice_agent_handle_t handle) {
-    if (!handle) return nullptr;
+    if (!handle)
+        return nullptr;
     return rac_llm_component_get_model_id(handle->llm_handle);
 }
 
 const char* rac_voice_agent_get_tts_voice_id(rac_voice_agent_handle_t handle) {
-    if (!handle) return nullptr;
+    if (!handle)
+        return nullptr;
     return rac_tts_component_get_voice_id(handle->tts_handle);
 }
 
@@ -378,6 +459,14 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
+    // Defensive validation: Verify all components are in LOADED state before processing
+    // This catches issues like dangling handles or improperly initialized components
+    rac_result_t validation_result = validate_all_components_ready(handle);
+    if (validation_result != RAC_SUCCESS) {
+        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Component validation failed - cannot process");
+        return validation_result;
+    }
+
     rac_log(RAC_LOG_INFO, "VoiceAgent", "Processing voice turn");
 
     // Initialize result
@@ -388,8 +477,8 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
 
     rac_stt_result_t stt_result = {};
     rac_result_t result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size,
-                                             nullptr,  // default options
-                                             &stt_result);
+                                                       nullptr,  // default options
+                                                       &stt_result);
 
     if (result != RAC_SUCCESS) {
         rac_log(RAC_LOG_ERROR, "VoiceAgent", "STT transcription failed");
@@ -410,8 +499,8 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
 
     rac_llm_result_t llm_result = {};
     result = rac_llm_component_generate(handle->llm_handle, stt_result.text,
-                              nullptr,  // default options
-                              &llm_result);
+                                        nullptr,  // default options
+                                        &llm_result);
 
     if (result != RAC_SUCCESS) {
         rac_log(RAC_LOG_ERROR, "VoiceAgent", "LLM generation failed");
@@ -426,8 +515,8 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
 
     rac_tts_result_t tts_result = {};
     result = rac_tts_component_synthesize(handle->tts_handle, llm_result.text,
-                                nullptr,  // default options
-                                &tts_result);
+                                          nullptr,  // default options
+                                          &tts_result);
 
     if (result != RAC_SUCCESS) {
         rac_log(RAC_LOG_ERROR, "VoiceAgent", "TTS synthesis failed");
@@ -441,9 +530,9 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
     void* wav_data = nullptr;
     size_t wav_size = 0;
     result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
-                                       tts_result.sample_rate > 0 ? tts_result.sample_rate
-                                                                  : RAC_TTS_DEFAULT_SAMPLE_RATE,
-                                       &wav_data, &wav_size);
+                                      tts_result.sample_rate > 0 ? tts_result.sample_rate
+                                                                 : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                      &wav_data, &wav_size);
 
     if (result != RAC_SUCCESS) {
         rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to convert audio to WAV format");
@@ -490,10 +579,21 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
+    // Defensive validation: Verify all components are in LOADED state before processing
+    rac_result_t validation_result = validate_all_components_ready(handle);
+    if (validation_result != RAC_SUCCESS) {
+        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Component validation failed - cannot process stream");
+        rac_voice_agent_event_t error_event = {};
+        error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
+        error_event.data.error_code = validation_result;
+        callback(&error_event, user_data);
+        return validation_result;
+    }
+
     // Step 1: Transcribe
     rac_stt_result_t stt_result = {};
-    rac_result_t result =
-        rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr, &stt_result);
+    rac_result_t result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size,
+                                                       nullptr, &stt_result);
 
     if (result != RAC_SUCCESS) {
         rac_voice_agent_event_t error_event = {};
@@ -530,7 +630,8 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
 
     // Step 3: Synthesize
     rac_tts_result_t tts_result = {};
-    result = rac_tts_component_synthesize(handle->tts_handle, llm_result.text, nullptr, &tts_result);
+    result =
+        rac_tts_component_synthesize(handle->tts_handle, llm_result.text, nullptr, &tts_result);
 
     if (result != RAC_SUCCESS) {
         rac_stt_result_free(&stt_result);
@@ -546,9 +647,9 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     void* wav_data = nullptr;
     size_t wav_size = 0;
     result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
-                                       tts_result.sample_rate > 0 ? tts_result.sample_rate
-                                                                  : RAC_TTS_DEFAULT_SAMPLE_RATE,
-                                       &wav_data, &wav_size);
+                                      tts_result.sample_rate > 0 ? tts_result.sample_rate
+                                                                 : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                      &wav_data, &wav_size);
 
     if (result != RAC_SUCCESS) {
         rac_stt_result_free(&stt_result);
@@ -603,8 +704,8 @@ rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle, const v
     }
 
     rac_stt_result_t stt_result = {};
-    rac_result_t result =
-        rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr, &stt_result);
+    rac_result_t result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size,
+                                                       nullptr, &stt_result);
 
     if (result != RAC_SUCCESS) {
         return result;
@@ -629,7 +730,8 @@ rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, 
     }
 
     rac_llm_result_t llm_result = {};
-    rac_result_t result = rac_llm_component_generate(handle->llm_handle, prompt, nullptr, &llm_result);
+    rac_result_t result =
+        rac_llm_component_generate(handle->llm_handle, prompt, nullptr, &llm_result);
 
     if (result != RAC_SUCCESS) {
         return result;
@@ -654,7 +756,8 @@ rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle, 
     }
 
     rac_tts_result_t tts_result = {};
-    rac_result_t result = rac_tts_component_synthesize(handle->tts_handle, text, nullptr, &tts_result);
+    rac_result_t result =
+        rac_tts_component_synthesize(handle->tts_handle, text, nullptr, &tts_result);
 
     if (result != RAC_SUCCESS) {
         return result;
@@ -664,9 +767,9 @@ rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle, 
     void* wav_data = nullptr;
     size_t wav_size = 0;
     result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
-                                       tts_result.sample_rate > 0 ? tts_result.sample_rate
-                                                                  : RAC_TTS_DEFAULT_SAMPLE_RATE,
-                                       &wav_data, &wav_size);
+                                      tts_result.sample_rate > 0 ? tts_result.sample_rate
+                                                                 : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                      &wav_data, &wav_size);
 
     if (result != RAC_SUCCESS) {
         rac_tts_result_free(&tts_result);

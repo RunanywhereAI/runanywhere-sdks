@@ -33,50 +33,25 @@ typedef enum rac_stt_event_type {
 // =============================================================================
 
 RAC_API rac_result_t rac_stt_event_transcription_started(
-    const char* transcription_id,
-    const char* model_id,
-    double audio_length_ms,
-    int32_t audio_size_bytes,
-    const char* language,
-    rac_bool_t is_streaming,
-    rac_inference_framework_t framework
-);
+    const char* transcription_id, const char* model_id, double audio_length_ms,
+    int32_t audio_size_bytes, const char* language, rac_bool_t is_streaming,
+    rac_inference_framework_t framework);
 
-RAC_API rac_result_t rac_stt_event_partial_transcript(
-    const char* text,
-    int32_t word_count
-);
+RAC_API rac_result_t rac_stt_event_partial_transcript(const char* text, int32_t word_count);
 
-RAC_API rac_result_t rac_stt_event_final_transcript(
-    const char* text,
-    float confidence
-);
+RAC_API rac_result_t rac_stt_event_final_transcript(const char* text, float confidence);
 
 RAC_API rac_result_t rac_stt_event_transcription_completed(
-    const char* transcription_id,
-    const char* model_id,
-    const char* text,
-    float confidence,
-    double duration_ms,
-    double audio_length_ms,
-    int32_t word_count,
-    double real_time_factor,
-    const char* language,
-    rac_bool_t is_streaming,
-    rac_inference_framework_t framework
-);
+    const char* transcription_id, const char* model_id, const char* text, float confidence,
+    double duration_ms, double audio_length_ms, int32_t word_count, double real_time_factor,
+    const char* language, rac_bool_t is_streaming, rac_inference_framework_t framework);
 
-RAC_API rac_result_t rac_stt_event_transcription_failed(
-    const char* transcription_id,
-    const char* model_id,
-    rac_result_t error_code,
-    const char* error_message
-);
+RAC_API rac_result_t rac_stt_event_transcription_failed(const char* transcription_id,
+                                                        const char* model_id,
+                                                        rac_result_t error_code,
+                                                        const char* error_message);
 
-RAC_API rac_result_t rac_stt_event_language_detected(
-    const char* language,
-    float confidence
-);
+RAC_API rac_result_t rac_stt_event_language_detected(const char* language, float confidence);
 
 RAC_API const char* rac_stt_event_type_string(rac_stt_event_type_t event_type);
 

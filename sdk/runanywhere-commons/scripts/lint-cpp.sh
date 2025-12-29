@@ -58,6 +58,38 @@ done
 
 cd "${PROJECT_ROOT}"
 
+# Find clang tools - check PATH, then homebrew, then Xcode
+find_clang_format() {
+    if command -v clang-format &> /dev/null; then
+        echo "clang-format"
+    elif [ -x "/opt/homebrew/opt/llvm/bin/clang-format" ]; then
+        echo "/opt/homebrew/opt/llvm/bin/clang-format"
+    elif [ -x "/usr/local/opt/llvm/bin/clang-format" ]; then
+        echo "/usr/local/opt/llvm/bin/clang-format"
+    elif xcrun -find clang-format &>/dev/null; then
+        xcrun -find clang-format
+    else
+        echo ""
+    fi
+}
+
+find_clang_tidy() {
+    if command -v clang-tidy &> /dev/null; then
+        echo "clang-tidy"
+    elif [ -x "/opt/homebrew/opt/llvm/bin/clang-tidy" ]; then
+        echo "/opt/homebrew/opt/llvm/bin/clang-tidy"
+    elif [ -x "/usr/local/opt/llvm/bin/clang-tidy" ]; then
+        echo "/usr/local/opt/llvm/bin/clang-tidy"
+    elif xcrun -find clang-tidy &>/dev/null; then
+        xcrun -find clang-tidy
+    else
+        echo ""
+    fi
+}
+
+CLANG_FORMAT=$(find_clang_format)
+CLANG_TIDY=$(find_clang_tidy)
+
 # Find all C/C++ files
 find_source_files() {
     find include src backends -name "*.cpp" -o -name "*.h" -o -name "*.c" 2>/dev/null || true
@@ -65,7 +97,7 @@ find_source_files() {
 
 # Check if clang-format is available
 check_clang_format() {
-    if ! command -v clang-format &> /dev/null; then
+    if [ -z "$CLANG_FORMAT" ]; then
         echo -e "${YELLOW}Warning: clang-format not found, skipping format checks${NC}"
         return 1
     fi
@@ -74,7 +106,7 @@ check_clang_format() {
 
 # Check if clang-tidy is available
 check_clang_tidy() {
-    if ! command -v clang-tidy &> /dev/null; then
+    if [ -z "$CLANG_TIDY" ]; then
         echo -e "${YELLOW}Warning: clang-tidy not found, skipping static analysis${NC}"
         return 1
     fi
@@ -100,7 +132,7 @@ run_format() {
     local errors=0
 
     if [ "$FIX_FORMAT" = true ]; then
-        echo "$files" | xargs clang-format -i
+        echo "$files" | xargs "$CLANG_FORMAT" -i
         echo -e "${GREEN}Format fixes applied${NC}"
     else
         for file in $files; do
@@ -108,7 +140,7 @@ run_format() {
                 echo "Checking: $file"
             fi
 
-            if ! clang-format --dry-run --Werror "$file" 2>/dev/null; then
+            if ! "$CLANG_FORMAT" --dry-run --Werror "$file" 2>/dev/null; then
                 echo -e "${RED}Format error in: $file${NC}"
                 ((errors++))
             fi
@@ -163,7 +195,7 @@ run_tidy() {
             echo "Analyzing: $file"
         fi
 
-        if ! clang-tidy $compile_db "$file" 2>/dev/null; then
+        if ! "$CLANG_TIDY" $compile_db "$file" 2>/dev/null; then
             ((errors++))
         fi
     done

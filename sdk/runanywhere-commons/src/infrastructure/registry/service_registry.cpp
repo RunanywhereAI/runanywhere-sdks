@@ -107,8 +107,8 @@ rac_result_t rac_service_register_provider(const rac_service_provider_t* provide
         providers.begin(), providers.end(),
         [](const ProviderEntry& a, const ProviderEntry& b) { return a.priority > b.priority; });
 
-    RAC_LOG_INFO(LOG_CAT, "Registered provider: %s for capability %d",
-                 provider->name, static_cast<int>(provider->capability));
+    RAC_LOG_INFO(LOG_CAT, "Registered provider: %s for capability %d", provider->name,
+                 static_cast<int>(provider->capability));
     return RAC_SUCCESS;
 }
 
@@ -124,7 +124,8 @@ rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t 
 
     auto it = state.providers.find(capability);
     if (it == state.providers.end()) {
-        RAC_LOG_WARNING(LOG_CAT, "Provider not found for capability %d", static_cast<int>(capability));
+        RAC_LOG_WARNING(LOG_CAT, "Provider not found for capability %d",
+                        static_cast<int>(capability));
         return RAC_ERROR_PROVIDER_NOT_FOUND;
     }
 

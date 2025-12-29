@@ -5,10 +5,11 @@
  * Implements the generic TTS service API by delegating to ONNX functions.
  */
 
-#include "rac/features/tts/rac_tts_service.h"
 #include "rac_tts_onnx.h"
 
 #include <cstdlib>
+
+#include "rac/features/tts/rac_tts_service.h"
 
 extern "C" {
 
@@ -26,8 +27,7 @@ rac_result_t rac_tts_initialize(rac_handle_t handle) {
 }
 
 rac_result_t rac_tts_synthesize(rac_handle_t handle, const char* text,
-                                const rac_tts_options_t* options,
-                                rac_tts_result_t* out_result) {
+                                const rac_tts_options_t* options, rac_tts_result_t* out_result) {
     return rac_tts_onnx_synthesize(handle, text, options, out_result);
 }
 

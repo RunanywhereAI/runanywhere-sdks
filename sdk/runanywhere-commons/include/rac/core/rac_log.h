@@ -10,8 +10,8 @@
 #ifndef RAC_LOG_H
 #define RAC_LOG_H
 
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 #include "rac/core/rac_types.h"
 
@@ -30,18 +30,31 @@ extern "C" {
  * @param format Printf-style format string
  * @param ... Format arguments
  */
-static inline void rac_log_impl(rac_log_level_t level, const char* category, const char* format, ...) {
+static inline void rac_log_impl(rac_log_level_t level, const char* category, const char* format,
+                                ...) {
     // TODO: Route to platform adapter's logging when available
     // For now, output to stderr for debugging
 
     const char* level_str = "???";
     switch (level) {
-        case RAC_LOG_TRACE: level_str = "TRACE"; break;
-        case RAC_LOG_DEBUG: level_str = "DEBUG"; break;
-        case RAC_LOG_INFO: level_str = "INFO"; break;
-        case RAC_LOG_WARNING: level_str = "WARN"; break;
-        case RAC_LOG_ERROR: level_str = "ERROR"; break;
-        case RAC_LOG_FATAL: level_str = "FATAL"; break;
+        case RAC_LOG_TRACE:
+            level_str = "TRACE";
+            break;
+        case RAC_LOG_DEBUG:
+            level_str = "DEBUG";
+            break;
+        case RAC_LOG_INFO:
+            level_str = "INFO";
+            break;
+        case RAC_LOG_WARNING:
+            level_str = "WARN";
+            break;
+        case RAC_LOG_ERROR:
+            level_str = "ERROR";
+            break;
+        case RAC_LOG_FATAL:
+            level_str = "FATAL";
+            break;
     }
 
     va_list args;

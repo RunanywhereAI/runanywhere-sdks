@@ -5,10 +5,11 @@
  * Implements the generic LLM service API by delegating to LlamaCPP functions.
  */
 
-#include "rac/features/llm/rac_llm_service.h"
 #include "rac_llm_llamacpp.h"
 
 #include <cstdlib>
+
+#include "rac/features/llm/rac_llm_service.h"
 
 // Callback adapter context
 struct StreamCallbackContext {
@@ -41,17 +42,15 @@ rac_result_t rac_llm_initialize(rac_handle_t handle, const char* model_path) {
 }
 
 rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
-                              const rac_llm_options_t* options,
-                              rac_llm_result_t* out_result) {
+                              const rac_llm_options_t* options, rac_llm_result_t* out_result) {
     return rac_llm_llamacpp_generate(handle, prompt, options, out_result);
 }
 
 rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
                                      const rac_llm_options_t* options,
                                      rac_llm_stream_callback_fn callback, void* user_data) {
-    StreamCallbackContext ctx = { callback, user_data };
-    return rac_llm_llamacpp_generate_stream(handle, prompt, options,
-                                            stream_callback_adapter, &ctx);
+    StreamCallbackContext ctx = {callback, user_data};
+    return rac_llm_llamacpp_generate_stream(handle, prompt, options, stream_callback_adapter, &ctx);
 }
 
 rac_result_t rac_llm_cancel(rac_handle_t handle) {

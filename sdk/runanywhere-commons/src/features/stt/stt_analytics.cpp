@@ -6,9 +6,6 @@
  * Swift Source: Sources/RunAnywhere/Features/STT/Analytics/STTAnalyticsService.swift
  */
 
-#include "rac/features/stt/rac_stt_analytics.h"
-#include "rac/core/rac_log.h"
-
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -17,6 +14,9 @@
 #include <random>
 #include <sstream>
 #include <string>
+
+#include "rac/core/rac_log.h"
+#include "rac/features/stt/rac_stt_analytics.h"
 
 // =============================================================================
 // INTERNAL TYPES - Mirrors Swift's TranscriptionTracker
@@ -49,16 +49,21 @@ std::string generate_uuid() {
     std::stringstream ss;
     ss << std::hex;
 
-    for (int i = 0; i < 8; i++) ss << dis(gen);
+    for (int i = 0; i < 8; i++)
+        ss << dis(gen);
     ss << "-";
-    for (int i = 0; i < 4; i++) ss << dis(gen);
+    for (int i = 0; i < 4; i++)
+        ss << dis(gen);
     ss << "-4";
-    for (int i = 0; i < 3; i++) ss << dis(gen);
+    for (int i = 0; i < 3; i++)
+        ss << dis(gen);
     ss << "-";
     ss << (8 + dis(gen) % 4);
-    for (int i = 0; i < 3; i++) ss << dis(gen);
+    for (int i = 0; i < 3; i++)
+        ss << dis(gen);
     ss << "-";
-    for (int i = 0; i < 12; i++) ss << dis(gen);
+    for (int i = 0; i < 12; i++)
+        ss << dis(gen);
 
     return ss.str();
 }
@@ -84,14 +89,14 @@ struct rac_stt_analytics_s {
     bool has_last_event_time;
 
     rac_stt_analytics_s()
-        : transcription_count(0)
-        , total_confidence(0.0f)
-        , total_latency_ms(0)
-        , total_audio_processed_ms(0)
-        , total_real_time_factor(0)
-        , start_time_ms(get_current_time_ms())
-        , last_event_time_ms(0)
-        , has_last_event_time(false) {}
+        : transcription_count(0),
+          total_confidence(0.0f),
+          total_latency_ms(0),
+          total_audio_processed_ms(0),
+          total_real_time_factor(0),
+          start_time_ms(get_current_time_ms()),
+          last_event_time_ms(0),
+          has_last_event_time(false) {}
 };
 
 // =============================================================================
@@ -121,17 +126,12 @@ void rac_stt_analytics_destroy(rac_stt_analytics_handle_t handle) {
     }
 }
 
-rac_result_t rac_stt_analytics_start_transcription(
-    rac_stt_analytics_handle_t handle,
-    const char* model_id,
-    double audio_length_ms,
-    int32_t audio_size_bytes,
-    const char* language,
-    rac_bool_t is_streaming,
-    int32_t sample_rate,
-    rac_inference_framework_t framework,
-    char** out_transcription_id
-) {
+rac_result_t rac_stt_analytics_start_transcription(rac_stt_analytics_handle_t handle,
+                                                   const char* model_id, double audio_length_ms,
+                                                   int32_t audio_size_bytes, const char* language,
+                                                   rac_bool_t is_streaming, int32_t sample_rate,
+                                                   rac_inference_framework_t framework,
+                                                   char** out_transcription_id) {
     if (!handle || !model_id || !language || !out_transcription_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -164,10 +164,8 @@ rac_result_t rac_stt_analytics_start_transcription(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_analytics_track_partial_transcript(
-    rac_stt_analytics_handle_t handle,
-    const char* text
-) {
+rac_result_t rac_stt_analytics_track_partial_transcript(rac_stt_analytics_handle_t handle,
+                                                        const char* text) {
     if (!handle || !text) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -177,11 +175,8 @@ rac_result_t rac_stt_analytics_track_partial_transcript(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_analytics_track_final_transcript(
-    rac_stt_analytics_handle_t handle,
-    const char* text,
-    float confidence
-) {
+rac_result_t rac_stt_analytics_track_final_transcript(rac_stt_analytics_handle_t handle,
+                                                      const char* text, float confidence) {
     if (!handle || !text) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -191,12 +186,9 @@ rac_result_t rac_stt_analytics_track_final_transcript(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_analytics_complete_transcription(
-    rac_stt_analytics_handle_t handle,
-    const char* transcription_id,
-    const char* text,
-    float confidence
-) {
+rac_result_t rac_stt_analytics_complete_transcription(rac_stt_analytics_handle_t handle,
+                                                      const char* transcription_id,
+                                                      const char* text, float confidence) {
     if (!handle || !transcription_id || !text) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -215,9 +207,8 @@ rac_result_t rac_stt_analytics_complete_transcription(
     double processing_time_ms = static_cast<double>(end_time_ms - tracker.start_time_ms);
 
     // Calculate real-time factor (RTF): processing time / audio length
-    double real_time_factor = tracker.audio_length_ms > 0
-                                  ? processing_time_ms / tracker.audio_length_ms
-                                  : 0;
+    double real_time_factor =
+        tracker.audio_length_ms > 0 ? processing_time_ms / tracker.audio_length_ms : 0;
 
     // Update metrics
     handle->transcription_count++;
@@ -234,12 +225,10 @@ rac_result_t rac_stt_analytics_complete_transcription(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_analytics_track_transcription_failed(
-    rac_stt_analytics_handle_t handle,
-    const char* transcription_id,
-    rac_result_t error_code,
-    const char* error_message
-) {
+rac_result_t rac_stt_analytics_track_transcription_failed(rac_stt_analytics_handle_t handle,
+                                                          const char* transcription_id,
+                                                          rac_result_t error_code,
+                                                          const char* error_message) {
     if (!handle || !transcription_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -256,11 +245,8 @@ rac_result_t rac_stt_analytics_track_transcription_failed(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_analytics_track_language_detection(
-    rac_stt_analytics_handle_t handle,
-    const char* language,
-    float confidence
-) {
+rac_result_t rac_stt_analytics_track_language_detection(rac_stt_analytics_handle_t handle,
+                                                        const char* language, float confidence) {
     if (!handle || !language) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -269,14 +255,10 @@ rac_result_t rac_stt_analytics_track_language_detection(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_analytics_track_error(
-    rac_stt_analytics_handle_t handle,
-    rac_result_t error_code,
-    const char* error_message,
-    const char* operation,
-    const char* model_id,
-    const char* transcription_id
-) {
+rac_result_t rac_stt_analytics_track_error(rac_stt_analytics_handle_t handle,
+                                           rac_result_t error_code, const char* error_message,
+                                           const char* operation, const char* model_id,
+                                           const char* transcription_id) {
     if (!handle) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -293,10 +275,8 @@ rac_result_t rac_stt_analytics_track_error(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_analytics_get_metrics(
-    rac_stt_analytics_handle_t handle,
-    rac_stt_metrics_t* out_metrics
-) {
+rac_result_t rac_stt_analytics_get_metrics(rac_stt_analytics_handle_t handle,
+                                           rac_stt_metrics_t* out_metrics) {
     if (!handle || !out_metrics) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -305,8 +285,7 @@ rac_result_t rac_stt_analytics_get_metrics(
 
     out_metrics->total_events = handle->transcription_count;
     out_metrics->start_time_ms = handle->start_time_ms;
-    out_metrics->last_event_time_ms =
-        handle->has_last_event_time ? handle->last_event_time_ms : 0;
+    out_metrics->last_event_time_ms = handle->has_last_event_time ? handle->last_event_time_ms : 0;
     out_metrics->total_transcriptions = handle->transcription_count;
 
     out_metrics->average_confidence =

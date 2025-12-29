@@ -50,9 +50,9 @@ typedef struct rac_llm_model_load_event {
     const char* model_id;
     int64_t model_size_bytes;
     rac_inference_framework_t framework;
-    double duration_ms;         /**< Only for completed events */
-    rac_result_t error_code;    /**< Only for failed events */
-    const char* error_message;  /**< Only for failed events */
+    double duration_ms;        /**< Only for completed events */
+    rac_result_t error_code;   /**< Only for failed events */
+    const char* error_message; /**< Only for failed events */
 } rac_llm_model_load_event_t;
 
 /**
@@ -69,7 +69,7 @@ typedef struct rac_llm_generation_event {
     int32_t output_tokens;
     double duration_ms;
     double tokens_per_second;
-    double time_to_first_token_ms;  /**< -1 if not applicable */
+    double time_to_first_token_ms; /**< -1 if not applicable */
     float temperature;
     int32_t max_tokens;
     int32_t context_length;
@@ -94,11 +94,9 @@ typedef struct rac_llm_generation_event {
  * @param framework Inference framework
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_model_load_started(
-    const char* model_id,
-    int64_t model_size_bytes,
-    rac_inference_framework_t framework
-);
+RAC_API rac_result_t rac_llm_event_model_load_started(const char* model_id,
+                                                      int64_t model_size_bytes,
+                                                      rac_inference_framework_t framework);
 
 /**
  * @brief Publish a model load completed event
@@ -109,12 +107,9 @@ RAC_API rac_result_t rac_llm_event_model_load_started(
  * @param framework Inference framework
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_model_load_completed(
-    const char* model_id,
-    double duration_ms,
-    int64_t model_size_bytes,
-    rac_inference_framework_t framework
-);
+RAC_API rac_result_t rac_llm_event_model_load_completed(const char* model_id, double duration_ms,
+                                                        int64_t model_size_bytes,
+                                                        rac_inference_framework_t framework);
 
 /**
  * @brief Publish a model load failed event
@@ -125,12 +120,9 @@ RAC_API rac_result_t rac_llm_event_model_load_completed(
  * @param framework Inference framework
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_model_load_failed(
-    const char* model_id,
-    rac_result_t error_code,
-    const char* error_message,
-    rac_inference_framework_t framework
-);
+RAC_API rac_result_t rac_llm_event_model_load_failed(const char* model_id, rac_result_t error_code,
+                                                     const char* error_message,
+                                                     rac_inference_framework_t framework);
 
 /**
  * @brief Publish a model unloaded event
@@ -149,12 +141,9 @@ RAC_API rac_result_t rac_llm_event_model_unloaded(const char* model_id);
  * @param framework Inference framework
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_generation_started(
-    const char* generation_id,
-    const char* model_id,
-    rac_bool_t is_streaming,
-    rac_inference_framework_t framework
-);
+RAC_API rac_result_t rac_llm_event_generation_started(const char* generation_id,
+                                                      const char* model_id, rac_bool_t is_streaming,
+                                                      rac_inference_framework_t framework);
 
 /**
  * @brief Publish a first token event (streaming only)
@@ -165,12 +154,9 @@ RAC_API rac_result_t rac_llm_event_generation_started(
  * @param framework Inference framework
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_first_token(
-    const char* generation_id,
-    const char* model_id,
-    double time_to_first_token_ms,
-    rac_inference_framework_t framework
-);
+RAC_API rac_result_t rac_llm_event_first_token(const char* generation_id, const char* model_id,
+                                               double time_to_first_token_ms,
+                                               rac_inference_framework_t framework);
 
 /**
  * @brief Publish a streaming update event
@@ -179,10 +165,8 @@ RAC_API rac_result_t rac_llm_event_first_token(
  * @param tokens_generated Number of tokens generated so far
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_streaming_update(
-    const char* generation_id,
-    int32_t tokens_generated
-);
+RAC_API rac_result_t rac_llm_event_streaming_update(const char* generation_id,
+                                                    int32_t tokens_generated);
 
 /**
  * @brief Publish a generation completed event
@@ -190,9 +174,7 @@ RAC_API rac_result_t rac_llm_event_streaming_update(
  * @param event Generation event data
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_generation_completed(
-    const rac_llm_generation_event_t* event
-);
+RAC_API rac_result_t rac_llm_event_generation_completed(const rac_llm_generation_event_t* event);
 
 /**
  * @brief Publish a generation failed event
@@ -202,11 +184,9 @@ RAC_API rac_result_t rac_llm_event_generation_completed(
  * @param error_message Error message
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_generation_failed(
-    const char* generation_id,
-    rac_result_t error_code,
-    const char* error_message
-);
+RAC_API rac_result_t rac_llm_event_generation_failed(const char* generation_id,
+                                                     rac_result_t error_code,
+                                                     const char* error_message);
 
 // =============================================================================
 // UTILITY FUNCTIONS

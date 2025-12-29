@@ -5,8 +5,9 @@
  * Implements the generic VAD service API by delegating to ONNX functions.
  */
 
-#include "rac/features/vad/rac_vad_service.h"
 #include "rac_vad_onnx.h"
+
+#include "rac/features/vad/rac_vad_service.h"
 
 extern "C" {
 
@@ -24,8 +25,7 @@ rac_result_t rac_vad_initialize(rac_handle_t handle) {
 }
 
 rac_result_t rac_vad_set_activity_callback(rac_handle_t handle,
-                                           rac_vad_activity_callback_fn callback,
-                                           void* user_data) {
+                                           rac_vad_activity_callback_fn callback, void* user_data) {
     // ONNX VAD uses synchronous processing; callbacks not directly supported
     (void)handle;
     (void)callback;
@@ -33,8 +33,7 @@ rac_result_t rac_vad_set_activity_callback(rac_handle_t handle,
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_vad_set_audio_callback(rac_handle_t handle,
-                                        rac_vad_audio_callback_fn callback,
+rac_result_t rac_vad_set_audio_callback(rac_handle_t handle, rac_vad_audio_callback_fn callback,
                                         void* user_data) {
     (void)handle;
     (void)callback;
@@ -64,8 +63,8 @@ rac_result_t rac_vad_resume(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_vad_process_samples(rac_handle_t handle, const float* samples,
-                                     size_t num_samples, rac_bool_t* out_is_speech) {
+rac_result_t rac_vad_process_samples(rac_handle_t handle, const float* samples, size_t num_samples,
+                                     rac_bool_t* out_is_speech) {
     return rac_vad_onnx_process(handle, samples, num_samples, out_is_speech);
 }
 

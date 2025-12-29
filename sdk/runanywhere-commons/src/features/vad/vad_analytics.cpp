@@ -6,12 +6,12 @@
  * Swift Source: Sources/RunAnywhere/Features/VAD/Analytics/VADAnalyticsService.swift
  */
 
-#include "rac/features/vad/rac_vad_analytics.h"
-#include "rac/core/rac_log.h"
-
 #include <chrono>
 #include <cstdlib>
 #include <mutex>
+
+#include "rac/core/rac_log.h"
+#include "rac/features/vad/rac_vad_analytics.h"
 
 // =============================================================================
 // INTERNAL UTILITIES
@@ -49,14 +49,14 @@ struct rac_vad_analytics_s {
     bool has_last_event_time;
 
     rac_vad_analytics_s()
-        : current_framework(RAC_FRAMEWORK_BUILTIN)
-        , speech_start_time_ms(0)
-        , has_speech_start(false)
-        , total_speech_segments(0)
-        , total_speech_duration_ms(0)
-        , start_time_ms(get_current_time_ms())
-        , last_event_time_ms(0)
-        , has_last_event_time(false) {}
+        : current_framework(RAC_FRAMEWORK_BUILTIN),
+          speech_start_time_ms(0),
+          has_speech_start(false),
+          total_speech_segments(0),
+          total_speech_duration_ms(0),
+          start_time_ms(get_current_time_ms()),
+          last_event_time_ms(0),
+          has_last_event_time(false) {}
 };
 
 // =============================================================================
@@ -86,10 +86,8 @@ void rac_vad_analytics_destroy(rac_vad_analytics_handle_t handle) {
     }
 }
 
-rac_result_t rac_vad_analytics_track_initialized(
-    rac_vad_analytics_handle_t handle,
-    rac_inference_framework_t framework
-) {
+rac_result_t rac_vad_analytics_track_initialized(rac_vad_analytics_handle_t handle,
+                                                 rac_inference_framework_t framework) {
     if (!handle) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -104,12 +102,10 @@ rac_result_t rac_vad_analytics_track_initialized(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_vad_analytics_track_initialization_failed(
-    rac_vad_analytics_handle_t handle,
-    rac_result_t error_code,
-    const char* error_message,
-    rac_inference_framework_t framework
-) {
+rac_result_t rac_vad_analytics_track_initialization_failed(rac_vad_analytics_handle_t handle,
+                                                           rac_result_t error_code,
+                                                           const char* error_message,
+                                                           rac_inference_framework_t framework) {
     if (!handle) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -236,12 +232,10 @@ rac_result_t rac_vad_analytics_track_resumed(rac_vad_analytics_handle_t handle) 
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_vad_analytics_track_model_load_started(
-    rac_vad_analytics_handle_t handle,
-    const char* model_id,
-    int64_t model_size_bytes,
-    rac_inference_framework_t framework
-) {
+rac_result_t rac_vad_analytics_track_model_load_started(rac_vad_analytics_handle_t handle,
+                                                        const char* model_id,
+                                                        int64_t model_size_bytes,
+                                                        rac_inference_framework_t framework) {
     if (!handle || !model_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -256,12 +250,9 @@ rac_result_t rac_vad_analytics_track_model_load_started(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_vad_analytics_track_model_load_completed(
-    rac_vad_analytics_handle_t handle,
-    const char* model_id,
-    double duration_ms,
-    int64_t model_size_bytes
-) {
+rac_result_t rac_vad_analytics_track_model_load_completed(rac_vad_analytics_handle_t handle,
+                                                          const char* model_id, double duration_ms,
+                                                          int64_t model_size_bytes) {
     if (!handle || !model_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -276,12 +267,10 @@ rac_result_t rac_vad_analytics_track_model_load_completed(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_vad_analytics_track_model_load_failed(
-    rac_vad_analytics_handle_t handle,
-    const char* model_id,
-    rac_result_t error_code,
-    const char* error_message
-) {
+rac_result_t rac_vad_analytics_track_model_load_failed(rac_vad_analytics_handle_t handle,
+                                                       const char* model_id,
+                                                       rac_result_t error_code,
+                                                       const char* error_message) {
     if (!handle || !model_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -296,10 +285,8 @@ rac_result_t rac_vad_analytics_track_model_load_failed(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_vad_analytics_track_model_unloaded(
-    rac_vad_analytics_handle_t handle,
-    const char* model_id
-) {
+rac_result_t rac_vad_analytics_track_model_unloaded(rac_vad_analytics_handle_t handle,
+                                                    const char* model_id) {
     if (!handle || !model_id) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -313,10 +300,8 @@ rac_result_t rac_vad_analytics_track_model_unloaded(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_vad_analytics_get_metrics(
-    rac_vad_analytics_handle_t handle,
-    rac_vad_metrics_t* out_metrics
-) {
+rac_result_t rac_vad_analytics_get_metrics(rac_vad_analytics_handle_t handle,
+                                           rac_vad_metrics_t* out_metrics) {
     if (!handle || !out_metrics) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -325,8 +310,7 @@ rac_result_t rac_vad_analytics_get_metrics(
 
     out_metrics->total_events = handle->total_speech_segments;
     out_metrics->start_time_ms = handle->start_time_ms;
-    out_metrics->last_event_time_ms =
-        handle->has_last_event_time ? handle->last_event_time_ms : 0;
+    out_metrics->last_event_time_ms = handle->has_last_event_time ? handle->last_event_time_ms : 0;
     out_metrics->total_speech_segments = handle->total_speech_segments;
     out_metrics->total_speech_duration_ms = handle->total_speech_duration_ms;
 

@@ -102,16 +102,9 @@ RAC_API void rac_stt_analytics_destroy(rac_stt_analytics_handle_t handle);
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_stt_analytics_start_transcription(
-    rac_stt_analytics_handle_t handle,
-    const char* model_id,
-    double audio_length_ms,
-    int32_t audio_size_bytes,
-    const char* language,
-    rac_bool_t is_streaming,
-    int32_t sample_rate,
-    rac_inference_framework_t framework,
-    char** out_transcription_id
-);
+    rac_stt_analytics_handle_t handle, const char* model_id, double audio_length_ms,
+    int32_t audio_size_bytes, const char* language, rac_bool_t is_streaming, int32_t sample_rate,
+    rac_inference_framework_t framework, char** out_transcription_id);
 
 /**
  * @brief Track partial transcript (for streaming transcription)
@@ -120,10 +113,8 @@ RAC_API rac_result_t rac_stt_analytics_start_transcription(
  * @param text Partial transcript text
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_track_partial_transcript(
-    rac_stt_analytics_handle_t handle,
-    const char* text
-);
+RAC_API rac_result_t rac_stt_analytics_track_partial_transcript(rac_stt_analytics_handle_t handle,
+                                                                const char* text);
 
 /**
  * @brief Track final transcript (for streaming transcription)
@@ -133,11 +124,8 @@ RAC_API rac_result_t rac_stt_analytics_track_partial_transcript(
  * @param confidence Confidence score (0.0 to 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_track_final_transcript(
-    rac_stt_analytics_handle_t handle,
-    const char* text,
-    float confidence
-);
+RAC_API rac_result_t rac_stt_analytics_track_final_transcript(rac_stt_analytics_handle_t handle,
+                                                              const char* text, float confidence);
 
 /**
  * @brief Complete a transcription
@@ -148,12 +136,9 @@ RAC_API rac_result_t rac_stt_analytics_track_final_transcript(
  * @param confidence Confidence score (0.0 to 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_complete_transcription(
-    rac_stt_analytics_handle_t handle,
-    const char* transcription_id,
-    const char* text,
-    float confidence
-);
+RAC_API rac_result_t rac_stt_analytics_complete_transcription(rac_stt_analytics_handle_t handle,
+                                                              const char* transcription_id,
+                                                              const char* text, float confidence);
 
 /**
  * @brief Track transcription failure
@@ -164,12 +149,10 @@ RAC_API rac_result_t rac_stt_analytics_complete_transcription(
  * @param error_message Error message
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_track_transcription_failed(
-    rac_stt_analytics_handle_t handle,
-    const char* transcription_id,
-    rac_result_t error_code,
-    const char* error_message
-);
+RAC_API rac_result_t rac_stt_analytics_track_transcription_failed(rac_stt_analytics_handle_t handle,
+                                                                  const char* transcription_id,
+                                                                  rac_result_t error_code,
+                                                                  const char* error_message);
 
 /**
  * @brief Track language detection
@@ -179,11 +162,9 @@ RAC_API rac_result_t rac_stt_analytics_track_transcription_failed(
  * @param confidence Detection confidence (0.0 to 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_track_language_detection(
-    rac_stt_analytics_handle_t handle,
-    const char* language,
-    float confidence
-);
+RAC_API rac_result_t rac_stt_analytics_track_language_detection(rac_stt_analytics_handle_t handle,
+                                                                const char* language,
+                                                                float confidence);
 
 /**
  * @brief Track an error during STT operations
@@ -196,14 +177,11 @@ RAC_API rac_result_t rac_stt_analytics_track_language_detection(
  * @param transcription_id Transcription ID (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_track_error(
-    rac_stt_analytics_handle_t handle,
-    rac_result_t error_code,
-    const char* error_message,
-    const char* operation,
-    const char* model_id,
-    const char* transcription_id
-);
+RAC_API rac_result_t rac_stt_analytics_track_error(rac_stt_analytics_handle_t handle,
+                                                   rac_result_t error_code,
+                                                   const char* error_message, const char* operation,
+                                                   const char* model_id,
+                                                   const char* transcription_id);
 
 // =============================================================================
 // METRICS
@@ -216,10 +194,8 @@ RAC_API rac_result_t rac_stt_analytics_track_error(
  * @param out_metrics Output: Metrics structure
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_get_metrics(
-    rac_stt_analytics_handle_t handle,
-    rac_stt_metrics_t* out_metrics
-);
+RAC_API rac_result_t rac_stt_analytics_get_metrics(rac_stt_analytics_handle_t handle,
+                                                   rac_stt_metrics_t* out_metrics);
 
 #ifdef __cplusplus
 }
