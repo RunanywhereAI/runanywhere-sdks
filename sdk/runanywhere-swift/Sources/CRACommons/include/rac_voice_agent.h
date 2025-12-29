@@ -351,7 +351,7 @@ RAC_API void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
-                                                     const char* model_id);
+                                                    const char* model_id);
 
 /**
  * @brief Load an LLM model into the voice agent.
@@ -361,7 +361,7 @@ RAC_API rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t han
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
-                                                     const char* model_id);
+                                                    const char* model_id);
 
 /**
  * @brief Load a TTS voice into the voice agent.
@@ -371,7 +371,7 @@ RAC_API rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t han
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
-                                                     const char* voice_id);
+                                                    const char* voice_id);
 
 /**
  * @brief Check if STT model is loaded.
@@ -381,7 +381,7 @@ RAC_API rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t han
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t handle,
-                                                    rac_bool_t* out_loaded);
+                                                   rac_bool_t* out_loaded);
 
 /**
  * @brief Check if LLM model is loaded.
@@ -391,7 +391,7 @@ RAC_API rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t hand
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_is_llm_loaded(rac_voice_agent_handle_t handle,
-                                                    rac_bool_t* out_loaded);
+                                                   rac_bool_t* out_loaded);
 
 /**
  * @brief Check if TTS voice is loaded.
@@ -401,7 +401,7 @@ RAC_API rac_result_t rac_voice_agent_is_llm_loaded(rac_voice_agent_handle_t hand
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_is_tts_loaded(rac_voice_agent_handle_t handle,
-                                                    rac_bool_t* out_loaded);
+                                                   rac_bool_t* out_loaded);
 
 /**
  * @brief Get the currently loaded STT model ID.

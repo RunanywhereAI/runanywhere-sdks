@@ -25,10 +25,10 @@
 #ifndef RAC_STRUCTURED_ERROR_H
 #define RAC_STRUCTURED_ERROR_H
 
+#include <stdint.h>
+
 #include "rac_error.h"
 #include "rac_types.h"
-
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,21 +44,21 @@ extern "C" {
  * These define which component/modality an error belongs to.
  */
 typedef enum rac_error_category {
-    RAC_CATEGORY_GENERAL = 0,           /**< General SDK errors */
-    RAC_CATEGORY_STT = 1,               /**< Speech-to-Text errors */
-    RAC_CATEGORY_TTS = 2,               /**< Text-to-Speech errors */
-    RAC_CATEGORY_LLM = 3,               /**< Large Language Model errors */
-    RAC_CATEGORY_VAD = 4,               /**< Voice Activity Detection errors */
-    RAC_CATEGORY_VLM = 5,               /**< Vision Language Model errors */
+    RAC_CATEGORY_GENERAL = 0,             /**< General SDK errors */
+    RAC_CATEGORY_STT = 1,                 /**< Speech-to-Text errors */
+    RAC_CATEGORY_TTS = 2,                 /**< Text-to-Speech errors */
+    RAC_CATEGORY_LLM = 3,                 /**< Large Language Model errors */
+    RAC_CATEGORY_VAD = 4,                 /**< Voice Activity Detection errors */
+    RAC_CATEGORY_VLM = 5,                 /**< Vision Language Model errors */
     RAC_CATEGORY_SPEAKER_DIARIZATION = 6, /**< Speaker Diarization errors */
-    RAC_CATEGORY_WAKE_WORD = 7,         /**< Wake Word Detection errors */
-    RAC_CATEGORY_VOICE_AGENT = 8,       /**< Voice Agent errors */
-    RAC_CATEGORY_DOWNLOAD = 9,          /**< Download errors */
-    RAC_CATEGORY_FILE_MANAGEMENT = 10,  /**< File management errors */
-    RAC_CATEGORY_NETWORK = 11,          /**< Network errors */
-    RAC_CATEGORY_AUTHENTICATION = 12,   /**< Authentication errors */
-    RAC_CATEGORY_SECURITY = 13,         /**< Security errors */
-    RAC_CATEGORY_RUNTIME = 14,          /**< Runtime/backend errors */
+    RAC_CATEGORY_WAKE_WORD = 7,           /**< Wake Word Detection errors */
+    RAC_CATEGORY_VOICE_AGENT = 8,         /**< Voice Agent errors */
+    RAC_CATEGORY_DOWNLOAD = 9,            /**< Download errors */
+    RAC_CATEGORY_FILE_MANAGEMENT = 10,    /**< File management errors */
+    RAC_CATEGORY_NETWORK = 11,            /**< Network errors */
+    RAC_CATEGORY_AUTHENTICATION = 12,     /**< Authentication errors */
+    RAC_CATEGORY_SECURITY = 13,           /**< Security errors */
+    RAC_CATEGORY_RUNTIME = 14,            /**< Runtime/backend errors */
 } rac_error_category_t;
 
 // =============================================================================
@@ -69,10 +69,10 @@ typedef enum rac_error_category {
  * @brief A single frame in a stack trace.
  */
 typedef struct rac_stack_frame {
-    const char* function;   /**< Function name */
-    const char* file;       /**< Source file name */
-    int32_t line;           /**< Line number */
-    void* address;          /**< Memory address (for symbolication) */
+    const char* function; /**< Function name */
+    const char* file;     /**< Source file name */
+    int32_t line;         /**< Line number */
+    void* address;        /**< Memory address (for symbolication) */
 } rac_stack_frame_t;
 
 // =============================================================================
@@ -101,13 +101,13 @@ typedef struct rac_stack_frame {
  */
 typedef struct rac_error {
     // Core error info
-    rac_result_t code;                          /**< Error code (RAC_ERROR_*) */
-    rac_error_category_t category;              /**< Error category */
-    char message[RAC_MAX_ERROR_MESSAGE];        /**< Human-readable message */
+    rac_result_t code;                   /**< Error code (RAC_ERROR_*) */
+    rac_error_category_t category;       /**< Error category */
+    char message[RAC_MAX_ERROR_MESSAGE]; /**< Human-readable message */
 
     // Source location where error occurred
-    char source_file[RAC_MAX_METADATA_STRING];  /**< Source file name */
-    int32_t source_line;                        /**< Source line number */
+    char source_file[RAC_MAX_METADATA_STRING];     /**< Source file name */
+    int32_t source_line;                           /**< Source line number */
     char source_function[RAC_MAX_METADATA_STRING]; /**< Function name */
 
     // Stack trace
@@ -115,16 +115,16 @@ typedef struct rac_error {
     int32_t stack_frame_count;
 
     // Underlying error (optional)
-    rac_result_t underlying_code;               /**< Underlying error code (0 if none) */
+    rac_result_t underlying_code;                   /**< Underlying error code (0 if none) */
     char underlying_message[RAC_MAX_ERROR_MESSAGE]; /**< Underlying error message */
 
     // Context metadata
-    char model_id[RAC_MAX_METADATA_STRING];     /**< Model ID if applicable */
-    char framework[RAC_MAX_METADATA_STRING];    /**< Framework (e.g., "sherpa-onnx") */
-    char session_id[RAC_MAX_METADATA_STRING];   /**< Session ID for correlation */
+    char model_id[RAC_MAX_METADATA_STRING];   /**< Model ID if applicable */
+    char framework[RAC_MAX_METADATA_STRING];  /**< Framework (e.g., "sherpa-onnx") */
+    char session_id[RAC_MAX_METADATA_STRING]; /**< Session ID for correlation */
 
     // Timing
-    int64_t timestamp_ms;                       /**< When error occurred (unix ms) */
+    int64_t timestamp_ms; /**< When error occurred (unix ms) */
 
     // Custom metadata (key-value pairs for extensibility)
     char custom_key1[64];
@@ -148,7 +148,7 @@ typedef struct rac_error {
  * @return New error instance (caller must call rac_error_destroy)
  */
 RAC_API rac_error_t* rac_error_create(rac_result_t code, rac_error_category_t category,
-                                       const char* message);
+                                      const char* message);
 
 /**
  * @brief Creates an error with source location.
@@ -164,8 +164,8 @@ RAC_API rac_error_t* rac_error_create(rac_result_t code, rac_error_category_t ca
  * @return New error instance
  */
 RAC_API rac_error_t* rac_error_create_at(rac_result_t code, rac_error_category_t category,
-                                          const char* message, const char* file, int32_t line,
-                                          const char* function);
+                                         const char* message, const char* file, int32_t line,
+                                         const char* function);
 
 /**
  * @brief Creates an error with formatted message.
@@ -177,7 +177,7 @@ RAC_API rac_error_t* rac_error_create_at(rac_result_t code, rac_error_category_t
  * @return New error instance
  */
 RAC_API rac_error_t* rac_error_createf(rac_result_t code, rac_error_category_t category,
-                                        const char* format, ...);
+                                       const char* format, ...);
 
 /**
  * @brief Destroys a structured error and frees memory.
@@ -207,7 +207,7 @@ RAC_API rac_error_t* rac_error_copy(const rac_error_t* error);
  * @param function Function name
  */
 RAC_API void rac_error_set_source(rac_error_t* error, const char* file, int32_t line,
-                                   const char* function);
+                                  const char* function);
 
 /**
  * @brief Sets the underlying error.
@@ -217,7 +217,7 @@ RAC_API void rac_error_set_source(rac_error_t* error, const char* file, int32_t 
  * @param underlying_message Underlying error message
  */
 RAC_API void rac_error_set_underlying(rac_error_t* error, rac_result_t underlying_code,
-                                       const char* underlying_message);
+                                      const char* underlying_message);
 
 /**
  * @brief Sets model context for the error.
@@ -227,7 +227,7 @@ RAC_API void rac_error_set_underlying(rac_error_t* error, rac_result_t underlyin
  * @param framework Framework name (e.g., "sherpa-onnx", "llama.cpp")
  */
 RAC_API void rac_error_set_model_context(rac_error_t* error, const char* model_id,
-                                          const char* framework);
+                                         const char* framework);
 
 /**
  * @brief Sets session ID for correlation.
@@ -246,7 +246,7 @@ RAC_API void rac_error_set_session(rac_error_t* error, const char* session_id);
  * @param value Metadata value
  */
 RAC_API void rac_error_set_custom(rac_error_t* error, int32_t index, const char* key,
-                                   const char* value);
+                                  const char* value);
 
 // =============================================================================
 // STACK TRACE
@@ -274,7 +274,7 @@ RAC_API int32_t rac_error_capture_stack_trace(rac_error_t* error);
  * @param line Line number
  */
 RAC_API void rac_error_add_frame(rac_error_t* error, const char* function, const char* file,
-                                  int32_t line);
+                                 int32_t line);
 
 // =============================================================================
 // ERROR INFORMATION
@@ -343,7 +343,7 @@ RAC_API char* rac_error_to_json(const rac_error_t* error);
  * @return Number of properties written
  */
 RAC_API int32_t rac_error_get_telemetry_properties(const rac_error_t* error, char** out_keys,
-                                                    char** out_values);
+                                                   char** out_values);
 
 /**
  * @brief Formats error as a human-readable string.
@@ -385,10 +385,10 @@ RAC_API char* rac_error_to_debug_string(const rac_error_t* error);
 /**
  * @brief Category-specific error macros.
  */
-#define RAC_ERROR_STT(code, msg)    RAC_ERROR(code, RAC_CATEGORY_STT, msg)
-#define RAC_ERROR_TTS(code, msg)    RAC_ERROR(code, RAC_CATEGORY_TTS, msg)
-#define RAC_ERROR_LLM(code, msg)    RAC_ERROR(code, RAC_CATEGORY_LLM, msg)
-#define RAC_ERROR_VAD(code, msg)    RAC_ERROR(code, RAC_CATEGORY_VAD, msg)
+#define RAC_ERROR_STT(code, msg) RAC_ERROR(code, RAC_CATEGORY_STT, msg)
+#define RAC_ERROR_TTS(code, msg) RAC_ERROR(code, RAC_CATEGORY_TTS, msg)
+#define RAC_ERROR_LLM(code, msg) RAC_ERROR(code, RAC_CATEGORY_LLM, msg)
+#define RAC_ERROR_VAD(code, msg) RAC_ERROR(code, RAC_CATEGORY_VAD, msg)
 #define RAC_ERROR_GENERAL(code, msg) RAC_ERROR(code, RAC_CATEGORY_GENERAL, msg)
 #define RAC_ERROR_NETWORK(code, msg) RAC_ERROR(code, RAC_CATEGORY_NETWORK, msg)
 #define RAC_ERROR_DOWNLOAD(code, msg) RAC_ERROR(code, RAC_CATEGORY_DOWNLOAD, msg)
@@ -428,13 +428,12 @@ RAC_API void rac_clear_last_error(void);
  * @return The error code (for easy return statements)
  */
 RAC_API rac_result_t rac_set_error(rac_result_t code, rac_error_category_t category,
-                                    const char* message);
+                                   const char* message);
 
 /**
  * @brief Convenience macro to set error and return.
  */
-#define RAC_RETURN_ERROR(code, category, msg) \
-    return rac_set_error(code, category, msg)
+#define RAC_RETURN_ERROR(code, category, msg) return rac_set_error(code, category, msg)
 
 #ifdef __cplusplus
 }
@@ -455,27 +454,19 @@ namespace rac {
  * @brief RAII wrapper for rac_error_t.
  */
 class Error {
-public:
+   public:
     Error(rac_result_t code, rac_error_category_t category, const char* message)
         : error_(rac_error_create(code, category, message), rac_error_destroy) {}
 
     Error(rac_error_t* error) : error_(error, rac_error_destroy) {}
 
     // Factory methods
-    static Error stt(rac_result_t code, const char* msg) {
-        return Error(code, RAC_CATEGORY_STT, msg);
-    }
-    static Error tts(rac_result_t code, const char* msg) {
-        return Error(code, RAC_CATEGORY_TTS, msg);
-    }
-    static Error llm(rac_result_t code, const char* msg) {
-        return Error(code, RAC_CATEGORY_LLM, msg);
-    }
-    static Error vad(rac_result_t code, const char* msg) {
-        return Error(code, RAC_CATEGORY_VAD, msg);
-    }
+    static Error stt(rac_result_t code, const char* msg) { return {code, RAC_CATEGORY_STT, msg}; }
+    static Error tts(rac_result_t code, const char* msg) { return {code, RAC_CATEGORY_TTS, msg}; }
+    static Error llm(rac_result_t code, const char* msg) { return {code, RAC_CATEGORY_LLM, msg}; }
+    static Error vad(rac_result_t code, const char* msg) { return {code, RAC_CATEGORY_VAD, msg}; }
     static Error network(rac_result_t code, const char* msg) {
-        return Error(code, RAC_CATEGORY_NETWORK, msg);
+        return {code, RAC_CATEGORY_NETWORK, msg};
     }
 
     // Accessors
@@ -487,23 +478,27 @@ public:
 
     // Configuration
     Error& setModelContext(const char* model_id, const char* framework) {
-        if (error_) rac_error_set_model_context(error_.get(), model_id, framework);
+        if (error_)
+            rac_error_set_model_context(error_.get(), model_id, framework);
         return *this;
     }
 
     Error& setSession(const char* session_id) {
-        if (error_) rac_error_set_session(error_.get(), session_id);
+        if (error_)
+            rac_error_set_session(error_.get(), session_id);
         return *this;
     }
 
     Error& captureStackTrace() {
-        if (error_) rac_error_capture_stack_trace(error_.get());
+        if (error_)
+            rac_error_capture_stack_trace(error_.get());
         return *this;
     }
 
     // Conversion
     std::string toString() const {
-        if (!error_) return "";
+        if (!error_)
+            return "";
         char* str = rac_error_to_string(error_.get());
         std::string result(str ? str : "");
         rac_free(str);
@@ -511,7 +506,8 @@ public:
     }
 
     std::string toJson() const {
-        if (!error_) return "{}";
+        if (!error_)
+            return "{}";
         char* json = rac_error_to_json(error_.get());
         std::string result(json ? json : "{}");
         rac_free(json);
@@ -523,12 +519,12 @@ public:
     const rac_error_t* get() const { return error_.get(); }
     operator bool() const { return error_ != nullptr; }
 
-private:
+   private:
     std::unique_ptr<rac_error_t, decltype(&rac_error_destroy)> error_;
 };
 
-} // namespace rac
+}  // namespace rac
 
-#endif // __cplusplus
+#endif  // __cplusplus
 
 #endif /* RAC_STRUCTURED_ERROR_H */

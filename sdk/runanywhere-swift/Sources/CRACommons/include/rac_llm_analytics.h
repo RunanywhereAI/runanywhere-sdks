@@ -15,8 +15,8 @@
 #define RAC_LLM_ANALYTICS_H
 
 #include "rac_types.h"
-#include "rac_llm_types.h"
 #include "rac_llm_metrics.h"
+#include "rac_llm_types.h"
 #include "rac_model_types.h"
 
 #ifdef __cplusplus
@@ -72,14 +72,9 @@ RAC_API void rac_llm_analytics_destroy(rac_llm_analytics_handle_t handle);
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_llm_analytics_start_generation(
-    rac_llm_analytics_handle_t handle,
-    const char* model_id,
-    rac_inference_framework_t framework,
-    const float* temperature,
-    const int32_t* max_tokens,
-    const int32_t* context_length,
-    char** out_generation_id
-);
+    rac_llm_analytics_handle_t handle, const char* model_id, rac_inference_framework_t framework,
+    const float* temperature, const int32_t* max_tokens, const int32_t* context_length,
+    char** out_generation_id);
 
 /**
  * @brief Start tracking a streaming generation
@@ -96,14 +91,9 @@ RAC_API rac_result_t rac_llm_analytics_start_generation(
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_llm_analytics_start_streaming_generation(
-    rac_llm_analytics_handle_t handle,
-    const char* model_id,
-    rac_inference_framework_t framework,
-    const float* temperature,
-    const int32_t* max_tokens,
-    const int32_t* context_length,
-    char** out_generation_id
-);
+    rac_llm_analytics_handle_t handle, const char* model_id, rac_inference_framework_t framework,
+    const float* temperature, const int32_t* max_tokens, const int32_t* context_length,
+    char** out_generation_id);
 
 /**
  * @brief Track first token for streaming generation (TTFT metric)
@@ -114,10 +104,8 @@ RAC_API rac_result_t rac_llm_analytics_start_streaming_generation(
  * @param generation_id The generation ID from start_streaming_generation
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_analytics_track_first_token(
-    rac_llm_analytics_handle_t handle,
-    const char* generation_id
-);
+RAC_API rac_result_t rac_llm_analytics_track_first_token(rac_llm_analytics_handle_t handle,
+                                                         const char* generation_id);
 
 /**
  * @brief Track streaming update (analytics only)
@@ -129,11 +117,9 @@ RAC_API rac_result_t rac_llm_analytics_track_first_token(
  * @param tokens_generated Number of tokens generated so far
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_analytics_track_streaming_update(
-    rac_llm_analytics_handle_t handle,
-    const char* generation_id,
-    int32_t tokens_generated
-);
+RAC_API rac_result_t rac_llm_analytics_track_streaming_update(rac_llm_analytics_handle_t handle,
+                                                              const char* generation_id,
+                                                              int32_t tokens_generated);
 
 /**
  * @brief Complete a generation (works for both streaming and non-streaming)
@@ -145,13 +131,11 @@ RAC_API rac_result_t rac_llm_analytics_track_streaming_update(
  * @param model_id The model ID used
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_analytics_complete_generation(
-    rac_llm_analytics_handle_t handle,
-    const char* generation_id,
-    int32_t input_tokens,
-    int32_t output_tokens,
-    const char* model_id
-);
+RAC_API rac_result_t rac_llm_analytics_complete_generation(rac_llm_analytics_handle_t handle,
+                                                           const char* generation_id,
+                                                           int32_t input_tokens,
+                                                           int32_t output_tokens,
+                                                           const char* model_id);
 
 /**
  * @brief Track generation failure
@@ -162,12 +146,10 @@ RAC_API rac_result_t rac_llm_analytics_complete_generation(
  * @param error_message Error message
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_analytics_track_generation_failed(
-    rac_llm_analytics_handle_t handle,
-    const char* generation_id,
-    rac_result_t error_code,
-    const char* error_message
-);
+RAC_API rac_result_t rac_llm_analytics_track_generation_failed(rac_llm_analytics_handle_t handle,
+                                                               const char* generation_id,
+                                                               rac_result_t error_code,
+                                                               const char* error_message);
 
 /**
  * @brief Track an error during LLM operations
@@ -180,14 +162,10 @@ RAC_API rac_result_t rac_llm_analytics_track_generation_failed(
  * @param generation_id Generation ID (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_analytics_track_error(
-    rac_llm_analytics_handle_t handle,
-    rac_result_t error_code,
-    const char* error_message,
-    const char* operation,
-    const char* model_id,
-    const char* generation_id
-);
+RAC_API rac_result_t rac_llm_analytics_track_error(rac_llm_analytics_handle_t handle,
+                                                   rac_result_t error_code,
+                                                   const char* error_message, const char* operation,
+                                                   const char* model_id, const char* generation_id);
 
 // =============================================================================
 // METRICS
@@ -200,10 +178,8 @@ RAC_API rac_result_t rac_llm_analytics_track_error(
  * @param out_metrics Output: Metrics structure
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_analytics_get_metrics(
-    rac_llm_analytics_handle_t handle,
-    rac_generation_metrics_t* out_metrics
-);
+RAC_API rac_result_t rac_llm_analytics_get_metrics(rac_llm_analytics_handle_t handle,
+                                                   rac_generation_metrics_t* out_metrics);
 
 #ifdef __cplusplus
 }
