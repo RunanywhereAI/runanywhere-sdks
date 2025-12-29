@@ -8,7 +8,34 @@
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac_stt_onnx.h"
 
+#include <cstdint>
 #include <cstdlib>
+#include <vector>
+
+// =============================================================================
+// AUDIO FORMAT CONVERSION
+// =============================================================================
+
+/**
+ * Convert Int16 PCM audio to Float32 normalized to [-1.0, 1.0].
+ * This is needed because Swift sends Int16 audio but Sherpa-ONNX expects Float32.
+ *
+ * @param int16_data Raw Int16 PCM audio bytes
+ * @param byte_count Number of bytes (not samples!)
+ * @return Vector of Float32 samples normalized to [-1.0, 1.0]
+ */
+static std::vector<float> convert_int16_to_float32(const void* int16_data, size_t byte_count) {
+    const int16_t* samples = static_cast<const int16_t*>(int16_data);
+    size_t num_samples = byte_count / sizeof(int16_t);
+
+    std::vector<float> float_samples(num_samples);
+    for (size_t i = 0; i < num_samples; ++i) {
+        // Normalize Int16 [-32768, 32767] to Float32 [-1.0, 1.0]
+        float_samples[i] = static_cast<float>(samples[i]) / 32768.0f;
+    }
+
+    return float_samples;
+}
 
 extern "C" {
 
@@ -30,9 +57,11 @@ rac_result_t rac_stt_initialize(rac_handle_t handle, const char* model_path) {
 rac_result_t rac_stt_transcribe(rac_handle_t handle, const void* audio_data,
                                 size_t audio_size, const rac_stt_options_t* options,
                                 rac_stt_result_t* out_result) {
-    const float* samples = static_cast<const float*>(audio_data);
-    size_t num_samples = audio_size / sizeof(float);
-    return rac_stt_onnx_transcribe(handle, samples, num_samples, options, out_result);
+    // Convert Int16 PCM to Float32 (Swift sends Int16, Sherpa-ONNX expects Float32)
+    std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
+
+    return rac_stt_onnx_transcribe(handle, float_samples.data(), float_samples.size(), options,
+                                   out_result);
 }
 
 rac_result_t rac_stt_transcribe_stream(rac_handle_t handle, const void* audio_data,
@@ -44,10 +73,10 @@ rac_result_t rac_stt_transcribe_stream(rac_handle_t handle, const void* audio_da
         return result;
     }
 
-    const float* samples = static_cast<const float*>(audio_data);
-    size_t num_samples = audio_size / sizeof(float);
+    // Convert Int16 PCM to Float32 (Swift sends Int16, Sherpa-ONNX expects Float32)
+    std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
 
-    result = rac_stt_onnx_feed_audio(handle, stream, samples, num_samples);
+    result = rac_stt_onnx_feed_audio(handle, stream, float_samples.data(), float_samples.size());
     if (result != RAC_SUCCESS) {
         rac_stt_onnx_destroy_stream(handle, stream);
         return result;
