@@ -33,6 +33,7 @@ public actor TTSCapability: ModelLoadableCapability {
 
     private let logger = SDKLogger(category: "TTSCapability")
     private let analyticsService: TTSAnalyticsService
+    private let audioPlayback = AudioPlaybackManager()
 
     // MARK: - Initialization
 
@@ -202,7 +203,9 @@ public actor TTSCapability: ModelLoadableCapability {
         }
 
         let sampleRate = Int(ttsResult.sample_rate)
-        let durationSec = Double(audioData.count) / Double(sampleRate * 2)  // 16-bit audio
+        // C++ returns Float32 (4 bytes per sample), so divide by 4
+        let numSamples = audioData.count / 4
+        let durationSec = Double(numSamples) / Double(sampleRate)
         let durationMs = durationSec * 1000
 
         // Complete analytics
@@ -288,7 +291,9 @@ public actor TTSCapability: ModelLoadableCapability {
         let endTime = Date()
         let processingTime = endTime.timeIntervalSince(startTime)
         let sampleRate = options.sampleRate
-        let durationSec = Double(totalAudioData.count) / Double(sampleRate * 2)
+        // C++ returns Float32 (4 bytes per sample), so divide by 4
+        let numSamples = totalAudioData.count / 4
+        let durationSec = Double(numSamples) / Double(sampleRate)
 
         logger.info("Streaming synthesis completed: \(Int(durationSec * 1000))ms audio")
 
@@ -354,13 +359,84 @@ public actor TTSCapability: ModelLoadableCapability {
     /// Speak text using system audio (synthesize + play)
     public func speak(_ text: String, options: TTSOptions = TTSOptions()) async throws -> TTSSpeakResult {
         let output = try await synthesize(text, options: options)
-        // Audio playback would be handled here by platform-specific code
-        // For now, just return the result without actually playing
+
+        // Convert Float32 PCM to WAV format for AVAudioPlayer
+        let wavData = convertFloat32PCMToWAV(
+            pcmData: output.audioData,
+            sampleRate: Int(options.sampleRate)
+        )
+
+        // Play the audio
+        if !wavData.isEmpty {
+            logger.info("Playing audio: \(wavData.count) bytes")
+            try await audioPlayback.play(wavData)
+        }
+
         return TTSSpeakResult(from: output)
+    }
+
+    /// Convert Float32 PCM samples to WAV format (Int16 PCM with header)
+    ///
+    /// C++ TTS returns Float32 samples in range [-1.0, 1.0], but AVAudioPlayer
+    /// requires a complete audio file format (WAV) with headers.
+    private func convertFloat32PCMToWAV(pcmData: Data, sampleRate: Int) -> Data {
+        guard !pcmData.isEmpty else { return Data() }
+
+        // Float32 is 4 bytes per sample
+        let numSamples = pcmData.count / 4
+
+        // Convert Float32 to Int16
+        var int16Samples = [Int16](repeating: 0, count: numSamples)
+        pcmData.withUnsafeBytes { rawBuffer in
+            let floatBuffer = rawBuffer.bindMemory(to: Float.self)
+            for i in 0..<numSamples {
+                // Clamp to [-1.0, 1.0] and convert to Int16 range
+                let sample = max(-1.0, min(1.0, floatBuffer[i]))
+                int16Samples[i] = Int16(sample * 32767.0)
+            }
+        }
+
+        // Build WAV header (44 bytes)
+        let channels: UInt16 = 1
+        let bitsPerSample: UInt16 = 16
+        let byteRate = UInt32(sampleRate) * UInt32(channels) * UInt32(bitsPerSample / 8)
+        let blockAlign = channels * (bitsPerSample / 8)
+        let dataSize = UInt32(numSamples * 2)  // Int16 = 2 bytes per sample
+        let fileSize = dataSize + 36  // Header size minus 8 bytes for RIFF header
+
+        var wavData = Data()
+
+        // RIFF header
+        wavData.append(contentsOf: "RIFF".utf8)
+        wavData.append(contentsOf: withUnsafeBytes(of: fileSize.littleEndian) { Array($0) })
+        wavData.append(contentsOf: "WAVE".utf8)
+
+        // fmt chunk
+        wavData.append(contentsOf: "fmt ".utf8)
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt32(16).littleEndian) { Array($0) })  // Chunk size
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt16(1).littleEndian) { Array($0) })   // Audio format (PCM)
+        wavData.append(contentsOf: withUnsafeBytes(of: channels.littleEndian) { Array($0) })
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt32(sampleRate).littleEndian) { Array($0) })
+        wavData.append(contentsOf: withUnsafeBytes(of: byteRate.littleEndian) { Array($0) })
+        wavData.append(contentsOf: withUnsafeBytes(of: blockAlign.littleEndian) { Array($0) })
+        wavData.append(contentsOf: withUnsafeBytes(of: bitsPerSample.littleEndian) { Array($0) })
+
+        // data chunk
+        wavData.append(contentsOf: "data".utf8)
+        wavData.append(contentsOf: withUnsafeBytes(of: dataSize.littleEndian) { Array($0) })
+
+        // Audio data (Int16 samples)
+        int16Samples.withUnsafeBufferPointer { buffer in
+            wavData.append(UnsafeBufferPointer(start: UnsafeRawPointer(buffer.baseAddress)?.assumingMemoryBound(to: UInt8.self),
+                                                count: numSamples * 2))
+        }
+
+        return wavData
     }
 
     /// Stop speaking
     public func stopSpeaking() async {
+        audioPlayback.stop()
         await stop()
     }
 }
