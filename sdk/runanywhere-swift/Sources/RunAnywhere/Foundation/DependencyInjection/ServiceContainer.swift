@@ -6,6 +6,12 @@ public class ServiceContainer {
     /// Shared instance
     public static let shared = ServiceContainer()
 
+    // MARK: - Thread Safety
+
+    /// Lock for thread-safe capability initialization
+    /// Swift's `lazy var` is NOT thread-safe - multiple threads can create multiple instances
+    private let capabilityLock = NSLock()
+
     // MARK: - Core Registries
 
     /// Model registry for managing model information
@@ -14,31 +20,101 @@ public class ServiceContainer {
     }()
 
     // MARK: - Simplified Capabilities (New Architecture)
+    // Using thread-safe initialization to prevent race conditions
+
+    private var _llmCapability: LLMCapability?
+    private var _sttCapability: STTCapability?
+    private var _ttsCapability: TTSCapability?
+    private var _vadCapability: VADCapability?
+    private var _voiceAgentCapability: VoiceAgentCapability?
 
     /// LLM capability - handles all text generation operations
-    private(set) lazy var llmCapability: LLMCapability = {
-        LLMCapability()
-    }()
+    var llmCapability: LLMCapability {
+        capabilityLock.lock()
+        defer { capabilityLock.unlock() }
+        if let capability = _llmCapability {
+            return capability
+        }
+        let capability = LLMCapability()
+        _llmCapability = capability
+        return capability
+    }
 
     /// STT capability - handles speech-to-text operations
-    private(set) lazy var sttCapability: STTCapability = {
-        STTCapability()
-    }()
+    var sttCapability: STTCapability {
+        capabilityLock.lock()
+        defer { capabilityLock.unlock() }
+        if let capability = _sttCapability {
+            return capability
+        }
+        let capability = STTCapability()
+        _sttCapability = capability
+        return capability
+    }
 
     /// TTS capability - handles text-to-speech operations
-    private(set) lazy var ttsCapability: TTSCapability = {
-        TTSCapability()
-    }()
+    var ttsCapability: TTSCapability {
+        capabilityLock.lock()
+        defer { capabilityLock.unlock() }
+        if let capability = _ttsCapability {
+            return capability
+        }
+        let capability = TTSCapability()
+        _ttsCapability = capability
+        return capability
+    }
 
     /// VAD capability - handles voice activity detection
-    private(set) lazy var vadCapability: VADCapability = {
-        VADCapability()
-    }()
+    var vadCapability: VADCapability {
+        capabilityLock.lock()
+        defer { capabilityLock.unlock() }
+        if let capability = _vadCapability {
+            return capability
+        }
+        let capability = VADCapability()
+        _vadCapability = capability
+        return capability
+    }
 
     /// Voice Agent capability - composes STT, LLM, TTS, VAD for full voice pipeline
-    private(set) lazy var voiceAgentCapability: VoiceAgentCapability = {
-        VoiceAgentCapability()
-    }()
+    /// Uses shared handles from the individual capabilities
+    var voiceAgentCapability: VoiceAgentCapability {
+        capabilityLock.lock()
+        defer { capabilityLock.unlock() }
+        if let capability = _voiceAgentCapability {
+            return capability
+        }
+        // Access individual capabilities while still holding the lock
+        // This ensures they're created before VoiceAgentCapability
+        let stt = _sttCapability ?? {
+            let newCapability = STTCapability()
+            _sttCapability = newCapability
+            return newCapability
+        }()
+        let llm = _llmCapability ?? {
+            let newCapability = LLMCapability()
+            _llmCapability = newCapability
+            return newCapability
+        }()
+        let tts = _ttsCapability ?? {
+            let newCapability = TTSCapability()
+            _ttsCapability = newCapability
+            return newCapability
+        }()
+        let vad = _vadCapability ?? {
+            let newCapability = VADCapability()
+            _vadCapability = newCapability
+            return newCapability
+        }()
+        let capability = VoiceAgentCapability(
+            sttCapability: stt,
+            llmCapability: llm,
+            ttsCapability: tts,
+            vadCapability: vad
+        )
+        _voiceAgentCapability = capability
+        return capability
+    }
 
     // MARK: - Infrastructure Services
 
@@ -138,6 +214,17 @@ public class ServiceContainer {
 
     /// Reset service container state (for testing)
     public func reset() {
+        capabilityLock.lock()
+        defer { capabilityLock.unlock() }
+
+        // Reset capabilities
+        _llmCapability = nil
+        _sttCapability = nil
+        _ttsCapability = nil
+        _vadCapability = nil
+        _voiceAgentCapability = nil
+
+        // Reset services
         authenticationService = nil
         apiClient = nil
         networkService = nil

@@ -8,35 +8,50 @@
 //  ⚠️ WARNING: This is a direct wrapper. Do NOT add custom logic here.
 //  The C++ layer (runanywhere-commons) is the source of truth.
 //
+//  Architecture:
+//  - Voice agent uses SHARED handles from the individual capabilities (STT, LLM, TTS, VAD)
+//  - Models are loaded via the individual capabilities, not the voice agent
+//  - Voice agent is purely an orchestrator - it doesn't own the component handles
+//
 
 import CRACommons
 import Foundation
 
 /// Actor-based Voice Agent capability that orchestrates STT, LLM, TTS, and VAD.
 /// This is a thin wrapper over the C++ rac_voice_agent API.
+///
+/// The voice agent uses shared handles from the individual capabilities.
+/// Models are loaded via STTCapability, LLMCapability, TTSCapability - not via this class.
 public actor VoiceAgentCapability {
 
     // MARK: - State
 
-    /// Handle to the C++ voice agent
+    /// Handle to the C++ voice agent (uses shared component handles)
     private var handle: rac_voice_agent_handle_t?
-
-    /// Component handles
-    private var llmHandle: rac_handle_t?
-    private var sttHandle: rac_handle_t?
-    private var ttsHandle: rac_handle_t?
-    private var vadHandle: rac_handle_t?
-
-    /// Current configuration
-    private var config: VoiceAgentConfiguration?
 
     // MARK: - Dependencies
 
     private let logger = SDKLogger(category: "VoiceAgentCapability")
 
+    /// References to individual capabilities (for shared handles)
+    private let sttCapability: STTCapability
+    private let llmCapability: LLMCapability
+    private let ttsCapability: TTSCapability
+    private let vadCapability: VADCapability
+
     // MARK: - Initialization
 
-    public init() {}
+    public init(
+        sttCapability: STTCapability,
+        llmCapability: LLMCapability,
+        ttsCapability: TTSCapability,
+        vadCapability: VADCapability
+    ) {
+        self.sttCapability = sttCapability
+        self.llmCapability = llmCapability
+        self.ttsCapability = ttsCapability
+        self.vadCapability = vadCapability
+    }
 
     deinit {
         if let handle = handle {
@@ -44,14 +59,9 @@ public actor VoiceAgentCapability {
         }
     }
 
-    // MARK: - Configuration
-
-    public func configure(_ config: VoiceAgentConfiguration) {
-        self.config = config
-    }
-
     // MARK: - Lifecycle
 
+    /// Whether the voice agent is ready (all models loaded and handle created)
     public var isReady: Bool {
         get async {
             guard let handle = handle else { return false }
@@ -61,35 +71,65 @@ public actor VoiceAgentCapability {
         }
     }
 
-    /// Initialize the voice agent with configuration
-    public func initialize(_ config: VoiceAgentConfiguration) async throws {
-        self.config = config
+    /// Whether STT model is loaded (delegates to STTCapability)
+    public var isSTTLoaded: Bool {
+        get async {
+            await sttCapability.isModelLoaded
+        }
+    }
 
-        // Create component handles if needed
-        if llmHandle == nil {
-            var newLLMHandle: rac_handle_t?
-            rac_llm_component_create(&newLLMHandle)
-            llmHandle = newLLMHandle
+    /// Whether LLM model is loaded (delegates to LLMCapability)
+    public var isLLMLoaded: Bool {
+        get async {
+            await llmCapability.isModelLoaded
         }
-        if sttHandle == nil {
-            var newSTTHandle: rac_handle_t?
-            rac_stt_component_create(&newSTTHandle)
-            sttHandle = newSTTHandle
+    }
+
+    /// Whether TTS voice is loaded (delegates to TTSCapability)
+    public var isTTSLoaded: Bool {
+        get async {
+            await ttsCapability.isModelLoaded
         }
-        if ttsHandle == nil {
-            var newTTSHandle: rac_handle_t?
-            rac_tts_component_create(&newTTSHandle)
-            ttsHandle = newTTSHandle
+    }
+
+    /// Get the currently loaded STT model ID (delegates to STTCapability)
+    public var currentSTTModelId: String? {
+        get async {
+            await sttCapability.currentModelId
         }
-        if vadHandle == nil {
-            var newVADHandle: rac_handle_t?
-            rac_vad_component_create(&newVADHandle)
-            vadHandle = newVADHandle
+    }
+
+    /// Get the currently loaded LLM model ID (delegates to LLMCapability)
+    public var currentLLMModelId: String? {
+        get async {
+            await llmCapability.currentModelId
+        }
+    }
+
+    /// Get the currently loaded TTS voice ID (delegates to TTSCapability)
+    public var currentTTSVoiceId: String? {
+        get async {
+            await ttsCapability.currentModelId
+        }
+    }
+
+    // MARK: - Creation
+
+    /// Create the voice agent with shared handles from individual capabilities
+    public func create() async throws {
+        guard handle == nil else {
+            logger.debug("Voice agent already created")
+            return
         }
 
-        // Create voice agent
+        // Get or create handles from individual capabilities
+        let llmHandle = try await llmCapability.getOrCreateHandle()
+        let sttHandle = try await sttCapability.getOrCreateHandle()
+        let ttsHandle = try await ttsCapability.getOrCreateHandle()
+        let vadHandle = try await vadCapability.getOrCreateHandle()
+
         var newHandle: rac_voice_agent_handle_t?
-        let createResult = rac_voice_agent_create(
+        let result = rac_voice_agent_create(
             llmHandle,
             sttHandle,
             ttsHandle,
@@ -97,11 +137,20 @@ public actor VoiceAgentCapability {
             &newHandle
         )
 
-        guard createResult == RAC_SUCCESS, let createdHandle = newHandle else {
-            throw SDKError.voiceAgent(.initializationFailed, "Failed to create voice agent: \(createResult)")
+        guard result == RAC_SUCCESS, let createdHandle = newHandle else {
+            throw SDKError.voiceAgent(.initializationFailed, "Failed to create voice agent: \(result)")
         }
 
         handle = createdHandle
+        logger.info("Voice agent created with shared handles")
+    }
+
+    // MARK: - Initialization
+
+    /// Initialize the voice agent with configuration
+    public func initialize(_ config: VoiceAgentConfiguration) async throws {
+        try await ensureCreated()
+        guard let handle = handle else { return }
 
         // Build C config
         var cConfig = rac_voice_agent_config_t()
@@ -111,7 +160,19 @@ public actor VoiceAgentCapability {
         cConfig.vad_config.frame_length = Float(config.vadConfig.frameLength)
         cConfig.vad_config.energy_threshold = Float(config.vadConfig.energyThreshold)
 
-        // Initialize
+        // STT config
+        if let sttModelId = config.sttConfig.modelId {
+            cConfig.stt_config.model_id = (sttModelId as NSString).utf8String
+        }
+
+        // LLM config
+        if let llmModelId = config.llmConfig.modelId {
+            cConfig.llm_config.model_id = (llmModelId as NSString).utf8String
+        }
+
+        // TTS config (voice is non-optional with default value)
+        cConfig.tts_config.voice = (config.ttsConfig.voice as NSString).utf8String
+
         let result = rac_voice_agent_initialize(handle, &cConfig)
         guard result == RAC_SUCCESS else {
             throw SDKError.voiceAgent(.initializationFailed, "Voice agent initialization failed: \(result)")
@@ -120,11 +181,12 @@ public actor VoiceAgentCapability {
         logger.info("Voice agent initialized")
     }
 
-    /// Initialize using already-loaded models
+    /// Initialize using already-loaded models from individual capabilities
+    ///
+    /// Use this when models were loaded via STTCapability, LLMCapability, TTSCapability.
     public func initializeWithLoadedModels() async throws {
-        guard let handle = handle else {
-            throw SDKError.voiceAgent(.notInitialized, "Voice agent not created")
-        }
+        try await ensureCreated()
+        guard let handle = handle else { return }
 
         let result = rac_voice_agent_initialize_with_loaded_models(handle)
         guard result == RAC_SUCCESS else {
@@ -134,23 +196,14 @@ public actor VoiceAgentCapability {
         logger.info("Voice agent initialized with loaded models")
     }
 
+    /// Cleanup voice agent resources
     public func cleanup() async {
         if let handle = handle {
             rac_voice_agent_cleanup(handle)
             rac_voice_agent_destroy(handle)
         }
         handle = nil
-
-        // Clean up component handles
-        if let llm = llmHandle { rac_llm_component_destroy(llm) }
-        if let stt = sttHandle { rac_stt_component_destroy(stt) }
-        if let tts = ttsHandle { rac_tts_component_destroy(tts) }
-        if let vad = vadHandle { rac_vad_component_destroy(vad) }
-
-        llmHandle = nil
-        sttHandle = nil
-        ttsHandle = nil
-        vadHandle = nil
+        logger.info("Voice agent cleaned up")
     }
 
     // MARK: - Voice Processing
@@ -185,22 +238,14 @@ public actor VoiceAgentCapability {
 
         // Extract results
         let speechDetected = cResult.speech_detected == RAC_TRUE
-        let transcription: String?
-        if let transcriptionPtr = cResult.transcription {
-            transcription = String(cString: transcriptionPtr)
-        } else {
-            transcription = nil
-        }
-        let response: String?
-        if let responsePtr = cResult.response {
-            response = String(cString: responsePtr)
-        } else {
-            response = nil
-        }
+        let transcription: String? = cResult.transcription.map { String(cString: $0) }
+        let response: String? = cResult.response.map { String(cString: $0) }
 
+        // C++ now returns WAV format directly - no conversion needed
         var synthesizedAudio: Data?
         if let audioPtr = cResult.synthesized_audio, cResult.synthesized_audio_size > 0 {
             synthesizedAudio = Data(bytes: audioPtr, count: cResult.synthesized_audio_size)
+            logger.info("Received \(cResult.synthesized_audio_size) bytes WAV audio")
         }
 
         // Free C result
@@ -308,5 +353,13 @@ public actor VoiceAgentCapability {
         }
 
         return detected == RAC_TRUE
+    }
+
+    // MARK: - Private Helpers
+
+    private func ensureCreated() async throws {
+        if handle == nil {
+            try await create()
+        }
     }
 }

@@ -12,6 +12,7 @@
 #include <cstring>
 #include <mutex>
 
+#include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_types.h"
@@ -31,6 +32,9 @@ struct rac_voice_agent {
     // State
     bool is_configured;
 
+    // Whether we own the component handles (and should destroy them)
+    bool owns_components;
+
     // Composed component handles
     rac_handle_t llm_handle;
     rac_handle_t stt_handle;
@@ -39,6 +43,10 @@ struct rac_voice_agent {
 
     // Thread safety
     std::mutex mutex;
+
+    rac_voice_agent() : is_configured(false), owns_components(false),
+                        llm_handle(nullptr), stt_handle(nullptr),
+                        tts_handle(nullptr), vad_handle(nullptr) {}
 };
 
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp
@@ -46,6 +54,60 @@ struct rac_voice_agent {
 // =============================================================================
 // LIFECYCLE API
 // =============================================================================
+
+rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle) {
+    if (!out_handle) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    rac_log(RAC_LOG_INFO, "VoiceAgent", "Creating standalone voice agent");
+
+    rac_voice_agent* agent = new rac_voice_agent();
+    agent->owns_components = true;
+
+    // Create LLM component
+    rac_result_t result = rac_llm_component_create(&agent->llm_handle);
+    if (result != RAC_SUCCESS) {
+        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to create LLM component");
+        delete agent;
+        return result;
+    }
+
+    // Create STT component
+    result = rac_stt_component_create(&agent->stt_handle);
+    if (result != RAC_SUCCESS) {
+        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to create STT component");
+        rac_llm_component_destroy(agent->llm_handle);
+        delete agent;
+        return result;
+    }
+
+    // Create TTS component
+    result = rac_tts_component_create(&agent->tts_handle);
+    if (result != RAC_SUCCESS) {
+        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to create TTS component");
+        rac_stt_component_destroy(agent->stt_handle);
+        rac_llm_component_destroy(agent->llm_handle);
+        delete agent;
+        return result;
+    }
+
+    // Create VAD component
+    result = rac_vad_component_create(&agent->vad_handle);
+    if (result != RAC_SUCCESS) {
+        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to create VAD component");
+        rac_tts_component_destroy(agent->tts_handle);
+        rac_stt_component_destroy(agent->stt_handle);
+        rac_llm_component_destroy(agent->llm_handle);
+        delete agent;
+        return result;
+    }
+
+    rac_log(RAC_LOG_INFO, "VoiceAgent", "Standalone voice agent created with all components");
+
+    *out_handle = agent;
+    return RAC_SUCCESS;
+}
 
 rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
                                     rac_handle_t stt_component_handle,
@@ -63,13 +125,13 @@ rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
     }
 
     rac_voice_agent* agent = new rac_voice_agent();
-    agent->is_configured = false;
+    agent->owns_components = false;  // External handles, don't destroy them
     agent->llm_handle = llm_component_handle;
     agent->stt_handle = stt_component_handle;
     agent->tts_handle = tts_component_handle;
     agent->vad_handle = vad_component_handle;
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Voice agent created");
+    rac_log(RAC_LOG_INFO, "VoiceAgent", "Voice agent created with external handles");
 
     *out_handle = agent;
     return RAC_SUCCESS;
@@ -80,11 +142,102 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
         return;
     }
 
-    // Note: We don't destroy the component handles - they're owned externally
-    // This mirrors Swift where the capabilities are passed by reference
-    delete handle;
+    // If we own the components, destroy them
+    if (handle->owns_components) {
+        rac_log(RAC_LOG_DEBUG, "VoiceAgent", "Destroying owned component handles");
+        if (handle->vad_handle) rac_vad_component_destroy(handle->vad_handle);
+        if (handle->tts_handle) rac_tts_component_destroy(handle->tts_handle);
+        if (handle->stt_handle) rac_stt_component_destroy(handle->stt_handle);
+        if (handle->llm_handle) rac_llm_component_destroy(handle->llm_handle);
+    }
 
+    delete handle;
     rac_log(RAC_LOG_DEBUG, "VoiceAgent", "Voice agent destroyed");
+}
+
+// =============================================================================
+// MODEL LOADING API
+// =============================================================================
+
+rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
+                                             const char* model_id) {
+    if (!handle || !model_id) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(handle->mutex);
+
+    rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading STT model");
+    return rac_stt_component_load_model(handle->stt_handle, model_id);
+}
+
+rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
+                                             const char* model_id) {
+    if (!handle || !model_id) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(handle->mutex);
+
+    rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading LLM model");
+    return rac_llm_component_load_model(handle->llm_handle, model_id);
+}
+
+rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
+                                             const char* voice_id) {
+    if (!handle || !voice_id) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(handle->mutex);
+
+    rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading TTS voice");
+    return rac_tts_component_load_voice(handle->tts_handle, voice_id);
+}
+
+rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t handle,
+                                            rac_bool_t* out_loaded) {
+    if (!handle || !out_loaded) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    *out_loaded = rac_stt_component_is_loaded(handle->stt_handle);
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_voice_agent_is_llm_loaded(rac_voice_agent_handle_t handle,
+                                            rac_bool_t* out_loaded) {
+    if (!handle || !out_loaded) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    *out_loaded = rac_llm_component_is_loaded(handle->llm_handle);
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_voice_agent_is_tts_loaded(rac_voice_agent_handle_t handle,
+                                            rac_bool_t* out_loaded) {
+    if (!handle || !out_loaded) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    *out_loaded = rac_tts_component_is_loaded(handle->tts_handle);
+    return RAC_SUCCESS;
+}
+
+const char* rac_voice_agent_get_stt_model_id(rac_voice_agent_handle_t handle) {
+    if (!handle) return nullptr;
+    return rac_stt_component_get_model_id(handle->stt_handle);
+}
+
+const char* rac_voice_agent_get_llm_model_id(rac_voice_agent_handle_t handle) {
+    if (!handle) return nullptr;
+    return rac_llm_component_get_model_id(handle->llm_handle);
+}
+
+const char* rac_voice_agent_get_tts_voice_id(rac_voice_agent_handle_t handle) {
+    if (!handle) return nullptr;
+    return rac_tts_component_get_voice_id(handle->tts_handle);
 }
 
 rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
@@ -283,20 +436,36 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
         return result;
     }
 
+    // Step 4: Convert Float32 PCM to WAV format for playback
+    // TTS returns raw Float32 samples, but audio players need WAV format
+    void* wav_data = nullptr;
+    size_t wav_size = 0;
+    result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
+                                       tts_result.sample_rate > 0 ? tts_result.sample_rate
+                                                                  : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                       &wav_data, &wav_size);
+
+    if (result != RAC_SUCCESS) {
+        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to convert audio to WAV format");
+        rac_stt_result_free(&stt_result);
+        rac_llm_result_free(&llm_result);
+        rac_tts_result_free(&tts_result);
+        return result;
+    }
+
+    rac_log(RAC_LOG_DEBUG, "VoiceAgent", "Converted PCM to WAV format");
+
     // Build result (mirrors Swift's VoiceAgentResult)
     out_result->speech_detected = RAC_TRUE;
     out_result->transcription = rac_strdup(stt_result.text);
     out_result->response = rac_strdup(llm_result.text);
-    out_result->synthesized_audio = tts_result.audio_data;
-    out_result->synthesized_audio_size = tts_result.audio_size;
+    out_result->synthesized_audio = wav_data;
+    out_result->synthesized_audio_size = wav_size;
 
-    // Clear tts_result's ownership (we transferred it)
-    tts_result.audio_data = nullptr;
-    tts_result.audio_size = 0;
-
-    // Free intermediate results
+    // Free intermediate results (tts_result audio data is no longer needed since we have WAV)
     rac_stt_result_free(&stt_result);
     rac_llm_result_free(&llm_result);
+    rac_tts_result_free(&tts_result);
 
     rac_log(RAC_LOG_INFO, "VoiceAgent", "Voice turn completed");
 
@@ -373,11 +542,30 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return result;
     }
 
-    // Emit audio synthesized event
+    // Step 4: Convert Float32 PCM to WAV format for playback
+    void* wav_data = nullptr;
+    size_t wav_size = 0;
+    result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
+                                       tts_result.sample_rate > 0 ? tts_result.sample_rate
+                                                                  : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                       &wav_data, &wav_size);
+
+    if (result != RAC_SUCCESS) {
+        rac_stt_result_free(&stt_result);
+        rac_llm_result_free(&llm_result);
+        rac_tts_result_free(&tts_result);
+        rac_voice_agent_event_t error_event = {};
+        error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
+        error_event.data.error_code = result;
+        callback(&error_event, user_data);
+        return result;
+    }
+
+    // Emit audio synthesized event (with WAV data)
     rac_voice_agent_event_t audio_event = {};
     audio_event.type = RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED;
-    audio_event.data.audio.audio_data = tts_result.audio_data;
-    audio_event.data.audio.audio_size = tts_result.audio_size;
+    audio_event.data.audio.audio_data = wav_data;
+    audio_event.data.audio.audio_size = wav_size;
     callback(&audio_event, user_data);
 
     // Emit final processed event
@@ -386,16 +574,14 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     processed_event.data.result.speech_detected = RAC_TRUE;
     processed_event.data.result.transcription = rac_strdup(stt_result.text);
     processed_event.data.result.response = rac_strdup(llm_result.text);
-    processed_event.data.result.synthesized_audio = tts_result.audio_data;
-    processed_event.data.result.synthesized_audio_size = tts_result.audio_size;
+    processed_event.data.result.synthesized_audio = wav_data;
+    processed_event.data.result.synthesized_audio_size = wav_size;
     callback(&processed_event, user_data);
 
-    // Clear tts_result ownership (transferred)
-    tts_result.audio_data = nullptr;
-
-    // Free intermediate results
+    // Free intermediate results (WAV data ownership transferred to processed_event)
     rac_stt_result_free(&stt_result);
     rac_llm_result_free(&llm_result);
+    rac_tts_result_free(&tts_result);
 
     return RAC_SUCCESS;
 }
@@ -474,11 +660,24 @@ rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle, 
         return result;
     }
 
-    *out_audio = tts_result.audio_data;
-    *out_audio_size = tts_result.audio_size;
+    // Convert Float32 PCM to WAV format for playback
+    void* wav_data = nullptr;
+    size_t wav_size = 0;
+    result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
+                                       tts_result.sample_rate > 0 ? tts_result.sample_rate
+                                                                  : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                       &wav_data, &wav_size);
 
-    // Transfer ownership, don't free
-    tts_result.audio_data = nullptr;
+    if (result != RAC_SUCCESS) {
+        rac_tts_result_free(&tts_result);
+        return result;
+    }
+
+    *out_audio = wav_data;
+    *out_audio_size = wav_size;
+
+    // Free the original PCM data
+    rac_tts_result_free(&tts_result);
 
     return RAC_SUCCESS;
 }

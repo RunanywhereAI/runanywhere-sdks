@@ -1,12 +1,14 @@
 #!/bin/bash
 # build_and_run.sh - Build, install, and run the RunAnywhereAI app
-# Usage: ./build_and_run.sh [simulator|device|mac] [device-name-or-id] [--add-models] [--build-sdk] [--clean] [--clean-data]
+# Usage: ./build_and_run.sh [simulator|device|mac] [device-name-or-id] [--add-models] [--build-sdk] [--build-cpp] [--clean] [--clean-data]
 # Examples:
 #   ./build_and_run.sh simulator "iPhone 16 Pro"
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --add-models
 #   ./build_and_run.sh device "YOUR_DEVICE_ID"
 #   ./build_and_run.sh device "Your Device Name" --add-models
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
+#   ./build_and_run.sh simulator "iPhone 16 Pro" --build-cpp --build-sdk
+#   ./build_and_run.sh simulator "iPhone 16 Pro" --build-cpp   # Builds C++ and Swift SDK
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --clean
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --clean-data
 #   ./build_and_run.sh mac
@@ -92,22 +94,25 @@ TARGET_TYPE="${1:-device}"
 DEVICE_NAME="${2:-}"
 ADD_MODELS=false
 BUILD_SDK=false
+BUILD_CPP=false
 CLEAN_BUILD=false
 CLEAN_DATA=false
 FORCE_PROJECT=false
+SDK_ONLY=false
 
 # Check for help flag
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Usage: $0 [simulator|device|mac] [device-name-or-id] [--add-models] [--build-sdk] [--clean] [--clean-data] [--use-project]"
+    echo "Usage: $0 [simulator|device|mac] [device-name-or-id] [--add-models] [--build-sdk] [--build-cpp] [--clean] [--clean-data]"
     echo ""
     echo "Arguments:"
     echo "  simulator|device|mac  Target type (default: device)"
     echo "  device-name-or-id     Device name or ID (optional for simulator, not used for mac)"
     echo "  --add-models          Add model files to Xcode project (optional)"
-    echo "  --build-sdk           Build the RunAnywhere SDK before building the app (optional)"
+    echo "  --build-sdk           Build the RunAnywhere Swift SDK before building the app"
+    echo "  --build-cpp           Build C++ layer (runanywhere-commons), copy XCFrameworks, sync headers, and build Swift SDK"
+    echo "  --sdk-only            Only build C++/SDK, skip Xcode app build (use with --build-cpp or --build-sdk)"
     echo "  --clean               Clean all build artifacts before building (optional)"
     echo "  --clean-data          Clean app data including database (optional)"
-    echo "  --use-project         (Deprecated - always uses .xcodeproj now)"
     echo ""
     echo "Examples:"
     echo "  $0 simulator \"iPhone 16 Pro\""
@@ -115,6 +120,8 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  $0 device"
     echo "  $0 device \"My iPhone\" --add-models"
     echo "  $0 simulator \"iPhone 16 Pro\" --build-sdk"
+    echo "  $0 simulator \"iPhone 16 Pro\" --build-cpp"
+    echo "  $0 simulator \"iPhone 16 Pro\" --build-cpp --sdk-only"
     echo "  $0 simulator \"iPhone 16 Pro\" --clean"
     echo "  $0 simulator \"iPhone 16 Pro\" --clean-data"
     echo "  $0 mac"
@@ -128,6 +135,9 @@ for arg in "${@:3}"; do
         ADD_MODELS=true
     elif [ "$arg" = "--build-sdk" ]; then
         BUILD_SDK=true
+    elif [ "$arg" = "--build-cpp" ]; then
+        BUILD_CPP=true
+        BUILD_SDK=true  # Building C++ implies building Swift SDK too
     elif [ "$arg" = "--clean" ]; then
         CLEAN_BUILD=true
     elif [ "$arg" = "--clean-data" ]; then
@@ -135,6 +145,8 @@ for arg in "${@:3}"; do
         CLEAN_BUILD=true  # Clean data implies clean build
     elif [ "$arg" = "--use-project" ]; then
         FORCE_PROJECT=true
+    elif [ "$arg" = "--sdk-only" ]; then
+        SDK_ONLY=true
     fi
 done
 
@@ -299,10 +311,144 @@ if [ "$CLEAN_DATA" = true ]; then
     clean_app_data
 fi
 
+# Build C++ layer if requested
+if [ "$BUILD_CPP" = true ]; then
+    print_status "Building C++ layer (runanywhere-core + runanywhere-commons)..."
+
+    CORE_PATH="../../../../../runanywhere-core"
+    COMMONS_PATH="../../../../sdk/runanywhere-commons"
+    SWIFT_SDK_PATH="../../../../sdk/runanywhere-swift"
+
+    # =========================================================================
+    # Step 1: Build runanywhere-core iOS XCFramework
+    # =========================================================================
+    if [ -d "$CORE_PATH" ]; then
+        print_status "Building runanywhere-core iOS XCFramework..."
+        pushd "$CORE_PATH" > /dev/null
+
+        if ./scripts/ios/build.sh 2>&1 | tee /tmp/core_build.log; then
+            print_status "runanywhere-core built successfully!"
+        else
+            print_error "runanywhere-core build failed! Check /tmp/core_build.log"
+            tail -30 /tmp/core_build.log
+            exit 1
+        fi
+
+        # Create combined XCFramework
+        if ./scripts/build-xcframework.sh --ios-only 2>&1 | tee -a /tmp/core_build.log; then
+            print_status "RunAnywhereCore.xcframework created!"
+        else
+            print_warning "XCFramework creation had issues, continuing..."
+        fi
+
+        popd > /dev/null
+
+        # Copy RunAnywhereCore.xcframework to Swift SDK
+        if [ -d "$CORE_PATH/dist/RunAnywhereCore.xcframework" ]; then
+            print_status "Copying RunAnywhereCore.xcframework to Swift SDK..."
+            rm -rf "$SWIFT_SDK_PATH/Binaries/RunAnywhereCore.xcframework"
+            cp -r "$CORE_PATH/dist/RunAnywhereCore.xcframework" "$SWIFT_SDK_PATH/Binaries/"
+        fi
+    else
+        print_warning "runanywhere-core not found at $CORE_PATH, skipping..."
+    fi
+
+    # =========================================================================
+    # Step 2: Build runanywhere-commons iOS XCFrameworks
+    # =========================================================================
+    if [ ! -d "$COMMONS_PATH" ]; then
+        print_error "runanywhere-commons not found at $COMMONS_PATH"
+        exit 1
+    fi
+
+    print_status "Building runanywhere-commons iOS XCFrameworks..."
+    pushd "$COMMONS_PATH" > /dev/null
+
+    if ./scripts/build-ios.sh 2>&1 | tee /tmp/commons_build.log; then
+        print_status "runanywhere-commons XCFrameworks built successfully!"
+    else
+        print_error "runanywhere-commons build failed! Check /tmp/commons_build.log"
+        tail -30 /tmp/commons_build.log
+        exit 1
+    fi
+
+    popd > /dev/null
+
+    # =========================================================================
+    # Step 3: Clean existing XCFrameworks (full clean before fresh install)
+    # =========================================================================
+    print_status "Cleaning existing XCFrameworks from Swift SDK..."
+    BINARIES_DIR="$SWIFT_SDK_PATH/Binaries"
+    DIST_DIR="$COMMONS_PATH/dist"
+
+    # Remove all existing XCFrameworks to ensure fresh install
+    for framework in RACommons RABackendLlamaCPP RABackendONNX RunAnywhereCore onnxruntime; do
+        if [ -d "$BINARIES_DIR/${framework}.xcframework" ]; then
+            print_status "  Removing old ${framework}.xcframework..."
+            rm -rf "$BINARIES_DIR/${framework}.xcframework"
+        fi
+    done
+
+    # =========================================================================
+    # Step 4: Copy ALL fresh XCFrameworks to Swift SDK Binaries
+    # =========================================================================
+    print_status "Installing fresh XCFrameworks to Swift SDK..."
+
+    # Copy runanywhere-commons frameworks
+    for framework in RACommons RABackendLlamaCPP RABackendONNX; do
+        if [ -d "$DIST_DIR/${framework}.xcframework" ]; then
+            print_status "  Installing ${framework}.xcframework..."
+            cp -r "$DIST_DIR/${framework}.xcframework" "$BINARIES_DIR/"
+        else
+            print_warning "  ${framework}.xcframework not found in dist!"
+        fi
+    done
+
+    # Copy runanywhere-core framework (if built)
+    if [ -d "$CORE_PATH/dist/RunAnywhereCore.xcframework" ]; then
+        print_status "  Installing RunAnywhereCore.xcframework..."
+        cp -r "$CORE_PATH/dist/RunAnywhereCore.xcframework" "$BINARIES_DIR/"
+    else
+        print_warning "  RunAnywhereCore.xcframework not found!"
+    fi
+
+    # Copy vendored onnxruntime.xcframework (third-party dependency)
+    ONNX_RUNTIME_SRC="$CORE_PATH/third_party/onnxruntime-ios/onnxruntime.xcframework"
+    if [ -d "$ONNX_RUNTIME_SRC" ]; then
+        print_status "  Installing onnxruntime.xcframework (vendored)..."
+        cp -r "$ONNX_RUNTIME_SRC" "$BINARIES_DIR/"
+    else
+        print_warning "  onnxruntime.xcframework not found in third_party!"
+    fi
+
+    # =========================================================================
+    # Step 5: Sync headers to CRACommons
+    # =========================================================================
+    print_status "Syncing headers to CRACommons..."
+    HEADERS_SRC="$COMMONS_PATH/include/rac"
+    HEADERS_DST="$SWIFT_SDK_PATH/Sources/CRACommons/include"
+
+    # Copy all headers with flat structure for Swift compatibility
+    for header in $(find "$HEADERS_SRC" -name "*.h" -type f); do
+        header_name=$(basename "$header")
+        # Convert nested includes (with subdirectories) to flat includes
+        # Pattern: rac/.*/filename.h -> filename.h
+        # Only matches paths with at least one subdirectory level after rac/
+        # Leaves flat includes like "rac_types.h" unchanged
+        sed 's|#include "rac/.*/\([^/"]*\)"|#include "\1"|g' "$header" > "$HEADERS_DST/$header_name"
+    done
+
+    print_status "C++ layer build complete!"
+    print_status "Framework sizes:"
+    du -sh "$BINARIES_DIR"/*.xcframework 2>/dev/null | while read size path; do
+        echo "    $(basename "$path"): $size"
+    done
+fi
+
 # Build SDK if requested
 if [ "$BUILD_SDK" = true ]; then
     print_status "Building RunAnywhere SDK..."
-    SDK_PATH="../../../sdk/runanywhere-swift"
+    SDK_PATH="../../../../sdk/runanywhere-swift"
     if [ -d "$SDK_PATH" ]; then
         pushd "$SDK_PATH" > /dev/null
         if swift build -Xswiftc -suppress-warnings 2>&1 | tee /tmp/sdk_build.log; then
@@ -321,6 +467,13 @@ if [ "$BUILD_SDK" = true ]; then
         print_error "SDK directory not found at $SDK_PATH"
         exit 1
     fi
+fi
+
+# Exit early if --sdk-only flag is set
+if [ "$SDK_ONLY" = true ]; then
+    print_status "SDK-only build complete! Skipping Xcode app build."
+    print_status "You can now open Xcode and build the app manually."
+    exit 0
 fi
 
 # Ensure all model files are in the project (only if --add-models flag is set)

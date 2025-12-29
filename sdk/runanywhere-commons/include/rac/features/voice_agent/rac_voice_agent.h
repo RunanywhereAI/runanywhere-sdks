@@ -299,7 +299,22 @@ typedef struct rac_voice_agent* rac_voice_agent_handle_t;
 // =============================================================================
 
 /**
- * @brief Create a voice agent instance.
+ * @brief Create a standalone voice agent that owns its component handles.
+ *
+ * This is the recommended API. The voice agent creates and manages its own
+ * STT, LLM, TTS, and VAD component handles internally. Use the model loading
+ * APIs to load models after creation.
+ *
+ * @param out_handle Output: Handle to the created voice agent
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
+
+/**
+ * @brief Create a voice agent instance with external component handles.
+ *
+ * DEPRECATED: Prefer rac_voice_agent_create_standalone().
+ * This API is for backward compatibility when you need to share handles.
  *
  * @param llm_component_handle Handle to LLM component (rac_llm_component)
  * @param stt_component_handle Handle to STT component (rac_stt_component)
@@ -317,9 +332,100 @@ RAC_API rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
 /**
  * @brief Destroy a voice agent instance.
  *
+ * If created with rac_voice_agent_create_standalone(), this also destroys
+ * the owned component handles.
+ *
  * @param handle Voice agent handle
  */
 RAC_API void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
+
+// =============================================================================
+// MODEL LOADING API (for standalone voice agent)
+// =============================================================================
+
+/**
+ * @brief Load an STT model into the voice agent.
+ *
+ * @param handle Voice agent handle
+ * @param model_id STT model identifier
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
+                                                     const char* model_id);
+
+/**
+ * @brief Load an LLM model into the voice agent.
+ *
+ * @param handle Voice agent handle
+ * @param model_id LLM model identifier
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
+                                                     const char* model_id);
+
+/**
+ * @brief Load a TTS voice into the voice agent.
+ *
+ * @param handle Voice agent handle
+ * @param voice_id TTS voice identifier
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
+                                                     const char* voice_id);
+
+/**
+ * @brief Check if STT model is loaded.
+ *
+ * @param handle Voice agent handle
+ * @param out_loaded Output: RAC_TRUE if loaded
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t handle,
+                                                    rac_bool_t* out_loaded);
+
+/**
+ * @brief Check if LLM model is loaded.
+ *
+ * @param handle Voice agent handle
+ * @param out_loaded Output: RAC_TRUE if loaded
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_voice_agent_is_llm_loaded(rac_voice_agent_handle_t handle,
+                                                    rac_bool_t* out_loaded);
+
+/**
+ * @brief Check if TTS voice is loaded.
+ *
+ * @param handle Voice agent handle
+ * @param out_loaded Output: RAC_TRUE if loaded
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_voice_agent_is_tts_loaded(rac_voice_agent_handle_t handle,
+                                                    rac_bool_t* out_loaded);
+
+/**
+ * @brief Get the currently loaded STT model ID.
+ *
+ * @param handle Voice agent handle
+ * @return Model ID string (static, do not free) or NULL if not loaded
+ */
+RAC_API const char* rac_voice_agent_get_stt_model_id(rac_voice_agent_handle_t handle);
+
+/**
+ * @brief Get the currently loaded LLM model ID.
+ *
+ * @param handle Voice agent handle
+ * @return Model ID string (static, do not free) or NULL if not loaded
+ */
+RAC_API const char* rac_voice_agent_get_llm_model_id(rac_voice_agent_handle_t handle);
+
+/**
+ * @brief Get the currently loaded TTS voice ID.
+ *
+ * @param handle Voice agent handle
+ * @return Voice ID string (static, do not free) or NULL if not loaded
+ */
+RAC_API const char* rac_voice_agent_get_tts_voice_id(rac_voice_agent_handle_t handle);
 
 /**
  * @brief Initialize the voice agent with configuration.

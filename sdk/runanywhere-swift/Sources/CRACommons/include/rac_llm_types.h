@@ -366,6 +366,17 @@ typedef struct rac_llm_stream_result {
     char* error_message;
 } rac_llm_stream_result_t;
 
+// =============================================================================
+// MEMORY MANAGEMENT
+// =============================================================================
+
+/**
+ * @brief Free LLM result resources
+ *
+ * @param result Result to free (can be NULL)
+ */
+RAC_API void rac_llm_result_free(rac_llm_result_t* result);
+
 #ifdef __cplusplus
 }
 #endif

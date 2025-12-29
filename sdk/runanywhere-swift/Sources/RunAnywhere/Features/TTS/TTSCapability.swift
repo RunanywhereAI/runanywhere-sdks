@@ -53,6 +53,23 @@ public actor TTSCapability: ModelLoadableCapability {
         self.config = config
     }
 
+    // MARK: - Handle Access (for VoiceAgent)
+
+    /// Get or create the internal handle (for voice agent to share)
+    internal func getOrCreateHandle() throws -> rac_handle_t {
+        if let handle = handle {
+            return handle
+        }
+
+        var newHandle: rac_handle_t?
+        let createResult = rac_tts_component_create(&newHandle)
+        guard createResult == RAC_SUCCESS, let createdHandle = newHandle else {
+            throw SDKError.tts(.modelLoadFailed, "Failed to create TTS component: \(createResult)")
+        }
+        handle = createdHandle
+        return createdHandle
+    }
+
     // MARK: - Model Lifecycle (ModelLoadableCapability Protocol)
 
     public var isModelLoaded: Bool {
@@ -360,11 +377,8 @@ public actor TTSCapability: ModelLoadableCapability {
     public func speak(_ text: String, options: TTSOptions = TTSOptions()) async throws -> TTSSpeakResult {
         let output = try await synthesize(text, options: options)
 
-        // Convert Float32 PCM to WAV format for AVAudioPlayer
-        let wavData = convertFloat32PCMToWAV(
-            pcmData: output.audioData,
-            sampleRate: Int(options.sampleRate)
-        )
+        // Convert Float32 PCM to WAV format using C++ utility
+        let wavData = try convertToWAV(pcmData: output.audioData, sampleRate: Int32(options.sampleRate))
 
         // Play the audio
         if !wavData.isEmpty {
@@ -375,61 +389,29 @@ public actor TTSCapability: ModelLoadableCapability {
         return TTSSpeakResult(from: output)
     }
 
-    /// Convert Float32 PCM samples to WAV format (Int16 PCM with header)
-    ///
-    /// C++ TTS returns Float32 samples in range [-1.0, 1.0], but AVAudioPlayer
-    /// requires a complete audio file format (WAV) with headers.
-    private func convertFloat32PCMToWAV(pcmData: Data, sampleRate: Int) -> Data {
+    /// Convert Float32 PCM to WAV using C++ audio utilities
+    private func convertToWAV(pcmData: Data, sampleRate: Int32) throws -> Data {
         guard !pcmData.isEmpty else { return Data() }
 
-        // Float32 is 4 bytes per sample
-        let numSamples = pcmData.count / 4
+        var wavDataPtr: UnsafeMutableRawPointer?
+        var wavSize: Int = 0
 
-        // Convert Float32 to Int16
-        var int16Samples = [Int16](repeating: 0, count: numSamples)
-        pcmData.withUnsafeBytes { rawBuffer in
-            let floatBuffer = rawBuffer.bindMemory(to: Float.self)
-            for i in 0..<numSamples {
-                // Clamp to [-1.0, 1.0] and convert to Int16 range
-                let sample = max(-1.0, min(1.0, floatBuffer[i]))
-                int16Samples[i] = Int16(sample * 32767.0)
-            }
+        let result = pcmData.withUnsafeBytes { pcmPtr in
+            rac_audio_float32_to_wav(
+                pcmPtr.baseAddress,
+                pcmData.count,
+                sampleRate,
+                &wavDataPtr,
+                &wavSize
+            )
         }
 
-        // Build WAV header (44 bytes)
-        let channels: UInt16 = 1
-        let bitsPerSample: UInt16 = 16
-        let byteRate = UInt32(sampleRate) * UInt32(channels) * UInt32(bitsPerSample / 8)
-        let blockAlign = channels * (bitsPerSample / 8)
-        let dataSize = UInt32(numSamples * 2)  // Int16 = 2 bytes per sample
-        let fileSize = dataSize + 36  // Header size minus 8 bytes for RIFF header
-
-        var wavData = Data()
-
-        // RIFF header
-        wavData.append(contentsOf: "RIFF".utf8)
-        wavData.append(contentsOf: withUnsafeBytes(of: fileSize.littleEndian) { Array($0) })
-        wavData.append(contentsOf: "WAVE".utf8)
-
-        // fmt chunk
-        wavData.append(contentsOf: "fmt ".utf8)
-        wavData.append(contentsOf: withUnsafeBytes(of: UInt32(16).littleEndian) { Array($0) })  // Chunk size
-        wavData.append(contentsOf: withUnsafeBytes(of: UInt16(1).littleEndian) { Array($0) })   // Audio format (PCM)
-        wavData.append(contentsOf: withUnsafeBytes(of: channels.littleEndian) { Array($0) })
-        wavData.append(contentsOf: withUnsafeBytes(of: UInt32(sampleRate).littleEndian) { Array($0) })
-        wavData.append(contentsOf: withUnsafeBytes(of: byteRate.littleEndian) { Array($0) })
-        wavData.append(contentsOf: withUnsafeBytes(of: blockAlign.littleEndian) { Array($0) })
-        wavData.append(contentsOf: withUnsafeBytes(of: bitsPerSample.littleEndian) { Array($0) })
-
-        // data chunk
-        wavData.append(contentsOf: "data".utf8)
-        wavData.append(contentsOf: withUnsafeBytes(of: dataSize.littleEndian) { Array($0) })
-
-        // Audio data (Int16 samples)
-        int16Samples.withUnsafeBufferPointer { buffer in
-            wavData.append(UnsafeBufferPointer(start: UnsafeRawPointer(buffer.baseAddress)?.assumingMemoryBound(to: UInt8.self),
-                                                count: numSamples * 2))
+        guard result == RAC_SUCCESS, let ptr = wavDataPtr, wavSize > 0 else {
+            throw SDKError.tts(.processingFailed, "Failed to convert PCM to WAV: \(result)")
         }
+
+        let wavData = Data(bytes: ptr, count: wavSize)
+        rac_free(ptr)
 
         return wavData
     }

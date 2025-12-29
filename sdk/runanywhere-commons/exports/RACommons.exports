@@ -1,6 +1,11 @@
 # RunAnywhere Commons - Exported Symbols
 # Auto-generated from librac_commons.a
 
+# Audio Utilities
+_rac_audio_float32_to_wav
+_rac_audio_int16_to_wav
+_rac_audio_wav_header_size
+
 # Memory and Core
 _rac_alloc
 _rac_free
@@ -324,12 +329,22 @@ _rac_energy_vad_stop
 # Voice Agent
 _rac_voice_agent_cleanup
 _rac_voice_agent_create
+_rac_voice_agent_create_standalone
 _rac_voice_agent_destroy
 _rac_voice_agent_detect_speech
 _rac_voice_agent_generate_response
+_rac_voice_agent_get_llm_model_id
+_rac_voice_agent_get_stt_model_id
+_rac_voice_agent_get_tts_voice_id
 _rac_voice_agent_initialize
 _rac_voice_agent_initialize_with_loaded_models
+_rac_voice_agent_is_llm_loaded
 _rac_voice_agent_is_ready
+_rac_voice_agent_is_stt_loaded
+_rac_voice_agent_is_tts_loaded
+_rac_voice_agent_load_llm_model
+_rac_voice_agent_load_stt_model
+_rac_voice_agent_load_tts_voice
 _rac_voice_agent_process_stream
 _rac_voice_agent_process_voice_turn
 _rac_voice_agent_result_free
