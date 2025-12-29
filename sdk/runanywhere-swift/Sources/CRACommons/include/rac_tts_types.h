@@ -356,6 +356,17 @@ typedef struct rac_tts_speak_result {
     int64_t timestamp_ms;
 } rac_tts_speak_result_t;
 
+// =============================================================================
+// MEMORY MANAGEMENT
+// =============================================================================
+
+/**
+ * @brief Free TTS result resources
+ *
+ * @param result Result to free (can be NULL)
+ */
+RAC_API void rac_tts_result_free(rac_tts_result_t* result);
+
 #ifdef __cplusplus
 }
 #endif

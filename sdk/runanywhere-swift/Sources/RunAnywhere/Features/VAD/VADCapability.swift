@@ -56,6 +56,23 @@ public actor VADCapability: Capability {
         self.config = config
     }
 
+    // MARK: - Handle Access (for VoiceAgent)
+
+    /// Get or create the internal handle (for voice agent to share)
+    internal func getOrCreateHandle() throws -> rac_handle_t {
+        if let handle = handle {
+            return handle
+        }
+
+        var newHandle: rac_handle_t?
+        let createResult = rac_vad_component_create(&newHandle)
+        guard createResult == RAC_SUCCESS, let createdHandle = newHandle else {
+            throw SDKError.vad(.initializationFailed, "Failed to create VAD component: \(createResult)")
+        }
+        handle = createdHandle
+        return createdHandle
+    }
+
     // MARK: - Lifecycle
 
     public var isReady: Bool {

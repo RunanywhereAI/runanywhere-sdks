@@ -51,6 +51,23 @@ public actor LLMCapability: ModelLoadableCapability {
         self.config = config
     }
 
+    // MARK: - Handle Access (for VoiceAgent)
+
+    /// Get or create the internal handle (for voice agent to share)
+    internal func getOrCreateHandle() throws -> rac_handle_t {
+        if let handle = handle {
+            return handle
+        }
+
+        var newHandle: rac_handle_t?
+        let createResult = rac_llm_component_create(&newHandle)
+        guard createResult == RAC_SUCCESS, let createdHandle = newHandle else {
+            throw SDKError.llm(.modelLoadFailed, "Failed to create LLM component: \(createResult)")
+        }
+        handle = createdHandle
+        return createdHandle
+    }
+
     // MARK: - Model Lifecycle (ModelLoadableCapability Protocol)
 
     public var isModelLoaded: Bool {

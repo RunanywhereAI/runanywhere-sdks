@@ -5,6 +5,11 @@
 //  Public API for Voice Agent operations (full voice pipeline).
 //  Events are tracked via EventPublisher.
 //
+//  Architecture:
+//  - Voice agent uses SHARED handles from the individual capabilities (STT, LLM, TTS)
+//  - Models are loaded via loadSTT(), loadLLM(), loadTTS() (the individual capability APIs)
+//  - Voice agent is purely an orchestrator for the full voice pipeline
+//
 
 import Foundation
 
@@ -18,6 +23,8 @@ public extension RunAnywhere {
     ///
     /// Use this to check which models are loaded and ready for the voice pipeline.
     /// This is useful for UI that needs to show the setup state before starting voice.
+    ///
+    /// Models are loaded via the individual capability APIs (loadSTT, loadLLM, loadTTS).
     ///
     /// Example:
     /// ```swift
@@ -33,33 +40,33 @@ public extension RunAnywhere {
             return VoiceAgentComponentStates()
         }
 
-        // Query each capability for its current state
-        async let sttLoaded = serviceContainer.sttCapability.isModelLoaded
-        async let sttModelId = serviceContainer.sttCapability.currentModelId
-        async let llmLoaded = serviceContainer.llmCapability.isModelLoaded
-        async let llmModelId = serviceContainer.llmCapability.currentModelId
-        async let ttsLoaded = serviceContainer.ttsCapability.isVoiceLoaded
-        async let ttsVoiceId = serviceContainer.ttsCapability.currentVoiceId
+        // Voice agent delegates to individual capabilities for model state
+        async let sttLoaded = serviceContainer.voiceAgentCapability.isSTTLoaded
+        async let sttModelId = serviceContainer.voiceAgentCapability.currentSTTModelId
+        async let llmLoaded = serviceContainer.voiceAgentCapability.isLLMLoaded
+        async let llmModelId = serviceContainer.voiceAgentCapability.currentLLMModelId
+        async let ttsLoaded = serviceContainer.voiceAgentCapability.isTTSLoaded
+        async let ttsVoiceId = serviceContainer.voiceAgentCapability.currentTTSVoiceId
 
-        let (sttIsLoaded, sttId, llmIsLoaded, llmId, ttsIsLoaded, ttsId) =
+        let (sttL, sttId, llmL, llmId, ttsL, ttsId) =
             await (sttLoaded, sttModelId, llmLoaded, llmModelId, ttsLoaded, ttsVoiceId)
 
         let sttState: ComponentLoadState
-        if sttIsLoaded, let modelId = sttId {
+        if sttL, let modelId = sttId {
             sttState = .loaded(modelId: modelId)
         } else {
             sttState = .notLoaded
         }
 
         let llmState: ComponentLoadState
-        if llmIsLoaded, let modelId = llmId {
+        if llmL, let modelId = llmId {
             llmState = .loaded(modelId: modelId)
         } else {
             llmState = .notLoaded
         }
 
         let ttsState: ComponentLoadState
-        if ttsIsLoaded, let modelId = ttsId {
+        if ttsL, let modelId = ttsId {
             ttsState = .loaded(modelId: modelId)
         } else {
             ttsState = .notLoaded
@@ -99,23 +106,18 @@ public extension RunAnywhere {
         }
     }
 
-    /// Initialize voice agent using already-loaded models
+    /// Initialize voice agent using already-loaded models from individual capabilities
     ///
-    /// Use this when you've already loaded STT, LLM, and TTS models via the individual APIs:
-    /// - `RunAnywhere.loadSTTModel(_:)`
-    /// - `RunAnywhere.loadModel(_:)` (for LLM)
-    /// - `RunAnywhere.loadTTSVoice(_:)`
-    ///
-    /// This will verify all components are loaded and mark the voice agent as ready.
+    /// Use this after loading models via the individual capability APIs:
     ///
     /// Example:
     /// ```swift
-    /// // Load models individually (maybe from different views)
-    /// try await RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
-    /// try await RunAnywhere.loadModel("lfm2-350m-q4_k_m")
-    /// try await RunAnywhere.loadTTSVoice("vits-piper-en_GB-alba-medium")
+    /// // Load models via individual capability APIs
+    /// try await RunAnywhere.loadSTT("sherpa-onnx-whisper-tiny.en")
+    /// try await RunAnywhere.loadLLM("lfm2-350m-q4_k_m")
+    /// try await RunAnywhere.loadTTS("vits-piper-en_GB-alba-medium")
     ///
-    /// // Then initialize voice agent with those pre-loaded models
+    /// // Then initialize voice agent (it will use the shared handles)
     /// try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
     /// ```
     static func initializeVoiceAgentWithLoadedModels() async throws {
@@ -136,7 +138,7 @@ public extension RunAnywhere {
         }
     }
 
-    /// Check if voice agent is ready (all components initialized via initializeVoiceAgent)
+    /// Check if voice agent is ready (all components initialized)
     static var isVoiceAgentReady: Bool {
         get async {
             await serviceContainer.voiceAgentCapability.isReady
@@ -145,14 +147,13 @@ public extension RunAnywhere {
 
     // MARK: - Voice Processing
 
-    /// Process a complete voice turn: audio → transcription → LLM response → synthesized speech
+    /// Process a complete voice turn: audio -> transcription -> LLM response -> synthesized speech
     static func processVoiceTurn(_ audioData: Data) async throws -> VoiceAgentResult {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         do {
-            // Voice agent capability handles all event tracking internally
             let result = try await serviceContainer.voiceAgentCapability.processVoiceTurn(audioData)
             return result
         } catch {

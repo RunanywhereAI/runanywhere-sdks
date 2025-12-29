@@ -20,6 +20,7 @@
 #include "rac_core.h"
 #include "rac_platform_adapter.h"
 #include "rac_component_types.h"
+#include "rac_audio_utils.h"
 
 // Lifecycle management
 #include "rac_lifecycle.h"
