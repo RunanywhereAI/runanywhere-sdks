@@ -19,6 +19,11 @@ final class SwiftPlatformAdapter {
     /// Whether the adapter has been registered with commons
     private var isRegistered = false
 
+    /// The platform adapter struct - MUST be stored as instance property
+    /// so it remains valid for the lifetime of this singleton.
+    /// C++ stores a raw pointer to this struct, so it must not be deallocated.
+    private var adapter = rac_platform_adapter_t()
+
     private init() {}
 
     // MARK: - Registration
@@ -28,7 +33,8 @@ final class SwiftPlatformAdapter {
     func register() { // swiftlint:disable:this function_body_length
         guard !isRegistered else { return }
 
-        var adapter = rac_platform_adapter_t()
+        // Reset the adapter (it's stored as instance property to keep it alive)
+        adapter = rac_platform_adapter_t()
 
         // Logging callback
         adapter.log = { level, category, message, _ in
@@ -195,21 +201,73 @@ final class SwiftPlatformAdapter {
         let msgString = String(cString: message)
         let categoryString = category.map { String(cString: $0) } ?? "RAC"
 
+        // Parse structured metadata from C++ log messages
+        // Format: "Message | key1=value1, key2=value2, ..."
+        let (cleanMessage, metadata) = parseLogMetadata(msgString)
+
         let logger = SDKLogger(category: categoryString)
         switch level {
         case RAC_LOG_ERROR:
-            logger.error(msgString)
+            logger.error(cleanMessage, metadata: metadata)
         case RAC_LOG_WARNING:
-            logger.warning(msgString)
+            logger.warning(cleanMessage, metadata: metadata)
         case RAC_LOG_INFO:
-            logger.info(msgString)
+            logger.info(cleanMessage, metadata: metadata)
         case RAC_LOG_DEBUG:
-            logger.debug(msgString)
+            logger.debug(cleanMessage, metadata: metadata)
         case RAC_LOG_TRACE:
-            logger.debug("[TRACE] \(msgString)")
+            logger.debug("[TRACE] \(cleanMessage)", metadata: metadata)
         default:
-            logger.info(msgString)
+            logger.info(cleanMessage, metadata: metadata)
         }
+    }
+
+    /// Parses structured metadata from C++ log messages.
+    ///
+    /// Input format: "Message text | file=foo.cpp:123, func=bar, model=whisper"
+    /// Returns: ("Message text", ["file": "foo.cpp:123", "func": "bar", "model": "whisper"])
+    private static func parseLogMetadata(_ message: String) -> (String, [String: Any]?) { // swiftlint:disable:this avoid_any_type
+        // Split on " | " to separate message from metadata
+        let parts = message.components(separatedBy: " | ")
+        guard parts.count >= 2 else {
+            return (message, nil)
+        }
+
+        let cleanMessage = parts[0]
+        let metadataString = parts.dropFirst().joined(separator: " | ")
+
+        // Parse key=value pairs (comma or space separated)
+        var metadata: [String: Any] = [:] // swiftlint:disable:this prefer_concrete_types avoid_any_type
+        let pairs = metadataString.components(separatedBy: CharacterSet(charactersIn: ", "))
+            .filter { !$0.isEmpty }
+
+        for pair in pairs {
+            let keyValue = pair.components(separatedBy: "=")
+            guard keyValue.count == 2 else { continue }
+
+            let key = keyValue[0].trimmingCharacters(in: .whitespaces)
+            let value = keyValue[1].trimmingCharacters(in: .whitespaces)
+
+            // Map C++ metadata keys to Swift conventions
+            switch key {
+            case "file":
+                metadata["source_file"] = value
+            case "func":
+                metadata["source_function"] = value
+            case "error_code":
+                metadata["error_code"] = Int(value) ?? value
+            case "error":
+                metadata["error_message"] = value
+            case "model":
+                metadata["model_id"] = value
+            case "framework":
+                metadata["framework"] = value
+            default:
+                metadata[key] = value
+            }
+        }
+
+        return (cleanMessage, metadata.isEmpty ? nil : metadata)
     }
 
     private static func handleFileExists(path: UnsafePointer<CChar>?) -> rac_bool_t {

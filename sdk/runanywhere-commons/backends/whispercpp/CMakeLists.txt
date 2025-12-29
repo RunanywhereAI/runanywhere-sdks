@@ -9,7 +9,13 @@
 #
 
 cmake_minimum_required(VERSION 3.16)
-project(RABackendWhisperCPP VERSION 1.0.0 LANGUAGES CXX)
+
+# Use version from parent project (loaded from VERSIONS file)
+if(NOT DEFINED RAC_PROJECT_VERSION)
+    set(RAC_PROJECT_VERSION "1.0.0")
+endif()
+
+project(RABackendWhisperCPP VERSION ${RAC_PROJECT_VERSION} LANGUAGES CXX)
 
 # =============================================================================
 # OPTIONS

@@ -14,6 +14,9 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BUILD_DIR="${PROJECT_ROOT}/build/ios"
 DIST_DIR="${PROJECT_ROOT}/dist"
 
+# Load versions from VERSIONS file (single source of truth)
+source "${SCRIPT_DIR}/load-versions.sh"
+
 # Configuration
 IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-13.0}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
@@ -218,7 +221,7 @@ EOF
     <key>CFBundlePackageType</key>
     <string>FMWK</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>${PROJECT_VERSION:-1.0.0}</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>MinimumOSVersion</key>
@@ -321,6 +324,9 @@ combine_onnx_libs() {
 
     echo "Combining ONNX libraries for ${PLATFORM}..."
 
+    # Sherpa-ONNX xcframework path
+    local SHERPA_ONNX_XCFW="${PROJECT_ROOT}/../../../runanywhere-core/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
+
     # Collect all needed libraries (excluding ONNX Runtime itself)
     local LIBS=""
 
@@ -329,6 +335,37 @@ combine_onnx_libs() {
 
     # runanywhere-core ONNX backend
     [ -f "${PLATFORM_DIR}/runanywhere-core/src/backends/onnx/librunanywhere_onnx.a" ] && LIBS="$LIBS ${PLATFORM_DIR}/runanywhere-core/src/backends/onnx/librunanywhere_onnx.a"
+
+    # Sherpa-ONNX static library (provides STT/TTS/VAD implementations)
+    local SHERPA_LIB=""
+    if [ "${PLATFORM}" = "OS" ]; then
+        SHERPA_LIB="${SHERPA_ONNX_XCFW}/ios-arm64/libsherpa-onnx.a"
+    elif [ "${PLATFORM}" = "SIMULATORARM64" ]; then
+        # Extract arm64 slice from fat simulator binary
+        local SHERPA_SIM_LIB="${SHERPA_ONNX_XCFW}/ios-arm64_x86_64-simulator/libsherpa-onnx.a"
+        if [ -f "${SHERPA_SIM_LIB}" ]; then
+            SHERPA_LIB="${PLATFORM_DIR}/libsherpa-onnx-arm64.a"
+            lipo -extract arm64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
+            lipo -thin arm64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
+            cp "${SHERPA_SIM_LIB}" "${SHERPA_LIB}"
+        fi
+    elif [ "${PLATFORM}" = "SIMULATOR" ]; then
+        # Extract x86_64 slice from fat simulator binary
+        local SHERPA_SIM_LIB="${SHERPA_ONNX_XCFW}/ios-arm64_x86_64-simulator/libsherpa-onnx.a"
+        if [ -f "${SHERPA_SIM_LIB}" ]; then
+            SHERPA_LIB="${PLATFORM_DIR}/libsherpa-onnx-x86_64.a"
+            lipo -extract x86_64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
+            lipo -thin x86_64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
+            cp "${SHERPA_SIM_LIB}" "${SHERPA_LIB}"
+        fi
+    fi
+
+    if [ -f "${SHERPA_LIB}" ]; then
+        LIBS="$LIBS ${SHERPA_LIB}"
+        echo "  Including Sherpa-ONNX: ${SHERPA_LIB}"
+    else
+        echo -e "${YELLOW}Warning: Sherpa-ONNX library not found for ${PLATFORM}${NC}"
+    fi
 
     # NOTE: ONNX Runtime xcframework is NOT bundled here.
     # It should be linked separately by the consuming app/framework.

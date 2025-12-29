@@ -177,6 +177,7 @@ public actor STTCapability: ModelLoadableCapability {
         // Build C options
         var cOptions = rac_stt_options_t()
         cOptions.language = (options.language as NSString).utf8String
+        cOptions.sample_rate = Int32(options.sampleRate)
 
         // Transcribe
         var sttResult = rac_stt_result_t()
@@ -276,6 +277,7 @@ public actor STTCapability: ModelLoadableCapability {
         // Build C options
         var cOptions = rac_stt_options_t()
         cOptions.language = (options.language as NSString).utf8String
+        cOptions.sample_rate = Int32(options.sampleRate)
 
         // Stream transcription with callback
         let result = audioData.withUnsafeBytes { audioPtr in
@@ -356,6 +358,7 @@ public actor STTCapability: ModelLoadableCapability {
 
         // Process samples through C++ API
         var cOptions = rac_stt_options_t()
+        cOptions.sample_rate = Int32(RAC_STT_DEFAULT_SAMPLE_RATE)
 
         let data = samples.withUnsafeBufferPointer { buffer in
             Data(buffer: buffer)
