@@ -237,8 +237,8 @@ typedef struct rac_analytics_event_data {
  * @param data Event data (lifetime: only valid during callback)
  * @param user_data User data provided during registration
  */
-typedef void (*rac_analytics_callback_fn)(rac_event_type_t type, const rac_analytics_event_data_t* data,
-                                          void* user_data);
+typedef void (*rac_analytics_callback_fn)(rac_event_type_t type,
+                                          const rac_analytics_event_data_t* data, void* user_data);
 
 /**
  * @brief Register analytics event callback
@@ -250,7 +250,8 @@ typedef void (*rac_analytics_callback_fn)(rac_event_type_t type, const rac_analy
  * @param user_data User data passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_analytics_events_set_callback(rac_analytics_callback_fn callback, void* user_data);
+RAC_API rac_result_t rac_analytics_events_set_callback(rac_analytics_callback_fn callback,
+                                                       void* user_data);
 
 /**
  * @brief Emit an analytics event
@@ -261,7 +262,8 @@ RAC_API rac_result_t rac_analytics_events_set_callback(rac_analytics_callback_fn
  * @param type Event type
  * @param data Event data
  */
-RAC_API void rac_analytics_event_emit(rac_event_type_t type, const rac_analytics_event_data_t* data);
+RAC_API void rac_analytics_event_emit(rac_event_type_t type,
+                                      const rac_analytics_event_data_t* data);
 
 /**
  * @brief Check if analytics event callback is registered
@@ -324,7 +326,8 @@ static const rac_analytics_tts_synthesis_t RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT =
     .error_message = RAC_NULL};
 
 /** Default VAD event */
-static const rac_analytics_vad_t RAC_ANALYTICS_VAD_DEFAULT = {.speech_duration_ms = 0.0, .energy_level = 0.0f};
+static const rac_analytics_vad_t RAC_ANALYTICS_VAD_DEFAULT = {.speech_duration_ms = 0.0,
+                                                              .energy_level = 0.0f};
 
 #ifdef __cplusplus
 }

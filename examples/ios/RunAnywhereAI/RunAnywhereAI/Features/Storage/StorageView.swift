@@ -443,24 +443,6 @@ private struct StoredModelRow: View {
                         }
                     }
 
-                    // Tags
-                    if !model.tags.isEmpty {
-                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                            Text("Tags:")
-                                .font(AppTypography.caption2Medium)
-                            HStack(spacing: AppSpacing.xSmall) {
-                                ForEach(model.tags, id: \.self) { tag in
-                                    Text(tag)
-                                        .font(AppTypography.caption2)
-                                        .padding(.horizontal, AppSpacing.small)
-                                        .padding(.vertical, AppSpacing.xxSmall)
-                                        .background(AppColors.badgePrimary)
-                                        .cornerRadius(AppSpacing.cornerRadiusSmall)
-                                }
-                            }
-                        }
-                    }
-
                     Divider()
 
                     // File Information
@@ -493,15 +475,6 @@ private struct StoredModelRow: View {
                             .foregroundColor(AppColors.textSecondary)
                     }
 
-                    if let lastUsed = model.lastUsed {
-                        HStack {
-                            Text("Last used:")
-                                .font(AppTypography.caption2Medium)
-                            Text(lastUsed, style: .relative)
-                                .font(AppTypography.caption2)
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                    }
                 }
                 .padding(.top, AppSpacing.xSmall)
                 .padding(.horizontal, AppSpacing.smallMedium)

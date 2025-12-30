@@ -223,7 +223,7 @@ private struct SimplifiedModelRow: View {
 
                 // Size and status
                 HStack(spacing: AppSpacing.smallMedium) {
-                    if let size = model.memoryRequired, size > 0 {
+                    if let size = model.downloadSize, size > 0 {
                         Label(
                             ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
                             systemImage: "memorychip"
