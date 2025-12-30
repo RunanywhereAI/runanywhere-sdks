@@ -235,7 +235,7 @@ struct FlatModelRow: View {
     private var statusRowView: some View {
         HStack(spacing: AppSpacing.smallMedium) {
             // Size badge
-            if let size = model.memoryRequired, size > 0 {
+            if let size = model.downloadSize, size > 0 {
                 Label(
                     ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
                     systemImage: "memorychip"
