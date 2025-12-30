@@ -9,6 +9,7 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -32,8 +33,8 @@ static void trim_whitespace(const char* str, size_t* out_start, size_t* out_end)
     size_t end = len;
 
     // Skip leading whitespace
-    while (start < len && (str[start] == ' ' || str[start] == '\t' || str[start] == '\n' ||
-                           str[start] == '\r')) {
+    while (start < len &&
+           (str[start] == ' ' || str[start] == '\t' || str[start] == '\n' || str[start] == '\r')) {
         start++;
     }
 
@@ -266,7 +267,7 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
 
     // First, try to find a complete JSON object
     size_t json_start, json_end;
-    if (rac_structured_output_find_complete_json(trimmed, &json_start, &json_end)) {
+    if (rac_structured_output_find_complete_json(trimmed, &json_start, &json_end) != 0) {
         size_t json_len = json_end - json_start;
         char* result = static_cast<char*>(malloc(json_len + 1));
         if (!result) {
@@ -285,7 +286,7 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
     size_t brace_start;
     if (find_char(trimmed, '{', 0, &brace_start)) {
         size_t brace_end;
-        if (rac_structured_output_find_matching_brace(trimmed, brace_start, &brace_end)) {
+        if (rac_structured_output_find_matching_brace(trimmed, brace_start, &brace_end) != 0) {
             size_t json_len = brace_end - brace_start + 1;
             char* result = static_cast<char*>(malloc(json_len + 1));
             if (!result) {
@@ -305,7 +306,8 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
     size_t bracket_start;
     if (find_char(trimmed, '[', 0, &bracket_start)) {
         size_t bracket_end;
-        if (rac_structured_output_find_matching_bracket(trimmed, bracket_start, &bracket_end)) {
+        if (rac_structured_output_find_matching_bracket(trimmed, bracket_start, &bracket_end) !=
+            0) {
             size_t json_len = bracket_end - bracket_start + 1;
             char* result = static_cast<char*>(malloc(json_len + 1));
             if (!result) {
@@ -387,16 +389,14 @@ extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json
 // PREPARE PROMPT - Ported from Swift lines 43-82
 // =============================================================================
 
-extern "C" rac_result_t
-rac_structured_output_prepare_prompt(const char* original_prompt,
-                                     const rac_structured_output_config_t* config,
-                                     char** out_prompt) {
+extern "C" rac_result_t rac_structured_output_prepare_prompt(
+    const char* original_prompt, const rac_structured_output_config_t* config, char** out_prompt) {
     if (!original_prompt || !out_prompt) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
     // If no config or schema not included in prompt, return original
-    if (!config || !config->include_schema_in_prompt) {
+    if (config == nullptr || config->include_schema_in_prompt == 0) {
         size_t len = strlen(original_prompt);
         char* result = static_cast<char*>(malloc(len + 1));
         if (!result) {

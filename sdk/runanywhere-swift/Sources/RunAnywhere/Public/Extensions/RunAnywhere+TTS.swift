@@ -3,9 +3,12 @@
 //  RunAnywhere SDK
 //
 //  Public API for Text-to-Speech operations.
-//  Events are tracked via EventPublisher.
+//  Calls C++ directly via HandleManager for all operations.
+//  Events are emitted by C++ layer via CppEventBridge.
 //
 
+@preconcurrency import AVFoundation
+import CRACommons
 import Foundation
 
 // MARK: - TTS Operations
@@ -17,36 +20,45 @@ public extension RunAnywhere {
     /// Load a TTS voice
     /// - Parameter voiceId: The voice identifier
     /// - Throws: Error if loading fails
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func loadTTSVoice(_ voiceId: String) async throws {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        try await serviceContainer.ttsCapability.loadVoice(voiceId)
+        // Resolve voice ID to local file path
+        let allModels = try await availableModels()
+        guard let modelInfo = allModels.first(where: { $0.id == voiceId }) else {
+            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
+        }
+        guard let localPath = modelInfo.localPath else {
+            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
+        }
+
+        try await HandleManager.shared.loadTTSVoice(localPath.path, voiceId: voiceId)
     }
 
     /// Unload the currently loaded TTS voice
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func unloadTTSVoice() async throws {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        try await serviceContainer.ttsCapability.unload()
+        await HandleManager.shared.unloadTTS()
     }
 
     /// Check if a TTS voice is loaded
     static var isTTSVoiceLoaded: Bool {
         get async {
-            await serviceContainer.ttsCapability.isVoiceLoaded
+            await HandleManager.shared.isTTSLoaded
         }
     }
 
     /// Get available TTS voices
     static var availableTTSVoices: [String] {
         get async {
-            await serviceContainer.ttsCapability.availableVoices
+            let criteria = ModelCriteria(framework: .onnx)
+            let ttsModels = ServiceContainer.shared.modelRegistry.filterModels(by: criteria)
+            return ttsModels.map { $0.id }
         }
     }
 
@@ -57,7 +69,6 @@ public extension RunAnywhere {
     ///   - text: Text to synthesize
     ///   - options: Synthesis options
     /// - Returns: TTS output with audio data
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func synthesize(
         _ text: String,
         options: TTSOptions = TTSOptions()
@@ -66,7 +77,61 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        return try await serviceContainer.ttsCapability.synthesize(text, options: options)
+        let handle = try await HandleManager.shared.getTTSHandle()
+
+        guard await HandleManager.shared.isTTSLoaded else {
+            throw SDKError.tts(.notInitialized, "TTS voice not loaded")
+        }
+
+        let voiceId = await HandleManager.shared.currentTTSVoiceId ?? "unknown"
+        let startTime = Date()
+
+        // Build C options
+        var cOptions = rac_tts_options_t()
+        cOptions.rate = options.rate
+        cOptions.pitch = options.pitch
+        cOptions.volume = options.volume
+        cOptions.sample_rate = Int32(options.sampleRate)
+
+        // Synthesize (C++ emits events)
+        var ttsResult = rac_tts_result_t()
+        let synthesizeResult = text.withCString { textPtr in
+            rac_tts_component_synthesize(handle, textPtr, &cOptions, &ttsResult)
+        }
+
+        guard synthesizeResult == RAC_SUCCESS else {
+            throw SDKError.tts(.processingFailed, "Synthesis failed: \(synthesizeResult)")
+        }
+
+        let endTime = Date()
+        let processingTime = endTime.timeIntervalSince(startTime)
+
+        // Extract audio data
+        let audioData: Data
+        if let audioPtr = ttsResult.audio_data, ttsResult.audio_size > 0 {
+            audioData = Data(bytes: audioPtr, count: ttsResult.audio_size)
+        } else {
+            audioData = Data()
+        }
+
+        let sampleRate = Int(ttsResult.sample_rate)
+        let numSamples = audioData.count / 4  // Float32 = 4 bytes
+        let durationSec = Double(numSamples) / Double(sampleRate)
+
+        let metadata = TTSSynthesisMetadata(
+            voice: voiceId,
+            language: options.language,
+            processingTime: processingTime,
+            characterCount: text.count
+        )
+
+        return TTSOutput(
+            audioData: audioData,
+            format: options.audioFormat,
+            duration: durationSec,
+            phonemeTimestamps: nil,
+            metadata: metadata
+        )
     }
 
     /// Stream synthesis for long text
@@ -84,12 +149,74 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        return try await serviceContainer.ttsCapability.synthesizeStream(text, options: options, onAudioChunk: onAudioChunk)
+        let handle = try await HandleManager.shared.getTTSHandle()
+
+        guard await HandleManager.shared.isTTSLoaded else {
+            throw SDKError.tts(.notInitialized, "TTS voice not loaded")
+        }
+
+        let voiceId = await HandleManager.shared.currentTTSVoiceId ?? "unknown"
+        let startTime = Date()
+        var totalAudioData = Data()
+
+        // Build C options
+        var cOptions = rac_tts_options_t()
+        cOptions.rate = options.rate
+        cOptions.pitch = options.pitch
+        cOptions.volume = options.volume
+        cOptions.sample_rate = Int32(options.sampleRate)
+
+        // Create callback context
+        let context = TTSStreamContext(onChunk: onAudioChunk, totalData: &totalAudioData)
+        let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+        let streamResult = text.withCString { textPtr in
+            rac_tts_component_synthesize_stream(
+                handle,
+                textPtr,
+                &cOptions,
+                { audioPtr, audioSize, userData in
+                    guard let audioPtr = audioPtr, let userData = userData else { return }
+                    let ctx = Unmanaged<TTSStreamContext>.fromOpaque(userData).takeUnretainedValue()
+                    let chunk = Data(bytes: audioPtr, count: audioSize)
+                    ctx.onChunk(chunk)
+                    ctx.totalData.pointee.append(chunk)
+                },
+                contextPtr
+            )
+        }
+
+        Unmanaged<TTSStreamContext>.fromOpaque(contextPtr).release()
+
+        guard streamResult == RAC_SUCCESS else {
+            throw SDKError.tts(.processingFailed, "Streaming synthesis failed: \(streamResult)")
+        }
+
+        let endTime = Date()
+        let processingTime = endTime.timeIntervalSince(startTime)
+        let numSamples = totalAudioData.count / 4
+        let durationSec = Double(numSamples) / Double(options.sampleRate)
+
+        let metadata = TTSSynthesisMetadata(
+            voice: voiceId,
+            language: options.language,
+            processingTime: processingTime,
+            characterCount: text.count
+        )
+
+        return TTSOutput(
+            audioData: totalAudioData,
+            format: options.audioFormat,
+            duration: durationSec,
+            phonemeTimestamps: nil,
+            metadata: metadata
+        )
     }
 
     /// Stop current TTS synthesis
     static func stopSynthesis() async {
-        await serviceContainer.ttsCapability.stop()
+        guard let handle = try? await HandleManager.shared.getTTSHandle() else { return }
+        rac_tts_component_stop(handle)
     }
 
     // MARK: - Speak (Simple API)
@@ -122,18 +249,71 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        return try await serviceContainer.ttsCapability.speak(text, options: options)
+        let output = try await synthesize(text, options: options)
+
+        // Convert Float32 PCM to WAV format using C++ utility
+        let wavData = try convertPCMToWAV(pcmData: output.audioData, sampleRate: Int32(options.sampleRate))
+
+        // Play the audio using platform audio manager
+        if !wavData.isEmpty {
+            try await ttsAudioPlayback.play(wavData)
+        }
+
+        return TTSSpeakResult(from: output)
     }
 
     /// Whether speech is currently playing
     static var isSpeaking: Bool {
-        get async {
-            await serviceContainer.ttsCapability.isSpeaking
-        }
+        get async { false }
     }
 
     /// Stop current speech playback
     static func stopSpeaking() async {
-        await serviceContainer.ttsCapability.stopSpeaking()
+        ttsAudioPlayback.stop()
+        await stopSynthesis()
+    }
+
+    // MARK: - Private Audio Playback
+
+    /// Audio playback manager for TTS speak functionality
+    private static let ttsAudioPlayback = AudioPlaybackManager()
+
+    /// Convert Float32 PCM to WAV using C++ audio utilities
+    private static func convertPCMToWAV(pcmData: Data, sampleRate: Int32) throws -> Data {
+        guard !pcmData.isEmpty else { return Data() }
+
+        var wavDataPtr: UnsafeMutableRawPointer?
+        var wavSize: Int = 0
+
+        let result = pcmData.withUnsafeBytes { pcmPtr in
+            rac_audio_float32_to_wav(
+                pcmPtr.baseAddress,
+                pcmData.count,
+                sampleRate,
+                &wavDataPtr,
+                &wavSize
+            )
+        }
+
+        guard result == RAC_SUCCESS, let ptr = wavDataPtr, wavSize > 0 else {
+            throw SDKError.tts(.processingFailed, "Failed to convert PCM to WAV: \(result)")
+        }
+
+        let wavData = Data(bytes: ptr, count: wavSize)
+        rac_free(ptr)
+
+        return wavData
+    }
+}
+
+// MARK: - Streaming Context
+
+private final class TTSStreamContext: @unchecked Sendable {
+    let onChunk: (Data) -> Void
+    var totalData: UnsafeMutablePointer<Data>
+
+    init(onChunk: @escaping (Data) -> Void, totalData: UnsafeMutablePointer<Data>) {
+        self.onChunk = onChunk
+        self.totalData = totalData
     }
 }

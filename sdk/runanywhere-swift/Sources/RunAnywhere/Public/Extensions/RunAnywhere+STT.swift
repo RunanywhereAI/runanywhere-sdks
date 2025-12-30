@@ -3,10 +3,12 @@
 //  RunAnywhere SDK
 //
 //  Public API for Speech-to-Text operations.
-//  Events are tracked via EventPublisher.
+//  Calls C++ directly via HandleManager for all operations.
+//  Events are emitted by C++ layer via CppEventBridge.
 //
 
 @preconcurrency import AVFoundation
+import CRACommons
 import Foundation
 
 // MARK: - STT Operations
@@ -18,34 +20,31 @@ public extension RunAnywhere {
     /// Simple voice transcription using default model
     /// - Parameter audioData: Audio data to transcribe
     /// - Returns: Transcribed text
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func transcribe(_ audioData: Data) async throws -> String {
         guard isInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
-        // STTCapability handles all event tracking automatically
-        let result = try await serviceContainer.sttCapability.transcribe(audioData)
+        let result = try await transcribeWithOptions(audioData, options: STTOptions())
         return result.text
     }
 
     // MARK: - Model Loading
 
     /// Unload the currently loaded STT model
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func unloadSTTModel() async throws {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        try await serviceContainer.sttCapability.unload()
+        await HandleManager.shared.unloadSTT()
     }
 
     /// Check if an STT model is loaded
     static var isSTTModelLoaded: Bool {
         get async {
-            await serviceContainer.sttCapability.isModelLoaded
+            await HandleManager.shared.isSTTLoaded
         }
     }
 
@@ -56,7 +55,6 @@ public extension RunAnywhere {
     ///   - audioData: Raw audio data
     ///   - options: Transcription options
     /// - Returns: Transcription output with text and metadata
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func transcribeWithOptions(
         _ audioData: Data,
         options: STTOptions
@@ -65,7 +63,74 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        return try await serviceContainer.sttCapability.transcribe(audioData, options: options)
+        // Get handle from HandleManager
+        let handle = try await HandleManager.shared.getSTTHandle()
+
+        guard await HandleManager.shared.isSTTLoaded else {
+            throw SDKError.stt(.notInitialized, "STT model not loaded")
+        }
+
+        let modelId = await HandleManager.shared.currentSTTModelId ?? "unknown"
+        let startTime = Date()
+
+        // Calculate audio metrics
+        let audioSizeBytes = audioData.count
+        let audioLengthSec = estimateAudioLength(dataSize: audioSizeBytes)
+
+        // Build C options
+        var cOptions = rac_stt_options_t()
+        cOptions.language = (options.language as NSString).utf8String
+        cOptions.sample_rate = Int32(options.sampleRate)
+
+        // Transcribe (C++ emits events)
+        var sttResult = rac_stt_result_t()
+        let transcribeResult = audioData.withUnsafeBytes { audioPtr in
+            rac_stt_component_transcribe(
+                handle,
+                audioPtr.baseAddress,
+                audioData.count,
+                &cOptions,
+                &sttResult
+            )
+        }
+
+        guard transcribeResult == RAC_SUCCESS else {
+            throw SDKError.stt(.processingFailed, "Transcription failed: \(transcribeResult)")
+        }
+
+        let endTime = Date()
+        let processingTimeSec = endTime.timeIntervalSince(startTime)
+
+        // Extract result
+        let transcribedText: String
+        if let textPtr = sttResult.text {
+            transcribedText = String(cString: textPtr)
+        } else {
+            transcribedText = ""
+        }
+        let detectedLanguage: String?
+        if let langPtr = sttResult.detected_language {
+            detectedLanguage = String(cString: langPtr)
+        } else {
+            detectedLanguage = nil
+        }
+        let confidence = sttResult.confidence
+
+        // Create metadata
+        let metadata = TranscriptionMetadata(
+            modelId: modelId,
+            processingTime: processingTimeSec,
+            audioLength: audioLengthSec
+        )
+
+        return STTOutput(
+            text: transcribedText,
+            confidence: confidence,
+            wordTimestamps: nil,
+            detectedLanguage: detectedLanguage,
+            alternatives: nil,
+            metadata: metadata
+        )
     }
 
     /// Transcribe audio buffer to text
@@ -73,7 +138,6 @@ public extension RunAnywhere {
     ///   - buffer: Audio buffer
     ///   - language: Optional language hint
     /// - Returns: Transcription output
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     static func transcribeBuffer(
         _ buffer: AVAudioPCMBuffer,
         language: String? = nil
@@ -98,7 +162,7 @@ public extension RunAnywhere {
             options = STTOptions()
         }
 
-        return try await serviceContainer.sttCapability.transcribe(audioData, options: options)
+        return try await transcribeWithOptions(audioData, options: options)
     }
 
     /// Start streaming transcription
@@ -107,22 +171,107 @@ public extension RunAnywhere {
     ///   - onPartialResult: Callback for partial transcription results
     ///   - onFinalResult: Callback for final transcription result
     ///   - onError: Callback for errors
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
+    @available(*, deprecated, message: "Use transcribeStream(audioData:options:onPartialResult:) instead")
     static func startStreamingTranscription(
         options: STTOptions = STTOptions(),
         onPartialResult: @escaping (STTTranscriptionResult) -> Void,
         onFinalResult: @escaping (STTOutput) -> Void,
         onError: @escaping (Error) -> Void
     ) async throws {
+        throw SDKError.stt(.streamingNotSupported, "Use transcribeStream(audioData:options:onPartialResult:) instead")
+    }
+
+    /// Transcribe audio with streaming callbacks
+    /// - Parameters:
+    ///   - audioData: Audio data to transcribe
+    ///   - options: Transcription options
+    ///   - onPartialResult: Callback for partial results
+    /// - Returns: Final transcription output
+    static func transcribeStream(
+        audioData: Data,
+        options: STTOptions = STTOptions(),
+        onPartialResult: @escaping (STTTranscriptionResult) -> Void
+    ) async throws -> STTOutput {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        try await serviceContainer.sttCapability.startStreamingTranscription(
-            options: options,
-            onPartialResult: onPartialResult,
-            onFinalResult: onFinalResult,
-            onError: onError
+        let handle = try await HandleManager.shared.getSTTHandle()
+
+        guard await HandleManager.shared.isSTTLoaded else {
+            throw SDKError.stt(.notInitialized, "STT model not loaded")
+        }
+
+        guard await HandleManager.shared.sttSupportsStreaming else {
+            throw SDKError.stt(.streamingNotSupported, "Model does not support streaming")
+        }
+
+        let modelId = await HandleManager.shared.currentSTTModelId ?? "unknown"
+        let startTime = Date()
+
+        // Create context for callback bridging
+        let context = STTStreamingContext(onPartialResult: onPartialResult)
+        let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+        // Build C options
+        var cOptions = rac_stt_options_t()
+        cOptions.language = (options.language as NSString).utf8String
+        cOptions.sample_rate = Int32(options.sampleRate)
+
+        // Stream transcription with callback
+        let result = audioData.withUnsafeBytes { audioPtr in
+            rac_stt_component_transcribe_stream(
+                handle,
+                audioPtr.baseAddress,
+                audioData.count,
+                &cOptions,
+                { partialText, isFinal, userData in
+                    guard let userData = userData else { return }
+                    let ctx = Unmanaged<STTStreamingContext>.fromOpaque(userData).takeUnretainedValue()
+
+                    let text = partialText.map { String(cString: $0) } ?? ""
+                    let partialResult = STTTranscriptionResult(
+                        transcript: text,
+                        confidence: nil,
+                        timestamps: nil,
+                        language: nil,
+                        alternatives: nil
+                    )
+
+                    ctx.onPartialResult(partialResult)
+
+                    if isFinal == RAC_TRUE {
+                        ctx.finalText = text
+                    }
+                },
+                contextPtr
+            )
+        }
+
+        // Release context
+        let finalContext = Unmanaged<STTStreamingContext>.fromOpaque(contextPtr).takeRetainedValue()
+
+        guard result == RAC_SUCCESS else {
+            throw SDKError.stt(.processingFailed, "Streaming transcription failed: \(result)")
+        }
+
+        let endTime = Date()
+        let processingTimeSec = endTime.timeIntervalSince(startTime)
+        let audioLengthSec = estimateAudioLength(dataSize: audioData.count)
+
+        let metadata = TranscriptionMetadata(
+            modelId: modelId,
+            processingTime: processingTimeSec,
+            audioLength: audioLengthSec
+        )
+
+        return STTOutput(
+            text: finalContext.finalText,
+            confidence: 0.0,
+            wordTimestamps: nil,
+            detectedLanguage: nil,
+            alternatives: nil,
+            metadata: metadata
         )
     }
 
@@ -133,11 +282,55 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        try await serviceContainer.sttCapability.processStreamingAudio(samples)
+        let handle = try await HandleManager.shared.getSTTHandle()
+
+        var cOptions = rac_stt_options_t()
+        cOptions.sample_rate = Int32(RAC_STT_DEFAULT_SAMPLE_RATE)
+
+        let data = samples.withUnsafeBufferPointer { buffer in
+            Data(buffer: buffer)
+        }
+
+        var sttResult = rac_stt_result_t()
+        let transcribeResult = data.withUnsafeBytes { audioPtr in
+            rac_stt_component_transcribe(
+                handle,
+                audioPtr.baseAddress,
+                data.count,
+                &cOptions,
+                &sttResult
+            )
+        }
+
+        if transcribeResult != RAC_SUCCESS {
+            throw SDKError.stt(.processingFailed, "Streaming process failed: \(transcribeResult)")
+        }
     }
 
     /// Stop streaming transcription
     static func stopStreamingTranscription() async {
-        await serviceContainer.sttCapability.stopStreamingTranscription()
+        // No-op - streaming is handled per-call
+    }
+
+    // MARK: - Private Helpers
+
+    /// Estimate audio length from data size (assumes 16kHz mono 16-bit)
+    private static func estimateAudioLength(dataSize: Int) -> Double {
+        let bytesPerSample = 2  // 16-bit
+        let sampleRate = 16000.0
+        let samples = Double(dataSize) / Double(bytesPerSample)
+        return samples / sampleRate
+    }
+}
+
+// MARK: - Streaming Context Helper
+
+/// Context class for bridging C callbacks to Swift closures
+private final class STTStreamingContext: @unchecked Sendable {
+    let onPartialResult: (STTTranscriptionResult) -> Void
+    var finalText: String = ""
+
+    init(onPartialResult: @escaping (STTTranscriptionResult) -> Void) {
+        self.onPartialResult = onPartialResult
     }
 }

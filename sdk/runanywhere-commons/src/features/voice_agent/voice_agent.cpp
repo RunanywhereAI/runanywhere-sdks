@@ -940,8 +940,7 @@ rac_bool_t rac_audio_pipeline_is_valid_transition(rac_audio_pipeline_state_t fro
         case RAC_AUDIO_PIPELINE_GENERATING_RESPONSE:
             // From generatingResponse: can go to playingTTS, idle, cooldown, or error
             return (to_state == RAC_AUDIO_PIPELINE_PLAYING_TTS ||
-                    to_state == RAC_AUDIO_PIPELINE_IDLE ||
-                    to_state == RAC_AUDIO_PIPELINE_COOLDOWN)
+                    to_state == RAC_AUDIO_PIPELINE_IDLE || to_state == RAC_AUDIO_PIPELINE_COOLDOWN)
                        ? RAC_TRUE
                        : RAC_FALSE;
 

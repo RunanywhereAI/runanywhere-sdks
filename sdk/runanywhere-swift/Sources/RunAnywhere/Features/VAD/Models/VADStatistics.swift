@@ -4,7 +4,11 @@
 //
 //  Statistics for VAD debugging and monitoring
 //
+//  🟢 BRIDGE: Thin wrapper over C++ rac_energy_vad_stats_t
+//  C++ Source: include/rac/features/vad/rac_vad_energy.h
+//
 
+import CRACommons
 import Foundation
 
 /// Statistics for VAD debugging and monitoring
@@ -39,6 +43,20 @@ public struct VADStatistics: Sendable {
         self.ambient = ambient
         self.recentAvg = recentAvg
         self.recentMax = recentMax
+    }
+
+    // MARK: - C++ Bridge (rac_energy_vad_stats_t)
+
+    /// Initialize from C++ rac_energy_vad_stats_t
+    /// - Parameter cStats: The C++ statistics struct
+    public init(from cStats: rac_energy_vad_stats_t) {
+        self.init(
+            current: cStats.current,
+            threshold: cStats.threshold,
+            ambient: cStats.ambient,
+            recentAvg: cStats.recent_avg,
+            recentMax: cStats.recent_max
+        )
     }
 }
 

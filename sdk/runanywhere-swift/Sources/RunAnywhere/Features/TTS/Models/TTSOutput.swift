@@ -4,7 +4,11 @@
 //
 //  Output model for Text-to-Speech operations
 //
+//  🟢 BRIDGE: Thin wrapper over C++ rac_tts_output_t
+//  C++ Source: include/rac/features/tts/rac_tts_types.h
+//
 
+import CRACommons
 import Foundation
 
 /// Output from Text-to-Speech synthesis
@@ -61,6 +65,54 @@ public struct TTSOutput: ComponentOutput, Sendable {
     public var hasPhonemeTimestamps: Bool {
         guard let timestamps = phonemeTimestamps else { return false }
         return !timestamps.isEmpty
+    }
+
+    // MARK: - C++ Bridge (rac_tts_output_t)
+
+    /// Initialize from C++ rac_tts_output_t
+    /// - Parameter cOutput: The C++ output struct
+    public init(from cOutput: rac_tts_output_t) {
+        // Convert audio data
+        let audioData: Data
+        if cOutput.audio_size > 0, let dataPtr = cOutput.audio_data {
+            audioData = Data(bytes: dataPtr, count: cOutput.audio_size)
+        } else {
+            audioData = Data()
+        }
+
+        // Convert audio format
+        let format = AudioFormat(from: cOutput.format)
+
+        // Convert phoneme timestamps
+        var phonemeTimestamps: [TTSPhonemeTimestamp]?
+        if cOutput.num_phoneme_timestamps > 0, let cPhonemes = cOutput.phoneme_timestamps {
+            phonemeTimestamps = (0..<cOutput.num_phoneme_timestamps).compactMap { i in
+                let cPhoneme = cPhonemes[Int(i)]
+                guard let phoneme = cPhoneme.phoneme else { return nil }
+                return TTSPhonemeTimestamp(
+                    phoneme: String(cString: phoneme),
+                    startTime: TimeInterval(cPhoneme.start_time_ms) / 1000.0,
+                    endTime: TimeInterval(cPhoneme.end_time_ms) / 1000.0
+                )
+            }
+        }
+
+        // Convert metadata
+        let metadata = TTSSynthesisMetadata(
+            voice: cOutput.metadata.voice.map { String(cString: $0) } ?? "unknown",
+            language: cOutput.metadata.language.map { String(cString: $0) } ?? "en-US",
+            processingTime: TimeInterval(cOutput.metadata.processing_time_ms) / 1000.0,
+            characterCount: Int(cOutput.metadata.character_count)
+        )
+
+        self.init(
+            audioData: audioData,
+            format: format,
+            duration: TimeInterval(cOutput.duration_ms) / 1000.0,
+            phonemeTimestamps: phonemeTimestamps,
+            metadata: metadata,
+            timestamp: Date(timeIntervalSince1970: TimeInterval(cOutput.timestamp_ms) / 1000.0)
+        )
     }
 }
 

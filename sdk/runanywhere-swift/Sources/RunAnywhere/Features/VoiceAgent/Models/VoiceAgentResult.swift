@@ -4,7 +4,11 @@
 //
 //  Output types for VoiceAgent capability
 //
+//  🟢 BRIDGE: Thin wrapper over C++ rac_voice_agent_result_t
+//  C++ Source: include/rac/features/voice_agent/rac_voice_agent.h
+//
 
+import CRACommons
 import Foundation
 
 /// Result from voice agent processing
@@ -33,6 +37,24 @@ public struct VoiceAgentResult: Sendable {
         self.transcription = transcription
         self.response = response
         self.synthesizedAudio = synthesizedAudio
+    }
+
+    // MARK: - C++ Bridge (rac_voice_agent_result_t)
+
+    /// Initialize from C++ rac_voice_agent_result_t
+    /// - Parameter cResult: The C++ result struct
+    public init(from cResult: rac_voice_agent_result_t) {
+        self.init(
+            speechDetected: cResult.speech_detected == RAC_TRUE,
+            transcription: cResult.transcription.map { String(cString: $0) },
+            response: cResult.response.map { String(cString: $0) },
+            synthesizedAudio: {
+                guard cResult.synthesized_audio_size > 0, let audioPtr = cResult.synthesized_audio else {
+                    return nil
+                }
+                return Data(bytes: audioPtr, count: cResult.synthesized_audio_size)
+            }()
+        )
     }
 }
 

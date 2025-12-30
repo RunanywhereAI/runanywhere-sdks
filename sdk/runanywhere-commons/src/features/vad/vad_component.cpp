@@ -9,11 +9,13 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
+#include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_energy.h"
@@ -74,8 +76,23 @@ static void log_error(const char* category, const char* msg) {
  */
 static void vad_speech_activity_callback(rac_speech_activity_event_t event, void* user_data) {
     auto* component = reinterpret_cast<rac_vad_component*>(user_data);
-    if (component && component->activity_callback) {
-        // Convert energy VAD event to speech activity type
+    if (!component)
+        return;
+
+    // Emit analytics event for speech activity
+    rac_analytics_event_data_t event_data;
+    event_data.data.vad = RAC_ANALYTICS_VAD_DEFAULT;
+
+    if (event == RAC_SPEECH_ACTIVITY_STARTED) {
+        // Emit VAD_SPEECH_STARTED event
+        rac_analytics_event_emit(RAC_EVENT_VAD_SPEECH_STARTED, &event_data);
+    } else {
+        // Emit VAD_SPEECH_ENDED event
+        rac_analytics_event_emit(RAC_EVENT_VAD_SPEECH_ENDED, &event_data);
+    }
+
+    // Route to user callback
+    if (component->activity_callback) {
         rac_speech_activity_t activity{};
         if (event == RAC_SPEECH_ACTIVITY_STARTED) {
             activity = RAC_SPEECH_STARTED;
@@ -306,7 +323,16 @@ extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    return rac_energy_vad_start(component->vad_service);
+    rac_result_t result = rac_energy_vad_start(component->vad_service);
+
+    if (result == RAC_SUCCESS) {
+        // Emit VAD_STARTED event
+        rac_analytics_event_data_t event_data;
+        event_data.data.vad = RAC_ANALYTICS_VAD_DEFAULT;
+        rac_analytics_event_emit(RAC_EVENT_VAD_STARTED, &event_data);
+    }
+
+    return result;
 }
 
 extern "C" rac_result_t rac_vad_component_stop(rac_handle_t handle) {
@@ -320,7 +346,16 @@ extern "C" rac_result_t rac_vad_component_stop(rac_handle_t handle) {
         return RAC_SUCCESS;  // Already stopped
     }
 
-    return rac_energy_vad_stop(component->vad_service);
+    rac_result_t result = rac_energy_vad_stop(component->vad_service);
+
+    if (result == RAC_SUCCESS) {
+        // Emit VAD_STOPPED event
+        rac_analytics_event_data_t event_data;
+        event_data.data.vad = RAC_ANALYTICS_VAD_DEFAULT;
+        rac_analytics_event_emit(RAC_EVENT_VAD_STOPPED, &event_data);
+    }
+
+    return result;
 }
 
 extern "C" rac_result_t rac_vad_component_reset(rac_handle_t handle) {

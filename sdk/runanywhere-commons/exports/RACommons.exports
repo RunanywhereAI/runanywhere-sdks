@@ -28,6 +28,11 @@ _rac_error_is_expected
 _rac_error_message
 _rac_error_set_details
 
+# Analytics Events (Cross-Platform)
+_rac_analytics_events_set_callback
+_rac_analytics_event_emit
+_rac_analytics_events_has_callback
+
 # Platform Adapter
 _rac_get_platform_adapter
 _rac_set_platform_adapter

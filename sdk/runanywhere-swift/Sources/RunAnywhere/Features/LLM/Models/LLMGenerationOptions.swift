@@ -4,7 +4,11 @@
 //
 //  Options for text generation
 //
+//  🟢 BRIDGE: Thin wrapper over C++ rac_llm_options_t
+//  C++ Source: include/rac/features/llm/rac_llm_types.h
+//
 
+import CRACommons
 import Foundation
 
 /// Options for text generation
@@ -62,5 +66,34 @@ public struct LLMGenerationOptions: Sendable {
         self.preferredFramework = preferredFramework
         self.structuredOutput = structuredOutput
         self.systemPrompt = systemPrompt
+    }
+
+    // MARK: - C++ Bridge (rac_llm_options_t)
+
+    /// Execute a closure with the C++ equivalent options struct
+    /// - Parameter body: Closure that receives pointer to rac_llm_options_t
+    /// - Returns: The result of the closure
+    public func withCOptions<T>(_ body: (UnsafePointer<rac_llm_options_t>) throws -> T) rethrows -> T {
+        var cOptions = rac_llm_options_t()
+        cOptions.max_tokens = Int32(maxTokens)
+        cOptions.temperature = temperature
+        cOptions.top_p = topP
+        cOptions.streaming_enabled = streamingEnabled ? RAC_TRUE : RAC_FALSE
+
+        // Note: stop_sequences requires careful memory management
+        // For now, we don't pass stop sequences to C++ - they can be handled by Swift
+        cOptions.stop_sequences = nil
+        cOptions.num_stop_sequences = 0
+
+        // Handle system prompt
+        if let prompt = systemPrompt {
+            return try prompt.withCString { promptPtr in
+                cOptions.system_prompt = promptPtr
+                return try body(&cOptions)
+            }
+        } else {
+            cOptions.system_prompt = nil
+            return try body(&cOptions)
+        }
     }
 }

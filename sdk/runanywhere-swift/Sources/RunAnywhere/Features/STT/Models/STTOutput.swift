@@ -4,7 +4,11 @@
 //
 //  Output model from Speech-to-Text
 //
+//  🟢 BRIDGE: Thin wrapper over C++ rac_stt_output_t
+//  C++ Source: include/rac/features/stt/rac_stt_types.h
+//
 
+import CRACommons
 import Foundation
 
 // MARK: - STT Output
@@ -48,6 +52,57 @@ public struct STTOutput: ComponentOutput {
         self.alternatives = alternatives
         self.metadata = metadata
         self.timestamp = timestamp
+    }
+
+    // MARK: - C++ Bridge (rac_stt_output_t)
+
+    /// Initialize from C++ rac_stt_output_t
+    /// - Parameter cOutput: The C++ output struct
+    public init(from cOutput: rac_stt_output_t) {
+        // Convert word timestamps
+        var wordTimestamps: [WordTimestamp]?
+        if cOutput.num_word_timestamps > 0, let cWords = cOutput.word_timestamps {
+            wordTimestamps = (0..<cOutput.num_word_timestamps).compactMap { i in
+                let cWord = cWords[Int(i)]
+                guard let text = cWord.text else { return nil }
+                return WordTimestamp(
+                    word: String(cString: text),
+                    startTime: TimeInterval(cWord.start_ms) / 1000.0,
+                    endTime: TimeInterval(cWord.end_ms) / 1000.0,
+                    confidence: cWord.confidence
+                )
+            }
+        }
+
+        // Convert alternatives
+        var alternatives: [TranscriptionAlternative]?
+        if cOutput.num_alternatives > 0, let cAlts = cOutput.alternatives {
+            alternatives = (0..<cOutput.num_alternatives).compactMap { i in
+                let cAlt = cAlts[Int(i)]
+                guard let text = cAlt.text else { return nil }
+                return TranscriptionAlternative(
+                    text: String(cString: text),
+                    confidence: cAlt.confidence
+                )
+            }
+        }
+
+        // Convert metadata
+        let metadata = TranscriptionMetadata(
+            modelId: cOutput.metadata.model_id.map { String(cString: $0) } ?? "unknown",
+            processingTime: TimeInterval(cOutput.metadata.processing_time_ms) / 1000.0,
+            audioLength: TimeInterval(cOutput.metadata.audio_length_ms) / 1000.0
+        )
+
+        self.init(
+            text: cOutput.text.map { String(cString: $0) } ?? "",
+            confidence: cOutput.confidence,
+            wordTimestamps: wordTimestamps,
+            detectedLanguage: cOutput.detected_language.map { String(cString: $0) },
+            alternatives: alternatives,
+            metadata: metadata,
+            timestamp: Date(timeIntervalSince1970: TimeInterval(cOutput.timestamp_ms) / 1000.0)
+        )
     }
 }
 

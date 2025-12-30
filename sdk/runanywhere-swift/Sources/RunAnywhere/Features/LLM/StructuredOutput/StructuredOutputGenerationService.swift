@@ -1,8 +1,10 @@
+import CRACommons
 import Foundation
 
 // MARK: - Structured Output Generation Service
 
-/// Service for generating structured output from LLMs
+/// Service for generating structured output from LLMs.
+/// Uses HandleManager directly to call C++ layer.
 public final class StructuredOutputGenerationService {
 
     private let handler: StructuredOutputHandler
@@ -18,13 +20,11 @@ public final class StructuredOutputGenerationService {
     ///   - type: The type to generate (must conform to Generatable)
     ///   - prompt: The prompt to generate from
     ///   - options: Generation options (structured output config will be added automatically)
-    ///   - llmCapability: The LLM capability to use for generation
     /// - Returns: The generated object of the specified type
     public func generateStructured<T: Generatable>(
         _ type: T.Type,
         prompt: String,
-        options: LLMGenerationOptions?,
-        llmCapability: LLMCapability
+        options: LLMGenerationOptions? = nil
     ) async throws -> T {
         // Get system prompt for structured output
         let systemPrompt = handler.getSystemPrompt(for: type)
@@ -47,11 +47,8 @@ public final class StructuredOutputGenerationService {
         // Build user prompt
         let userPrompt = handler.buildUserPrompt(for: type, content: prompt)
 
-        // Generate the text using LLMCapability
-        let generationResult = try await llmCapability.generate(
-            userPrompt,
-            options: effectiveOptions
-        )
+        // Generate the text directly via HandleManager → C++
+        let generationResult = try await generateViaHandleManager(userPrompt, options: effectiveOptions)
 
         // Parse using StructuredOutputHandler
         let result = try handler.parseStructuredOutput(
@@ -62,6 +59,52 @@ public final class StructuredOutputGenerationService {
         return result
     }
 
+    /// Internal: Generate via HandleManager (calls C++ directly)
+    private func generateViaHandleManager(_ prompt: String, options: LLMGenerationOptions) async throws -> LLMGenerationResult {
+        let handle = try await HandleManager.shared.getLLMHandle()
+
+        guard await HandleManager.shared.isLLMLoaded else {
+            throw SDKError.llm(.notInitialized, "LLM model not loaded")
+        }
+
+        let modelId = await HandleManager.shared.currentLLMModelId ?? "unknown"
+        let startTime = Date()
+
+        // Build C options
+        var cOptions = rac_llm_options_t()
+        cOptions.max_tokens = Int32(options.maxTokens)
+        cOptions.temperature = options.temperature
+        cOptions.top_p = options.topP
+        cOptions.streaming_enabled = RAC_FALSE
+
+        // Generate
+        var llmResult = rac_llm_result_t()
+        let generateResult = prompt.withCString { promptPtr in
+            rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+        }
+
+        guard generateResult == RAC_SUCCESS else {
+            throw SDKError.llm(.generationFailed, "Generation failed: \(generateResult)")
+        }
+
+        let totalTimeMs = Date().timeIntervalSince(startTime) * 1000
+        let generatedText = llmResult.text.map { String(cString: $0) } ?? ""
+
+        return LLMGenerationResult(
+            text: generatedText,
+            thinkingContent: nil,
+            inputTokens: Int(llmResult.prompt_tokens),
+            tokensUsed: Int(llmResult.completion_tokens),
+            modelUsed: modelId,
+            latencyMs: totalTimeMs,
+            framework: "llamacpp",
+            tokensPerSecond: Double(llmResult.tokens_per_second),
+            timeToFirstTokenMs: nil,
+            thinkingTokens: 0,
+            responseTokens: Int(llmResult.completion_tokens)
+        )
+    }
+
     // MARK: - Streaming Generation
 
     /// Generate structured output with streaming support
@@ -69,14 +112,16 @@ public final class StructuredOutputGenerationService {
     ///   - type: The type to generate (must conform to Generatable)
     ///   - content: The content to generate from
     ///   - options: Generation options (optional)
-    ///   - streamGenerator: Function to generate token stream
     /// - Returns: A structured output stream containing tokens and final result
     public func generateStructuredStream<T: Generatable>(
         _ type: T.Type,
         content: String,
-        options: LLMGenerationOptions?,
-        streamGenerator: @escaping (String, LLMGenerationOptions) async throws -> LLMStreamingResult
+        options: LLMGenerationOptions? = nil
     ) -> StructuredOutputStreamResult<T> {
+        // Internal stream generator that calls HandleManager directly
+        let streamGenerator: (String, LLMGenerationOptions) async throws -> LLMStreamingResult = { prompt, opts in
+            try await RunAnywhere.generateStream(prompt, options: opts)
+        }
         // Create a shared accumulator
         let accumulator = StreamAccumulator()
         let handler = self.handler
@@ -176,13 +221,11 @@ public final class StructuredOutputGenerationService {
     ///   - prompt: The prompt to generate from
     ///   - structuredOutput: Structured output configuration
     ///   - options: Generation options
-    ///   - llmCapability: The LLM capability to use for generation
     /// - Returns: Generation result with structured data
     public func generateWithStructuredOutput(
         prompt: String,
         structuredOutput: StructuredOutputConfig,
-        options: LLMGenerationOptions?,
-        llmCapability: LLMCapability
+        options: LLMGenerationOptions? = nil
     ) async throws -> LLMGenerationResult {
         // Generate using regular generation with structured config in options
         let baseOptions = options ?? LLMGenerationOptions()
@@ -197,9 +240,6 @@ public final class StructuredOutputGenerationService {
             systemPrompt: baseOptions.systemPrompt
         )
 
-        return try await llmCapability.generate(
-            prompt,
-            options: internalOptions
-        )
+        return try await generateViaHandleManager(prompt, options: internalOptions)
     }
 }

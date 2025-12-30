@@ -120,6 +120,7 @@ set(RAC_CORE_SOURCES
     src/core/rac_logger.cpp
     src/core/rac_audio_utils.cpp
     src/core/component_types.cpp
+    src/core/events.cpp
     src/core/capabilities/lifecycle_manager.cpp
 )
 

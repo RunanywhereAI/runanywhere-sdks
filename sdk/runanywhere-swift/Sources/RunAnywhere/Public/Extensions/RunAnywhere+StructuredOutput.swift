@@ -3,6 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Public API for structured output generation.
+//  Calls C++ directly via HandleManager (no capabilities layer).
 //
 
 import Foundation
@@ -17,7 +18,7 @@ public extension RunAnywhere {
     ///   - prompt: The prompt to generate from
     ///   - options: Generation options (structured output config will be added automatically)
     /// - Returns: The generated object of the specified type
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
+    /// - Note: Events are automatically dispatched via C++ layer
     static func generateStructured<T: Generatable>(
         _ type: T.Type,
         prompt: String,
@@ -26,8 +27,7 @@ public extension RunAnywhere {
         return try await serviceContainer.structuredOutputService.generateStructured(
             type,
             prompt: prompt,
-            options: options,
-            llmCapability: serviceContainer.llmCapability
+            options: options
         )
     }
 
@@ -45,13 +45,7 @@ public extension RunAnywhere {
         return serviceContainer.structuredOutputService.generateStructuredStream(
             type,
             content: content,
-            options: options,
-            streamGenerator: { prompt, opts in
-                try await serviceContainer.llmCapability.generateStream(
-                    prompt,
-                    options: opts
-                )
-            }
+            options: options
         )
     }
 
@@ -61,7 +55,7 @@ public extension RunAnywhere {
     ///   - structuredOutput: Structured output configuration
     ///   - options: Generation options
     /// - Returns: Generation result with structured data
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
+    /// - Note: Events are automatically dispatched via C++ layer
     static func generateWithStructuredOutput(
         prompt: String,
         structuredOutput: StructuredOutputConfig,
@@ -70,8 +64,7 @@ public extension RunAnywhere {
         return try await serviceContainer.structuredOutputService.generateWithStructuredOutput(
             prompt: prompt,
             structuredOutput: structuredOutput,
-            options: options,
-            llmCapability: serviceContainer.llmCapability
+            options: options
         )
     }
 }

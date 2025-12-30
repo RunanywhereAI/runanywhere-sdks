@@ -4,6 +4,9 @@
 //
 //  Options for text-to-speech synthesis operations
 //
+//  🟢 BRIDGE: Thin wrapper over C++ rac_tts_options_t
+//  C++ Source: include/rac/features/tts/rac_tts_types.h
+//
 
 import CRACommons
 import Foundation
@@ -81,5 +84,34 @@ public struct TTSOptions: Sendable {
     /// Default options
     public static var `default`: TTSOptions {
         TTSOptions()
+    }
+
+    // MARK: - C++ Bridge (rac_tts_options_t)
+
+    /// Execute a closure with the C++ equivalent options struct
+    /// - Parameter body: Closure that receives pointer to rac_tts_options_t
+    /// - Returns: The result of the closure
+    public func withCOptions<T>(_ body: (UnsafePointer<rac_tts_options_t>) throws -> T) rethrows -> T {
+        var cOptions = rac_tts_options_t()
+        cOptions.rate = rate
+        cOptions.pitch = pitch
+        cOptions.volume = volume
+        cOptions.audio_format = audioFormat.toCFormat()
+        cOptions.sample_rate = Int32(sampleRate)
+        cOptions.use_ssml = useSSML ? RAC_TRUE : RAC_FALSE
+
+        return try language.withCString { langPtr in
+            cOptions.language = langPtr
+
+            if let voice = voice {
+                return try voice.withCString { voicePtr in
+                    cOptions.voice = voicePtr
+                    return try body(&cOptions)
+                }
+            } else {
+                cOptions.voice = nil
+                return try body(&cOptions)
+            }
+        }
     }
 }

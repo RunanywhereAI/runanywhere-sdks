@@ -6,35 +6,38 @@ extension RunAnywhere {
 
     /// Load an LLM model by ID
     /// - Parameter modelId: The model identifier
-    /// - Note: Events are automatically dispatched to both EventBus (for apps) and Analytics (for telemetry)
     public static func loadModel(_ modelId: String) async throws {
-        // Ensure initialized
         guard isInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        // Ensure services are ready (O(1) after first call)
         try await ensureServicesReady()
 
-        // LLMCapability handles all event tracking automatically
-        try await serviceContainer.llmCapability.loadModel(modelId)
+        // Resolve model ID to local file path
+        let allModels = try await availableModels()
+        guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
+            throw SDKError.llm(.modelNotFound, "Model '\(modelId)' not found in registry")
+        }
+        guard let localPath = modelInfo.localPath else {
+            throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded")
+        }
+
+        try await HandleManager.shared.loadLLMModel(localPath.path, modelId: modelId)
     }
 
     /// Unload the currently loaded LLM model
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     public static func unloadModel() async throws {
         guard isInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        // LLMCapability handles all event tracking automatically
-        try await serviceContainer.llmCapability.unload()
+        await HandleManager.shared.unloadLLM()
     }
 
     /// Check if an LLM model is loaded
     public static var isModelLoaded: Bool {
         get async {
-            await serviceContainer.llmCapability.isModelLoaded
+            await HandleManager.shared.isLLMLoaded
         }
     }
 
@@ -47,42 +50,52 @@ extension RunAnywhere {
     /// - Note: Returns `false` if no model is loaded
     public static var supportsLLMStreaming: Bool {
         get async {
-            await serviceContainer.llmCapability.supportsStreaming
+            true  // C++ layer supports streaming
         }
     }
 
     /// Load an STT (Speech-to-Text) model by ID
-    /// This loads the model into the STT capability
+    /// This loads the model into the STT component
     /// - Parameter modelId: The model identifier (e.g., "whisper-base")
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     public static func loadSTTModel(_ modelId: String) async throws {
-        // Ensure initialized
         guard isInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        // Ensure services are ready (O(1) after first call)
         try await ensureServicesReady()
 
-        // STTCapability handles all event tracking automatically
-        try await serviceContainer.sttCapability.loadModel(modelId)
+        // Resolve model ID to local file path
+        let allModels = try await availableModels()
+        guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
+            throw SDKError.stt(.modelNotFound, "Model '\(modelId)' not found in registry")
+        }
+        guard let localPath = modelInfo.localPath else {
+            throw SDKError.stt(.modelNotFound, "Model '\(modelId)' is not downloaded")
+        }
+
+        try await HandleManager.shared.loadSTTModel(localPath.path, modelId: modelId)
     }
 
     /// Load a TTS (Text-to-Speech) voice by ID
-    /// This loads the voice into the TTS capability
+    /// This loads the voice into the TTS component
     /// - Parameter voiceId: The voice identifier
-    /// - Note: Events are automatically dispatched to both EventBus and Analytics
     public static func loadTTSModel(_ voiceId: String) async throws {
-        // Ensure initialized
         guard isInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        // Ensure services are ready (O(1) after first call)
         try await ensureServicesReady()
 
-        // TTSCapability handles all event tracking automatically
-        try await serviceContainer.ttsCapability.loadVoice(voiceId)
+        // Resolve voice ID to local file path
+        let allModels = try await availableModels()
+        guard let modelInfo = allModels.first(where: { $0.id == voiceId }) else {
+            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
+        }
+        guard let localPath = modelInfo.localPath else {
+            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
+        }
+
+        try await HandleManager.shared.loadTTSVoice(localPath.path, voiceId: voiceId)
     }
 
     /// Get available models
@@ -96,7 +109,7 @@ extension RunAnywhere {
     /// - Returns: Currently loaded model ID if any
     public static func getCurrentModelId() async -> String? {
         guard isInitialized else { return nil }
-        return await serviceContainer.llmCapability.currentModelId
+        return await HandleManager.shared.currentLLMModelId
     }
 
     /// Get the currently loaded LLM model as ModelInfo
@@ -119,7 +132,7 @@ extension RunAnywhere {
     public static var currentSTTModel: ModelInfo? {
         get async {
             guard isInitialized else { return nil }
-            guard let modelId = await serviceContainer.sttCapability.currentModelId else { return nil }
+            guard let modelId = await HandleManager.shared.currentSTTModelId else { return nil }
             let models = (try? await availableModels()) ?? []
             return models.first { $0.id == modelId }
         }
@@ -132,7 +145,7 @@ extension RunAnywhere {
     public static var currentTTSVoiceId: String? {
         get async {
             guard isInitialized else { return nil }
-            return await serviceContainer.ttsCapability.currentModelId
+            return await HandleManager.shared.currentTTSVoiceId
         }
     }
 
@@ -142,6 +155,6 @@ extension RunAnywhere {
     /// or explicitly requests cancellation.
     public static func cancelGeneration() async {
         guard isInitialized else { return }
-        await serviceContainer.llmCapability.cancel()
+        await HandleManager.shared.cancelLLM()
     }
 }

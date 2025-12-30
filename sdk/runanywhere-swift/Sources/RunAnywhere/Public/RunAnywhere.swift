@@ -247,6 +247,10 @@ public enum RunAnywhere {
         // This must happen early so all C++ logs (from runanywhere-core) route to SDKLogger
         SwiftPlatformAdapter.shared.register()
 
+        // Step 3.5: Register C++ event bridge for analytics
+        // C++ is the canonical source of truth for all analytics events
+        CppEventBridge.shared.register()
+
         // Now safe to create logger and track events
         let logger = SDKLogger(category: "RunAnywhere.Init")
         EventPublisher.shared.track(SDKLifecycleEvent.initStarted)
