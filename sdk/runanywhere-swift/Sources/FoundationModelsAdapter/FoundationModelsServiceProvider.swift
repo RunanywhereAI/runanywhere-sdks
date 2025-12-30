@@ -79,10 +79,8 @@ public enum AppleAI: RunAnywhereModule {
             localPath: URL(string: "builtin://foundation-models"),  // Special builtin scheme
             artifactType: .builtIn,
             downloadSize: nil,
-            memoryRequired: nil,  // System managed
             contextLength: 4096,
             supportsThinking: false,
-            tags: ["apple", "foundation-models", "built-in", "on-device"],
             description: """
                 Apple's built-in Foundation Models powered by Apple Intelligence. \
                 Requires iOS 26+ / macOS 26+ and an Apple Intelligence capable device.
