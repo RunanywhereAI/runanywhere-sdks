@@ -433,6 +433,114 @@ RAC_API rac_result_t rac_artifact_infer_from_url(const char* url, rac_model_form
 RAC_API rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t* model);
 
 // =============================================================================
+// FORMAT DETECTION - From RegistryService.swift
+// =============================================================================
+
+/**
+ * @brief Detect model format from file extension.
+ * Ported from Swift RegistryService.detectFormatFromExtension() (lines 330-338)
+ *
+ * @param extension File extension (without dot, e.g., "onnx", "gguf")
+ * @param out_format Output: Detected format
+ * @return RAC_TRUE if format detected, RAC_FALSE if unknown
+ */
+RAC_API rac_bool_t rac_model_detect_format_from_extension(const char* extension,
+                                                          rac_model_format_t* out_format);
+
+/**
+ * @brief Detect framework from model format.
+ * Ported from Swift RegistryService.detectFramework(for:) (lines 340-343)
+ *
+ * @param format Model format
+ * @param out_framework Output: Detected framework
+ * @return RAC_TRUE if framework detected, RAC_FALSE if unknown
+ */
+RAC_API rac_bool_t rac_model_detect_framework_from_format(rac_model_format_t format,
+                                                          rac_inference_framework_t* out_framework);
+
+/**
+ * @brief Get file extension string for a model format.
+ * Mirrors Swift's ModelFormat.fileExtension.
+ *
+ * @param format Model format
+ * @return Extension string (e.g., "onnx", "gguf") or NULL if unknown
+ */
+RAC_API const char* rac_model_format_extension(rac_model_format_t format);
+
+// =============================================================================
+// MODEL ID/NAME GENERATION - From RegistryService.swift
+// =============================================================================
+
+/**
+ * @brief Generate model ID from URL by stripping known extensions.
+ * Ported from Swift RegistryService.generateModelId(from:) (lines 311-318)
+ *
+ * @param url URL path string (e.g., "model.tar.gz", "llama-7b.gguf")
+ * @param out_id Output buffer for model ID
+ * @param max_len Maximum length of output buffer
+ */
+RAC_API void rac_model_generate_id(const char* url, char* out_id, size_t max_len);
+
+/**
+ * @brief Generate human-readable model name from URL.
+ * Ported from Swift RegistryService.generateModelName(from:) (lines 320-324)
+ * Replaces underscores and dashes with spaces.
+ *
+ * @param url URL path string
+ * @param out_name Output buffer for model name
+ * @param max_len Maximum length of output buffer
+ */
+RAC_API void rac_model_generate_name(const char* url, char* out_name, size_t max_len);
+
+// =============================================================================
+// MODEL FILTERING - From RegistryService.swift
+// =============================================================================
+
+/**
+ * @brief Model filtering criteria.
+ * Mirrors Swift's ModelCriteria struct.
+ */
+typedef struct rac_model_filter {
+    /** Filter by framework (RAC_FRAMEWORK_UNKNOWN = any) */
+    rac_inference_framework_t framework;
+
+    /** Filter by format (RAC_MODEL_FORMAT_UNKNOWN = any) */
+    rac_model_format_t format;
+
+    /** Maximum download size in bytes (0 = no limit) */
+    int64_t max_size;
+
+    /** Search query for name/id/description (NULL = no search filter) */
+    const char* search_query;
+} rac_model_filter_t;
+
+/**
+ * @brief Filter models by criteria.
+ * Ported from Swift RegistryService.filterModels(by:) (lines 104-126)
+ *
+ * @param models Array of models to filter
+ * @param models_count Number of models in input array
+ * @param filter Filter criteria (NULL = no filtering, return all)
+ * @param out_models Output array for filtered models (caller allocates)
+ * @param out_capacity Maximum capacity of output array
+ * @return Number of models that passed the filter (may exceed out_capacity)
+ */
+RAC_API size_t rac_model_filter_models(const rac_model_info_t* models, size_t models_count,
+                                       const rac_model_filter_t* filter,
+                                       rac_model_info_t* out_models, size_t out_capacity);
+
+/**
+ * @brief Check if a model matches filter criteria.
+ * Helper function for filtering.
+ *
+ * @param model Model to check
+ * @param filter Filter criteria
+ * @return RAC_TRUE if model matches, RAC_FALSE otherwise
+ */
+RAC_API rac_bool_t rac_model_matches_filter(const rac_model_info_t* model,
+                                            const rac_model_filter_t* filter);
+
+// =============================================================================
 // MEMORY MANAGEMENT
 // =============================================================================
 
