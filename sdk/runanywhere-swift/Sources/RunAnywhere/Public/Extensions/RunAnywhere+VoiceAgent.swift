@@ -3,14 +3,16 @@
 //  RunAnywhere SDK
 //
 //  Public API for Voice Agent operations (full voice pipeline).
-//  Events are tracked via EventPublisher.
+//  Calls C++ directly via HandleManager for all operations.
+//  Events are emitted by C++ layer via CppEventBridge.
 //
 //  Architecture:
-//  - Voice agent uses SHARED handles from the individual capabilities (STT, LLM, TTS)
-//  - Models are loaded via loadSTT(), loadLLM(), loadTTS() (the individual capability APIs)
+//  - Voice agent uses SHARED handles from the individual components (STT, LLM, TTS, VAD)
+//  - Models are loaded via loadSTT(), loadLLM(), loadTTS() (the individual APIs)
 //  - Voice agent is purely an orchestrator for the full voice pipeline
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - Voice Agent Operations
@@ -24,7 +26,7 @@ public extension RunAnywhere {
     /// Use this to check which models are loaded and ready for the voice pipeline.
     /// This is useful for UI that needs to show the setup state before starting voice.
     ///
-    /// Models are loaded via the individual capability APIs (loadSTT, loadLLM, loadTTS).
+    /// Models are loaded via the individual APIs (loadSTT, loadLLM, loadTTS).
     ///
     /// Example:
     /// ```swift
@@ -40,33 +42,29 @@ public extension RunAnywhere {
             return VoiceAgentComponentStates()
         }
 
-        // Voice agent delegates to individual capabilities for model state
-        async let sttLoaded = serviceContainer.voiceAgentCapability.isSTTLoaded
-        async let sttModelId = serviceContainer.voiceAgentCapability.currentSTTModelId
-        async let llmLoaded = serviceContainer.voiceAgentCapability.isLLMLoaded
-        async let llmModelId = serviceContainer.voiceAgentCapability.currentLLMModelId
-        async let ttsLoaded = serviceContainer.voiceAgentCapability.isTTSLoaded
-        async let ttsVoiceId = serviceContainer.voiceAgentCapability.currentTTSVoiceId
-
-        let (sttL, sttId, llmL, llmId, ttsL, ttsId) =
-            await (sttLoaded, sttModelId, llmLoaded, llmModelId, ttsLoaded, ttsVoiceId)
+        let sttLoaded = await HandleManager.shared.isSTTLoaded
+        let sttId = await HandleManager.shared.currentSTTModelId
+        let llmLoaded = await HandleManager.shared.isLLMLoaded
+        let llmId = await HandleManager.shared.currentLLMModelId
+        let ttsLoaded = await HandleManager.shared.isTTSLoaded
+        let ttsId = await HandleManager.shared.currentTTSVoiceId
 
         let sttState: ComponentLoadState
-        if sttL, let modelId = sttId {
+        if sttLoaded, let modelId = sttId {
             sttState = .loaded(modelId: modelId)
         } else {
             sttState = .notLoaded
         }
 
         let llmState: ComponentLoadState
-        if llmL, let modelId = llmId {
+        if llmLoaded, let modelId = llmId {
             llmState = .loaded(modelId: modelId)
         } else {
             llmState = .notLoaded
         }
 
         let ttsState: ComponentLoadState
-        if ttsL, let modelId = ttsId {
+        if ttsLoaded, let modelId = ttsId {
             ttsState = .loaded(modelId: modelId)
         } else {
             ttsState = .notLoaded
@@ -98,7 +96,34 @@ public extension RunAnywhere {
         EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
 
         do {
-            try await serviceContainer.voiceAgentCapability.initialize(config)
+            let handle = try await HandleManager.shared.getVoiceAgentHandle()
+
+            // Build C config
+            var cConfig = rac_voice_agent_config_t()
+
+            // VAD config
+            cConfig.vad_config.sample_rate = Int32(config.vadConfig.sampleRate)
+            cConfig.vad_config.frame_length = Float(config.vadConfig.frameLength)
+            cConfig.vad_config.energy_threshold = Float(config.vadConfig.energyThreshold)
+
+            // STT config
+            if let sttModelId = config.sttConfig.modelId {
+                cConfig.stt_config.model_id = (sttModelId as NSString).utf8String
+            }
+
+            // LLM config
+            if let llmModelId = config.llmConfig.modelId {
+                cConfig.llm_config.model_id = (llmModelId as NSString).utf8String
+            }
+
+            // TTS config
+            cConfig.tts_config.voice = (config.ttsConfig.voice as NSString).utf8String
+
+            let result = rac_voice_agent_initialize(handle, &cConfig)
+            guard result == RAC_SUCCESS else {
+                throw SDKError.voiceAgent(.initializationFailed, "Voice agent initialization failed: \(result)")
+            }
+
             EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
             EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
@@ -106,13 +131,13 @@ public extension RunAnywhere {
         }
     }
 
-    /// Initialize voice agent using already-loaded models from individual capabilities
+    /// Initialize voice agent using already-loaded models from individual APIs
     ///
-    /// Use this after loading models via the individual capability APIs:
+    /// Use this after loading models via the individual APIs:
     ///
     /// Example:
     /// ```swift
-    /// // Load models via individual capability APIs
+    /// // Load models via individual APIs
     /// try await RunAnywhere.loadSTT("sherpa-onnx-whisper-tiny.en")
     /// try await RunAnywhere.loadLLM("lfm2-350m-q4_k_m")
     /// try await RunAnywhere.loadTTS("vits-piper-en_GB-alba-medium")
@@ -130,7 +155,13 @@ public extension RunAnywhere {
         EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
 
         do {
-            try await serviceContainer.voiceAgentCapability.initializeWithLoadedModels()
+            let handle = try await HandleManager.shared.getVoiceAgentHandle()
+
+            let result = rac_voice_agent_initialize_with_loaded_models(handle)
+            guard result == RAC_SUCCESS else {
+                throw SDKError.voiceAgent(.initializationFailed, "Failed to initialize with loaded models: \(result)")
+            }
+
             EventPublisher.shared.track(VoicePipelineEvent.pipelineCompleted(durationMs: 0))
         } catch {
             EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
@@ -141,7 +172,7 @@ public extension RunAnywhere {
     /// Check if voice agent is ready (all components initialized)
     static var isVoiceAgentReady: Bool {
         get async {
-            await serviceContainer.voiceAgentCapability.isReady
+            await HandleManager.shared.isVoiceAgentReady
         }
     }
 
@@ -154,8 +185,48 @@ public extension RunAnywhere {
         }
 
         do {
-            let result = try await serviceContainer.voiceAgentCapability.processVoiceTurn(audioData)
-            return result
+            let handle = try await HandleManager.shared.getVoiceAgentHandle()
+
+            var isReady: rac_bool_t = RAC_FALSE
+            rac_voice_agent_is_ready(handle, &isReady)
+            guard isReady == RAC_TRUE else {
+                throw SDKError.voiceAgent(.notInitialized, "Voice agent not ready")
+            }
+
+            var cResult = rac_voice_agent_result_t()
+            let result = audioData.withUnsafeBytes { audioPtr in
+                rac_voice_agent_process_voice_turn(
+                    handle,
+                    audioPtr.baseAddress,
+                    audioData.count,
+                    &cResult
+                )
+            }
+
+            guard result == RAC_SUCCESS else {
+                throw SDKError.voiceAgent(.processingFailed, "Voice turn processing failed: \(result)")
+            }
+
+            // Extract results
+            let speechDetected = cResult.speech_detected == RAC_TRUE
+            let transcription: String? = cResult.transcription.map { String(cString: $0) }
+            let response: String? = cResult.response.map { String(cString: $0) }
+
+            // C++ returns WAV format directly
+            var synthesizedAudio: Data?
+            if let audioPtr = cResult.synthesized_audio, cResult.synthesized_audio_size > 0 {
+                synthesizedAudio = Data(bytes: audioPtr, count: cResult.synthesized_audio_size)
+            }
+
+            // Free C result
+            rac_voice_agent_result_free(&cResult)
+
+            return VoiceAgentResult(
+                speechDetected: speechDetected,
+                transcription: transcription,
+                response: response,
+                synthesizedAudio: synthesizedAudio
+            )
         } catch {
             EventPublisher.shared.track(VoicePipelineEvent.pipelineFailed(error: SDKError.from(error, category: .voiceAgent)))
             throw error
@@ -169,7 +240,27 @@ public extension RunAnywhere {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
-        return try await serviceContainer.voiceAgentCapability.transcribe(audioData)
+
+        let handle = try await HandleManager.shared.getVoiceAgentHandle()
+
+        var transcriptionPtr: UnsafeMutablePointer<CChar>?
+        let result = audioData.withUnsafeBytes { audioPtr in
+            rac_voice_agent_transcribe(
+                handle,
+                audioPtr.baseAddress,
+                audioData.count,
+                &transcriptionPtr
+            )
+        }
+
+        guard result == RAC_SUCCESS, let ptr = transcriptionPtr else {
+            throw SDKError.voiceAgent(.processingFailed, "Transcription failed: \(result)")
+        }
+
+        let transcription = String(cString: ptr)
+        free(ptr)
+
+        return transcription
     }
 
     /// Generate LLM response (voice agent must be initialized)
@@ -177,7 +268,22 @@ public extension RunAnywhere {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
-        return try await serviceContainer.voiceAgentCapability.generateResponse(prompt)
+
+        let handle = try await HandleManager.shared.getVoiceAgentHandle()
+
+        var responsePtr: UnsafeMutablePointer<CChar>?
+        let result = prompt.withCString { promptPtr in
+            rac_voice_agent_generate_response(handle, promptPtr, &responsePtr)
+        }
+
+        guard result == RAC_SUCCESS, let ptr = responsePtr else {
+            throw SDKError.voiceAgent(.processingFailed, "Response generation failed: \(result)")
+        }
+
+        let response = String(cString: ptr)
+        free(ptr)
+
+        return response
     }
 
     /// Synthesize speech (voice agent must be initialized)
@@ -185,13 +291,29 @@ public extension RunAnywhere {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
-        return try await serviceContainer.voiceAgentCapability.synthesizeSpeech(text)
+
+        let handle = try await HandleManager.shared.getVoiceAgentHandle()
+
+        var audioPtr: UnsafeMutableRawPointer?
+        var audioSize: Int = 0
+        let result = text.withCString { textPtr in
+            rac_voice_agent_synthesize_speech(handle, textPtr, &audioPtr, &audioSize)
+        }
+
+        guard result == RAC_SUCCESS, let ptr = audioPtr, audioSize > 0 else {
+            throw SDKError.voiceAgent(.processingFailed, "Speech synthesis failed: \(result)")
+        }
+
+        let audioData = Data(bytes: ptr, count: audioSize)
+        free(ptr)
+
+        return audioData
     }
 
     // MARK: - Cleanup
 
     /// Cleanup voice agent resources
     static func cleanupVoiceAgent() async {
-        await serviceContainer.voiceAgentCapability.cleanup()
+        await HandleManager.shared.cleanupVoiceAgent()
     }
 }

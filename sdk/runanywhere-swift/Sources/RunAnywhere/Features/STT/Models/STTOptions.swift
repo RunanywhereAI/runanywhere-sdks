@@ -4,6 +4,9 @@
 //
 //  Options for speech-to-text transcription
 //
+//  🟢 BRIDGE: Thin wrapper over C++ rac_stt_options_t
+//  C++ Source: include/rac/features/stt/rac_stt_types.h
+//
 
 import CRACommons
 import Foundation
@@ -69,5 +72,26 @@ public struct STTOptions: Sendable {
     /// Create options with default settings for a specific language
     public static func `default`(language: String = "en") -> STTOptions {
         STTOptions(language: language)
+    }
+
+    // MARK: - C++ Bridge (rac_stt_options_t)
+
+    /// Execute a closure with the C++ equivalent options struct
+    /// - Parameter body: Closure that receives pointer to rac_stt_options_t
+    /// - Returns: The result of the closure
+    public func withCOptions<T>(_ body: (UnsafePointer<rac_stt_options_t>) throws -> T) rethrows -> T {
+        var cOptions = rac_stt_options_t()
+        cOptions.detect_language = detectLanguage ? RAC_TRUE : RAC_FALSE
+        cOptions.enable_punctuation = enablePunctuation ? RAC_TRUE : RAC_FALSE
+        cOptions.enable_diarization = enableDiarization ? RAC_TRUE : RAC_FALSE
+        cOptions.max_speakers = Int32(maxSpeakers ?? 0)
+        cOptions.enable_timestamps = enableTimestamps ? RAC_TRUE : RAC_FALSE
+        cOptions.audio_format = audioFormat.toCFormat()
+        cOptions.sample_rate = Int32(sampleRate)
+
+        return try language.withCString { langPtr in
+            cOptions.language = langPtr
+            return try body(&cOptions)
+        }
     }
 }

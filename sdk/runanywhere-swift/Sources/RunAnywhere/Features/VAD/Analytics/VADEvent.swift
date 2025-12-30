@@ -173,7 +173,7 @@ public enum VADEvent: SDKEvent, TelemetryEventProperties {
 
 // MARK: - VAD Metrics
 
-public struct VADMetrics: AnalyticsMetrics {
+public struct VADMetrics: Sendable {
     public let totalEvents: Int
     public let startTime: Date
     public let lastEventTime: Date?

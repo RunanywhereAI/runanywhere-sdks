@@ -72,6 +72,7 @@
 
 // Event system
 #include "rac_events.h"
+#include "rac_analytics_events.h"
 
 // Download management
 #include "rac_download.h"

@@ -413,7 +413,6 @@ void rac_model_generate_id(const char* url, char* out_id, size_t max_len) {
 
     // Known extensions to strip (from Swift lines 313)
     const char* known_extensions[] = {"gz", "bz2", "tar", "zip", "gguf", "onnx", "ort", "bin"};
-    const size_t num_extensions = sizeof(known_extensions) / sizeof(known_extensions[0]);
 
     // Strip known extensions from the end (Swift lines 314-316)
     bool found = true;
@@ -424,8 +423,8 @@ void rac_model_generate_id(const char* url, char* out_id, size_t max_len) {
             std::string ext = filename.substr(dot_pos + 1);
             std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
-            for (size_t i = 0; i < num_extensions; i++) {
-                if (ext == known_extensions[i]) {
+            for (const auto& known_extension : known_extensions) {
+                if (ext == known_extension) {
                     filename = filename.substr(0, dot_pos);
                     found = true;
                     break;
@@ -490,7 +489,8 @@ static bool contains_case_insensitive(const char* haystack, const char* needle) 
     return h.find(n) != std::string::npos;
 }
 
-rac_bool_t rac_model_matches_filter(const rac_model_info_t* model, const rac_model_filter_t* filter) {
+rac_bool_t rac_model_matches_filter(const rac_model_info_t* model,
+                                    const rac_model_filter_t* filter) {
     // Ported from Swift RegistryService.filterModels(by:) filter closure (lines 106-124)
     if (!model) {
         return RAC_FALSE;
@@ -512,7 +512,8 @@ rac_bool_t rac_model_matches_filter(const rac_model_info_t* model, const rac_mod
     }
 
     // Max size filter (Swift lines 113-115)
-    if (filter->max_size > 0 && model->download_size > 0 && model->download_size > filter->max_size) {
+    if (filter->max_size > 0 && model->download_size > 0 &&
+        model->download_size > filter->max_size) {
         return RAC_FALSE;
     }
 
