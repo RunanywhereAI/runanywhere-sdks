@@ -319,6 +319,240 @@ rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t* model) {
 }
 
 // =============================================================================
+// FORMAT DETECTION - Ported from Swift RegistryService.swift
+// =============================================================================
+
+rac_bool_t rac_model_detect_format_from_extension(const char* extension,
+                                                  rac_model_format_t* out_format) {
+    if (!extension || !out_format) {
+        return RAC_FALSE;
+    }
+
+    // Convert to lowercase for comparison
+    std::string ext(extension);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    // Ported from Swift RegistryService.detectFormatFromExtension() (lines 330-338)
+    if (ext == "onnx") {
+        *out_format = RAC_MODEL_FORMAT_ONNX;
+        return RAC_TRUE;
+    }
+    if (ext == "ort") {
+        *out_format = RAC_MODEL_FORMAT_ORT;
+        return RAC_TRUE;
+    }
+    if (ext == "gguf") {
+        *out_format = RAC_MODEL_FORMAT_GGUF;
+        return RAC_TRUE;
+    }
+    if (ext == "bin") {
+        *out_format = RAC_MODEL_FORMAT_BIN;
+        return RAC_TRUE;
+    }
+
+    return RAC_FALSE;
+}
+
+rac_bool_t rac_model_detect_framework_from_format(rac_model_format_t format,
+                                                  rac_inference_framework_t* out_framework) {
+    if (!out_framework) {
+        return RAC_FALSE;
+    }
+
+    // Ported from Swift RegistryService.detectFramework(for:) (lines 340-343)
+    // Uses InferenceFramework.framework(for:) which checks supported formats
+    switch (format) {
+        case RAC_MODEL_FORMAT_ONNX:
+        case RAC_MODEL_FORMAT_ORT:
+            *out_framework = RAC_FRAMEWORK_ONNX;
+            return RAC_TRUE;
+        case RAC_MODEL_FORMAT_GGUF:
+            *out_framework = RAC_FRAMEWORK_LLAMACPP;
+            return RAC_TRUE;
+        case RAC_MODEL_FORMAT_BIN:
+            *out_framework = RAC_FRAMEWORK_FLUID_AUDIO;
+            return RAC_TRUE;
+        default:
+            return RAC_FALSE;
+    }
+}
+
+const char* rac_model_format_extension(rac_model_format_t format) {
+    // Mirrors Swift's ModelFormat.fileExtension
+    switch (format) {
+        case RAC_MODEL_FORMAT_ONNX:
+            return "onnx";
+        case RAC_MODEL_FORMAT_ORT:
+            return "ort";
+        case RAC_MODEL_FORMAT_GGUF:
+            return "gguf";
+        case RAC_MODEL_FORMAT_BIN:
+            return "bin";
+        default:
+            return nullptr;
+    }
+}
+
+// =============================================================================
+// MODEL ID/NAME GENERATION - Ported from Swift RegistryService.swift
+// =============================================================================
+
+void rac_model_generate_id(const char* url, char* out_id, size_t max_len) {
+    // Ported from Swift RegistryService.generateModelId(from:) (lines 311-318)
+    if (!url || !out_id || max_len == 0) {
+        if (out_id && max_len > 0) {
+            out_id[0] = '\0';
+        }
+        return;
+    }
+
+    // Get last path component (filename)
+    std::string path(url);
+    size_t last_slash = path.rfind('/');
+    std::string filename = (last_slash != std::string::npos) ? path.substr(last_slash + 1) : path;
+
+    // Known extensions to strip (from Swift lines 313)
+    const char* known_extensions[] = {"gz", "bz2", "tar", "zip", "gguf", "onnx", "ort", "bin"};
+    const size_t num_extensions = sizeof(known_extensions) / sizeof(known_extensions[0]);
+
+    // Strip known extensions from the end (Swift lines 314-316)
+    bool found = true;
+    while (found && !filename.empty()) {
+        found = false;
+        size_t dot_pos = filename.rfind('.');
+        if (dot_pos != std::string::npos && dot_pos < filename.size() - 1) {
+            std::string ext = filename.substr(dot_pos + 1);
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+            for (size_t i = 0; i < num_extensions; i++) {
+                if (ext == known_extensions[i]) {
+                    filename = filename.substr(0, dot_pos);
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Copy result to output buffer
+    size_t copy_len = std::min(filename.size(), max_len - 1);
+    memcpy(out_id, filename.c_str(), copy_len);
+    out_id[copy_len] = '\0';
+}
+
+void rac_model_generate_name(const char* url, char* out_name, size_t max_len) {
+    // Ported from Swift RegistryService.generateModelName(from:) (lines 320-324)
+    if (!url || !out_name || max_len == 0) {
+        if (out_name && max_len > 0) {
+            out_name[0] = '\0';
+        }
+        return;
+    }
+
+    // Get last path component and strip single extension (Swift's deletingPathExtension())
+    std::string path(url);
+    size_t last_slash = path.rfind('/');
+    std::string filename = (last_slash != std::string::npos) ? path.substr(last_slash + 1) : path;
+
+    // Delete path extension (last .xxx)
+    size_t dot_pos = filename.rfind('.');
+    if (dot_pos != std::string::npos) {
+        filename = filename.substr(0, dot_pos);
+    }
+
+    // Replace underscores and dashes with spaces (Swift lines 322-323)
+    for (size_t i = 0; i < filename.size(); i++) {
+        if (filename[i] == '_' || filename[i] == '-') {
+            filename[i] = ' ';
+        }
+    }
+
+    // Copy result to output buffer
+    size_t copy_len = std::min(filename.size(), max_len - 1);
+    memcpy(out_name, filename.c_str(), copy_len);
+    out_name[copy_len] = '\0';
+}
+
+// =============================================================================
+// MODEL FILTERING - Ported from Swift RegistryService.swift
+// =============================================================================
+
+// Helper to check if string contains substring (case-insensitive)
+static bool contains_case_insensitive(const char* haystack, const char* needle) {
+    if (!haystack || !needle)
+        return false;
+
+    std::string h(haystack);
+    std::string n(needle);
+    std::transform(h.begin(), h.end(), h.begin(), ::tolower);
+    std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+
+    return h.find(n) != std::string::npos;
+}
+
+rac_bool_t rac_model_matches_filter(const rac_model_info_t* model, const rac_model_filter_t* filter) {
+    // Ported from Swift RegistryService.filterModels(by:) filter closure (lines 106-124)
+    if (!model) {
+        return RAC_FALSE;
+    }
+
+    // No filter = matches all
+    if (!filter) {
+        return RAC_TRUE;
+    }
+
+    // Framework filter (Swift lines 107-109)
+    if (filter->framework != RAC_FRAMEWORK_UNKNOWN && model->framework != filter->framework) {
+        return RAC_FALSE;
+    }
+
+    // Format filter (Swift lines 110-112)
+    if (filter->format != RAC_MODEL_FORMAT_UNKNOWN && model->format != filter->format) {
+        return RAC_FALSE;
+    }
+
+    // Max size filter (Swift lines 113-115)
+    if (filter->max_size > 0 && model->download_size > 0 && model->download_size > filter->max_size) {
+        return RAC_FALSE;
+    }
+
+    // Search query filter (Swift lines 116-122)
+    if (filter->search_query && strlen(filter->search_query) > 0) {
+        bool matches = contains_case_insensitive(model->name, filter->search_query) ||
+                       contains_case_insensitive(model->id, filter->search_query) ||
+                       contains_case_insensitive(model->description, filter->search_query);
+        if (!matches) {
+            return RAC_FALSE;
+        }
+    }
+
+    return RAC_TRUE;
+}
+
+size_t rac_model_filter_models(const rac_model_info_t* models, size_t models_count,
+                               const rac_model_filter_t* filter, rac_model_info_t* out_models,
+                               size_t out_capacity) {
+    // Ported from Swift RegistryService.filterModels(by:) (lines 104-126)
+    if (!models || models_count == 0) {
+        return 0;
+    }
+
+    size_t matched_count = 0;
+
+    for (size_t i = 0; i < models_count; i++) {
+        if (rac_model_matches_filter(&models[i], filter) == RAC_TRUE) {
+            // Copy to output if we have space
+            if (out_models && matched_count < out_capacity) {
+                out_models[matched_count] = models[i];
+            }
+            matched_count++;
+        }
+    }
+
+    return matched_count;
+}
+
+// =============================================================================
 // MEMORY MANAGEMENT
 // =============================================================================
 

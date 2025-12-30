@@ -117,6 +117,47 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
+    // ==========================================================================
+    // VALIDATION - Ported from Swift VADConfiguration.swift:62-110
+    // ==========================================================================
+
+    // 1. Energy threshold range (Swift lines 64-69)
+    if (config->energy_threshold < 0.0f || config->energy_threshold > 1.0f) {
+        log_error("VAD.Component",
+                  "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05");
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    // 2. Warning for very low threshold (Swift lines 72-77)
+    if (config->energy_threshold < 0.002f) {
+        rac_log(RAC_LOG_WARNING, "VAD.Component",
+                "Energy threshold is very low (< 0.002) and may cause false positives");
+    }
+
+    // 3. Warning for very high threshold (Swift lines 80-85)
+    if (config->energy_threshold > 0.1f) {
+        rac_log(RAC_LOG_WARNING, "VAD.Component",
+                "Energy threshold is very high (> 0.1) and may miss speech");
+    }
+
+    // 4. Sample rate validation (Swift lines 88-93)
+    if (config->sample_rate < 1 || config->sample_rate > 48000) {
+        log_error("VAD.Component", "Sample rate must be between 1 and 48000 Hz");
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    // 5. Frame length validation (Swift lines 96-101)
+    if (config->frame_length <= 0.0f || config->frame_length > 1.0f) {
+        log_error("VAD.Component", "Frame length must be between 0 and 1 second");
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    // 6. Calibration multiplier validation (Swift lines 104-109)
+    // Note: Check if calibration_multiplier exists in config
+    // Swift validates calibrationMultiplier >= 1.5 && <= 5.0
+
+    // ==========================================================================
+
     component->config = *config;
 
     log_info("VAD.Component", "VAD component configured");
@@ -375,6 +416,22 @@ extern "C" rac_result_t rac_vad_component_set_energy_threshold(rac_handle_t hand
                                                                float threshold) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
+
+    // Validation - Ported from Swift VADConfiguration.validate()
+    if (threshold < 0.0f || threshold > 1.0f) {
+        log_error("VAD.Component", "Threshold must be between 0.0 and 1.0");
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    // Warning for edge cases
+    if (threshold < 0.002f) {
+        rac_log(RAC_LOG_WARNING, "VAD.Component",
+                "Threshold is very low (< 0.002) and may cause false positives");
+    }
+    if (threshold > 0.1f) {
+        rac_log(RAC_LOG_WARNING, "VAD.Component",
+                "Threshold is very high (> 0.1) and may miss speech");
+    }
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);

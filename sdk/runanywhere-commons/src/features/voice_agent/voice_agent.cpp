@@ -825,3 +825,141 @@ void rac_voice_agent_result_free(rac_voice_agent_result_t* result) {
     result->synthesized_audio_size = 0;
     result->speech_detected = RAC_FALSE;
 }
+
+// =============================================================================
+// AUDIO PIPELINE STATE API
+// Ported from Swift's AudioPipelineState.swift
+// =============================================================================
+
+/**
+ * @brief Get string representation of audio pipeline state
+ *
+ * Ported from Swift AudioPipelineState enum rawValue (lines 4-24)
+ */
+const char* rac_audio_pipeline_state_name(rac_audio_pipeline_state_t state) {
+    switch (state) {
+        case RAC_AUDIO_PIPELINE_IDLE:
+            return "idle";
+        case RAC_AUDIO_PIPELINE_LISTENING:
+            return "listening";
+        case RAC_AUDIO_PIPELINE_PROCESSING_SPEECH:
+            return "processingSpeech";
+        case RAC_AUDIO_PIPELINE_GENERATING_RESPONSE:
+            return "generatingResponse";
+        case RAC_AUDIO_PIPELINE_PLAYING_TTS:
+            return "playingTTS";
+        case RAC_AUDIO_PIPELINE_COOLDOWN:
+            return "cooldown";
+        case RAC_AUDIO_PIPELINE_ERROR:
+            return "error";
+        default:
+            return "unknown";
+    }
+}
+
+/**
+ * @brief Check if microphone can be activated in current state
+ *
+ * Ported from Swift AudioPipelineStateManager.canActivateMicrophone() (lines 75-89)
+ */
+rac_bool_t rac_audio_pipeline_can_activate_microphone(rac_audio_pipeline_state_t current_state,
+                                                      int64_t last_tts_end_time_ms,
+                                                      int64_t cooldown_duration_ms) {
+    // Only allow in idle or listening states
+    switch (current_state) {
+        case RAC_AUDIO_PIPELINE_IDLE:
+        case RAC_AUDIO_PIPELINE_LISTENING:
+            // Check cooldown if we recently finished TTS
+            if (last_tts_end_time_ms > 0) {
+                // Get current time in milliseconds
+                int64_t now_ms = rac_get_current_time_ms();
+                int64_t elapsed_ms = now_ms - last_tts_end_time_ms;
+                if (elapsed_ms < cooldown_duration_ms) {
+                    return RAC_FALSE;  // Still in cooldown
+                }
+            }
+            return RAC_TRUE;
+
+        case RAC_AUDIO_PIPELINE_PROCESSING_SPEECH:
+        case RAC_AUDIO_PIPELINE_GENERATING_RESPONSE:
+        case RAC_AUDIO_PIPELINE_PLAYING_TTS:
+        case RAC_AUDIO_PIPELINE_COOLDOWN:
+        case RAC_AUDIO_PIPELINE_ERROR:
+            return RAC_FALSE;
+
+        default:
+            return RAC_FALSE;
+    }
+}
+
+/**
+ * @brief Check if TTS can be played in current state
+ *
+ * Ported from Swift AudioPipelineStateManager.canPlayTTS() (lines 92-99)
+ */
+rac_bool_t rac_audio_pipeline_can_play_tts(rac_audio_pipeline_state_t current_state) {
+    // TTS can only be played when we're generating a response
+    return (current_state == RAC_AUDIO_PIPELINE_GENERATING_RESPONSE) ? RAC_TRUE : RAC_FALSE;
+}
+
+/**
+ * @brief Check if a state transition is valid
+ *
+ * Ported from Swift AudioPipelineStateManager.isValidTransition() (lines 152-201)
+ */
+rac_bool_t rac_audio_pipeline_is_valid_transition(rac_audio_pipeline_state_t from_state,
+                                                  rac_audio_pipeline_state_t to_state) {
+    // Any state can transition to error
+    if (to_state == RAC_AUDIO_PIPELINE_ERROR) {
+        return RAC_TRUE;
+    }
+
+    switch (from_state) {
+        case RAC_AUDIO_PIPELINE_IDLE:
+            // From idle: can go to listening, cooldown, or error
+            return (to_state == RAC_AUDIO_PIPELINE_LISTENING ||
+                    to_state == RAC_AUDIO_PIPELINE_COOLDOWN)
+                       ? RAC_TRUE
+                       : RAC_FALSE;
+
+        case RAC_AUDIO_PIPELINE_LISTENING:
+            // From listening: can go to idle, processingSpeech, or error
+            return (to_state == RAC_AUDIO_PIPELINE_IDLE ||
+                    to_state == RAC_AUDIO_PIPELINE_PROCESSING_SPEECH)
+                       ? RAC_TRUE
+                       : RAC_FALSE;
+
+        case RAC_AUDIO_PIPELINE_PROCESSING_SPEECH:
+            // From processingSpeech: can go to idle, generatingResponse, listening, or error
+            return (to_state == RAC_AUDIO_PIPELINE_IDLE ||
+                    to_state == RAC_AUDIO_PIPELINE_GENERATING_RESPONSE ||
+                    to_state == RAC_AUDIO_PIPELINE_LISTENING)
+                       ? RAC_TRUE
+                       : RAC_FALSE;
+
+        case RAC_AUDIO_PIPELINE_GENERATING_RESPONSE:
+            // From generatingResponse: can go to playingTTS, idle, cooldown, or error
+            return (to_state == RAC_AUDIO_PIPELINE_PLAYING_TTS ||
+                    to_state == RAC_AUDIO_PIPELINE_IDLE ||
+                    to_state == RAC_AUDIO_PIPELINE_COOLDOWN)
+                       ? RAC_TRUE
+                       : RAC_FALSE;
+
+        case RAC_AUDIO_PIPELINE_PLAYING_TTS:
+            // From playingTTS: can go to cooldown, idle, or error
+            return (to_state == RAC_AUDIO_PIPELINE_COOLDOWN || to_state == RAC_AUDIO_PIPELINE_IDLE)
+                       ? RAC_TRUE
+                       : RAC_FALSE;
+
+        case RAC_AUDIO_PIPELINE_COOLDOWN:
+            // From cooldown: can only go to idle or error
+            return (to_state == RAC_AUDIO_PIPELINE_IDLE) ? RAC_TRUE : RAC_FALSE;
+
+        case RAC_AUDIO_PIPELINE_ERROR:
+            // From error: can only go to idle (reset)
+            return (to_state == RAC_AUDIO_PIPELINE_IDLE) ? RAC_TRUE : RAC_FALSE;
+
+        default:
+            return RAC_FALSE;
+    }
+}
