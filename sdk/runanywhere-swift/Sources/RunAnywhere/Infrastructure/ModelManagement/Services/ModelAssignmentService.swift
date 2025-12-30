@@ -135,7 +135,6 @@ public struct ModelAssignment: Codable, Sendable {
     public let format: String
     public let downloadUrl: String?
     public let size: Int64?
-    public let memoryRequired: Int64?
     public let contextLength: Int?
     public let supportsThinking: Bool
     public let compatibleFrameworks: [String]
@@ -148,7 +147,6 @@ public struct ModelAssignment: Codable, Sendable {
         case id, name, version, category, format
         case downloadUrl = "download_url"
         case size
-        case memoryRequired = "memory_required"
         case contextLength = "context_length"
         case supportsThinking = "supports_thinking"
         case compatibleFrameworks = "compatible_frameworks"
@@ -164,12 +162,11 @@ public struct ModelAssignmentMetadata: Codable, Sendable {
     public let description: String?
     public let author: String?
     public let license: String?
-    public let tags: [String]?
     public let capabilities: [String]?
     public let limitations: [String]?
 
     enum CodingKeys: String, CodingKey {
-        case description, author, license, tags
+        case description, author, license
         case capabilities, limitations
     }
 }
@@ -192,8 +189,7 @@ extension ModelAssignment {
         // Framework should always be provided by API - we don't infer from format
         let modelFramework = framework.flatMap { InferenceFramework(caseInsensitive: $0) } ?? .unknown
 
-        // Extract tags and description from metadata
-        let modelTags = metadata?.tags ?? []
+        // Extract description from metadata
         let modelDescription = metadata?.description
 
         // Create download URL if provided
@@ -208,16 +204,12 @@ extension ModelAssignment {
             downloadURL: downloadURL,
             localPath: nil,
             downloadSize: size,
-            memoryRequired: memoryRequired,
             contextLength: contextLength,
             supportsThinking: supportsThinking,
-            tags: modelTags,
             description: modelDescription,
             source: .remote,
             createdAt: Date(),
-            updatedAt: Date(),
-            lastUsed: nil,
-            usageCount: 0
+            updatedAt: Date()
         )
     }
 }

@@ -27,7 +27,6 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
 
     // Size information (in bytes)
     public let downloadSize: Int64?  // Size when downloading
-    public let memoryRequired: Int64?  // RAM needed to run the model
 
     // Framework (1:1 mapping - each model has exactly one framework)
     public let framework: InferenceFramework
@@ -37,18 +36,13 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
     public let supportsThinking: Bool  // For reasoning models
     public let thinkingPattern: ThinkingTagPattern?  // Custom thinking pattern (if supportsThinking)
 
-    // Optional metadata (flattened from ModelInfoMetadata)
-    public let tags: [String]
+    // Optional metadata
     public let description: String?
 
     // Tracking fields
     public let source: ModelSource
     public let createdAt: Date
     public var updatedAt: Date
-
-    // Usage tracking
-    public var lastUsed: Date?
-    public var usageCount: Int
 
     // MARK: - Computed Properties
 
@@ -80,12 +74,11 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, name, category, format, downloadURL, localPath
         case artifactType
-        case downloadSize, memoryRequired
+        case downloadSize
         case framework
         case contextLength, supportsThinking, thinkingPattern
-        case tags, description
+        case description
         case source, createdAt, updatedAt
-        case lastUsed, usageCount
     }
 
     public init(
@@ -98,17 +91,13 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
         localPath: URL? = nil,
         artifactType: ModelArtifactType? = nil,
         downloadSize: Int64? = nil,
-        memoryRequired: Int64? = nil,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
         thinkingPattern: ThinkingTagPattern? = nil,
-        tags: [String] = [],
         description: String? = nil,
         source: ModelSource = .remote,
         createdAt: Date = Date(),
-        updatedAt: Date = Date(),
-        lastUsed: Date? = nil,
-        usageCount: Int = 0
+        updatedAt: Date = Date()
     ) {
         self.id = id
         self.name = name
@@ -122,7 +111,6 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
         self.artifactType = artifactType ?? ModelArtifactType.infer(from: downloadURL, format: format)
 
         self.downloadSize = downloadSize
-        self.memoryRequired = memoryRequired
 
         // Set contextLength based on category if not provided
         if category.requiresContextLength {
@@ -137,13 +125,10 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
         // Set thinking pattern based on supportsThinking
         self.thinkingPattern = supportsThinking ? (thinkingPattern ?? .defaultPattern) : nil
 
-        self.tags = tags
         self.description = description
         self.source = source
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-        self.lastUsed = lastUsed
-        self.usageCount = usageCount
     }
 
 }

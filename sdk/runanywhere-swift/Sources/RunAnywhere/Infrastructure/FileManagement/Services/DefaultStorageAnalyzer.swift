@@ -59,8 +59,6 @@ public class DefaultStorageAnalyzer: StorageAnalyzer {
                     format: .unknown,
                     framework: framework,
                     createdDate: Date(),
-                    lastUsed: nil,
-                    tags: [],
                     description: nil,
                     contextLength: nil
                 )
@@ -108,44 +106,6 @@ public class DefaultStorageAnalyzer: StorageAnalyzer {
         )
     }
 
-    /// Get storage recommendations
-    public func getRecommendations(for storageInfo: StorageInfo) -> [StorageRecommendation] {
-        var recommendations: [StorageRecommendation] = []
-
-        let freeSpace = storageInfo.deviceStorage.freeSpace
-        let totalSpace = storageInfo.deviceStorage.totalSpace
-
-        if totalSpace > 0 {
-            let freePercentage = Double(freeSpace) / Double(totalSpace)
-
-            if freePercentage < 0.1 {
-                recommendations.append(StorageRecommendation(
-                    type: .warning,
-                    message: "Low storage space. Clear cache to free up space.",
-                    action: "Clear Cache"
-                ))
-            }
-
-            if freePercentage < 0.05 {
-                recommendations.append(StorageRecommendation(
-                    type: .critical,
-                    message: "Critical storage shortage. Consider removing unused models.",
-                    action: "Delete Models"
-                ))
-            }
-        }
-
-        if storageInfo.storedModels.count > 5 {
-            recommendations.append(StorageRecommendation(
-                type: .suggestion,
-                message: "Multiple models stored. Consider removing models you don't use.",
-                action: "Review Models"
-            ))
-        }
-
-        return recommendations
-    }
-
     /// Calculate size at URL
     public func calculateSize(at url: URL) async throws -> Int64 {
         let (exists, isDirectory) = FileOperationsUtilities.existsWithType(at: url)
@@ -186,8 +146,6 @@ public class DefaultStorageAnalyzer: StorageAnalyzer {
                     format: registeredModel?.format ?? .unknown,
                     framework: framework,
                     createdDate: Date(),
-                    lastUsed: nil,
-                    tags: registeredModel?.tags ?? [],
                     description: registeredModel?.description,
                     contextLength: registeredModel?.contextLength
                 ))

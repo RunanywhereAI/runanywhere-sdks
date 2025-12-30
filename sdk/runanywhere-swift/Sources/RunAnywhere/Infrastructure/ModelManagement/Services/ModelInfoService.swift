@@ -43,13 +43,12 @@ public actor ModelInfoService {
         return models.values.filter { frameworks.contains($0.framework) }
     }
 
-    /// Update model last used date
-    public func updateLastUsed(for modelId: String) async throws {
+    /// Update model timestamp (called when model is used)
+    public func updateModelTimestamp(for modelId: String) async throws {
         guard var model = models[modelId] else { return }
-        model.lastUsed = Date()
-        model.usageCount += 1
+        model.updatedAt = Date()
         models[modelId] = model
-        logger.debug("Updated last used for model: \(modelId)")
+        logger.debug("Updated timestamp for model: \(modelId)")
     }
 
     /// Remove model metadata

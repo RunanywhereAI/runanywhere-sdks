@@ -31,12 +31,6 @@ public struct StoredModel: Sendable {
     /// Date the model was downloaded/created
     public let createdDate: Date
 
-    /// Date the model was last used
-    public let lastUsed: Date?
-
-    /// Tags for categorization
-    public let tags: [String]
-
     /// Optional description
     public let description: String?
 
@@ -54,8 +48,6 @@ public struct StoredModel: Sendable {
         format: ModelFormat,
         framework: InferenceFramework?,
         createdDate: Date,
-        lastUsed: Date?,
-        tags: [String] = [],
         description: String? = nil,
         contextLength: Int? = nil,
         checksum: String? = nil
@@ -67,8 +59,6 @@ public struct StoredModel: Sendable {
         self.format = format
         self.framework = framework
         self.createdDate = createdDate
-        self.lastUsed = lastUsed
-        self.tags = tags
         self.description = description
         self.contextLength = contextLength
         self.checksum = checksum

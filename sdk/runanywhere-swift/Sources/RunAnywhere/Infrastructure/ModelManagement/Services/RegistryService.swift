@@ -113,9 +113,6 @@ public class RegistryService: ModelRegistry {
                 if let maxSize = criteria.maxSize, let downloadSize = model.downloadSize, downloadSize > maxSize {
                     return false
                 }
-                if !criteria.tags.isEmpty && !criteria.tags.allSatisfy({ model.tags.contains($0) }) {
-                    return false
-                }
                 if let search = criteria.search, !search.isEmpty {
                     let searchLower = search.lowercased()
                     let matches = model.name.lowercased().contains(searchLower)
@@ -168,10 +165,8 @@ public class RegistryService: ModelRegistry {
             localPath: nil,
             artifactType: artifactType,
             downloadSize: nil,
-            memoryRequired: estimatedSize ?? estimateMemoryFromURL(url),
             contextLength: resolvedCategory == .language ? 2048 : nil,
             supportsThinking: supportsThinking,
-            tags: ["user-added", framework.rawValue.lowercased()],
             description: "User-added model",
             source: .local  // Models added via SDK input are always local source
         )
@@ -260,10 +255,8 @@ public class RegistryService: ModelRegistry {
                 framework: framework,
                 localPath: file,
                 downloadSize: fileSize,
-                memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
                 contextLength: category == .language ? 2048 : nil,
                 supportsThinking: false,
-                tags: [],
                 source: .local  // Discovered locally on disk
             )
         }
@@ -293,10 +286,8 @@ public class RegistryService: ModelRegistry {
                     framework: framework,
                     localPath: url,
                     downloadSize: fileSize,
-                    memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
                     contextLength: category == .language ? 2048 : nil,
                     supportsThinking: false,
-                    tags: ["bundled"],
                     source: .local  // Bundled models are local
                 ))
             }
@@ -349,26 +340,5 @@ public class RegistryService: ModelRegistry {
     private func detectFramework(for format: ModelFormat) -> InferenceFramework? {
         // Use centralized framework detection from InferenceFramework
         InferenceFramework.framework(for: format)
-    }
-
-    private func estimateMemoryFromURL(_ url: URL) -> Int64 {
-        let filename = url.lastPathComponent.lowercased()
-        if filename.contains("7b") { return 7_000_000_000 }
-        if filename.contains("13b") { return 13_000_000_000 }
-        if filename.contains("3b") { return 3_000_000_000 }
-        if filename.contains("1b") { return 1_000_000_000 }
-        if filename.contains("500m") { return 500_000_000 }
-        if filename.contains("small") { return 500_000_000 }
-        if filename.contains("medium") { return 2_000_000_000 }
-        if filename.contains("large") { return 5_000_000_000 }
-        return 2_000_000_000
-    }
-
-    private func estimateMemoryUsage(fileSize: Int64, format: ModelFormat) -> Int64 {
-        switch format {
-        case .gguf: return fileSize
-        case .onnx, .ort: return Int64(Double(fileSize) * 1.2)
-        default: return Int64(Double(fileSize) * 1.5)
-        }
     }
 }
