@@ -111,12 +111,13 @@ public final class EventPublisher: @unchecked Sendable {
         lock.unlock()
     }
 
-    /// Initialize the event publisher with a remote telemetry data source.
+    /// Initialize the event publisher for the given environment.
     ///
     /// - Important: This should only be called by SDK initialization code.
     ///
-    /// - Parameter remoteDataSource: The data source for sending events to the backend
-    internal func initialize(remoteDataSource: RemoteTelemetryDataSource) {
+    /// - Parameter environment: The SDK environment
+    internal func initialize(environment: SDKEnvironment) {
+        let remoteDataSource = RemoteTelemetryDataSource(environment: environment)
         setAnalyticsHandler { event in
             Task {
                 await remoteDataSource.sendEvent(event)

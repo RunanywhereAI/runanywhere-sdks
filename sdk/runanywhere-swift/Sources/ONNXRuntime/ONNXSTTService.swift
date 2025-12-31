@@ -6,9 +6,9 @@
 //  This is a thin Swift wrapper around the rac_stt_onnx_* C APIs.
 //
 
-import CRABackendONNX
 import CRACommons
 import Foundation
+import ONNXBackend
 import os
 import RunAnywhere
 

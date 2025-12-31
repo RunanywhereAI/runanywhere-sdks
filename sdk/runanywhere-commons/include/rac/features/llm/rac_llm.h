@@ -11,7 +11,7 @@
 #ifndef RAC_LLM_H
 #define RAC_LLM_H
 
-#include "rac_llm_service.h"
-#include "rac_llm_types.h"
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_llm_types.h"
 
 #endif /* RAC_LLM_H */

@@ -12,7 +12,7 @@
 #define CRACOMMONS_H
 
 // =============================================================================
-// CORE - Types, Error, Platform
+// CORE - Types, Error, Platform, State
 // =============================================================================
 
 #include "rac_types.h"
@@ -24,6 +24,9 @@
 
 // Lifecycle management
 #include "rac_lifecycle.h"
+
+// SDK State (centralized state management)
+#include "rac_sdk_state.h"
 
 // =============================================================================
 // FEATURES - LLM, STT, TTS, VAD, Voice Agent
@@ -81,5 +84,23 @@
 #include "rac_model_types.h"
 #include "rac_model_paths.h"
 #include "rac_model_registry.h"
+
+// =============================================================================
+// NETWORK - Environment, Auth, API Types, Dev Config
+// =============================================================================
+
+#include "rac_environment.h"
+#include "rac_endpoints.h"
+#include "rac_api_types.h"
+#include "rac_http_client.h"
+#include "rac_auth_manager.h"
+#include "rac_dev_config.h"
+
+// =============================================================================
+// TELEMETRY - Event payloads, batching, manager
+// =============================================================================
+
+#include "rac_telemetry_types.h"
+#include "rac_telemetry_manager.h"
 
 #endif /* CRACOMMONS_H */

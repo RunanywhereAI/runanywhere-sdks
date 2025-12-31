@@ -1,22 +1,24 @@
+import CRACommons
 import Foundation
 
 /// Remote data source for sending telemetry data to API server
 /// Routes to correct analytics endpoint based on environment
+///
+/// Note: Most telemetry now flows through C++ (CppBridge.Telemetry).
+/// This class handles any remaining Swift-originated events.
 public actor RemoteTelemetryDataSource {
-    private let apiClient: APIClient?
     private let environment: SDKEnvironment
     private let logger = SDKLogger(category: "RemoteTelemetryDataSource")
     private let operationHelper = RemoteOperationHelper(timeout: 30.0)
 
-    public init(apiClient: APIClient?, environment: SDKEnvironment = .development) {
-        self.apiClient = apiClient
+    public init(environment: SDKEnvironment = .development) {
         self.environment = environment
     }
 
     // MARK: - Availability Check
 
     public func isAvailable() async -> Bool {
-        apiClient != nil
+        await CppBridge.HTTP.shared.isConfigured
     }
 
     // MARK: - Single Event Methods
@@ -36,7 +38,7 @@ public actor RemoteTelemetryDataSource {
 
     /// Send batch of typed telemetry payloads directly (preserves category → modality)
     public func sendPayloads(_ payloads: [TelemetryEventPayload]) async throws {
-        guard let apiClient = apiClient else {
+        guard await CppBridge.HTTP.shared.isConfigured else {
             throw SDKError.network(.serviceNotAvailable, "Remote telemetry data source not available")
         }
 
@@ -45,7 +47,9 @@ public actor RemoteTelemetryDataSource {
         }
 
         let typedEvents = payloads
-        let endpoint = APIEndpoint.telemetryEndpoint(for: environment)
+
+        // Get endpoint path from C++ based on environment
+        let path = String(cString: rac_endpoint_telemetry(environment.cEnvironment))
 
         // Development mode: Send array directly to Supabase REST API
         // Production mode: Send batch request wrapper to FastAPI backend
@@ -55,7 +59,7 @@ public actor RemoteTelemetryDataSource {
 
             // Supabase REST API expects array of rows: POST /rest/v1/table_name with body [{...}, {...}]
             let _: [TelemetryEventPayload] = try await operationHelper.withTimeout {
-                try await apiClient.post(endpoint, typedEvents, requiresAuth: false)
+                try await CppBridge.HTTP.shared.post(path, typedEvents, requiresAuth: false)
             }
             logger.debug("Sent \(typedEvents.count) events to Supabase")
         } else {
@@ -80,7 +84,7 @@ public actor RemoteTelemetryDataSource {
                 )
 
                 let response: TelemetryBatchResponse = try await operationHelper.withTimeout {
-                    try await apiClient.post(endpoint, batchRequest, requiresAuth: true)
+                    try await CppBridge.HTTP.shared.post(path, batchRequest, requiresAuth: true)
                 }
 
                 if !response.success {

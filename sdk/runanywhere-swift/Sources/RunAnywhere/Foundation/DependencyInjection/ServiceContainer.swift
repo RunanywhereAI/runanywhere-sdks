@@ -2,7 +2,9 @@ import Foundation
 
 /// Service container for dependency injection.
 /// Provides centralized access to SDK services.
-/// Note: Capabilities have been removed - use HandleManager for C++ component access.
+///
+/// Note: Network services (HTTP, Auth) are now handled by CppBridge.
+/// This container manages non-network services only.
 public class ServiceContainer {
     /// Shared instance
     public static let shared = ServiceContainer()
@@ -29,17 +31,6 @@ public class ServiceContainer {
     private(set) lazy var storageAnalyzer: StorageAnalyzer = {
         DefaultStorageAnalyzer(fileManager: fileManager, modelRegistry: modelRegistry)
     }()
-
-    // MARK: - Infrastructure
-
-    /// Network service (environment-based: mock or real)
-    public var networkService: (any NetworkService)?
-
-    /// Authentication service
-    public var authenticationService: AuthenticationService?
-
-    /// API client for network operations
-    public var apiClient: APIClient?
 
     // MARK: - Data Services
 
@@ -108,14 +99,10 @@ public class ServiceContainer {
         // Container is ready for lazy initialization
     }
 
-    // MARK: - Internal Setters (for bootstrap services)
+    // MARK: - Reset (for testing)
 
     /// Reset service container state (for testing)
     public func reset() {
-        // Reset services
-        authenticationService = nil
-        apiClient = nil
-        networkService = nil
         backingModelInfoService = nil
         _modelAssignmentService = nil
         _deviceRegistrationService = nil

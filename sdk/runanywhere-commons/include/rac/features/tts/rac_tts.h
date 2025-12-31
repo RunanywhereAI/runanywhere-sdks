@@ -11,7 +11,7 @@
 #ifndef RAC_TTS_H
 #define RAC_TTS_H
 
-#include "rac_tts_service.h"
-#include "rac_tts_types.h"
+#include "rac/features/tts/rac_tts_service.h"
+#include "rac/features/tts/rac_tts_types.h"
 
 #endif /* RAC_TTS_H */

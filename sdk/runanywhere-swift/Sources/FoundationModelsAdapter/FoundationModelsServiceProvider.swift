@@ -5,6 +5,7 @@
 //  Apple Foundation Models module providing LLM capabilities via Apple Intelligence.
 //
 
+import CRACommons
 import Foundation
 import OSLog
 import RunAnywhere
@@ -16,6 +17,9 @@ import RunAnywhere
 /// Provides large language model capabilities using Apple's
 /// built-in Foundation Models (Apple Intelligence) on iOS 26+ / macOS 26+.
 ///
+/// AppleAI registers with the C++ service registry via Swift callbacks,
+/// making it discoverable alongside C++ backends like LlamaCPP.
+///
 /// ## Registration
 ///
 /// ```swift
@@ -23,11 +27,7 @@ import RunAnywhere
 ///
 /// // Only available on iOS 26+ / macOS 26+
 /// if #available(iOS 26.0, macOS 26.0, *) {
-///     // Option 1: Direct registration
 ///     AppleAI.register()
-///
-///     // Option 2: Import module for auto-registration
-///     import FoundationModelsAdapter // Auto-registers via ModuleDiscovery
 /// }
 /// ```
 @available(iOS 26.0, macOS 26.0, *)
@@ -47,23 +47,78 @@ public enum AppleAI: RunAnywhereModule {
     /// Apple AI uses the Foundation Models inference framework
     public static let inferenceFramework: InferenceFramework = .foundationModels
 
-    /// Register Foundation Models LLM service with the SDK
+    // MARK: - Registration State
+
+    private static var isRegistered = false
+
+    /// Register Foundation Models LLM service with the C++ service registry.
+    ///
+    /// This registers AppleAI as a platform service in C++, making it
+    /// discoverable via `CppBridge.Services.listProviders(for: .llm)`.
     @MainActor
-    public static func register(priority: Int) {
-        ServiceRegistry.shared.registerLLM(
+    public static func register(priority: Int = 50) {
+        guard !isRegistered else { return }
+
+        logger.info("Registering AppleAI with C++ registry (priority: \(priority))...")
+
+        // Register module with C++ (for module discovery)
+        var moduleInfo = rac_module_info_t()
+        let version = "1.0.0"
+        let description = "Apple Intelligence Foundation Models"
+
+        moduleId.withCString { idPtr in
+            moduleName.withCString { namePtr in
+                version.withCString { versionPtr in
+                    description.withCString { descPtr in
+                        moduleInfo.id = idPtr
+                        moduleInfo.name = namePtr
+                        moduleInfo.version = versionPtr
+                        moduleInfo.description = descPtr
+
+                        let caps: [rac_capability_t] = [RAC_CAPABILITY_TEXT_GENERATION]
+                        caps.withUnsafeBufferPointer { capsPtr in
+                            moduleInfo.capabilities = capsPtr.baseAddress
+                            moduleInfo.num_capabilities = 1
+                            _ = rac_module_register(&moduleInfo)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Register service provider with C++ (via callbacks)
+        let success = CppBridge.Services.registerPlatformService(
             name: moduleName,
+            capability: .llm,
             priority: priority,
             canHandle: { modelId in
                 canHandleModel(modelId)
             },
-            factory: { config in
-                try await createService(config: config)
+            create: {
+                try await createService()
             }
         )
-        logger.info("Foundation Models LLM registered")
 
-        // Register the built-in Foundation Models as a model entry so it appears in model lists
-        registerBuiltInModel()
+        if success {
+            isRegistered = true
+            logger.info("✅ AppleAI registered with C++ registry")
+
+            // Register the built-in Foundation Models as a model entry
+            registerBuiltInModel()
+        } else {
+            logger.error("❌ Failed to register AppleAI with C++ registry")
+        }
+    }
+
+    /// Unregister Foundation Models module
+    public static func unregister() {
+        guard isRegistered else { return }
+
+        CppBridge.Services.unregisterPlatformService(name: moduleName, capability: .llm)
+        _ = moduleId.withCString { rac_module_unregister($0) }
+
+        isRegistered = false
+        logger.info("AppleAI unregistered")
     }
 
     /// Register the built-in Foundation Models as a model entry
@@ -120,13 +175,32 @@ public enum AppleAI: RunAnywhereModule {
     }
 }
 
-// MARK: - Auto-Discovery Registration
+// MARK: - Auto-Registration
 
 @available(iOS 26.0, macOS 26.0, *)
 extension AppleAI {
-    /// Enable auto-discovery for this module.
+    /// Enable auto-registration for this module.
     /// Access this property to trigger registration.
     public static let autoRegister: Void = {
-        ModuleDiscovery.register(AppleAI.self)
+        Task { @MainActor in
+            AppleAI.register()
+        }
     }()
+}
+
+// MARK: - Public API
+
+@available(iOS 26.0, macOS 26.0, *)
+extension AppleAI {
+    /// Check if this module can handle the given model ID
+    public static func canHandle(modelId: String?) -> Bool {
+        canHandleModel(modelId)
+    }
+
+    /// Create a FoundationModelsService instance
+    public static func createService() async throws -> FoundationModelsService {
+        let service = FoundationModelsService()
+        try await service.initialize(modelPath: "built-in")
+        return service
+    }
 }

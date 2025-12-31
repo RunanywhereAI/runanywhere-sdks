@@ -1,9 +1,0 @@
-module CRABackendONNX {
-    umbrella header "CRABackendONNX.h"
-
-    export *
-    module * { export * }
-
-    link framework "Accelerate"
-    link framework "CoreML"
-}

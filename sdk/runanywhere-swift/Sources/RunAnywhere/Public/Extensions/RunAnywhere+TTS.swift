@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Public API for Text-to-Speech operations.
-//  Calls C++ directly via HandleManager for all operations.
+//  Calls C++ directly via CapabilityManager for all operations.
 //  Events are emitted by C++ layer via CppEventBridge.
 //
 
@@ -34,7 +34,7 @@ public extension RunAnywhere {
             throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
         }
 
-        try await HandleManager.shared.loadTTSVoice(localPath.path, voiceId: voiceId)
+        try await CapabilityManager.shared.loadTTSVoice(localPath.path, voiceId: voiceId)
     }
 
     /// Unload the currently loaded TTS voice
@@ -43,13 +43,13 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        await HandleManager.shared.unloadTTS()
+        await CapabilityManager.shared.unloadTTS()
     }
 
     /// Check if a TTS voice is loaded
     static var isTTSVoiceLoaded: Bool {
         get async {
-            await HandleManager.shared.isTTSLoaded
+            await CapabilityManager.shared.isTTSLoaded
         }
     }
 
@@ -77,13 +77,13 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await HandleManager.shared.getTTSHandle()
+        let handle = try await CapabilityManager.shared.getTTSHandle()
 
-        guard await HandleManager.shared.isTTSLoaded else {
+        guard await CapabilityManager.shared.isTTSLoaded else {
             throw SDKError.tts(.notInitialized, "TTS voice not loaded")
         }
 
-        let voiceId = await HandleManager.shared.currentTTSVoiceId ?? "unknown"
+        let voiceId = await CapabilityManager.shared.currentTTSVoiceId ?? "unknown"
         let startTime = Date()
 
         // Build C options
@@ -149,13 +149,13 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await HandleManager.shared.getTTSHandle()
+        let handle = try await CapabilityManager.shared.getTTSHandle()
 
-        guard await HandleManager.shared.isTTSLoaded else {
+        guard await CapabilityManager.shared.isTTSLoaded else {
             throw SDKError.tts(.notInitialized, "TTS voice not loaded")
         }
 
-        let voiceId = await HandleManager.shared.currentTTSVoiceId ?? "unknown"
+        let voiceId = await CapabilityManager.shared.currentTTSVoiceId ?? "unknown"
         let startTime = Date()
         var totalAudioData = Data()
 
@@ -215,7 +215,7 @@ public extension RunAnywhere {
 
     /// Stop current TTS synthesis
     static func stopSynthesis() async {
-        guard let handle = try? await HandleManager.shared.getTTSHandle() else { return }
+        guard let handle = try? await CapabilityManager.shared.getTTSHandle() else { return }
         rac_tts_component_stop(handle)
     }
 

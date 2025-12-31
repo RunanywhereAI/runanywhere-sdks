@@ -38,16 +38,13 @@ public actor ModelAssignmentService {
         // Use centralized device info
         let deviceInfo = DeviceInfo.current
 
-        // Create the endpoint with parameters
-        let endpoint = APIEndpoint.modelAssignments(
-            deviceType: deviceInfo.deviceType,
-            platform: deviceInfo.platform
-        )
+        // Build path with query parameters
+        let path = "/api/v1/model-assignments/for-sdk?device_type=\(deviceInfo.deviceType)&platform=\(deviceInfo.platform)"
 
         do {
             // Fetch from network service (works with both mock and real)
             let response: ModelAssignmentResponse = try await networkService.get(
-                endpoint,
+                path,
                 requiresAuth: true
             )
 

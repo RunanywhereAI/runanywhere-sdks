@@ -11,7 +11,7 @@
 #ifndef RAC_VAD_H
 #define RAC_VAD_H
 
-#include "rac_vad_service.h"
-#include "rac_vad_types.h"
+#include "rac/features/vad/rac_vad_service.h"
+#include "rac/features/vad/rac_vad_types.h"
 
 #endif /* RAC_VAD_H */

@@ -12,9 +12,8 @@
 #ifndef RAC_STT_SERVICE_H
 #define RAC_STT_SERVICE_H
 
-#include "rac_stt_types.h"
-
 #include "rac_error.h"
+#include "rac_stt_types.h"
 
 #ifdef __cplusplus
 extern "C" {

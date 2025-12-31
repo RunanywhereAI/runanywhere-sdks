@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Public API for Voice Activity Detection operations.
-//  Calls C++ directly via HandleManager for all operations.
+//  Calls C++ directly via CapabilityManager for all operations.
 //  Events are emitted by C++ layer via CppEventBridge.
 //
 
@@ -13,7 +13,7 @@ import Foundation
 
 // MARK: - VAD State Storage
 
-/// Internal actor for managing VAD-specific state that can't be in HandleManager
+/// Internal actor for managing VAD-specific state that can't be in CapabilityManager
 private actor VADStateManager {
     static let shared = VADStateManager()
 
@@ -50,7 +50,7 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        try await HandleManager.shared.initializeVAD(sampleRate: 16000, channels: 1)
+        try await CapabilityManager.shared.initializeVAD(sampleRate: 16000, channels: 1)
     }
 
     /// Initialize VAD with configuration
@@ -61,7 +61,7 @@ public extension RunAnywhere {
         }
 
         // Get handle and configure
-        let handle = try await HandleManager.shared.getVADHandle()
+        let handle = try await CapabilityManager.shared.getVADHandle()
 
         var cConfig = rac_vad_config_t()
         cConfig.sample_rate = Int32(config.sampleRate)
@@ -83,7 +83,7 @@ public extension RunAnywhere {
     /// Check if VAD is ready
     static var isVADReady: Bool {
         get async {
-            await HandleManager.shared.isVADInitialized
+            await CapabilityManager.shared.isVADInitialized
         }
     }
 
@@ -116,7 +116,7 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await HandleManager.shared.getVADHandle()
+        let handle = try await CapabilityManager.shared.getVADHandle()
 
         var hasVoice: rac_bool_t = RAC_FALSE
         let result = samples.withUnsafeBufferPointer { buffer in
@@ -146,7 +146,7 @@ public extension RunAnywhere {
 
     /// Start VAD processing
     static func startVAD() async throws {
-        let handle = try await HandleManager.shared.getVADHandle()
+        let handle = try await CapabilityManager.shared.getVADHandle()
         let result = rac_vad_component_start(handle)
         guard result == RAC_SUCCESS else {
             throw SDKError.vad(.startFailed, "Failed to start VAD: \(result)")
@@ -155,7 +155,7 @@ public extension RunAnywhere {
 
     /// Stop VAD processing
     static func stopVAD() async throws {
-        let handle = try await HandleManager.shared.getVADHandle()
+        let handle = try await CapabilityManager.shared.getVADHandle()
         let result = rac_vad_component_stop(handle)
         if result != RAC_SUCCESS {
             // Log warning but don't throw
@@ -169,7 +169,7 @@ public extension RunAnywhere {
     static func setVADSpeechActivityCallback(_ callback: @escaping (SpeechActivityEvent) -> Void) async {
         await VADStateManager.shared.setOnSpeechActivity(callback)
 
-        guard let handle = try? await HandleManager.shared.getVADHandle() else { return }
+        guard let handle = try? await CapabilityManager.shared.getVADHandle() else { return }
 
         // Create callback context
         let context = VADCallbackContext(onActivity: callback)
@@ -198,7 +198,7 @@ public extension RunAnywhere {
 
     /// Cleanup VAD resources
     static func cleanupVAD() async {
-        await HandleManager.shared.cleanupVAD()
+        await CapabilityManager.shared.cleanupVAD()
         await VADStateManager.shared.setOnSpeechActivity(nil)
         await VADStateManager.shared.setOnAudioBuffer(nil)
         await VADStateManager.shared.setCallbackContext(nil)
