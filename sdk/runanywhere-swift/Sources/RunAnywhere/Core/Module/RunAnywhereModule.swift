@@ -11,8 +11,8 @@ import Foundation
 /// Protocol for SDK modules that provide AI capabilities.
 ///
 /// Modules encapsulate backend-specific functionality and register
-/// service providers with the SDK. Each module typically provides
-/// one or more capabilities (LLM, STT, TTS, VAD).
+/// service providers with the C++ commons layer. Each module typically
+/// provides one or more capabilities (LLM, STT, TTS, VAD).
 ///
 /// ## Implementing a Module
 ///
@@ -26,12 +26,9 @@ import Foundation
 ///
 ///     @MainActor
 ///     public static func register(priority: Int) {
-///         ServiceRegistry.shared.registerLLM(
-///             name: moduleName,
-///             priority: priority,
-///             canHandle: { modelId in canHandleModel(modelId) },
-///             factory: { config in try await createService(config: config) }
-///         )
+///         // Register with C++ backend
+///         let result = rac_backend_mymodule_register()
+///         guard result == RAC_SUCCESS else { return }
 ///     }
 /// }
 /// ```
@@ -43,7 +40,9 @@ import Foundation
 /// ```swift
 /// extension MyModule {
 ///     public static let autoRegister: Void = {
-///         ModuleDiscovery.register(MyModule.self)
+///         Task { @MainActor in
+///             MyModule.register()
+///         }
 ///     }()
 /// }
 /// ```

@@ -11,7 +11,7 @@
 #ifndef RAC_STT_H
 #define RAC_STT_H
 
-#include "rac_stt_service.h"
-#include "rac_stt_types.h"
+#include "rac/features/stt/rac_stt_service.h"
+#include "rac/features/stt/rac_stt_types.h"
 
 #endif /* RAC_STT_H */

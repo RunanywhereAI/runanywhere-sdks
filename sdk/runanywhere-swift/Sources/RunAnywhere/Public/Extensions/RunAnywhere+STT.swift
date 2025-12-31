@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Public API for Speech-to-Text operations.
-//  Calls C++ directly via HandleManager for all operations.
+//  Calls C++ directly via CapabilityManager for all operations.
 //  Events are emitted by C++ layer via CppEventBridge.
 //
 
@@ -38,13 +38,13 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        await HandleManager.shared.unloadSTT()
+        await CapabilityManager.shared.unloadSTT()
     }
 
     /// Check if an STT model is loaded
     static var isSTTModelLoaded: Bool {
         get async {
-            await HandleManager.shared.isSTTLoaded
+            await CapabilityManager.shared.isSTTLoaded
         }
     }
 
@@ -63,14 +63,14 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        // Get handle from HandleManager
-        let handle = try await HandleManager.shared.getSTTHandle()
+        // Get handle from CapabilityManager
+        let handle = try await CapabilityManager.shared.getSTTHandle()
 
-        guard await HandleManager.shared.isSTTLoaded else {
+        guard await CapabilityManager.shared.isSTTLoaded else {
             throw SDKError.stt(.notInitialized, "STT model not loaded")
         }
 
-        let modelId = await HandleManager.shared.currentSTTModelId ?? "unknown"
+        let modelId = await CapabilityManager.shared.currentSTTModelId ?? "unknown"
         let startTime = Date()
 
         // Calculate audio metrics
@@ -196,17 +196,17 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await HandleManager.shared.getSTTHandle()
+        let handle = try await CapabilityManager.shared.getSTTHandle()
 
-        guard await HandleManager.shared.isSTTLoaded else {
+        guard await CapabilityManager.shared.isSTTLoaded else {
             throw SDKError.stt(.notInitialized, "STT model not loaded")
         }
 
-        guard await HandleManager.shared.sttSupportsStreaming else {
+        guard await CapabilityManager.shared.sttSupportsStreaming else {
             throw SDKError.stt(.streamingNotSupported, "Model does not support streaming")
         }
 
-        let modelId = await HandleManager.shared.currentSTTModelId ?? "unknown"
+        let modelId = await CapabilityManager.shared.currentSTTModelId ?? "unknown"
         let startTime = Date()
 
         // Create context for callback bridging
@@ -282,7 +282,7 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await HandleManager.shared.getSTTHandle()
+        let handle = try await CapabilityManager.shared.getSTTHandle()
 
         var cOptions = rac_stt_options_t()
         cOptions.sample_rate = Int32(RAC_STT_DEFAULT_SAMPLE_RATE)

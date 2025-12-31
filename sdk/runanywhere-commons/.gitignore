@@ -54,3 +54,6 @@ Thumbs.db
 *.tmp
 *.swp
 *~
+
+# Development config with secrets (use .template file)
+src/infrastructure/network/development_config.cpp

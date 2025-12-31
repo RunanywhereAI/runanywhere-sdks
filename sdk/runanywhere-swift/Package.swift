@@ -43,6 +43,7 @@ let package = Package(
 
         // =================================================================
         // ONNX Runtime Backend - adds STT/TTS/VAD capabilities
+        // Single unified module (C headers + Swift)
         // =================================================================
         .library(
             name: "RunAnywhereONNX",
@@ -51,7 +52,7 @@ let package = Package(
 
         // =================================================================
         // LlamaCPP Backend - adds LLM text generation
-        // Uses GGUF models with Metal acceleration
+        // Single unified module (C headers + Swift)
         // =================================================================
         .library(
             name: "RunAnywhereLlamaCPP",
@@ -74,8 +75,6 @@ let package = Package(
         .package(url: "https://github.com/JohnSundell/Files.git", from: "4.3.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
-        // Temporarily disabled to debug build issues
-        // .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.57.1"),
         // SWCompression for pure Swift tar.bz2/tar.gz extraction
         .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
         // Sentry for crash reporting and error tracking
@@ -83,10 +82,9 @@ let package = Package(
     ],
     targets: [
         // =================================================================
-        // C Bridge Modules - Expose runanywhere-commons C APIs to Swift
+        // C Bridge Module - Core Commons
+        // Exposes runanywhere-commons C APIs to Swift
         // =================================================================
-
-        // CRACommons - Core commons C API bridge
         .target(
             name: "CRACommons",
             dependencies: ["RACommonsBinary"],
@@ -94,20 +92,26 @@ let package = Package(
             publicHeadersPath: "include"
         ),
 
-        // CRABackendLlamaCPP - LlamaCPP backend C API bridge
+        // =================================================================
+        // C Bridge Module - LlamaCPP Backend Headers
+        // Exposes LlamaCPP backend C APIs
+        // =================================================================
         .target(
-            name: "CRABackendLlamaCPP",
+            name: "LlamaCPPBackend",
             dependencies: ["RABackendLlamaCPPBinary"],
-            path: "Sources/CRABackendLlamaCPP",
-            publicHeadersPath: "include"
+            path: "Sources/LlamaCPPRuntime/include",
+            publicHeadersPath: "."
         ),
 
-        // CRABackendONNX - ONNX backend C API bridge
+        // =================================================================
+        // C Bridge Module - ONNX Backend Headers
+        // Exposes ONNX backend C APIs
+        // =================================================================
         .target(
-            name: "CRABackendONNX",
+            name: "ONNXBackend",
             dependencies: ["RABackendONNXBinary", "ONNXRuntimeBinary"],
-            path: "Sources/CRABackendONNX",
-            publicHeadersPath: "include"
+            path: "Sources/ONNXRuntime/include",
+            publicHeadersPath: "."
         ),
 
         // =================================================================
@@ -123,7 +127,7 @@ let package = Package(
                 .product(name: "DeviceKit", package: "DeviceKit"),
                 .product(name: "SWCompression", package: "SWCompression"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
-                // Link to new commons C bridge (RACommonsBinary is transitive via CRACommons)
+                // Link to commons C bridge
                 "CRACommons",
             ],
             path: "Sources/RunAnywhere",
@@ -136,16 +140,18 @@ let package = Package(
         ),
 
         // =================================================================
-        // ONNX Runtime Backend
+        // ONNX Runtime Backend (Unified Module)
+        // C headers in include/, Swift sources in root
         // Provides: STT (streaming), TTS, VAD
         // =================================================================
         .target(
             name: "ONNXRuntime",
             dependencies: [
                 "RunAnywhere",
-                "CRABackendONNX",
+                "ONNXBackend",  // C headers
             ],
             path: "Sources/ONNXRuntime",
+            exclude: ["include"],  // Exclude include/ from Swift sources
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
@@ -164,16 +170,18 @@ let package = Package(
         ),
 
         // =================================================================
-        // LlamaCPP Runtime Backend
+        // LlamaCPP Runtime Backend (Unified Module)
+        // C headers in include/, Swift sources in root
         // Provides: Text Generation (LLM) with GGUF models
         // =================================================================
         .target(
             name: "LlamaCPPRuntime",
             dependencies: [
                 "RunAnywhere",
-                "CRABackendLlamaCPP",
+                "LlamaCPPBackend",  // C headers
             ],
             path: "Sources/LlamaCPPRuntime",
+            exclude: ["include"],  // Exclude include/ from Swift sources
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
@@ -206,8 +214,6 @@ let package = Package(
 func binaryTargets() -> [Target] {
     if testLocal {
         // Local development mode: Use XCFrameworks from Binaries/ directory
-        // NOTE: You must build XCFrameworks using runanywhere-commons build scripts
-        // or download from releases to use this mode
         return [
             // Core commons library (~1-2MB)
             .binaryTarget(
@@ -232,7 +238,6 @@ func binaryTargets() -> [Target] {
         ]
     } else {
         // Production mode (default): Download from GitHub releases
-        // NOTE: Update URLs and checksums when new releases are published
         return [
             // Core commons library
             .binaryTarget(

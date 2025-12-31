@@ -126,13 +126,8 @@ struct RunAnywhereAIApp: App {
         logger.info("📦 Registering modules with their models...")
 
         // Register LlamaCPP backend with C++ commons
-        do {
-            try LlamaCPPRuntime.registerBackend()
-            LlamaCPP.register(priority: 100)
-            logger.info("✅ LlamaCPP backend registered")
-        } catch {
-            logger.error("❌ Failed to register LlamaCPP backend: \(error)")
-        }
+        LlamaCPP.register(priority: 100)
+        logger.info("✅ LlamaCPP backend registered")
 
         // Register ONNX backend service providers
         ONNX.register(priority: 100)

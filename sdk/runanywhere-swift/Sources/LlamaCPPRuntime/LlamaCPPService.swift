@@ -6,9 +6,9 @@
 //  This is a thin Swift wrapper around the rac_llm_llamacpp_* C APIs.
 //
 
-import CRABackendLlamaCPP
 import CRACommons
 import Foundation
+import LlamaCPPBackend
 import os
 import RunAnywhere
 

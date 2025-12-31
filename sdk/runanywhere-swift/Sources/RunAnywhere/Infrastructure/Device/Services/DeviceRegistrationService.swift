@@ -2,23 +2,20 @@
 //  DeviceRegistrationService.swift
 //  RunAnywhere SDK
 //
-//  Unified service for device registration and device info across all environments
-//  Uses NetworkService for all network calls
+//  Device registration service using C++ JSON building via CppBridge.Device
 //
 
+import CRACommons
 import Foundation
 
-/// Unified service for device registration with backend
-/// Handles registration for development, staging, and production environments
-/// Uses NetworkService (APIClient) for network calls
-/// Device UUID is managed by DeviceIdentity (Keychain-persisted)
+/// Service for device registration with backend
+/// Uses CppBridge.Device for JSON building (C++ is source of truth)
+/// Swift only handles HTTP transport via URLSession
 public actor DeviceRegistrationService {
 
     // MARK: - Properties
 
     private let logger = SDKLogger(category: "DeviceRegistration")
-
-    /// Key for tracking registration status
     private static let registeredKey = "com.runanywhere.sdk.deviceRegistered"
 
     // MARK: - Initialization
@@ -28,26 +25,19 @@ public actor DeviceRegistrationService {
     // MARK: - Device Info API
 
     /// Get current device information
-    /// Returns fresh data each time
-    public var currentDeviceInfo: DeviceInfo {
-        DeviceInfo.current
-    }
+    public var currentDeviceInfo: DeviceInfo { DeviceInfo.current }
 
     /// Get the persistent device ID (Keychain-stored UUID)
-    public var deviceId: String {
-        DeviceIdentity.persistentUUID
-    }
+    public var deviceId: String { DeviceIdentity.persistentUUID }
 
     // MARK: - Registration API
 
     /// Register device with backend if not already registered
-    /// Uses NetworkService for network calls
-    /// Works for all environments: development, staging, and production
+    /// Uses CppBridge.Device for JSON building, Swift for HTTP
     public func registerIfNeeded(
         networkService: any NetworkService,
         environment: SDKEnvironment
     ) async {
-        // Skip if already registered
         guard !isRegistered else {
             logger.debug("Device already registered, skipping")
             return
@@ -56,14 +46,24 @@ public actor DeviceRegistrationService {
         let deviceId = DeviceIdentity.persistentUUID
 
         do {
-            let request = DeviceRegistrationRequest.fromCurrentDevice()
-            let endpoint = APIEndpoint.deviceRegistrationEndpoint(for: environment)
+            // C++ builds the JSON with C++ build token
+            let buildToken = environment == .development ? CppBridge.DevConfig.buildToken : nil
+            guard let json = CppBridge.Device.buildRegistrationJSON(buildToken: buildToken) else {
+                throw SDKError.general(.validationFailed, "Failed to build registration JSON")
+            }
 
-            // Use NetworkService for the request
-            // Development mode uses build token, staging/production use JWT
-            let _: DeviceRegistrationResponse = try await networkService.post(
-                endpoint,
-                request,
+            // Get endpoint from C++
+            let path = CppBridge.Endpoints.deviceRegistration(for: environment)
+
+            // Swift makes HTTP call
+            guard let data = json.data(using: .utf8) else {
+                throw SDKError.general(.validationFailed, "Failed to encode JSON")
+            }
+
+            // Development uses API key auth, staging/production use JWT
+            let _: Data = try await networkService.postRaw(
+                path,
+                data,
                 requiresAuth: environment != .development
             )
 
@@ -72,7 +72,6 @@ public actor DeviceRegistrationService {
             logger.info("Device registration successful")
 
         } catch {
-            // Registration failure is non-critical - log and continue
             EventPublisher.shared.track(DeviceEvent.registrationFailed(error: SDKError.from(error, category: .network)))
             logger.warning("Device registration failed: \(error.localizedDescription)")
         }

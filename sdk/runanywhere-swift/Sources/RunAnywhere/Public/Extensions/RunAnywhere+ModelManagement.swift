@@ -22,7 +22,7 @@ extension RunAnywhere {
             throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded")
         }
 
-        try await HandleManager.shared.loadLLMModel(localPath.path, modelId: modelId)
+        try await CapabilityManager.shared.loadLLMModel(localPath.path, modelId: modelId)
     }
 
     /// Unload the currently loaded LLM model
@@ -31,13 +31,13 @@ extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        await HandleManager.shared.unloadLLM()
+        await CapabilityManager.shared.unloadLLM()
     }
 
     /// Check if an LLM model is loaded
     public static var isModelLoaded: Bool {
         get async {
-            await HandleManager.shared.isLLMLoaded
+            await CapabilityManager.shared.isLLMLoaded
         }
     }
 
@@ -73,7 +73,7 @@ extension RunAnywhere {
             throw SDKError.stt(.modelNotFound, "Model '\(modelId)' is not downloaded")
         }
 
-        try await HandleManager.shared.loadSTTModel(localPath.path, modelId: modelId)
+        try await CapabilityManager.shared.loadSTTModel(localPath.path, modelId: modelId)
     }
 
     /// Load a TTS (Text-to-Speech) voice by ID
@@ -95,7 +95,7 @@ extension RunAnywhere {
             throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
         }
 
-        try await HandleManager.shared.loadTTSVoice(localPath.path, voiceId: voiceId)
+        try await CapabilityManager.shared.loadTTSVoice(localPath.path, voiceId: voiceId)
     }
 
     /// Get available models
@@ -109,7 +109,7 @@ extension RunAnywhere {
     /// - Returns: Currently loaded model ID if any
     public static func getCurrentModelId() async -> String? {
         guard isInitialized else { return nil }
-        return await HandleManager.shared.currentLLMModelId
+        return await CapabilityManager.shared.currentLLMModelId
     }
 
     /// Get the currently loaded LLM model as ModelInfo
@@ -132,7 +132,7 @@ extension RunAnywhere {
     public static var currentSTTModel: ModelInfo? {
         get async {
             guard isInitialized else { return nil }
-            guard let modelId = await HandleManager.shared.currentSTTModelId else { return nil }
+            guard let modelId = await CapabilityManager.shared.currentSTTModelId else { return nil }
             let models = (try? await availableModels()) ?? []
             return models.first { $0.id == modelId }
         }
@@ -145,7 +145,7 @@ extension RunAnywhere {
     public static var currentTTSVoiceId: String? {
         get async {
             guard isInitialized else { return nil }
-            return await HandleManager.shared.currentTTSVoiceId
+            return await CapabilityManager.shared.currentTTSVoiceId
         }
     }
 
@@ -155,6 +155,6 @@ extension RunAnywhere {
     /// or explicitly requests cancellation.
     public static func cancelGeneration() async {
         guard isInitialized else { return }
-        await HandleManager.shared.cancelLLM()
+        await CapabilityManager.shared.cancelLLM()
     }
 }

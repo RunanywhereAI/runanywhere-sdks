@@ -121,6 +121,7 @@ set(RAC_CORE_SOURCES
     src/core/rac_audio_utils.cpp
     src/core/component_types.cpp
     src/core/events.cpp
+    src/core/sdk_state.cpp
     src/core/capabilities/lifecycle_manager.cpp
 )
 
@@ -133,6 +134,17 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_registry.cpp
     src/infrastructure/model_management/model_types.cpp
     src/infrastructure/model_management/model_paths.cpp
+    # Network / Data layer (maps to Swift Data/)
+    src/infrastructure/network/environment.cpp
+    src/infrastructure/network/endpoints.cpp
+    src/infrastructure/network/api_types.cpp
+    src/infrastructure/network/http_client.cpp
+    src/infrastructure/network/auth_manager.cpp
+    src/infrastructure/network/development_config.cpp
+    # Telemetry (maps to Swift Analytics/)
+    src/infrastructure/telemetry/telemetry_types.cpp
+    src/infrastructure/telemetry/telemetry_json.cpp
+    src/infrastructure/telemetry/telemetry_manager.cpp
 )
 
 # Feature sources (maps to Swift Features/)
@@ -202,20 +214,37 @@ endif()
 # =============================================================================
 # BACKEND MODULES
 # =============================================================================
+#
+# Backend libraries provide specific ML inference implementations:
+# - llamacpp: LLM text generation (GGUF models via llama.cpp)
+# - onnx: STT, TTS, VAD (ONNX Runtime models)
+# - whispercpp: STT (Whisper.cpp models)
+#
+# Each backend:
+# 1. Links against rac_commons for service registration
+# 2. Links against runanywhere-core for low-level inference
+# 3. Builds into a static library (.a) or xcframework
+#
 
 if(RAC_BUILD_LLAMACPP)
-    message(STATUS "Building LlamaCpp backend module")
-    add_subdirectory(backends/llamacpp)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/llamacpp/CMakeLists.txt")
+        message(STATUS "Building LlamaCpp backend")
+        add_subdirectory(backends/llamacpp)
+    endif()
 endif()
 
 if(RAC_BUILD_ONNX)
-    message(STATUS "Building ONNX backend module")
-    add_subdirectory(backends/onnx)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/onnx/CMakeLists.txt")
+        message(STATUS "Building ONNX backend")
+        add_subdirectory(backends/onnx)
+    endif()
 endif()
 
 if(RAC_BUILD_WHISPERCPP)
-    message(STATUS "Building WhisperCpp backend module")
-    add_subdirectory(backends/whispercpp)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/whispercpp/CMakeLists.txt")
+        message(STATUS "Building WhisperCpp backend")
+        add_subdirectory(backends/whispercpp)
+    endif()
 endif()
 
 # =============================================================================

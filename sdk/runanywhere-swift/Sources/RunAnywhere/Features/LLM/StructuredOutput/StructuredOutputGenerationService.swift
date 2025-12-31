@@ -4,7 +4,7 @@ import Foundation
 // MARK: - Structured Output Generation Service
 
 /// Service for generating structured output from LLMs.
-/// Uses HandleManager directly to call C++ layer.
+/// Uses CapabilityManager directly to call C++ layer.
 public final class StructuredOutputGenerationService {
 
     private let handler: StructuredOutputHandler
@@ -47,8 +47,8 @@ public final class StructuredOutputGenerationService {
         // Build user prompt
         let userPrompt = handler.buildUserPrompt(for: type, content: prompt)
 
-        // Generate the text directly via HandleManager → C++
-        let generationResult = try await generateViaHandleManager(userPrompt, options: effectiveOptions)
+        // Generate the text directly via CapabilityManager → C++
+        let generationResult = try await generateViaCapabilityManager(userPrompt, options: effectiveOptions)
 
         // Parse using StructuredOutputHandler
         let result = try handler.parseStructuredOutput(
@@ -59,15 +59,15 @@ public final class StructuredOutputGenerationService {
         return result
     }
 
-    /// Internal: Generate via HandleManager (calls C++ directly)
-    private func generateViaHandleManager(_ prompt: String, options: LLMGenerationOptions) async throws -> LLMGenerationResult {
-        let handle = try await HandleManager.shared.getLLMHandle()
+    /// Internal: Generate via CapabilityManager (calls C++ directly)
+    private func generateViaCapabilityManager(_ prompt: String, options: LLMGenerationOptions) async throws -> LLMGenerationResult {
+        let handle = try await CapabilityManager.shared.getLLMHandle()
 
-        guard await HandleManager.shared.isLLMLoaded else {
+        guard await CapabilityManager.shared.isLLMLoaded else {
             throw SDKError.llm(.notInitialized, "LLM model not loaded")
         }
 
-        let modelId = await HandleManager.shared.currentLLMModelId ?? "unknown"
+        let modelId = await CapabilityManager.shared.currentLLMModelId ?? "unknown"
         let startTime = Date()
 
         // Build C options
@@ -118,7 +118,7 @@ public final class StructuredOutputGenerationService {
         content: String,
         options: LLMGenerationOptions? = nil
     ) -> StructuredOutputStreamResult<T> {
-        // Internal stream generator that calls HandleManager directly
+        // Internal stream generator that calls CapabilityManager directly
         let streamGenerator: (String, LLMGenerationOptions) async throws -> LLMStreamingResult = { prompt, opts in
             try await RunAnywhere.generateStream(prompt, options: opts)
         }
@@ -240,6 +240,6 @@ public final class StructuredOutputGenerationService {
             systemPrompt: baseOptions.systemPrompt
         )
 
-        return try await generateViaHandleManager(prompt, options: internalOptions)
+        return try await generateViaCapabilityManager(prompt, options: internalOptions)
     }
 }

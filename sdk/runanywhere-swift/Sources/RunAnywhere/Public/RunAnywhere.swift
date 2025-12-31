@@ -114,25 +114,30 @@ public enum RunAnywhere {
 
     /// Get current user ID from authentication
     /// - Returns: User ID if authenticated, nil otherwise
-    public static func getUserId() async -> String? {
-        guard isInitialized, let authService = serviceContainer.authenticationService else {
-            return nil
-        }
-        return await authService.getUserId()
+    public static func getUserId() -> String? {
+        CppBridge.State.userId
     }
 
     /// Get current organization ID from authentication
     /// - Returns: Organization ID if authenticated, nil otherwise
-    public static func getOrganizationId() async -> String? {
-        guard isInitialized, let authService = serviceContainer.authenticationService else {
-            return nil
-        }
-        return await authService.getOrganizationId()
+    public static func getOrganizationId() -> String? {
+        CppBridge.State.organizationId
+    }
+
+    /// Check if currently authenticated
+    /// - Returns: true if authenticated with valid token
+    public static var isAuthenticated: Bool {
+        CppBridge.State.isAuthenticated
     }
 
     /// Check if device is registered with backend
     public static func isDeviceRegistered() async -> Bool {
-        await serviceContainer.deviceRegistrationService.isRegistered
+        // First try C++ state
+        if CppBridge.State.isDeviceRegistered {
+            return true
+        }
+        // Fallback to Swift service
+        return await serviceContainer.deviceRegistrationService.isRegistered
     }
 
     // MARK: - SDK Reset (Testing)
@@ -147,6 +152,10 @@ public enum RunAnywhere {
         hasCompletedServicesInit = false
         initParams = nil
         currentEnvironment = nil
+
+        // Shutdown all C++ bridges and state
+        CppBridge.shutdown()
+        CppBridge.State.shutdown()
 
         serviceContainer.reset()
 
@@ -247,11 +256,8 @@ public enum RunAnywhere {
         // This must happen early so all C++ logs (from runanywhere-core) route to SDKLogger
         SwiftPlatformAdapter.shared.register()
 
-        // Step 3.5: Register C++ event bridge for analytics
-        // C++ is the canonical source of truth for all analytics events
-        CppEventBridge.shared.register()
-
         // Now safe to create logger and track events
+        // Note: C++ event bridge is registered by CppBridge.initialize() in Step 3
         let logger = SDKLogger(category: "RunAnywhere.Init")
         EventPublisher.shared.track(SDKLifecycleEvent.initStarted)
 
@@ -265,7 +271,7 @@ public enum RunAnywhere {
             // Mark Phase 1 complete
             isInitialized = true
 
-            // Register built-in modules for discovery (actual ServiceRegistry registration in Phase 2)
+            // Register built-in modules (SystemTTS is platform-only fallback)
             _ = SystemTTS.autoRegister
 
             let initDurationMs = (CFAbsoluteTimeGetCurrent() - initStartTime) * 1000
@@ -322,48 +328,46 @@ public enum RunAnywhere {
 
         let logger = SDKLogger(category: "RunAnywhere.Services")
 
-        // Register all discovered modules with ServiceRegistry (SystemTTS, etc.)
-        // This must happen before any capability usage
-        await MainActor.run {
-            ModuleDiscovery.registerPendingModules()
-        }
+        // Modules are now auto-registered via their autoRegister property
+        // C++ backends (LlamaCPP, ONNX) call rac_backend_*_register()
+        // Platform-only modules (SystemTTS) are available as fallbacks
 
         // Check if services need initialization
-        let needsInit = environment == .development
-            ? serviceContainer.networkService == nil
-            : serviceContainer.authenticationService == nil
-
-        let apiClient: APIClient?
+        let needsInit = await !CppBridge.HTTP.shared.isConfigured
 
         if needsInit {
             logger.info("Initializing services for \(environment.description) mode...")
 
-            // Step 1: Setup API client
-            apiClient = try await setupAPIClient(params: params, environment: environment, logger: logger)
+            // Step 1: Configure HTTP transport (unified in CppBridge)
+            try await setupHTTP(params: params, environment: environment, logger: logger)
 
             // Step 2: Create model services
             await setupModelServices(logger: logger)
-        } else {
-            apiClient = serviceContainer.apiClient
         }
 
-        // Step 3: Initialize telemetry (fire-and-forget to backend)
-        if let client = apiClient ?? serviceContainer.apiClient {
-            let remoteDataSource = RemoteTelemetryDataSource(apiClient: client, environment: environment)
-            EventPublisher.shared.initialize(remoteDataSource: remoteDataSource)
-            logger.debug("Telemetry initialized")
-        }
+        // Step 3: Initialize C++ state and bridges
+        CppBridge.State.initialize(
+            environment: environment,
+            apiKey: params.apiKey,
+            baseURL: params.baseURL,
+            deviceId: DeviceIdentity.persistentUUID
+        )
+
+        // Initialize telemetry and events bridges
+        CppBridge.initialize(environment: environment)
+
+        // Initialize EventPublisher for Swift-originated events
+        EventPublisher.shared.initialize(environment: environment)
+        logger.debug("C++ state and bridges initialized")
 
         // Step 4: Initialize model registry
         await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
 
-        // Step 5: Register device
-        if let networkService = serviceContainer.networkService {
-            await serviceContainer.deviceRegistrationService.registerIfNeeded(
-                networkService: networkService,
-                environment: environment
-            )
-        }
+        // Step 5: Register device via CppBridge
+        await serviceContainer.deviceRegistrationService.registerIfNeeded(
+            networkService: CppBridge.HTTP.shared,
+            environment: environment
+        )
 
         // Mark Phase 2 complete
         hasCompletedServicesInit = true
@@ -382,39 +386,30 @@ public enum RunAnywhere {
     // MARK: - Private: Service Setup Helpers
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Setup API client based on environment
-    private static func setupAPIClient(
+    /// Setup HTTP transport via CppBridge.HTTP
+    private static func setupHTTP(
         params: SDKInitParams,
         environment: SDKEnvironment,
         logger: SDKLogger
-    ) async throws -> APIClient {
-        let apiClient: APIClient
-
+    ) async throws {
         switch environment {
         case .development:
-            if let devConfig = DevelopmentNetworkConfig.shared {
-                apiClient = devConfig.createAPIClient()
-                logger.debug("APIClient: Supabase (development)")
+            // Use C++ development config for Supabase (cross-platform)
+            if await CppBridge.DevConfig.configureHTTP() {
+                logger.debug("HTTP: Supabase from C++ config (development)")
             } else {
-                apiClient = APIClient(baseURL: params.baseURL, apiKey: params.apiKey)
-                logger.debug("APIClient: Provided URL (development)")
+                await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
+                logger.debug("HTTP: Provided URL (development)")
             }
-            serviceContainer.networkService = apiClient
-            serviceContainer.apiClient = apiClient
 
         case .staging, .production:
-            let (authenticatedClient, authService) = try await AuthenticationService.createAndAuthenticate(
-                baseURL: params.baseURL,
-                apiKey: params.apiKey
-            )
-            apiClient = authenticatedClient
-            serviceContainer.networkService = apiClient
-            serviceContainer.authenticationService = authService
-            serviceContainer.apiClient = apiClient
+            // Configure HTTP first
+            await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
+
+            // Authenticate via CppBridge.Auth
+            try await CppBridge.Auth.authenticate(apiKey: params.apiKey)
             logger.info("Authenticated for \(environment.description)")
         }
-
-        return apiClient
     }
 
     /// Setup model services (in-memory)
@@ -425,13 +420,12 @@ public enum RunAnywhere {
         let modelInfoService = ModelInfoService()
         serviceContainer.setModelInfoService(modelInfoService)
 
-        if let networkService = serviceContainer.networkService {
-            let modelAssignmentService = ModelAssignmentService(
-                networkService: networkService,
-                modelInfoService: modelInfoService
-            )
-            serviceContainer.setModelAssignmentService(modelAssignmentService)
-        }
+        // Use CppBridge.HTTP as network service
+        let modelAssignmentService = ModelAssignmentService(
+            networkService: CppBridge.HTTP.shared,
+            modelInfoService: modelInfoService
+        )
+        serviceContainer.setModelAssignmentService(modelAssignmentService)
 
         logger.debug("Model services initialized")
     }

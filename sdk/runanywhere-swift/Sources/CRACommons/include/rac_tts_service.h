@@ -12,9 +12,8 @@
 #ifndef RAC_TTS_SERVICE_H
 #define RAC_TTS_SERVICE_H
 
-#include "rac_tts_types.h"
-
 #include "rac_error.h"
+#include "rac_tts_types.h"
 
 #ifdef __cplusplus
 extern "C" {

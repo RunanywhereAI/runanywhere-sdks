@@ -12,9 +12,8 @@
 #ifndef RAC_VAD_SERVICE_H
 #define RAC_VAD_SERVICE_H
 
-#include "rac_vad_types.h"
-
 #include "rac/core/rac_error.h"
+#include "rac/features/vad/rac_vad_types.h"
 
 #ifdef __cplusplus
 extern "C" {

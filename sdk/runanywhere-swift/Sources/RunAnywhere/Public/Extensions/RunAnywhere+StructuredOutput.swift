@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Public API for structured output generation.
-//  Calls C++ directly via HandleManager (no capabilities layer).
+//  Calls C++ directly via CapabilityManager (no capabilities layer).
 //
 
 import Foundation

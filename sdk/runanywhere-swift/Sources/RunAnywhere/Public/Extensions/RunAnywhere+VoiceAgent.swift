@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Public API for Voice Agent operations (full voice pipeline).
-//  Calls C++ directly via HandleManager for all operations.
+//  Calls C++ directly via CapabilityManager for all operations.
 //  Events are emitted by C++ layer via CppEventBridge.
 //
 //  Architecture:
@@ -42,12 +42,12 @@ public extension RunAnywhere {
             return VoiceAgentComponentStates()
         }
 
-        let sttLoaded = await HandleManager.shared.isSTTLoaded
-        let sttId = await HandleManager.shared.currentSTTModelId
-        let llmLoaded = await HandleManager.shared.isLLMLoaded
-        let llmId = await HandleManager.shared.currentLLMModelId
-        let ttsLoaded = await HandleManager.shared.isTTSLoaded
-        let ttsId = await HandleManager.shared.currentTTSVoiceId
+        let sttLoaded = await CapabilityManager.shared.isSTTLoaded
+        let sttId = await CapabilityManager.shared.currentSTTModelId
+        let llmLoaded = await CapabilityManager.shared.isLLMLoaded
+        let llmId = await CapabilityManager.shared.currentLLMModelId
+        let ttsLoaded = await CapabilityManager.shared.isTTSLoaded
+        let ttsId = await CapabilityManager.shared.currentTTSVoiceId
 
         let sttState: ComponentLoadState
         if sttLoaded, let modelId = sttId {
@@ -96,7 +96,7 @@ public extension RunAnywhere {
         EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
 
         do {
-            let handle = try await HandleManager.shared.getVoiceAgentHandle()
+            let handle = try await CapabilityManager.shared.getVoiceAgentHandle()
 
             // Build C config
             var cConfig = rac_voice_agent_config_t()
@@ -155,7 +155,7 @@ public extension RunAnywhere {
         EventPublisher.shared.track(VoicePipelineEvent.pipelineStarted)
 
         do {
-            let handle = try await HandleManager.shared.getVoiceAgentHandle()
+            let handle = try await CapabilityManager.shared.getVoiceAgentHandle()
 
             let result = rac_voice_agent_initialize_with_loaded_models(handle)
             guard result == RAC_SUCCESS else {
@@ -172,7 +172,7 @@ public extension RunAnywhere {
     /// Check if voice agent is ready (all components initialized)
     static var isVoiceAgentReady: Bool {
         get async {
-            await HandleManager.shared.isVoiceAgentReady
+            await CapabilityManager.shared.isVoiceAgentReady
         }
     }
 
@@ -185,7 +185,7 @@ public extension RunAnywhere {
         }
 
         do {
-            let handle = try await HandleManager.shared.getVoiceAgentHandle()
+            let handle = try await CapabilityManager.shared.getVoiceAgentHandle()
 
             var isReady: rac_bool_t = RAC_FALSE
             rac_voice_agent_is_ready(handle, &isReady)
@@ -241,7 +241,7 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await HandleManager.shared.getVoiceAgentHandle()
+        let handle = try await CapabilityManager.shared.getVoiceAgentHandle()
 
         var transcriptionPtr: UnsafeMutablePointer<CChar>?
         let result = audioData.withUnsafeBytes { audioPtr in
@@ -269,7 +269,7 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await HandleManager.shared.getVoiceAgentHandle()
+        let handle = try await CapabilityManager.shared.getVoiceAgentHandle()
 
         var responsePtr: UnsafeMutablePointer<CChar>?
         let result = prompt.withCString { promptPtr in
@@ -292,7 +292,7 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        let handle = try await HandleManager.shared.getVoiceAgentHandle()
+        let handle = try await CapabilityManager.shared.getVoiceAgentHandle()
 
         var audioPtr: UnsafeMutableRawPointer?
         var audioSize: Int = 0
@@ -314,6 +314,6 @@ public extension RunAnywhere {
 
     /// Cleanup voice agent resources
     static func cleanupVoiceAgent() async {
-        await HandleManager.shared.cleanupVoiceAgent()
+        await CapabilityManager.shared.cleanupVoiceAgent()
     }
 }
