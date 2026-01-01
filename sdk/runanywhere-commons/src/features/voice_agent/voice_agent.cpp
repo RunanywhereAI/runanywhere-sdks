@@ -12,6 +12,7 @@
 #include <cstring>
 #include <mutex>
 
+#include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_component.h"
@@ -23,6 +24,17 @@
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
+
+// Forward declare event helpers from events.cpp
+namespace rac::events {
+void emit_voice_agent_stt_state_changed(rac_voice_agent_component_state_t state,
+                                        const char* model_id, const char* error_message);
+void emit_voice_agent_llm_state_changed(rac_voice_agent_component_state_t state,
+                                        const char* model_id, const char* error_message);
+void emit_voice_agent_tts_state_changed(rac_voice_agent_component_state_t state,
+                                        const char* model_id, const char* error_message);
+void emit_voice_agent_all_ready();
+}  // namespace rac::events
 
 // =============================================================================
 // INTERNAL STRUCTURE - Mirrors Swift's VoiceAgentCapability properties
@@ -248,7 +260,28 @@ rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle, con
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading STT model");
-    return rac_stt_component_load_model(handle->stt_handle, model_id);
+
+    // Emit loading state
+    rac::events::emit_voice_agent_stt_state_changed(RAC_VOICE_AGENT_STATE_LOADING, model_id,
+                                                    nullptr);
+
+    rac_result_t result = rac_stt_component_load_model(handle->stt_handle, model_id);
+
+    if (result == RAC_SUCCESS) {
+        rac::events::emit_voice_agent_stt_state_changed(RAC_VOICE_AGENT_STATE_LOADED, model_id,
+                                                        nullptr);
+        // Check if all components are now ready
+        if (rac_stt_component_is_loaded(handle->stt_handle) == RAC_TRUE &&
+            rac_llm_component_is_loaded(handle->llm_handle) == RAC_TRUE &&
+            rac_tts_component_is_loaded(handle->tts_handle) == RAC_TRUE) {
+            rac::events::emit_voice_agent_all_ready();
+        }
+    } else {
+        rac::events::emit_voice_agent_stt_state_changed(RAC_VOICE_AGENT_STATE_ERROR, model_id,
+                                                        "Failed to load STT model");
+    }
+
+    return result;
 }
 
 rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle, const char* model_id) {
@@ -259,7 +292,28 @@ rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle, con
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading LLM model");
-    return rac_llm_component_load_model(handle->llm_handle, model_id);
+
+    // Emit loading state
+    rac::events::emit_voice_agent_llm_state_changed(RAC_VOICE_AGENT_STATE_LOADING, model_id,
+                                                    nullptr);
+
+    rac_result_t result = rac_llm_component_load_model(handle->llm_handle, model_id);
+
+    if (result == RAC_SUCCESS) {
+        rac::events::emit_voice_agent_llm_state_changed(RAC_VOICE_AGENT_STATE_LOADED, model_id,
+                                                        nullptr);
+        // Check if all components are now ready
+        if (rac_stt_component_is_loaded(handle->stt_handle) == RAC_TRUE &&
+            rac_llm_component_is_loaded(handle->llm_handle) == RAC_TRUE &&
+            rac_tts_component_is_loaded(handle->tts_handle) == RAC_TRUE) {
+            rac::events::emit_voice_agent_all_ready();
+        }
+    } else {
+        rac::events::emit_voice_agent_llm_state_changed(RAC_VOICE_AGENT_STATE_ERROR, model_id,
+                                                        "Failed to load LLM model");
+    }
+
+    return result;
 }
 
 rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle, const char* voice_id) {
@@ -270,7 +324,28 @@ rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle, con
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading TTS voice");
-    return rac_tts_component_load_voice(handle->tts_handle, voice_id);
+
+    // Emit loading state
+    rac::events::emit_voice_agent_tts_state_changed(RAC_VOICE_AGENT_STATE_LOADING, voice_id,
+                                                    nullptr);
+
+    rac_result_t result = rac_tts_component_load_voice(handle->tts_handle, voice_id);
+
+    if (result == RAC_SUCCESS) {
+        rac::events::emit_voice_agent_tts_state_changed(RAC_VOICE_AGENT_STATE_LOADED, voice_id,
+                                                        nullptr);
+        // Check if all components are now ready
+        if (rac_stt_component_is_loaded(handle->stt_handle) == RAC_TRUE &&
+            rac_llm_component_is_loaded(handle->llm_handle) == RAC_TRUE &&
+            rac_tts_component_is_loaded(handle->tts_handle) == RAC_TRUE) {
+            rac::events::emit_voice_agent_all_ready();
+        }
+    } else {
+        rac::events::emit_voice_agent_tts_state_changed(RAC_VOICE_AGENT_STATE_ERROR, voice_id,
+                                                        "Failed to load TTS voice");
+    }
+
+    return result;
 }
 
 rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t handle,

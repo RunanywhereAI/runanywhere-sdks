@@ -44,28 +44,37 @@ extension LLMViewModel {
     // MARK: - SDK Event Handling
 
     func handleSDKEvent(_ event: any SDKEvent) {
-        guard let llmEvent = event as? LLMEvent else { return }
+        // Events now come from C++ via generic BridgedEvent
+        guard event.category == .llm else { return }
 
-        switch llmEvent {
-        case .modelLoadCompleted(let modelId, _, _, _):
+        let modelId = event.properties["model_id"] ?? ""
+        let generationId = event.properties["generation_id"] ?? ""
+
+        switch event.type {
+        case "llm_model_load_completed":
             handleModelLoadCompleted(modelId: modelId)
 
-        case .modelUnloaded(let modelId):
+        case "llm_model_unloaded":
             handleModelUnloaded(modelId: modelId)
 
-        case .modelLoadStarted:
+        case "llm_model_load_started":
             break
 
-        case let .firstToken(generationId, _, timeToFirstTokenMs, _):
-            handleFirstToken(generationId: generationId, timeToFirstTokenMs: timeToFirstTokenMs)
+        case "llm_first_token":
+            let ttft = Double(event.properties["time_to_first_token_ms"] ?? "0") ?? 0
+            handleFirstToken(generationId: generationId, timeToFirstTokenMs: ttft)
 
-        case let .generationCompleted(genId, mId, inTok, outTok, dur, tps, _, _, _, _, _, _):
+        case "llm_generation_completed":
+            let inputTokens = Int(event.properties["input_tokens"] ?? "0") ?? 0
+            let outputTokens = Int(event.properties["output_tokens"] ?? "0") ?? 0
+            let durationMs = Double(event.properties["processing_time_ms"] ?? "0") ?? 0
+            let tps = Double(event.properties["tokens_per_second"] ?? "0") ?? 0
             handleGenerationCompleted(
-                generationId: genId,
-                modelId: mId,
-                inputTokens: inTok,
-                outputTokens: outTok,
-                durationMs: dur,
+                generationId: generationId,
+                modelId: modelId,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                durationMs: durationMs,
                 tokensPerSecond: tps
             )
 

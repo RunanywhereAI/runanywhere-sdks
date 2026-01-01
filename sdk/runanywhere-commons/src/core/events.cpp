@@ -18,8 +18,10 @@ namespace {
 
 // Thread-safe event callback storage
 struct EventCallbackState {
-    rac_analytics_callback_fn callback = nullptr;
-    void* user_data = nullptr;
+    rac_analytics_callback_fn analytics_callback = nullptr;
+    void* analytics_user_data = nullptr;
+    rac_public_event_callback_fn public_callback = nullptr;
+    void* public_user_data = nullptr;
     std::mutex mutex;
 };
 
@@ -36,23 +38,75 @@ EventCallbackState& get_callback_state() {
 
 extern "C" {
 
+rac_event_destination_t rac_event_get_destination(rac_event_type_t type) {
+    switch (type) {
+        // Public-only events (too chatty for telemetry, needed for UI)
+        case RAC_EVENT_LLM_STREAMING_UPDATE:
+        case RAC_EVENT_STT_PARTIAL_TRANSCRIPT:
+        case RAC_EVENT_TTS_SYNTHESIS_CHUNK:
+        case RAC_EVENT_MODEL_DOWNLOAD_PROGRESS:
+        case RAC_EVENT_MODEL_EXTRACTION_PROGRESS:
+            return RAC_EVENT_DESTINATION_PUBLIC_ONLY;
+
+        // Telemetry-only events (internal metrics, not useful for app devs)
+        case RAC_EVENT_VAD_SPEECH_STARTED:
+        case RAC_EVENT_VAD_SPEECH_ENDED:
+        case RAC_EVENT_VAD_PAUSED:
+        case RAC_EVENT_VAD_RESUMED:
+        case RAC_EVENT_NETWORK_CONNECTIVITY_CHANGED:
+            return RAC_EVENT_DESTINATION_ANALYTICS_ONLY;
+
+        // All other events go to both destinations
+        default:
+            return RAC_EVENT_DESTINATION_ALL;
+    }
+}
+
 rac_result_t rac_analytics_events_set_callback(rac_analytics_callback_fn callback,
                                                void* user_data) {
     auto& state = get_callback_state();
     std::lock_guard<std::mutex> lock(state.mutex);
 
-    state.callback = callback;
-    state.user_data = user_data;
+    state.analytics_callback = callback;
+    state.analytics_user_data = user_data;
+
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_analytics_events_set_public_callback(rac_public_event_callback_fn callback,
+                                                      void* user_data) {
+    auto& state = get_callback_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
+
+    state.public_callback = callback;
+    state.public_user_data = user_data;
 
     return RAC_SUCCESS;
 }
 
 void rac_analytics_event_emit(rac_event_type_t type, const rac_analytics_event_data_t* data) {
+    if (data == nullptr) {
+        return;
+    }
+
     auto& state = get_callback_state();
     std::lock_guard<std::mutex> lock(state.mutex);
 
-    if (state.callback != nullptr && data != nullptr) {
-        state.callback(type, data, state.user_data);
+    // Get the destination for this event type
+    rac_event_destination_t dest = rac_event_get_destination(type);
+
+    // Route to analytics callback (telemetry)
+    if (dest == RAC_EVENT_DESTINATION_ANALYTICS_ONLY || dest == RAC_EVENT_DESTINATION_ALL) {
+        if (state.analytics_callback != nullptr) {
+            state.analytics_callback(type, data, state.analytics_user_data);
+        }
+    }
+
+    // Route to public callback (app developers)
+    if (dest == RAC_EVENT_DESTINATION_PUBLIC_ONLY || dest == RAC_EVENT_DESTINATION_ALL) {
+        if (state.public_callback != nullptr) {
+            state.public_callback(type, data, state.public_user_data);
+        }
     }
 }
 
@@ -60,7 +114,14 @@ rac_bool_t rac_analytics_events_has_callback(void) {
     auto& state = get_callback_state();
     std::lock_guard<std::mutex> lock(state.mutex);
 
-    return state.callback != nullptr ? RAC_TRUE : RAC_FALSE;
+    return state.analytics_callback != nullptr ? RAC_TRUE : RAC_FALSE;
+}
+
+rac_bool_t rac_analytics_events_has_public_callback(void) {
+    auto& state = get_callback_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
+
+    return state.public_callback != nullptr ? RAC_TRUE : RAC_FALSE;
 }
 
 }  // extern "C"
@@ -288,6 +349,304 @@ void emit_vad_speech_ended(double speech_duration_ms, float energy_level) {
     event.data.vad.energy_level = energy_level;
 
     rac_analytics_event_emit(RAC_EVENT_VAD_SPEECH_ENDED, &event);
+}
+
+// =============================================================================
+// SDK LIFECYCLE EVENTS
+// =============================================================================
+
+void emit_sdk_init_started() {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_SDK_INIT_STARTED;
+    event.data.sdk_lifecycle = RAC_ANALYTICS_SDK_LIFECYCLE_DEFAULT;
+
+    rac_analytics_event_emit(RAC_EVENT_SDK_INIT_STARTED, &event);
+}
+
+void emit_sdk_init_completed(double duration_ms) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_SDK_INIT_COMPLETED;
+    event.data.sdk_lifecycle = RAC_ANALYTICS_SDK_LIFECYCLE_DEFAULT;
+    event.data.sdk_lifecycle.duration_ms = duration_ms;
+
+    rac_analytics_event_emit(RAC_EVENT_SDK_INIT_COMPLETED, &event);
+}
+
+void emit_sdk_init_failed(rac_result_t error_code, const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_SDK_INIT_FAILED;
+    event.data.sdk_lifecycle = RAC_ANALYTICS_SDK_LIFECYCLE_DEFAULT;
+    event.data.sdk_lifecycle.error_code = error_code;
+    event.data.sdk_lifecycle.error_message = error_message;
+
+    rac_analytics_event_emit(RAC_EVENT_SDK_INIT_FAILED, &event);
+}
+
+void emit_sdk_models_loaded(int32_t count, double duration_ms) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_SDK_MODELS_LOADED;
+    event.data.sdk_lifecycle = RAC_ANALYTICS_SDK_LIFECYCLE_DEFAULT;
+    event.data.sdk_lifecycle.count = count;
+    event.data.sdk_lifecycle.duration_ms = duration_ms;
+
+    rac_analytics_event_emit(RAC_EVENT_SDK_MODELS_LOADED, &event);
+}
+
+// =============================================================================
+// MODEL DOWNLOAD EVENTS
+// =============================================================================
+
+void emit_model_download_started(const char* model_id, int64_t total_bytes,
+                                 const char* archive_type) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_DOWNLOAD_STARTED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.total_bytes = total_bytes;
+    event.data.model_download.archive_type = archive_type;
+
+    rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_STARTED, &event);
+}
+
+void emit_model_download_progress(const char* model_id, double progress, int64_t bytes_downloaded,
+                                  int64_t total_bytes) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_DOWNLOAD_PROGRESS;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.progress = progress;
+    event.data.model_download.bytes_downloaded = bytes_downloaded;
+    event.data.model_download.total_bytes = total_bytes;
+
+    rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_PROGRESS, &event);
+}
+
+void emit_model_download_completed(const char* model_id, int64_t size_bytes, double duration_ms,
+                                   const char* archive_type) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_DOWNLOAD_COMPLETED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.size_bytes = size_bytes;
+    event.data.model_download.duration_ms = duration_ms;
+    event.data.model_download.archive_type = archive_type;
+    event.data.model_download.progress = 100.0;
+
+    rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_COMPLETED, &event);
+}
+
+void emit_model_download_failed(const char* model_id, rac_result_t error_code,
+                                const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_DOWNLOAD_FAILED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.error_code = error_code;
+    event.data.model_download.error_message = error_message;
+
+    rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_FAILED, &event);
+}
+
+void emit_model_download_cancelled(const char* model_id) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_DOWNLOAD_CANCELLED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+
+    rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_CANCELLED, &event);
+}
+
+// =============================================================================
+// MODEL EXTRACTION EVENTS
+// =============================================================================
+
+void emit_model_extraction_started(const char* model_id, const char* archive_type) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_EXTRACTION_STARTED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.archive_type = archive_type;
+
+    rac_analytics_event_emit(RAC_EVENT_MODEL_EXTRACTION_STARTED, &event);
+}
+
+void emit_model_extraction_progress(const char* model_id, double progress) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_EXTRACTION_PROGRESS;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.progress = progress;
+
+    rac_analytics_event_emit(RAC_EVENT_MODEL_EXTRACTION_PROGRESS, &event);
+}
+
+void emit_model_extraction_completed(const char* model_id, int64_t size_bytes, double duration_ms) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_EXTRACTION_COMPLETED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.size_bytes = size_bytes;
+    event.data.model_download.duration_ms = duration_ms;
+
+    rac_analytics_event_emit(RAC_EVENT_MODEL_EXTRACTION_COMPLETED, &event);
+}
+
+void emit_model_extraction_failed(const char* model_id, rac_result_t error_code,
+                                  const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_EXTRACTION_FAILED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.error_code = error_code;
+    event.data.model_download.error_message = error_message;
+
+    rac_analytics_event_emit(RAC_EVENT_MODEL_EXTRACTION_FAILED, &event);
+}
+
+void emit_model_deleted(const char* model_id, int64_t size_bytes) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_DELETED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.size_bytes = size_bytes;
+
+    rac_analytics_event_emit(RAC_EVENT_MODEL_DELETED, &event);
+}
+
+// =============================================================================
+// STORAGE EVENTS
+// =============================================================================
+
+void emit_storage_cache_cleared(int64_t freed_bytes) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_STORAGE_CACHE_CLEARED;
+    event.data.storage = RAC_ANALYTICS_STORAGE_DEFAULT;
+    event.data.storage.freed_bytes = freed_bytes;
+
+    rac_analytics_event_emit(RAC_EVENT_STORAGE_CACHE_CLEARED, &event);
+}
+
+void emit_storage_cache_clear_failed(rac_result_t error_code, const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_STORAGE_CACHE_CLEAR_FAILED;
+    event.data.storage = RAC_ANALYTICS_STORAGE_DEFAULT;
+    event.data.storage.error_code = error_code;
+    event.data.storage.error_message = error_message;
+
+    rac_analytics_event_emit(RAC_EVENT_STORAGE_CACHE_CLEAR_FAILED, &event);
+}
+
+void emit_storage_temp_cleaned(int64_t freed_bytes) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_STORAGE_TEMP_CLEANED;
+    event.data.storage = RAC_ANALYTICS_STORAGE_DEFAULT;
+    event.data.storage.freed_bytes = freed_bytes;
+
+    rac_analytics_event_emit(RAC_EVENT_STORAGE_TEMP_CLEANED, &event);
+}
+
+// =============================================================================
+// DEVICE EVENTS
+// =============================================================================
+
+void emit_device_registered(const char* device_id) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_DEVICE_REGISTERED;
+    event.data.device = RAC_ANALYTICS_DEVICE_DEFAULT;
+    event.data.device.device_id = device_id;
+
+    rac_analytics_event_emit(RAC_EVENT_DEVICE_REGISTERED, &event);
+}
+
+void emit_device_registration_failed(rac_result_t error_code, const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_DEVICE_REGISTRATION_FAILED;
+    event.data.device = RAC_ANALYTICS_DEVICE_DEFAULT;
+    event.data.device.error_code = error_code;
+    event.data.device.error_message = error_message;
+
+    rac_analytics_event_emit(RAC_EVENT_DEVICE_REGISTRATION_FAILED, &event);
+}
+
+// =============================================================================
+// NETWORK EVENTS
+// =============================================================================
+
+void emit_network_connectivity_changed(bool is_online) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_NETWORK_CONNECTIVITY_CHANGED;
+    event.data.network = RAC_ANALYTICS_NETWORK_DEFAULT;
+    event.data.network.is_online = is_online ? RAC_TRUE : RAC_FALSE;
+
+    rac_analytics_event_emit(RAC_EVENT_NETWORK_CONNECTIVITY_CHANGED, &event);
+}
+
+// =============================================================================
+// SDK ERROR EVENTS
+// =============================================================================
+
+void emit_sdk_error(rac_result_t error_code, const char* error_message, const char* operation,
+                    const char* context) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_SDK_ERROR;
+    event.data.sdk_error = RAC_ANALYTICS_SDK_ERROR_DEFAULT;
+    event.data.sdk_error.error_code = error_code;
+    event.data.sdk_error.error_message = error_message;
+    event.data.sdk_error.operation = operation;
+    event.data.sdk_error.context = context;
+
+    rac_analytics_event_emit(RAC_EVENT_SDK_ERROR, &event);
+}
+
+// =============================================================================
+// VOICE AGENT STATE EVENTS
+// =============================================================================
+
+void emit_voice_agent_stt_state_changed(rac_voice_agent_component_state_t state,
+                                        const char* model_id, const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_VOICE_AGENT_STT_STATE_CHANGED;
+    event.data.voice_agent_state.component = "stt";
+    event.data.voice_agent_state.state = state;
+    event.data.voice_agent_state.model_id = model_id;
+    event.data.voice_agent_state.error_message = error_message;
+
+    rac_analytics_event_emit(RAC_EVENT_VOICE_AGENT_STT_STATE_CHANGED, &event);
+}
+
+void emit_voice_agent_llm_state_changed(rac_voice_agent_component_state_t state,
+                                        const char* model_id, const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_VOICE_AGENT_LLM_STATE_CHANGED;
+    event.data.voice_agent_state.component = "llm";
+    event.data.voice_agent_state.state = state;
+    event.data.voice_agent_state.model_id = model_id;
+    event.data.voice_agent_state.error_message = error_message;
+
+    rac_analytics_event_emit(RAC_EVENT_VOICE_AGENT_LLM_STATE_CHANGED, &event);
+}
+
+void emit_voice_agent_tts_state_changed(rac_voice_agent_component_state_t state,
+                                        const char* model_id, const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_VOICE_AGENT_TTS_STATE_CHANGED;
+    event.data.voice_agent_state.component = "tts";
+    event.data.voice_agent_state.state = state;
+    event.data.voice_agent_state.model_id = model_id;
+    event.data.voice_agent_state.error_message = error_message;
+
+    rac_analytics_event_emit(RAC_EVENT_VOICE_AGENT_TTS_STATE_CHANGED, &event);
+}
+
+void emit_voice_agent_all_ready() {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_VOICE_AGENT_ALL_READY;
+    event.data.voice_agent_state.component = "all";
+    event.data.voice_agent_state.state = RAC_VOICE_AGENT_STATE_LOADED;
+    event.data.voice_agent_state.model_id = nullptr;
+    event.data.voice_agent_state.error_message = nullptr;
+
+    rac_analytics_event_emit(RAC_EVENT_VOICE_AGENT_ALL_READY, &event);
 }
 
 }  // namespace rac::events

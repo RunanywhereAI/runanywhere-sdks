@@ -26,8 +26,8 @@ extension AlamofireDownloadService {
     func downloadModelWithCustomStrategy(_ model: ModelInfo, strategy: DownloadStrategy) async throws -> DownloadTask {
         logger.info("Using custom strategy for model: \(model.id)")
 
-        // Track download started
-        EventPublisher.shared.track(ModelEvent.downloadStarted(modelId: model.id))
+        // Track download started via C++
+        CppBridge.Events.emitDownloadStarted(modelId: model.id, totalBytes: model.downloadSize ?? 0)
 
         let taskId = UUID().uuidString
         let downloadStartTime = Date()
@@ -52,15 +52,17 @@ extension AlamofireDownloadService {
                         model: model,
                         to: destinationFolder,
                         progressHandler: { progress in
-                            // Track progress at 10% intervals (public EventBus only - for UI updates)
+                            // Track progress at 10% intervals via C++ (public events only - for UI updates)
                             if progress - lastReportedProgress >= 0.1 {
                                 lastReportedProgress = progress
-                                EventPublisher.shared.track(ModelEvent.downloadProgress(
+                                let bytesDownloaded = Int64(progress * Double(model.downloadSize ?? 100))
+                                let totalBytes = Int64(model.downloadSize ?? 100)
+                                CppBridge.Events.emitDownloadProgress(
                                     modelId: model.id,
-                                    progress: progress,
-                                    bytesDownloaded: Int64(progress * Double(model.downloadSize ?? 100)),
-                                    totalBytes: Int64(model.downloadSize ?? 100)
-                                ))
+                                    progress: progress * 100, // Convert to percentage
+                                    bytesDownloaded: bytesDownloaded,
+                                    totalBytes: totalBytes
+                                )
                             }
 
                             progressContinuation.yield(DownloadProgress(
@@ -84,13 +86,13 @@ extension AlamofireDownloadService {
                     try await CppBridge.ModelRegistry.shared.save(updatedModel)
                         self.logger.info("Model metadata saved successfully for: \(model.id)")
 
-                    // Track download completed
+                    // Track download completed via C++
                     let durationMs = Date().timeIntervalSince(downloadStartTime) * 1000
-                    EventPublisher.shared.track(ModelEvent.downloadCompleted(
+                    CppBridge.Events.emitDownloadCompleted(
                         modelId: model.id,
                         durationMs: durationMs,
                         sizeBytes: model.downloadSize ?? 0
-                    ))
+                    )
 
                     self.logger.info("Custom strategy download completed", metadata: [
                         "modelId": model.id,
@@ -99,9 +101,9 @@ extension AlamofireDownloadService {
 
                     return resultURL
                 } catch {
-                    // Track download failed
+                    // Track download failed via C++
                     let sdkError = SDKError.from(error, category: .download)
-                    EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: sdkError))
+                    CppBridge.Events.emitDownloadFailed(modelId: model.id, error: sdkError)
 
                     progressContinuation.yield(DownloadProgress(
                         bytesDownloaded: 0,

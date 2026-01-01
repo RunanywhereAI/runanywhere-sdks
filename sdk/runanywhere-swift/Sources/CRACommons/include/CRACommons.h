@@ -85,6 +85,7 @@
 #include "rac_model_paths.h"
 #include "rac_model_registry.h"
 #include "rac_model_strategy.h"
+#include "rac_model_assignment.h"
 
 // Storage analysis
 #include "rac_storage_analyzer.h"
@@ -113,5 +114,11 @@
 
 #include "rac_telemetry_types.h"
 #include "rac_telemetry_manager.h"
+
+// =============================================================================
+// DEVICE - Device registration manager
+// =============================================================================
+
+#include "rac_device_manager.h"
 
 #endif /* CRACOMMONS_H */

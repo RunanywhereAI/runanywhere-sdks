@@ -87,7 +87,7 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
                 try? await CppBridge.Download.shared.cancelDownload(taskId: taskId)
             }
 
-            EventPublisher.shared.track(ModelEvent.downloadCancelled(modelId: taskId))
+            CppBridge.Events.emitDownloadCancelled(modelId: taskId)
             logger.info("Cancelled download task: \(taskId)")
         }
     }
@@ -123,12 +123,12 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     func downloadModelWithArtifactType(_ model: ModelInfo) async throws -> DownloadTask {
         guard let downloadURL = model.downloadURL else {
             let downloadError = SDKError.download(.invalidInput, "Invalid download URL for model: \(model.id)")
-            EventPublisher.shared.track(ModelEvent.downloadFailed(modelId: model.id, error: downloadError))
+            CppBridge.Events.emitDownloadFailed(modelId: model.id, error: downloadError)
             throw downloadError
         }
 
-        // Track download started
-        EventPublisher.shared.track(ModelEvent.downloadStarted(modelId: model.id))
+        // Track download started via C++ event system
+        CppBridge.Events.emitDownloadStarted(modelId: model.id, totalBytes: model.downloadSize ?? 0)
 
         let downloadStartTime = Date()
         let (progressStream, progressContinuation) = AsyncStream<DownloadProgress>.makeStream()
@@ -333,11 +333,11 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         let durationMs = Date().timeIntervalSince(startTime) * 1000
         let fileSize = FileOperationsUtilities.fileSize(at: finalPath) ?? model.downloadSize ?? 0
 
-        EventPublisher.shared.track(ModelEvent.downloadCompleted(
+        CppBridge.Events.emitDownloadCompleted(
             modelId: model.id,
             durationMs: durationMs,
             sizeBytes: fileSize
-        ))
+        )
 
         // Report completion
         progressContinuation.yield(.completed(totalBytes: model.downloadSize ?? fileSize))

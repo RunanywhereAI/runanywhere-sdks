@@ -183,7 +183,7 @@ struct RunAnywhereAIApp: App {
             url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz")!,
             framework: .onnx,
             modality: .speechRecognition,
-            artifactType: .tarGzArchive(structure: .nestedDirectory),
+            artifactType: .archive(.tarGz, structure: .nestedDirectory),
             memoryRequirement: 75_000_000
         )
         RunAnywhere.registerModel(
@@ -192,7 +192,7 @@ struct RunAnywhereAIApp: App {
             url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz")!,
             framework: .onnx,
             modality: .speechSynthesis,
-            artifactType: .tarGzArchive(structure: .nestedDirectory),
+            artifactType: .archive(.tarGz, structure: .nestedDirectory),
             memoryRequirement: 65_000_000
         )
         RunAnywhere.registerModel(
@@ -201,7 +201,7 @@ struct RunAnywhereAIApp: App {
             url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz")!,
             framework: .onnx,
             modality: .speechSynthesis,
-            artifactType: .tarGzArchive(structure: .nestedDirectory),
+            artifactType: .archive(.tarGz, structure: .nestedDirectory),
             memoryRequirement: 65_000_000
         )
         logger.info("✅ ONNX STT/TTS models registered")

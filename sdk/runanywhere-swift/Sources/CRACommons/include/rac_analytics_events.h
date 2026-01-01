@@ -23,6 +23,18 @@ extern "C" {
 #endif
 
 // =============================================================================
+// EVENT DESTINATION
+// =============================================================================
+
+// Include the event publishing header for destination types
+#include "rac_events.h"
+
+// Alias the existing enum values for convenience in analytics context
+#define RAC_EVENT_DEST_PUBLIC_ONLY RAC_EVENT_DESTINATION_PUBLIC_ONLY
+#define RAC_EVENT_DEST_TELEMETRY_ONLY RAC_EVENT_DESTINATION_ANALYTICS_ONLY
+#define RAC_EVENT_DEST_ALL RAC_EVENT_DESTINATION_ALL
+
+// =============================================================================
 // EVENT TYPES
 // =============================================================================
 
@@ -30,7 +42,7 @@ extern "C" {
  * @brief Event type enumeration
  */
 typedef enum rac_event_type {
-    // LLM Events
+    // LLM Events (100-199)
     RAC_EVENT_LLM_MODEL_LOAD_STARTED = 100,
     RAC_EVENT_LLM_MODEL_LOAD_COMPLETED = 101,
     RAC_EVENT_LLM_MODEL_LOAD_FAILED = 102,
@@ -41,7 +53,7 @@ typedef enum rac_event_type {
     RAC_EVENT_LLM_FIRST_TOKEN = 113,
     RAC_EVENT_LLM_STREAMING_UPDATE = 114,
 
-    // STT Events
+    // STT Events (200-299)
     RAC_EVENT_STT_MODEL_LOAD_STARTED = 200,
     RAC_EVENT_STT_MODEL_LOAD_COMPLETED = 201,
     RAC_EVENT_STT_MODEL_LOAD_FAILED = 202,
@@ -51,7 +63,7 @@ typedef enum rac_event_type {
     RAC_EVENT_STT_TRANSCRIPTION_FAILED = 212,
     RAC_EVENT_STT_PARTIAL_TRANSCRIPT = 213,
 
-    // TTS Events
+    // TTS Events (300-399)
     RAC_EVENT_TTS_VOICE_LOAD_STARTED = 300,
     RAC_EVENT_TTS_VOICE_LOAD_COMPLETED = 301,
     RAC_EVENT_TTS_VOICE_LOAD_FAILED = 302,
@@ -61,7 +73,7 @@ typedef enum rac_event_type {
     RAC_EVENT_TTS_SYNTHESIS_FAILED = 312,
     RAC_EVENT_TTS_SYNTHESIS_CHUNK = 313,
 
-    // VAD Events
+    // VAD Events (400-499)
     RAC_EVENT_VAD_STARTED = 400,
     RAC_EVENT_VAD_STOPPED = 401,
     RAC_EVENT_VAD_SPEECH_STARTED = 402,
@@ -69,11 +81,60 @@ typedef enum rac_event_type {
     RAC_EVENT_VAD_PAUSED = 404,
     RAC_EVENT_VAD_RESUMED = 405,
 
-    // VoiceAgent Events
+    // VoiceAgent Events (500-599)
     RAC_EVENT_VOICE_AGENT_TURN_STARTED = 500,
     RAC_EVENT_VOICE_AGENT_TURN_COMPLETED = 501,
     RAC_EVENT_VOICE_AGENT_TURN_FAILED = 502,
+
+    // SDK Lifecycle Events (600-699)
+    RAC_EVENT_SDK_INIT_STARTED = 600,
+    RAC_EVENT_SDK_INIT_COMPLETED = 601,
+    RAC_EVENT_SDK_INIT_FAILED = 602,
+    RAC_EVENT_SDK_MODELS_LOADED = 603,
+
+    // Model Download Events (700-719)
+    RAC_EVENT_MODEL_DOWNLOAD_STARTED = 700,
+    RAC_EVENT_MODEL_DOWNLOAD_PROGRESS = 701,
+    RAC_EVENT_MODEL_DOWNLOAD_COMPLETED = 702,
+    RAC_EVENT_MODEL_DOWNLOAD_FAILED = 703,
+    RAC_EVENT_MODEL_DOWNLOAD_CANCELLED = 704,
+
+    // Model Extraction Events (710-719)
+    RAC_EVENT_MODEL_EXTRACTION_STARTED = 710,
+    RAC_EVENT_MODEL_EXTRACTION_PROGRESS = 711,
+    RAC_EVENT_MODEL_EXTRACTION_COMPLETED = 712,
+    RAC_EVENT_MODEL_EXTRACTION_FAILED = 713,
+
+    // Model Deletion Events (720-729)
+    RAC_EVENT_MODEL_DELETED = 720,
+
+    // Storage Events (800-899)
+    RAC_EVENT_STORAGE_CACHE_CLEARED = 800,
+    RAC_EVENT_STORAGE_CACHE_CLEAR_FAILED = 801,
+    RAC_EVENT_STORAGE_TEMP_CLEANED = 802,
+
+    // Device Events (900-999)
+    RAC_EVENT_DEVICE_REGISTERED = 900,
+    RAC_EVENT_DEVICE_REGISTRATION_FAILED = 901,
+
+    // Network Events (1000-1099)
+    RAC_EVENT_NETWORK_CONNECTIVITY_CHANGED = 1000,
+
+    // Error Events (1100-1199)
+    RAC_EVENT_SDK_ERROR = 1100,
+
+    // Framework Events (1200-1299)
+    RAC_EVENT_FRAMEWORK_MODELS_REQUESTED = 1200,
+    RAC_EVENT_FRAMEWORK_MODELS_RETRIEVED = 1201,
 } rac_event_type_t;
+
+/**
+ * @brief Get the destination for an event type
+ *
+ * @param type Event type
+ * @return Event destination
+ */
+RAC_API rac_event_destination_t rac_event_get_destination(rac_event_type_t type);
 
 // =============================================================================
 // EVENT DATA STRUCTURES
@@ -211,6 +272,96 @@ typedef struct rac_analytics_vad {
 } rac_analytics_vad_t;
 
 /**
+ * @brief Model download event data
+ * Used for: MODEL_DOWNLOAD_*, MODEL_EXTRACTION_*, MODEL_DELETED
+ */
+typedef struct rac_analytics_model_download {
+    /** Model identifier */
+    const char* model_id;
+    /** Download progress (0.0 - 100.0) */
+    double progress;
+    /** Bytes downloaded so far */
+    int64_t bytes_downloaded;
+    /** Total bytes to download */
+    int64_t total_bytes;
+    /** Duration in milliseconds */
+    double duration_ms;
+    /** Final size in bytes (for completed event) */
+    int64_t size_bytes;
+    /** Archive type (e.g., "zip", "tar.gz", "none") */
+    const char* archive_type;
+    /** Error code (RAC_SUCCESS if no error) */
+    rac_result_t error_code;
+    /** Error message (NULL if no error) */
+    const char* error_message;
+} rac_analytics_model_download_t;
+
+/**
+ * @brief SDK lifecycle event data
+ * Used for: SDK_INIT_*, SDK_MODELS_LOADED
+ */
+typedef struct rac_analytics_sdk_lifecycle {
+    /** Duration in milliseconds */
+    double duration_ms;
+    /** Count (e.g., number of models loaded) */
+    int32_t count;
+    /** Error code (RAC_SUCCESS if no error) */
+    rac_result_t error_code;
+    /** Error message (NULL if no error) */
+    const char* error_message;
+} rac_analytics_sdk_lifecycle_t;
+
+/**
+ * @brief Storage event data
+ * Used for: STORAGE_CACHE_CLEARED, STORAGE_TEMP_CLEANED
+ */
+typedef struct rac_analytics_storage {
+    /** Bytes freed */
+    int64_t freed_bytes;
+    /** Error code (RAC_SUCCESS if no error) */
+    rac_result_t error_code;
+    /** Error message (NULL if no error) */
+    const char* error_message;
+} rac_analytics_storage_t;
+
+/**
+ * @brief Device event data
+ * Used for: DEVICE_REGISTERED, DEVICE_REGISTRATION_FAILED
+ */
+typedef struct rac_analytics_device {
+    /** Device identifier */
+    const char* device_id;
+    /** Error code (RAC_SUCCESS if no error) */
+    rac_result_t error_code;
+    /** Error message (NULL if no error) */
+    const char* error_message;
+} rac_analytics_device_t;
+
+/**
+ * @brief Network event data
+ * Used for: NETWORK_CONNECTIVITY_CHANGED
+ */
+typedef struct rac_analytics_network {
+    /** Whether the device is online */
+    rac_bool_t is_online;
+} rac_analytics_network_t;
+
+/**
+ * @brief SDK error event data
+ * Used for: SDK_ERROR
+ */
+typedef struct rac_analytics_sdk_error {
+    /** Error code */
+    rac_result_t error_code;
+    /** Error message */
+    const char* error_message;
+    /** Operation that failed */
+    const char* operation;
+    /** Additional context */
+    const char* context;
+} rac_analytics_sdk_error_t;
+
+/**
  * @brief Union of all event data types
  */
 typedef struct rac_analytics_event_data {
@@ -221,6 +372,12 @@ typedef struct rac_analytics_event_data {
         rac_analytics_stt_transcription_t stt_transcription;
         rac_analytics_tts_synthesis_t tts_synthesis;
         rac_analytics_vad_t vad;
+        rac_analytics_model_download_t model_download;
+        rac_analytics_sdk_lifecycle_t sdk_lifecycle;
+        rac_analytics_storage_t storage;
+        rac_analytics_device_t device;
+        rac_analytics_network_t network;
+        rac_analytics_sdk_error_t sdk_error;
     } data;
 } rac_analytics_event_data_t;
 
@@ -271,6 +428,46 @@ RAC_API void rac_analytics_event_emit(rac_event_type_t type,
  * @return RAC_TRUE if callback is registered, RAC_FALSE otherwise
  */
 RAC_API rac_bool_t rac_analytics_events_has_callback(void);
+
+// =============================================================================
+// PUBLIC EVENT CALLBACK API
+// =============================================================================
+
+/**
+ * @brief Public event callback function type
+ *
+ * Platform SDKs implement this callback to receive public events from C++.
+ * Public events are intended for app developers (UI updates, user feedback).
+ *
+ * @param type Event type
+ * @param data Event data (lifetime: only valid during callback)
+ * @param user_data User data provided during registration
+ */
+typedef void (*rac_public_event_callback_fn)(rac_event_type_t type,
+                                             const rac_analytics_event_data_t* data,
+                                             void* user_data);
+
+/**
+ * @brief Register public event callback
+ *
+ * Called by platform SDKs to receive public events (for app developers).
+ * Events are routed based on their destination:
+ * - PUBLIC_ONLY: Only sent to this callback
+ * - ALL: Sent to both this callback and telemetry
+ *
+ * @param callback Callback function (NULL to unregister)
+ * @param user_data User data passed to callback
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_analytics_events_set_public_callback(rac_public_event_callback_fn callback,
+                                                              void* user_data);
+
+/**
+ * @brief Check if public event callback is registered
+ *
+ * @return RAC_TRUE if callback is registered, RAC_FALSE otherwise
+ */
+RAC_API rac_bool_t rac_analytics_events_has_public_callback(void);
 
 // =============================================================================
 // DEFAULT EVENT DATA
@@ -328,6 +525,40 @@ static const rac_analytics_tts_synthesis_t RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT =
 /** Default VAD event */
 static const rac_analytics_vad_t RAC_ANALYTICS_VAD_DEFAULT = {.speech_duration_ms = 0.0,
                                                               .energy_level = 0.0f};
+
+/** Default model download event */
+static const rac_analytics_model_download_t RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT = {
+    .model_id = RAC_NULL,
+    .progress = 0.0,
+    .bytes_downloaded = 0,
+    .total_bytes = 0,
+    .duration_ms = 0.0,
+    .size_bytes = 0,
+    .archive_type = RAC_NULL,
+    .error_code = RAC_SUCCESS,
+    .error_message = RAC_NULL};
+
+/** Default SDK lifecycle event */
+static const rac_analytics_sdk_lifecycle_t RAC_ANALYTICS_SDK_LIFECYCLE_DEFAULT = {
+    .duration_ms = 0.0, .count = 0, .error_code = RAC_SUCCESS, .error_message = RAC_NULL};
+
+/** Default storage event */
+static const rac_analytics_storage_t RAC_ANALYTICS_STORAGE_DEFAULT = {
+    .freed_bytes = 0, .error_code = RAC_SUCCESS, .error_message = RAC_NULL};
+
+/** Default device event */
+static const rac_analytics_device_t RAC_ANALYTICS_DEVICE_DEFAULT = {
+    .device_id = RAC_NULL, .error_code = RAC_SUCCESS, .error_message = RAC_NULL};
+
+/** Default network event */
+static const rac_analytics_network_t RAC_ANALYTICS_NETWORK_DEFAULT = {.is_online = RAC_FALSE};
+
+/** Default SDK error event */
+static const rac_analytics_sdk_error_t RAC_ANALYTICS_SDK_ERROR_DEFAULT = {
+    .error_code = RAC_SUCCESS,
+    .error_message = RAC_NULL,
+    .operation = RAC_NULL,
+    .context = RAC_NULL};
 
 #ifdef __cplusplus
 }

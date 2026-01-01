@@ -13,6 +13,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
 // =============================================================================
@@ -123,6 +124,10 @@ void rac_shutdown(void) {
 }
 
 rac_bool_t rac_is_initialized(void) {
+    // Force link device manager symbols by referencing the function
+    // This ensures the device manager object file is included in the archive
+    (void)&rac_device_manager_is_registered;
+
     return s_initialized.load() ? RAC_TRUE : RAC_FALSE;
 }
 
