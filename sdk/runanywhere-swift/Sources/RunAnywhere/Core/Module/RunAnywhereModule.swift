@@ -5,14 +5,20 @@
 //  Protocol for SDK modules that provide AI capabilities.
 //  Modules are the primary extension point for adding new backends.
 //
+//  Note: Registration is now handled by the C++ platform backend.
+//  Modules only need to provide metadata and service creation.
+//
 
 import Foundation
 
 /// Protocol for SDK modules that provide AI capabilities.
 ///
-/// Modules encapsulate backend-specific functionality and register
-/// service providers with the C++ commons layer. Each module typically
-/// provides one or more capabilities (LLM, STT, TTS, VAD).
+/// Modules encapsulate backend-specific functionality for the SDK.
+/// Each module typically provides one or more capabilities (LLM, STT, TTS, VAD).
+///
+/// Registration with the C++ service registry is handled automatically by the
+/// platform backend during SDK initialization. Modules only need to provide
+/// metadata and service creation methods.
 ///
 /// ## Implementing a Module
 ///
@@ -24,26 +30,11 @@ import Foundation
 ///     public static let defaultPriority: Int = 100
 ///     public static let inferenceFramework: InferenceFramework = .onnx
 ///
-///     @MainActor
-///     public static func register(priority: Int) {
-///         // Register with C++ backend
-///         let result = rac_backend_mymodule_register()
-///         guard result == RAC_SUCCESS else { return }
+///     public static func createService() async throws -> MyService {
+///         let service = MyService()
+///         try await service.initialize()
+///         return service
 ///     }
-/// }
-/// ```
-///
-/// ## Auto-Registration
-///
-/// Modules can support auto-registration by adding:
-///
-/// ```swift
-/// extension MyModule {
-///     public static let autoRegister: Void = {
-///         Task { @MainActor in
-///             MyModule.register()
-///         }
-///     }()
 /// }
 /// ```
 public protocol RunAnywhereModule {
@@ -61,22 +52,4 @@ public protocol RunAnywhereModule {
 
     /// The inference framework this module uses
     static var inferenceFramework: InferenceFramework { get }
-
-    /// Register this module's services with the SDK.
-    ///
-    /// - Parameter priority: The priority for service registration.
-    ///                       Higher values are preferred when multiple
-    ///                       providers can handle a request.
-    @MainActor
-    static func register(priority: Int)
-}
-
-// MARK: - Default Implementations
-
-public extension RunAnywhereModule {
-    /// Register with default priority
-    @MainActor
-    static func register() {
-        register(priority: defaultPriority)
-    }
 }

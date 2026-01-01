@@ -5,6 +5,9 @@
 //  Built-in System TTS module using AVSpeechSynthesizer.
 //  Platform-specific fallback when no other TTS providers are available.
 //
+//  Registration is now handled by the C++ platform backend. This module
+//  provides the Swift service implementation that the C++ backend calls.
+//
 
 import CRACommons
 import Foundation
@@ -17,8 +20,8 @@ import Foundation
 /// a fallback when no other TTS providers (like ONNX Piper) are available
 /// or when explicitly requested via the "system-tts" voice ID.
 ///
-/// SystemTTS registers with the C++ service registry via Swift callbacks,
-/// making it discoverable alongside C++ backends.
+/// The C++ platform backend handles registration with the service registry.
+/// This Swift module provides the actual implementation through callbacks.
 ///
 /// ## Usage
 ///
@@ -42,109 +45,6 @@ public enum SystemTTS: RunAnywhereModule {
     /// System TTS uses Apple's built-in speech synthesis
     public static let inferenceFramework: InferenceFramework = .systemTTS
 
-    // MARK: - Registration State
-
-    private static var isRegistered = false
-
-    /// Register System TTS module with the C++ service registry.
-    ///
-    /// This registers SystemTTS as a platform service in C++, making it
-    /// discoverable via `CppBridge.Services.listProviders(for: .tts)`.
-    @MainActor
-    public static func register(priority: Int = 10) {
-        guard !isRegistered else { return }
-
-        logger.info("Registering SystemTTS with C++ registry (priority: \(priority))...")
-
-        // Register module with C++ (for module discovery)
-        var moduleInfo = rac_module_info_t()
-        let version = "1.0.0"
-        let description = "Apple System TTS via AVSpeechSynthesizer"
-
-        moduleId.withCString { idPtr in
-            moduleName.withCString { namePtr in
-                version.withCString { versionPtr in
-                    description.withCString { descPtr in
-                        moduleInfo.id = idPtr
-                        moduleInfo.name = namePtr
-                        moduleInfo.version = versionPtr
-                        moduleInfo.description = descPtr
-
-                        var caps: [rac_capability_t] = [RAC_CAPABILITY_TTS]
-                        caps.withUnsafeBufferPointer { capsPtr in
-                            moduleInfo.capabilities = capsPtr.baseAddress
-                            moduleInfo.num_capabilities = 1
-                            _ = rac_module_register(&moduleInfo)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Register service provider with C++ (via callbacks)
-        let success = CppBridge.Services.registerPlatformService(
-            name: moduleName,
-            capability: .tts,
-            priority: priority,
-            canHandle: { voiceId in
-                canHandle(voiceId: voiceId)
-            },
-            create: {
-                try await createService()
-            }
-        )
-
-        if success {
-            isRegistered = true
-            logger.info("✅ SystemTTS registered with C++ registry")
-
-            // Register the built-in model entry
-            registerBuiltInModelEntry()
-        } else {
-            logger.error("❌ Failed to register SystemTTS with C++ registry")
-        }
-    }
-
-    // MARK: - Private: Model Entry Registration
-
-    @MainActor
-    private static func registerBuiltInModelEntry() {
-        let modelInfo = ModelInfo(
-            id: moduleId,
-            name: moduleName,
-            category: .speechSynthesis,
-            format: .unknown,
-            framework: .systemTTS,
-            downloadURL: nil,
-            localPath: URL(string: "builtin://system-tts"),  // Special builtin scheme
-            artifactType: .builtIn,
-            downloadSize: nil,
-            contextLength: nil,
-            supportsThinking: false,
-            description: """
-                Apple's built-in Text-to-Speech using AVSpeechSynthesizer. \
-                No download required - uses on-device speech synthesis.
-                """,
-            source: .local
-        )
-
-        Task {
-            try? await CppBridge.ModelRegistry.shared.save(modelInfo)
-            logger.info("Built-in System TTS model entry registered: \(modelInfo.id)")
-        }
-    }
-
-    /// Unregister System TTS module
-    public static func unregister() {
-        guard isRegistered else { return }
-
-        CppBridge.Services.unregisterPlatformService(name: moduleName, capability: .tts)
-        _ = moduleId.withCString { rac_module_unregister($0) }
-
-        isRegistered = false
-        logger.info("SystemTTS unregistered")
-    }
-
     // MARK: - Public API
 
     /// Check if this provider can handle the given voice ID
@@ -155,19 +55,10 @@ public enum SystemTTS: RunAnywhereModule {
         }
 
         let lowercasedId = voiceId.lowercased()
-
-        // Priority 1: Check by ID pattern (sync check for provider selection)
-        if lowercasedId.contains("system-tts") || lowercasedId == "system-tts-default" {
-            logger.debug("canHandle: voice '\(voiceId)' matches system-tts pattern -> true")
-            return true
-        }
-
-        // Priority 2: Explicitly handle system-tts requests by ID pattern
-        let matches = lowercasedId == "system-tts"
-            || lowercasedId == "system_tts"
+        return lowercasedId.contains("system-tts")
+            || lowercasedId.contains("system_tts")
             || lowercasedId == "system"
-
-        return matches
+            || lowercasedId == "system-tts-default"
     }
 
     /// Create a SystemTTSService instance
@@ -176,15 +67,4 @@ public enum SystemTTS: RunAnywhereModule {
         try await service.initialize()
         return service
     }
-}
-
-// MARK: - Auto-Registration
-
-extension SystemTTS {
-    /// Auto-register for discovery when SDK initializes
-    public static let autoRegister: Void = {
-        Task { @MainActor in
-            SystemTTS.register()
-        }
-    }()
 }

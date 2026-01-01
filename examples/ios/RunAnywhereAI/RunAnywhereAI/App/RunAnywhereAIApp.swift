@@ -205,12 +205,6 @@ struct RunAnywhereAIApp: App {
             memoryRequirement: 65_000_000
         )
         logger.info("✅ ONNX STT/TTS models registered")
-
-        // Foundation Models for iOS 26+ and macOS 26+
-        // SystemFoundationModels is part of RunAnywhere SDK and auto-registers on iOS 26+
-        SystemFoundationModels.register(priority: 200)
-        logger.info("✅ SystemFoundationModels module registered (Apple Intelligence)")
-
         logger.info("🎉 All modules and models registered")
     }
 }

@@ -1,12 +1,10 @@
 /**
  * @file rac_llm_service.h
- * @brief RunAnywhere Commons - LLM Service Interface (Protocol)
+ * @brief RunAnywhere Commons - LLM Service Interface
  *
- * C port of Swift's LLMService protocol from:
- * Sources/RunAnywhere/Features/LLM/Protocol/LLMService.swift
- *
- * This header defines the service interface. For data types,
- * see rac_llm_types.h.
+ * Defines the generic LLM service API and vtable for multi-backend dispatch.
+ * Backends (LlamaCpp, Platform, ONNX) implement the vtable and register
+ * with the service registry.
  */
 
 #ifndef RAC_LLM_SERVICE_H
@@ -20,11 +18,62 @@ extern "C" {
 #endif
 
 // =============================================================================
-// SERVICE INTERFACE - Mirrors Swift's LLMService protocol
+// SERVICE VTABLE - Backend implementations provide this
+// =============================================================================
+
+/**
+ * LLM Service operations vtable.
+ * Each backend implements these functions and provides a static vtable.
+ */
+typedef struct rac_llm_service_ops {
+    /** Initialize the service with a model path */
+    rac_result_t (*initialize)(void* impl, const char* model_path);
+
+    /** Generate text (blocking) */
+    rac_result_t (*generate)(void* impl, const char* prompt, const rac_llm_options_t* options,
+                             rac_llm_result_t* out_result);
+
+    /** Generate text with streaming callback */
+    rac_result_t (*generate_stream)(void* impl, const char* prompt,
+                                    const rac_llm_options_t* options,
+                                    rac_llm_stream_callback_fn callback, void* user_data);
+
+    /** Get service info */
+    rac_result_t (*get_info)(void* impl, rac_llm_info_t* out_info);
+
+    /** Cancel ongoing generation */
+    rac_result_t (*cancel)(void* impl);
+
+    /** Cleanup/unload model (keeps service alive) */
+    rac_result_t (*cleanup)(void* impl);
+
+    /** Destroy the service */
+    void (*destroy)(void* impl);
+} rac_llm_service_ops_t;
+
+/**
+ * LLM Service instance.
+ * Contains vtable pointer and backend-specific implementation.
+ */
+typedef struct rac_llm_service {
+    /** Vtable with backend operations */
+    const rac_llm_service_ops_t* ops;
+
+    /** Backend-specific implementation handle */
+    void* impl;
+
+    /** Model ID for reference */
+    const char* model_id;
+} rac_llm_service_t;
+
+// =============================================================================
+// PUBLIC API - Generic service functions
 // =============================================================================
 
 /**
  * @brief Create an LLM service
+ *
+ * Routes through service registry to find appropriate backend.
  *
  * @param model_id Model identifier (registry ID or path to model file)
  * @param out_handle Output: Handle to the created service
@@ -35,8 +84,6 @@ RAC_API rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_hand
 /**
  * @brief Initialize an LLM service
  *
- * Mirrors Swift's LLMService.initialize(modelPath:)
- *
  * @param handle Service handle
  * @param model_path Path to the model file (can be NULL)
  * @return RAC_SUCCESS or error code
@@ -46,12 +93,10 @@ RAC_API rac_result_t rac_llm_initialize(rac_handle_t handle, const char* model_p
 /**
  * @brief Generate text from prompt
  *
- * Mirrors Swift's LLMService.generate(prompt:options:)
- *
  * @param handle Service handle
  * @param prompt Input prompt
  * @param options Generation options (can be NULL for defaults)
- * @param out_result Output: Generation result (caller must free text with rac_free)
+ * @param out_result Output: Generation result (caller must free with rac_llm_result_free)
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
@@ -60,8 +105,6 @@ RAC_API rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
 
 /**
  * @brief Stream generate text token by token
- *
- * Mirrors Swift's LLMService.streamGenerate(prompt:options:onToken:)
  *
  * @param handle Service handle
  * @param prompt Input prompt
@@ -86,18 +129,13 @@ RAC_API rac_result_t rac_llm_get_info(rac_handle_t handle, rac_llm_info_t* out_i
 /**
  * @brief Cancel ongoing generation
  *
- * Mirrors Swift's LLMService.cancel()
- * Best-effort operation; not all backends support mid-generation cancellation.
- *
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_llm_cancel(rac_handle_t handle);
 
 /**
- * @brief Cleanup and release resources
- *
- * Mirrors Swift's LLMService.cleanup()
+ * @brief Cleanup and release model resources
  *
  * @param handle Service handle
  * @return RAC_SUCCESS or error code

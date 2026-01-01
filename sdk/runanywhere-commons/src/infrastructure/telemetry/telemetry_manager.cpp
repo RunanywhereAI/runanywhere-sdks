@@ -570,7 +570,7 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
 }
 
 void rac_telemetry_manager_http_complete(rac_telemetry_manager_t* manager, rac_bool_t success,
-                                         const char* response_json, const char* error_message) {
+                                         const char* /*response_json*/, const char* error_message) {
     if (!manager)
         return;
 

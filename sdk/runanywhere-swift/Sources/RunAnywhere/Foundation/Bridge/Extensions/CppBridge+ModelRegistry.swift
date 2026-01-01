@@ -32,20 +32,20 @@ extension CppBridge {
         private let logger = SDKLogger(category: "CppBridge.ModelRegistry")
 
         private init() {
-            var handlePtr: rac_model_registry_handle_t?
-            let result = rac_model_registry_create(&handlePtr)
-            if result == RAC_SUCCESS {
-                self.handle = handlePtr
-                logger.debug("Model registry created")
+            // Use the global C++ model registry so that models registered
+            // by C++ backends (like Platform) are visible to Swift
+            let globalRegistry = rac_get_model_registry()
+            if globalRegistry != nil {
+                self.handle = globalRegistry
+                logger.debug("Using global C++ model registry")
             } else {
-                logger.error("Failed to create model registry")
+                logger.error("Failed to get global model registry")
             }
         }
 
         deinit {
-            if let handle = handle {
-                rac_model_registry_destroy(handle)
-            }
+            // Don't destroy the global registry - it's managed by C++
+            // The handle is just a reference to the singleton
         }
 
         // MARK: - Save/Get Operations
