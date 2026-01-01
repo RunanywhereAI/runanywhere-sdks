@@ -116,7 +116,7 @@ struct ModelSelectionSheet: View {
     }
 
     private func loadAvailableFrameworks() async {
-        let allFrameworks = await MainActor.run { RunAnywhere.getRegisteredFrameworks() }
+        let allFrameworks = await RunAnywhere.getRegisteredFrameworks()
         var filtered = allFrameworks.filter { shouldShowFramework($0) }
         if context == .tts && !filtered.contains(.systemTTS) {
             filtered.insert(.systemTTS, at: 0)

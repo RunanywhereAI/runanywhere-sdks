@@ -13,6 +13,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/infrastructure/model_management/rac_model_registry.h"
 
 // =============================================================================
 // STATIC STATE
@@ -23,6 +24,10 @@ static std::mutex s_init_mutex;
 static const rac_platform_adapter_t* s_platform_adapter = nullptr;
 static rac_log_level_t s_log_level = RAC_LOG_INFO;
 static std::string s_log_tag = "RAC";
+
+// Global model registry
+static rac_model_registry_handle_t s_model_registry = nullptr;
+static std::mutex s_model_registry_mutex;
 
 // Version info
 static const char* s_version_string = "1.0.0";
@@ -175,6 +180,53 @@ rac_result_t rac_extract_archive(const char* archive_path, const char* destinati
 
     return s_platform_adapter->extract_archive(archive_path, destination_dir, progress_callback,
                                                callback_user_data, s_platform_adapter->user_data);
+}
+
+// =============================================================================
+// GLOBAL MODEL REGISTRY
+// =============================================================================
+
+rac_model_registry_handle_t rac_get_model_registry(void) {
+    std::lock_guard<std::mutex> lock(s_model_registry_mutex);
+
+    if (s_model_registry == nullptr) {
+        rac_result_t result = rac_model_registry_create(&s_model_registry);
+        if (result != RAC_SUCCESS) {
+            rac_log(RAC_LOG_ERROR, "RAC.Core", "Failed to create global model registry");
+            return nullptr;
+        }
+        rac_log(RAC_LOG_INFO, "RAC.Core", "Global model registry created");
+    }
+
+    return s_model_registry;
+}
+
+rac_result_t rac_register_model(const rac_model_info_t* model) {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (registry == nullptr) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+    return rac_model_registry_save(registry, model);
+}
+
+rac_result_t rac_get_model(const char* model_id, rac_model_info_t** out_model) {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (registry == nullptr) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+    return rac_model_registry_get(registry, model_id, out_model);
+}
+
+rac_bool_t rac_framework_is_platform_service(rac_inference_framework_t framework) {
+    // Platform services are Swift-native implementations
+    // that use service registry callbacks rather than C++ backends
+    switch (framework) {
+        case RAC_FRAMEWORK_FOUNDATION_MODELS:
+        case RAC_FRAMEWORK_SYSTEM_TTS:
+            return RAC_TRUE;
+        default:
+            return RAC_FALSE;
+    }
 }
 
 }  // extern "C"

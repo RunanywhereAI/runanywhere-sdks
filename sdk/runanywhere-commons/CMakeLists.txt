@@ -134,6 +134,8 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_registry.cpp
     src/infrastructure/model_management/model_types.cpp
     src/infrastructure/model_management/model_paths.cpp
+    src/infrastructure/model_management/model_strategy.cpp
+    src/infrastructure/storage/storage_analyzer.cpp
     # Network / Data layer (maps to Swift Data/)
     src/infrastructure/network/environment.cpp
     src/infrastructure/network/endpoints.cpp
@@ -151,6 +153,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
 set(RAC_FEATURES_SOURCES
     # LLM
     src/features/llm/llm_component.cpp
+    src/features/llm/rac_llm_service.cpp
     src/features/llm/streaming_metrics.cpp
     src/features/llm/llm_analytics.cpp
     src/features/llm/structured_output.cpp

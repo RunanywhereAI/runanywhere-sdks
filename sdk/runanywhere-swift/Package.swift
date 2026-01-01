@@ -25,7 +25,7 @@ let package = Package(
     // Core SDK (RunAnywhere) has availability annotations for iOS 14+ / macOS 12+
     // Optional modules have higher requirements:
     //   - LlamaCPPRuntime: iOS 16+ / macOS 13+
-    //   - AppleAI: iOS 26+ runtime (builds on iOS 16+)
+    //   - SystemFoundationModels: iOS 26+ runtime (builds on iOS 17+)
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
@@ -57,14 +57,6 @@ let package = Package(
         .library(
             name: "RunAnywhereLlamaCPP",
             targets: ["LlamaCPPRuntime"]
-        ),
-
-        // =================================================================
-        // Apple Foundation Models - Apple Intelligence (iOS 26+)
-        // =================================================================
-        .library(
-            name: "RunAnywhereAppleAI",
-            targets: ["FoundationModelsAdapter"]
         ),
 
     ],
@@ -190,18 +182,6 @@ let package = Package(
                 // Use -ObjC instead of -all_load for smaller binary size
                 .unsafeFlags(["-ObjC"])
             ]
-        ),
-
-        // =================================================================
-        // Apple Foundation Models (iOS 16+ build, iOS 26+ runtime)
-        // Provides: Apple Intelligence integration
-        // =================================================================
-        .target(
-            name: "FoundationModelsAdapter",
-            dependencies: [
-                "RunAnywhere",
-            ],
-            path: "Sources/FoundationModelsAdapter"
         ),
 
     ] + binaryTargets()

@@ -61,8 +61,40 @@ public enum ONNX: RunAnywhereModule {
     /// ONNX uses the ONNX Runtime inference framework
     public static let inferenceFramework: InferenceFramework = .onnx
 
-    /// Storage strategy for ONNX models (handles nested directory structures)
-    public static let storageStrategy: ModelStorageStrategy? = ONNXModelStorageStrategy()
+    // MARK: - Strategy Access (via C++ Bridge)
+
+    /// Find model path using C++ storage strategy
+    /// - Parameters:
+    ///   - modelId: Model identifier
+    ///   - modelFolder: Model folder URL
+    /// - Returns: Resolved model path, or nil if not found
+    public static func findModelPath(modelId: String, in modelFolder: URL) -> URL? {
+        return CppBridge.Strategy.findModelPath(
+            framework: inferenceFramework,
+            modelId: modelId,
+            modelFolder: modelFolder
+        )
+    }
+
+    /// Detect model in folder using C++ storage strategy
+    /// - Parameter modelFolder: Model folder URL
+    /// - Returns: Storage details if model detected
+    public static func detectModel(in modelFolder: URL) -> ModelStorageDetails? {
+        return CppBridge.Strategy.detectModel(
+            framework: inferenceFramework,
+            modelFolder: modelFolder
+        )
+    }
+
+    /// Validate model storage using C++ strategy
+    /// - Parameter modelFolder: Model folder URL
+    /// - Returns: True if storage is valid
+    public static func isValidStorage(at modelFolder: URL) -> Bool {
+        return CppBridge.Strategy.isValidStorage(
+            framework: inferenceFramework,
+            modelFolder: modelFolder
+        )
+    }
 
     // MARK: - Registration State
 

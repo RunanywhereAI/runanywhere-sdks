@@ -11,28 +11,11 @@ import Foundation
 
 public extension RunAnywhere {
 
-    /// Get models for a specific framework
-    /// - Parameter framework: The framework to query
-    /// - Returns: Array of models for the framework
-    static func getModelsForFramework(_ framework: InferenceFramework) -> [ModelInfo] {
-        EventPublisher.shared.track(FrameworkEvent.modelsRequested(framework: framework.rawValue))
-
-        let models = RunAnywhere.serviceContainer.modelRegistry.filterModels(by: ModelCriteria(framework: framework))
-
-        EventPublisher.shared.track(FrameworkEvent.modelsRetrieved(
-            framework: framework.rawValue,
-            count: models.count
-        ))
-
-        return models
-    }
-
     /// Get all registered frameworks derived from available models
     /// - Returns: Array of available inference frameworks that have models registered
-    @MainActor
-    static func getRegisteredFrameworks() -> [InferenceFramework] {
+    static func getRegisteredFrameworks() async -> [InferenceFramework] {
         // Derive frameworks from registered models - this is the source of truth
-        let allModels = serviceContainer.modelRegistry.filterModels(by: ModelCriteria())
+        let allModels = await CppBridge.ModelRegistry.shared.getAll()
         var frameworks: Set<InferenceFramework> = []
 
         for model in allModels {
@@ -46,9 +29,8 @@ public extension RunAnywhere {
     /// Get all registered frameworks for a specific capability
     /// - Parameter capability: The capability/component type to filter by
     /// - Returns: Array of frameworks that provide the specified capability
-    @MainActor
-    static func getFrameworks(for capability: SDKComponent) -> [InferenceFramework] {
-        let allModels = serviceContainer.modelRegistry.filterModels(by: ModelCriteria())
+    static func getFrameworks(for capability: SDKComponent) async -> [InferenceFramework] {
+        let allModels = await CppBridge.ModelRegistry.shared.getAll()
         var frameworks: Set<InferenceFramework> = []
 
         // Map capability to model categories

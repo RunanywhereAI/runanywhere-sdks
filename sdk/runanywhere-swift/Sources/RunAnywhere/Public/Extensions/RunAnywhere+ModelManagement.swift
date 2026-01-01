@@ -18,11 +18,127 @@ extension RunAnywhere {
         guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
             throw SDKError.llm(.modelNotFound, "Model '\(modelId)' not found in registry")
         }
-        guard let localPath = modelInfo.localPath else {
+        guard modelInfo.localPath != nil else {
             throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded")
         }
 
-        try await CapabilityManager.shared.loadLLMModel(localPath.path, modelId: modelId)
+        // Resolve actual model file path
+        let modelPath = try resolveModelFilePath(for: modelInfo)
+        try await CppBridge.LLM.shared.loadModel(modelPath.path, modelId: modelId)
+    }
+
+    // MARK: - Private: Model Path Resolution
+
+    /// Resolve the actual model file path for loading.
+    /// For single-file models (LlamaCpp), finds the actual .gguf file in the folder.
+    /// For directory-based models (ONNX), returns the folder containing the model files.
+    private static func resolveModelFilePath(for model: ModelInfo) throws -> URL {
+        let modelFolder = try CppBridge.ModelPaths.getModelFolder(modelId: model.id, framework: model.framework)
+
+        // For ONNX models (directory-based), we need to find the actual model directory
+        // Archives often create a nested folder with the model name inside
+        if model.framework == .onnx {
+            return resolveONNXModelPath(modelFolder: modelFolder, modelId: model.id)
+        }
+
+        // For single-file models (LlamaCpp), find the actual model file
+        return try resolveSingleFileModelPath(modelFolder: modelFolder, model: model)
+    }
+
+    /// Resolve ONNX model directory path (handles nested archive extraction)
+    private static func resolveONNXModelPath(modelFolder: URL, modelId: String) -> URL {
+        let logger = SDKLogger(category: "ModelPathResolver")
+
+        // Check if there's a nested folder with the model name (from archive extraction)
+        let nestedFolder = modelFolder.appendingPathComponent(modelId)
+        logger.debug("Checking nested folder: \(nestedFolder.path)")
+
+        if FileManager.default.fileExists(atPath: nestedFolder.path) {
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: nestedFolder.path, isDirectory: &isDir), isDir.boolValue {
+                // Check if this nested folder contains model files
+                if hasONNXModelFiles(at: nestedFolder) {
+                    logger.info("Found ONNX model at nested path: \(nestedFolder.path)")
+                    return nestedFolder
+                }
+            }
+        }
+
+        // Check if model files exist directly in the model folder
+        if hasONNXModelFiles(at: modelFolder) {
+            logger.info("Found ONNX model at folder: \(modelFolder.path)")
+            return modelFolder
+        }
+
+        // Scan for any subdirectory that contains model files
+        if let contents = try? FileManager.default.contentsOfDirectory(at: modelFolder, includingPropertiesForKeys: [.isDirectoryKey]) {
+            logger.debug("Scanning \(contents.count) items in model folder")
+            for item in contents {
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
+                    if hasONNXModelFiles(at: item) {
+                        logger.info("Found ONNX model in subdirectory: \(item.path)")
+                        return item
+                    }
+                }
+            }
+        }
+
+        // Fallback to model folder
+        logger.warning("No ONNX model files found, falling back to: \(modelFolder.path)")
+        return modelFolder
+    }
+
+    /// Check if a directory contains ONNX model files
+    private static func hasONNXModelFiles(at directory: URL) -> Bool {
+        guard let contents = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else {
+            return false
+        }
+
+        // Check for any .onnx files (handles various naming conventions)
+        let hasOnnxFiles = contents.contains { url in
+            url.pathExtension.lowercased() == "onnx"
+        }
+
+        // Also check for tokens.txt which is common to both STT and TTS
+        let hasTokensFile = contents.contains { url in
+            url.lastPathComponent.lowercased().contains("tokens")
+        }
+
+        return hasOnnxFiles || hasTokensFile
+    }
+
+    /// Resolve single-file model path (LlamaCpp .gguf files)
+    private static func resolveSingleFileModelPath(modelFolder: URL, model: ModelInfo) throws -> URL {
+        // Get the expected path from C++
+        let expectedPath = try CppBridge.ModelPaths.getExpectedModelPath(
+            modelId: model.id,
+            framework: model.framework,
+            format: model.format
+        )
+
+        // If expected path exists, use it
+        if FileManager.default.fileExists(atPath: expectedPath.path) {
+            return expectedPath
+        }
+
+        // Find files with the expected extension
+        let expectedExtension = model.format.rawValue.lowercased()
+        if let contents = try? FileManager.default.contentsOfDirectory(at: modelFolder, includingPropertiesForKeys: nil) {
+            // Look for files with the model format extension
+            let modelFiles = contents.filter { url in
+                let ext = url.pathExtension.lowercased()
+                return ext == expectedExtension || ext == "gguf" || ext == "bin"
+            }
+
+            // Return the first match
+            if let modelFile = modelFiles.first {
+                return modelFile
+            }
+        }
+
+        // Fallback to expected path
+        return expectedPath
     }
 
     /// Unload the currently loaded LLM model
@@ -31,13 +147,13 @@ extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        await CapabilityManager.shared.unloadLLM()
+        await CppBridge.LLM.shared.unload()
     }
 
     /// Check if an LLM model is loaded
     public static var isModelLoaded: Bool {
         get async {
-            await CapabilityManager.shared.isLLMLoaded
+            await CppBridge.LLM.shared.isLoaded
         }
     }
 
@@ -69,11 +185,15 @@ extension RunAnywhere {
         guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
             throw SDKError.stt(.modelNotFound, "Model '\(modelId)' not found in registry")
         }
-        guard let localPath = modelInfo.localPath else {
+        guard modelInfo.localPath != nil else {
             throw SDKError.stt(.modelNotFound, "Model '\(modelId)' is not downloaded")
         }
 
-        try await CapabilityManager.shared.loadSTTModel(localPath.path, modelId: modelId)
+        // Resolve actual model path
+        let modelPath = try resolveModelFilePath(for: modelInfo)
+        let logger = SDKLogger(category: "RunAnywhere.STT")
+        logger.info("Loading STT model from resolved path: \(modelPath.path)")
+        try await CppBridge.STT.shared.loadModel(modelPath.path, modelId: modelId)
     }
 
     /// Load a TTS (Text-to-Speech) voice by ID
@@ -91,25 +211,29 @@ extension RunAnywhere {
         guard let modelInfo = allModels.first(where: { $0.id == voiceId }) else {
             throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
         }
-        guard let localPath = modelInfo.localPath else {
+        guard modelInfo.localPath != nil else {
             throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
         }
 
-        try await CapabilityManager.shared.loadTTSVoice(localPath.path, voiceId: voiceId)
+        // Resolve actual model path
+        let modelPath = try resolveModelFilePath(for: modelInfo)
+        let logger = SDKLogger(category: "RunAnywhere.TTS")
+        logger.info("Loading TTS voice from resolved path: \(modelPath.path)")
+        try await CppBridge.TTS.shared.loadVoice(modelPath.path, voiceId: voiceId)
     }
 
     /// Get available models
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
         guard isInitialized else { throw SDKError.general(.notInitialized, "SDK not initialized") }
-        return await serviceContainer.modelRegistry.discoverModels()
+        return await CppBridge.ModelRegistry.shared.getAll()
     }
 
     /// Get currently loaded LLM model ID
     /// - Returns: Currently loaded model ID if any
     public static func getCurrentModelId() async -> String? {
         guard isInitialized else { return nil }
-        return await CapabilityManager.shared.currentLLMModelId
+        return await CppBridge.LLM.shared.currentModelId
     }
 
     /// Get the currently loaded LLM model as ModelInfo
@@ -132,7 +256,7 @@ extension RunAnywhere {
     public static var currentSTTModel: ModelInfo? {
         get async {
             guard isInitialized else { return nil }
-            guard let modelId = await CapabilityManager.shared.currentSTTModelId else { return nil }
+            guard let modelId = await CppBridge.STT.shared.currentModelId else { return nil }
             let models = (try? await availableModels()) ?? []
             return models.first { $0.id == modelId }
         }
@@ -145,7 +269,7 @@ extension RunAnywhere {
     public static var currentTTSVoiceId: String? {
         get async {
             guard isInitialized else { return nil }
-            return await CapabilityManager.shared.currentTTSVoiceId
+            return await CppBridge.TTS.shared.currentVoiceId
         }
     }
 
@@ -155,6 +279,6 @@ extension RunAnywhere {
     /// or explicitly requests cancellation.
     public static func cancelGeneration() async {
         guard isInitialized else { return }
-        await CapabilityManager.shared.cancelLLM()
+        await CppBridge.LLM.shared.cancel()
     }
 }

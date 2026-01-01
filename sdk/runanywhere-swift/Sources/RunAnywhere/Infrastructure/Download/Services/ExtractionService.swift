@@ -1,10 +1,10 @@
 //
-//  ModelExtractionService.swift
+//  ExtractionService.swift
 //  RunAnywhere SDK
 //
 //  Centralized service for extracting model archives.
 //  Uses pure Swift extraction via SWCompression (no native C library dependency).
-//  Located in ModelManagement as it uses ModelArtifactType and is model-specific.
+//  Located in Download as it's part of the download post-processing pipeline.
 //
 
 import Foundation
@@ -36,7 +36,7 @@ public struct ExtractionResult: Sendable {
 // MARK: - Extraction Service Protocol
 
 /// Protocol for model extraction service
-public protocol ModelExtractionServiceProtocol: Sendable {
+public protocol ExtractionServiceProtocol: Sendable {
     /// Extract an archive based on the model's artifact type
     /// - Parameters:
     ///   - archiveURL: URL to the downloaded archive
@@ -56,8 +56,8 @@ public protocol ModelExtractionServiceProtocol: Sendable {
 
 /// Default implementation of the model extraction service
 /// Uses pure Swift extraction via SWCompression for all archive types
-public final class DefaultModelExtractionService: ModelExtractionServiceProtocol, @unchecked Sendable {
-    private let logger = SDKLogger(category: "ModelExtractionService")
+public final class DefaultExtractionService: ExtractionServiceProtocol, @unchecked Sendable {
+    private let logger = SDKLogger(category: "ExtractionService")
 
     public init() {}
 
@@ -222,3 +222,9 @@ public final class DefaultModelExtractionService: ModelExtractionServiceProtocol
         return (totalSize, fileCount)
     }
 }
+
+// MARK: - Type Aliases for backward compatibility
+
+/// Type alias for backward compatibility
+public typealias ModelExtractionServiceProtocol = ExtractionServiceProtocol
+public typealias DefaultModelExtractionService = DefaultExtractionService

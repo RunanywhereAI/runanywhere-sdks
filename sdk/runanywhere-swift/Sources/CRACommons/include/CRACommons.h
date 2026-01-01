@@ -84,6 +84,10 @@
 #include "rac_model_types.h"
 #include "rac_model_paths.h"
 #include "rac_model_registry.h"
+#include "rac_model_strategy.h"
+
+// Storage analysis
+#include "rac_storage_analyzer.h"
 
 // =============================================================================
 // NETWORK - Environment, Auth, API Types, Dev Config

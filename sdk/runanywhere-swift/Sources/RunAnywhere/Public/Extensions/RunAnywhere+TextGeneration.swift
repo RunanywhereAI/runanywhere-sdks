@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Public API for text generation (LLM) operations.
-//  Calls C++ directly via CapabilityManager for all operations.
+//  Calls C++ directly via CppBridge.LLM for all operations.
 //  Events are emitted by C++ layer via CppEventBridge.
 //
 
@@ -38,15 +38,15 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        // Get handle from CapabilityManager
-        let handle = try await CapabilityManager.shared.getLLMHandle()
+        // Get handle from CppBridge.LLM
+        let handle = try await CppBridge.LLM.shared.getHandle()
 
         // Verify model is loaded
-        guard await CapabilityManager.shared.isLLMLoaded else {
+        guard await CppBridge.LLM.shared.isLoaded else {
             throw SDKError.llm(.notInitialized, "LLM model not loaded")
         }
 
-        let modelId = await CapabilityManager.shared.currentLLMModelId ?? "unknown"
+        let modelId = await CppBridge.LLM.shared.currentModelId ?? "unknown"
         let opts = options ?? LLMGenerationOptions()
 
         let startTime = Date()
@@ -131,13 +131,13 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        let handle = try await CapabilityManager.shared.getLLMHandle()
+        let handle = try await CppBridge.LLM.shared.getHandle()
 
-        guard await CapabilityManager.shared.isLLMLoaded else {
+        guard await CppBridge.LLM.shared.isLoaded else {
             throw SDKError.llm(.notInitialized, "LLM model not loaded")
         }
 
-        let modelId = await CapabilityManager.shared.currentLLMModelId ?? "unknown"
+        let modelId = await CppBridge.LLM.shared.currentModelId ?? "unknown"
         let opts = options ?? LLMGenerationOptions()
 
         let collector = LLMStreamingMetricsCollector(modelId: modelId, promptLength: prompt.count)

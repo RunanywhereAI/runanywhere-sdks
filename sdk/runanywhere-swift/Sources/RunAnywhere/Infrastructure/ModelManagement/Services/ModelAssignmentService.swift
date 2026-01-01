@@ -1,19 +1,18 @@
 import Foundation
 
 /// Service for fetching and managing model assignments from the backend
+/// Uses CppBridge.ModelRegistry directly for storage
 public actor ModelAssignmentService {
     private let logger = SDKLogger(category: "ModelAssignmentService")
     private let networkService: any NetworkService
-    private let modelInfoService: ModelInfoService
     private var cachedAssignments: [ModelInfo]?
     private var lastFetchTime: Date?
     private let cacheTimeout: TimeInterval = 3600 // 1 hour cache
 
     // MARK: - Initialization
 
-    public init(networkService: any NetworkService, modelInfoService: ModelInfoService) {
+    public init(networkService: any NetworkService) {
         self.networkService = networkService
-        self.modelInfoService = modelInfoService
         logger.info("ModelAssignmentService initialized")
     }
 
@@ -57,9 +56,9 @@ public actor ModelAssignmentService {
             cachedAssignments = modelInfos
             lastFetchTime = Date()
 
-            // Save to in-memory storage
+            // Save to C++ registry directly
             for model in modelInfos {
-                try await modelInfoService.saveModel(model)
+                try await CppBridge.ModelRegistry.shared.save(model)
             }
 
             logger.info("Model assignments cached")
@@ -74,8 +73,8 @@ public actor ModelAssignmentService {
                 return cached
             }
 
-            // Last resort: load from in-memory storage
-            let localModels = try await modelInfoService.loadStoredModels()
+            // Last resort: load from C++ registry
+            let localModels = await CppBridge.ModelRegistry.shared.getAll()
             if !localModels.isEmpty {
                 logger.info("Using \(localModels.count) in-memory stored models as fallback")
                 cachedAssignments = localModels

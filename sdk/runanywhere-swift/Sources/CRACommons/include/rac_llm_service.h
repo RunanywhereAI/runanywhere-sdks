@@ -26,11 +26,11 @@ extern "C" {
 /**
  * @brief Create an LLM service
  *
- * @param model_path Path to the model file (can be NULL for some providers)
+ * @param model_id Model identifier (registry ID or path to model file)
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_create(const char* model_path, rac_handle_t* out_handle);
+RAC_API rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle);
 
 /**
  * @brief Initialize an LLM service

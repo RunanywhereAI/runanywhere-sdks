@@ -244,6 +244,112 @@ RAC_API void rac_model_info_array_free(rac_model_info_t** models, size_t count);
  */
 RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
 
+// =============================================================================
+// MODEL DISCOVERY - Scan file system for downloaded models
+// =============================================================================
+
+/**
+ * @brief Callback to list directory contents
+ * @param path Directory path
+ * @param out_entries Output: Array of entry names (allocated by callback)
+ * @param out_count Output: Number of entries
+ * @param user_data User context
+ * @return RAC_SUCCESS or error code
+ */
+typedef rac_result_t (*rac_list_directory_fn)(const char* path, char*** out_entries,
+                                              size_t* out_count, void* user_data);
+
+/**
+ * @brief Callback to free directory entries
+ * @param entries Array of entry names
+ * @param count Number of entries
+ * @param user_data User context
+ */
+typedef void (*rac_free_directory_entries_fn)(char** entries, size_t count, void* user_data);
+
+/**
+ * @brief Callback to check if path is a directory
+ * @param path Path to check
+ * @param user_data User context
+ * @return RAC_TRUE if directory, RAC_FALSE otherwise
+ */
+typedef rac_bool_t (*rac_is_directory_fn)(const char* path, void* user_data);
+
+/**
+ * @brief Callback to check if path exists
+ * @param path Path to check
+ * @param user_data User context
+ * @return RAC_TRUE if exists
+ */
+typedef rac_bool_t (*rac_path_exists_discovery_fn)(const char* path, void* user_data);
+
+/**
+ * @brief Callback to check if file has model extension
+ * @param path File path
+ * @param framework Expected framework
+ * @param user_data User context
+ * @return RAC_TRUE if valid model file
+ */
+typedef rac_bool_t (*rac_is_model_file_fn)(const char* path, rac_inference_framework_t framework,
+                                           void* user_data);
+
+/**
+ * @brief Callbacks for model discovery file operations
+ */
+typedef struct {
+    rac_list_directory_fn list_directory;
+    rac_free_directory_entries_fn free_entries;
+    rac_is_directory_fn is_directory;
+    rac_path_exists_discovery_fn path_exists;
+    rac_is_model_file_fn is_model_file;
+    void* user_data;
+} rac_discovery_callbacks_t;
+
+/**
+ * @brief Discovery result for a single model
+ */
+typedef struct {
+    /** Model ID that was discovered */
+    const char* model_id;
+    /** Path where model was found */
+    const char* local_path;
+    /** Framework of the model */
+    rac_inference_framework_t framework;
+} rac_discovered_model_t;
+
+/**
+ * @brief Result of model discovery scan
+ */
+typedef struct {
+    /** Number of models discovered as downloaded */
+    size_t discovered_count;
+    /** Array of discovered models */
+    rac_discovered_model_t* discovered_models;
+    /** Number of unregistered model folders found */
+    size_t unregistered_count;
+} rac_discovery_result_t;
+
+/**
+ * @brief Discover downloaded models on the file system.
+ *
+ * Scans the models directory for each framework, checks if folders
+ * contain valid model files, and updates the registry for registered models.
+ *
+ * @param handle Registry handle
+ * @param callbacks Platform file operation callbacks
+ * @param out_result Output: Discovery result (caller must call rac_discovery_result_free)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_model_registry_discover_downloaded(
+    rac_model_registry_handle_t handle, const rac_discovery_callbacks_t* callbacks,
+    rac_discovery_result_t* out_result);
+
+/**
+ * @brief Free discovery result
+ * @param result Discovery result to free
+ */
+RAC_API void rac_discovery_result_free(rac_discovery_result_t* result);
+
 #ifdef __cplusplus
 }
 #endif

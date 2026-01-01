@@ -2,7 +2,9 @@ import Alamofire
 import Files
 import Foundation
 
-/// Simplified download service using Alamofire
+/// Download service using Alamofire for HTTP and C++ bridge for orchestration
+/// C++ handles: task tracking, progress calculation, retry logic
+/// Swift handles: HTTP transport via Alamofire, extraction via SWCompression
 public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
 
     // MARK: - Properties
@@ -16,9 +18,6 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     /// Extraction service for handling archive extraction
     let extractionService: ModelExtractionServiceProtocol
 
-    /// Helper for handling download progress
-    let progressHandler: DownloadProgressHandler
-
     // MARK: - Custom Download Strategies
 
     /// Storage for custom download strategies provided by host app
@@ -31,7 +30,6 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         extractionService: ModelExtractionServiceProtocol = DefaultModelExtractionService()
     ) {
         self.extractionService = extractionService
-        self.progressHandler = DownloadProgressHandler()
 
         // Configure session
         let sessionConfiguration = URLSessionConfiguration.default
@@ -84,6 +82,11 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
             downloadRequest.cancel()
             activeDownloadRequests.removeValue(forKey: taskId)
 
+            // Notify C++ bridge
+            Task {
+                try? await CppBridge.Download.shared.cancelDownload(taskId: taskId)
+            }
+
             EventPublisher.shared.track(ModelEvent.downloadCancelled(modelId: taskId))
             logger.info("Cancelled download task: \(taskId)")
         }
@@ -94,12 +97,18 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     /// Pause all active downloads
     public func pauseAll() {
         activeDownloadRequests.values.forEach { $0.suspend() }
+        Task {
+            try? await CppBridge.Download.shared.pauseAll()
+        }
         logger.info("Paused all downloads")
     }
 
     /// Resume all paused downloads
     public func resumeAll() {
         activeDownloadRequests.values.forEach { $0.resume() }
+        Task {
+            try? await CppBridge.Download.shared.resumeAll()
+        }
         logger.info("Resumed all downloads")
     }
 
@@ -121,12 +130,32 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         // Track download started
         EventPublisher.shared.track(ModelEvent.downloadStarted(modelId: model.id))
 
-        let taskId = UUID().uuidString
         let downloadStartTime = Date()
         let (progressStream, progressContinuation) = AsyncStream<DownloadProgress>.makeStream()
 
         // Determine if we need extraction
-        let requiresExtraction = model.artifactType.requiresExtraction
+        // First check artifact type, then infer from URL if not explicitly set
+        var requiresExtraction = model.artifactType.requiresExtraction
+
+        // If artifact type doesn't require extraction, check if URL indicates an archive
+        // This is a safeguard for models registered without explicit artifact type
+        if !requiresExtraction, let archiveType = ArchiveType.from(url: downloadURL) {
+            logger.info("URL indicates archive type (\(archiveType.rawValue)) but artifact type doesn't require extraction. Inferring extraction needed.")
+            requiresExtraction = true
+        }
+
+        // Get destination path from C++ path utilities
+        let destinationFolder = try CppBridge.ModelPaths.getModelFolder(modelId: model.id, framework: model.framework)
+
+        // Start tracking in C++ download manager
+        let taskId = try await CppBridge.Download.shared.startDownload(
+            modelId: model.id,
+            url: downloadURL,
+            destinationPath: destinationFolder,
+            requiresExtraction: requiresExtraction
+        ) { progress in
+            progressContinuation.yield(progress)
+        }
 
         // Create download task
         let task = DownloadTask(
@@ -146,9 +175,15 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
                         taskId: taskId,
                         requiresExtraction: requiresExtraction,
                         downloadStartTime: downloadStartTime,
+                        destinationFolder: destinationFolder,
                         progressContinuation: progressContinuation
                     )
                 } catch {
+                    // Notify C++ bridge of failure
+                    await CppBridge.Download.shared.markFailed(
+                        taskId: taskId,
+                        error: SDKError.from(error, category: .download)
+                    )
                     progressContinuation.yield(.failed(error, bytesDownloaded: 0, totalBytes: model.downloadSize ?? 0))
                     throw error
                 }
@@ -165,25 +200,20 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         taskId: String,
         requiresExtraction: Bool,
         downloadStartTime: Date,
+        destinationFolder: URL,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        // Get destination folder (framework is required - 1:1 mapping)
-        let framework = model.framework
-        let fileManager = ServiceContainer.shared.fileManager
-        let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
-        let modelFolderURL = URL(fileURLWithPath: modelFolder.path)
-
         // Determine download destination
         let downloadDestination = determineDownloadDestination(
             for: model,
-            modelFolderURL: modelFolderURL,
+            modelFolderURL: destinationFolder,
             requiresExtraction: requiresExtraction
         )
 
         // Log download start
         logDownloadStart(model: model, url: downloadURL, destination: downloadDestination, requiresExtraction: requiresExtraction)
 
-        // Perform download
+        // Perform download (Alamofire HTTP)
         let downloadedURL = try await performDownload(
             url: downloadURL,
             destination: downloadDestination,
@@ -192,16 +222,19 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
             progressContinuation: progressContinuation
         )
 
+        // Notify C++ that download portion is complete
+        await CppBridge.Download.shared.markComplete(taskId: taskId, downloadedPath: downloadedURL)
+
         // Handle extraction if needed
         let finalModelPath = try await handlePostDownloadProcessing(
             downloadedURL: downloadedURL,
-            modelFolderURL: modelFolderURL,
+            modelFolderURL: destinationFolder,
             model: model,
             requiresExtraction: requiresExtraction,
             progressContinuation: progressContinuation
         )
 
-        // Update and save model
+        // Update model metadata via C++ registry
         try await updateModelMetadata(model: model, localPath: finalModelPath)
 
         // Track completion
@@ -218,13 +251,34 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     ) -> URL {
         if requiresExtraction {
             // Download to temp location for archives
-            return FileManager.default.temporaryDirectory
-                .appendingPathComponent("\(model.id)_\(UUID().uuidString)")
-                .appendingPathExtension(getArchiveExtension(for: model.artifactType))
+            // Get archive extension - use the one from artifact type or infer from URL
+            let archiveExt = getArchiveExtensionFromModelOrURL(model)
+
+            // Note: URL.appendingPathExtension doesn't work well with multi-part extensions like "tar.gz"
+            // So we construct the filename with extension directly
+            let filename = "\(model.id)_\(UUID().uuidString).\(archiveExt)"
+            return FileManager.default.temporaryDirectory.appendingPathComponent(filename)
         } else {
             // Download directly to model folder
             return modelFolderURL.appendingPathComponent("\(model.id).\(model.format.rawValue)")
         }
+    }
+
+    /// Get archive extension from model's artifact type or infer from download URL
+    private func getArchiveExtensionFromModelOrURL(_ model: ModelInfo) -> String {
+        // First try to get from artifact type
+        if case .archive(let archiveType, _, _) = model.artifactType {
+            return archiveType.fileExtension
+        }
+
+        // If not an explicit archive type, try to infer from download URL
+        if let url = model.downloadURL,
+           let archiveType = ArchiveType.from(url: url) {
+            return archiveType.fileExtension
+        }
+
+        // Default to archive (unknown type)
+        return "archive"
     }
 
     /// Log download start information
@@ -261,22 +315,12 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         }
     }
 
-    /// Update model metadata in registry and persistent storage
+    /// Update model metadata via C++ registry
     private func updateModelMetadata(model: ModelInfo, localPath: URL) async throws {
         var updatedModel = model
         updatedModel.localPath = localPath
-        ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
-
-        // Save metadata persistently
-        Task {
-            do {
-                let modelInfoService = await ServiceContainer.shared.modelInfoService
-                try await modelInfoService.saveModel(updatedModel)
-                self.logger.info("Model metadata saved successfully for: \(model.id)")
-            } catch {
-                self.logger.error("Failed to save model metadata for \(model.id): \(error)")
-            }
-        }
+        try await CppBridge.ModelRegistry.shared.save(updatedModel)
+        logger.info("Model metadata saved successfully for: \(model.id)")
     }
 
     /// Track download completion with analytics
@@ -314,10 +358,6 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
     }
 
     // MARK: - Helper Methods
-
-    func calculateDownloadSpeed(progress: Progress) -> String {
-        return progressHandler.calculateSpeed(progress: progress)
-    }
 
     func mapAlamofireError(_ error: AFError) -> SDKError {
         switch error {

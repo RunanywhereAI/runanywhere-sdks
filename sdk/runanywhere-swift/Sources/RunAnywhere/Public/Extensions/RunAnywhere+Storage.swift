@@ -49,9 +49,19 @@ public extension RunAnywhere {
 public extension RunAnywhere {
 
     /// Get storage information
+    /// Business logic is in C++ via CppBridge.Storage
     static func getStorageInfo() async -> StorageInfo {
-        let storageAnalyzer = RunAnywhere.serviceContainer.storageAnalyzer
-        return await storageAnalyzer.analyzeStorage()
+        return await CppBridge.Storage.shared.analyzeStorage()
+    }
+
+    /// Check if storage is available for a model download
+    static func checkStorageAvailable(for modelSize: Int64, safetyMargin: Double = 0.1) -> StorageAvailability {
+        return CppBridge.Storage.shared.checkStorageAvailable(modelSize: modelSize, safetyMargin: safetyMargin)
+    }
+
+    /// Get storage metrics for a specific model
+    static func getModelStorageMetrics(modelId: String, framework: InferenceFramework) async -> ModelStorageMetrics? {
+        return await CppBridge.Storage.shared.getModelStorageMetrics(modelId: modelId, framework: framework)
     }
 
     /// Clear cache
