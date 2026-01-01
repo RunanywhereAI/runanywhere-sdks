@@ -31,10 +31,10 @@ extern "C" {
  * @brief HTTP response for device registration
  */
 typedef struct rac_device_http_response {
-    rac_result_t result;       // RAC_SUCCESS on success
-    int32_t status_code;       // HTTP status code (200, 400, etc.)
-    const char* response_body; // Response JSON (can be NULL)
-    const char* error_message; // Error message (can be NULL)
+    rac_result_t result;        // RAC_SUCCESS on success
+    int32_t status_code;        // HTTP status code (200, 400, etc.)
+    const char* response_body;  // Response JSON (can be NULL)
+    const char* error_message;  // Error message (can be NULL)
 } rac_device_http_response_t;
 
 /**
@@ -78,8 +78,7 @@ typedef void (*rac_device_set_registered_fn)(rac_bool_t registered, void* user_d
  * @param user_data User-provided context
  * @return RAC_SUCCESS on success, error code otherwise
  */
-typedef rac_result_t (*rac_device_http_post_fn)(const char* endpoint,
-                                                const char* json_body,
+typedef rac_result_t (*rac_device_http_post_fn)(const char* endpoint, const char* json_body,
                                                 rac_bool_t requires_auth,
                                                 rac_device_http_response_t* out_response,
                                                 void* user_data);

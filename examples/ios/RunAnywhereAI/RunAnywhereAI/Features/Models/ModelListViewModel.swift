@@ -149,17 +149,11 @@ class ModelListViewModel: ObservableObject {
     }
 
     func downloadModel(_ model: ModelInfo) async throws {
-        // Get the model info and use the Download service
-        let allModels = try await RunAnywhere.availableModels()
-        guard let modelInfo = allModels.first(where: { $0.id == model.id }) else {
-            throw SDKError.general(.modelNotFound, "Model not found: \(model.id)")
-        }
-
-        // Use the SDK's download mechanism via the Download class
-        let task = try await Download.shared.downloadModel(modelInfo)
+        // Use the SDK's public download API
+        let progressStream = try await RunAnywhere.downloadModel(model.id)
 
         // Wait for completion
-        for await progress in task.progress {
+        for await progress in progressStream {
             print("Download progress: \(Int(progress.overallProgress * 100))%")
             if progress.stage == .completed {
                 break
