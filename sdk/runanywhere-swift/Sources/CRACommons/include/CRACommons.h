@@ -40,6 +40,7 @@
 #include "rac_llm_metrics.h"
 #include "rac_llm_analytics.h"
 #include "rac_llm_events.h"
+#include "rac_llm_structured_output.h"
 
 // STT (Speech-to-Text)
 #include "rac_stt.h"

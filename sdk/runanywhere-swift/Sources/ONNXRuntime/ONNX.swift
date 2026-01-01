@@ -29,16 +29,15 @@ import RunAnywhere
 ///
 /// ## Usage
 ///
-/// ```swift
-/// // Create STT service directly
-/// let sttService = ONNXSTTService()
-/// try await sttService.initialize(modelPath: "/path/to/model")
-/// let result = try await sttService.transcribe(audioData: data, options: .init())
+/// Services are accessed through the main SDK APIs - the C++ backend handles
+/// service creation and lifecycle internally:
 ///
-/// // Create TTS service directly
-/// let ttsService = ONNXTTSService(modelPath: "/path/to/piper")
-/// try await ttsService.initialize()
-/// let audio = try await ttsService.synthesize(text: "Hello", options: .init())
+/// ```swift
+/// // STT via public API
+/// let text = try await RunAnywhere.transcribe(audioData)
+///
+/// // TTS via public API
+/// try await RunAnywhere.speak("Hello")
 /// ```
 public enum ONNX: RunAnywhereModule {
     private static let logger = SDKLogger(category: "ONNX")

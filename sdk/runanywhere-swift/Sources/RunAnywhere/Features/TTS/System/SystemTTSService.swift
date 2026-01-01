@@ -22,7 +22,7 @@ import Foundation
 /// **Concurrency:** This service uses `Task.detached` to completely isolate AVFoundation
 /// operations from Swift's async runtime, avoiding "unsafeForcedSync" warnings.
 @MainActor
-public final class SystemTTSService: NSObject, TTSService {
+public final class SystemTTSService: NSObject {
 
     // MARK: - Framework Identification
 
@@ -43,7 +43,7 @@ public final class SystemTTSService: NSObject, TTSService {
         synthesizer.delegate = self
     }
 
-    // MARK: - TTSService Protocol
+    // MARK: - TTS Operations
 
     public nonisolated func initialize() async throws {
         await MainActor.run {
