@@ -60,41 +60,6 @@ public enum ONNX: RunAnywhereModule {
     /// ONNX uses the ONNX Runtime inference framework
     public static let inferenceFramework: InferenceFramework = .onnx
 
-    // MARK: - Strategy Access (via C++ Bridge)
-
-    /// Find model path using C++ storage strategy
-    /// - Parameters:
-    ///   - modelId: Model identifier
-    ///   - modelFolder: Model folder URL
-    /// - Returns: Resolved model path, or nil if not found
-    public static func findModelPath(modelId: String, in modelFolder: URL) -> URL? {
-        return CppBridge.Strategy.findModelPath(
-            framework: inferenceFramework,
-            modelId: modelId,
-            modelFolder: modelFolder
-        )
-    }
-
-    /// Detect model in folder using C++ storage strategy
-    /// - Parameter modelFolder: Model folder URL
-    /// - Returns: Storage details if model detected
-    public static func detectModel(in modelFolder: URL) -> ModelStorageDetails? {
-        return CppBridge.Strategy.detectModel(
-            framework: inferenceFramework,
-            modelFolder: modelFolder
-        )
-    }
-
-    /// Validate model storage using C++ strategy
-    /// - Parameter modelFolder: Model folder URL
-    /// - Returns: True if storage is valid
-    public static func isValidStorage(at modelFolder: URL) -> Bool {
-        return CppBridge.Strategy.isValidStorage(
-            framework: inferenceFramework,
-            modelFolder: modelFolder
-        )
-    }
-
     // MARK: - Registration State
 
     private static var isRegistered = false
@@ -145,15 +110,9 @@ public enum ONNX: RunAnywhereModule {
     // MARK: - Model Handling
 
     /// Check if ONNX can handle a given model for STT
+    /// Uses model name pattern matching - actual framework info is in C++ registry
     public static func canHandleSTT(modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
-
-        // Check model info cache for framework and category
-        if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            return modelInfo.framework == .onnx && modelInfo.category == .speechRecognition
-        }
-
-        // Fallback: check for STT model patterns
         let lowercased = modelId.lowercased()
         return lowercased.contains("whisper") ||
                lowercased.contains("zipformer") ||
@@ -161,15 +120,9 @@ public enum ONNX: RunAnywhereModule {
     }
 
     /// Check if ONNX can handle a given model for TTS
+    /// Uses model name pattern matching - actual framework info is in C++ registry
     public static func canHandleTTS(modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
-
-        // Check model info cache for framework and category
-        if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            return modelInfo.framework == .onnx && modelInfo.category == .speechSynthesis
-        }
-
-        // Fallback: check for TTS model patterns
         let lowercased = modelId.lowercased()
         return lowercased.contains("piper") || lowercased.contains("vits")
     }

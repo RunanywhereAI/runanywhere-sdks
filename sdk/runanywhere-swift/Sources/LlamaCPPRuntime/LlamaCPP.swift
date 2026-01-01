@@ -113,15 +113,9 @@ public enum LlamaCPP: RunAnywhereModule {
     // MARK: - Model Handling
 
     /// Check if LlamaCPP can handle a given model
+    /// Uses file extension pattern matching - actual framework info is in C++ registry
     public static func canHandle(modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
-
-        // Check model info cache for framework
-        if let modelInfo = ModelInfoCache.shared.modelInfo(for: modelId) {
-            return modelInfo.framework == .llamaCpp
-        }
-
-        // Fallback: check for .gguf extension
         return modelId.lowercased().hasSuffix(".gguf")
     }
 }
