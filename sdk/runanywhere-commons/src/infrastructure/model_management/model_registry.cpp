@@ -454,35 +454,6 @@ rac_artifact_type_kind_t rac_model_infer_artifact_type(const char* url, rac_mode
 }
 
 // =============================================================================
-// PUBLIC API - MEMORY MANAGEMENT
-// =============================================================================
-
-rac_model_info_t* rac_model_info_alloc(void) {
-    return static_cast<rac_model_info_t*>(calloc(1, sizeof(rac_model_info_t)));
-}
-
-void rac_model_info_free(rac_model_info_t* model) {
-    free_model_info(model);
-}
-
-void rac_model_info_array_free(rac_model_info_t** models, size_t count) {
-    if (!models) {
-        return;
-    }
-
-    for (size_t i = 0; i < count; ++i) {
-        if (models[i]) {
-            free_model_info(models[i]);
-        }
-    }
-    free(models);
-}
-
-rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model) {
-    return deep_copy_model(model);
-}
-
-// =============================================================================
 // PUBLIC API - MODEL DISCOVERY
 // =============================================================================
 

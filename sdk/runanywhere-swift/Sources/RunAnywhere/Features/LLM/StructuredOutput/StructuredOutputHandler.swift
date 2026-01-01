@@ -282,16 +282,4 @@ public class StructuredOutputHandler {
     }
 }
 
-/// Structured output validation result
-public struct StructuredOutputValidation: Sendable {
-    public let isValid: Bool
-    public let containsJSON: Bool
-    public let error: String?
-}
-
-// MARK: - Error Handling
-// StructuredOutputError has been replaced with SDKError.llm():
-// - .invalidJSON(msg) -> SDKError.llm(.invalidFormat, msg)
-// - .validationFailed(msg) -> SDKError.llm(.validationFailed, msg)
-// - .extractionFailed(msg) -> SDKError.llm(.extractionFailed, msg)
-// - .unsupportedType(msg) -> SDKError.llm(.invalidFormat, msg)
+// Note: StructuredOutputValidation is defined in LLMTypes.swift

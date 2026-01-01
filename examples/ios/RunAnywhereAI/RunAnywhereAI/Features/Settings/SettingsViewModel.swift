@@ -204,7 +204,7 @@ class SettingsViewModel: ObservableObject {
 
             totalStorageSize = storageInfo.appStorage.totalSize
             availableSpace = storageInfo.deviceStorage.freeSpace
-            modelStorageSize = storageInfo.modelStorage.totalSize
+            modelStorageSize = storageInfo.totalModelsSize
             storedModels = storageInfo.storedModels
 
             print("Settings: Loaded storage data - Total: \(totalStorageSize), Available: \(availableSpace)")

@@ -147,20 +147,22 @@ class TTSViewModel: ObservableObject {
     }
 
     private func handleSDKEvent(_ event: any SDKEvent) {
-        if let ttsEvent = event as? TTSEvent {
-            switch ttsEvent {
-            case .modelLoadCompleted(let voiceId, _, _, _):
-                selectedModelId = voiceId
-                selectedModelName = voiceId
-                logger.info("TTS voice loaded: \(voiceId)")
-            case .modelUnloaded:
-                selectedModelId = nil
-                selectedModelName = nil
-                selectedFramework = nil
-                logger.info("TTS voice unloaded")
-            default:
-                break
-            }
+        // Events now come from C++ via generic BridgedEvent
+        guard event.category == .tts else { return }
+
+        switch event.type {
+        case "tts_voice_load_completed":
+            let voiceId = event.properties["model_id"] ?? ""
+            selectedModelId = voiceId
+            selectedModelName = voiceId
+            logger.info("TTS voice loaded: \(voiceId)")
+        case "tts_voice_unloaded":
+            selectedModelId = nil
+            selectedModelName = nil
+            selectedFramework = nil
+            logger.info("TTS voice unloaded")
+        default:
+            break
         }
     }
 

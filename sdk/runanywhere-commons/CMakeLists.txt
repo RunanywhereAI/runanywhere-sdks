@@ -136,6 +136,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_types.cpp
     src/infrastructure/model_management/model_paths.cpp
     src/infrastructure/model_management/model_strategy.cpp
+    src/infrastructure/model_management/model_assignment.cpp
     src/infrastructure/storage/storage_analyzer.cpp
     # Network / Data layer (maps to Swift Data/)
     src/infrastructure/network/environment.cpp
@@ -148,6 +149,8 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/telemetry/telemetry_types.cpp
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
+    # Device (device registration manager)
+    src/infrastructure/device/rac_device_manager.cpp
 )
 
 # Feature sources (maps to Swift Features/)

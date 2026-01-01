@@ -16,6 +16,17 @@ import Foundation
 /// ```
 public class SimplifiedFileManager {
 
+    // MARK: - Shared Instance
+
+    /// Shared file manager instance
+    public static let shared: SimplifiedFileManager = {
+        do {
+            return try SimplifiedFileManager()
+        } catch {
+            fatalError("Failed to initialize SimplifiedFileManager: \(error)")
+        }
+    }()
+
     // MARK: - Properties
 
     private let baseFolder: Folder

@@ -210,8 +210,7 @@ extension AlamofireDownloadService {
 
     func saveResumeData(_ data: Data, for modelId: String) {
         do {
-            let fileManager = ServiceContainer.shared.fileManager
-            try fileManager.storeCache(key: "resume_\(modelId)", data: data)
+            try SimplifiedFileManager.shared.storeCache(key: "resume_\(modelId)", data: data)
         } catch {
             logger.error("Failed to save resume data for \(modelId): \(error)")
         }
@@ -219,8 +218,7 @@ extension AlamofireDownloadService {
 
     public func getResumeData(for modelId: String) -> Data? {
         do {
-            let fileManager = ServiceContainer.shared.fileManager
-            return try fileManager.loadCache(key: "resume_\(modelId)")
+            return try SimplifiedFileManager.shared.loadCache(key: "resume_\(modelId)")
         } catch {
             logger.error("Failed to load resume data for \(modelId): \(error)")
             return nil

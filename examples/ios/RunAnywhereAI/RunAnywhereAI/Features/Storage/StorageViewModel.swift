@@ -31,7 +31,7 @@ class StorageViewModel: ObservableObject {
         // Update storage sizes from the public API
         totalStorageSize = storageInfo.appStorage.totalSize
         availableSpace = storageInfo.deviceStorage.freeSpace
-        modelStorageSize = storageInfo.modelStorage.totalSize
+        modelStorageSize = storageInfo.totalModelsSize
 
         // Use StoredModel directly from SDK
         storedModels = storageInfo.storedModels

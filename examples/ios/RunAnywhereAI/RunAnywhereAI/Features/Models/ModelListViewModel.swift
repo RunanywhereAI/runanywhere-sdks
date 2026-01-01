@@ -46,23 +46,25 @@ class ModelListViewModel: ObservableObject {
 
     /// Handle SDK events to update model state
     private func handleSDKEvent(_ event: any SDKEvent) {
-        // Check for LLM model load/unload events
-        if let llmEvent = event as? LLMEvent {
-            switch llmEvent {
-            case .modelLoadCompleted(let modelId, _, _, _):
-                // Find the matching model and set as current
-                if let matchingModel = availableModels.first(where: { $0.id == modelId }) {
-                    currentModel = matchingModel
-                    print("✅ ModelListViewModel: Model loaded: \(matchingModel.name)")
-                }
-            case .modelUnloaded(let modelId):
-                if currentModel?.id == modelId {
-                    currentModel = nil
-                    print("ℹ️ ModelListViewModel: Model unloaded: \(modelId)")
-                }
-            default:
-                break
+        // Events now come from C++ via generic BridgedEvent
+        guard event.category == .llm else { return }
+
+        let modelId = event.properties["model_id"] ?? ""
+
+        switch event.type {
+        case "llm_model_load_completed":
+            // Find the matching model and set as current
+            if let matchingModel = availableModels.first(where: { $0.id == modelId }) {
+                currentModel = matchingModel
+                print("✅ ModelListViewModel: Model loaded: \(matchingModel.name)")
             }
+        case "llm_model_unloaded":
+            if currentModel?.id == modelId {
+                currentModel = nil
+                print("ℹ️ ModelListViewModel: Model unloaded: \(modelId)")
+            }
+        default:
+            break
         }
     }
 
