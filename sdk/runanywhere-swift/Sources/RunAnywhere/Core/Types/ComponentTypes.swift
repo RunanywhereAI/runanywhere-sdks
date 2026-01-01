@@ -29,9 +29,6 @@ extension ComponentConfiguration {
     public var preferredFramework: InferenceFramework? { nil }
 }
 
-/// Protocol for component input data
-public protocol ComponentInput: Sendable {}
-
 /// Protocol for component output data
 public protocol ComponentOutput: Sendable {
     var timestamp: Date { get }

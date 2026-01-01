@@ -19,7 +19,7 @@ import FoundationModels
 /// This service provides LLM text generation using Apple's built-in Foundation Models.
 /// It requires iOS 26+ / macOS 26+ and an Apple Intelligence capable device.
 @available(iOS 26.0, macOS 26.0, *)
-public class SystemFoundationModelsService: LLMService {
+public class SystemFoundationModelsService {
     private var _currentModel: String?
     private var _isReady = false
     private let logger = Logger(

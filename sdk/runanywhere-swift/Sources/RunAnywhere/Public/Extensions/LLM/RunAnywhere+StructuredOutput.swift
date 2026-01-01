@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Public API for structured output generation.
-//  Calls C++ directly via CppBridge.LLM.
+//  Uses C++ rac_structured_output_* APIs for JSON extraction.
 //
 
 import CRACommons
@@ -19,16 +19,13 @@ public extension RunAnywhere {
     ///   - prompt: The prompt to generate from
     ///   - options: Generation options (structured output config will be added automatically)
     /// - Returns: The generated object of the specified type
-    /// - Note: Events are automatically dispatched via C++ layer
     static func generateStructured<T: Generatable>(
         _ type: T.Type,
         prompt: String,
         options: LLMGenerationOptions? = nil
     ) async throws -> T {
-        let handler = StructuredOutputHandler()
-
-        // Get system prompt for structured output
-        let systemPrompt = handler.getSystemPrompt(for: type)
+        // Get system prompt from C++
+        let systemPrompt = getStructuredOutputSystemPrompt(for: type)
 
         // Create effective options with system prompt
         let effectiveOptions = LLMGenerationOptions(
@@ -45,14 +42,11 @@ public extension RunAnywhere {
             systemPrompt: systemPrompt
         )
 
-        // Build user prompt
-        let userPrompt = handler.buildUserPrompt(for: type, content: prompt)
-
         // Generate text via CppBridge.LLM
-        let generationResult = try await generateForStructuredOutput(userPrompt, options: effectiveOptions)
+        let generationResult = try await generateForStructuredOutput(prompt, options: effectiveOptions)
 
-        // Parse using StructuredOutputHandler
-        return try handler.parseStructuredOutput(from: generationResult.text, type: type)
+        // Extract JSON using C++ and parse to Swift type
+        return try parseStructuredOutput(from: generationResult.text, type: type)
     }
 
     /// Generate structured output with streaming support
@@ -66,11 +60,10 @@ public extension RunAnywhere {
         content: String,
         options: LLMGenerationOptions? = nil
     ) -> StructuredOutputStreamResult<T> {
-        let handler = StructuredOutputHandler()
         let accumulator = StreamAccumulator()
 
-        // Get system prompt for structured output
-        let systemPrompt = handler.getSystemPrompt(for: type)
+        // Get system prompt from C++
+        let systemPrompt = getStructuredOutputSystemPrompt(for: type)
 
         // Create effective options with system prompt
         let effectiveOptions = LLMGenerationOptions(
@@ -87,9 +80,6 @@ public extension RunAnywhere {
             systemPrompt: systemPrompt
         )
 
-        // Build user prompt
-        let userPrompt = handler.buildUserPrompt(for: type, content: content)
-
         // Create token stream
         let tokenStream = AsyncThrowingStream<StreamToken, Error> { continuation in
             Task {
@@ -97,7 +87,7 @@ public extension RunAnywhere {
                     var tokenIndex = 0
 
                     // Stream tokens via public API
-                    let streamingResult = try await generateStream(userPrompt, options: effectiveOptions)
+                    let streamingResult = try await generateStream(content, options: effectiveOptions)
                     for try await token in streamingResult.stream {
                         let streamToken = StreamToken(
                             text: token,
@@ -130,12 +120,12 @@ public extension RunAnywhere {
             // Get full response
             let fullResponse = await accumulator.fullText
 
-            // Parse using StructuredOutputHandler with retry logic
+            // Parse using C++ extraction + Swift decoding with retry logic
             var lastError: Error?
 
             for attempt in 1...3 {
                 do {
-                    return try handler.parseStructuredOutput(from: fullResponse, type: type)
+                    return try parseStructuredOutput(from: fullResponse, type: type)
                 } catch {
                     lastError = error
                     if attempt < 3 {
@@ -156,7 +146,6 @@ public extension RunAnywhere {
     ///   - structuredOutput: Structured output configuration
     ///   - options: Generation options
     /// - Returns: Generation result with structured data
-    /// - Note: Events are automatically dispatched via C++ layer
     static func generateWithStructuredOutput(
         prompt: String,
         structuredOutput: StructuredOutputConfig,
@@ -178,6 +167,62 @@ public extension RunAnywhere {
     }
 
     // MARK: - Private Helpers
+
+    /// Get system prompt for structured output using C++ API
+    private static func getStructuredOutputSystemPrompt<T: Generatable>(for type: T.Type) -> String {
+        var promptPtr: UnsafeMutablePointer<CChar>?
+
+        let result = type.jsonSchema.withCString { schemaPtr in
+            rac_structured_output_get_system_prompt(schemaPtr, &promptPtr)
+        }
+
+        guard result == RAC_SUCCESS, let ptr = promptPtr else {
+            // Fallback to basic prompt if C++ fails
+            return """
+            You are a JSON generator that outputs ONLY valid JSON without any additional text.
+            Start with { and end with }. No text before or after.
+            Expected schema: \(type.jsonSchema)
+            """
+        }
+
+        let prompt = String(cString: ptr)
+        rac_free(ptr)
+        return prompt
+    }
+
+    /// Parse structured output using C++ JSON extraction + Swift decoding
+    private static func parseStructuredOutput<T: Generatable>(
+        from text: String,
+        type: T.Type
+    ) throws -> T {
+        // Use C++ to extract JSON from the response
+        var jsonPtr: UnsafeMutablePointer<CChar>?
+
+        let extractResult = text.withCString { textPtr in
+            rac_structured_output_extract_json(textPtr, &jsonPtr, nil)
+        }
+
+        guard extractResult == RAC_SUCCESS, let ptr = jsonPtr else {
+            throw SDKError.llm(.extractionFailed, "No valid JSON found in the response")
+        }
+
+        let jsonString = String(cString: ptr)
+        rac_free(ptr)
+
+        // Convert to Data and decode using Swift's JSONDecoder
+        guard let jsonData = jsonString.data(using: .utf8) else {
+            throw SDKError.llm(.invalidFormat, "Failed to convert JSON string to data")
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        do {
+            return try decoder.decode(type, from: jsonData)
+        } catch {
+            throw SDKError.llm(.validationFailed, "JSON decoding failed: \(error.localizedDescription)")
+        }
+    }
 
     /// Internal generation for structured output (calls C++ directly)
     private static func generateForStructuredOutput(

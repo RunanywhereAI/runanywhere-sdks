@@ -30,11 +30,17 @@ import RunAnywhere
 ///
 /// ## Usage
 ///
+/// LLM services are accessed through the main SDK APIs - the C++ backend handles
+/// service creation and lifecycle internally:
+///
 /// ```swift
-/// // Create service directly
-/// let service = LlamaCPPService()
-/// try await service.initialize(modelPath: "/path/to/model.gguf")
-/// let result = try await service.generate(prompt: "Hello!", options: .init())
+/// // Generate text via public API
+/// let response = try await RunAnywhere.chat("Hello!")
+///
+/// // Stream text via public API
+/// for try await token in try await RunAnywhere.streamChat("Tell me a story") {
+///     print(token, terminator: "")
+/// }
 /// ```
 public enum LlamaCPP: RunAnywhereModule {
     private static let logger = SDKLogger(category: "LlamaCPP")
