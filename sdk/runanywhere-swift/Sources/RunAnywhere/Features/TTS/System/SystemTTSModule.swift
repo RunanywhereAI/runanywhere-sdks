@@ -62,6 +62,7 @@ public enum SystemTTS: RunAnywhereModule {
     }
 
     /// Create a SystemTTSService instance
+    @MainActor
     public static func createService() async throws -> SystemTTSService {
         let service = SystemTTSService()
         try await service.initialize()

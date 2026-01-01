@@ -211,26 +211,18 @@ extension CppBridge {
 
             callbacks.create = { _, _ -> rac_handle_t? in
                 var serviceHandle: rac_handle_t?
-                let group = DispatchGroup()
-                group.enter()
 
-                Task {
-                    do {
-                        let service = SystemTTSService()
-                        try await service.initialize()
-                        Platform.systemTTSService = service
+                // Use DispatchQueue.main.sync to create the MainActor-isolated service
+                // This ensures proper thread safety for AVSpeechSynthesizer
+                DispatchQueue.main.sync {
+                    let service = SystemTTSService()
+                    Platform.systemTTSService = service
 
-                        // Return a marker handle
-                        serviceHandle = UnsafeMutableRawPointer(bitPattern: 0x5157E775)
-                        Platform.logger.info("System TTS service created")
-                    } catch {
-                        Platform.logger.error("Failed to create System TTS service: \(error)")
-                        serviceHandle = nil
-                    }
-                    group.leave()
+                    // Return a marker handle
+                    serviceHandle = UnsafeMutableRawPointer(bitPattern: 0x5157E775)
+                    Platform.logger.info("System TTS service created")
                 }
 
-                group.wait()
                 return serviceHandle
             }
 
@@ -287,15 +279,17 @@ extension CppBridge {
             }
 
             callbacks.stop = { _, _ in
-                Platform.systemTTSService?.stop()
+                DispatchQueue.main.async {
+                    Platform.systemTTSService?.stop()
+                }
             }
 
             callbacks.destroy = { _, _ in
-                Task {
-                    await Platform.systemTTSService?.cleanup()
+                DispatchQueue.main.async {
+                    Platform.systemTTSService?.stop()
+                    Platform.systemTTSService = nil
+                    Platform.logger.debug("System TTS service destroyed")
                 }
-                Platform.systemTTSService = nil
-                Platform.logger.debug("System TTS service destroyed")
             }
 
             callbacks.user_data = nil
