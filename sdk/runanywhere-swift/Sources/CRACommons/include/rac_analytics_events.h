@@ -85,6 +85,11 @@ typedef enum rac_event_type {
     RAC_EVENT_VOICE_AGENT_TURN_STARTED = 500,
     RAC_EVENT_VOICE_AGENT_TURN_COMPLETED = 501,
     RAC_EVENT_VOICE_AGENT_TURN_FAILED = 502,
+    // Voice Agent Component State Events
+    RAC_EVENT_VOICE_AGENT_STT_STATE_CHANGED = 510,
+    RAC_EVENT_VOICE_AGENT_LLM_STATE_CHANGED = 511,
+    RAC_EVENT_VOICE_AGENT_TTS_STATE_CHANGED = 512,
+    RAC_EVENT_VOICE_AGENT_ALL_READY = 513,
 
     // SDK Lifecycle Events (600-699)
     RAC_EVENT_SDK_INIT_STARTED = 600,
@@ -362,6 +367,33 @@ typedef struct rac_analytics_sdk_error {
 } rac_analytics_sdk_error_t;
 
 /**
+ * @brief Voice agent component state
+ * Used for: VOICE_AGENT_*_STATE_CHANGED events
+ */
+typedef enum rac_voice_agent_component_state {
+    RAC_VOICE_AGENT_STATE_NOT_LOADED = 0,
+    RAC_VOICE_AGENT_STATE_LOADING = 1,
+    RAC_VOICE_AGENT_STATE_LOADED = 2,
+    RAC_VOICE_AGENT_STATE_ERROR = 3,
+} rac_voice_agent_component_state_t;
+
+/**
+ * @brief Voice agent state change event data
+ * Used for: VOICE_AGENT_STT_STATE_CHANGED, VOICE_AGENT_LLM_STATE_CHANGED,
+ *           VOICE_AGENT_TTS_STATE_CHANGED, VOICE_AGENT_ALL_READY
+ */
+typedef struct rac_analytics_voice_agent_state {
+    /** Component name: "stt", "llm", "tts", or "all" */
+    const char* component;
+    /** New state */
+    rac_voice_agent_component_state_t state;
+    /** Model ID (if loaded) */
+    const char* model_id;
+    /** Error message (if state is ERROR) */
+    const char* error_message;
+} rac_analytics_voice_agent_state_t;
+
+/**
  * @brief Union of all event data types
  */
 typedef struct rac_analytics_event_data {
@@ -378,6 +410,7 @@ typedef struct rac_analytics_event_data {
         rac_analytics_device_t device;
         rac_analytics_network_t network;
         rac_analytics_sdk_error_t sdk_error;
+        rac_analytics_voice_agent_state_t voice_agent_state;
     } data;
 } rac_analytics_event_data_t;
 
@@ -554,11 +587,10 @@ static const rac_analytics_device_t RAC_ANALYTICS_DEVICE_DEFAULT = {
 static const rac_analytics_network_t RAC_ANALYTICS_NETWORK_DEFAULT = {.is_online = RAC_FALSE};
 
 /** Default SDK error event */
-static const rac_analytics_sdk_error_t RAC_ANALYTICS_SDK_ERROR_DEFAULT = {
-    .error_code = RAC_SUCCESS,
-    .error_message = RAC_NULL,
-    .operation = RAC_NULL,
-    .context = RAC_NULL};
+static const rac_analytics_sdk_error_t RAC_ANALYTICS_SDK_ERROR_DEFAULT = {.error_code = RAC_SUCCESS,
+                                                                          .error_message = RAC_NULL,
+                                                                          .operation = RAC_NULL,
+                                                                          .context = RAC_NULL};
 
 #ifdef __cplusplus
 }

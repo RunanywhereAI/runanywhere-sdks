@@ -5,7 +5,12 @@ import Foundation
 /// Download service using Alamofire for HTTP and C++ bridge for orchestration
 /// C++ handles: task tracking, progress calculation, retry logic
 /// Swift handles: HTTP transport via Alamofire, extraction via SWCompression
-public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
+public class AlamofireDownloadService: @unchecked Sendable {
+
+    // MARK: - Shared Instance
+
+    /// Shared singleton instance
+    public static let shared = AlamofireDownloadService()
 
     // MARK: - Properties
 
@@ -17,11 +22,6 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
 
     /// Extraction service for handling archive extraction
     let extractionService: ModelExtractionServiceProtocol
-
-    // MARK: - Custom Download Strategies
-
-    /// Storage for custom download strategies provided by host app
-    var customStrategies: [DownloadStrategy] = []
 
     // MARK: - Initialization
 
@@ -51,25 +51,14 @@ public class AlamofireDownloadService: DownloadService, @unchecked Sendable {
         )
     }
 
-    // MARK: - DownloadService Protocol
+    // MARK: - Download API
 
+    /// Download a model
+    /// - Parameter model: The model to download
+    /// - Returns: A download task tracking the download
+    /// - Throws: An error if download setup fails
     public func downloadModel(_ model: ModelInfo) async throws -> DownloadTask {
-        // First, check if a custom strategy should handle this model
-        if case .custom(let strategyId) = model.artifactType {
-            logger.info("Model \(model.id) requires custom strategy: \(strategyId)")
-            if let strategy = await MainActor.run(body: { findCustomStrategy(for: model) }) {
-                return try await downloadModelWithCustomStrategy(model, strategy: strategy)
-            }
-        }
-
-        // Check if any registered custom strategy can handle this model
-        for strategy in customStrategies where strategy.canHandle(model: model) {
-            logger.info("Using custom strategy \(type(of: strategy)) for model \(model.id)")
-            return try await downloadModelWithCustomStrategy(model, strategy: strategy)
-        }
-
-        // Use artifact-type-based download handling
-        logger.info("Using artifact-based download for model \(model.id)", metadata: [
+        logger.info("Starting artifact-based download for model \(model.id)", metadata: [
             "artifactType": model.artifactType.displayName,
             "requiresExtraction": model.artifactType.requiresExtraction
         ])
