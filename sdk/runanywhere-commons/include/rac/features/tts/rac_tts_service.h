@@ -1,12 +1,10 @@
 /**
  * @file rac_tts_service.h
- * @brief RunAnywhere Commons - TTS Service Interface (Protocol)
+ * @brief RunAnywhere Commons - TTS Service Interface
  *
- * C port of Swift's TTSService protocol from:
- * Sources/RunAnywhere/Features/TTS/Protocol/TTSService.swift
- *
- * This header defines the service interface. For data types,
- * see rac_tts_types.h.
+ * Defines the generic TTS service API and vtable for multi-backend dispatch.
+ * Backends (ONNX, Platform/System TTS, etc.) implement the vtable and register
+ * with the service registry.
  */
 
 #ifndef RAC_TTS_SERVICE_H
@@ -20,22 +18,71 @@ extern "C" {
 #endif
 
 // =============================================================================
-// SERVICE INTERFACE - Mirrors Swift's TTSService protocol
+// SERVICE VTABLE - Backend implementations provide this
 // =============================================================================
 
 /**
- * @brief Create a TTS service using the service registry
+ * TTS Service operations vtable.
+ * Each backend implements these functions and provides a static vtable.
+ */
+typedef struct rac_tts_service_ops {
+    /** Initialize the service */
+    rac_result_t (*initialize)(void* impl);
+
+    /** Synthesize text to audio (blocking) */
+    rac_result_t (*synthesize)(void* impl, const char* text, const rac_tts_options_t* options,
+                               rac_tts_result_t* out_result);
+
+    /** Stream synthesis for long text */
+    rac_result_t (*synthesize_stream)(void* impl, const char* text,
+                                      const rac_tts_options_t* options,
+                                      rac_tts_stream_callback_t callback, void* user_data);
+
+    /** Stop current synthesis */
+    rac_result_t (*stop)(void* impl);
+
+    /** Get service info */
+    rac_result_t (*get_info)(void* impl, rac_tts_info_t* out_info);
+
+    /** Cleanup/release resources (keeps service alive) */
+    rac_result_t (*cleanup)(void* impl);
+
+    /** Destroy the service */
+    void (*destroy)(void* impl);
+} rac_tts_service_ops_t;
+
+/**
+ * TTS Service instance.
+ * Contains vtable pointer and backend-specific implementation.
+ */
+typedef struct rac_tts_service {
+    /** Vtable with backend operations */
+    const rac_tts_service_ops_t* ops;
+
+    /** Backend-specific implementation handle */
+    void* impl;
+
+    /** Model/voice ID for reference */
+    const char* model_id;
+} rac_tts_service_t;
+
+// =============================================================================
+// PUBLIC API - Generic service functions
+// =============================================================================
+
+/**
+ * @brief Create a TTS service
  *
- * @param model_path Path to the model file (can be NULL for some providers)
+ * Routes through service registry to find appropriate backend.
+ *
+ * @param voice_id Voice/model identifier (registry ID or path)
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_create(const char* model_path, rac_handle_t* out_handle);
+RAC_API rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle);
 
 /**
  * @brief Initialize a TTS service
- *
- * Mirrors Swift's TTSService.initialize()
  *
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
@@ -44,8 +91,6 @@ RAC_API rac_result_t rac_tts_initialize(rac_handle_t handle);
 
 /**
  * @brief Synthesize text to audio
- *
- * Mirrors Swift's TTSService.synthesize(text:options:)
  *
  * @param handle Service handle
  * @param text Text to synthesize
@@ -60,8 +105,6 @@ RAC_API rac_result_t rac_tts_synthesize(rac_handle_t handle, const char* text,
 /**
  * @brief Stream synthesis for long text
  *
- * Mirrors Swift's TTSService.synthesizeStream(text:options:onChunk:)
- *
  * @param handle Service handle
  * @param text Text to synthesize
  * @param options Synthesis options
@@ -75,8 +118,6 @@ RAC_API rac_result_t rac_tts_synthesize_stream(rac_handle_t handle, const char* 
 
 /**
  * @brief Stop current synthesis
- *
- * Mirrors Swift's TTSService.stop()
  *
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
@@ -94,8 +135,6 @@ RAC_API rac_result_t rac_tts_get_info(rac_handle_t handle, rac_tts_info_t* out_i
 
 /**
  * @brief Cleanup and release resources
- *
- * Mirrors Swift's TTSService.cleanup()
  *
  * @param handle Service handle
  * @return RAC_SUCCESS or error code

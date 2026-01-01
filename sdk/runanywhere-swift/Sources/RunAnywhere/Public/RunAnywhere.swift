@@ -271,9 +271,6 @@ public enum RunAnywhere {
             // Mark Phase 1 complete
             isInitialized = true
 
-            // Register built-in modules (SystemTTS is platform-only fallback)
-            _ = SystemTTS.autoRegister
-
             let initDurationMs = (CFAbsoluteTimeGetCurrent() - initStartTime) * 1000
             logger.info("✅ Phase 1 complete in \(String(format: "%.1f", initDurationMs))ms (\(params.environment.description))")
 
@@ -328,9 +325,13 @@ public enum RunAnywhere {
 
         let logger = SDKLogger(category: "RunAnywhere.Services")
 
-        // Modules are now auto-registered via their autoRegister property
-        // C++ backends (LlamaCPP, ONNX) call rac_backend_*_register()
-        // Platform-only modules (SystemTTS) are available as fallbacks
+        // Register platform backend (Foundation Models + System TTS)
+        // This registers Swift callbacks with C++, then C++ registers
+        // the module and service providers with the service registry.
+        // Must be called on MainActor and before services use the registry.
+        await MainActor.run {
+            CppBridge.Platform.register()
+        }
 
         // Check if services need initialization
         let httpNeedsInit = await !CppBridge.HTTP.shared.isConfigured

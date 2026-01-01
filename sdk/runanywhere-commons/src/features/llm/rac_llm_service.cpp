@@ -1,43 +1,23 @@
 /**
  * @file rac_llm_service.cpp
- * @brief LLM Service - Framework-Aware Service Creation via Service Registry
+ * @brief LLM Service - Generic API with VTable Dispatch
  *
- * This file implements the generic LLM service API by routing requests
- * through the service registry. The registry selects the appropriate
- * provider (LlamaCPP, ONNX, Foundation Models, etc.) based on the
- * model's framework from the model registry.
- *
- * Flow:
- * 1. rac_llm_create(model_id) is called
- * 2. Query model registry to get framework for this model
- * 3. Create service request with framework hint
- * 4. Service registry finds matching provider (by can_handle + priority)
- * 5. Provider's create() is called to instantiate the service
+ * Simple dispatch layer that routes calls through the service vtable.
+ * Each backend provides its own vtable when creating a service.
+ * No wrappers, no switch statements - just vtable calls.
  */
 
 #include "rac/features/llm/rac_llm_service.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include "rac/core/rac_core.h"
-#include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
-// =============================================================================
-// INTERNAL HELPERS
-// =============================================================================
-
-static void log_info(const char* msg) {
-    rac_log(RAC_LOG_INFO, "LLM.Service", msg);
-}
-
-static void log_error(const char* msg) {
-    rac_log(RAC_LOG_ERROR, "LLM.Service", msg);
-}
-
-static void log_debug(const char* msg) {
-    rac_log(RAC_LOG_DEBUG, "LLM.Service", msg);
-}
+static const char* LOG_CAT = "LLM.Service";
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -52,52 +32,149 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
 
     *out_handle = nullptr;
 
-    // Step 1: Query model registry to get framework
+    RAC_LOG_INFO(LOG_CAT, "Creating LLM service for: %s", model_id);
+
+    // Query model registry to get framework
     rac_model_info_t* model_info = nullptr;
     rac_result_t result = rac_get_model(model_id, &model_info);
 
-    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
-    const char* model_path = nullptr;
+    rac_inference_framework_t framework = RAC_FRAMEWORK_LLAMACPP;
+    const char* model_path = model_id;
 
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
-        model_path = model_info->local_path;
-        log_debug("Found model in registry");
-    } else {
-        // Model not in registry - treat model_id as path, default to LlamaCPP
-        log_debug("Model not in registry, using model_id as path with LlamaCPP framework");
-        model_path = model_id;
-        framework = RAC_FRAMEWORK_LLAMACPP;
+        model_path = model_info->local_path ? model_info->local_path : model_id;
     }
 
-    // Step 2: Build service request
+    // Build service request
     rac_service_request_t request = {};
     request.identifier = model_id;
     request.capability = RAC_CAPABILITY_TEXT_GENERATION;
     request.framework = framework;
     request.model_path = model_path;
-    request.config_json = nullptr;
 
-    // Step 3: Use service registry to create service
+    // Service registry returns an rac_llm_service_t* with vtable already set
     result = rac_service_create(RAC_CAPABILITY_TEXT_GENERATION, &request, out_handle);
 
-    // Cleanup model info
     if (model_info) {
         rac_model_info_free(model_info);
     }
 
     if (result != RAC_SUCCESS) {
-        log_error("Service registry failed to create LLM service");
+        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry");
         return result;
     }
 
-    if (*out_handle == nullptr) {
-        log_error("Service registry returned null handle");
-        return RAC_ERROR_NO_CAPABLE_PROVIDER;
+    RAC_LOG_INFO(LOG_CAT, "LLM service created");
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
+// GENERIC API - Simple vtable dispatch
+// =============================================================================
+
+rac_result_t rac_llm_initialize(rac_handle_t handle, const char* model_path) {
+    if (!handle)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->initialize) {
+        return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    log_info("LLM service created via service registry");
-    return RAC_SUCCESS;
+    return service->ops->initialize(service->impl, model_path);
+}
+
+rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
+                              const rac_llm_options_t* options, rac_llm_result_t* out_result) {
+    if (!handle || !prompt || !out_result)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->generate) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    return service->ops->generate(service->impl, prompt, options, out_result);
+}
+
+rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
+                                     const rac_llm_options_t* options,
+                                     rac_llm_stream_callback_fn callback, void* user_data) {
+    if (!handle || !prompt || !callback)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->generate_stream) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    return service->ops->generate_stream(service->impl, prompt, options, callback, user_data);
+}
+
+rac_result_t rac_llm_get_info(rac_handle_t handle, rac_llm_info_t* out_info) {
+    if (!handle || !out_info)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->get_info) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    return service->ops->get_info(service->impl, out_info);
+}
+
+rac_result_t rac_llm_cancel(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->cancel) {
+        return RAC_SUCCESS;  // No-op if not supported
+    }
+
+    return service->ops->cancel(service->impl);
+}
+
+rac_result_t rac_llm_cleanup(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->cleanup) {
+        return RAC_SUCCESS;  // No-op if not supported
+    }
+
+    return service->ops->cleanup(service->impl);
+}
+
+void rac_llm_destroy(rac_handle_t handle) {
+    if (!handle)
+        return;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+
+    // Call backend destroy
+    if (service->ops && service->ops->destroy) {
+        service->ops->destroy(service->impl);
+    }
+
+    // Free model_id if allocated
+    if (service->model_id) {
+        free(const_cast<char*>(service->model_id));
+    }
+
+    // Free service struct
+    free(service);
+}
+
+void rac_llm_result_free(rac_llm_result_t* result) {
+    if (!result)
+        return;
+    if (result->text) {
+        free(result->text);
+        result->text = nullptr;
+    }
 }
 
 }  // extern "C"

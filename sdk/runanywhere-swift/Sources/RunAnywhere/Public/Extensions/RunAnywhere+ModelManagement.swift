@@ -18,6 +18,17 @@ extension RunAnywhere {
         guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
             throw SDKError.llm(.modelNotFound, "Model '\(modelId)' not found in registry")
         }
+
+        // Handle built-in models (Foundation Models, System TTS) - no file path needed
+        // These are platform services that don't require downloaded model files
+        if modelInfo.isBuiltIn {
+            // For built-in models, just pass the model ID to C++
+            // The service registry will route to the correct platform provider
+            try await CppBridge.LLM.shared.loadModel(modelId, modelId: modelId)
+            return
+        }
+
+        // For downloaded models, verify they exist and resolve the file path
         guard modelInfo.localPath != nil else {
             throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded")
         }
@@ -211,6 +222,15 @@ extension RunAnywhere {
         guard let modelInfo = allModels.first(where: { $0.id == voiceId }) else {
             throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
         }
+
+        // Handle built-in voices (System TTS) - no file path needed
+        if modelInfo.isBuiltIn {
+            let logger = SDKLogger(category: "RunAnywhere.TTS")
+            logger.info("Loading built-in TTS voice: \(voiceId)")
+            try await CppBridge.TTS.shared.loadVoice(voiceId, voiceId: voiceId)
+            return
+        }
+
         guard modelInfo.localPath != nil else {
             throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
         }

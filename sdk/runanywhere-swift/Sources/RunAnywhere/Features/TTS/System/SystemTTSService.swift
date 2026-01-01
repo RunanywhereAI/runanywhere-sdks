@@ -9,27 +9,42 @@
 import AVFoundation
 import Foundation
 
-// MARK: - State Actor
+// MARK: - Speech State (Thread-safe for AVSpeechSynthesizer delegate callbacks)
 
-/// Actor for managing speech synthesis state (Swift 6 concurrency)
-private actor SpeechState {
-    var continuation: CheckedContinuation<Data, Error>?
-    var isSpeaking = false
+/// Thread-safe state for speech synthesis using lock
+private final class SpeechState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _continuation: CheckedContinuation<Data, Error>?
+    private var _isSpeaking = false
+
+    var isSpeaking: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return _isSpeaking
+    }
 
     func setContinuation(_ cont: CheckedContinuation<Data, Error>?) {
-        continuation = cont
-        isSpeaking = cont != nil
+        lock.lock()
+        _continuation = cont
+        _isSpeaking = cont != nil
+        lock.unlock()
     }
 
     func complete(with result: Result<Data, Error>) {
+        lock.lock()
+        let continuation = _continuation
+        _continuation = nil
+        _isSpeaking = false
+        lock.unlock()
+
+        guard let continuation = continuation else { return }
+
         switch result {
         case .success(let data):
-            continuation?.resume(returning: data)
+            continuation.resume(returning: data)
         case .failure(let error):
-            continuation?.resume(throwing: error)
+            continuation.resume(throwing: error)
         }
-        continuation = nil
-        isSpeaking = false
     }
 }
 
@@ -72,14 +87,12 @@ public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
 
         let utterance = createUtterance(text: text, options: options)
 
+        // Use withCheckedThrowingContinuation properly with MainActor dispatch
         return try await withCheckedThrowingContinuation { continuation in
-            Task {
-                await state.setContinuation(continuation)
-
-                // AVSpeechSynthesizer must be called on main thread
-                await MainActor.run {
-                    self.synthesizer.speak(utterance)
-                }
+            // Dispatch to main thread synchronously to set state and speak
+            DispatchQueue.main.async { [self] in
+                state.setContinuation(continuation)
+                synthesizer.speak(utterance)
             }
         }
     }
@@ -95,11 +108,9 @@ public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
     }
 
     public func stop() {
-        Task { @MainActor in
+        DispatchQueue.main.async { [self] in
             synthesizer.stopSpeaking(at: .immediate)
-        }
-        Task {
-            await state.complete(with: .success(Data()))
+            state.complete(with: .success(Data()))
         }
     }
 
@@ -155,9 +166,8 @@ extension SystemTTSService: AVSpeechSynthesizerDelegate {
         didFinish utterance: AVSpeechUtterance
     ) {
         logger.info("Speech playback completed")
-        Task {
-            await state.complete(with: .success(Data()))
-        }
+        // Delegate is called on main thread, access state directly
+        state.complete(with: .success(Data()))
     }
 
     public func speechSynthesizer(
@@ -165,9 +175,7 @@ extension SystemTTSService: AVSpeechSynthesizerDelegate {
         didCancel utterance: AVSpeechUtterance
     ) {
         logger.info("Speech playback cancelled")
-        Task {
-            await state.complete(with: .failure(CancellationError()))
-        }
+        state.complete(with: .failure(CancellationError()))
     }
 
     public func speechSynthesizer(

@@ -71,6 +71,21 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
         isDownloaded
     }
 
+    /// Whether this is a built-in platform model (e.g., Apple Foundation Models, System TTS)
+    /// Built-in models don't require downloading - they use platform services
+    public var isBuiltIn: Bool {
+        // Check artifact type first (source of truth from C++ registration)
+        if artifactType == .builtIn {
+            return true
+        }
+        // Fallback: check for builtin:// URL scheme
+        if let localPath = localPath, localPath.scheme == "builtin" {
+            return true
+        }
+        // Check framework - Foundation Models and System TTS are always built-in
+        return framework == .foundationModels || framework == .systemTTS
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id, name, category, format, downloadURL, localPath
         case artifactType

@@ -18,6 +18,7 @@ project(RunAnywhereCommons
 option(RAC_BUILD_LLAMACPP "Build LlamaCpp backend module" ON)
 option(RAC_BUILD_ONNX "Build ONNX backend module (STT, TTS, VAD)" ON)
 option(RAC_BUILD_WHISPERCPP "Build WhisperCpp backend module (STT)" OFF)
+option(RAC_BUILD_PLATFORM "Build Platform backend module (Apple Foundation Models, System TTS)" ON)
 
 # Feature options
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
@@ -159,9 +160,11 @@ set(RAC_FEATURES_SOURCES
     src/features/llm/structured_output.cpp
     # STT
     src/features/stt/stt_component.cpp
+    src/features/stt/rac_stt_service.cpp
     src/features/stt/stt_analytics.cpp
     # TTS
     src/features/tts/tts_component.cpp
+    src/features/tts/rac_tts_service.cpp
     src/features/tts/tts_analytics.cpp
     # VAD
     src/features/vad/vad_component.cpp
@@ -173,11 +176,24 @@ set(RAC_FEATURES_SOURCES
     src/features/result_free.cpp
 )
 
+# Platform backend sources (Apple Foundation Models + System TTS)
+# These are always included on Apple platforms since they're required for platform services
+if(APPLE)
+    set(RAC_PLATFORM_SOURCES
+        backends/platform/src/rac_llm_platform.cpp
+        backends/platform/src/rac_tts_platform.cpp
+        backends/platform/src/rac_backend_platform_register.cpp
+    )
+else()
+    set(RAC_PLATFORM_SOURCES "")
+endif()
+
 # Combine all sources
 set(RAC_COMMONS_SOURCES
     ${RAC_CORE_SOURCES}
     ${RAC_INFRASTRUCTURE_SOURCES}
     ${RAC_FEATURES_SOURCES}
+    ${RAC_PLATFORM_SOURCES}
 )
 
 if(RAC_BUILD_SHARED)
@@ -199,6 +215,25 @@ target_include_directories(rac_commons PRIVATE
     ${RUNANYWHERE_CORE_DIR}/src
     ${RUNANYWHERE_CORE_DIR}/src/capabilities
 )
+
+# Backend headers - needed for vtable dispatch in service files
+# These headers define backend-specific functions called through vtables
+if(RAC_BUILD_LLAMACPP)
+    target_include_directories(rac_commons PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/backends/llamacpp/include>
+    )
+endif()
+if(RAC_BUILD_ONNX)
+    target_include_directories(rac_commons PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/backends/onnx/include>
+    )
+endif()
+# Platform backend headers (always on Apple)
+if(APPLE)
+    target_include_directories(rac_commons PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/backends/platform/include>
+    )
+endif()
 
 target_link_libraries(rac_commons PUBLIC
     runanywhere_bridge
@@ -250,6 +285,13 @@ if(RAC_BUILD_WHISPERCPP)
     endif()
 endif()
 
+if(RAC_BUILD_PLATFORM)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/platform/CMakeLists.txt")
+        message(STATUS "Building Platform backend (Apple Foundation Models, System TTS)")
+        add_subdirectory(backends/platform)
+    endif()
+endif()
+
 # =============================================================================
 # TESTS
 # =============================================================================
@@ -290,5 +332,6 @@ message(STATUS "Backend modules:")
 message(STATUS "  LlamaCpp:     ${RAC_BUILD_LLAMACPP}")
 message(STATUS "  ONNX:         ${RAC_BUILD_ONNX}")
 message(STATUS "  WhisperCpp:   ${RAC_BUILD_WHISPERCPP}")
+message(STATUS "  Platform:     ${RAC_BUILD_PLATFORM}")
 message(STATUS "====================================")
 message(STATUS "")
