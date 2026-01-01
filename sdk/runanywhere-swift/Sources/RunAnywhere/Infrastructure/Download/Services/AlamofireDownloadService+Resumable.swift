@@ -45,11 +45,9 @@ extension AlamofireDownloadService {
         resumeData: Data?,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        // Get destination folder (framework is required - 1:1 mapping)
-        let framework = model.framework
-        let fileManager = ServiceContainer.shared.fileManager
-        let modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
-        let destinationURL = URL(fileURLWithPath: modelFolder.path).appendingPathComponent("\(model.id).\(model.format.rawValue)")
+        // Use C++ path utilities for destination
+        let modelFolder = try CppBridge.ModelPaths.getModelFolder(modelId: model.id, framework: model.framework)
+        let destinationURL = modelFolder.appendingPathComponent("\(model.id).\(model.format.rawValue)")
 
         let destination: DownloadRequest.Destination = { _, _ in
             return (destinationURL, [.removePreviousFile, .createIntermediateDirectories])
@@ -65,6 +63,7 @@ extension AlamofireDownloadService {
         // Configure request
         configureResumableDownloadRequest(
             downloadRequest: downloadRequest,
+            taskId: taskId,
             progressContinuation: progressContinuation
         )
 
@@ -94,6 +93,7 @@ extension AlamofireDownloadService {
     /// Configure the resumable download request with progress tracking
     func configureResumableDownloadRequest(
         downloadRequest: DownloadRequest,
+        taskId: String,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) {
         downloadRequest
@@ -103,6 +103,16 @@ extension AlamofireDownloadService {
                     totalBytes: progress.totalUnitCount,
                     state: .downloading
                 )
+
+                // Update C++ bridge with progress
+                Task {
+                    await CppBridge.Download.shared.updateProgress(
+                        taskId: taskId,
+                        bytesDownloaded: progress.completedUnitCount,
+                        totalBytes: progress.totalUnitCount
+                    )
+                }
+
                 progressContinuation.yield(downloadProgress)
             }
             .validate()
@@ -157,16 +167,13 @@ extension AlamofireDownloadService {
                 state: .completed
             ))
 
-            // Update model with local path in registry
+            // Update model with local path via C++ registry
             var updatedModel = model
             updatedModel.localPath = url
-            ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
-            // Save metadata persistently in a Task
             Task {
                 do {
-                    let modelInfoService = await ServiceContainer.shared.modelInfoService
-                    try await modelInfoService.saveModel(updatedModel)
+                    try await CppBridge.ModelRegistry.shared.save(updatedModel)
                     self.logger.info("Model metadata saved successfully for: \(model.id)")
                 } catch {
                     self.logger.error("Failed to save model metadata for \(model.id): \(error)")

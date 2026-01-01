@@ -53,9 +53,7 @@ struct SimplifiedModelsView: View {
 
     private func loadAvailableFrameworks() async {
         // Get available frameworks from SDK - derived from registered models
-        let frameworks = await MainActor.run {
-            RunAnywhere.getRegisteredFrameworks()
-        }
+        let frameworks = await RunAnywhere.getRegisteredFrameworks()
         await MainActor.run {
             self.availableFrameworks = frameworks
         }

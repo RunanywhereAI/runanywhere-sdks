@@ -11,6 +11,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/infrastructure/model_management/rac_model_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -176,6 +177,12 @@ typedef struct rac_service_request {
 
     /** The capability being requested */
     rac_capability_t capability;
+
+    /** Framework hint for routing (from model registry) */
+    rac_inference_framework_t framework;
+
+    /** Local path to model file (can be NULL if using identifier lookup) */
+    const char* model_path;
 } rac_service_request_t;
 
 /**
@@ -269,6 +276,37 @@ RAC_API rac_result_t rac_service_create(rac_capability_t capability,
  */
 RAC_API rac_result_t rac_service_list_providers(rac_capability_t capability,
                                                 const char*** out_names, size_t* out_count);
+
+// =============================================================================
+// GLOBAL MODEL REGISTRY API
+// =============================================================================
+
+/**
+ * Gets the global model registry instance.
+ * The registry is created automatically on first access.
+ *
+ * @return Handle to the global model registry
+ */
+RAC_API struct rac_model_registry* rac_get_model_registry(void);
+
+/**
+ * Registers a model with the global registry.
+ * Convenience function that calls rac_model_registry_save on the global registry.
+ *
+ * @param model Model info to register
+ * @return RAC_SUCCESS on success, or error code
+ */
+RAC_API rac_result_t rac_register_model(const struct rac_model_info* model);
+
+/**
+ * Gets model info from the global registry.
+ * Convenience function that calls rac_model_registry_get on the global registry.
+ *
+ * @param model_id Model identifier
+ * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
+ * @return RAC_SUCCESS on success, RAC_ERROR_NOT_FOUND if not registered
+ */
+RAC_API rac_result_t rac_get_model(const char* model_id, struct rac_model_info** out_model);
 
 #ifdef __cplusplus
 }

@@ -97,8 +97,40 @@ public enum SystemTTS: RunAnywhereModule {
         if success {
             isRegistered = true
             logger.info("✅ SystemTTS registered with C++ registry")
+
+            // Register the built-in model entry
+            registerBuiltInModelEntry()
         } else {
             logger.error("❌ Failed to register SystemTTS with C++ registry")
+        }
+    }
+
+    // MARK: - Private: Model Entry Registration
+
+    @MainActor
+    private static func registerBuiltInModelEntry() {
+        let modelInfo = ModelInfo(
+            id: moduleId,
+            name: moduleName,
+            category: .speechSynthesis,
+            format: .unknown,
+            framework: .systemTTS,
+            downloadURL: nil,
+            localPath: URL(string: "builtin://system-tts"),  // Special builtin scheme
+            artifactType: .builtIn,
+            downloadSize: nil,
+            contextLength: nil,
+            supportsThinking: false,
+            description: """
+                Apple's built-in Text-to-Speech using AVSpeechSynthesizer. \
+                No download required - uses on-device speech synthesis.
+                """,
+            source: .local
+        )
+
+        Task {
+            try? await CppBridge.ModelRegistry.shared.save(modelInfo)
+            logger.info("Built-in System TTS model entry registered: \(modelInfo.id)")
         }
     }
 
@@ -117,13 +149,25 @@ public enum SystemTTS: RunAnywhereModule {
 
     /// Check if this provider can handle the given voice ID
     public static func canHandle(voiceId: String?) -> Bool {
-        guard let voiceId = voiceId?.lowercased() else {
-            // System TTS can handle nil (fallback)
+        guard let voiceId = voiceId else {
+            // System TTS can handle nil (fallback for TTS)
             return true
         }
 
-        // Explicitly handle system-tts requests
-        return voiceId == "system-tts" || voiceId == "system_tts" || voiceId == "system"
+        let lowercasedId = voiceId.lowercased()
+
+        // Priority 1: Check by ID pattern (sync check for provider selection)
+        if lowercasedId.contains("system-tts") || lowercasedId == "system-tts-default" {
+            logger.debug("canHandle: voice '\(voiceId)' matches system-tts pattern -> true")
+            return true
+        }
+
+        // Priority 2: Explicitly handle system-tts requests by ID pattern
+        let matches = lowercasedId == "system-tts"
+            || lowercasedId == "system_tts"
+            || lowercasedId == "system"
+
+        return matches
     }
 
     /// Create a SystemTTSService instance

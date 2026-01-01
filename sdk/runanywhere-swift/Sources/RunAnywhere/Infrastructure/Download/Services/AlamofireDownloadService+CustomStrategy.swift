@@ -10,18 +10,6 @@ extension AlamofireDownloadService {
         logger.info("Registered custom download strategy")
     }
 
-    /// Refresh strategies from framework adapters (call after registering new adapters)
-    public func refreshStrategies() {
-        autoRegisterStrategies()
-    }
-
-    /// Auto-discover and register strategies from service providers
-    func autoRegisterStrategies() {
-        // Download strategies are registered directly by service providers
-        // No auto-discovery needed since adapters are removed
-        logger.info("[DEBUG] Download strategies are registered directly by service providers")
-    }
-
     /// Find a custom strategy for the model
     /// Checks manually registered strategies (module strategies are now registered via `registerStrategy`)
     @MainActor
@@ -56,7 +44,8 @@ extension AlamofireDownloadService {
                 }
 
                 do {
-                    let destinationFolder = try getDestinationFolder(for: model.id, framework: model.framework)
+                    // Use C++ path utilities
+                    let destinationFolder = try CppBridge.ModelPaths.getModelFolder(modelId: model.id, framework: model.framework)
 
                     var lastReportedProgress: Double = -1.0
                     let resultURL = try await strategy.download(
@@ -89,20 +78,11 @@ extension AlamofireDownloadService {
                         state: .completed
                     ))
 
-                    // Update model with local path in registry
+                    // Update model with local path via C++ registry
                     var updatedModel = model
                     updatedModel.localPath = resultURL
-                    ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
-
-                    // Save metadata persistently
-                    do {
-                        let modelInfoService = await ServiceContainer.shared.modelInfoService
-                        try await modelInfoService.saveModel(updatedModel)
+                    try await CppBridge.ModelRegistry.shared.save(updatedModel)
                         self.logger.info("Model metadata saved successfully for: \(model.id)")
-                    } catch {
-                        self.logger.error("Failed to save model metadata for \(model.id): \(error)")
-                        // Continue with download completion, but log the error
-                    }
 
                     // Track download completed
                     let durationMs = Date().timeIntervalSince(downloadStartTime) * 1000
@@ -134,10 +114,5 @@ extension AlamofireDownloadService {
         )
 
         return task
-    }
-
-    /// Helper to get destination folder for a model
-    func getDestinationFolder(for modelId: String, framework: InferenceFramework) throws -> URL {
-        return try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
     }
 }

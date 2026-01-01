@@ -1,20 +1,30 @@
+//
+//  SystemFoundationModelsService.swift
+//  RunAnywhere SDK
+//
+//  Service implementation for Apple's Foundation Models (Apple Intelligence).
+//  Requires iOS 26+ / macOS 26+.
+//
+
 import Foundation
 import OSLog
-import RunAnywhere
 
 // Import FoundationModels with conditional compilation
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
 
-/// Service implementation for Apple's Foundation Models
+/// Service implementation for Apple's Foundation Models (Apple Intelligence).
+///
+/// This service provides LLM text generation using Apple's built-in Foundation Models.
+/// It requires iOS 26+ / macOS 26+ and an Apple Intelligence capable device.
 @available(iOS 26.0, macOS 26.0, *)
-public class FoundationModelsService: LLMService {
+public class SystemFoundationModelsService: LLMService {
     private var _currentModel: String?
     private var _isReady = false
     private let logger = Logger(
-        subsystem: "com.runanywhere.FoundationModels",
-        category: "FoundationModelsService"
+        subsystem: "com.runanywhere.sdk",
+        category: "SystemFoundationModelsService"
     )
 
     #if canImport(FoundationModels)

@@ -4,21 +4,15 @@ import Foundation
 /// Provides centralized access to SDK services.
 ///
 /// Note: Network services (HTTP, Auth) are now handled by CppBridge.
-/// This container manages non-network services only.
+/// Model registry is now directly accessed via CppBridge.ModelRegistry.shared.
+/// This container manages platform-specific services only.
 public class ServiceContainer {
     /// Shared instance
     public static let shared = ServiceContainer()
 
-    // MARK: - Core Registries
-
-    /// Model registry for managing model information
-    public private(set) lazy var modelRegistry: ModelRegistry = {
-        RegistryService()
-    }()
-
     // MARK: - Infrastructure Services
 
-    /// Simplified file manager
+    /// Simplified file manager for platform-specific file operations
     private(set) lazy var fileManager: SimplifiedFileManager = {
         do {
             return try SimplifiedFileManager()
@@ -27,27 +21,9 @@ public class ServiceContainer {
         }
     }()
 
-    /// Storage analyzer for storage operations
-    private(set) lazy var storageAnalyzer: StorageAnalyzer = {
-        DefaultStorageAnalyzer(fileManager: fileManager, modelRegistry: modelRegistry)
-    }()
-
     // MARK: - Data Services
 
-    /// Model info service (internal access for optional checking in development mode)
-    internal var backingModelInfoService: ModelInfoService?
-    public var modelInfoService: ModelInfoService {
-        guard let service = backingModelInfoService else {
-            fatalError("ModelInfoService not initialized. Call RunAnywhere.initialize() first.")
-        }
-        return service
-    }
-
-    internal func setModelInfoService(_ service: ModelInfoService) {
-        backingModelInfoService = service
-    }
-
-    /// Model assignment service
+    /// Model assignment service - fetches model assignments from backend
     private var _modelAssignmentService: ModelAssignmentService?
     public var modelAssignmentService: ModelAssignmentService {
         guard let service = _modelAssignmentService else {
@@ -80,19 +56,6 @@ public class ServiceContainer {
         EventBus.shared
     }
 
-    // MARK: - Structured Output Services
-
-    /// Structured output generation service
-    private var _structuredOutputService: StructuredOutputGenerationService?
-    public var structuredOutputService: StructuredOutputGenerationService {
-        if let service = _structuredOutputService {
-            return service
-        }
-        let service = StructuredOutputGenerationService()
-        _structuredOutputService = service
-        return service
-    }
-
     // MARK: - Initialization
 
     public init() {
@@ -103,9 +66,7 @@ public class ServiceContainer {
 
     /// Reset service container state (for testing)
     public func reset() {
-        backingModelInfoService = nil
         _modelAssignmentService = nil
         _deviceRegistrationService = nil
-        _structuredOutputService = nil
     }
 }

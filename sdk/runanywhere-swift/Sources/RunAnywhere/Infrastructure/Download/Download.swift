@@ -84,11 +84,9 @@ public final class Download {
         }
     }
 
-    /// Refresh strategies from framework adapters (if using AlamofireDownloadService)
+    /// Refresh strategies (no-op as strategies are now managed by C++ layer)
     public func refreshStrategies() {
-        if let alamofireService = downloadService as? AlamofireDownloadService {
-            alamofireService.refreshStrategies()
-            logger.debug("Refreshed download strategies")
-        }
+        // Download strategies are now managed by the C++ download manager
+        logger.debug("Download strategies are managed by C++ layer")
     }
 }

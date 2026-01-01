@@ -35,6 +35,7 @@ extern "C" {
  * Mirrors Swift's ArchiveType enum.
  */
 typedef enum rac_archive_type {
+    RAC_ARCHIVE_TYPE_NONE = -1,   /**< No archive - direct file */
     RAC_ARCHIVE_TYPE_ZIP = 0,     /**< ZIP archive */
     RAC_ARCHIVE_TYPE_TAR_BZ2 = 1, /**< tar.bz2 archive */
     RAC_ARCHIVE_TYPE_TAR_GZ = 2,  /**< tar.gz archive */

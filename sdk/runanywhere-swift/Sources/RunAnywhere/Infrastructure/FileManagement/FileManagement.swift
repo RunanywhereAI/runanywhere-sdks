@@ -92,10 +92,4 @@ public final class FileManagement {
         logger.info("Temp files cleaned")
     }
 
-    // MARK: - Storage Analysis
-
-    /// Create a storage analyzer
-    public func createStorageAnalyzer(with modelRegistry: ModelRegistry) -> StorageAnalyzer {
-        return DefaultStorageAnalyzer(fileManager: fileManager, modelRegistry: modelRegistry)
-    }
 }

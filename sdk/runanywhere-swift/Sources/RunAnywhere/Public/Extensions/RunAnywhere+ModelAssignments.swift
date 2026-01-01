@@ -16,7 +16,6 @@ public extension RunAnywhere {
     ///   - memoryRequirement: Estimated memory usage in bytes
     ///   - supportsThinking: Whether the model supports reasoning/thinking
     /// - Returns: The created ModelInfo
-    @MainActor
     @discardableResult
     static func registerModel(
         id: String? = nil,
@@ -28,16 +27,39 @@ public extension RunAnywhere {
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false
     ) -> ModelInfo {
-        return serviceContainer.modelRegistry.addModelFromURL(
-            id: id,
+        // Generate model ID from URL filename if not provided
+        let modelId = id ?? generateModelId(from: url)
+
+        // Detect format from URL extension
+        let format = detectFormat(from: url)
+
+        // Create ModelInfo
+        let modelInfo = ModelInfo(
+            id: modelId,
             name: name,
-            url: url,
-            framework: framework,
             category: modality,
+            format: format,
+            framework: framework,
+            downloadURL: url,
+            localPath: nil,
             artifactType: artifactType,
-            estimatedSize: memoryRequirement,
-            supportsThinking: supportsThinking
+            downloadSize: memoryRequirement,
+            contextLength: modality.requiresContextLength ? 2048 : nil,
+            supportsThinking: supportsThinking,
+            description: "User-added model",
+            source: .local
         )
+
+        // Save to C++ registry (fire-and-forget)
+        Task {
+            do {
+                try await CppBridge.ModelRegistry.shared.save(modelInfo)
+            } catch {
+                SDKLogger(category: "RunAnywhere.Models").error("Failed to register model: \(error)")
+            }
+        }
+
+        return modelInfo
     }
 
     /// Register a model from a URL string
@@ -51,7 +73,6 @@ public extension RunAnywhere {
     ///   - memoryRequirement: Estimated memory usage in bytes
     ///   - supportsThinking: Whether the model supports reasoning/thinking
     /// - Returns: The created ModelInfo, or nil if URL is invalid
-    @MainActor
     @discardableResult
     static func registerModel(
         id: String? = nil,
@@ -77,6 +98,28 @@ public extension RunAnywhere {
             memoryRequirement: memoryRequirement,
             supportsThinking: supportsThinking
         )
+    }
+
+    // MARK: - Private Helpers
+
+    private static func generateModelId(from url: URL) -> String {
+        var filename = url.lastPathComponent
+        let knownExtensions = ["gz", "bz2", "tar", "zip", "gguf", "onnx", "ort", "bin"]
+        while let ext = filename.split(separator: ".").last, knownExtensions.contains(String(ext).lowercased()) {
+            filename = String(filename.dropLast(ext.count + 1))
+        }
+        return filename
+    }
+
+    private static func detectFormat(from url: URL) -> ModelFormat {
+        let ext = url.pathExtension.lowercased()
+        switch ext {
+        case "onnx": return .onnx
+        case "ort": return .ort
+        case "gguf": return .gguf
+        case "bin": return .bin
+        default: return .unknown
+        }
     }
 }
 

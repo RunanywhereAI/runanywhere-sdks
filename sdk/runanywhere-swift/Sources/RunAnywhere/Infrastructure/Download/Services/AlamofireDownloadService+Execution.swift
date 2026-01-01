@@ -5,7 +5,12 @@ import Foundation
 
 extension AlamofireDownloadService {
 
-    /// Perform the actual download
+    /// Progress logging interval (every 10%)
+    private static let logProgressIntervalPercent = 10
+    /// Public event interval (every 5%)
+    private static let publicProgressIntervalFraction = 0.05
+
+    /// Perform the actual download using Alamofire
     func performDownload(
         url: URL,
         destination: URL,
@@ -13,12 +18,13 @@ extension AlamofireDownloadService {
         taskId: String,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        let destination: DownloadRequest.Destination = { _, _ in
-            return (destination, [.removePreviousFile, .createIntermediateDirectories])
+        let destinationURL = destination
+        let dest: DownloadRequest.Destination = { _, _ in
+            return (destinationURL, [.removePreviousFile, .createIntermediateDirectories])
         }
 
         var lastReportedProgress = -1.0
-        let downloadRequest = session.download(url, to: destination)
+        let downloadRequest = session.download(url, to: dest)
             .downloadProgress { progress in
                 let downloadProgress = DownloadProgress(
                     stage: .downloading,
@@ -28,21 +34,29 @@ extension AlamofireDownloadService {
                     state: .downloading
                 )
 
+                // Update C++ bridge with progress
+                Task {
+                    await CppBridge.Download.shared.updateProgress(
+                        taskId: taskId,
+                        bytesDownloaded: progress.completedUnitCount,
+                        totalBytes: progress.totalUnitCount
+                    )
+                }
+
                 // Log progress at defined intervals (local logging only)
                 let progressPercent = Int(progress.fractionCompleted * 100)
-                if progressPercent.isMultiple(of: DownloadConstants.logProgressIntervalPercent) && progressPercent > 0 {
+                if progressPercent.isMultiple(of: Self.logProgressIntervalPercent) && progressPercent > 0 {
                     self.logger.debug("Download progress", metadata: [
                         "modelId": model.id,
                         "progress": progressPercent,
                         "bytesDownloaded": progress.completedUnitCount,
-                        "totalBytes": progress.totalUnitCount,
-                        "speed": self.calculateDownloadSpeed(progress: progress)
+                        "totalBytes": progress.totalUnitCount
                     ])
                 }
 
                 // Track progress at defined intervals (public EventBus only - for UI updates)
                 let progressValue = progress.fractionCompleted
-                if progressValue - lastReportedProgress >= DownloadConstants.publicProgressIntervalFraction {
+                if progressValue - lastReportedProgress >= Self.publicProgressIntervalFraction {
                     lastReportedProgress = progressValue
                     EventPublisher.shared.track(ModelEvent.downloadProgress(
                         modelId: model.id,
@@ -85,15 +99,33 @@ extension AlamofireDownloadService {
         }
     }
 
-    /// Perform extraction for archive models
+    /// Perform extraction for archive models (platform-specific - uses SWCompression)
     func performExtraction(
         archiveURL: URL,
         destinationFolder: URL,
         model: ModelInfo,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        guard case .archive(let archiveType, _, _) = model.artifactType else {
-            throw SDKError.download(.extractionFailed, "Model does not require extraction")
+        // Determine archive type from model artifact type or infer from archive URL/download URL
+        let archiveType: ArchiveType
+        let artifactTypeForExtraction: ModelArtifactType
+
+        if case .archive(let type, let structure, let expectedFiles) = model.artifactType {
+            archiveType = type
+            artifactTypeForExtraction = model.artifactType
+        } else if let inferredType = ArchiveType.from(url: archiveURL) {
+            // Infer from downloaded archive file path
+            archiveType = inferredType
+            artifactTypeForExtraction = .archive(inferredType, structure: .unknown, expectedFiles: .none)
+            logger.info("Inferred archive type from file path: \(inferredType.rawValue)")
+        } else if let originalDownloadURL = model.downloadURL,
+                  let inferredType = ArchiveType.from(url: originalDownloadURL) {
+            // Infer from original download URL
+            archiveType = inferredType
+            artifactTypeForExtraction = .archive(inferredType, structure: .unknown, expectedFiles: .none)
+            logger.info("Inferred archive type from download URL: \(inferredType.rawValue)")
+        } else {
+            throw SDKError.download(.extractionFailed, "Could not determine archive type for model: \(model.id)")
         }
 
         let extractionStartTime = Date()
@@ -119,7 +151,7 @@ extension AlamofireDownloadService {
             let result = try await extractionService.extract(
                 archiveURL: archiveURL,
                 to: destinationFolder,
-                artifactType: model.artifactType,
+                artifactType: artifactTypeForExtraction,
                 progressHandler: { progress in
                     // Track extraction progress (public EventBus only - for UI updates)
                     if progress - lastReportedExtractionProgress >= 0.1 {

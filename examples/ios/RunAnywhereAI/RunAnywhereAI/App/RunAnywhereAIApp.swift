@@ -16,10 +16,6 @@ import os
 #if os(macOS)
 import AppKit
 #endif
-// Import Foundation Models adapter from SDK (requires iOS 26+ / macOS 26+)
-#if canImport(FoundationModelsAdapter)
-import FoundationModelsAdapter
-#endif
 
 @main
 struct RunAnywhereAIApp: App {
@@ -211,13 +207,9 @@ struct RunAnywhereAIApp: App {
         logger.info("✅ ONNX STT/TTS models registered")
 
         // Foundation Models for iOS 26+ and macOS 26+
-        // Built-in model is automatically registered by the module
-        #if canImport(FoundationModelsAdapter)
-        if #available(iOS 26.0, macOS 26.0, *) {
-            AppleAI.register(priority: 200)
-            logger.info("✅ AppleAI module registered (Foundation Models)")
-        }
-        #endif
+        // SystemFoundationModels is part of RunAnywhere SDK and auto-registers on iOS 26+
+        SystemFoundationModels.register(priority: 200)
+        logger.info("✅ SystemFoundationModels module registered (Apple Intelligence)")
 
         logger.info("🎉 All modules and models registered")
     }

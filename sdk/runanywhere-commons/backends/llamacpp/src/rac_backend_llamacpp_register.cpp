@@ -57,8 +57,10 @@ LlamaCPPRegistryState& get_state() {
 /**
  * Check if this provider can handle the request.
  *
- * Mirrors Swift's canHandle closure in LlamaCPPServiceProvider:
- * canHandle: { modelId in modelId?.hasSuffix(".gguf") ?? true }
+ * Framework-aware routing:
+ * 1. If framework == LLAMACPP, always handle
+ * 2. If framework == UNKNOWN, check file extension (.gguf)
+ * 3. Otherwise, do not handle (let other providers handle)
  */
 rac_bool_t llamacpp_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
@@ -67,13 +69,24 @@ rac_bool_t llamacpp_can_handle(const rac_service_request_t* request, void* user_
         return RAC_FALSE;
     }
 
-    // If no identifier specified, we can handle it (default provider)
-    if (request->identifier == nullptr || request->identifier[0] == '\0') {
+    // Priority 1: Check framework hint from model registry
+    if (request->framework == RAC_FRAMEWORK_LLAMACPP) {
         return RAC_TRUE;
     }
 
+    // Priority 2: If framework is explicitly set to something else, don't handle
+    if (request->framework != RAC_FRAMEWORK_UNKNOWN) {
+        return RAC_FALSE;
+    }
+
+    // Priority 3: Framework unknown - fall back to file extension check
+    const char* path = request->model_path ? request->model_path : request->identifier;
+    if (path == nullptr || path[0] == '\0') {
+        // No path/identifier and unknown framework - don't be default anymore
+        return RAC_FALSE;
+    }
+
     // Check if model path ends with .gguf
-    const char* path = request->identifier;
     size_t len = strlen(path);
     if (len >= 5) {
         const char* ext = path + len - 5;
@@ -88,7 +101,7 @@ rac_bool_t llamacpp_can_handle(const rac_service_request_t* request, void* user_
 /**
  * Create a LlamaCPP LLM service.
  *
- * Mirrors Swift's factory closure in LlamaCPPServiceProvider.
+ * Uses model_path from request (set by model registry lookup).
  */
 rac_handle_t llamacpp_create_service(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
@@ -97,12 +110,23 @@ rac_handle_t llamacpp_create_service(const rac_service_request_t* request, void*
         return nullptr;
     }
 
+    // Prefer model_path (from model registry), fall back to identifier
+    const char* model_path = request->model_path ? request->model_path : request->identifier;
+
+    if (model_path == nullptr || model_path[0] == '\0') {
+        RAC_LOG_ERROR(LOG_CAT, "No model path provided");
+        return nullptr;
+    }
+
+    RAC_LOG_DEBUG(LOG_CAT, "Creating LlamaCPP service for: %s", model_path);
+
     rac_handle_t handle = nullptr;
-    rac_result_t result = rac_llm_llamacpp_create(request->identifier,
+    rac_result_t result = rac_llm_llamacpp_create(model_path,
                                                   nullptr,  // Use default config
                                                   &handle);
 
     if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to create LlamaCPP service: %d", result);
         return nullptr;
     }
 

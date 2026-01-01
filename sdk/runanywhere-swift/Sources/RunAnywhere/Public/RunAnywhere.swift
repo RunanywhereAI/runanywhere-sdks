@@ -313,7 +313,7 @@ public enum RunAnywhere {
     ///
     /// This method:
     /// 1. Sets up API client (with authentication for production/staging)
-    /// 2. Loads model catalog from remote API
+    /// 2. Initializes C++ model registry and bridges
     /// 3. Initializes EventPublisher for telemetry
     /// 4. Registers device with backend
     public static func completeServicesInitialization() async throws {
@@ -333,15 +333,15 @@ public enum RunAnywhere {
         // Platform-only modules (SystemTTS) are available as fallbacks
 
         // Check if services need initialization
-        let needsInit = await !CppBridge.HTTP.shared.isConfigured
+        let httpNeedsInit = await !CppBridge.HTTP.shared.isConfigured
 
-        if needsInit {
+        if httpNeedsInit {
             logger.info("Initializing services for \(environment.description) mode...")
 
             // Step 1: Configure HTTP transport (unified in CppBridge)
             try await setupHTTP(params: params, environment: environment, logger: logger)
 
-            // Step 2: Create model services
+            // Step 2: Create model assignment service (uses CppBridge.ModelRegistry directly)
             await setupModelServices(logger: logger)
         }
 
@@ -360,14 +360,24 @@ public enum RunAnywhere {
         EventPublisher.shared.initialize(environment: environment)
         logger.debug("C++ state and bridges initialized")
 
-        // Step 4: Initialize model registry
-        await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
+        // Step 4: Set base directory for C++ model paths
+        if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            try CppBridge.ModelPaths.setBaseDirectory(documentsURL)
+            logger.debug("Model paths base directory set")
+        }
 
         // Step 5: Register device via CppBridge
         await serviceContainer.deviceRegistrationService.registerIfNeeded(
             networkService: CppBridge.HTTP.shared,
             environment: environment
         )
+
+        // Step 6: Discover already-downloaded models on file system
+        // This scans the models directory and updates the registry for models found on disk
+        let discoveryResult = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
+        if discoveryResult.discoveredCount > 0 {
+            logger.info("Discovered \(discoveryResult.discoveredCount) downloaded models on startup")
+        }
 
         // Mark Phase 2 complete
         hasCompletedServicesInit = true
@@ -412,18 +422,14 @@ public enum RunAnywhere {
         }
     }
 
-    /// Setup model services (in-memory)
+    /// Setup model services
+    /// Model registry is handled by CppBridge.ModelRegistry directly
     private static func setupModelServices(logger: SDKLogger) async {
         logger.debug("Setting up model services...")
 
-        // ModelInfoService works in-memory, models fetched via ModelAssignmentService
-        let modelInfoService = ModelInfoService()
-        serviceContainer.setModelInfoService(modelInfoService)
-
-        // Use CppBridge.HTTP as network service
+        // ModelAssignmentService uses CppBridge.ModelRegistry directly
         let modelAssignmentService = ModelAssignmentService(
-            networkService: CppBridge.HTTP.shared,
-            modelInfoService: modelInfoService
+            networkService: CppBridge.HTTP.shared
         )
         serviceContainer.setModelAssignmentService(modelAssignmentService)
 
