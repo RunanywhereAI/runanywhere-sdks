@@ -118,7 +118,8 @@ build_platform() {
         -DRAC_BUILD_LLAMACPP="${BUILD_LLAMACPP}" \
         -DRAC_BUILD_ONNX="${BUILD_ONNX}" \
         -DRAC_BUILD_WHISPERCPP="${BUILD_WHISPERCPP}" \
-        -DRAC_BUILD_SHARED=OFF
+        -DRAC_BUILD_SHARED=OFF \
+        -DRUNANYWHERE_CORE_DIR="${RUNANYWHERE_CORE_DIR}"
 
     cmake --build . --config "${BUILD_TYPE}" -j$(sysctl -n hw.ncpu)
 
