@@ -7,6 +7,7 @@
 #include <cstring>
 #include <ctime>
 
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_api_types.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 

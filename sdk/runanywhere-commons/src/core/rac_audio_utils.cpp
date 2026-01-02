@@ -13,6 +13,7 @@
 #include <cstring>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 
 // WAV file constants
 static constexpr size_t WAV_HEADER_SIZE = 44;

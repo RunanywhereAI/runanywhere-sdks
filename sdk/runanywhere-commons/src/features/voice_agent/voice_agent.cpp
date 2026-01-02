@@ -14,6 +14,8 @@
 
 #include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_audio_utils.h"
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_types.h"
@@ -89,17 +91,14 @@ struct rac_voice_agent {
 static rac_result_t validate_component_ready(const char* component_name, rac_handle_t handle,
                                              rac_lifecycle_state_t (*get_state_fn)(rac_handle_t)) {
     if (handle == nullptr) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent",
-                (std::string(component_name) + " handle is null").c_str());
+        RAC_LOG_ERROR("VoiceAgent", "%s handle is null", component_name);
         return RAC_ERROR_INVALID_HANDLE;
     }
 
     rac_lifecycle_state_t state = get_state_fn(handle);
     if (state != RAC_LIFECYCLE_STATE_LOADED) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent",
-                (std::string(component_name) +
-                 " is not loaded (state: " + rac_lifecycle_state_name(state) + ")")
-                    .c_str());
+        RAC_LOG_ERROR("VoiceAgent", "%s is not loaded (state: %s)", component_name,
+                      rac_lifecycle_state_name(state));
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
@@ -149,7 +148,7 @@ rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_han
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Creating standalone voice agent");
+    RAC_LOG_INFO("VoiceAgent", "Creating standalone voice agent");
 
     rac_voice_agent* agent = new rac_voice_agent();
     agent->owns_components = true;
@@ -157,7 +156,7 @@ rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_han
     // Create LLM component
     rac_result_t result = rac_llm_component_create(&agent->llm_handle);
     if (result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to create LLM component");
+        RAC_LOG_ERROR("VoiceAgent", "Failed to create LLM component");
         delete agent;
         return result;
     }
@@ -165,7 +164,7 @@ rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_han
     // Create STT component
     result = rac_stt_component_create(&agent->stt_handle);
     if (result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to create STT component");
+        RAC_LOG_ERROR("VoiceAgent", "Failed to create STT component");
         rac_llm_component_destroy(agent->llm_handle);
         delete agent;
         return result;
@@ -174,7 +173,7 @@ rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_han
     // Create TTS component
     result = rac_tts_component_create(&agent->tts_handle);
     if (result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to create TTS component");
+        RAC_LOG_ERROR("VoiceAgent", "Failed to create TTS component");
         rac_stt_component_destroy(agent->stt_handle);
         rac_llm_component_destroy(agent->llm_handle);
         delete agent;
@@ -184,7 +183,7 @@ rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_han
     // Create VAD component
     result = rac_vad_component_create(&agent->vad_handle);
     if (result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to create VAD component");
+        RAC_LOG_ERROR("VoiceAgent", "Failed to create VAD component");
         rac_tts_component_destroy(agent->tts_handle);
         rac_stt_component_destroy(agent->stt_handle);
         rac_llm_component_destroy(agent->llm_handle);
@@ -192,7 +191,7 @@ rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_han
         return result;
     }
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Standalone voice agent created with all components");
+    RAC_LOG_INFO("VoiceAgent", "Standalone voice agent created with all components");
 
     *out_handle = agent;
     return RAC_SUCCESS;
@@ -220,7 +219,7 @@ rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
     agent->tts_handle = tts_component_handle;
     agent->vad_handle = vad_component_handle;
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Voice agent created with external handles");
+    RAC_LOG_INFO("VoiceAgent", "Voice agent created with external handles");
 
     *out_handle = agent;
     return RAC_SUCCESS;
@@ -233,7 +232,7 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
 
     // If we own the components, destroy them
     if (handle->owns_components) {
-        rac_log(RAC_LOG_DEBUG, "VoiceAgent", "Destroying owned component handles");
+        RAC_LOG_DEBUG("VoiceAgent", "Destroying owned component handles");
         if (handle->vad_handle)
             rac_vad_component_destroy(handle->vad_handle);
         if (handle->tts_handle)
@@ -245,7 +244,7 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     }
 
     delete handle;
-    rac_log(RAC_LOG_DEBUG, "VoiceAgent", "Voice agent destroyed");
+    RAC_LOG_DEBUG("VoiceAgent", "Voice agent destroyed");
 }
 
 // =============================================================================
@@ -259,7 +258,7 @@ rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle, con
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading STT model");
+    RAC_LOG_INFO("VoiceAgent", "Loading STT model");
 
     // Emit loading state
     rac::events::emit_voice_agent_stt_state_changed(RAC_VOICE_AGENT_STATE_LOADING, model_id,
@@ -291,7 +290,7 @@ rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle, con
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading LLM model");
+    RAC_LOG_INFO("VoiceAgent", "Loading LLM model");
 
     // Emit loading state
     rac::events::emit_voice_agent_llm_state_changed(RAC_VOICE_AGENT_STATE_LOADING, model_id,
@@ -323,7 +322,7 @@ rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle, con
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading TTS voice");
+    RAC_LOG_INFO("VoiceAgent", "Loading TTS voice");
 
     // Emit loading state
     rac::events::emit_voice_agent_tts_state_changed(RAC_VOICE_AGENT_STATE_LOADING, voice_id,
@@ -404,24 +403,24 @@ rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Initializing Voice Agent");
+    RAC_LOG_INFO("VoiceAgent", "Initializing Voice Agent");
 
     const rac_voice_agent_config_t* cfg = config ? config : &RAC_VOICE_AGENT_CONFIG_DEFAULT;
 
     // Step 1: Initialize VAD (mirrors Swift's initializeVAD)
     rac_result_t result = rac_vad_component_initialize(handle->vad_handle);
     if (result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "VAD component failed to initialize");
+        RAC_LOG_ERROR("VoiceAgent", "VAD component failed to initialize");
         return result;
     }
 
     // Step 2: Initialize STT model (mirrors Swift's initializeSTTModel)
     if (cfg->stt_config.model_id && strlen(cfg->stt_config.model_id) > 0) {
         // Load the specified model
-        rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading STT model");
+        RAC_LOG_INFO("VoiceAgent", "Loading STT model");
         result = rac_stt_component_load_model(handle->stt_handle, cfg->stt_config.model_id);
         if (result != RAC_SUCCESS) {
-            rac_log(RAC_LOG_ERROR, "VoiceAgent", "STT component failed to initialize");
+            RAC_LOG_ERROR("VoiceAgent", "STT component failed to initialize");
             return result;
         }
     }
@@ -429,10 +428,10 @@ rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
 
     // Step 3: Initialize LLM model (mirrors Swift's initializeLLMModel)
     if (cfg->llm_config.model_id && strlen(cfg->llm_config.model_id) > 0) {
-        rac_log(RAC_LOG_INFO, "VoiceAgent", "Loading LLM model");
+        RAC_LOG_INFO("VoiceAgent", "Loading LLM model");
         result = rac_llm_component_load_model(handle->llm_handle, cfg->llm_config.model_id);
         if (result != RAC_SUCCESS) {
-            rac_log(RAC_LOG_ERROR, "VoiceAgent", "LLM component failed to initialize");
+            RAC_LOG_ERROR("VoiceAgent", "LLM component failed to initialize");
             return result;
         }
     }
@@ -440,10 +439,10 @@ rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
     // Step 4: Initialize TTS (mirrors Swift's initializeTTSVoice)
     // Note: TTS uses load_model with voice as model_id
     if (cfg->tts_config.voice && strlen(cfg->tts_config.voice) > 0) {
-        rac_log(RAC_LOG_INFO, "VoiceAgent", "Initializing TTS");
+        RAC_LOG_INFO("VoiceAgent", "Initializing TTS");
         result = rac_tts_component_load_voice(handle->tts_handle, cfg->tts_config.voice);
         if (result != RAC_SUCCESS) {
-            rac_log(RAC_LOG_ERROR, "VoiceAgent", "TTS component failed to initialize");
+            RAC_LOG_ERROR("VoiceAgent", "TTS component failed to initialize");
             return result;
         }
     }
@@ -452,7 +451,7 @@ rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
     // Note: In the C API, we trust initialization succeeded
 
     handle->is_configured = true;
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Voice Agent initialized successfully");
+    RAC_LOG_INFO("VoiceAgent", "Voice Agent initialized successfully");
 
     return RAC_SUCCESS;
 }
@@ -464,12 +463,12 @@ rac_result_t rac_voice_agent_initialize_with_loaded_models(rac_voice_agent_handl
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Initializing Voice Agent with already-loaded models");
+    RAC_LOG_INFO("VoiceAgent", "Initializing Voice Agent with already-loaded models");
 
     // Initialize VAD
     rac_result_t result = rac_vad_component_initialize(handle->vad_handle);
     if (result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "VAD component failed to initialize");
+        RAC_LOG_ERROR("VoiceAgent", "VAD component failed to initialize");
         return result;
     }
 
@@ -477,7 +476,7 @@ rac_result_t rac_voice_agent_initialize_with_loaded_models(rac_voice_agent_handl
     // The Swift version checks isModelLoaded properties
 
     handle->is_configured = true;
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Voice Agent initialized with pre-loaded models");
+    RAC_LOG_INFO("VoiceAgent", "Voice Agent initialized with pre-loaded models");
 
     return RAC_SUCCESS;
 }
@@ -489,7 +488,7 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Cleaning up Voice Agent");
+    RAC_LOG_INFO("VoiceAgent", "Cleaning up Voice Agent");
 
     // Cleanup all components (mirrors Swift's cleanup)
     rac_llm_component_cleanup(handle->llm_handle);
@@ -530,7 +529,7 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
 
     // Mirrors Swift's guard isConfigured
     if (!handle->is_configured) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Voice Agent is not initialized");
+        RAC_LOG_ERROR("VoiceAgent", "Voice Agent is not initialized");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
@@ -538,17 +537,17 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
     // This catches issues like dangling handles or improperly initialized components
     rac_result_t validation_result = validate_all_components_ready(handle);
     if (validation_result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Component validation failed - cannot process");
+        RAC_LOG_ERROR("VoiceAgent", "Component validation failed - cannot process");
         return validation_result;
     }
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Processing voice turn");
+    RAC_LOG_INFO("VoiceAgent", "Processing voice turn");
 
     // Initialize result
     memset(out_result, 0, sizeof(rac_voice_agent_result_t));
 
     // Step 1: Transcribe audio (mirrors Swift's Step 1)
-    rac_log(RAC_LOG_DEBUG, "VoiceAgent", "Step 1: Transcribing audio");
+    RAC_LOG_DEBUG("VoiceAgent", "Step 1: Transcribing audio");
 
     rac_stt_result_t stt_result = {};
     rac_result_t result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size,
@@ -556,21 +555,21 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
                                                        &stt_result);
 
     if (result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "STT transcription failed");
+        RAC_LOG_ERROR("VoiceAgent", "STT transcription failed");
         return result;
     }
 
     if (!stt_result.text || strlen(stt_result.text) == 0) {
-        rac_log(RAC_LOG_WARNING, "VoiceAgent", "Empty transcription, skipping processing");
+        RAC_LOG_WARNING("VoiceAgent", "Empty transcription, skipping processing");
         rac_stt_result_free(&stt_result);
         // Return invalid state to indicate empty input (mirrors Swift's emptyInput error)
         return RAC_ERROR_INVALID_STATE;
     }
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Transcription completed");
+    RAC_LOG_INFO("VoiceAgent", "Transcription completed");
 
     // Step 2: Generate LLM response (mirrors Swift's Step 2)
-    rac_log(RAC_LOG_DEBUG, "VoiceAgent", "Step 2: Generating LLM response");
+    RAC_LOG_DEBUG("VoiceAgent", "Step 2: Generating LLM response");
 
     rac_llm_result_t llm_result = {};
     result = rac_llm_component_generate(handle->llm_handle, stt_result.text,
@@ -578,15 +577,15 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
                                         &llm_result);
 
     if (result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "LLM generation failed");
+        RAC_LOG_ERROR("VoiceAgent", "LLM generation failed");
         rac_stt_result_free(&stt_result);
         return result;
     }
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "LLM response generated");
+    RAC_LOG_INFO("VoiceAgent", "LLM response generated");
 
     // Step 3: Synthesize speech (mirrors Swift's Step 3)
-    rac_log(RAC_LOG_DEBUG, "VoiceAgent", "Step 3: Synthesizing speech");
+    RAC_LOG_DEBUG("VoiceAgent", "Step 3: Synthesizing speech");
 
     rac_tts_result_t tts_result = {};
     result = rac_tts_component_synthesize(handle->tts_handle, llm_result.text,
@@ -594,7 +593,7 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
                                           &tts_result);
 
     if (result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "TTS synthesis failed");
+        RAC_LOG_ERROR("VoiceAgent", "TTS synthesis failed");
         rac_stt_result_free(&stt_result);
         rac_llm_result_free(&llm_result);
         return result;
@@ -610,14 +609,14 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
                                       &wav_data, &wav_size);
 
     if (result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Failed to convert audio to WAV format");
+        RAC_LOG_ERROR("VoiceAgent", "Failed to convert audio to WAV format");
         rac_stt_result_free(&stt_result);
         rac_llm_result_free(&llm_result);
         rac_tts_result_free(&tts_result);
         return result;
     }
 
-    rac_log(RAC_LOG_DEBUG, "VoiceAgent", "Converted PCM to WAV format");
+    RAC_LOG_DEBUG("VoiceAgent", "Converted PCM to WAV format");
 
     // Build result (mirrors Swift's VoiceAgentResult)
     out_result->speech_detected = RAC_TRUE;
@@ -631,7 +630,7 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
     rac_llm_result_free(&llm_result);
     rac_tts_result_free(&tts_result);
 
-    rac_log(RAC_LOG_INFO, "VoiceAgent", "Voice turn completed");
+    RAC_LOG_INFO("VoiceAgent", "Voice turn completed");
 
     return RAC_SUCCESS;
 }
@@ -657,7 +656,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     // Defensive validation: Verify all components are in LOADED state before processing
     rac_result_t validation_result = validate_all_components_ready(handle);
     if (validation_result != RAC_SUCCESS) {
-        rac_log(RAC_LOG_ERROR, "VoiceAgent", "Component validation failed - cannot process stream");
+        RAC_LOG_ERROR("VoiceAgent", "Component validation failed - cannot process stream");
         rac_voice_agent_event_t error_event = {};
         error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
         error_event.data.error_code = validation_result;

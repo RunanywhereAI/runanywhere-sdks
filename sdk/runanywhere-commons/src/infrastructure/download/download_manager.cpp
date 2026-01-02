@@ -19,6 +19,8 @@
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/infrastructure/download/rac_download.h"
 
@@ -131,7 +133,7 @@ rac_result_t rac_download_manager_create(const rac_download_config_t* config,
     mgr->is_healthy = true;
     mgr->is_paused = false;
 
-    rac_log(RAC_LOG_INFO, "DownloadManager", "Download manager created");
+    RAC_LOG_INFO("DownloadManager", "Download manager created");
 
     *out_handle = mgr;
     return RAC_SUCCESS;
@@ -156,7 +158,7 @@ void rac_download_manager_destroy(rac_download_manager_handle_t handle) {
     }
 
     delete handle;
-    rac_log(RAC_LOG_DEBUG, "DownloadManager", "Download manager destroyed");
+    RAC_LOG_DEBUG("DownloadManager", "Download manager destroyed");
 }
 
 // =============================================================================
@@ -176,7 +178,7 @@ rac_result_t rac_download_manager_start(rac_download_manager_handle_t handle, co
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     if (handle->is_paused) {
-        rac_log(RAC_LOG_WARNING, "DownloadManager", "Download manager is paused");
+        RAC_LOG_WARNING("DownloadManager", "Download manager is paused");
         return RAC_ERROR_INVALID_STATE;
     }
 
@@ -200,7 +202,7 @@ rac_result_t rac_download_manager_start(rac_download_manager_handle_t handle, co
 
     *out_task_id = rac_strdup(task_id.c_str());
 
-    rac_log(RAC_LOG_INFO, "DownloadManager", "Started download task");
+    RAC_LOG_INFO("DownloadManager", "Started download task");
 
     // Notify initial progress
     download_task_internal& stored_task = handle->tasks[task_id];
@@ -238,7 +240,7 @@ rac_result_t rac_download_manager_cancel(rac_download_manager_handle_t handle,
     notify_progress(task);
     notify_complete(task, RAC_ERROR_CANCELLED, nullptr);
 
-    rac_log(RAC_LOG_INFO, "DownloadManager", "Cancelled download task");
+    RAC_LOG_INFO("DownloadManager", "Cancelled download task");
 
     return RAC_SUCCESS;
 }
@@ -251,7 +253,7 @@ rac_result_t rac_download_manager_pause_all(rac_download_manager_handle_t handle
     std::lock_guard<std::mutex> lock(handle->mutex);
     handle->is_paused = true;
 
-    rac_log(RAC_LOG_INFO, "DownloadManager", "Paused all downloads");
+    RAC_LOG_INFO("DownloadManager", "Paused all downloads");
 
     return RAC_SUCCESS;
 }
@@ -264,7 +266,7 @@ rac_result_t rac_download_manager_resume_all(rac_download_manager_handle_t handl
     std::lock_guard<std::mutex> lock(handle->mutex);
     handle->is_paused = false;
 
-    rac_log(RAC_LOG_INFO, "DownloadManager", "Resumed all downloads");
+    RAC_LOG_INFO("DownloadManager", "Resumed all downloads");
 
     return RAC_SUCCESS;
 }
@@ -428,7 +430,7 @@ rac_result_t rac_download_manager_mark_complete(rac_download_manager_handle_t ha
         notify_complete(task, RAC_SUCCESS, downloaded_path);
     }
 
-    rac_log(RAC_LOG_INFO, "DownloadManager", "Download completed");
+    RAC_LOG_INFO("DownloadManager", "Download completed");
 
     return RAC_SUCCESS;
 }
@@ -460,7 +462,7 @@ rac_result_t rac_download_manager_mark_failed(rac_download_manager_handle_t hand
         }
         notify_progress(task);
 
-        rac_log(RAC_LOG_WARNING, "DownloadManager", "Download failed, will retry");
+        RAC_LOG_WARNING("DownloadManager", "Download failed, will retry");
 
         // Note: Platform adapter should retry after delay
     } else {
@@ -474,7 +476,7 @@ rac_result_t rac_download_manager_mark_failed(rac_download_manager_handle_t hand
         notify_progress(task);
         notify_complete(task, error_code, nullptr);
 
-        rac_log(RAC_LOG_ERROR, "DownloadManager", "Download failed after all retries");
+        RAC_LOG_ERROR("DownloadManager", "Download failed after all retries");
     }
 
     return RAC_SUCCESS;

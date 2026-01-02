@@ -16,6 +16,8 @@
 
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_analytics_events.h"
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_energy.h"
@@ -61,14 +63,6 @@ struct rac_vad_component {
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
-
-static void log_info(const char* category, const char* msg) {
-    rac_log(RAC_LOG_INFO, category, msg);
-}
-
-static void log_error(const char* category, const char* msg) {
-    rac_log(RAC_LOG_ERROR, category, msg);
-}
 
 /**
  * Internal speech activity callback wrapper.
@@ -147,13 +141,13 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
 
     // 2. Warning for very low threshold (Swift lines 72-77)
     if (config->energy_threshold < 0.002f) {
-        rac_log(RAC_LOG_WARNING, "VAD.Component",
+        RAC_LOG_WARNING("VAD.Component",
                 "Energy threshold is very low (< 0.002) and may cause false positives");
     }
 
     // 3. Warning for very high threshold (Swift lines 80-85)
     if (config->energy_threshold > 0.1f) {
-        rac_log(RAC_LOG_WARNING, "VAD.Component",
+        RAC_LOG_WARNING("VAD.Component",
                 "Energy threshold is very high (> 0.1) and may miss speech");
     }
 
@@ -460,11 +454,11 @@ extern "C" rac_result_t rac_vad_component_set_energy_threshold(rac_handle_t hand
 
     // Warning for edge cases
     if (threshold < 0.002f) {
-        rac_log(RAC_LOG_WARNING, "VAD.Component",
+        RAC_LOG_WARNING("VAD.Component",
                 "Threshold is very low (< 0.002) and may cause false positives");
     }
     if (threshold > 0.1f) {
-        rac_log(RAC_LOG_WARNING, "VAD.Component",
+        RAC_LOG_WARNING("VAD.Component",
                 "Threshold is very high (> 0.1) and may miss speech");
     }
 

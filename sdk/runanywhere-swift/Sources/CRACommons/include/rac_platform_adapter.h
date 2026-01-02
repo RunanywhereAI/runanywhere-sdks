@@ -146,6 +146,22 @@ typedef struct rac_platform_adapter {
     void (*log)(rac_log_level_t level, const char* category, const char* message, void* user_data);
 
     // -------------------------------------------------------------------------
+    // Error Tracking (Optional - for Sentry/crash reporting)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Track a structured error for telemetry/crash reporting.
+     * Can be NULL - errors will still be logged but not sent to Sentry.
+     *
+     * Called for non-expected errors (i.e., not cancellations).
+     * The JSON string contains full error details including stack trace.
+     *
+     * @param error_json JSON representation of the structured error
+     * @param user_data Platform context
+     */
+    void (*track_error)(const char* error_json, void* user_data);
+
+    // -------------------------------------------------------------------------
     // Clock
     // -------------------------------------------------------------------------
 

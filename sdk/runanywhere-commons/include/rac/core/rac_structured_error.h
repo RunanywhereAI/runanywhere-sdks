@@ -435,6 +435,70 @@ RAC_API rac_result_t rac_set_error(rac_result_t code, rac_error_category_t categ
  */
 #define RAC_RETURN_ERROR(code, category, msg) return rac_set_error(code, category, msg)
 
+// =============================================================================
+// UNIFIED ERROR HANDLING (Log + Track)
+// =============================================================================
+
+/**
+ * @brief Creates, logs, and tracks a structured error.
+ *
+ * This is the recommended way to handle errors in C++ code. It:
+ * 1. Creates a structured error with source location
+ * 2. Captures stack trace (if available)
+ * 3. Logs the error via the logging system
+ * 4. Sends to error tracking (Sentry) via platform adapter
+ * 5. Sets as last error for retrieval
+ *
+ * @param code Error code
+ * @param category Error category
+ * @param message Error message
+ * @param file Source file (__FILE__)
+ * @param line Source line (__LINE__)
+ * @param function Function name (__func__)
+ * @return The error code (for easy return statements)
+ */
+RAC_API rac_result_t rac_error_log_and_track(rac_result_t code, rac_error_category_t category,
+                                             const char* message, const char* file, int32_t line,
+                                             const char* function);
+
+/**
+ * @brief Creates, logs, and tracks a structured error with model context.
+ *
+ * Same as rac_error_log_and_track but includes model information.
+ *
+ * @param code Error code
+ * @param category Error category
+ * @param message Error message
+ * @param model_id Model ID
+ * @param framework Framework name
+ * @param file Source file
+ * @param line Source line
+ * @param function Function name
+ * @return The error code
+ */
+RAC_API rac_result_t rac_error_log_and_track_model(rac_result_t code, rac_error_category_t category,
+                                                   const char* message, const char* model_id,
+                                                   const char* framework, const char* file,
+                                                   int32_t line, const char* function);
+
+/**
+ * @brief Convenience macro to create, log, track error and return.
+ *
+ * Usage:
+ *   if (model == NULL) {
+ *       RAC_RETURN_TRACKED_ERROR(RAC_ERROR_MODEL_NOT_FOUND, RAC_CATEGORY_LLM, "Model not found");
+ *   }
+ */
+#define RAC_RETURN_TRACKED_ERROR(code, category, msg) \
+    return rac_error_log_and_track(code, category, msg, __FILE__, __LINE__, __func__)
+
+/**
+ * @brief Convenience macro with model context.
+ */
+#define RAC_RETURN_TRACKED_ERROR_MODEL(code, category, msg, model_id, framework)    \
+    return rac_error_log_and_track_model(code, category, msg, model_id, framework,  \
+                                         __FILE__, __LINE__, __func__)
+
 #ifdef __cplusplus
 }
 #endif

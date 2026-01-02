@@ -8,6 +8,7 @@
 #include <cstring>
 #include <vector>
 
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_http_client.h"
 
 // =============================================================================

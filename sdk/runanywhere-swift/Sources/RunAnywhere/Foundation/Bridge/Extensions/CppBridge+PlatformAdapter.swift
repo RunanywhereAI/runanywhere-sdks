@@ -63,6 +63,9 @@ extension CppBridge {
                 RAC_ERROR_NOT_SUPPORTED
             }
 
+            // MARK: Error Tracking (Sentry)
+            adapter.track_error = platformTrackErrorCallback
+
             // MARK: Optional Callbacks (handled by Swift directly)
             adapter.http_download = nil
             adapter.http_download_cancel = nil
@@ -338,4 +341,103 @@ private func platformNowMsCallback(
     userData: UnsafeMutableRawPointer?
 ) -> Int64 {
     Int64(Date().timeIntervalSince1970 * 1000)
+}
+
+// MARK: - Error Tracking Callback
+
+/// Receives structured error JSON from C++ and sends to Sentry
+private func platformTrackErrorCallback(
+    errorJson: UnsafePointer<CChar>?,
+    userData: UnsafeMutableRawPointer?
+) {
+    guard let errorJson = errorJson else { return }
+
+    let jsonString = String(cString: errorJson)
+
+    // Parse the JSON and create a Sentry event
+    guard let jsonData = jsonString.data(using: .utf8),
+          let errorDict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else { // swiftlint:disable:this avoid_any_type
+        return
+    }
+
+    // Convert C++ structured error to Swift SDKError for consistent handling
+    let sdkError = createSDKErrorFromCppError(errorDict)
+
+    // Log through the standard logging system (which routes to Sentry)
+    let category = errorDict["category"] as? String ?? "general"
+    let message = errorDict["message"] as? String ?? "Unknown error"
+
+    // Build metadata from C++ error
+    // swiftlint:disable:next prefer_concrete_types avoid_any_type
+    var metadata: [String: Any] = [:]
+
+    if let code = errorDict["code"] as? Int {
+        metadata["error_code"] = code
+    }
+    if let codeName = errorDict["code_name"] as? String {
+        metadata["error_code_name"] = codeName
+    }
+    if let sourceFile = errorDict["source_file"] as? String {
+        metadata["source_file"] = sourceFile
+    }
+    if let sourceLine = errorDict["source_line"] as? Int {
+        metadata["source_line"] = sourceLine
+    }
+    if let sourceFunction = errorDict["source_function"] as? String {
+        metadata["source_function"] = sourceFunction
+    }
+    if let modelId = errorDict["model_id"] as? String {
+        metadata["model_id"] = modelId
+    }
+    if let framework = errorDict["framework"] as? String {
+        metadata["framework"] = framework
+    }
+    if let sessionId = errorDict["session_id"] as? String {
+        metadata["session_id"] = sessionId
+    }
+    if let underlyingCode = errorDict["underlying_code"] as? Int, underlyingCode != 0 {
+        metadata["underlying_code"] = underlyingCode
+        metadata["underlying_message"] = errorDict["underlying_message"] as? String ?? ""
+    }
+    if let stackFrameCount = errorDict["stack_frame_count"] as? Int {
+        metadata["stack_frame_count"] = stackFrameCount
+    }
+
+    // Route through logging system which handles Sentry
+    Logging.shared.log(level: .error, category: category, message: message, metadata: metadata)
+
+    // Also directly capture in Sentry if available for better error grouping
+    if SentryManager.shared.isInitialized {
+        SentryManager.shared.captureError(sdkError, context: metadata)
+    }
+}
+
+// Creates an SDKError from C++ error dictionary for consistent error handling
+// swiftlint:disable:next avoid_any_type prefer_concrete_types
+private func createSDKErrorFromCppError(_ errorDict: [String: Any]) -> SDKError {
+    let code = errorDict["code"] as? Int32 ?? Int32(RAC_ERROR_UNKNOWN)
+    let message = errorDict["message"] as? String ?? "Unknown error"
+    let categoryName = errorDict["category"] as? String ?? "general"
+
+    // Map category name to ErrorCategory
+    let category = ErrorCategory(rawValue: categoryName) ?? .general
+
+    // Map C++ error code to Swift ErrorCode
+    let errorCode = CommonsErrorMapping.toSDKError(code)?.code ?? .unknown
+
+    // Build stack trace from C++ if available
+    var stackTrace: [String] = []
+    if let sourceFile = errorDict["source_file"] as? String,
+       let sourceLine = errorDict["source_line"] as? Int,
+       let sourceFunction = errorDict["source_function"] as? String {
+        stackTrace.append("\(sourceFunction) at \(sourceFile):\(sourceLine)")
+    }
+
+    return SDKError(
+        code: errorCode,
+        message: message,
+        category: category,
+        stackTrace: stackTrace,
+        underlyingError: nil
+    )
 }

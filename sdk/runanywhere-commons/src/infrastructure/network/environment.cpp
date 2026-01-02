@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cstring>
 
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/network/rac_environment.h"
 

@@ -14,6 +14,7 @@
 #include <sstream>
 #include <string>
 
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 

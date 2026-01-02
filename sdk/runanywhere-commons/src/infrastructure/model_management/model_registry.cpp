@@ -18,6 +18,8 @@
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -127,7 +129,7 @@ rac_result_t rac_model_registry_create(rac_model_registry_handle_t* out_handle) 
 
     rac_model_registry* registry = new rac_model_registry();
 
-    rac_log(RAC_LOG_INFO, "ModelRegistry", "Model registry created");
+    RAC_LOG_INFO("ModelRegistry", "Model registry created");
 
     *out_handle = registry;
     return RAC_SUCCESS;
@@ -145,7 +147,7 @@ void rac_model_registry_destroy(rac_model_registry_handle_t handle) {
     handle->models.clear();
 
     delete handle;
-    rac_log(RAC_LOG_DEBUG, "ModelRegistry", "Model registry destroyed");
+    RAC_LOG_DEBUG("ModelRegistry", "Model registry destroyed");
 }
 
 // =============================================================================
@@ -176,7 +178,7 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
 
     handle->models[model_id] = copy;
 
-    rac_log(RAC_LOG_DEBUG, "ModelRegistry", "Model saved");
+    RAC_LOG_DEBUG("ModelRegistry", "Model saved");
 
     return RAC_SUCCESS;
 }
@@ -326,7 +328,7 @@ rac_result_t rac_model_registry_remove(rac_model_registry_handle_t handle, const
     free_model_info(it->second);
     handle->models.erase(it);
 
-    rac_log(RAC_LOG_DEBUG, "ModelRegistry", "Model removed");
+    RAC_LOG_DEBUG("ModelRegistry", "Model removed");
 
     return RAC_SUCCESS;
 }
@@ -537,22 +539,22 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
 
     // Check required callbacks
     if (!callbacks->list_directory || !callbacks->path_exists || !callbacks->is_directory) {
-        rac_log(RAC_LOG_WARNING, "ModelRegistry", "Discovery: Missing required callbacks");
+        RAC_LOG_WARNING("ModelRegistry", "Discovery: Missing required callbacks");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    rac_log(RAC_LOG_INFO, "ModelRegistry", "Starting model discovery scan...");
+    RAC_LOG_INFO("ModelRegistry", "Starting model discovery scan...");
 
     // Get models directory path
     char models_dir[1024];
     if (rac_model_paths_get_models_directory(models_dir, sizeof(models_dir)) != RAC_SUCCESS) {
-        rac_log(RAC_LOG_WARNING, "ModelRegistry", "Discovery: Base directory not configured");
+        RAC_LOG_WARNING("ModelRegistry", "Discovery: Base directory not configured");
         return RAC_SUCCESS;  // Not an error, just nothing to discover
     }
 
     // Check if models directory exists
     if (callbacks->path_exists(models_dir, callbacks->user_data) != RAC_TRUE) {
-        rac_log(RAC_LOG_DEBUG, "ModelRegistry", "Discovery: Models directory does not exist yet");
+        RAC_LOG_DEBUG("ModelRegistry", "Discovery: Models directory does not exist yet");
         return RAC_SUCCESS;
     }
 
@@ -636,12 +638,12 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
                     disc.framework = framework;
                     discovered.push_back(disc);
 
-                    rac_log(RAC_LOG_INFO, "ModelRegistry", "Discovered downloaded model");
+                    RAC_LOG_INFO("ModelRegistry", "Discovered downloaded model");
                 }
             } else {
                 // Model folder exists but not registered
                 unregistered++;
-                rac_log(RAC_LOG_DEBUG, "ModelRegistry", "Found unregistered model folder");
+                RAC_LOG_DEBUG("ModelRegistry", "Found unregistered model folder");
             }
         }
 
@@ -664,7 +666,7 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
         }
     }
 
-    rac_log(RAC_LOG_INFO, "ModelRegistry", "Model discovery complete");
+    RAC_LOG_INFO("ModelRegistry", "Model discovery complete");
 
     return RAC_SUCCESS;
 }

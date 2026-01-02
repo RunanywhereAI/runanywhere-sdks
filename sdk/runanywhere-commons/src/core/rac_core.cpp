@@ -12,6 +12,8 @@
 #include <string>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -135,6 +137,36 @@ rac_version_t rac_get_version(void) {
     return s_version;
 }
 
+rac_result_t rac_configure_logging(rac_environment_t environment) {
+    switch (environment) {
+        case RAC_ENV_DEVELOPMENT:
+            // Debug mode: print to C++ stderr + send to Swift
+            rac_logger_set_stderr_always(RAC_TRUE);
+            rac_logger_set_min_level(RAC_LOG_DEBUG);
+            RAC_LOG_INFO("RAC.Core", "Logging configured for development: stderr ON, level=DEBUG");
+            break;
+
+        case RAC_ENV_STAGING:
+            // Staging: print to C++ stderr + send to Swift
+            rac_logger_set_stderr_always(RAC_TRUE);
+            rac_logger_set_min_level(RAC_LOG_INFO);
+            RAC_LOG_INFO("RAC.Core", "Logging configured for staging: stderr ON, level=INFO");
+            break;
+
+        case RAC_ENV_PRODUCTION:
+        default:
+            // Production: NO C++ stderr, only send to Swift bridge
+            // Swift handles local console and Sentry routing
+            rac_logger_set_stderr_always(RAC_FALSE);
+            rac_logger_set_min_level(RAC_LOG_WARNING);
+            // Note: This log will only go to Swift, not stderr
+            RAC_LOG_INFO("RAC.Core", "Logging configured for production: stderr OFF, level=WARNING");
+            break;
+    }
+
+    return RAC_SUCCESS;
+}
+
 // =============================================================================
 // HTTP DOWNLOAD CONVENIENCE FUNCTIONS
 // =============================================================================
@@ -197,10 +229,10 @@ rac_model_registry_handle_t rac_get_model_registry(void) {
     if (s_model_registry == nullptr) {
         rac_result_t result = rac_model_registry_create(&s_model_registry);
         if (result != RAC_SUCCESS) {
-            rac_log(RAC_LOG_ERROR, "RAC.Core", "Failed to create global model registry");
+            RAC_LOG_ERROR("RAC.Core", "Failed to create global model registry");
             return nullptr;
         }
-        rac_log(RAC_LOG_INFO, "RAC.Core", "Global model registry created");
+        RAC_LOG_INFO("RAC.Core", "Global model registry created");
     }
 
     return s_model_registry;

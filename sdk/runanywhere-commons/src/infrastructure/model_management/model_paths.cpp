@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 
 // =============================================================================

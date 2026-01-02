@@ -102,6 +102,11 @@ public enum CppBridge {
         // This must be registered before any other C++ calls
         PlatformAdapter.register()
 
+        // Step 1.5: Configure C++ logging based on environment
+        // In production: disables C++ stderr, logs only go through Swift bridge
+        // In development: C++ stderr ON for debugging
+        rac_configure_logging(environment.cEnvironment)
+
         // Step 2: Events callback (for analytics routing)
         Events.register()
 
