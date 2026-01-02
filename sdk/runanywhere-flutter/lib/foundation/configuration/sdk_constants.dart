@@ -18,4 +18,3 @@ class SDKConstants {
   /// SDK name
   static const String name = 'RunAnywhere Flutter SDK';
 }
-

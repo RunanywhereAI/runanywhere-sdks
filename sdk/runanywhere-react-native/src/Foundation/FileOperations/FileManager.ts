@@ -70,4 +70,3 @@ export class FileManager {
     return false;
   }
 }
-

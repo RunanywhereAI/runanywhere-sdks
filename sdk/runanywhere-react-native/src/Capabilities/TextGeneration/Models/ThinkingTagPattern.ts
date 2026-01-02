@@ -42,4 +42,3 @@ export class ThinkingTagPatternImpl implements ThinkingTagPattern {
     '</thinking>'
   );
 }
-

@@ -1,0 +1,97 @@
+name: Build Commons
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'sdks/sdk/runanywhere-commons/**'
+      - '.github/workflows/build-commons.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sdks/sdk/runanywhere-commons/**'
+  workflow_dispatch:
+
+env:
+  COMMONS_DIR: sdks/sdk/runanywhere-commons
+
+jobs:
+  build-macos:
+    name: Build macOS/iOS
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.2'
+
+      - name: Install CMake
+        run: brew install cmake ninja
+
+      - name: Build runanywhere-core (modular)
+        run: |
+          cd runanywhere-core
+          mkdir -p build && cd build
+          cmake .. -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DRA_BUILD_MODULAR=ON
+          ninja
+
+      - name: Build RACommons
+        run: |
+          cd ${{ env.COMMONS_DIR }}
+          mkdir -p build && cd build
+          cmake .. -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DRUNANYWHERE_CORE_DIR=${{ github.workspace }}/runanywhere-core
+          ninja RACommons
+
+      - name: Build Backends
+        run: |
+          cd ${{ env.COMMONS_DIR }}/build
+          ninja RABackendLlamaCPP RABackendONNX RABackendWhisperCPP
+
+      - name: Build iOS XCFrameworks
+        run: |
+          cd ${{ env.COMMONS_DIR }}
+          chmod +x scripts/build-ios.sh
+          ./scripts/build-ios.sh
+
+      - name: Upload XCFrameworks
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcframeworks-macos
+          path: ${{ env.COMMONS_DIR }}/dist/*.xcframework
+          retention-days: 7
+
+  lint:
+    name: Lint C++
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format and clang-tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-tidy
+
+      - name: Check formatting
+        run: |
+          cd ${{ env.COMMONS_DIR }}
+          find include src backends -name '*.cpp' -o -name '*.h' | \
+            xargs clang-format --dry-run --Werror
+
+      - name: Run clang-tidy
+        run: |
+          cd ${{ env.COMMONS_DIR }}
+          mkdir -p build && cd build
+          cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON || true
+          cd ..
+          find include src -name '*.cpp' | head -20 | \
+            xargs clang-tidy -p build --warnings-as-errors='*' || true

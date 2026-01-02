@@ -8,10 +8,10 @@ import kotlinx.serialization.json.Json
 /**
  * Loads configuration from JSON files based on environment
  * Optional enhancement - existing ConfigurationService already handles config loading
- * 
+ *
  * This provides an alternative way to load environment-specific configs from files:
  * - dev.json for development
- * - staging.json for staging  
+ * - staging.json for staging
  * - prod.json for production
  */
 class ConfigurationLoader {
@@ -25,7 +25,7 @@ class ConfigurationLoader {
     /**
      * Load configuration for the given environment
      * Files: dev.json, staging.json, prod.json
-     * 
+     *
      * @param environment SDK environment
      * @return ConfigurationData if file exists and is valid, null otherwise
      */
@@ -66,4 +66,3 @@ class ConfigurationLoader {
  * Expect/actual pattern for platform-specific implementations
  */
 internal expect suspend fun loadResourceFile(fileName: String): String
-

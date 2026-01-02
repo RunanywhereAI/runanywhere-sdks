@@ -26,4 +26,3 @@ export interface VLMServiceProvider {
    */
   readonly name: string;
 }
-

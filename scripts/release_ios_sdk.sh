@@ -27,8 +27,13 @@ VERSION_FILE="$SDK_DIR/VERSION"
 CHANGELOG_FILE="$SDK_DIR/CHANGELOG.md"
 README_ROOT="README.md"
 README_SDK="$SDK_DIR/README.md"
-TOKEN_REL_PATH="Sources/RunAnywhere/Foundation/Constants/BuildToken.swift"
-TOKEN_ABS_PATH="$SDK_DIR/$TOKEN_REL_PATH"
+DEV_CONFIG_REL_PATH="Sources/RunAnywhere/Foundation/Constants/DevelopmentConfig.swift"
+DEV_CONFIG_ABS_PATH="$SDK_DIR/$DEV_CONFIG_REL_PATH"
+SECRETS_FILE="scripts/.release-secrets"
+
+# These will be loaded from secrets file or environment
+SUPABASE_URL=""
+SUPABASE_ANON_KEY=""
 
 ### Portable sed (GNU vs BSD)
 sedi() {
@@ -38,6 +43,54 @@ sedi() {
   else
     # BSD sed (macOS)
     sed -i '' "$@"
+  fi
+}
+
+### Load secrets from file or environment
+load_secrets() {
+  print_header "Loading Release Secrets"
+
+  # Try to load from secrets file first
+  if [[ -f "$SECRETS_FILE" ]]; then
+    print_info "Loading secrets from $SECRETS_FILE"
+    # Source the file to get variables (only SUPABASE_URL and SUPABASE_ANON_KEY)
+    # shellcheck source=/dev/null
+    source "$SECRETS_FILE"
+  fi
+
+  # Environment variables override file values (useful for CI)
+  SUPABASE_URL="${SUPABASE_URL:-}"
+  SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+
+  # Validate required secrets
+  local missing_secrets=0
+
+  if [[ -z "$SUPABASE_URL" ]]; then
+    print_error "Missing SUPABASE_URL"
+    missing_secrets=1
+  else
+    print_success "SUPABASE_URL: ${SUPABASE_URL:0:40}..."
+  fi
+
+  if [[ -z "$SUPABASE_ANON_KEY" ]]; then
+    print_error "Missing SUPABASE_ANON_KEY"
+    missing_secrets=1
+  else
+    print_success "SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:0:20}..."
+  fi
+
+  if [[ $missing_secrets -eq 1 ]]; then
+    echo ""
+    print_error "Missing required secrets!"
+    print_info "Option 1: Ensure scripts/.release-secrets exists with:"
+    echo "  SUPABASE_URL=\"https://your-project.supabase.co\""
+    echo "  SUPABASE_ANON_KEY=\"your-anon-key\""
+    echo ""
+    print_info "Option 2: Set environment variables:"
+    echo "  export SUPABASE_URL=\"https://your-project.supabase.co\""
+    echo "  export SUPABASE_ANON_KEY=\"your-anon-key\""
+    echo ""
+    exit 1
   fi
 }
 
@@ -69,7 +122,16 @@ while [[ $# -gt 0 ]]; do
       echo "  --skip-build        Skip build check (for testing)"
       echo "  --help, -h          Show this help"
       echo ""
-      echo "Environment Variables:"
+      echo "Secrets (required - use ONE of these methods):"
+      echo ""
+      echo "  Method 1: Secrets file (for local dev)"
+      echo "    Ensure scripts/.release-secrets exists with SUPABASE_URL and SUPABASE_ANON_KEY"
+      echo ""
+      echo "  Method 2: Environment variables (for CI)"
+      echo "    export SUPABASE_URL=\"https://your-project.supabase.co\""
+      echo "    export SUPABASE_ANON_KEY=\"your-anon-key\""
+      echo ""
+      echo "Other Environment Variables:"
       echo "  DATABASE_URL        PostgreSQL URL for auto-inserting build token"
       echo ""
       exit 0
@@ -140,10 +202,10 @@ validate_preconditions() {
     print_warning "DATABASE_URL is set but psql not found (will print SQL for manual execution)"
   fi
 
-  # Verify .gitignore contains BuildToken.swift
-  if ! grep -qF "$TOKEN_ABS_PATH" .gitignore 2>/dev/null; then
-    print_warning "BuildToken.swift not in .gitignore - add this line:"
-    print_info "  $TOKEN_ABS_PATH"
+  # Verify .gitignore contains DevelopmentConfig.swift
+  if ! grep -qF "$DEV_CONFIG_ABS_PATH" .gitignore 2>/dev/null; then
+    print_warning "DevelopmentConfig.swift not in .gitignore - add this line:"
+    print_info "  $DEV_CONFIG_ABS_PATH"
   fi
 }
 
@@ -196,8 +258,8 @@ generate_build_token() {
   echo "bt_${uuid}_${timestamp}"
 }
 
-### Generate BuildToken.swift file with real token
-generate_build_token_file() {
+### Generate DevelopmentConfig.swift file with all 3 values
+generate_dev_config_file() {
   local build_token="$1"
   local output_file="$2"
 
@@ -206,7 +268,7 @@ generate_build_token_file() {
   cat > "$output_file" <<EOF
 import Foundation
 
-/// Build token for development mode device registration
+/// Development mode configuration for SDK
 ///
 /// ⚠️ THIS FILE IS AUTO-GENERATED DURING RELEASES
 /// ⚠️ DO NOT MANUALLY EDIT THIS FILE
@@ -216,23 +278,40 @@ import Foundation
 ///
 /// Security Model:
 /// - This file is in .gitignore (not committed to main branch)
-/// - Real tokens are ONLY in release tags (for SPM distribution)
-/// - Token is used ONLY when SDK is in .development mode
-/// - Backend validates token via POST /api/v1/devices/register/dev
+/// - Real values are ONLY in release tags (for SPM distribution)
+/// - Used ONLY when SDK is in .development mode
+/// - Backend validates build token via POST /api/v1/devices/register/dev
 ///
-/// Token Properties:
+/// This file contains all 3 values needed for development mode:
+/// 1. Supabase project URL
+/// 2. Supabase anon key (safe to expose - RLS controls data access)
+/// 3. Build token (validates SDK installation)
+///
+/// Build Token Properties:
 /// - Format: bt_<uuid>_<timestamp>
 /// - Rotatable: Each release gets a new token
 /// - Revocable: Backend can mark token as inactive
 /// - Rate-limited: Backend enforces 100 req/min per device
-enum BuildToken {
+enum DevelopmentConfig {
+    // MARK: - Supabase Configuration
+
+    /// Supabase project URL for development device analytics
+    static let supabaseURL = "$SUPABASE_URL"
+
+    /// Supabase anon/public API key
+    /// Note: Anon key is safe to include in client code - data access is controlled by RLS policies
+    // swiftlint:disable:next line_length
+    static let supabaseAnonKey = "$SUPABASE_ANON_KEY"
+
+    // MARK: - Build Token
+
     /// Development mode build token
     /// Generated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-    static let token = "$build_token"
+    static let buildToken = "$build_token"
 }
 EOF
 
-  print_success "Generated BuildToken.swift"
+  print_success "Generated DevelopmentConfig.swift with all 3 values"
 }
 
 ### Update version references in files
@@ -360,6 +439,9 @@ main() {
   # Validate everything first
   validate_preconditions
 
+  # Load secrets from file or environment
+  load_secrets
+
   # Get current version
   local current_version
   current_version="$(get_current_version)"
@@ -435,8 +517,8 @@ main() {
 
   print_success "Committed version updates to main"
 
-  # Step 2: Create worktree for tag commit (includes BuildToken.swift)
-  print_header "Step 2: Creating Release Tag with BuildToken.swift"
+  # Step 2: Create worktree for tag commit (includes DevelopmentConfig.swift)
+  print_header "Step 2: Creating Release Tag with DevelopmentConfig.swift"
 
   local worktree_dir
   worktree_dir="$(mktemp -d)/release-v$new_version"
@@ -446,22 +528,26 @@ main() {
   git worktree add -b "$release_branch" "$worktree_dir"
   print_info "Created worktree at $worktree_dir"
 
-  # Generate BuildToken.swift in worktree
-  local worktree_token_path="$worktree_dir/$TOKEN_ABS_PATH"
-  generate_build_token_file "$build_token" "$worktree_token_path"
+  # Generate DevelopmentConfig.swift in worktree (contains all 3 values)
+  local worktree_config_path="$worktree_dir/$DEV_CONFIG_ABS_PATH"
+  generate_dev_config_file "$build_token" "$worktree_config_path"
 
-  # Commit BuildToken.swift in worktree
+  # Commit DevelopmentConfig.swift in worktree
   pushd "$worktree_dir" >/dev/null
-  git add -f "$TOKEN_ABS_PATH"
-  git commit -m "Add BuildToken.swift for release v$new_version
+  git add -f "$DEV_CONFIG_ABS_PATH"
+  git commit -m "Add DevelopmentConfig.swift for release v$new_version
 
-SECURITY: BuildToken.swift is in .gitignore and NOT in main branch.
+SECURITY: DevelopmentConfig.swift is in .gitignore and NOT in main branch.
 This file is ONLY included in release tags for SPM distribution.
 
-Token: $build_token
+Contains all 3 development mode values:
+- Supabase URL: $SUPABASE_URL
+- Supabase anon key: [included]
+- Build token: $build_token
+
 Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
 
-  print_success "Committed BuildToken.swift in worktree"
+  print_success "Committed DevelopmentConfig.swift in worktree"
 
   # Create annotated tag
   local tag_name="v$new_version"
@@ -492,9 +578,12 @@ Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
   print_success "Released v$new_version successfully"
   print_success "Build token: $build_token"
   echo ""
-  print_info "Main branch: Contains version updates (NO BuildToken.swift)"
-  print_info "Tag $tag_name: Contains BuildToken.swift with real token"
-  print_info "SPM users downloading v$new_version will get the real token"
+  print_info "Main branch: Contains version updates (NO DevelopmentConfig.swift)"
+  print_info "Tag $tag_name: Contains DevelopmentConfig.swift with all 3 values:"
+  print_info "  - Supabase URL: $SUPABASE_URL"
+  print_info "  - Supabase anon key: [included]"
+  print_info "  - Build token: $build_token"
+  print_info "SPM users downloading v$new_version will get the real configuration"
   echo ""
   print_info "Users can now install with:"
   echo ""

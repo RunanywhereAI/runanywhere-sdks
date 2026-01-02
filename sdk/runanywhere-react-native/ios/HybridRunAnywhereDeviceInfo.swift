@@ -4,31 +4,31 @@ import UIKit
 
 /// Swift implementation of RunAnywhereDeviceInfo HybridObject
 class HybridRunAnywhereDeviceInfo: HybridRunAnywhereDeviceInfoSpec {
-    
+
     func getDeviceModel() throws -> Promise<String> {
         return Promise.async {
             return UIDevice.current.model
         }
     }
-    
+
     func getOSVersion() throws -> Promise<String> {
         return Promise.async {
             return UIDevice.current.systemVersion
         }
     }
-    
+
     func getPlatform() throws -> Promise<String> {
         return Promise.async {
             return "ios"
         }
     }
-    
+
     func getTotalRAM() throws -> Promise<Double> {
         return Promise.async {
             return Double(ProcessInfo.processInfo.physicalMemory)
         }
     }
-    
+
     func getAvailableRAM() throws -> Promise<Double> {
         return Promise.async {
             var info = mach_task_basic_info()
@@ -46,27 +46,27 @@ class HybridRunAnywhereDeviceInfo: HybridRunAnywhereDeviceInfoSpec {
             return 0
         }
     }
-    
+
     func getCPUCores() throws -> Promise<Double> {
         return Promise.async {
             return Double(ProcessInfo.processInfo.processorCount)
         }
     }
-    
+
     func hasGPU() throws -> Promise<Bool> {
         return Promise.async {
             // iOS devices always have GPU
             return true
         }
     }
-    
+
     func hasNPU() throws -> Promise<Bool> {
         return Promise.async {
             // Check for Neural Engine (A11 Bionic and later)
             return true
         }
     }
-    
+
     func getChipName() throws -> Promise<String> {
         return Promise.async {
             var sysinfo = utsname()
@@ -79,7 +79,7 @@ class HybridRunAnywhereDeviceInfo: HybridRunAnywhereDeviceInfoSpec {
             return machine
         }
     }
-    
+
     func getThermalState() throws -> Promise<Double> {
         return Promise.async {
             let state = ProcessInfo.processInfo.thermalState
@@ -92,7 +92,7 @@ class HybridRunAnywhereDeviceInfo: HybridRunAnywhereDeviceInfoSpec {
             }
         }
     }
-    
+
     func getBatteryLevel() throws -> Promise<Double> {
         return Promise.async {
             await MainActor.run {
@@ -101,7 +101,7 @@ class HybridRunAnywhereDeviceInfo: HybridRunAnywhereDeviceInfoSpec {
             return Double(UIDevice.current.batteryLevel)
         }
     }
-    
+
     func isCharging() throws -> Promise<Bool> {
         return Promise.async {
             await MainActor.run {
@@ -111,7 +111,7 @@ class HybridRunAnywhereDeviceInfo: HybridRunAnywhereDeviceInfoSpec {
             return state == .charging || state == .full
         }
     }
-    
+
     func isLowPowerMode() throws -> Promise<Bool> {
         return Promise.async {
             return ProcessInfo.processInfo.isLowPowerModeEnabled

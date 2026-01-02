@@ -13,12 +13,17 @@ struct SimplifiedModelsView: View {
     @StateObject private var deviceInfo = DeviceInfoService.shared
 
     @State private var selectedModel: ModelInfo?
+    @State private var expandedFramework: InferenceFramework?
+    @State private var availableFrameworks: [InferenceFramework] = []
+    @State private var showingAddModelSheet = false
 
     /// All available models sorted by availability (downloaded first)
     private var sortedModels: [ModelInfo] {
         viewModel.availableModels.sorted { model1, model2 in
-            let m1Priority = model1.preferredFramework == .foundationModels ? 0 : (model1.localPath != nil ? 1 : 2)
-            let m2Priority = model2.preferredFramework == .foundationModels ? 0 : (model2.localPath != nil ? 1 : 2)
+            let m1BuiltIn = model1.framework == .foundationModels || model1.framework == .systemTTS || model1.artifactType == .builtIn
+            let m2BuiltIn = model2.framework == .foundationModels || model2.framework == .systemTTS || model2.artifactType == .builtIn
+            let m1Priority = m1BuiltIn ? 0 : (model1.localPath != nil ? 1 : 2)
+            let m2Priority = m2BuiltIn ? 0 : (model2.localPath != nil ? 1 : 2)
             if m1Priority != m2Priority {
                 return m1Priority < m2Priority
             }
@@ -45,6 +50,15 @@ struct SimplifiedModelsView: View {
 
     private func loadInitialData() async {
         await viewModel.loadModels()
+        await loadAvailableFrameworks()
+    }
+
+    private func loadAvailableFrameworks() async {
+        // Get available frameworks from SDK - derived from registered models
+        let frameworks = await RunAnywhere.getRegisteredFrameworks()
+        await MainActor.run {
+            self.availableFrameworks = frameworks
+        }
     }
 
     private var deviceStatusSection: some View {
@@ -61,8 +75,11 @@ struct SimplifiedModelsView: View {
         Group {
             deviceInfoRow(label: "Model", systemImage: "iphone", value: device.modelName)
             deviceInfoRow(label: "Chip", systemImage: "cpu", value: device.chipName)
-            deviceInfoRow(label: "Memory", systemImage: "memorychip",
-                         value: ByteCountFormatter.string(fromByteCount: device.totalMemory, countStyle: .memory))
+            deviceInfoRow(
+                label: "Memory",
+                systemImage: "memorychip",
+                value: ByteCountFormatter.string(fromByteCount: device.totalMemory, countStyle: .memory)
+            )
 
             if device.neuralEngineAvailable {
                 neuralEngineRow
@@ -162,29 +179,34 @@ private struct SimplifiedModelRow: View {
     @State private var downloadProgress: Double = 0.0
 
     private var frameworkColor: Color {
-        guard let framework = model.preferredFramework else { return .gray }
-        switch framework {
-        case .llamaCpp: return .blue
+        switch model.framework {
+        case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
-        case .whisperKit: return .green
+        case .systemTTS: return .primary
         default: return .gray
         }
     }
 
     private var frameworkName: String {
-        guard let framework = model.preferredFramework else { return "Unknown" }
-        switch framework {
+        switch model.framework {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
-        case .whisperKit: return "Whisper"
-        default: return framework.displayName
+        case .systemTTS: return "System"
+        default: return model.framework.displayName
         }
     }
 
+    /// Check if this is a built-in model that doesn't require download
+    private var isBuiltIn: Bool {
+        model.framework == .foundationModels ||
+        model.framework == .systemTTS ||
+        model.artifactType == .builtIn
+    }
+
     private var isReady: Bool {
-        model.preferredFramework == .foundationModels || model.localPath != nil
+        isBuiltIn || model.localPath != nil
     }
 
     var body: some View {
@@ -210,7 +232,7 @@ private struct SimplifiedModelRow: View {
 
                 // Size and status
                 HStack(spacing: AppSpacing.smallMedium) {
-                    if let size = model.memoryRequired, size > 0 {
+                    if let size = model.downloadSize, size > 0 {
                         Label(
                             ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
                             systemImage: "memorychip"
@@ -230,11 +252,14 @@ private struct SimplifiedModelRow: View {
                     } else {
                         HStack(spacing: AppSpacing.xxSmall) {
                             Image(systemName: isReady ? "checkmark.circle.fill" : "arrow.down.circle")
-                                .foregroundColor(isReady ? AppColors.statusGreen : AppColors.statusBlue)
+                                .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                                 .font(AppTypography.caption2)
-                            Text(model.preferredFramework == .foundationModels ? "Built-in" : (model.localPath != nil ? "Ready" : "Download"))
+                            let statusText = isBuiltIn
+                                ? "Built-in"
+                                : (model.localPath != nil ? "Ready" : "Download")
+                            Text(statusText)
                                 .font(AppTypography.caption2)
-                                .foregroundColor(isReady ? AppColors.statusGreen : AppColors.statusBlue)
+                                .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                         }
                     }
 
@@ -256,13 +281,15 @@ private struct SimplifiedModelRow: View {
             Spacer()
 
             // Action button
-            if model.preferredFramework == .foundationModels {
+            if isBuiltIn {
+                // Built-in models (Foundation Models, System TTS) - always ready
                 Button("Use") {
                     onSelectModel()
                 }
                 .font(AppTypography.caption)
                 .fontWeight(.semibold)
                 .buttonStyle(.borderedProminent)
+                .tint(AppColors.primaryAccent)
                 .controlSize(.small)
                 .disabled(isSelected)
             } else if model.localPath == nil {
@@ -283,6 +310,7 @@ private struct SimplifiedModelRow: View {
                     .font(AppTypography.caption)
                     .fontWeight(.semibold)
                     .buttonStyle(.bordered)
+                    .tint(AppColors.primaryAccent)
                     .controlSize(.small)
                 }
             } else {
@@ -301,6 +329,7 @@ private struct SimplifiedModelRow: View {
                     .font(AppTypography.caption)
                     .fontWeight(.semibold)
                     .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primaryAccent)
                     .controlSize(.small)
                 }
             }
@@ -315,32 +344,31 @@ private struct SimplifiedModelRow: View {
         }
 
         do {
-            let progressStream = try await RunAnywhere.downloadModelWithProgress(model.id)
+            // Use the new convenience download API
+            let progressStream = try await RunAnywhere.downloadModel(model.id)
 
             for await progress in progressStream {
                 await MainActor.run {
-                    self.downloadProgress = progress.percentage
+                    self.downloadProgress = progress.overallProgress
+                    print("Download progress for \(model.name): \(Int(progress.overallProgress * 100))%")
                 }
 
-                switch progress.state {
-                case .completed:
+                // Check if download completed
+                if progress.stage == .completed {
                     await MainActor.run {
                         self.downloadProgress = 1.0
                         self.isDownloading = false
                         onDownloadCompleted()
                     }
                     return
-
-                case .failed:
-                    await MainActor.run {
-                        self.downloadProgress = 0.0
-                        self.isDownloading = false
-                    }
-                    return
-
-                default:
-                    continue
                 }
+            }
+
+            // If we exit the loop normally, download completed
+            await MainActor.run {
+                self.downloadProgress = 1.0
+                self.isDownloading = false
+                onDownloadCompleted()
             }
         } catch {
             await MainActor.run {

@@ -14,4 +14,3 @@ class LoadedModel {
     required this.service,
   });
 }
-

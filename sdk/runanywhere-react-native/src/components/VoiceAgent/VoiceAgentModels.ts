@@ -27,4 +27,3 @@ export enum VoiceAgentEvent {
   AudioSynthesized = 'audioSynthesized',
   Error = 'error',
 }
-

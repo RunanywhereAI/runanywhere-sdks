@@ -53,4 +53,3 @@ export function detectFormatFromURL(url: string): ModelFormat | null {
 
   return ModelFormat.Unknown;
 }
-

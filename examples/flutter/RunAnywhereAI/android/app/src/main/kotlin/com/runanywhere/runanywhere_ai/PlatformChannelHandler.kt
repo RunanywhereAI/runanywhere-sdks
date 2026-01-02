@@ -121,4 +121,3 @@ class PlatformChannelHandler(private val context: Context) {
         // TODO: Implement native model unloading
     }
 }
-

@@ -135,4 +135,3 @@ export interface STTStreamResult {
   /** Timestamp when this result was generated */
   readonly timestamp: Date;
 }
-

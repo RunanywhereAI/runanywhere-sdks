@@ -26,4 +26,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Event bus for reactive programming
 - Service container for dependency injection
 - Module registry for plugin architecture
-

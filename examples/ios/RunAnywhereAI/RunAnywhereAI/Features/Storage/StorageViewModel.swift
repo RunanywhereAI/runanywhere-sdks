@@ -31,7 +31,7 @@ class StorageViewModel: ObservableObject {
         // Update storage sizes from the public API
         totalStorageSize = storageInfo.appStorage.totalSize
         availableSpace = storageInfo.deviceStorage.freeSpace
-        modelStorageSize = storageInfo.modelStorage.totalSize
+        modelStorageSize = storageInfo.totalModelsSize
 
         // Use StoredModel directly from SDK
         storedModels = storageInfo.storedModels
@@ -61,13 +61,16 @@ class StorageViewModel: ObservableObject {
         }
     }
 
-    func deleteModel(_ modelId: String) async {
+    func deleteModel(_ model: StoredModel) async {
+        guard let framework = model.framework else {
+            errorMessage = "Cannot delete model: unknown framework"
+            return
+        }
         do {
-            try await RunAnywhere.deleteStoredModel(modelId)
+            try await RunAnywhere.deleteStoredModel(model.id, framework: framework)
             await refreshData()
         } catch {
             errorMessage = "Failed to delete model: \(error.localizedDescription)"
         }
     }
-
 }
