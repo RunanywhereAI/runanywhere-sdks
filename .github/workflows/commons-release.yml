@@ -102,23 +102,26 @@ jobs:
           fi
           echo "✓ Core: $(cat third_party/runanywhere-core/DOWNLOADED_VERSION)"
 
-          # Check ONNX Runtime
+          # Check ONNX Runtime (in commons third_party/ for FetchONNXRuntime.cmake)
           if [ ! -d "third_party/onnxruntime-ios/onnxruntime.xcframework" ]; then
             echo "ERROR: onnxruntime.xcframework not downloaded"
             exit 1
           fi
-          echo "✓ ONNX Runtime"
+          echo "✓ ONNX Runtime (third_party/onnxruntime-ios/)"
 
-          # Check Sherpa-ONNX
-          if [ ! -d "third_party/sherpa-onnx-ios/sherpa-onnx.xcframework" ]; then
+          # Check Sherpa-ONNX (inside runanywhere-core/third_party/ for ONNX backend CMake)
+          if [ ! -d "third_party/runanywhere-core/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework" ]; then
             echo "ERROR: sherpa-onnx.xcframework not downloaded"
             exit 1
           fi
-          echo "✓ Sherpa-ONNX"
+          echo "✓ Sherpa-ONNX (third_party/runanywhere-core/third_party/sherpa-onnx-ios/)"
 
           echo ""
           echo "=== third_party/ contents ==="
           ls -la third_party/
+          echo ""
+          echo "=== third_party/runanywhere-core/third_party/ contents ==="
+          ls -la third_party/runanywhere-core/third_party/
 
       - name: Setup Development Config
         working-directory: ${{ env.COMMONS_DIR }}
