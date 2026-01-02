@@ -14,9 +14,15 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 // =============================================================================
 // BINARY TARGET CONFIGURATION
 // =============================================================================
-// Set to `true` to use local XCFrameworks from Binaries/ directory (for local development/testing)
-// Set to `false` to use remote XCFrameworks from GitHub releases (default for production use)
-let testLocal = true  // Default to local for development during migration
+//
+// testLocal = true  → Use local XCFrameworks from Binaries/ directory
+//                     (for local development when building runanywhere-commons)
+//
+// testLocal = false → Download XCFrameworks from GitHub releases (PRODUCTION)
+//                     (default for end users and CI/CD)
+//
+// =============================================================================
+let testLocal = false
 // =============================================================================
 
 let package = Package(
@@ -190,6 +196,10 @@ let package = Package(
 // =============================================================================
 // BINARY TARGET SELECTION
 // =============================================================================
+// Version constants for remote XCFrameworks
+let commonsVersion = "0.1.0"
+let coreVersion = "0.1.1-dev.03aacf9"
+
 // This function returns the appropriate binary targets based on testLocal setting
 func binaryTargets() -> [Target] {
     if testLocal {
@@ -218,30 +228,32 @@ func binaryTargets() -> [Target] {
         ]
     } else {
         // Production mode (default): Download from GitHub releases
+        // Commons frameworks from runanywhere-sdks releases
+        // ONNX Runtime from runanywhere-binaries releases (core dependency)
         return [
-            // Core commons library
+            // Core commons library (~2MB)
             .binaryTarget(
                 name: "RACommonsBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/RACommons.xcframework.zip",
-                checksum: "PLACEHOLDER_CHECKSUM_RACommons"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v0.1.0/RACommons-0.1.0.zip",
+                checksum: "399d9ddcd9021943613daadf106248ba1a0bf6d3c7c41159f97cf4ef42441f9e"
             ),
-            // LlamaCPP backend
+            // LlamaCPP backend (~30MB with Metal)
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/RABackendLlamaCPP.xcframework.zip",
-                checksum: "PLACEHOLDER_CHECKSUM_RABackendLlamaCPP"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v0.1.0/RABackendLlamaCPP-0.1.0.zip",
+                checksum: "e44d538762b7c82a0a6fd96f651007e29b2825536e7f5fdd6ed8ca8bc2959e5a"
             ),
-            // ONNX backend wrapper
+            // ONNX backend wrapper (~400KB)
             .binaryTarget(
                 name: "RABackendONNXBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/RABackendONNX.xcframework.zip",
-                checksum: "PLACEHOLDER_CHECKSUM_RABackendONNX"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v0.1.0/RABackendONNX-0.1.0.zip",
+                checksum: "766edf6086f119c1540cf3eaf7656194a682aa42128f23c2dd0299f01d2d516a"
             ),
-            // ONNX Runtime (required for ONNX backend)
+            // ONNX Runtime (~48MB - from runanywhere-binaries/core releases)
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/onnxruntime.xcframework.zip",
-                checksum: "PLACEHOLDER_CHECKSUM_ONNXRuntime"
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v0.1.1-dev.03aacf9/onnxruntime-ios-v0.1.1-dev.03aacf9.zip",
+                checksum: "3c71a9065616371bdbd095ba8d7a10d86f474dd09a825c11b62efd92c58a0e47"
             ),
         ]
     }
