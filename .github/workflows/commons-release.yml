@@ -80,6 +80,11 @@ jobs:
         id: core
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
+          set -x  # Enable debug output
+          echo "PWD: $(pwd)"
+          echo "Contents of current directory:"
+          ls -la
+
           chmod +x scripts/download-core.sh
 
           # Determine core version
@@ -87,7 +92,6 @@ jobs:
             CORE_VERSION="${{ github.event.inputs.core_version }}"
           else
             # Use specific known-good version for now
-            # TODO: Switch back to LATEST_CORE_VERSION once stable releases are working
             CORE_VERSION="0.1.1-dev.03aacf9"
             echo "Using hardcoded core version: $CORE_VERSION"
           fi
@@ -96,17 +100,24 @@ jobs:
           echo "core_version=$CORE_VERSION" >> $GITHUB_OUTPUT
 
           # Download core source and dependencies
-          RUNANYWHERE_CORE_VERSION="$CORE_VERSION" ./scripts/download-core.sh
+          echo "Running download-core.sh..."
+          RUNANYWHERE_CORE_VERSION="$CORE_VERSION" bash -x ./scripts/download-core.sh
 
       - name: Verify Core Downloaded
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
+          echo "PWD: $(pwd)"
+          echo "Checking third_party directory..."
+          ls -la third_party/ || echo "third_party/ does not exist"
           if [ ! -d "third_party/runanywhere-core" ]; then
             echo "ERROR: runanywhere-core not downloaded"
             exit 1
           fi
           echo "Core version: $(cat third_party/runanywhere-core/DOWNLOADED_VERSION 2>/dev/null || echo 'unknown')"
+          echo "Core contents:"
           ls -la third_party/runanywhere-core/
+          echo "Dependencies:"
+          ls -la third_party/runanywhere-core/third_party/ || echo "No third_party deps dir"
 
       - name: Build iOS XCFrameworks
         working-directory: ${{ env.COMMONS_DIR }}
