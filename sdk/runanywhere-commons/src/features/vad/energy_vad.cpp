@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/vad/rac_vad_energy.h"
 
@@ -91,13 +93,13 @@ static void update_voice_activity_state(rac_energy_vad* vad, bool has_voice) {
         if (!vad->is_currently_speaking && vad->consecutive_voice_frames >= start_threshold) {
             // Extra validation during TTS to prevent false positives (mirrors Swift)
             if (vad->is_tts_active) {
-                rac_log(RAC_LOG_WARNING, "EnergyVAD",
+                RAC_LOG_WARNING("EnergyVAD",
                         "Voice detected during TTS playback - likely feedback! Ignoring.");
                 return;
             }
 
             vad->is_currently_speaking = true;
-            rac_log(RAC_LOG_INFO, "EnergyVAD", "VAD: SPEECH STARTED");
+            RAC_LOG_INFO("EnergyVAD", "VAD: SPEECH STARTED");
 
             // Fire callback
             if (vad->speech_callback) {
@@ -111,7 +113,7 @@ static void update_voice_activity_state(rac_energy_vad* vad, bool has_voice) {
         // Stop speaking if we have enough consecutive silent frames
         if (vad->is_currently_speaking && vad->consecutive_silent_frames >= end_threshold) {
             vad->is_currently_speaking = false;
-            rac_log(RAC_LOG_INFO, "EnergyVAD", "VAD: SPEECH ENDED");
+            RAC_LOG_INFO("EnergyVAD", "VAD: SPEECH ENDED");
 
             // Fire callback
             if (vad->speech_callback) {
@@ -161,11 +163,11 @@ static void handle_calibration_frame(rac_energy_vad* vad, float energy) {
         // Cap at reasonable maximum (mirrors Swift cap)
         if (vad->energy_threshold > RAC_VAD_MAX_THRESHOLD) {
             vad->energy_threshold = RAC_VAD_MAX_THRESHOLD;
-            rac_log(RAC_LOG_WARNING, "EnergyVAD",
+            RAC_LOG_WARNING("EnergyVAD",
                     "Calibration detected high ambient noise. Capping threshold.");
         }
 
-        rac_log(RAC_LOG_INFO, "EnergyVAD", "VAD Calibration Complete");
+        RAC_LOG_INFO("EnergyVAD", "VAD Calibration Complete");
 
         vad->is_calibrating = false;
         vad->calibration_samples.clear();
@@ -236,7 +238,7 @@ rac_result_t rac_energy_vad_create(const rac_energy_vad_config_t* config,
     vad->audio_callback = nullptr;
     vad->audio_user_data = nullptr;
 
-    rac_log(RAC_LOG_INFO, "EnergyVAD", "SimpleEnergyVADService initialized");
+    RAC_LOG_INFO("EnergyVAD", "SimpleEnergyVADService initialized");
 
     *out_handle = vad;
     return RAC_SUCCESS;
@@ -248,7 +250,7 @@ void rac_energy_vad_destroy(rac_energy_vad_handle_t handle) {
     }
 
     delete handle;
-    rac_log(RAC_LOG_DEBUG, "EnergyVAD", "SimpleEnergyVADService destroyed");
+    RAC_LOG_DEBUG("EnergyVAD", "SimpleEnergyVADService destroyed");
 }
 
 rac_result_t rac_energy_vad_initialize(rac_energy_vad_handle_t handle) {
@@ -265,7 +267,7 @@ rac_result_t rac_energy_vad_initialize(rac_energy_vad_handle_t handle) {
     handle->consecutive_voice_frames = 0;
 
     // Start calibration (mirrors Swift's startCalibration)
-    rac_log(RAC_LOG_INFO, "EnergyVAD", "Starting VAD calibration - measuring ambient noise");
+    RAC_LOG_INFO("EnergyVAD", "Starting VAD calibration - measuring ambient noise");
 
     handle->is_calibrating = true;
     handle->calibration_samples.clear();
@@ -291,7 +293,7 @@ rac_result_t rac_energy_vad_start(rac_energy_vad_handle_t handle) {
     handle->consecutive_silent_frames = 0;
     handle->consecutive_voice_frames = 0;
 
-    rac_log(RAC_LOG_INFO, "EnergyVAD", "SimpleEnergyVADService started");
+    RAC_LOG_INFO("EnergyVAD", "SimpleEnergyVADService started");
     return RAC_SUCCESS;
 }
 
@@ -310,7 +312,7 @@ rac_result_t rac_energy_vad_stop(rac_energy_vad_handle_t handle) {
     // If currently speaking, send end event
     if (handle->is_currently_speaking) {
         handle->is_currently_speaking = false;
-        rac_log(RAC_LOG_INFO, "EnergyVAD", "VAD: SPEECH ENDED (stopped)");
+        RAC_LOG_INFO("EnergyVAD", "VAD: SPEECH ENDED (stopped)");
 
         if (handle->speech_callback) {
             handle->speech_callback(RAC_SPEECH_ACTIVITY_ENDED, handle->speech_user_data);
@@ -321,7 +323,7 @@ rac_result_t rac_energy_vad_stop(rac_energy_vad_handle_t handle) {
     handle->consecutive_silent_frames = 0;
     handle->consecutive_voice_frames = 0;
 
-    rac_log(RAC_LOG_INFO, "EnergyVAD", "SimpleEnergyVADService stopped");
+    RAC_LOG_INFO("EnergyVAD", "SimpleEnergyVADService stopped");
     return RAC_SUCCESS;
 }
 
@@ -427,7 +429,7 @@ rac_result_t rac_energy_vad_pause(rac_energy_vad_handle_t handle) {
     }
 
     handle->is_paused = true;
-    rac_log(RAC_LOG_INFO, "EnergyVAD", "VAD paused");
+    RAC_LOG_INFO("EnergyVAD", "VAD paused");
 
     // If currently speaking, send end event
     if (handle->is_currently_speaking) {
@@ -466,7 +468,7 @@ rac_result_t rac_energy_vad_resume(rac_energy_vad_handle_t handle) {
     handle->recent_energy_values.clear();
     handle->debug_frame_count = 0;
 
-    rac_log(RAC_LOG_INFO, "EnergyVAD", "VAD resumed");
+    RAC_LOG_INFO("EnergyVAD", "VAD resumed");
     return RAC_SUCCESS;
 }
 
@@ -477,7 +479,7 @@ rac_result_t rac_energy_vad_start_calibration(rac_energy_vad_handle_t handle) {
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    rac_log(RAC_LOG_INFO, "EnergyVAD", "Starting VAD calibration");
+    RAC_LOG_INFO("EnergyVAD", "Starting VAD calibration");
 
     handle->is_calibrating = true;
     handle->calibration_samples.clear();
@@ -529,7 +531,7 @@ rac_result_t rac_energy_vad_notify_tts_start(rac_energy_vad_handle_t handle) {
     float new_threshold = handle->energy_threshold * handle->tts_threshold_multiplier;
     handle->energy_threshold = std::min(new_threshold, 0.1f);
 
-    rac_log(RAC_LOG_INFO, "EnergyVAD", "TTS starting - VAD blocked and threshold increased");
+    RAC_LOG_INFO("EnergyVAD", "TTS starting - VAD blocked and threshold increased");
 
     // End any current speech detection
     if (handle->is_currently_speaking) {
@@ -559,7 +561,7 @@ rac_result_t rac_energy_vad_notify_tts_finish(rac_energy_vad_handle_t handle) {
     // Immediately restore threshold
     handle->energy_threshold = handle->base_energy_threshold;
 
-    rac_log(RAC_LOG_INFO, "EnergyVAD", "TTS finished - VAD threshold restored");
+    RAC_LOG_INFO("EnergyVAD", "TTS finished - VAD threshold restored");
 
     // Reset state for immediate readiness
     handle->recent_energy_values.clear();

@@ -10,7 +10,7 @@
 #include <cstdlib>
 #include <mutex>
 
-#include "rac/core/rac_log.h"
+#include "rac/core/rac_logger.h"
 #include "rac/features/vad/rac_vad_analytics.h"
 
 // =============================================================================

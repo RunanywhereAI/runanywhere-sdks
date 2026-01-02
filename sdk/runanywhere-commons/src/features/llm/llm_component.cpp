@@ -17,7 +17,9 @@
 
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_analytics_events.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/infrastructure/events/rac_events.h"
@@ -68,17 +70,6 @@ static int32_t estimate_tokens(const char* text) {
 }
 
 /**
- * Log helper.
- */
-static void log_info(const char* category, const char* msg) {
-    rac_log(RAC_LOG_INFO, category, msg);
-}
-
-static void log_error(const char* category, const char* msg) {
-    rac_log(RAC_LOG_ERROR, category, msg);
-}
-
-/**
  * Generate a unique ID for generation tracking.
  */
 static std::string generate_unique_id() {
@@ -102,25 +93,25 @@ static rac_result_t llm_create_service(const char* model_id, void* user_data,
                                        rac_handle_t* out_service) {
     (void)user_data;
 
-    log_info("LLM.Component", "Creating LLM service");
+    RAC_LOG_INFO("LLM.Component", "Creating LLM service for model: %s", model_id ? model_id : "");
 
     // Create LLM service
     rac_result_t result = rac_llm_create(model_id, out_service);
     if (result != RAC_SUCCESS) {
-        log_error("LLM.Component", "Failed to create LLM service");
+        RAC_LOG_ERROR("LLM.Component", "Failed to create LLM service: %d", result);
         return result;
     }
 
     // Initialize with model path
     result = rac_llm_initialize(*out_service, model_id);
     if (result != RAC_SUCCESS) {
-        log_error("LLM.Component", "Failed to initialize LLM service");
+        RAC_LOG_ERROR("LLM.Component", "Failed to initialize LLM service: %d", result);
         rac_llm_destroy(*out_service);
         *out_service = nullptr;
         return result;
     }
 
-    log_info("LLM.Component", "LLM service created successfully");
+    RAC_LOG_INFO("LLM.Component", "LLM service created successfully");
     return RAC_SUCCESS;
 }
 
@@ -132,7 +123,7 @@ static void llm_destroy_service(rac_handle_t service, void* user_data) {
     (void)user_data;
 
     if (service) {
-        log_info("LLM.Component", "Destroying LLM service");
+        RAC_LOG_DEBUG("LLM.Component", "Destroying LLM service");
         rac_llm_cleanup(service);
         rac_llm_destroy(service);
     }
@@ -168,7 +159,7 @@ extern "C" rac_result_t rac_llm_component_create(rac_handle_t* out_handle) {
 
     *out_handle = reinterpret_cast<rac_handle_t>(component);
 
-    log_info("LLM.Component", "LLM component created");
+    RAC_LOG_INFO("LLM.Component", "LLM component created");
 
     return RAC_SUCCESS;
 }

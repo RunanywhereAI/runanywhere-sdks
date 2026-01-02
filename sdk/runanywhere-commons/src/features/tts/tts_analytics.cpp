@@ -15,7 +15,7 @@
 #include <sstream>
 #include <string>
 
-#include "rac/core/rac_log.h"
+#include "rac/core/rac_logger.h"
 #include "rac/features/tts/rac_tts_analytics.h"
 
 // =============================================================================

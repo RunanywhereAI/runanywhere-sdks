@@ -16,6 +16,7 @@
 #include <string>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_sdk_state.h"
 
 // =============================================================================

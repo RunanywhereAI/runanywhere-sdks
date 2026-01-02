@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
 
 const char* rac_endpoint_device_registration(rac_environment_t env) {

@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/events/rac_events.h"
 

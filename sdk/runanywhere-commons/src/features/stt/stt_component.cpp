@@ -17,6 +17,8 @@
 
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_analytics_events.h"
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_service.h"
@@ -53,14 +55,6 @@ struct rac_stt_component {
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
-
-static void log_info(const char* category, const char* msg) {
-    rac_log(RAC_LOG_INFO, category, msg);
-}
-
-static void log_error(const char* category, const char* msg) {
-    rac_log(RAC_LOG_ERROR, category, msg);
-}
 
 /**
  * Generate a unique ID for transcription tracking.

@@ -13,6 +13,7 @@
 #include <string>
 
 #include "rac/core/rac_analytics_events.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
@@ -36,22 +37,8 @@ DeviceManagerState& get_state() {
     return state;
 }
 
-// Forward declaration for logging
-void log_info(const char* message);
-void log_error(const char* message);
-void log_debug(const char* message);
-
-void log_info(const char* message) {
-    rac_log(RAC_LOG_INFO, "DeviceManager", message);
-}
-
-void log_error(const char* message) {
-    rac_log(RAC_LOG_ERROR, "DeviceManager", message);
-}
-
-void log_debug(const char* message) {
-    rac_log(RAC_LOG_DEBUG, "DeviceManager", message);
-}
+// Logging category
+static const char* LOG_CAT = "DeviceManager";
 
 // Helper to emit device registered event
 void emit_device_registered(const char* device_id) {
@@ -90,7 +77,7 @@ rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks_t* call
     // Validate required callbacks
     if (!callbacks->get_device_info || !callbacks->get_device_id || !callbacks->is_registered ||
         !callbacks->set_registered || !callbacks->http_post) {
-        log_error("One or more required callbacks are NULL");
+        RAC_LOG_ERROR(LOG_CAT, "One or more required callbacks are NULL");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
@@ -100,7 +87,7 @@ rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks_t* call
     state.callbacks = *callbacks;
     state.callbacks_set = true;
 
-    log_info("Device manager callbacks configured");
+    RAC_LOG_INFO(LOG_CAT, "Device manager callbacks configured");
     return RAC_SUCCESS;
 }
 
@@ -109,22 +96,22 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
     std::lock_guard<std::mutex> lock(state.mutex);
 
     if (!state.callbacks_set) {
-        log_error("Device manager callbacks not set");
+        RAC_LOG_ERROR(LOG_CAT, "Device manager callbacks not set");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
     // Step 1: Check if already registered
     if (state.callbacks.is_registered(state.callbacks.user_data) == RAC_TRUE) {
-        log_debug("Device already registered, skipping");
+        RAC_LOG_DEBUG(LOG_CAT, "Device already registered, skipping");
         return RAC_SUCCESS;
     }
 
-    log_info("Starting device registration");
+    RAC_LOG_INFO(LOG_CAT, "Starting device registration");
 
     // Step 2: Get device ID
     const char* device_id = state.callbacks.get_device_id(state.callbacks.user_data);
     if (!device_id || strlen(device_id) == 0) {
-        log_error("Failed to get device ID");
+        RAC_LOG_ERROR(LOG_CAT, "Failed to get device ID");
         emit_device_registration_failed(RAC_ERROR_INVALID_STATE, "Failed to get device ID");
         return RAC_ERROR_INVALID_STATE;
     }
@@ -152,7 +139,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
     rac_result_t result = rac_device_registration_to_json(&request, env, &json_ptr, &json_len);
 
     if (result != RAC_SUCCESS || !json_ptr) {
-        log_error("Failed to build registration JSON");
+        RAC_LOG_ERROR(LOG_CAT, "Failed to build registration JSON");
         emit_device_registration_failed(result, "Failed to build registration JSON");
         return result;
     }
@@ -160,7 +147,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
     // Step 6: Get endpoint
     const char* endpoint = rac_endpoint_device_registration(env);
     if (!endpoint) {
-        log_error("Failed to get device registration endpoint");
+        RAC_LOG_ERROR(LOG_CAT, "Failed to get device registration endpoint");
         rac_free(json_ptr);
         emit_device_registration_failed(RAC_ERROR_INVALID_STATE, "Failed to get endpoint");
         return RAC_ERROR_INVALID_STATE;
@@ -183,7 +170,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         if (response.error_message) {
             error_msg = error_msg + ": " + response.error_message;
         }
-        log_error(error_msg.c_str());
+        RAC_LOG_ERROR(LOG_CAT, "%s", error_msg.c_str());
         emit_device_registration_failed(result != RAC_SUCCESS ? result : response.result,
                                         response.error_message ? response.error_message
                                                                : "HTTP request failed");
@@ -196,7 +183,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
     // Step 11: Emit success event
     emit_device_registered(device_id);
 
-    log_info("Device registration successful");
+    RAC_LOG_INFO(LOG_CAT, "Device registration successful");
     return RAC_SUCCESS;
 }
 
@@ -220,7 +207,7 @@ void rac_device_manager_clear_registration(void) {
     }
 
     state.callbacks.set_registered(RAC_FALSE, state.callbacks.user_data);
-    log_info("Device registration cleared");
+    RAC_LOG_INFO(LOG_CAT, "Device registration cleared");
 }
 
 const char* rac_device_manager_get_device_id(void) {

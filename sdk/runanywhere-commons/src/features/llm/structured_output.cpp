@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 
@@ -258,7 +259,7 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
     trim_whitespace(text, &trim_start, &trim_end);
 
     if (trim_start >= trim_end) {
-        rac_log(RAC_LOG_ERROR, "StructuredOutput", "Empty text provided");
+        RAC_LOG_ERROR("StructuredOutput", "Empty text provided");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
@@ -339,7 +340,7 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
     }
 
     // Log the text that couldn't be parsed
-    rac_log(RAC_LOG_ERROR, "StructuredOutput", "No valid JSON found in the response");
+    RAC_LOG_ERROR("StructuredOutput", "No valid JSON found in the response");
     return RAC_ERROR_INVALID_FORMAT;
 }
 

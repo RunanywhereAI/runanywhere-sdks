@@ -12,6 +12,7 @@
 #include "rac_error.h"
 #include "rac_types.h"
 #include "rac_model_types.h"
+#include "rac_environment.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,6 +85,21 @@ RAC_API rac_bool_t rac_is_initialized(void);
  * @return Version information structure
  */
 RAC_API rac_version_t rac_get_version(void);
+
+/**
+ * Configures logging based on the environment.
+ *
+ * This configures C++ local logging (stderr) based on the environment:
+ * - Development: stderr ON, min level DEBUG
+ * - Staging: stderr ON, min level INFO
+ * - Production: stderr OFF, min level WARNING (logs only go to Swift bridge)
+ *
+ * Call this during SDK initialization after setting the platform adapter.
+ *
+ * @param environment The current SDK environment
+ * @return RAC_SUCCESS on success
+ */
+RAC_API rac_result_t rac_configure_logging(rac_environment_t environment);
 
 // =============================================================================
 // MODULE INFORMATION

@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
 
 rac_telemetry_payload_t rac_telemetry_payload_default(void) {

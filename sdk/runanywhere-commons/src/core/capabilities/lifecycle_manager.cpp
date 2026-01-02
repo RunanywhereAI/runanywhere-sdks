@@ -16,6 +16,7 @@
 #include <string>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/infrastructure/events/rac_events.h"
 
@@ -155,8 +156,8 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_id,
     if (mgr->state.load() == RAC_LIFECYCLE_STATE_LOADED && mgr->current_model_id == model_id &&
         mgr->current_service != nullptr) {
         // Mirrors Swift: logger.info("Model already loaded, skipping duplicate load")
-        rac_log(RAC_LOG_INFO, mgr->logger_category.c_str(),
-                "Model already loaded, skipping duplicate load");
+        RAC_LOG_INFO(mgr->logger_category.c_str(),
+                     "Model already loaded, skipping duplicate load");
         *out_service = mgr->current_service;
         return RAC_SUCCESS;
     }
@@ -166,8 +167,7 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_id,
     mgr->state.store(RAC_LIFECYCLE_STATE_LOADING);
     track_lifecycle_event(mgr, "load.started", model_id, 0.0, RAC_SUCCESS);
 
-    rac_log(RAC_LOG_INFO, mgr->logger_category.c_str(),
-            ("Loading model: " + std::string(model_id)).c_str());
+    RAC_LOG_INFO(mgr->logger_category.c_str(), "Loading model: %s", model_id);
 
     // Create service via callback
     rac_handle_t service = nullptr;
@@ -188,9 +188,8 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_id,
         mgr->load_count++;
         mgr->total_load_time_ms += load_time_ms;
 
-        rac_log(
-            RAC_LOG_INFO, mgr->logger_category.c_str(),
-            ("Loaded model in " + std::to_string(static_cast<int>(load_time_ms)) + "ms").c_str());
+        RAC_LOG_INFO(mgr->logger_category.c_str(), "Loaded model in %dms",
+                     static_cast<int>(load_time_ms));
 
         *out_service = service;
         return RAC_SUCCESS;
@@ -203,7 +202,7 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_id,
     // Track load failed (mirrors Swift: trackEvent(type: .loadFailed))
     track_lifecycle_event(mgr, "load.failed", model_id, load_time_ms, result);
 
-    rac_log(RAC_LOG_ERROR, mgr->logger_category.c_str(), "Failed to load model");
+    RAC_LOG_ERROR(mgr->logger_category.c_str(), "Failed to load model");
 
     return result;
 }
@@ -218,8 +217,8 @@ rac_result_t rac_lifecycle_unload(rac_handle_t handle) {
 
     // Mirrors Swift: if let modelId = await lifecycle.currentResourceId
     if (!mgr->current_model_id.empty()) {
-        rac_log(RAC_LOG_INFO, mgr->logger_category.c_str(),
-                ("Unloading model: " + mgr->current_model_id).c_str());
+        RAC_LOG_INFO(mgr->logger_category.c_str(), "Unloading model: %s",
+                     mgr->current_model_id.c_str());
 
         // Destroy service if callback provided
         if (mgr->destroy_fn != nullptr && mgr->current_service != nullptr) {

@@ -15,6 +15,8 @@
 #include <mutex>
 #include <string>
 
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_metrics.h"
 
@@ -267,7 +269,7 @@ rac_result_t rac_generation_analytics_create(rac_generation_analytics_handle_t* 
 
     rac_generation_analytics* service = new rac_generation_analytics();
 
-    rac_log(RAC_LOG_INFO, "GenerationAnalytics", "Service created");
+    RAC_LOG_INFO("GenerationAnalytics", "Service created");
 
     *out_handle = service;
     return RAC_SUCCESS;
@@ -276,7 +278,7 @@ rac_result_t rac_generation_analytics_create(rac_generation_analytics_handle_t* 
 void rac_generation_analytics_destroy(rac_generation_analytics_handle_t handle) {
     if (handle) {
         delete handle;
-        rac_log(RAC_LOG_DEBUG, "GenerationAnalytics", "Service destroyed");
+        RAC_LOG_DEBUG("GenerationAnalytics", "Service destroyed");
     }
 }
 

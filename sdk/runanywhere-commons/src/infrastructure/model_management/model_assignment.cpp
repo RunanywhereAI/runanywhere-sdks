@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "rac/core/rac_core.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -128,7 +129,7 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
     // Find "models" array
     size_t models_pos = json.find("\"models\"");
     if (models_pos == std::string::npos) {
-        rac_log(RAC_LOG_WARNING, LOG_CAT, "No 'models' array in response");
+        RAC_LOG_WARNING(LOG_CAT, "No 'models' array in response");
         return models;
     }
 
@@ -286,7 +287,7 @@ rac_result_t rac_model_assignment_set_callbacks(const rac_assignment_callbacks_t
     std::lock_guard<std::mutex> lock(g_mutex);
     g_callbacks = *callbacks;
 
-    rac_log(RAC_LOG_DEBUG, LOG_CAT, "Model assignment callbacks set");
+    RAC_LOG_DEBUG(LOG_CAT, "Model assignment callbacks set");
     return RAC_SUCCESS;
 }
 
@@ -302,13 +303,13 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     if (!force_refresh && is_cache_valid()) {
         snprintf(msg, sizeof(msg), "Returning cached model assignments (%zu models)",
                  g_cached_models.size());
-        rac_log(RAC_LOG_DEBUG, LOG_CAT, msg);
+        RAC_LOG_DEBUG(LOG_CAT, msg);
         return copy_models_to_output(g_cached_models, out_models, out_count);
     }
 
     // Need to fetch from backend
     if (!g_callbacks.http_get || !g_callbacks.get_device_info) {
-        rac_log(RAC_LOG_ERROR, LOG_CAT, "Callbacks not set");
+        RAC_LOG_ERROR(LOG_CAT, "Callbacks not set");
         return RAC_ERROR_INVALID_STATE;
     }
 
@@ -323,12 +324,12 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
         device_info.platform ? device_info.platform : "unknown", endpoint, sizeof(endpoint));
 
     if (len < 0) {
-        rac_log(RAC_LOG_ERROR, LOG_CAT, "Failed to build endpoint URL");
+        RAC_LOG_ERROR(LOG_CAT, "Failed to build endpoint URL");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
     snprintf(msg, sizeof(msg), "Fetching model assignments from: %s", endpoint);
-    rac_log(RAC_LOG_INFO, LOG_CAT, msg);
+    RAC_LOG_INFO(LOG_CAT, msg);
 
     // Make HTTP request
     rac_assignment_http_response_t response = {};
@@ -338,11 +339,11 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     if (result != RAC_SUCCESS || response.result != RAC_SUCCESS) {
         snprintf(msg, sizeof(msg), "HTTP request failed: %s",
                  response.error_message ? response.error_message : "unknown error");
-        rac_log(RAC_LOG_ERROR, LOG_CAT, msg);
+        RAC_LOG_ERROR(LOG_CAT, msg);
 
         // Return cached data as fallback
         if (!g_cached_models.empty()) {
-            rac_log(RAC_LOG_INFO, LOG_CAT, "Using cached models as fallback");
+            RAC_LOG_INFO(LOG_CAT, "Using cached models as fallback");
             return copy_models_to_output(g_cached_models, out_models, out_count);
         }
 
@@ -352,11 +353,11 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     if (response.status_code != 200) {
         snprintf(msg, sizeof(msg), "HTTP %d: %s", response.status_code,
                  response.error_message ? response.error_message : "request failed");
-        rac_log(RAC_LOG_ERROR, LOG_CAT, msg);
+        RAC_LOG_ERROR(LOG_CAT, msg);
 
         // Return cached data as fallback
         if (!g_cached_models.empty()) {
-            rac_log(RAC_LOG_INFO, LOG_CAT, "Using cached models as fallback");
+            RAC_LOG_INFO(LOG_CAT, "Using cached models as fallback");
             return copy_models_to_output(g_cached_models, out_models, out_count);
         }
 
@@ -367,7 +368,7 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     std::vector<rac_model_info_t*> models =
         parse_models_json(response.response_body, response.response_length);
     snprintf(msg, sizeof(msg), "Parsed %zu model assignments", models.size());
-    rac_log(RAC_LOG_INFO, LOG_CAT, msg);
+    RAC_LOG_INFO(LOG_CAT, msg);
 
     // Save to registry
     rac_model_registry_handle_t registry = rac_get_model_registry();
@@ -375,7 +376,7 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
         for (auto* model : models) {
             rac_model_registry_save(registry, model);
         }
-        rac_log(RAC_LOG_DEBUG, LOG_CAT, "Saved models to registry");
+        RAC_LOG_DEBUG(LOG_CAT, "Saved models to registry");
     }
 
     // Update cache
@@ -395,7 +396,7 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     }
 
     snprintf(msg, sizeof(msg), "Successfully fetched %zu model assignments", *out_count);
-    rac_log(RAC_LOG_INFO, LOG_CAT, msg);
+    RAC_LOG_INFO(LOG_CAT, msg);
 
     return result;
 }
@@ -439,7 +440,7 @@ rac_result_t rac_model_assignment_get_by_category(rac_model_category_t category,
 void rac_model_assignment_clear_cache(void) {
     std::lock_guard<std::mutex> lock(g_mutex);
     clear_cache_internal();
-    rac_log(RAC_LOG_DEBUG, LOG_CAT, "Model assignment cache cleared");
+    RAC_LOG_DEBUG(LOG_CAT, "Model assignment cache cleared");
 }
 
 void rac_model_assignment_set_cache_timeout(uint32_t timeout_seconds) {
@@ -447,5 +448,5 @@ void rac_model_assignment_set_cache_timeout(uint32_t timeout_seconds) {
     g_cache_timeout_seconds = timeout_seconds;
     char msg[64];
     snprintf(msg, sizeof(msg), "Cache timeout set to %u seconds", timeout_seconds);
-    rac_log(RAC_LOG_DEBUG, LOG_CAT, msg);
+    RAC_LOG_DEBUG(LOG_CAT, msg);
 }

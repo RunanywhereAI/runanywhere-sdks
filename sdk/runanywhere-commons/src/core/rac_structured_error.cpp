@@ -245,50 +245,283 @@ void rac_error_add_frame(rac_error_t* error, const char* function, const char* f
 // =============================================================================
 
 const char* rac_error_code_name(rac_result_t code) {
-    // Note: This is a subset - add more as needed
     switch (code) {
+        // Success
         case RAC_SUCCESS:
             return "SUCCESS";
+
+        // Initialization Errors (-100 to -109)
         case RAC_ERROR_NOT_INITIALIZED:
-            return "NOT_INITIALIZED";
+            return "notInitialized";
         case RAC_ERROR_ALREADY_INITIALIZED:
-            return "ALREADY_INITIALIZED";
+            return "alreadyInitialized";
         case RAC_ERROR_INITIALIZATION_FAILED:
-            return "INITIALIZATION_FAILED";
+            return "initializationFailed";
+        case RAC_ERROR_INVALID_CONFIGURATION:
+            return "invalidConfiguration";
+        case RAC_ERROR_INVALID_API_KEY:
+            return "invalidAPIKey";
+        case RAC_ERROR_ENVIRONMENT_MISMATCH:
+            return "environmentMismatch";
+        case RAC_ERROR_INVALID_PARAMETER:
+            return "invalidConfiguration";
+
+        // Model Errors (-110 to -129)
         case RAC_ERROR_MODEL_NOT_FOUND:
-            return "MODEL_NOT_FOUND";
+            return "modelNotFound";
         case RAC_ERROR_MODEL_LOAD_FAILED:
-            return "MODEL_LOAD_FAILED";
+            return "modelLoadFailed";
+        case RAC_ERROR_MODEL_VALIDATION_FAILED:
+            return "modelValidationFailed";
+        case RAC_ERROR_MODEL_INCOMPATIBLE:
+            return "modelIncompatible";
+        case RAC_ERROR_INVALID_MODEL_FORMAT:
+            return "invalidModelFormat";
+        case RAC_ERROR_MODEL_STORAGE_CORRUPTED:
+            return "modelStorageCorrupted";
         case RAC_ERROR_MODEL_NOT_LOADED:
-            return "MODEL_NOT_LOADED";
+            return "notInitialized";
+
+        // Generation Errors (-130 to -149)
         case RAC_ERROR_GENERATION_FAILED:
-            return "GENERATION_FAILED";
-        case RAC_ERROR_TIMEOUT:
-            return "TIMEOUT";
-        case RAC_ERROR_CANCELLED:
-            return "CANCELLED";
+            return "generationFailed";
+        case RAC_ERROR_GENERATION_TIMEOUT:
+            return "generationTimeout";
+        case RAC_ERROR_CONTEXT_TOO_LONG:
+            return "contextTooLong";
+        case RAC_ERROR_TOKEN_LIMIT_EXCEEDED:
+            return "tokenLimitExceeded";
+        case RAC_ERROR_COST_LIMIT_EXCEEDED:
+            return "costLimitExceeded";
+        case RAC_ERROR_INFERENCE_FAILED:
+            return "generationFailed";
+
+        // Network Errors (-150 to -179)
         case RAC_ERROR_NETWORK_UNAVAILABLE:
-            return "NETWORK_UNAVAILABLE";
+            return "networkUnavailable";
         case RAC_ERROR_NETWORK_ERROR:
-            return "NETWORK_ERROR";
-        case RAC_ERROR_INVALID_INPUT:
-            return "INVALID_INPUT";
-        case RAC_ERROR_INVALID_STATE:
-            return "INVALID_STATE";
-        case RAC_ERROR_NOT_SUPPORTED:
-            return "NOT_SUPPORTED";
-        case RAC_ERROR_PROCESSING_FAILED:
-            return "PROCESSING_FAILED";
-        case RAC_ERROR_INSUFFICIENT_MEMORY:
-            return "INSUFFICIENT_MEMORY";
+            return "networkError";
+        case RAC_ERROR_REQUEST_FAILED:
+            return "requestFailed";
+        case RAC_ERROR_DOWNLOAD_FAILED:
+            return "downloadFailed";
+        case RAC_ERROR_SERVER_ERROR:
+            return "serverError";
+        case RAC_ERROR_TIMEOUT:
+            return "timeout";
+        case RAC_ERROR_INVALID_RESPONSE:
+            return "invalidResponse";
+        case RAC_ERROR_HTTP_ERROR:
+            return "httpError";
+        case RAC_ERROR_CONNECTION_LOST:
+            return "connectionLost";
+        case RAC_ERROR_PARTIAL_DOWNLOAD:
+            return "partialDownload";
+        case RAC_ERROR_HTTP_REQUEST_FAILED:
+            return "requestFailed";
+        case RAC_ERROR_HTTP_NOT_SUPPORTED:
+            return "notSupported";
+
+        // Storage Errors (-180 to -219)
+        case RAC_ERROR_INSUFFICIENT_STORAGE:
+            return "insufficientStorage";
+        case RAC_ERROR_STORAGE_FULL:
+            return "storageFull";
+        case RAC_ERROR_STORAGE_ERROR:
+            return "storageError";
         case RAC_ERROR_FILE_NOT_FOUND:
-            return "FILE_NOT_FOUND";
+            return "fileNotFound";
+        case RAC_ERROR_FILE_READ_FAILED:
+            return "fileReadFailed";
+        case RAC_ERROR_FILE_WRITE_FAILED:
+            return "fileWriteFailed";
         case RAC_ERROR_PERMISSION_DENIED:
-            return "PERMISSION_DENIED";
+            return "permissionDenied";
+        case RAC_ERROR_DELETE_FAILED:
+            return "deleteFailed";
+        case RAC_ERROR_MOVE_FAILED:
+            return "moveFailed";
+        case RAC_ERROR_DIRECTORY_CREATION_FAILED:
+            return "directoryCreationFailed";
+        case RAC_ERROR_DIRECTORY_NOT_FOUND:
+            return "directoryNotFound";
+        case RAC_ERROR_INVALID_PATH:
+            return "invalidPath";
+        case RAC_ERROR_INVALID_FILE_NAME:
+            return "invalidFileName";
+        case RAC_ERROR_TEMP_FILE_CREATION_FAILED:
+            return "tempFileCreationFailed";
+
+        // Hardware Errors (-220 to -229)
+        case RAC_ERROR_HARDWARE_UNSUPPORTED:
+            return "hardwareUnsupported";
+        case RAC_ERROR_INSUFFICIENT_MEMORY:
+            return "insufficientMemory";
+
+        // Component State Errors (-230 to -249)
+        case RAC_ERROR_COMPONENT_NOT_READY:
+            return "componentNotReady";
+        case RAC_ERROR_INVALID_STATE:
+            return "invalidState";
+        case RAC_ERROR_SERVICE_NOT_AVAILABLE:
+            return "serviceNotAvailable";
+        case RAC_ERROR_SERVICE_BUSY:
+            return "serviceBusy";
+        case RAC_ERROR_PROCESSING_FAILED:
+            return "processingFailed";
+        case RAC_ERROR_START_FAILED:
+            return "startFailed";
+        case RAC_ERROR_NOT_SUPPORTED:
+            return "notSupported";
+
+        // Validation Errors (-250 to -279)
+        case RAC_ERROR_VALIDATION_FAILED:
+            return "validationFailed";
+        case RAC_ERROR_INVALID_INPUT:
+            return "invalidInput";
+        case RAC_ERROR_INVALID_FORMAT:
+            return "invalidFormat";
+        case RAC_ERROR_EMPTY_INPUT:
+            return "emptyInput";
+        case RAC_ERROR_TEXT_TOO_LONG:
+            return "textTooLong";
+        case RAC_ERROR_INVALID_SSML:
+            return "invalidSSML";
+        case RAC_ERROR_INVALID_SPEAKING_RATE:
+            return "invalidSpeakingRate";
+        case RAC_ERROR_INVALID_PITCH:
+            return "invalidPitch";
+        case RAC_ERROR_INVALID_VOLUME:
+            return "invalidVolume";
+        case RAC_ERROR_INVALID_ARGUMENT:
+            return "invalidInput";
+        case RAC_ERROR_NULL_POINTER:
+            return "invalidInput";
+        case RAC_ERROR_BUFFER_TOO_SMALL:
+            return "invalidInput";
+
+        // Audio Errors (-280 to -299)
+        case RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED:
+            return "audioFormatNotSupported";
+        case RAC_ERROR_AUDIO_SESSION_FAILED:
+            return "audioSessionFailed";
+        case RAC_ERROR_MICROPHONE_PERMISSION_DENIED:
+            return "microphonePermissionDenied";
+        case RAC_ERROR_INSUFFICIENT_AUDIO_DATA:
+            return "insufficientAudioData";
+        case RAC_ERROR_EMPTY_AUDIO_BUFFER:
+            return "emptyAudioBuffer";
+        case RAC_ERROR_AUDIO_SESSION_ACTIVATION_FAILED:
+            return "audioSessionActivationFailed";
+
+        // Language/Voice Errors (-300 to -319)
+        case RAC_ERROR_LANGUAGE_NOT_SUPPORTED:
+            return "languageNotSupported";
+        case RAC_ERROR_VOICE_NOT_AVAILABLE:
+            return "voiceNotAvailable";
+        case RAC_ERROR_STREAMING_NOT_SUPPORTED:
+            return "streamingNotSupported";
+        case RAC_ERROR_STREAM_CANCELLED:
+            return "streamCancelled";
+
+        // Authentication Errors (-320 to -329)
+        case RAC_ERROR_AUTHENTICATION_FAILED:
+            return "authenticationFailed";
+        case RAC_ERROR_UNAUTHORIZED:
+            return "unauthorized";
+        case RAC_ERROR_FORBIDDEN:
+            return "forbidden";
+
+        // Security Errors (-330 to -349)
+        case RAC_ERROR_KEYCHAIN_ERROR:
+            return "keychainError";
+        case RAC_ERROR_ENCODING_ERROR:
+            return "encodingError";
+        case RAC_ERROR_DECODING_ERROR:
+            return "decodingError";
+        case RAC_ERROR_SECURE_STORAGE_FAILED:
+            return "keychainError";
+
+        // Extraction Errors (-350 to -369)
+        case RAC_ERROR_EXTRACTION_FAILED:
+            return "extractionFailed";
+        case RAC_ERROR_CHECKSUM_MISMATCH:
+            return "checksumMismatch";
+        case RAC_ERROR_UNSUPPORTED_ARCHIVE:
+            return "unsupportedArchive";
+
+        // Calibration Errors (-370 to -379)
+        case RAC_ERROR_CALIBRATION_FAILED:
+            return "calibrationFailed";
+        case RAC_ERROR_CALIBRATION_TIMEOUT:
+            return "calibrationTimeout";
+
+        // Cancellation (-380 to -389)
+        case RAC_ERROR_CANCELLED:
+            return "cancelled";
+
+        // Module/Service Errors (-400 to -499)
+        case RAC_ERROR_MODULE_NOT_FOUND:
+            return "frameworkNotAvailable";
+        case RAC_ERROR_MODULE_ALREADY_REGISTERED:
+            return "alreadyInitialized";
+        case RAC_ERROR_MODULE_LOAD_FAILED:
+            return "initializationFailed";
+        case RAC_ERROR_SERVICE_NOT_FOUND:
+            return "serviceNotAvailable";
+        case RAC_ERROR_SERVICE_ALREADY_REGISTERED:
+            return "alreadyInitialized";
+        case RAC_ERROR_SERVICE_CREATE_FAILED:
+            return "initializationFailed";
+        case RAC_ERROR_CAPABILITY_NOT_FOUND:
+            return "featureNotAvailable";
+        case RAC_ERROR_PROVIDER_NOT_FOUND:
+            return "serviceNotAvailable";
+        case RAC_ERROR_NO_CAPABLE_PROVIDER:
+            return "serviceNotAvailable";
+        case RAC_ERROR_NOT_FOUND:
+            return "modelNotFound";
+
+        // Platform Adapter Errors (-500 to -599)
+        case RAC_ERROR_ADAPTER_NOT_SET:
+            return "notInitialized";
+
+        // Backend Errors (-600 to -699)
+        case RAC_ERROR_BACKEND_NOT_FOUND:
+            return "frameworkNotAvailable";
+        case RAC_ERROR_BACKEND_NOT_READY:
+            return "componentNotReady";
+        case RAC_ERROR_BACKEND_INIT_FAILED:
+            return "initializationFailed";
+        case RAC_ERROR_BACKEND_BUSY:
+            return "serviceBusy";
+        case RAC_ERROR_INVALID_HANDLE:
+            return "invalidState";
+
+        // Event Errors (-700 to -799)
+        case RAC_ERROR_EVENT_INVALID_CATEGORY:
+            return "invalidInput";
+        case RAC_ERROR_EVENT_SUBSCRIPTION_FAILED:
+            return "unknown";
+        case RAC_ERROR_EVENT_PUBLISH_FAILED:
+            return "unknown";
+
+        // Other Errors (-800 to -899)
+        case RAC_ERROR_NOT_IMPLEMENTED:
+            return "notImplemented";
+        case RAC_ERROR_FEATURE_NOT_AVAILABLE:
+            return "featureNotAvailable";
+        case RAC_ERROR_FRAMEWORK_NOT_AVAILABLE:
+            return "frameworkNotAvailable";
+        case RAC_ERROR_UNSUPPORTED_MODALITY:
+            return "unsupportedModality";
         case RAC_ERROR_UNKNOWN:
-            return "UNKNOWN";
+            return "unknown";
+        case RAC_ERROR_INTERNAL:
+            return "unknown";
+
         default:
-            return "UNKNOWN_CODE";
+            return "unknown";
     }
 }
 
@@ -588,6 +821,102 @@ rac_result_t rac_set_error(rac_result_t code, rac_error_category_t category, con
         rac_set_last_error(error);
         rac_error_destroy(error);
     }
+    return code;
+}
+
+// =============================================================================
+// UNIFIED ERROR HANDLING
+// =============================================================================
+
+rac_result_t rac_error_log_and_track(rac_result_t code, rac_error_category_t category,
+                                     const char* message, const char* file, int32_t line,
+                                     const char* function) {
+    // Create structured error with source location
+    rac_error_t* error = rac_error_create_at(code, category, message, file, line, function);
+    if (!error) {
+        return code;
+    }
+
+    // Capture stack trace
+    rac_error_capture_stack_trace(error);
+
+    // Set as last error
+    rac_set_last_error(error);
+
+    // Skip logging and tracking for expected errors (cancellation, etc.)
+    if (rac_error_is_expected(code) != 0) {
+        rac_error_destroy(error);
+        return code;
+    }
+
+    // Log the error
+    rac_log_metadata_t meta = RAC_LOG_METADATA_EMPTY;
+    meta.file = file;
+    meta.line = line;
+    meta.function = function;
+    meta.error_code = code;
+    rac_logger_log(RAC_LOG_ERROR, rac_error_category_name(category), message, &meta);
+
+    // Track error via platform adapter (for Sentry)
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    if (adapter && adapter->track_error) {
+        char* json = rac_error_to_json(error);
+        if (json) {
+            adapter->track_error(json, adapter->user_data);
+            rac_free(json);
+        }
+    }
+
+    rac_error_destroy(error);
+    return code;
+}
+
+rac_result_t rac_error_log_and_track_model(rac_result_t code, rac_error_category_t category,
+                                           const char* message, const char* model_id,
+                                           const char* framework, const char* file, int32_t line,
+                                           const char* function) {
+    // Create structured error with source location
+    rac_error_t* error = rac_error_create_at(code, category, message, file, line, function);
+    if (!error) {
+        return code;
+    }
+
+    // Add model context
+    rac_error_set_model_context(error, model_id, framework);
+
+    // Capture stack trace
+    rac_error_capture_stack_trace(error);
+
+    // Set as last error
+    rac_set_last_error(error);
+
+    // Skip logging and tracking for expected errors
+    if (rac_error_is_expected(code) != 0) {
+        rac_error_destroy(error);
+        return code;
+    }
+
+    // Log the error with model context
+    rac_log_metadata_t meta = RAC_LOG_METADATA_EMPTY;
+    meta.file = file;
+    meta.line = line;
+    meta.function = function;
+    meta.error_code = code;
+    meta.model_id = model_id;
+    meta.framework = framework;
+    rac_logger_log(RAC_LOG_ERROR, rac_error_category_name(category), message, &meta);
+
+    // Track error via platform adapter (for Sentry)
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    if (adapter && adapter->track_error) {
+        char* json = rac_error_to_json(error);
+        if (json) {
+            adapter->track_error(json, adapter->user_data);
+            rac_free(json);
+        }
+    }
+
+    rac_error_destroy(error);
     return code;
 }
 

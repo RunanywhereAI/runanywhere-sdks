@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_api_types.h"
 
 // Simple JSON building helpers (no external dependencies)
