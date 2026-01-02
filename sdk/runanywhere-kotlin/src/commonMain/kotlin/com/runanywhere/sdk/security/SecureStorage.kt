@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.security
 
-import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKError
 
 /**
  * Platform-agnostic secure storage interface
