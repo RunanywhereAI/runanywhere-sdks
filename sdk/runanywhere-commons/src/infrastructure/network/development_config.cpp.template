@@ -12,14 +12,16 @@
  * - Contact team lead for access to development credentials
  */
 
-#include "rac_dev_config.h"
 #include <cstring>
 
-namespace {
+#include "rac/core/rac_logger.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
 
-// ============================================================================
-// FILL IN YOUR DEVELOPMENT CREDENTIALS BELOW
-// ============================================================================
+// =============================================================================
+// Configuration Values - FILL IN YOUR CREDENTIALS BELOW
+// =============================================================================
+
+namespace {
 
 // Supabase project URL for development device analytics
 // Get this from: https://supabase.com/dashboard → Your Project → Settings → API
@@ -38,7 +40,7 @@ constexpr const char* BUILD_TOKEN = "YOUR_BUILD_TOKEN";
 // Set to nullptr if not using Sentry
 constexpr const char* SENTRY_DSN = nullptr;
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // =============================================================================
 // Public API Implementation (DO NOT MODIFY BELOW)
@@ -47,10 +49,8 @@ constexpr const char* SENTRY_DSN = nullptr;
 extern "C" {
 
 bool rac_dev_config_is_available(void) {
-    return SUPABASE_URL != nullptr &&
-           SUPABASE_ANON_KEY != nullptr &&
-           std::strlen(SUPABASE_URL) > 0 &&
-           std::strlen(SUPABASE_ANON_KEY) > 0;
+    return SUPABASE_URL != nullptr && SUPABASE_ANON_KEY != nullptr &&
+           std::strlen(SUPABASE_URL) > 0 && std::strlen(SUPABASE_ANON_KEY) > 0;
 }
 
 const char* rac_dev_config_get_supabase_url(void) {
@@ -77,4 +77,4 @@ bool rac_dev_config_has_build_token(void) {
     return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0;
 }
 
-} // extern "C"
+}  // extern "C"
