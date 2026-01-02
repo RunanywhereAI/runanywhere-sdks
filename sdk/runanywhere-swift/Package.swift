@@ -23,6 +23,10 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 //
 // =============================================================================
 let testLocal = false
+
+// Version constants for remote XCFrameworks (must be defined before package)
+let commonsVersion = "0.1.0"
+let coreVersion = "0.1.1-dev.03aacf9"
 // =============================================================================
 
 let package = Package(
@@ -196,10 +200,6 @@ let package = Package(
 // =============================================================================
 // BINARY TARGET SELECTION
 // =============================================================================
-// Version constants for remote XCFrameworks
-let commonsVersion = "0.1.0"
-let coreVersion = "0.1.1-dev.03aacf9"
-
 // This function returns the appropriate binary targets based on testLocal setting
 func binaryTargets() -> [Target] {
     if testLocal {
