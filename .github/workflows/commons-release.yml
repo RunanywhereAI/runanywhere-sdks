@@ -6,8 +6,8 @@ name: Build and Release XCFrameworks
 #   - RABackendLlamaCPP.xcframework (LLM backend)
 #   - RABackendONNX.xcframework (STT/TTS/VAD backend)
 #
-# It downloads runanywhere-core source from the public runanywhere-binaries
-# repository, builds the XCFrameworks, and publishes them.
+# It downloads runanywhere-core source from runanywhere-binaries releases,
+# builds the XCFrameworks, and publishes them as a GitHub release on this repo.
 #
 # Trigger:
 #   - Tag push: commons-v*
@@ -36,9 +36,6 @@ on:
         type: boolean
 
 env:
-  # Public binaries repository for publishing XCFrameworks
-  PUBLIC_REPO_OWNER: 'RunanywhereAI'
-  PUBLIC_REPO_NAME: 'runanywhere-binaries'
   # Working directory for commons
   COMMONS_DIR: sdk/runanywhere-commons
 
@@ -168,10 +165,10 @@ jobs:
           retention-days: 30
 
   # ===========================================================================
-  # Publish to runanywhere-binaries
+  # Publish Release to this repo (runanywhere-sdks)
   # ===========================================================================
   publish:
-    name: Publish to runanywhere-binaries
+    name: Publish Release
     needs: build-ios
     if: github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
@@ -190,61 +187,9 @@ jobs:
           echo "=== Downloaded Artifacts ==="
           ls -laR dist/
 
-      - name: Checkout Public Binaries Repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}
-          token: ${{ secrets.BINARY_REPO_PAT }}
-          path: public-repo
-          fetch-depth: 0
-
-      - name: Update Public Repository
-        run: |
-          VERSION="${{ needs.build-ios.outputs.version }}"
-          CORE_VERSION="${{ needs.build-ios.outputs.core_version }}"
-
-          cd public-repo
-
-          # Create releases directory
-          mkdir -p releases/commons-v${VERSION}
-
-          # Copy all XCFramework ZIPs (handle nested directory from artifact download)
-          find ../dist -name "*.zip" -exec cp {} releases/commons-v${VERSION}/ \; 2>/dev/null || true
-          find ../dist -name "*.sha256" -exec cp {} releases/commons-v${VERSION}/ \; 2>/dev/null || true
-
-          # Update version files
-          echo "${VERSION}" > LATEST_COMMONS_VERSION
-
-          # Git operations
-          git config user.name "GitHub Actions Bot"
-          git config user.email "actions@github.com"
-
-          git add -A
-          git commit -m "Release runanywhere-commons v${VERSION}
-
-          Built with runanywhere-core: ${CORE_VERSION}
-
-          XCFrameworks:
-          $(ls -1 releases/commons-v${VERSION}/*.zip 2>/dev/null | xargs -I {} basename {} || echo 'None')
-          " || echo "No changes to commit"
-
-      - name: Create Git Tag
-        run: |
-          VERSION="${{ needs.build-ios.outputs.version }}"
-          cd public-repo
-          git tag -a "commons-v${VERSION}" -m "runanywhere-commons v${VERSION}" 2>/dev/null || echo "Tag already exists"
-
-      - name: Push to Public Repository
-        run: |
-          cd public-repo
-          git push origin main --tags
-        env:
-          GITHUB_TOKEN: ${{ secrets.BINARY_REPO_PAT }}
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          repository: ${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}
           tag_name: commons-v${{ needs.build-ios.outputs.version }}
           name: RunAnywhere Commons v${{ needs.build-ios.outputs.version }}
           files: |
@@ -270,7 +215,7 @@ jobs:
             ```swift
             .binaryTarget(
                 name: "RACommonsBinary",
-                url: "https://github.com/${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}/releases/download/commons-v${{ needs.build-ios.outputs.version }}/RACommons-${{ needs.build-ios.outputs.version }}.zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v${{ needs.build-ios.outputs.version }}/RACommons-${{ needs.build-ios.outputs.version }}.zip",
                 checksum: "..."
             ),
             ```
@@ -291,4 +236,4 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.BINARY_REPO_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
