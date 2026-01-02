@@ -85,19 +85,38 @@ download_core_source() {
         rm -rf "${CORE_DIR}"
     fi
 
-    # Download tarball
-    curl -L -o "${TARBALL_PATH}" "${DOWNLOAD_URL}"
-
-    if [[ ! -f "${TARBALL_PATH}" ]]; then
+    # Download tarball with proper error handling
+    echo "Downloading..."
+    if ! curl -L --fail --progress-bar -o "${TARBALL_PATH}" "${DOWNLOAD_URL}"; then
         echo -e "${RED}Failed to download ${TARBALL_NAME}${NC}"
+        echo -e "${RED}URL: ${DOWNLOAD_URL}${NC}"
+        echo ""
+        echo "Make sure the release exists at:"
+        echo "  https://github.com/${BINARIES_REPO}/releases/tag/core-v${VERSION}"
+        exit 1
+    fi
+
+    # Verify it's a valid gzip file
+    if ! file "${TARBALL_PATH}" | grep -q "gzip"; then
+        echo -e "${RED}Downloaded file is not a valid gzip archive${NC}"
+        echo "File type: $(file "${TARBALL_PATH}")"
+        rm -f "${TARBALL_PATH}"
         exit 1
     fi
 
     # Extract
     echo "Extracting..."
     mkdir -p "${CORE_DIR}"
-    tar -xzf "${TARBALL_PATH}" -C "${CORE_DIR}"
+    if ! tar -xzf "${TARBALL_PATH}" -C "${CORE_DIR}"; then
+        echo -e "${RED}Failed to extract tarball${NC}"
+        rm -f "${TARBALL_PATH}"
+        exit 1
+    fi
     rm "${TARBALL_PATH}"
+
+    # List contents to help debug
+    echo "Extracted contents:"
+    ls -la "${CORE_DIR}/" | head -10
 
     echo -e "${GREEN}✓ runanywhere-core source downloaded to ${CORE_DIR}${NC}"
 }
