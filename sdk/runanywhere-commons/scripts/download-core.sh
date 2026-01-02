@@ -23,7 +23,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 THIRD_PARTY_DIR="${PROJECT_ROOT}/third_party"
 CORE_DIR="${THIRD_PARTY_DIR}/runanywhere-core"
-DEPS_DIR="${CORE_DIR}/third_party"
+
+# Dependencies go directly in third_party/ (where runanywhere-core CMake expects them)
+ONNX_IOS_DIR="${THIRD_PARTY_DIR}/onnxruntime-ios"
+SHERPA_IOS_DIR="${THIRD_PARTY_DIR}/sherpa-onnx-ios"
 
 # GitHub repository for published binaries
 BINARIES_REPO="RunanywhereAI/runanywhere-binaries"
@@ -130,38 +133,36 @@ download_ios_deps() {
         return
     fi
 
-    mkdir -p "${DEPS_DIR}"
-
-    # ONNX Runtime for iOS
+    # ONNX Runtime for iOS -> third_party/onnxruntime-ios/
     echo -e "${GREEN}Downloading ONNX Runtime for iOS...${NC}"
     local ONNX_ZIP="onnxruntime-ios-v${VERSION}.zip"
     local ONNX_URL="${BINARIES_URL}/releases/download/core-v${VERSION}/${ONNX_ZIP}"
     echo "  URL: ${ONNX_URL}"
 
-    if curl -L --fail -o "${DEPS_DIR}/${ONNX_ZIP}" "${ONNX_URL}" 2>/dev/null; then
-        cd "${DEPS_DIR}"
-        unzip -q -o "${ONNX_ZIP}"
-        rm "${ONNX_ZIP}"
-        echo -e "${GREEN}✓ ONNX Runtime for iOS downloaded${NC}"
-        # List what was extracted
-        ls -la *.xcframework 2>/dev/null || true
+    mkdir -p "${ONNX_IOS_DIR}"
+    if curl -L --fail -o "${THIRD_PARTY_DIR}/${ONNX_ZIP}" "${ONNX_URL}" 2>/dev/null; then
+        cd "${ONNX_IOS_DIR}"
+        unzip -q -o "${THIRD_PARTY_DIR}/${ONNX_ZIP}"
+        rm "${THIRD_PARTY_DIR}/${ONNX_ZIP}"
+        echo -e "${GREEN}✓ ONNX Runtime -> ${ONNX_IOS_DIR}${NC}"
+        ls -la
     else
         echo -e "${YELLOW}⚠ ONNX Runtime for iOS not found in release${NC}"
     fi
 
-    # Sherpa-ONNX for iOS
+    # Sherpa-ONNX for iOS -> third_party/sherpa-onnx-ios/
     echo -e "${GREEN}Downloading Sherpa-ONNX for iOS...${NC}"
     local SHERPA_ZIP="sherpa-onnx-ios-v${VERSION}.zip"
     local SHERPA_URL="${BINARIES_URL}/releases/download/core-v${VERSION}/${SHERPA_ZIP}"
     echo "  URL: ${SHERPA_URL}"
 
-    if curl -L --fail -o "${DEPS_DIR}/${SHERPA_ZIP}" "${SHERPA_URL}" 2>/dev/null; then
-        cd "${DEPS_DIR}"
-        unzip -q -o "${SHERPA_ZIP}"
-        rm "${SHERPA_ZIP}"
-        echo -e "${GREEN}✓ Sherpa-ONNX for iOS downloaded${NC}"
-        # List what was extracted
-        ls -la *.xcframework 2>/dev/null || true
+    mkdir -p "${SHERPA_IOS_DIR}"
+    if curl -L --fail -o "${THIRD_PARTY_DIR}/${SHERPA_ZIP}" "${SHERPA_URL}" 2>/dev/null; then
+        cd "${SHERPA_IOS_DIR}"
+        unzip -q -o "${THIRD_PARTY_DIR}/${SHERPA_ZIP}"
+        rm "${THIRD_PARTY_DIR}/${SHERPA_ZIP}"
+        echo -e "${GREEN}✓ Sherpa-ONNX -> ${SHERPA_IOS_DIR}${NC}"
+        ls -la
     else
         echo -e "${YELLOW}⚠ Sherpa-ONNX for iOS not found in release${NC}"
     fi
@@ -170,32 +171,11 @@ download_ios_deps() {
 }
 
 # =============================================================================
-# Download macOS dependencies
+# Download macOS dependencies (skip for iOS builds)
 # =============================================================================
 download_macos_deps() {
-    if [[ "${SKIP_DEPS}" == "true" ]]; then
-        echo -e "${YELLOW}Skipping macOS dependencies (SKIP_DEPS=true)${NC}"
-        return
-    fi
-
-    mkdir -p "${DEPS_DIR}"
-
-    # ONNX Runtime for macOS
-    echo -e "${GREEN}Downloading ONNX Runtime for macOS...${NC}"
-    local ONNX_ZIP="onnxruntime-macos-v${VERSION}.zip"
-    local ONNX_URL="${BINARIES_URL}/releases/download/core-v${VERSION}/${ONNX_ZIP}"
-    echo "  URL: ${ONNX_URL}"
-
-    if curl -L --fail -o "${DEPS_DIR}/${ONNX_ZIP}" "${ONNX_URL}" 2>/dev/null; then
-        cd "${DEPS_DIR}"
-        unzip -q -o "${ONNX_ZIP}"
-        rm "${ONNX_ZIP}"
-        echo -e "${GREEN}✓ ONNX Runtime for macOS downloaded${NC}"
-    else
-        echo -e "${YELLOW}⚠ ONNX Runtime for macOS not found in release${NC}"
-    fi
-
-    cd "${PROJECT_ROOT}"
+    # Skip macOS deps for iOS builds
+    echo -e "${YELLOW}Skipping macOS dependencies (iOS build)${NC}"
 }
 
 # =============================================================================
@@ -218,20 +198,23 @@ verify_downloads() {
         echo -e "${GREEN}✓ Core source${NC}"
     else
         echo -e "${RED}✗ Core source NOT found${NC}"
-    fi
-
-    # Check sherpa-onnx
-    if [ -d "${DEPS_DIR}/sherpa-onnx.xcframework" ]; then
-        echo -e "${GREEN}✓ sherpa-onnx.xcframework${NC}"
-    else
-        echo -e "${YELLOW}⚠ sherpa-onnx.xcframework not found${NC}"
+        exit 1
     fi
 
     # Check onnxruntime
-    if [ -d "${DEPS_DIR}/onnxruntime.xcframework" ]; then
+    if [ -d "${ONNX_IOS_DIR}/onnxruntime.xcframework" ]; then
         echo -e "${GREEN}✓ onnxruntime.xcframework${NC}"
     else
-        echo -e "${YELLOW}⚠ onnxruntime.xcframework not found${NC}"
+        echo -e "${RED}✗ onnxruntime.xcframework NOT found${NC}"
+        exit 1
+    fi
+
+    # Check sherpa-onnx
+    if [ -d "${SHERPA_IOS_DIR}/sherpa-onnx.xcframework" ]; then
+        echo -e "${GREEN}✓ sherpa-onnx.xcframework${NC}"
+    else
+        echo -e "${RED}✗ sherpa-onnx.xcframework NOT found${NC}"
+        exit 1
     fi
 }
 
@@ -250,16 +233,14 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}Download Complete!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
-echo "Downloaded to: ${CORE_DIR}"
 echo "Version: ${VERSION}"
 echo ""
 echo "Directory structure:"
 echo "  third_party/"
-echo "    runanywhere-core/           # Core source"
-echo "      third_party/"
-echo "        sherpa-onnx.xcframework # STT/TTS/VAD"
-echo "        onnxruntime.xcframework # ONNX Runtime"
+echo "    runanywhere-core/              # Core source"
+echo "    onnxruntime-ios/               # ONNX Runtime xcframework"
+echo "    sherpa-onnx-ios/               # Sherpa-ONNX xcframework"
 echo ""
 echo "To build iOS XCFrameworks:"
-echo "  BUILD_MODE=remote ./scripts/build-ios.sh"
+echo "  ./scripts/build-ios.sh"
 echo ""
