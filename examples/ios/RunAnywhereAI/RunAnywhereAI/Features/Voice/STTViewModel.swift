@@ -174,26 +174,28 @@ class STTViewModel: ObservableObject {
     }
 
     private func handleSDKEvent(_ event: any SDKEvent) {
-        if let sttEvent = event as? STTEvent {
-            switch sttEvent {
-            case .modelLoadCompleted(let modelId, _, _, _):
-                selectedModelId = modelId
-                // Look up the model name from available models
-                if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
-                    selectedModelName = matchingModel.name
-                    selectedFramework = matchingModel.framework
-                } else {
-                    selectedModelName = modelId // Fallback to ID if model not found
-                }
-                logger.info("STT model loaded: \(modelId)")
-            case .modelUnloaded:
-                selectedModelId = nil
-                selectedModelName = nil
-                selectedFramework = nil
-                logger.info("STT model unloaded")
-            default:
-                break
+        // Events now come from C++ via generic BridgedEvent
+        guard event.category == .stt else { return }
+
+        switch event.type {
+        case "stt_model_load_completed":
+            let modelId = event.properties["model_id"] ?? ""
+            selectedModelId = modelId
+            // Look up the model name from available models
+            if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
+                selectedModelName = matchingModel.name
+                selectedFramework = matchingModel.framework
+            } else {
+                selectedModelName = modelId // Fallback to ID if model not found
             }
+            logger.info("STT model loaded: \(modelId)")
+        case "stt_model_unloaded":
+            selectedModelId = nil
+            selectedModelName = nil
+            selectedFramework = nil
+            logger.info("STT model unloaded")
+        default:
+            break
         }
     }
 

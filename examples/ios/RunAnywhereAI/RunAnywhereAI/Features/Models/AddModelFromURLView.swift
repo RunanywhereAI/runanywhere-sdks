@@ -160,9 +160,7 @@ struct AddModelFromURLView: View {
     }
 
     private func loadAvailableFrameworks() async {
-        let frameworks = await MainActor.run {
-            RunAnywhere.getRegisteredFrameworks()
-        }
+        let frameworks = await RunAnywhere.getRegisteredFrameworks()
         await MainActor.run {
             self.availableFrameworks = frameworks.isEmpty ? [.llamaCpp] : frameworks
             // Set default selection to first available framework

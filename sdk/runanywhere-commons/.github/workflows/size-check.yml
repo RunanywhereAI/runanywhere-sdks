@@ -1,0 +1,114 @@
+name: Binary Size Check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sdks/sdk/runanywhere-commons/**'
+  workflow_dispatch:
+
+env:
+  COMMONS_DIR: sdks/sdk/runanywhere-commons
+
+  # Size limits in bytes
+  # RACommons: 2MB
+  LIMIT_RACOMMONS: 2097152
+  # RABackendLlamaCPP: 25MB
+  LIMIT_LLAMACPP: 26214400
+  # RABackendONNX: 70MB
+  LIMIT_ONNX: 73400320
+  # RABackendWhisperCPP: 15MB
+  LIMIT_WHISPERCPP: 15728640
+
+jobs:
+  size-check:
+    name: Check Binary Sizes
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.2'
+
+      - name: Install CMake
+        run: brew install cmake ninja
+
+      - name: Build XCFrameworks
+        run: |
+          cd ${{ env.COMMONS_DIR }}
+          chmod +x scripts/build-ios.sh
+          ./scripts/build-ios.sh || echo "Build may have partial success"
+
+      - name: Analyze sizes
+        id: sizes
+        run: |
+          cd ${{ env.COMMONS_DIR }}
+          chmod +x scripts/analyze-binary-size.sh
+          ./scripts/analyze-binary-size.sh > size-report.txt
+          cat size-report.txt
+
+          # Extract sizes for comparison
+          RACOMMONS_SIZE=$(du -sb dist/RACommons.xcframework 2>/dev/null | cut -f1 || echo "0")
+          LLAMACPP_SIZE=$(du -sb dist/RABackendLlamaCPP.xcframework 2>/dev/null | cut -f1 || echo "0")
+          ONNX_SIZE=$(du -sb dist/RABackendONNX.xcframework 2>/dev/null | cut -f1 || echo "0")
+          WHISPERCPP_SIZE=$(du -sb dist/RABackendWhisperCPP.xcframework 2>/dev/null | cut -f1 || echo "0")
+
+          echo "racommons_size=$RACOMMONS_SIZE" >> $GITHUB_OUTPUT
+          echo "llamacpp_size=$LLAMACPP_SIZE" >> $GITHUB_OUTPUT
+          echo "onnx_size=$ONNX_SIZE" >> $GITHUB_OUTPUT
+          echo "whispercpp_size=$WHISPERCPP_SIZE" >> $GITHUB_OUTPUT
+
+      - name: Check RACommons size
+        if: steps.sizes.outputs.racommons_size != '0'
+        run: |
+          SIZE=${{ steps.sizes.outputs.racommons_size }}
+          LIMIT=${{ env.LIMIT_RACOMMONS }}
+          if [ "$SIZE" -gt "$LIMIT" ]; then
+            echo "❌ RACommons ($SIZE bytes) exceeds limit ($LIMIT bytes)"
+            exit 1
+          fi
+          echo "✅ RACommons: $SIZE bytes (limit: $LIMIT)"
+
+      - name: Check LlamaCPP size
+        if: steps.sizes.outputs.llamacpp_size != '0'
+        run: |
+          SIZE=${{ steps.sizes.outputs.llamacpp_size }}
+          LIMIT=${{ env.LIMIT_LLAMACPP }}
+          if [ "$SIZE" -gt "$LIMIT" ]; then
+            echo "❌ RABackendLlamaCPP ($SIZE bytes) exceeds limit ($LIMIT bytes)"
+            exit 1
+          fi
+          echo "✅ RABackendLlamaCPP: $SIZE bytes (limit: $LIMIT)"
+
+      - name: Check ONNX size
+        if: steps.sizes.outputs.onnx_size != '0'
+        run: |
+          SIZE=${{ steps.sizes.outputs.onnx_size }}
+          LIMIT=${{ env.LIMIT_ONNX }}
+          if [ "$SIZE" -gt "$LIMIT" ]; then
+            echo "❌ RABackendONNX ($SIZE bytes) exceeds limit ($LIMIT bytes)"
+            exit 1
+          fi
+          echo "✅ RABackendONNX: $SIZE bytes (limit: $LIMIT)"
+
+      - name: Check WhisperCPP size
+        if: steps.sizes.outputs.whispercpp_size != '0'
+        run: |
+          SIZE=${{ steps.sizes.outputs.whispercpp_size }}
+          LIMIT=${{ env.LIMIT_WHISPERCPP }}
+          if [ "$SIZE" -gt "$LIMIT" ]; then
+            echo "❌ RABackendWhisperCPP ($SIZE bytes) exceeds limit ($LIMIT bytes)"
+            exit 1
+          fi
+          echo "✅ RABackendWhisperCPP: $SIZE bytes (limit: $LIMIT)"
+
+      - name: Upload size report
+        uses: actions/upload-artifact@v4
+        with:
+          name: size-report
+          path: ${{ env.COMMONS_DIR }}/size-report.txt

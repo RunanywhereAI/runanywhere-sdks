@@ -46,23 +46,25 @@ class ModelListViewModel: ObservableObject {
 
     /// Handle SDK events to update model state
     private func handleSDKEvent(_ event: any SDKEvent) {
-        // Check for LLM model load/unload events
-        if let llmEvent = event as? LLMEvent {
-            switch llmEvent {
-            case .modelLoadCompleted(let modelId, _, _, _):
-                // Find the matching model and set as current
-                if let matchingModel = availableModels.first(where: { $0.id == modelId }) {
-                    currentModel = matchingModel
-                    print("✅ ModelListViewModel: Model loaded: \(matchingModel.name)")
-                }
-            case .modelUnloaded(let modelId):
-                if currentModel?.id == modelId {
-                    currentModel = nil
-                    print("ℹ️ ModelListViewModel: Model unloaded: \(modelId)")
-                }
-            default:
-                break
+        // Events now come from C++ via generic BridgedEvent
+        guard event.category == .llm else { return }
+
+        let modelId = event.properties["model_id"] ?? ""
+
+        switch event.type {
+        case "llm_model_load_completed":
+            // Find the matching model and set as current
+            if let matchingModel = availableModels.first(where: { $0.id == modelId }) {
+                currentModel = matchingModel
+                print("✅ ModelListViewModel: Model loaded: \(matchingModel.name)")
             }
+        case "llm_model_unloaded":
+            if currentModel?.id == modelId {
+                currentModel = nil
+                print("ℹ️ ModelListViewModel: Model unloaded: \(modelId)")
+            }
+        default:
+            break
         }
     }
 
@@ -147,17 +149,11 @@ class ModelListViewModel: ObservableObject {
     }
 
     func downloadModel(_ model: ModelInfo) async throws {
-        // Get the model info and use the Download service
-        let allModels = try await RunAnywhere.availableModels()
-        guard let modelInfo = allModels.first(where: { $0.id == model.id }) else {
-            throw SDKError.general(.modelNotFound, "Model not found: \(model.id)")
-        }
-
-        // Use the SDK's download mechanism via the Download class
-        let task = try await Download.shared.downloadModel(modelInfo)
+        // Use the SDK's public download API
+        let progressStream = try await RunAnywhere.downloadModel(model.id)
 
         // Wait for completion
-        for await progress in task.progress {
+        for await progress in progressStream {
             print("Download progress: \(Int(progress.overallProgress * 100))%")
             if progress.stage == .completed {
                 break

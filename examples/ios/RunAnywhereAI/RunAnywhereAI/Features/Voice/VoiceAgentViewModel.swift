@@ -269,25 +269,33 @@ final class VoiceAgentViewModel: ObservableObject {
     }
 
     private func handleSDKEvent(_ event: any SDKEvent) {
-        if let llmEvent = event as? LLMEvent {
-            handleLLMEvent(llmEvent)
-        } else if let sttEvent = event as? STTEvent {
-            handleSTTEvent(sttEvent)
-        } else if let ttsEvent = event as? TTSEvent {
-            handleTTSEvent(ttsEvent)
+        // Events now come from C++ via generic BridgedEvent
+        // Handle by event type string and category
+        switch event.category {
+        case .llm:
+            handleLLMEvent(event)
+        case .stt:
+            handleSTTEvent(event)
+        case .tts:
+            handleTTSEvent(event)
+        default:
+            break
         }
     }
 
-    private func handleLLMEvent(_ event: LLMEvent) {
-        switch event {
-        case .modelLoadStarted:
+    private func handleLLMEvent(_ event: any SDKEvent) {
+        let modelId = event.properties["model_id"] ?? ""
+        let errorMessage = event.properties["error_message"]
+
+        switch event.type {
+        case "llm_model_load_started":
             llmModelState = .loading
-        case .modelLoadCompleted(let id, _, _, _):
+        case "llm_model_load_completed":
             llmModelState = .loaded
-            updateModel(.llm, id: id)
-        case .modelLoadFailed(_, let error, _):
-            llmModelState = .error(error.message)
-        case .modelUnloaded:
+            updateModel(.llm, id: modelId)
+        case "llm_model_load_failed":
+            llmModelState = .error(errorMessage ?? "Unknown error")
+        case "llm_model_unloaded":
             llmModelState = .notLoaded
             llmModel = nil
         default:
@@ -295,16 +303,19 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
-    private func handleSTTEvent(_ event: STTEvent) {
-        switch event {
-        case .modelLoadStarted:
+    private func handleSTTEvent(_ event: any SDKEvent) {
+        let modelId = event.properties["model_id"] ?? ""
+        let errorMessage = event.properties["error_message"]
+
+        switch event.type {
+        case "stt_model_load_started":
             sttModelState = .loading
-        case .modelLoadCompleted(let id, _, _, _):
+        case "stt_model_load_completed":
             sttModelState = .loaded
-            updateModel(.stt, id: id)
-        case .modelLoadFailed(_, let error, _):
-            sttModelState = .error(error.message)
-        case .modelUnloaded:
+            updateModel(.stt, id: modelId)
+        case "stt_model_load_failed":
+            sttModelState = .error(errorMessage ?? "Unknown error")
+        case "stt_model_unloaded":
             sttModelState = .notLoaded
             sttModel = nil
         default:
@@ -312,16 +323,19 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
-    private func handleTTSEvent(_ event: TTSEvent) {
-        switch event {
-        case .modelLoadStarted:
+    private func handleTTSEvent(_ event: any SDKEvent) {
+        let modelId = event.properties["model_id"] ?? ""
+        let errorMessage = event.properties["error_message"]
+
+        switch event.type {
+        case "tts_voice_load_started":
             ttsModelState = .loading
-        case .modelLoadCompleted(let id, _, _, _):
+        case "tts_voice_load_completed":
             ttsModelState = .loaded
-            updateModel(.tts, id: id)
-        case .modelLoadFailed(_, let error, _):
-            ttsModelState = .error(error.message)
-        case .modelUnloaded:
+            updateModel(.tts, id: modelId)
+        case "tts_voice_load_failed":
+            ttsModelState = .error(errorMessage ?? "Unknown error")
+        case "tts_voice_unloaded":
             ttsModelState = .notLoaded
             ttsModel = nil
         default:
