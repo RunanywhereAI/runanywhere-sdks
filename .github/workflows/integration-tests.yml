@@ -85,7 +85,7 @@ jobs:
         xcodebuild build \
           -project RunAnywhereAI.xcodeproj \
           -scheme RunAnywhereAI \
-          -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2' \
           -configuration Debug \
           -derivedDataPath build
       continue-on-error: true
@@ -96,7 +96,7 @@ jobs:
         xcodebuild test \
           -project RunAnywhereAI.xcodeproj \
           -scheme RunAnywhereAI \
-          -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2' \
           -resultBundlePath TestResults.xcresult
       continue-on-error: true
 
@@ -143,7 +143,7 @@ jobs:
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.38.1'
+        flutter-version: '3.24.1'
         channel: 'stable'
 
     - name: Get SDK dependencies

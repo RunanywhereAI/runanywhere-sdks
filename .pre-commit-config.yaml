@@ -20,15 +20,15 @@ repos:
         name: Check TODOs have GitHub issue references
         entry: scripts/check-todos-hook.sh
         language: script
-        pass_filenames: false
-        always_run: true
+        pass_filenames: true
+        types: [text]
 
   # Android Lint - Re-enabled after fixing directory paths
   - repo: local
     hooks:
       - id: android-sdk-lint
         name: Android SDK Lint
-        entry: bash -c 'cd sdk/runanywhere-kotlin && if [ -f "./gradlew" ] && [ -n "$ANDROID_HOME" -o -f "../../../local.properties" ]; then ./gradlew lint --quiet; else echo "Skipping Android lint (no gradle or SDK)"; exit 0; fi'
+        entry: bash -c 'cd sdk/runanywhere-kotlin && if [ -f "./gradlew" ] && [ -n "$ANDROID_HOME" -o -f "./local.properties" ]; then ./gradlew lint --quiet; else echo "Skipping Android lint (no gradle or SDK)"; exit 0; fi'
         language: system
         files: ^sdk/runanywhere-kotlin/.*\.(kt|kts|java|xml)$
         pass_filenames: false

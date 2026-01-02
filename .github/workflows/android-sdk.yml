@@ -77,6 +77,7 @@ jobs:
           flags: android-sdk
           name: android-sdk-coverage
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload lint results
         uses: actions/upload-artifact@v4

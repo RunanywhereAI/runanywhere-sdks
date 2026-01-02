@@ -5,7 +5,8 @@
 set -e
 
 # Find TODOs without issue references
-if grep -rEn "(//|/\*|#)\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#[0-9]+)" \
+# First find all TODOs, then filter out those with issue references
+if grep -rEn "(//|/\*|#)\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)" \
     --include="*.swift" \
     --include="*.kt" \
     --include="*.java" \
@@ -30,7 +31,8 @@ if grep -rEn "(//|/\*|#)\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#[0-9
     grep -v ".build/" | \
     grep -v "build/" | \
     grep -v "DerivedData/" | \
-    grep -v "scripts/check-todos-hook.sh"; then
+    grep -v "scripts/check-todos-hook.sh" | \
+    grep -vE "#[0-9]+"; then
 
     echo "ERROR: Found TODOs without GitHub issue references"
     echo "All TODOs must reference an issue (e.g., // TODO: #123 - Description)"

@@ -213,23 +213,21 @@ run_tests() {
     print_header "Building and Testing"
 
     print_info "Running Gradle build..."
+    (
         cd "$SDK_DIR" || { print_error "Failed to change to $SDK_DIR"; exit 1; }
-    if ./gradlew build --no-daemon; then
+        if ! ./gradlew build --no-daemon; then
+            print_error "Build failed"
+            exit 1
+        fi
         print_success "Build successful"
-    else
-        print_error "Build failed"
-        exit 1
-    fi
 
-    print_info "Running tests..."
-    if ./gradlew test --no-daemon; then
+        print_info "Running tests..."
+        if ! ./gradlew test --no-daemon; then
+            print_error "Tests failed"
+            exit 1
+        fi
         print_success "All tests passed"
-    else
-        print_error "Tests failed"
-        exit 1
-    fi
-
-    cd - >/dev/null
+    )
 }
 
 ### Create GitHub release
@@ -257,7 +255,7 @@ create_github_release() {
         --notes "$release_notes" \
         --latest
 
-    print_success "GitHub release created: https://github.com/RunanywhereAI/sdks/releases/tag/$tag_name"
+    print_success "GitHub release created: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/$tag_name"
 }
 
 ### Main release process
@@ -350,7 +348,7 @@ main() {
     print_success "Released Android SDK v$new_version successfully"
     echo ""
     print_info "Next steps:"
-    echo "  1. Verify the GitHub release: https://github.com/RunanywhereAI/sdks/releases/tag/$tag_name"
+    echo "  1. Verify the GitHub release: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/$tag_name"
     echo "  2. Publish to Maven Central (if configured)"
     echo "  3. Update documentation if needed"
     echo ""
