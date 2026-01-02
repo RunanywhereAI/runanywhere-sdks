@@ -75,8 +75,13 @@ if(TARGET rac_commons)
     target_link_libraries(rac_backend_onnx PUBLIC rac_commons)
 endif()
 
-# Also link runanywhere_bridge directly to ensure ra_create_backend symbols are available
-if(TARGET runanywhere_bridge)
+# Link runanywhere_bridge directly to ensure ra_create_backend symbols are available
+# Use pre-built library if available, otherwise use compiled target
+if(DEFINED RUNANYWHERE_CORE_BRIDGE_LIB)
+    # Pre-built library mode (USE_PREBUILT_CORE=ON)
+    target_link_libraries(rac_backend_onnx PRIVATE ${RUNANYWHERE_CORE_BRIDGE_LIB})
+elseif(TARGET runanywhere_bridge)
+    # Source compilation mode (legacy)
     target_link_libraries(rac_backend_onnx PRIVATE runanywhere_bridge)
 endif()
 
@@ -86,7 +91,13 @@ target_include_directories(rac_backend_onnx PUBLIC
 )
 
 # Link against runanywhere-core's onnx backend
-if(TARGET runanywhere_onnx)
+# Use pre-built library if available, otherwise use compiled target
+if(DEFINED RUNANYWHERE_CORE_ONNX_LIB)
+    # Pre-built library mode (USE_PREBUILT_CORE=ON)
+    target_link_libraries(rac_backend_onnx PRIVATE ${RUNANYWHERE_CORE_ONNX_LIB})
+    # Include directories are set globally via RUNANYWHERE_CORE_INCLUDE_DIRS
+elseif(TARGET runanywhere_onnx)
+    # Source compilation mode (legacy)
     target_link_libraries(rac_backend_onnx PRIVATE runanywhere_onnx)
     # Include runanywhere-core headers for backend APIs
     target_include_directories(rac_backend_onnx PRIVATE

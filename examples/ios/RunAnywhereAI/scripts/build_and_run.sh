@@ -264,30 +264,34 @@ build_commons() {
         exit 1
     fi
 
-    # In local mode, download core source (commons will compile core libraries from it)
-    # Note: Commons build internally compiles core libraries (librunanywhere_bridge.a, etc.)
-    # and links them into commons frameworks. We don't build core as a separate step.
+    # In local mode, download PRE-BUILT core libraries (not source)
+    # Commons will link against pre-built libraries instead of compiling core
     if $LOCAL_MODE; then
-        local download_script="$COMMONS_DIR/scripts/download-core.sh"
+        local download_script="$COMMONS_DIR/scripts/download-core-prebuilt.sh"
         if [[ -x "$download_script" ]]; then
-            if [[ ! -d "$COMMONS_DIR/third_party/runanywhere-core" ]]; then
-                log_info "Local mode: Downloading runanywhere-core source"
-                log_info "  (Commons build will compile core libraries internally)"
+            if [[ ! -d "$COMMONS_DIR/third_party/runanywhere-core-prebuilt" ]]; then
+                log_info "Local mode: Downloading PRE-BUILT runanywhere-core libraries"
+                log_info "  (Commons will link against pre-built libraries, not compile core)"
                 log_step "Running: $download_script"
                 cd "$COMMONS_DIR"
                 "$download_script"
             else
-                log_info "Local mode: Using downloaded runanywhere-core source"
-                log_info "  (Commons build will compile core libraries internally)"
+                log_info "Local mode: Using downloaded PRE-BUILT core libraries"
+                log_info "  (Commons will link against pre-built libraries, not compile core)"
             fi
         else
-            log_warn "download-core.sh not found - commons build may fail if core is missing"
+            log_warn "download-core-prebuilt.sh not found - commons build may fail if core is missing"
         fi
     fi
 
     log_step "Running: $COMMONS_BUILD_SCRIPT"
     cd "$COMMONS_DIR"
-    "$COMMONS_BUILD_SCRIPT"
+    # In local mode, use pre-built core libraries
+    if $LOCAL_MODE; then
+        USE_PREBUILT_CORE=ON "$COMMONS_BUILD_SCRIPT"
+    else
+        "$COMMONS_BUILD_SCRIPT"
+    fi
 
     local end_time=$(date +%s)
     TIME_COMMONS=$((end_time - start_time))
@@ -301,14 +305,14 @@ copy_frameworks_to_swift() {
     fi
 
     log_header "Copying XCFrameworks to runanywhere-swift/Binaries (Local Mode - Commons Only)"
-    log_info "Note: RunAnywhereCore and onnxruntime will be consumed from remote releases"
+    log_info "Note: onnxruntime will be consumed from remote releases"
     
     local binaries_dir="$SWIFT_SDK_DIR/Binaries"
     mkdir -p "$binaries_dir"
 
-    # Only copy runanywhere-commons frameworks (built locally)
-    # LlamaCPP and onnxruntime come from remote GitHub releases
-    local frameworks=("RACommons" "RABackendONNX")
+    # Copy all runanywhere-commons frameworks (built locally)
+    # onnxruntime comes from remote GitHub releases
+    local frameworks=("RACommons" "RABackendLlamaCPP" "RABackendONNX")
     for framework in "${frameworks[@]}"; do
         local src="$COMMONS_DIR/dist/${framework}.xcframework"
         if [[ -d "$src" ]]; then
@@ -322,7 +326,7 @@ copy_frameworks_to_swift() {
     done
 
     log_info "XCFrameworks copied to: $binaries_dir"
-    log_info "RABackendLlamaCPP and onnxruntime will be downloaded from GitHub releases"
+    log_info "onnxruntime will be downloaded from GitHub releases"
 }
 
 set_package_mode() {
@@ -562,17 +566,25 @@ main() {
     echo ""
 
     # Execute build steps by calling individual project scripts
-    # In local mode, we download core source (not build it separately)
-    # Commons build will compile core libraries internally and link them into commons frameworks
-    # We use remote onnxruntime binary (the only pre-built binary we use)
+    # 
+    # WITHOUT --local flag (REMOTE MODE):
+    #   - Everything consumed from remote GitHub releases
+    #   - No local builds, all XCFrameworks downloaded
+    #
+    # WITH --local flag (LOCAL DEVELOPMENT MODE):
+    #   - Downloads PRE-BUILT core libraries (not source, not compiled)
+    #   - Only runanywhere-commons is built locally
+    #   - Commons links against pre-built core libraries (remote)
+    #   - Commons frameworks copied to Swift SDK for local use
     if $LOCAL_MODE; then
-        log_info "Local mode: Downloading core source (commons will build core libraries internally)"
-        # Build commons locally (it will compile core libraries from downloaded source)
+        log_info "Local mode: Using pre-built core libraries (remote), building commons locally"
+        # Build commons locally (links against pre-built core libraries)
         $BUILD_COMMONS && build_commons
     else
-        # Normal mode: build everything
-        $BUILD_CORE && build_core
-        $BUILD_COMMONS && build_commons
+        # Remote mode: Everything from GitHub releases, no local builds
+        log_info "Remote mode: All frameworks from GitHub releases"
+        # Note: build_core and build_commons are skipped in remote mode
+        # All XCFrameworks come from Package.swift remote URLs
     fi
     $BUILD_SDK && build_swift_sdk
 
