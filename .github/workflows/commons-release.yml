@@ -94,15 +94,34 @@ jobs:
 
           RUNANYWHERE_CORE_VERSION="$CORE_VERSION" ./scripts/download-core.sh
 
-      - name: Verify Core Downloaded
+      - name: Verify Downloads
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
-          if [ ! -d "third_party/runanywhere-core" ]; then
+          echo "=== Verifying Downloads ==="
+          # Check core source
+          if [ ! -f "third_party/runanywhere-core/CMakeLists.txt" ]; then
             echo "ERROR: runanywhere-core not downloaded"
             exit 1
           fi
-          echo "Core version: $(cat third_party/runanywhere-core/DOWNLOADED_VERSION)"
-          ls -la third_party/runanywhere-core/third_party/
+          echo "✓ Core: $(cat third_party/runanywhere-core/DOWNLOADED_VERSION)"
+
+          # Check ONNX Runtime
+          if [ ! -d "third_party/onnxruntime-ios/onnxruntime.xcframework" ]; then
+            echo "ERROR: onnxruntime.xcframework not downloaded"
+            exit 1
+          fi
+          echo "✓ ONNX Runtime"
+
+          # Check Sherpa-ONNX
+          if [ ! -d "third_party/sherpa-onnx-ios/sherpa-onnx.xcframework" ]; then
+            echo "ERROR: sherpa-onnx.xcframework not downloaded"
+            exit 1
+          fi
+          echo "✓ Sherpa-ONNX"
+
+          echo ""
+          echo "=== third_party/ contents ==="
+          ls -la third_party/
 
       - name: Build iOS XCFrameworks
         working-directory: ${{ env.COMMONS_DIR }}
