@@ -22,7 +22,7 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 //                     (default for end users and CI/CD)
 //
 // =============================================================================
-let testLocal = false
+let testLocal = true
 
 // Version constants for remote XCFrameworks (must be defined before package)
 let commonsVersion = "0.1.0"
@@ -108,10 +108,11 @@ let package = Package(
         // =================================================================
         // C Bridge Module - ONNX Backend Headers
         // Exposes ONNX backend C APIs
+        // Note: RABackendONNX requires RunAnywhereCore for ra_create_backend symbols
         // =================================================================
         .target(
             name: "ONNXBackend",
-            dependencies: ["RABackendONNXBinary", "ONNXRuntimeBinary"],
+            dependencies: onnxBackendDependencies(),
             path: "Sources/ONNXRuntime/include",
             publicHeadersPath: "."
         ),
@@ -198,32 +199,48 @@ let package = Package(
 )
 
 // =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+// ONNXBackend dependencies
+// Note: RABackendONNX already includes runanywhere_bridge symbols (ra_create_backend, etc.)
+// so we don't need to link RunAnywhereCore separately
+func onnxBackendDependencies() -> [Target.Dependency] {
+    return ["RABackendONNXBinary", "ONNXRuntimeBinary"]
+}
+
+// =============================================================================
 // BINARY TARGET SELECTION
 // =============================================================================
 // This function returns the appropriate binary targets based on testLocal setting
+// NOTE: When testLocal = true, only commons frameworks are local.
+//       RunAnywhereCore and onnxruntime always come from remote releases.
 func binaryTargets() -> [Target] {
     if testLocal {
-        // Local development mode: Use XCFrameworks from Binaries/ directory
+        // Local development mode: Only runanywhere-commons frameworks are local
+        // Everything else (LlamaCPP, onnxruntime) comes from remote releases
         return [
-            // Core commons library (~1-2MB)
+            // Local commons frameworks (built locally from runanywhere-commons)
             .binaryTarget(
                 name: "RACommonsBinary",
                 path: "Binaries/RACommons.xcframework"
             ),
-            // LlamaCPP backend (~30MB with all llama.cpp dependencies)
-            .binaryTarget(
-                name: "RABackendLlamaCPPBinary",
-                path: "Binaries/RABackendLlamaCPP.xcframework"
-            ),
-            // ONNX backend wrapper (~400KB - links against ONNX Runtime)
+            // ONNX backend wrapper (built locally from runanywhere-commons)
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 path: "Binaries/RABackendONNX.xcframework"
             ),
-            // ONNX Runtime (~48MB - required for ONNX backend)
+            // LlamaCPP backend from remote (from runanywhere-sdks releases)
+            .binaryTarget(
+                name: "RABackendLlamaCPPBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RABackendLlamaCPP-\(commonsVersion).zip",
+                checksum: "352774858112b97a41eacff2bf8c425b8ee3d135620af6673282777fc5626845"
+            ),
+            // ONNX Runtime from remote (from runanywhere-binaries releases)
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
-                path: "Binaries/onnxruntime.xcframework"
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/onnxruntime-ios-v\(coreVersion).zip",
+                checksum: "3c71a9065616371bdbd095ba8d7a10d86f474dd09a825c11b62efd92c58a0e47"
             ),
         ]
     } else {

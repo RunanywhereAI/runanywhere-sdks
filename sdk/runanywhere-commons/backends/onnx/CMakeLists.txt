@@ -70,8 +70,14 @@ target_compile_features(rac_backend_onnx PUBLIC cxx_std_17)
 # =============================================================================
 
 # Link against rac_commons (parent project provides this)
+# rac_commons links runanywhere_bridge which provides ra_create_backend
 if(TARGET rac_commons)
     target_link_libraries(rac_backend_onnx PUBLIC rac_commons)
+endif()
+
+# Also link runanywhere_bridge directly to ensure ra_create_backend symbols are available
+if(TARGET runanywhere_bridge)
+    target_link_libraries(rac_backend_onnx PRIVATE runanywhere_bridge)
 endif()
 
 # Include runanywhere-commons public headers
