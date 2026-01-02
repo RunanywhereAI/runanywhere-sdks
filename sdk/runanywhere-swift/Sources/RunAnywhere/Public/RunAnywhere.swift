@@ -32,14 +32,12 @@ import UIKit
 //   completeServicesInitialization()
 //     ├─ Setup API Client
 //     │    ├─ Development: Use Supabase
-//     │    └─ Production/Staging:  Authenticate with backend
-//     ├─ Create Core Services
-//     │    ├─ SyncCoordinator
-//     │    ├─ TelemetryRepository
-//     │    ├─ ModelInfoService
-//     │    └─ ModelAssignmentService
-//     ├─ Load Models (sync from remote + load from DB)
-//     ├─ Initialize Analytics & EventPublisher
+//     │    └─ Production/Staging: Authenticate with backend
+//     ├─ Register C++ Bridge Callbacks
+//     │    ├─ Model Assignment (CppBridge.ModelAssignment)
+//     │    └─ Platform Services (CppBridge.Platform)
+//     ├─ Load Models (from remote API via C++)
+//     ├─ Initialize EventPublisher (telemetry → backend)
 //     └─ Register Device with Backend
 //
 // USAGE:
@@ -67,11 +65,6 @@ public enum RunAnywhere {
 
     /// Track if services initialization is complete (makes API calls O(1) after first use)
     internal static var hasCompletedServicesInit = false
-
-    /// Access to service container
-    internal static var serviceContainer: ServiceContainer {
-        ServiceContainer.shared
-    }
 
     // MARK: - SDK State
 
@@ -116,25 +109,25 @@ public enum RunAnywhere {
 
     /// Get current user ID from authentication
     /// - Returns: User ID if authenticated, nil otherwise
-    public static func getUserId() async -> String? {
-        guard isInitialized, let authService = serviceContainer.authenticationService else {
-            return nil
-        }
-        return await authService.getUserId()
+    public static func getUserId() -> String? {
+        CppBridge.State.userId
     }
 
     /// Get current organization ID from authentication
     /// - Returns: Organization ID if authenticated, nil otherwise
-    public static func getOrganizationId() async -> String? {
-        guard isInitialized, let authService = serviceContainer.authenticationService else {
-            return nil
-        }
-        return await authService.getOrganizationId()
+    public static func getOrganizationId() -> String? {
+        CppBridge.State.organizationId
+    }
+
+    /// Check if currently authenticated
+    /// - Returns: true if authenticated with valid token
+    public static var isAuthenticated: Bool {
+        CppBridge.State.isAuthenticated
     }
 
     /// Check if device is registered with backend
-    public static func isDeviceRegistered() async -> Bool {
-        await serviceContainer.deviceRegistrationService.isRegistered
+    public static func isDeviceRegistered() -> Bool {
+        CppBridge.Device.isRegistered
     }
 
     // MARK: - SDK Reset (Testing)
@@ -150,7 +143,12 @@ public enum RunAnywhere {
         initParams = nil
         currentEnvironment = nil
 
-        serviceContainer.reset()
+        // Shutdown all C++ bridges and state
+        CppBridge.shutdown()
+        CppBridge.State.shutdown()
+
+        // Clear model assignment cache
+        CppBridge.ModelAssignment.clearCache()
 
         logger.info("SDK state reset completed")
     }
@@ -187,7 +185,7 @@ public enum RunAnywhere {
      *   - baseURL: Backend API base URL (optional for development, required for production/staging)
      *   - environment: SDK environment (default: .development)
      *
-     * - Throws: RunAnywhereError if validation fails
+     * - Throws: SDKError if validation fails
      */
     public static func initialize(
         apiKey: String? = nil,
@@ -202,10 +200,10 @@ public enum RunAnywhere {
         } else {
             // Production/Staging mode - require API key and URL
             guard let apiKey = apiKey, !apiKey.isEmpty else {
-                throw RunAnywhereError.invalidConfiguration("API key is required for \(environment.description) mode")
+                throw SDKError.general(.invalidConfiguration, "API key is required for \(environment.description) mode")
             }
             guard let baseURL = baseURL, !baseURL.isEmpty else {
-                throw RunAnywhereError.invalidConfiguration("Base URL is required for \(environment.description) mode")
+                throw SDKError.general(.invalidConfiguration, "Base URL is required for \(environment.description) mode")
             }
             params = try SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
         }
@@ -236,19 +234,26 @@ public enum RunAnywhere {
         guard !isInitialized else { return }
 
         let initStartTime = CFAbsoluteTimeGetCurrent()
-        let logger = SDKLogger(category: "RunAnywhere.Init")
 
-        EventPublisher.shared.track(SDKLifecycleEvent.initStarted)
+        // Step 1: Set environment FIRST so Logging.shared initializes with correct config
+        // This must happen before any SDKLogger usage to ensure logs appear correctly
+        currentEnvironment = params.environment
+        initParams = params
+
+        // Step 2: Apply environment-specific logging configuration
+        Logging.shared.applyEnvironmentConfiguration(params.environment)
+
+        // Step 3: Initialize all core C++ bridges (platform adapter, events, telemetry, device)
+        // This must happen early so all C++ logs route to SDKLogger and events can be emitted
+        CppBridge.initialize(environment: params.environment)
+
+        // Now safe to create logger and track events
+        let logger = SDKLogger(category: "RunAnywhere.Init")
+        CppBridge.Events.emitSDKInitStarted()
 
         do {
-            // Step 1: Initialize logging system
-            RunAnywhere.setLogLevel(params.environment.defaultLogLevel)
 
-            // Step 2: Store parameters
-            initParams = params
-            currentEnvironment = params.environment
-
-            // Step 3: Persist to Keychain (production/staging only)
+            // Step 4: Persist to Keychain (production/staging only)
             if params.environment != .development {
                 try KeychainManager.shared.storeSDKParams(params)
             }
@@ -259,7 +264,7 @@ public enum RunAnywhere {
             let initDurationMs = (CFAbsoluteTimeGetCurrent() - initStartTime) * 1000
             logger.info("✅ Phase 1 complete in \(String(format: "%.1f", initDurationMs))ms (\(params.environment.description))")
 
-            EventPublisher.shared.track(SDKLifecycleEvent.initCompleted(durationMs: initDurationMs))
+            CppBridge.Events.emitSDKInitCompleted(durationMs: initDurationMs)
 
             // Optionally start Phase 2 in background
             if startBackgroundServices {
@@ -279,7 +284,7 @@ public enum RunAnywhere {
             logger.error("❌ Initialization failed: \(error.localizedDescription)")
             initParams = nil
             isInitialized = false
-            EventPublisher.shared.track(SDKLifecycleEvent.initFailed(error: error.localizedDescription))
+            CppBridge.Events.emitSDKInitFailed(error: SDKError.from(error))
             throw error
         }
     }
@@ -295,10 +300,9 @@ public enum RunAnywhere {
     ///
     /// This method:
     /// 1. Sets up API client (with authentication for production/staging)
-    /// 2. Creates core services (telemetry, models, sync)
-    /// 3. Loads model catalog from remote + local storage
-    /// 4. Initializes analytics pipeline
-    /// 5. Registers device with backend
+    /// 2. Initializes C++ model registry and bridges
+    /// 3. Initializes EventPublisher for telemetry
+    /// 4. Registers device with backend
     public static func completeServicesInitialization() async throws {
         // Fast path: already completed
         if hasCompletedServicesInit {
@@ -306,44 +310,56 @@ public enum RunAnywhere {
         }
 
         guard let params = initParams, let environment = currentEnvironment else {
-            throw RunAnywhereError.notInitialized
+            throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         let logger = SDKLogger(category: "RunAnywhere.Services")
 
-        // Check if services need initialization
-        let needsInit = environment == .development
-            ? serviceContainer.networkService == nil
-            : serviceContainer.authenticationService == nil
+        // Check if HTTP needs initialization
+        let httpNeedsInit = await !CppBridge.HTTP.shared.isConfigured
 
-        if needsInit {
+        if httpNeedsInit {
             logger.info("Initializing services for \(environment.description) mode...")
 
-            // Step 1: Setup API client
-            let apiClient = try await setupAPIClient(params: params, environment: environment, logger: logger)
-
-            // Step 2: Create and inject core services
-            let (telemetryRepo, modelInfoService) = await setupCoreServices(
-                apiClient: apiClient,
-                environment: environment,
-                logger: logger
-            )
-
-            // Step 3: Load models
-            await loadModels(modelInfoService: modelInfoService, logger: logger)
-
-            // Step 4: Initialize analytics
-            await initializeAnalytics(telemetryRepository: telemetryRepo, apiKey: params.apiKey, logger: logger)
-
-            logger.info("✅ Services initialized")
+            // Step 1: Configure HTTP transport
+            try await setupHTTP(params: params, environment: environment, logger: logger)
         }
 
-        // Step 5: Register device
-        if let networkService = serviceContainer.networkService {
-            await serviceContainer.deviceRegistrationService.registerIfNeeded(
-                networkService: networkService,
-                environment: environment
-            )
+        // Step 2: Initialize C++ state
+        CppBridge.State.initialize(
+            environment: environment,
+            apiKey: params.apiKey,
+            baseURL: params.baseURL,
+            deviceId: DeviceIdentity.persistentUUID
+        )
+        logger.debug("C++ state initialized")
+
+        // Step 3: Initialize service bridges (Platform, ModelAssignment)
+        // Must be on MainActor for Platform services
+        await MainActor.run {
+            CppBridge.initializeServices()
+        }
+        logger.debug("Service bridges initialized")
+
+        // Step 4: Set base directory for C++ model paths
+        if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            try CppBridge.ModelPaths.setBaseDirectory(documentsURL)
+            logger.debug("Model paths base directory set")
+        }
+
+        // Step 5: Register device via CppBridge (C++ handles all business logic)
+        do {
+            try await CppBridge.Device.registerIfNeeded(environment: environment)
+            logger.debug("Device registration check completed")
+        } catch {
+            logger.warning("Device registration failed (non-critical): \(error.localizedDescription)")
+        }
+
+        // Step 6: Discover already-downloaded models on file system
+        // This scans the models directory and updates the registry for models found on disk
+        let discoveryResult = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
+        if discoveryResult.discoveredCount > 0 {
+            logger.info("Discovered \(discoveryResult.discoveredCount) downloaded models on startup")
         }
 
         // Mark Phase 2 complete
@@ -363,96 +379,30 @@ public enum RunAnywhere {
     // MARK: - Private: Service Setup Helpers
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Setup API client based on environment
-    private static func setupAPIClient(
+    /// Setup HTTP transport via CppBridge.HTTP
+    private static func setupHTTP(
         params: SDKInitParams,
         environment: SDKEnvironment,
         logger: SDKLogger
-    ) async throws -> APIClient {
-        let apiClient: APIClient
-
+    ) async throws {
         switch environment {
         case .development:
-            if let devConfig = DevelopmentNetworkConfig.shared {
-                apiClient = devConfig.createAPIClient()
-                logger.debug("APIClient: Supabase (development)")
+            // Use C++ development config for Supabase (cross-platform)
+            if await CppBridge.DevConfig.configureHTTP() {
+                logger.debug("HTTP: Supabase from C++ config (development)")
             } else {
-                apiClient = APIClient(baseURL: params.baseURL, apiKey: params.apiKey)
-                logger.debug("APIClient: Provided URL (development)")
+                await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
+                logger.debug("HTTP: Provided URL (development)")
             }
-            serviceContainer.networkService = apiClient
-            serviceContainer.apiClient = apiClient
 
         case .staging, .production:
-            let (authenticatedClient, authService) = try await AuthenticationService.createAndAuthenticate(
-                baseURL: params.baseURL,
-                apiKey: params.apiKey
-            )
-            apiClient = authenticatedClient
-            serviceContainer.networkService = apiClient
-            serviceContainer.authenticationService = authService
-            serviceContainer.apiClient = apiClient
+            // Configure HTTP first
+            await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
+
+            // Authenticate via CppBridge.Auth
+            try await CppBridge.Auth.authenticate(apiKey: params.apiKey)
             logger.info("Authenticated for \(environment.description)")
         }
-
-        return apiClient
     }
 
-    /// Create and inject core services
-    private static func setupCoreServices(
-        apiClient: APIClient?,
-        environment: SDKEnvironment,
-        logger: SDKLogger
-    ) async -> (TelemetryRepositoryImpl, ModelInfoService) {
-        logger.debug("Creating core services...")
-
-        let syncCoordinator = SyncCoordinator(enableAutoSync: false)
-        serviceContainer.setSyncCoordinator(syncCoordinator)
-
-        let telemetryRepo = TelemetryRepositoryImpl(
-            databaseManager: DatabaseManager.shared,
-            apiClient: apiClient,
-            environment: environment
-        )
-
-        let modelRepo = ModelInfoRepositoryImpl(
-            databaseManager: DatabaseManager.shared,
-            apiClient: apiClient
-        )
-        let modelInfoService = ModelInfoService(
-            modelInfoRepository: modelRepo,
-            syncCoordinator: syncCoordinator
-        )
-        serviceContainer.setModelInfoService(modelInfoService)
-
-        if let networkService = serviceContainer.networkService {
-            let modelAssignmentService = ModelAssignmentService(
-                networkService: networkService,
-                modelInfoService: modelInfoService
-            )
-            serviceContainer.setModelAssignmentService(modelAssignmentService)
-        }
-
-        logger.debug("Core services created")
-        return (telemetryRepo, modelInfoService)
-    }
-
-    /// Load models from storage
-    private static func loadModels(modelInfoService: ModelInfoService, logger: SDKLogger) async {
-        try? await modelInfoService.syncModelInfo()
-        _ = try? await modelInfoService.loadStoredModels()
-        logger.debug("Model catalog loaded")
-    }
-
-    /// Initialize analytics pipeline
-    private static func initializeAnalytics(
-        telemetryRepository: TelemetryRepositoryImpl,
-        apiKey: String,
-        logger: SDKLogger
-    ) async {
-        await (serviceContainer.modelRegistry as? RegistryService)?.initialize(with: apiKey)
-        await serviceContainer.analyticsQueueManager.initialize(telemetryRepository: telemetryRepository)
-        EventPublisher.shared.initialize(analyticsQueue: serviceContainer.analyticsQueueManager)
-        logger.debug("Analytics initialized")
-    }
 }
