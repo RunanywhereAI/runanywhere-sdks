@@ -35,6 +35,9 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+
 env:
   # Working directory for commons
   COMMONS_DIR: sdk/runanywhere-commons
