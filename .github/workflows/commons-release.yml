@@ -1,0 +1,274 @@
+name: Build and Release XCFrameworks
+
+# =============================================================================
+# This workflow builds modular XCFrameworks for iOS/macOS:
+#   - RACommons.xcframework (core commons library)
+#   - RABackendLlamaCPP.xcframework (LLM backend)
+#   - RABackendONNX.xcframework (STT/TTS/VAD backend)
+#
+# It downloads runanywhere-core source from the public runanywhere-binaries
+# repository, builds the XCFrameworks, and publishes them.
+#
+# Trigger:
+#   - Tag push: commons-v*
+#   - Manual workflow_dispatch
+#
+# =============================================================================
+
+on:
+  push:
+    tags:
+      - 'commons-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 2.0.0)'
+        required: true
+        type: string
+      core_version:
+        description: 'runanywhere-core version to use (leave empty for latest)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run (build only, do not publish)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  # Public binaries repository for publishing XCFrameworks
+  PUBLIC_REPO_OWNER: 'RunanywhereAI'
+  PUBLIC_REPO_NAME: 'runanywhere-binaries'
+  # Working directory for commons
+  COMMONS_DIR: sdk/runanywhere-commons
+
+jobs:
+  # ===========================================================================
+  # Build iOS XCFrameworks
+  # ===========================================================================
+  build-ios:
+    name: Build iOS XCFrameworks
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      core_version: ${{ steps.core.outputs.core_version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/commons-v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Install Dependencies
+        run: brew install cmake ninja
+
+      - name: Download runanywhere-core Source
+        id: core
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/download-core.sh
+
+          # Determine core version
+          if [ -n "${{ github.event.inputs.core_version }}" ]; then
+            CORE_VERSION="${{ github.event.inputs.core_version }}"
+          else
+            # Fetch latest from runanywhere-binaries
+            CORE_VERSION=$(curl -sL "https://raw.githubusercontent.com/${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}/main/LATEST_CORE_VERSION" || echo "")
+            if [ -z "$CORE_VERSION" ]; then
+              echo "Failed to fetch latest core version, using 'latest'"
+              CORE_VERSION="latest"
+            fi
+          fi
+
+          echo "Using runanywhere-core version: $CORE_VERSION"
+          echo "core_version=$CORE_VERSION" >> $GITHUB_OUTPUT
+
+          # Download core source and dependencies
+          RUNANYWHERE_CORE_VERSION="$CORE_VERSION" ./scripts/download-core.sh
+
+      - name: Verify Core Downloaded
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          if [ ! -d "third_party/runanywhere-core" ]; then
+            echo "ERROR: runanywhere-core not downloaded"
+            exit 1
+          fi
+          echo "Core version: $(cat third_party/runanywhere-core/DOWNLOADED_VERSION 2>/dev/null || echo 'unknown')"
+          ls -la third_party/runanywhere-core/
+
+      - name: Build iOS XCFrameworks
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-ios.sh
+          ./scripts/build-ios.sh
+
+      - name: Package Release
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/package-release.sh
+          ./scripts/package-release.sh ${{ steps.version.outputs.version }}
+
+      - name: List Artifacts
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          echo "=== Build Artifacts ==="
+          ls -la dist/
+          echo ""
+          echo "=== XCFramework Sizes ==="
+          for xcf in dist/*.xcframework; do
+            if [ -d "$xcf" ]; then
+              size=$(du -sh "$xcf" | cut -f1)
+              echo "  $(basename "$xcf"): $size"
+            fi
+          done
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcframeworks-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/*.xcframework.zip
+            ${{ env.COMMONS_DIR }}/dist/*.zip
+            ${{ env.COMMONS_DIR }}/dist/*.sha256
+            ${{ env.COMMONS_DIR }}/dist/MANIFEST.md
+          retention-days: 30
+
+  # ===========================================================================
+  # Publish to runanywhere-binaries
+  # ===========================================================================
+  publish:
+    name: Publish to runanywhere-binaries
+    needs: build-ios
+    if: github.event.inputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: xcframeworks-${{ needs.build-ios.outputs.version }}
+          path: dist
+
+      - name: List Downloaded Artifacts
+        run: |
+          echo "=== Downloaded Artifacts ==="
+          ls -laR dist/
+
+      - name: Checkout Public Binaries Repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}
+          token: ${{ secrets.BINARY_REPO_PAT }}
+          path: public-repo
+          fetch-depth: 0
+
+      - name: Update Public Repository
+        run: |
+          VERSION="${{ needs.build-ios.outputs.version }}"
+          CORE_VERSION="${{ needs.build-ios.outputs.core_version }}"
+
+          cd public-repo
+
+          # Create releases directory
+          mkdir -p releases/commons-v${VERSION}
+
+          # Copy all XCFramework ZIPs (handle nested directory from artifact download)
+          find ../dist -name "*.zip" -exec cp {} releases/commons-v${VERSION}/ \; 2>/dev/null || true
+          find ../dist -name "*.sha256" -exec cp {} releases/commons-v${VERSION}/ \; 2>/dev/null || true
+
+          # Update version files
+          echo "${VERSION}" > LATEST_COMMONS_VERSION
+
+          # Git operations
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+          git add -A
+          git commit -m "Release runanywhere-commons v${VERSION}
+
+          Built with runanywhere-core: ${CORE_VERSION}
+
+          XCFrameworks:
+          $(ls -1 releases/commons-v${VERSION}/*.zip 2>/dev/null | xargs -I {} basename {} || echo 'None')
+          " || echo "No changes to commit"
+
+      - name: Create Git Tag
+        run: |
+          VERSION="${{ needs.build-ios.outputs.version }}"
+          cd public-repo
+          git tag -a "commons-v${VERSION}" -m "runanywhere-commons v${VERSION}" 2>/dev/null || echo "Tag already exists"
+
+      - name: Push to Public Repository
+        run: |
+          cd public-repo
+          git push origin main --tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.BINARY_REPO_PAT }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: ${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}
+          tag_name: commons-v${{ needs.build-ios.outputs.version }}
+          name: RunAnywhere Commons v${{ needs.build-ios.outputs.version }}
+          files: |
+            dist/**/*.zip
+            dist/**/*.sha256
+          body: |
+            ## RunAnywhere Commons v${{ needs.build-ios.outputs.version }}
+
+            Modular XCFrameworks for iOS/macOS.
+
+            ### XCFrameworks
+
+            | Framework | Description |
+            |-----------|-------------|
+            | `RACommons.xcframework` | Core commons library (service registry, model management) |
+            | `RABackendLlamaCPP.xcframework` | LLM backend (llama.cpp + Metal) |
+            | `RABackendONNX.xcframework` | STT/TTS/VAD backend (Sherpa-ONNX) |
+
+            ### Swift Package Manager
+
+            Update your `Package.swift`:
+
+            ```swift
+            .binaryTarget(
+                name: "RACommonsBinary",
+                url: "https://github.com/${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}/releases/download/commons-v${{ needs.build-ios.outputs.version }}/RACommons-${{ needs.build-ios.outputs.version }}.zip",
+                checksum: "..."
+            ),
+            ```
+
+            ### Requirements
+
+            - **ONNX Runtime**: `RABackendONNX` requires `onnxruntime.xcframework` (download separately)
+            - **Platforms**: iOS 17+, macOS 14+
+
+            ### Verification
+
+            ```bash
+            shasum -a 256 -c *.sha256
+            ```
+
+            ---
+            Built with runanywhere-core: ${{ needs.build-ios.outputs.core_version }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.BINARY_REPO_PAT }}
