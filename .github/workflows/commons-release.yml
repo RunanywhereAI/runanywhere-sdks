@@ -86,12 +86,10 @@ jobs:
           if [ -n "${{ github.event.inputs.core_version }}" ]; then
             CORE_VERSION="${{ github.event.inputs.core_version }}"
           else
-            # Fetch latest from runanywhere-binaries
-            CORE_VERSION=$(curl -sL "https://raw.githubusercontent.com/${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}/main/LATEST_CORE_VERSION" || echo "")
-            if [ -z "$CORE_VERSION" ]; then
-              echo "Failed to fetch latest core version, using 'latest'"
-              CORE_VERSION="latest"
-            fi
+            # Use specific known-good version for now
+            # TODO: Switch back to LATEST_CORE_VERSION once stable releases are working
+            CORE_VERSION="0.1.1-dev.03aacf9"
+            echo "Using hardcoded core version: $CORE_VERSION"
           fi
 
           echo "Using runanywhere-core version: $CORE_VERSION"
