@@ -164,12 +164,20 @@ struct FlatModelRow: View {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
+        case .systemTTS: return "System"
         default: return model.framework.displayName
         }
     }
 
+    /// Check if this is a built-in model that doesn't require download
+    private var isBuiltIn: Bool {
+        model.framework == .foundationModels ||
+        model.framework == .systemTTS ||
+        model.artifactType == .builtIn
+    }
+
     private var statusIcon: String {
-        if model.framework == .foundationModels {
+        if isBuiltIn {
             return "checkmark.circle.fill"
         } else if model.localPath != nil {
             return "checkmark.circle.fill"
@@ -179,7 +187,7 @@ struct FlatModelRow: View {
     }
 
     private var statusColor: Color {
-        if model.framework == .foundationModels || model.localPath != nil {
+        if isBuiltIn || model.localPath != nil {
             return AppColors.statusGreen
         } else {
             return AppColors.primaryAccent
@@ -187,7 +195,7 @@ struct FlatModelRow: View {
     }
 
     private var statusText: String {
-        if model.framework == .foundationModels {
+        if isBuiltIn {
             return "Built-in"
         } else if model.localPath != nil {
             return "Ready"
@@ -235,7 +243,7 @@ struct FlatModelRow: View {
     private var statusRowView: some View {
         HStack(spacing: AppSpacing.smallMedium) {
             // Size badge
-            if let size = model.memoryRequired, size > 0 {
+            if let size = model.downloadSize, size > 0 {
                 Label(
                     ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
                     systemImage: "memorychip"
@@ -281,8 +289,8 @@ struct FlatModelRow: View {
     }
 
     @ViewBuilder private var actionButton: some View {
-        if model.framework == .foundationModels {
-            // Foundation Models are built-in
+        if isBuiltIn {
+            // Built-in models (Foundation Models, System TTS) - always ready
             Button("Use") {
                 onSelectModel()
             }

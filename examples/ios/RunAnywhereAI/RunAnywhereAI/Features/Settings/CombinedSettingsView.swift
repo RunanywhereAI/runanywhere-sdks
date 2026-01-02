@@ -707,16 +707,6 @@ private struct StoredModelRow: View {
                     .foregroundColor(AppColors.textSecondary)
             }
 
-            if let lastUsed = model.lastUsed {
-                HStack {
-                    Text("Last used:")
-                        .font(AppTypography.caption2Medium)
-                    Text(lastUsed, style: .relative)
-                        .font(AppTypography.caption2)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-            }
-
             HStack {
                 Text("Size:")
                     .font(AppTypography.caption2Medium)

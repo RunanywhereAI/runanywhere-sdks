@@ -116,7 +116,7 @@ struct ModelSelectionSheet: View {
     }
 
     private func loadAvailableFrameworks() async {
-        let allFrameworks = await MainActor.run { RunAnywhere.getRegisteredFrameworks() }
+        let allFrameworks = await RunAnywhere.getRegisteredFrameworks()
         var filtered = allFrameworks.filter { shouldShowFramework($0) }
         if context == .tts && !filtered.contains(.systemTTS) {
             filtered.insert(.systemTTS, at: 0)
@@ -191,9 +191,7 @@ extension ModelSelectionSheet {
     }
 
     @ViewBuilder private var modelsContent: some View {
-        if context == .tts {
-            SystemTTSRow(isLoading: isLoadingModel) { await selectSystemTTS() }
-        }
+        // System TTS is now registered via C++ platform backend and shown in model list
         ForEach(availableModels, id: \.id) { model in
             FlatModelRow(
                 model: model,
@@ -210,32 +208,6 @@ extension ModelSelectionSheet {
 // MARK: - Model Loading Actions
 
 extension ModelSelectionSheet {
-    private func selectSystemTTS() async {
-        await MainActor.run {
-            isLoadingModel = true
-            loadingProgress = "Configuring System TTS..."
-        }
-
-        let systemTTSModel = ModelInfo(
-            id: "system-tts",
-            name: "System TTS",
-            category: .speechSynthesis,
-            format: .unknown,
-            framework: .systemTTS,
-            downloadURL: nil
-        )
-
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        await MainActor.run { loadingProgress = "System TTS ready!" }
-        try? await Task.sleep(nanoseconds: 200_000_000)
-
-        await onModelSelected(systemTTSModel)
-        await MainActor.run {
-            isLoadingModel = false
-            dismiss()
-        }
-    }
-
     private func selectAndLoadModel(_ model: ModelInfo) async {
         if model.framework != .foundationModels {
             guard model.localPath != nil else { return }

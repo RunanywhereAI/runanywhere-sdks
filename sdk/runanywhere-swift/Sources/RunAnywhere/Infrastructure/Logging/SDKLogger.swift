@@ -281,9 +281,9 @@ public final class Logging: @unchecked Sendable {
             output += " | \(metaStr)"
         }
 
-        #if DEBUG
+        // Always print when local logging is enabled (controlled by configuration)
+        // The enableLocalLogging flag already controls whether this method is called
         print(output)
-        #endif
     }
 
     // MARK: - Metadata Sanitization

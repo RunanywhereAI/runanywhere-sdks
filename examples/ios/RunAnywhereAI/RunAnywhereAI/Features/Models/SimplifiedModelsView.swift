@@ -20,8 +20,10 @@ struct SimplifiedModelsView: View {
     /// All available models sorted by availability (downloaded first)
     private var sortedModels: [ModelInfo] {
         viewModel.availableModels.sorted { model1, model2 in
-            let m1Priority = model1.framework == .foundationModels ? 0 : (model1.localPath != nil ? 1 : 2)
-            let m2Priority = model2.framework == .foundationModels ? 0 : (model2.localPath != nil ? 1 : 2)
+            let m1BuiltIn = model1.framework == .foundationModels || model1.framework == .systemTTS || model1.artifactType == .builtIn
+            let m2BuiltIn = model2.framework == .foundationModels || model2.framework == .systemTTS || model2.artifactType == .builtIn
+            let m1Priority = m1BuiltIn ? 0 : (model1.localPath != nil ? 1 : 2)
+            let m2Priority = m2BuiltIn ? 0 : (model2.localPath != nil ? 1 : 2)
             if m1Priority != m2Priority {
                 return m1Priority < m2Priority
             }
@@ -53,9 +55,7 @@ struct SimplifiedModelsView: View {
 
     private func loadAvailableFrameworks() async {
         // Get available frameworks from SDK - derived from registered models
-        let frameworks = await MainActor.run {
-            RunAnywhere.getRegisteredFrameworks()
-        }
+        let frameworks = await RunAnywhere.getRegisteredFrameworks()
         await MainActor.run {
             self.availableFrameworks = frameworks
         }
@@ -183,6 +183,7 @@ private struct SimplifiedModelRow: View {
         case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
+        case .systemTTS: return .primary
         default: return .gray
         }
     }
@@ -192,12 +193,20 @@ private struct SimplifiedModelRow: View {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
+        case .systemTTS: return "System"
         default: return model.framework.displayName
         }
     }
 
+    /// Check if this is a built-in model that doesn't require download
+    private var isBuiltIn: Bool {
+        model.framework == .foundationModels ||
+        model.framework == .systemTTS ||
+        model.artifactType == .builtIn
+    }
+
     private var isReady: Bool {
-        model.framework == .foundationModels || model.localPath != nil
+        isBuiltIn || model.localPath != nil
     }
 
     var body: some View {
@@ -223,7 +232,7 @@ private struct SimplifiedModelRow: View {
 
                 // Size and status
                 HStack(spacing: AppSpacing.smallMedium) {
-                    if let size = model.memoryRequired, size > 0 {
+                    if let size = model.downloadSize, size > 0 {
                         Label(
                             ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
                             systemImage: "memorychip"
@@ -245,7 +254,7 @@ private struct SimplifiedModelRow: View {
                             Image(systemName: isReady ? "checkmark.circle.fill" : "arrow.down.circle")
                                 .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                                 .font(AppTypography.caption2)
-                            let statusText = model.framework == .foundationModels
+                            let statusText = isBuiltIn
                                 ? "Built-in"
                                 : (model.localPath != nil ? "Ready" : "Download")
                             Text(statusText)
@@ -272,7 +281,8 @@ private struct SimplifiedModelRow: View {
             Spacer()
 
             // Action button
-            if model.framework == .foundationModels {
+            if isBuiltIn {
+                // Built-in models (Foundation Models, System TTS) - always ready
                 Button("Use") {
                     onSelectModel()
                 }
