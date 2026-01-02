@@ -144,7 +144,14 @@ download_ios_deps() {
         cd "${ONNX_IOS_DIR}"
         unzip -q -o "${THIRD_PARTY_DIR}/${ONNX_ZIP}"
         rm "${THIRD_PARTY_DIR}/${ONNX_ZIP}"
-        echo -e "${GREEN}✓ ONNX Runtime -> ${ONNX_IOS_DIR}${NC}"
+
+        # Create Headers symlink for CMake (it looks for onnxruntime-ios/Headers/)
+        if [ -d "onnxruntime.xcframework/ios-arm64/onnxruntime.framework/Headers" ]; then
+            ln -sf onnxruntime.xcframework/ios-arm64/onnxruntime.framework/Headers Headers
+            echo -e "${GREEN}✓ ONNX Runtime -> ${ONNX_IOS_DIR}${NC}"
+        else
+            echo -e "${YELLOW}⚠ Could not find Headers in xcframework${NC}"
+        fi
         ls -la
     else
         echo -e "${YELLOW}⚠ ONNX Runtime for iOS not found in release${NC}"
