@@ -30,10 +30,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # =============================================================================
-# PATHS - Always use downloaded core from third_party/
+# PATHS - Downloaded dependencies in third_party/
 # =============================================================================
 RUNANYWHERE_CORE_DIR="${PROJECT_ROOT}/third_party/runanywhere-core"
-SHERPA_ONNX_XCFW="${RUNANYWHERE_CORE_DIR}/third_party/sherpa-onnx.xcframework"
+SHERPA_ONNX_XCFW="${PROJECT_ROOT}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
 
 # Validate core exists
 if [ ! -d "${RUNANYWHERE_CORE_DIR}" ]; then
