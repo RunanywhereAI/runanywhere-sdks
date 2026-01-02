@@ -356,6 +356,9 @@ combine_onnx_libs() {
     # runanywhere-core ONNX backend
     [ -f "${PLATFORM_DIR}/runanywhere-core/src/backends/onnx/librunanywhere_onnx.a" ] && LIBS="$LIBS ${PLATFORM_DIR}/runanywhere-core/src/backends/onnx/librunanywhere_onnx.a"
 
+    # runanywhere-core bridge (provides ra_create_backend, ra_initialize)
+    [ -f "${PLATFORM_DIR}/runanywhere-core/librunanywhere_bridge.a" ] && LIBS="$LIBS ${PLATFORM_DIR}/runanywhere-core/librunanywhere_bridge.a"
+
     # Sherpa-ONNX static library (provides STT/TTS/VAD implementations)
     # Uses global SHERPA_ONNX_XCFW set at script start based on BUILD_MODE
     local SHERPA_LIB=""

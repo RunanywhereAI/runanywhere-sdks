@@ -37,6 +37,7 @@
 #   --build-sdk       Build runanywhere-swift (Swift SDK)
 #   --build-all       Build everything (core + commons + sdk)
 #   --skip-app        Only build SDK components, skip Xcode app build
+#   --local           Use local builds (copies core to commons, frameworks to swift, enables testLocal)
 #
 # OTHER OPTIONS:
 #   --clean           Clean build artifacts before building
@@ -47,6 +48,7 @@
 #   ./build_and_run.sh device --build-all          # Rebuild everything, run on device
 #   ./build_and_run.sh simulator --build-commons   # Rebuild commons + SDK, run on sim
 #   ./build_and_run.sh --build-all --skip-app      # Just rebuild all SDK components
+#   ./build_and_run.sh device --build-all --local  # Full local build (core->commons->swift->app)
 #
 # INDIVIDUAL PROJECT BUILDS (can be run standalone):
 #   cd runanywhere-core && ./scripts/ios/build.sh && ./scripts/build-xcframework.sh
@@ -62,12 +64,12 @@ set -e
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
+WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../../../../" && pwd)"
 
 # Project directories
-CORE_DIR="$WORKSPACE_ROOT/runanywhere-core"
-COMMONS_DIR="$WORKSPACE_ROOT/sdks/sdk/runanywhere-commons"
-SWIFT_SDK_DIR="$WORKSPACE_ROOT/sdks/sdk/runanywhere-swift"
+CORE_DIR="$WORKSPACE_ROOT/../runanywhere-core"
+COMMONS_DIR="$WORKSPACE_ROOT/sdk/runanywhere-commons"
+SWIFT_SDK_DIR="$WORKSPACE_ROOT/sdk/runanywhere-swift"
 APP_DIR="$SCRIPT_DIR/.."
 
 # Build scripts (each project has its own)
@@ -137,6 +139,7 @@ BUILD_COMMONS=false
 BUILD_SDK=false
 SKIP_APP=false
 CLEAN_BUILD=false
+LOCAL_MODE=false
 
 [[ "$1" == "--help" || "$1" == "-h" ]] && show_help
 
@@ -164,6 +167,9 @@ for arg in "$@"; do
         --skip-app)
             SKIP_APP=true
             ;;
+        --local)
+            LOCAL_MODE=true
+            ;;
         --clean)
             CLEAN_BUILD=true
             ;;
@@ -182,6 +188,12 @@ done
 build_core() {
     log_header "Building runanywhere-core"
     local start_time=$(date +%s)
+
+    if [[ ! -d "$CORE_DIR" ]]; then
+        log_error "runanywhere-core not found at: $CORE_DIR"
+        log_error "Expected location: $WORKSPACE_ROOT/../runanywhere-core"
+        exit 1
+    fi
 
     if [[ ! -x "$CORE_BUILD_SCRIPT" ]]; then
         log_error "Core build script not found: $CORE_BUILD_SCRIPT"
@@ -203,6 +215,46 @@ build_core() {
     log_time "Core build time: $(format_duration $TIME_CORE)"
 }
 
+copy_core_to_commons() {
+    if ! $LOCAL_MODE; then
+        return 0
+    fi
+
+    log_header "Copying runanywhere-core to runanywhere-commons (Local Mode)"
+    
+    local core_dest="$COMMONS_DIR/third_party/runanywhere-core"
+    
+    if [[ ! -d "$CORE_DIR" ]]; then
+        log_error "runanywhere-core not found at: $CORE_DIR"
+        exit 1
+    fi
+
+    log_step "Copying runanywhere-core source to $core_dest"
+    mkdir -p "$(dirname "$core_dest")"
+    
+    # Remove existing if present
+    if [[ -d "$core_dest" ]]; then
+        log_step "Removing existing copy..."
+        rm -rf "$core_dest"
+    fi
+    
+    # Copy source (exclude build artifacts)
+    log_step "Copying source files..."
+    if command -v rsync &> /dev/null; then
+        rsync -av --exclude='build/' --exclude='.git/' --exclude='dist/' --exclude='*.xcframework' "$CORE_DIR/" "$core_dest/" || {
+            log_warn "rsync failed, using cp..."
+            cp -r "$CORE_DIR" "$(dirname "$core_dest")/"
+        }
+    else
+        cp -r "$CORE_DIR" "$(dirname "$core_dest")/"
+        # Clean up build artifacts after copy
+        find "$core_dest" -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
+        find "$core_dest" -type d -name ".git" -exec rm -rf {} + 2>/dev/null || true
+    fi
+    
+    log_info "Copied runanywhere-core to commons third_party"
+}
+
 build_commons() {
     log_header "Building runanywhere-commons"
     local start_time=$(date +%s)
@@ -210,6 +262,27 @@ build_commons() {
     if [[ ! -x "$COMMONS_BUILD_SCRIPT" ]]; then
         log_error "Commons build script not found: $COMMONS_BUILD_SCRIPT"
         exit 1
+    fi
+
+    # In local mode, download core source (commons will compile core libraries from it)
+    # Note: Commons build internally compiles core libraries (librunanywhere_bridge.a, etc.)
+    # and links them into commons frameworks. We don't build core as a separate step.
+    if $LOCAL_MODE; then
+        local download_script="$COMMONS_DIR/scripts/download-core.sh"
+        if [[ -x "$download_script" ]]; then
+            if [[ ! -d "$COMMONS_DIR/third_party/runanywhere-core" ]]; then
+                log_info "Local mode: Downloading runanywhere-core source"
+                log_info "  (Commons build will compile core libraries internally)"
+                log_step "Running: $download_script"
+                cd "$COMMONS_DIR"
+                "$download_script"
+            else
+                log_info "Local mode: Using downloaded runanywhere-core source"
+                log_info "  (Commons build will compile core libraries internally)"
+            fi
+        else
+            log_warn "download-core.sh not found - commons build may fail if core is missing"
+        fi
     fi
 
     log_step "Running: $COMMONS_BUILD_SCRIPT"
@@ -222,6 +295,85 @@ build_commons() {
     log_time "Commons build time: $(format_duration $TIME_COMMONS)"
 }
 
+copy_frameworks_to_swift() {
+    if ! $LOCAL_MODE; then
+        return 0
+    fi
+
+    log_header "Copying XCFrameworks to runanywhere-swift/Binaries (Local Mode - Commons Only)"
+    log_info "Note: RunAnywhereCore and onnxruntime will be consumed from remote releases"
+    
+    local binaries_dir="$SWIFT_SDK_DIR/Binaries"
+    mkdir -p "$binaries_dir"
+
+    # Only copy runanywhere-commons frameworks (built locally)
+    # LlamaCPP and onnxruntime come from remote GitHub releases
+    local frameworks=("RACommons" "RABackendONNX")
+    for framework in "${frameworks[@]}"; do
+        local src="$COMMONS_DIR/dist/${framework}.xcframework"
+        if [[ -d "$src" ]]; then
+            log_step "Copying ${framework}.xcframework (local build)"
+            rm -rf "$binaries_dir/${framework}.xcframework"
+            cp -r "$src" "$binaries_dir/"
+            log_info "  ✓ ${framework}.xcframework"
+        else
+            log_warn "  ✗ ${framework}.xcframework not found at $src"
+        fi
+    done
+
+    log_info "XCFrameworks copied to: $binaries_dir"
+    log_info "RABackendLlamaCPP and onnxruntime will be downloaded from GitHub releases"
+}
+
+set_package_mode() {
+    local package_file="$SWIFT_SDK_DIR/Package.swift"
+    
+    if [[ ! -f "$package_file" ]]; then
+        log_error "Package.swift not found: $package_file"
+        exit 1
+    fi
+
+    if $LOCAL_MODE; then
+        log_header "Enabling Local Mode in Package.swift"
+        
+        # Check if already in local mode
+        if grep -q 'let testLocal = true' "$package_file"; then
+            log_info "Already in local mode"
+            return 0
+        fi
+
+        # Change testLocal to true
+        log_step "Setting testLocal = true"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' 's/let testLocal = false/let testLocal = true/' "$package_file"
+        else
+            sed -i 's/let testLocal = false/let testLocal = true/' "$package_file"
+        fi
+        
+        if grep -q 'let testLocal = true' "$package_file"; then
+            log_info "✓ Local mode enabled"
+        else
+            log_error "Failed to enable local mode"
+            exit 1
+        fi
+    else
+        # Restore remote mode if currently in local mode
+        if grep -q 'let testLocal = true' "$package_file"; then
+            log_header "Restoring Remote Mode in Package.swift"
+            log_step "Setting testLocal = false"
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' 's/let testLocal = true/let testLocal = false/' "$package_file"
+            else
+                sed -i 's/let testLocal = true/let testLocal = false/' "$package_file"
+            fi
+            
+            if grep -q 'let testLocal = false' "$package_file"; then
+                log_info "✓ Remote mode restored"
+            fi
+        fi
+    fi
+}
+
 build_swift_sdk() {
     log_header "Building runanywhere-swift"
     local start_time=$(date +%s)
@@ -231,11 +383,17 @@ build_swift_sdk() {
         exit 1
     fi
 
+    # In local mode, copy frameworks and set package mode
+    if $LOCAL_MODE; then
+        copy_frameworks_to_swift
+    fi
+    set_package_mode
+
     # Determine what flags to pass
     local FLAGS=""
 
-    # Install frameworks if core or commons was rebuilt
-    if $BUILD_CORE || $BUILD_COMMONS; then
+    # Install frameworks if core or commons was rebuilt (only if not in local mode)
+    if ! $LOCAL_MODE && ($BUILD_CORE || $BUILD_COMMONS); then
         FLAGS="$FLAGS --install-frameworks --sync-headers"
     fi
 
@@ -395,6 +553,7 @@ main() {
     echo "Build Commons: $BUILD_COMMONS"
     echo "Build SDK: $BUILD_SDK"
     echo "Skip App: $SKIP_APP"
+    echo "Local Mode: $LOCAL_MODE"
     echo ""
     echo "Scripts:"
     echo "  Core:    $CORE_BUILD_SCRIPT"
@@ -403,8 +562,18 @@ main() {
     echo ""
 
     # Execute build steps by calling individual project scripts
-    $BUILD_CORE && build_core
-    $BUILD_COMMONS && build_commons
+    # In local mode, we download core source (not build it separately)
+    # Commons build will compile core libraries internally and link them into commons frameworks
+    # We use remote onnxruntime binary (the only pre-built binary we use)
+    if $LOCAL_MODE; then
+        log_info "Local mode: Downloading core source (commons will build core libraries internally)"
+        # Build commons locally (it will compile core libraries from downloaded source)
+        $BUILD_COMMONS && build_commons
+    else
+        # Normal mode: build everything
+        $BUILD_CORE && build_core
+        $BUILD_COMMONS && build_commons
+    fi
     $BUILD_SDK && build_swift_sdk
 
     # Build and deploy app
