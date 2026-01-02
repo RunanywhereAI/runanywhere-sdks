@@ -6,6 +6,14 @@
 # - RABackendLlamaCPP.xcframework (LlamaCpp backend)
 # - RABackendONNX.xcframework (ONNX backend)
 # - RABackendWhisperCPP.xcframework (WhisperCpp backend)
+#
+# MODES:
+#   BUILD_MODE=local   - Use local monorepo (../../../runanywhere-core)
+#   BUILD_MODE=remote  - Use downloaded core (third_party/runanywhere-core)
+#
+# Usage:
+#   BUILD_MODE=local ./scripts/build-ios.sh   # Local development
+#   BUILD_MODE=remote ./scripts/build-ios.sh  # CI/standalone builds
 
 set -e
 
@@ -17,6 +25,52 @@ DIST_DIR="${PROJECT_ROOT}/dist"
 # Load versions from VERSIONS file (single source of truth)
 source "${SCRIPT_DIR}/load-versions.sh"
 
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# =============================================================================
+# BUILD MODE DETECTION
+# =============================================================================
+# Auto-detect mode if not specified
+if [ -z "${BUILD_MODE}" ]; then
+    if [ -d "${PROJECT_ROOT}/third_party/runanywhere-core" ]; then
+        BUILD_MODE="remote"
+    elif [ -d "${PROJECT_ROOT}/../../../runanywhere-core" ]; then
+        BUILD_MODE="local"
+    else
+        echo -e "${RED}ERROR: Cannot detect build mode${NC}"
+        echo "Please set BUILD_MODE=local or BUILD_MODE=remote"
+        echo "Or run ./scripts/download-core.sh first for remote mode"
+        exit 1
+    fi
+fi
+
+# Set paths based on mode
+if [ "${BUILD_MODE}" = "local" ]; then
+    RUNANYWHERE_CORE_DIR="${PROJECT_ROOT}/../../../runanywhere-core"
+    SHERPA_ONNX_XCFW="${RUNANYWHERE_CORE_DIR}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
+elif [ "${BUILD_MODE}" = "remote" ]; then
+    RUNANYWHERE_CORE_DIR="${PROJECT_ROOT}/third_party/runanywhere-core"
+    # In remote mode, sherpa-onnx is extracted directly (no subdirectory)
+    SHERPA_ONNX_XCFW="${RUNANYWHERE_CORE_DIR}/third_party/sherpa-onnx.xcframework"
+else
+    echo -e "${RED}ERROR: Invalid BUILD_MODE '${BUILD_MODE}'${NC}"
+    echo "Use BUILD_MODE=local or BUILD_MODE=remote"
+    exit 1
+fi
+
+# Validate paths
+if [ ! -d "${RUNANYWHERE_CORE_DIR}" ]; then
+    echo -e "${RED}ERROR: runanywhere-core not found at ${RUNANYWHERE_CORE_DIR}${NC}"
+    if [ "${BUILD_MODE}" = "remote" ]; then
+        echo "Run: ./scripts/download-core.sh"
+    fi
+    exit 1
+fi
+
 # Configuration
 IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-13.0}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
@@ -26,15 +80,13 @@ BUILD_LLAMACPP="${BUILD_LLAMACPP:-ON}"
 BUILD_ONNX="${BUILD_ONNX:-ON}"
 BUILD_WHISPERCPP="${BUILD_WHISPERCPP:-OFF}"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}RunAnywhere Commons - iOS Build${NC}"
 echo -e "${GREEN}========================================${NC}"
+echo "Build mode: ${BUILD_MODE}"
+echo "Core directory: ${RUNANYWHERE_CORE_DIR}"
+echo "Sherpa-ONNX: ${SHERPA_ONNX_XCFW}"
+echo ""
 echo "Deployment target: iOS ${IOS_DEPLOYMENT_TARGET}"
 echo "Build type: ${BUILD_TYPE}"
 echo "LlamaCpp: ${BUILD_LLAMACPP}"
@@ -324,9 +376,6 @@ combine_onnx_libs() {
 
     echo "Combining ONNX libraries for ${PLATFORM}..."
 
-    # Sherpa-ONNX xcframework path
-    local SHERPA_ONNX_XCFW="${PROJECT_ROOT}/../../../runanywhere-core/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
-
     # Collect all needed libraries (excluding ONNX Runtime itself)
     local LIBS=""
 
@@ -337,34 +386,39 @@ combine_onnx_libs() {
     [ -f "${PLATFORM_DIR}/runanywhere-core/src/backends/onnx/librunanywhere_onnx.a" ] && LIBS="$LIBS ${PLATFORM_DIR}/runanywhere-core/src/backends/onnx/librunanywhere_onnx.a"
 
     # Sherpa-ONNX static library (provides STT/TTS/VAD implementations)
+    # Uses global SHERPA_ONNX_XCFW set at script start based on BUILD_MODE
     local SHERPA_LIB=""
-    if [ "${PLATFORM}" = "OS" ]; then
-        SHERPA_LIB="${SHERPA_ONNX_XCFW}/ios-arm64/libsherpa-onnx.a"
-    elif [ "${PLATFORM}" = "SIMULATORARM64" ]; then
-        # Extract arm64 slice from fat simulator binary
-        local SHERPA_SIM_LIB="${SHERPA_ONNX_XCFW}/ios-arm64_x86_64-simulator/libsherpa-onnx.a"
-        if [ -f "${SHERPA_SIM_LIB}" ]; then
-            SHERPA_LIB="${PLATFORM_DIR}/libsherpa-onnx-arm64.a"
-            lipo -extract arm64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
-            lipo -thin arm64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
-            cp "${SHERPA_SIM_LIB}" "${SHERPA_LIB}"
+    if [ -d "${SHERPA_ONNX_XCFW}" ]; then
+        if [ "${PLATFORM}" = "OS" ]; then
+            SHERPA_LIB="${SHERPA_ONNX_XCFW}/ios-arm64/libsherpa-onnx.a"
+        elif [ "${PLATFORM}" = "SIMULATORARM64" ]; then
+            # Extract arm64 slice from fat simulator binary
+            local SHERPA_SIM_LIB="${SHERPA_ONNX_XCFW}/ios-arm64_x86_64-simulator/libsherpa-onnx.a"
+            if [ -f "${SHERPA_SIM_LIB}" ]; then
+                SHERPA_LIB="${PLATFORM_DIR}/libsherpa-onnx-arm64.a"
+                lipo -extract arm64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
+                lipo -thin arm64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
+                cp "${SHERPA_SIM_LIB}" "${SHERPA_LIB}"
+            fi
+        elif [ "${PLATFORM}" = "SIMULATOR" ]; then
+            # Extract x86_64 slice from fat simulator binary
+            local SHERPA_SIM_LIB="${SHERPA_ONNX_XCFW}/ios-arm64_x86_64-simulator/libsherpa-onnx.a"
+            if [ -f "${SHERPA_SIM_LIB}" ]; then
+                SHERPA_LIB="${PLATFORM_DIR}/libsherpa-onnx-x86_64.a"
+                lipo -extract x86_64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
+                lipo -thin x86_64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
+                cp "${SHERPA_SIM_LIB}" "${SHERPA_LIB}"
+            fi
         fi
-    elif [ "${PLATFORM}" = "SIMULATOR" ]; then
-        # Extract x86_64 slice from fat simulator binary
-        local SHERPA_SIM_LIB="${SHERPA_ONNX_XCFW}/ios-arm64_x86_64-simulator/libsherpa-onnx.a"
-        if [ -f "${SHERPA_SIM_LIB}" ]; then
-            SHERPA_LIB="${PLATFORM_DIR}/libsherpa-onnx-x86_64.a"
-            lipo -extract x86_64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
-            lipo -thin x86_64 "${SHERPA_SIM_LIB}" -output "${SHERPA_LIB}" 2>/dev/null || \
-            cp "${SHERPA_SIM_LIB}" "${SHERPA_LIB}"
-        fi
-    fi
 
-    if [ -f "${SHERPA_LIB}" ]; then
-        LIBS="$LIBS ${SHERPA_LIB}"
-        echo "  Including Sherpa-ONNX: ${SHERPA_LIB}"
+        if [ -f "${SHERPA_LIB}" ]; then
+            LIBS="$LIBS ${SHERPA_LIB}"
+            echo "  Including Sherpa-ONNX: ${SHERPA_LIB}"
+        else
+            echo -e "${YELLOW}Warning: Sherpa-ONNX library not found at ${SHERPA_LIB}${NC}"
+        fi
     else
-        echo -e "${YELLOW}Warning: Sherpa-ONNX library not found for ${PLATFORM}${NC}"
+        echo -e "${YELLOW}Warning: Sherpa-ONNX xcframework not found at ${SHERPA_ONNX_XCFW}${NC}"
     fi
 
     # NOTE: ONNX Runtime xcframework is NOT bundled here.

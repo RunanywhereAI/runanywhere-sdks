@@ -114,7 +114,7 @@ jobs:
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
           chmod +x scripts/build-ios.sh
-          ./scripts/build-ios.sh
+          BUILD_MODE=remote ./scripts/build-ios.sh
 
       - name: Package Release
         working-directory: ${{ env.COMMONS_DIR }}
