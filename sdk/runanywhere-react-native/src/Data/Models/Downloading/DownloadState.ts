@@ -17,4 +17,3 @@ export enum DownloadState {
   Failed = 'failed',
   Cancelled = 'cancelled',
 }
-

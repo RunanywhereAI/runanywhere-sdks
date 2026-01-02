@@ -18,4 +18,3 @@ export interface DownloadProgress {
   readonly speed: number | null; // bytes per second
   readonly estimatedTimeRemaining: number | null; // seconds
 }
-

@@ -291,4 +291,3 @@ export class VoiceAgentComponent extends BaseComponent<VoiceAgentServiceWrapper>
     return floatArray;
   }
 }
-

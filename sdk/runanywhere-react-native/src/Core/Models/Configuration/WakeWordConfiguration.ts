@@ -7,4 +7,3 @@ export interface WakeWordConfiguration {
   modelId?: string | null;
   // Add all other properties from iOS WakeWordConfiguration
 }
-

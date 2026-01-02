@@ -27,4 +27,3 @@ abstract class ComponentInitParameters {
   /// Validate the parameters
   void validate();
 }
-

@@ -30,4 +30,3 @@ export interface SpeakerDiarizationService {
    */
   cleanup(): Promise<void>;
 }
-

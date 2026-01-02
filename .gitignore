@@ -229,6 +229,16 @@ sdk/runanywhere-swift/Configuration/RunAnywhereConfig.prod.json
 sdk/runanywhere-swift/Configuration/*.private.json
 sdk/runanywhere-swift/Configuration/Private/
 
+# Development mode configuration (generated during releases)
+# Contains: Supabase URL, anon key, and build token
+# Real values are ONLY in release tags for SPM distribution
+sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Constants/DevelopmentConfig.swift
+
+# Release secrets file (contains Supabase URL and anon key)
+# This file is required for running release_ios_sdk.sh
+# For CI, set SUPABASE_URL and SUPABASE_ANON_KEY environment variables
+scripts/.release-secrets
+
 # Keep example files
 !sdk/runanywhere-swift/Configuration/RunAnywhereConfig.example.json
 
@@ -271,3 +281,8 @@ pubspec.lock
 # Flutter auto-generated files (contain developer-specific local paths)
 **/ios/Flutter/Generated.xcconfig
 **/ios/Flutter/flutter_export_environment.sh
+sdk/runanywhere-swift/Sources/RunAnywhere/Data/Network/DevelopmentConfig.swift
+
+# Secrets files (API keys, tokens, etc.)
+**/Secrets.swift
+**/Secrets.xcconfig

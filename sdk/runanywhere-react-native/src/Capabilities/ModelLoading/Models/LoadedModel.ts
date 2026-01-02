@@ -32,4 +32,3 @@ export class LoadedModelImpl implements LoadedModel {
     this.service = service;
   }
 }
-

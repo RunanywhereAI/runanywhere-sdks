@@ -1,6 +1,6 @@
 /**
  * AudioDecoder.h
- * 
+ *
  * iOS audio file decoder using built-in AudioToolbox.
  * Converts any audio format (M4A, CAF, WAV, etc.) to PCM float32 samples.
  */
@@ -17,7 +17,7 @@ extern "C" {
 /**
  * Decode an audio file to PCM float32 samples at 16kHz mono
  * Works with any iOS-supported audio format (M4A, CAF, WAV, MP3, etc.)
- * 
+ *
  * @param filePath Path to the audio file (null-terminated C string)
  * @param samples Output: pointer to float array (caller must free with ra_free_audio_samples)
  * @param numSamples Output: number of samples
@@ -36,5 +36,3 @@ void ra_free_audio_samples(float* samples);
 #endif
 
 #endif /* AudioDecoder_h */
-
-

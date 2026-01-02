@@ -7,4 +7,3 @@ export interface VLMConfiguration {
   modelId?: string | null;
   // Add all other properties from iOS VLMConfiguration
 }
-

@@ -115,7 +115,7 @@ export const TTSScreen: React.FC = () => {
   // Helper to stop sound playback
   const stopSound = useCallback(async () => {
     stopProgressUpdates();
-    
+
     // iOS: Stop NativeAudioModule
     if (Platform.OS === 'ios' && NativeAudioModule) {
       try {
@@ -124,7 +124,7 @@ export const TTSScreen: React.FC = () => {
         // Ignore errors
       }
     }
-    
+
     // Stop react-native-sound (Android)
     if (soundRef.current) {
       soundRef.current.stop();
@@ -223,12 +223,12 @@ export const TTSScreen: React.FC = () => {
   const loadModel = useCallback(async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      
+
       // Reset audio state when switching models
       setAudioGenerated(false);
       setAudioFilePath(null);
       stopSound();
-      
+
       console.log(`[TTSScreen] Loading model: ${model.id} from ${model.localPath}`);
 
       // Handle System TTS specially - it's always available, no download needed
@@ -267,7 +267,7 @@ export const TTSScreen: React.FC = () => {
       // and finding the correct nested model folder
       const modelType = model.modelType || 'piper';
       console.log(`[TTSScreen] Calling loadTTSModel with path: ${model.localPath}, type: ${modelType}`);
-      
+
       const success = await RunAnywhere.loadTTSModel(model.localPath, modelType);
 
       if (success) {
@@ -403,15 +403,15 @@ export const TTSScreen: React.FC = () => {
       // iOS: Use NativeAudioModule for System TTS
       if (Platform.OS === 'ios' && NativeAudioModule) {
         console.log('[TTSScreen] iOS: Using NativeAudioModule.speak()');
-        
+
         setIsPlaying(true);
-        
+
         // Estimate duration based on text length and speed
         const estimatedDuration = (text.length * 0.06) / speed;
         setDuration(estimatedDuration);
         setSampleRate(0); // System TTS doesn't expose sample rate
         setAudioGenerated(false); // No audio file for System TTS
-        
+
         try {
           const result = await NativeAudioModule.speak(text, speed, pitch);
           console.log('[TTSScreen] iOS System TTS result:', result);
@@ -423,15 +423,15 @@ export const TTSScreen: React.FC = () => {
         }
         return;
       }
-      
+
       // Android: Use react-native-tts
       const tts = getTts();
-      
+
       if (!tts) {
         Alert.alert('TTS Not Available', 'System TTS is not available.');
         return;
       }
-      
+
       // Listen for finish event first
       const finishListener = tts.addListener('tts-finish', () => {
         console.log('[TTSScreen] System TTS finished');
@@ -449,9 +449,9 @@ export const TTSScreen: React.FC = () => {
       // Speak the text with options
       // iOS rate: 0.0-1.0, Android rate: 0.01-0.99
       const androidRate = Math.min(0.99, Math.max(0.01, speed * 0.5));
-      
+
       console.log('[TTSScreen] Android System TTS speaking with rate:', androidRate, 'pitch:', pitch);
-      
+
       // Just speak with default settings - avoid setDefaultRate issue
       // The speak function itself should work
       tts.speak(text, {
@@ -620,7 +620,7 @@ export const TTSScreen: React.FC = () => {
       if (isPlaying) {
         // Pause playback
         console.log('[TTSScreen] Pausing playback...');
-        
+
         // iOS: Use NativeAudioModule
         if (Platform.OS === 'ios' && NativeAudioModule) {
           try {
@@ -631,7 +631,7 @@ export const TTSScreen: React.FC = () => {
         } else if (soundRef.current) {
           soundRef.current.pause();
         }
-        
+
         stopProgressUpdates();
         setIsPlaying(false);
         console.log('[TTSScreen] Playback paused');
@@ -643,7 +643,7 @@ export const TTSScreen: React.FC = () => {
           try {
             await NativeAudioModule.resumePlayback();
             setIsPlaying(true);
-            
+
             // Restart progress updates
             progressIntervalRef.current = setInterval(async () => {
               try {
@@ -654,7 +654,7 @@ export const TTSScreen: React.FC = () => {
                 if (totalDuration > 0) {
                   setPlaybackProgress(currentSec / totalDuration);
                 }
-                
+
                 if (!status.isPlaying && currentSec >= totalDuration - 0.1) {
                   stopProgressUpdates();
                   setIsPlaying(false);
@@ -665,13 +665,13 @@ export const TTSScreen: React.FC = () => {
                 // Ignore
               }
             }, 100);
-            
+
             return;
           } catch (e) {
             console.log('[TTSScreen] iOS resume error, starting fresh:', e);
           }
         }
-        
+
         // Android: Use react-native-sound
         if (soundRef.current && currentTime > 0) {
           // Resume existing sound
@@ -686,7 +686,7 @@ export const TTSScreen: React.FC = () => {
             setCurrentTime(0);
             setPlaybackProgress(0);
           });
-          
+
           // Start progress updates
           progressIntervalRef.current = setInterval(() => {
             soundRef.current?.getCurrentTime((seconds) => {
@@ -697,13 +697,13 @@ export const TTSScreen: React.FC = () => {
               }
             });
           }, 100);
-          
+
           setIsPlaying(true);
         } else {
           // Start fresh playback
           console.log('[TTSScreen] Starting fresh playback...');
           await stopSound(); // Clean up any existing sound
-          
+
           // iOS: Use NativeAudioModule
           if (Platform.OS === 'ios' && NativeAudioModule) {
             console.log('[TTSScreen] Using NativeAudioModule for iOS playback');
@@ -711,7 +711,7 @@ export const TTSScreen: React.FC = () => {
               const result = await NativeAudioModule.playAudio(audioFilePath);
               console.log('[TTSScreen] iOS playback started:', result);
               setIsPlaying(true);
-              
+
               // Start progress updates for iOS
               progressIntervalRef.current = setInterval(async () => {
                 try {
@@ -722,7 +722,7 @@ export const TTSScreen: React.FC = () => {
                   if (totalDuration > 0) {
                     setPlaybackProgress(currentSec / totalDuration);
                   }
-                  
+
                   // Check if playback finished
                   if (!status.isPlaying && currentSec >= totalDuration - 0.1) {
                     stopProgressUpdates();
@@ -735,7 +735,7 @@ export const TTSScreen: React.FC = () => {
                   // Ignore errors during polling
                 }
               }, 100);
-              
+
               return;
             } catch (error: any) {
               console.error('[TTSScreen] iOS playback error:', error);
@@ -743,7 +743,7 @@ export const TTSScreen: React.FC = () => {
               return;
             }
           }
-          
+
           const SoundClass = getSound();
           if (!SoundClass) {
             Alert.alert('Playback Error', 'Sound player not available');
@@ -755,11 +755,11 @@ export const TTSScreen: React.FC = () => {
               Alert.alert('Playback Error', `Failed to load audio: ${error.message}`);
               return;
             }
-            
+
             console.log('[TTSScreen] Sound loaded, duration:', sound.getDuration(), 'seconds');
             soundRef.current = sound;
             sound.setVolume(volume);
-            
+
             sound.play((success) => {
               if (success) {
                 console.log('[TTSScreen] Playback finished successfully');
@@ -771,7 +771,7 @@ export const TTSScreen: React.FC = () => {
               setCurrentTime(0);
               setPlaybackProgress(0);
             });
-            
+
             // Start progress updates
             progressIntervalRef.current = setInterval(() => {
               sound.getCurrentTime((seconds) => {
@@ -782,7 +782,7 @@ export const TTSScreen: React.FC = () => {
                 }
               });
             }, 100);
-            
+
             setIsPlaying(true);
             console.log('[TTSScreen] Playback started successfully');
           });

@@ -48,4 +48,3 @@ extension SDKComponentExtension on SDKComponent {
     }
   }
 }
-

@@ -14,4 +14,3 @@ export interface STTTranscriptionResult {
   language?: string;
   // Add all other properties from iOS STTTranscriptionResult
 }
-

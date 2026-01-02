@@ -158,4 +158,3 @@ enum SDKErrorType {
   timeout,
   serverError,
 }
-

@@ -38,4 +38,3 @@ export interface STTServiceProvider {
    */
   readonly name: string;
 }
-

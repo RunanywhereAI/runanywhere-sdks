@@ -61,4 +61,3 @@ export function getRoutingReasonDescription(reason: RoutingReason): string {
       return 'Model not available on device';
   }
 }
-

@@ -31,4 +31,3 @@ export enum QuantizationLevel {
   Int2 = 'int2',
   Mixed = 'mixed',
 }
-

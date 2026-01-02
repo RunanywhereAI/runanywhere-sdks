@@ -44,4 +44,3 @@ export class EmptyComponentParameters implements ComponentInitParameters {
     // No validation needed for empty parameters
   }
 }
-
