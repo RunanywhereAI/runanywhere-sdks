@@ -22,7 +22,7 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 //                     (default for end users and CI/CD)
 //
 // =============================================================================
-let testLocal = true
+let testLocal = true  // Local development mode: use local frameworks from Binaries/
 
 // Version constants for remote XCFrameworks (must be defined before package)
 let commonsVersion = "0.1.0"
@@ -217,24 +217,23 @@ func onnxBackendDependencies() -> [Target.Dependency] {
 //       RunAnywhereCore and onnxruntime always come from remote releases.
 func binaryTargets() -> [Target] {
     if testLocal {
-        // Local development mode: Only runanywhere-commons frameworks are local
-        // Everything else (LlamaCPP, onnxruntime) comes from remote releases
+        // Local development mode: All runanywhere-commons frameworks are local
+        // Only onnxruntime comes from remote releases
         return [
             // Local commons frameworks (built locally from runanywhere-commons)
             .binaryTarget(
                 name: "RACommonsBinary",
                 path: "Binaries/RACommons.xcframework"
             ),
+            // LlamaCPP backend (built locally from runanywhere-commons)
+            .binaryTarget(
+                name: "RABackendLlamaCPPBinary",
+                path: "Binaries/RABackendLlamaCPP.xcframework"
+            ),
             // ONNX backend wrapper (built locally from runanywhere-commons)
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 path: "Binaries/RABackendONNX.xcframework"
-            ),
-            // LlamaCPP backend from remote (from runanywhere-sdks releases)
-            .binaryTarget(
-                name: "RABackendLlamaCPPBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RABackendLlamaCPP-\(commonsVersion).zip",
-                checksum: "352774858112b97a41eacff2bf8c425b8ee3d135620af6673282777fc5626845"
             ),
             // ONNX Runtime from remote (from runanywhere-binaries releases)
             .binaryTarget(
