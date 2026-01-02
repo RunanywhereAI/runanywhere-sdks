@@ -234,25 +234,25 @@ func binaryTargets() -> [Target] {
             // Core commons library (~2MB)
             .binaryTarget(
                 name: "RACommonsBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v0.1.0/RACommons-0.1.0.zip",
-                checksum: "399d9ddcd9021943613daadf106248ba1a0bf6d3c7c41159f97cf4ef42441f9e"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RACommons-\(commonsVersion).zip",
+                checksum: "9a0149da28fe348f6b9843ccb98d75a0046180a4471b887702d54ca60150a3d9"
             ),
             // LlamaCPP backend (~30MB with Metal)
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v0.1.0/RABackendLlamaCPP-0.1.0.zip",
-                checksum: "e44d538762b7c82a0a6fd96f651007e29b2825536e7f5fdd6ed8ca8bc2959e5a"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RABackendLlamaCPP-\(commonsVersion).zip",
+                checksum: "352774858112b97a41eacff2bf8c425b8ee3d135620af6673282777fc5626845"
             ),
-            // ONNX backend wrapper (~400KB)
+            // ONNX backend wrapper (~12MB with Sherpa-ONNX)
             .binaryTarget(
                 name: "RABackendONNXBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v0.1.0/RABackendONNX-0.1.0.zip",
-                checksum: "766edf6086f119c1540cf3eaf7656194a682aa42128f23c2dd0299f01d2d516a"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RABackendONNX-\(commonsVersion).zip",
+                checksum: "af91e45667c1a1786f124daf2be8790d48fa055027b62e018765d954afed84a6"
             ),
             // ONNX Runtime (~48MB - from runanywhere-binaries/core releases)
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v0.1.1-dev.03aacf9/onnxruntime-ios-v0.1.1-dev.03aacf9.zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/onnxruntime-ios-v\(coreVersion).zip",
                 checksum: "3c71a9065616371bdbd095ba8d7a10d86f474dd09a825c11b62efd92c58a0e47"
             ),
         ]
