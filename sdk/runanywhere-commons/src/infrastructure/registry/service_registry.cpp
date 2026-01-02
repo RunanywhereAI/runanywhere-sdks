@@ -171,7 +171,7 @@ rac_result_t rac_service_create(rac_capability_t capability, const rac_service_r
             if (handle != nullptr) {
                 *out_handle = handle;
                 RAC_LOG_DEBUG("ServiceRegistry",
-                        ("Service created by provider: " + provider.name).c_str());
+                              ("Service created by provider: " + provider.name).c_str());
                 return RAC_SUCCESS;
             }
         }

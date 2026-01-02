@@ -17,8 +17,8 @@
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_energy.h"
 #include "rac/features/vad/rac_vad_service.h"
@@ -142,13 +142,13 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
     // 2. Warning for very low threshold (Swift lines 72-77)
     if (config->energy_threshold < 0.002f) {
         RAC_LOG_WARNING("VAD.Component",
-                "Energy threshold is very low (< 0.002) and may cause false positives");
+                        "Energy threshold is very low (< 0.002) and may cause false positives");
     }
 
     // 3. Warning for very high threshold (Swift lines 80-85)
     if (config->energy_threshold > 0.1f) {
         RAC_LOG_WARNING("VAD.Component",
-                "Energy threshold is very high (> 0.1) and may miss speech");
+                        "Energy threshold is very high (> 0.1) and may miss speech");
     }
 
     // 4. Sample rate validation (Swift lines 88-93)
@@ -455,11 +455,10 @@ extern "C" rac_result_t rac_vad_component_set_energy_threshold(rac_handle_t hand
     // Warning for edge cases
     if (threshold < 0.002f) {
         RAC_LOG_WARNING("VAD.Component",
-                "Threshold is very low (< 0.002) and may cause false positives");
+                        "Threshold is very low (< 0.002) and may cause false positives");
     }
     if (threshold > 0.1f) {
-        RAC_LOG_WARNING("VAD.Component",
-                "Threshold is very high (> 0.1) and may miss speech");
+        RAC_LOG_WARNING("VAD.Component", "Threshold is very high (> 0.1) and may miss speech");
     }
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);

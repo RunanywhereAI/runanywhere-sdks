@@ -17,8 +17,8 @@
 #include <vector>
 
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/features/vad/rac_vad_energy.h"
 
 // =============================================================================
@@ -94,7 +94,7 @@ static void update_voice_activity_state(rac_energy_vad* vad, bool has_voice) {
             // Extra validation during TTS to prevent false positives (mirrors Swift)
             if (vad->is_tts_active) {
                 RAC_LOG_WARNING("EnergyVAD",
-                        "Voice detected during TTS playback - likely feedback! Ignoring.");
+                                "Voice detected during TTS playback - likely feedback! Ignoring.");
                 return;
             }
 
@@ -164,7 +164,7 @@ static void handle_calibration_frame(rac_energy_vad* vad, float energy) {
         if (vad->energy_threshold > RAC_VAD_MAX_THRESHOLD) {
             vad->energy_threshold = RAC_VAD_MAX_THRESHOLD;
             RAC_LOG_WARNING("EnergyVAD",
-                    "Calibration detected high ambient noise. Capping threshold.");
+                            "Calibration detected high ambient noise. Capping threshold.");
         }
 
         RAC_LOG_INFO("EnergyVAD", "VAD Calibration Complete");

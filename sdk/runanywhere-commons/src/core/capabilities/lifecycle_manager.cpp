@@ -156,8 +156,7 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_id,
     if (mgr->state.load() == RAC_LIFECYCLE_STATE_LOADED && mgr->current_model_id == model_id &&
         mgr->current_service != nullptr) {
         // Mirrors Swift: logger.info("Model already loaded, skipping duplicate load")
-        RAC_LOG_INFO(mgr->logger_category.c_str(),
-                     "Model already loaded, skipping duplicate load");
+        RAC_LOG_INFO(mgr->logger_category.c_str(), "Model already loaded, skipping duplicate load");
         *out_service = mgr->current_service;
         return RAC_SUCCESS;
     }

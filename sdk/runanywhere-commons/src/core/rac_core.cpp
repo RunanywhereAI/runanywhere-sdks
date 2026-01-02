@@ -13,8 +13,8 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
@@ -160,7 +160,8 @@ rac_result_t rac_configure_logging(rac_environment_t environment) {
             rac_logger_set_stderr_always(RAC_FALSE);
             rac_logger_set_min_level(RAC_LOG_WARNING);
             // Note: This log will only go to Swift, not stderr
-            RAC_LOG_INFO("RAC.Core", "Logging configured for production: stderr OFF, level=WARNING");
+            RAC_LOG_INFO("RAC.Core",
+                         "Logging configured for production: stderr OFF, level=WARNING");
             break;
     }
 
