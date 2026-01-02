@@ -12,11 +12,14 @@
 #define CRACOMMONS_H
 
 // =============================================================================
-// CORE - Types, Error, Platform, State
+// CORE - Types, Error, Logging, Platform, State
 // =============================================================================
 
 #include "rac_types.h"
 #include "rac_error.h"
+#include "rac_structured_error.h"
+#include "rac_log.h"
+#include "rac_logger.h"
 #include "rac_core.h"
 #include "rac_platform_adapter.h"
 #include "rac_component_types.h"
