@@ -20,8 +20,8 @@
 #include <vector>
 
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/infrastructure/download/rac_download.h"
 
 // =============================================================================

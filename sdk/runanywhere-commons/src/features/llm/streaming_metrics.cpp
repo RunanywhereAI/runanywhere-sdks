@@ -16,8 +16,8 @@
 #include <string>
 
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/features/llm/rac_llm_metrics.h"
 
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp

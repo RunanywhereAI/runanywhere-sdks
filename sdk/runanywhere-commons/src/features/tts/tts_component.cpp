@@ -18,8 +18,8 @@
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_structured_error.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_service.h"
 

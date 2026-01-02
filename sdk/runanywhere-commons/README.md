@@ -58,12 +58,17 @@ Shared C/C++ layer providing the core module/service registry, event system, and
 
 ## XCFrameworks
 
-| Framework | Size Target | Capabilities |
-|-----------|-------------|--------------|
-| RACommons | ~2 MB | Core registries, events, platform adapter |
-| RABackendLlamaCPP | ~15-25 MB | LLM text generation |
-| RABackendONNX | ~50-70 MB | STT, TTS, VAD |
-| RABackendWhisperCPP | ~8-15 MB | STT (GGML models) |
+| Framework | Size | Capabilities | Dependencies |
+|-----------|------|--------------|--------------|
+| RACommons | ~1-2 MB | Core registries, events, platform adapter | None |
+| RABackendLlamaCPP | ~30 MB | LLM text generation (GGUF models) | RACommons |
+| RABackendONNX | ~400 KB | STT, TTS, VAD (wrapper) | RACommons, onnxruntime.xcframework |
+| onnxruntime.xcframework | ~48 MB | ONNX Runtime engine | (external) |
+
+**Note:** `RABackendONNX` is a thin wrapper around Sherpa-ONNX. It requires `onnxruntime.xcframework` to be linked separately because:
+- ONNX Runtime is large (~48 MB) and shouldn't bloat other backends
+- Can be updated independently
+- Different licensing (MIT)
 
 ## Building
 
@@ -73,18 +78,50 @@ Shared C/C++ layer providing the core module/service registry, event system, and
 - CMake 3.16+
 - Ninja (optional but recommended)
 
+### Getting runanywhere-core
+
+`runanywhere-commons` depends on `runanywhere-core` for low-level ML inference.
+
+**Option 1: Download from runanywhere-binaries (CI/CD and remote builds)**
+```bash
+# Downloads latest version
+./scripts/download-core.sh
+
+# Or specify a version
+./scripts/download-core.sh 1.0.0
+```
+
+This downloads the source to `third_party/runanywhere-core/`.
+
+**Option 2: Local monorepo (development)**
+
+If you have the monorepo structure:
+```
+runanywhere-all/
+├── runanywhere-core/
+└── sdks/sdk/runanywhere-commons/
+```
+
+CMake will automatically find it at `../../../runanywhere-core`.
+
 ### Build iOS XCFrameworks
 
 ```bash
 cd sdks/sdk/runanywhere-commons
+
+# If using downloaded core (not in monorepo)
+./scripts/download-core.sh
+
+# Build XCFrameworks
 ./scripts/build-ios.sh
 ```
 
 Outputs to `dist/`:
-- `RACommons.xcframework`
-- `RABackendLlamaCPP.xcframework`
-- `RABackendONNX.xcframework`
-- `RABackendWhisperCPP.xcframework`
+- `RACommons.xcframework` (~1-2 MB)
+- `RABackendLlamaCPP.xcframework` (~30 MB)
+- `RABackendONNX.xcframework` (~400 KB)
+
+**Note:** `RABackendONNX` requires `onnxruntime.xcframework` (~48 MB) to be linked separately.
 
 ### Build Android Libraries
 

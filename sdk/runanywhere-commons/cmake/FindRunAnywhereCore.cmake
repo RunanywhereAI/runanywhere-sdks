@@ -6,14 +6,40 @@
 #   RUNANYWHERE_CORE_DIR - Path to runanywhere-core root directory
 #   RUNANYWHERE_CORE_INCLUDE_DIRS - Include directories
 #
+# Search order:
+#   1. RUNANYWHERE_CORE_DIR (if provided via cmake -D or cache)
+#   2. third_party/runanywhere-core (downloaded via download-core.sh)
+#   3. ../../../runanywhere-core (local monorepo layout)
+#
 # Usage:
+#   # Option 1: Let it auto-detect
+#   include(FindRunAnywhereCore)
+#
+#   # Option 2: Specify path
 #   set(RUNANYWHERE_CORE_DIR "/path/to/runanywhere-core")
 #   include(FindRunAnywhereCore)
+#
+#   # Option 3: Via cmake command line
+#   cmake -DRUNANYWHERE_CORE_DIR=/path/to/core ..
 
-# Use provided path or default
+# Search for runanywhere-core in multiple locations
 if(NOT DEFINED RUNANYWHERE_CORE_DIR)
-    # Default path assumes commons is at sdks/sdk/runanywhere-commons
-    set(RUNANYWHERE_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../runanywhere-core")
+    # Try downloaded location first (third_party/runanywhere-core)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/runanywhere-core/CMakeLists.txt")
+        set(RUNANYWHERE_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/runanywhere-core")
+        message(STATUS "Found runanywhere-core in third_party/ (downloaded)")
+    # Try local monorepo layout
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../runanywhere-core/CMakeLists.txt")
+        set(RUNANYWHERE_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../runanywhere-core")
+        message(STATUS "Found runanywhere-core in parent directory (monorepo)")
+    else()
+        message(WARNING "runanywhere-core not found.")
+        message(WARNING "Please either:")
+        message(WARNING "  1. Run: ./scripts/download-core.sh")
+        message(WARNING "  2. Set -DRUNANYWHERE_CORE_DIR=/path/to/runanywhere-core")
+        set(RUNANYWHERE_CORE_FOUND FALSE)
+        return()
+    endif()
 endif()
 
 # Normalize path
