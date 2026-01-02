@@ -123,6 +123,13 @@ jobs:
           echo "=== third_party/ contents ==="
           ls -la third_party/
 
+      - name: Setup Development Config
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          # Create development_config.cpp from template (gitignored, contains placeholders)
+          cp src/infrastructure/network/development_config.cpp.template \
+             src/infrastructure/network/development_config.cpp
+
       - name: Build iOS XCFrameworks
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
