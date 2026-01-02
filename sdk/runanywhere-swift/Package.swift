@@ -14,9 +14,15 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 // =============================================================================
 // BINARY TARGET CONFIGURATION
 // =============================================================================
-// Set to `true` to use local XCFrameworks from Binaries/ directory (for local development/testing)
-// Set to `false` to use remote XCFrameworks from GitHub releases (default for production use)
-let testLocal = false  // Set to false to test remote XCFrameworks from GitHub releases
+//
+// testLocal = true  → Use local XCFrameworks from Binaries/ directory
+//                     (for local development when building runanywhere-commons)
+//
+// testLocal = false → Download XCFrameworks from GitHub releases (PRODUCTION)
+//                     (default for end users and CI/CD)
+//
+// =============================================================================
+let testLocal = false
 // =============================================================================
 
 let package = Package(
@@ -190,6 +196,10 @@ let package = Package(
 // =============================================================================
 // BINARY TARGET SELECTION
 // =============================================================================
+// Version constants for remote XCFrameworks
+let commonsVersion = "0.1.0"
+let coreVersion = "0.1.1-dev.03aacf9"
+
 // This function returns the appropriate binary targets based on testLocal setting
 func binaryTargets() -> [Target] {
     if testLocal {
