@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Pre-commit hook script to check for TODOs without GitHub issue references
 
