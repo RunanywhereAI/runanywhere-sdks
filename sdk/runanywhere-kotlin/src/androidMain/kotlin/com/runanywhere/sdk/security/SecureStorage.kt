@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,7 +42,7 @@ class AndroidSecureStorage private constructor(
         fun create(identifier: String): AndroidSecureStorage {
             val appContext =
                 context
-                    ?: throw SDKError.SecurityError("AndroidSecureStorage not initialized. Call initialize(context) first.")
+                    ?: throw SDKError.storage("AndroidSecureStorage not initialized. Call initialize(context) first.")
 
             // Return cached instance if available for the same identifier
             cachedStorage?.let { cached ->
@@ -73,7 +73,7 @@ class AndroidSecureStorage private constructor(
                 cachedStorage = storage
                 return storage
             } catch (e: Exception) {
-                throw SDKError.SecurityError("Failed to create secure storage: ${e.message}")
+                throw SDKError.storage("Failed to create secure storage: ${e.message}")
             }
         }
 
@@ -100,7 +100,7 @@ class AndroidSecureStorage private constructor(
             logger.debug("Stored secure string for key: $key")
         } catch (e: Exception) {
             logger.error("Failed to store secure string for key: $key", e)
-            throw SDKError.SecurityError("Failed to store secure data: ${e.message}")
+            throw SDKError.storage("Failed to store secure data: ${e.message}")
         }
     }
 
@@ -114,7 +114,7 @@ class AndroidSecureStorage private constructor(
                 value
             } catch (e: Exception) {
                 logger.error("Failed to retrieve secure string for key: $key", e)
-                throw SDKError.SecurityError("Failed to retrieve secure data: ${e.message}")
+                throw SDKError.storage("Failed to retrieve secure data: ${e.message}")
             }
         }
 
@@ -132,7 +132,7 @@ class AndroidSecureStorage private constructor(
             logger.debug("Stored secure data for key: $key (${data.size} bytes)")
         } catch (e: Exception) {
             logger.error("Failed to store secure data for key: $key", e)
-            throw SDKError.SecurityError("Failed to store secure data: ${e.message}")
+            throw SDKError.storage("Failed to store secure data: ${e.message}")
         }
     }
 
@@ -149,7 +149,7 @@ class AndroidSecureStorage private constructor(
                 }
             } catch (e: Exception) {
                 logger.error("Failed to retrieve secure data for key: $key", e)
-                throw SDKError.SecurityError("Failed to retrieve secure data: ${e.message}")
+                throw SDKError.storage("Failed to retrieve secure data: ${e.message}")
             }
         }
 
@@ -164,7 +164,7 @@ class AndroidSecureStorage private constructor(
                 logger.debug("Removed secure data for key: $key")
             } catch (e: Exception) {
                 logger.error("Failed to remove secure data for key: $key", e)
-                throw SDKError.SecurityError("Failed to remove secure data: ${e.message}")
+                throw SDKError.storage("Failed to remove secure data: ${e.message}")
             }
         }
 
@@ -185,7 +185,7 @@ class AndroidSecureStorage private constructor(
                 logger.info("Cleared all secure data")
             } catch (e: Exception) {
                 logger.error("Failed to clear all secure data", e)
-                throw SDKError.SecurityError("Failed to clear secure data: ${e.message}")
+                throw SDKError.storage("Failed to clear secure data: ${e.message}")
             }
         }
 
