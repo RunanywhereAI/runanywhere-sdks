@@ -2,15 +2,16 @@
 //  SDKEvent.swift
 //  RunAnywhere SDK
 //
-//  Single unified event protocol for the entire SDK.
-//  Events declare their destination and the router handles the rest.
+//  Minimal event protocol for SDK events.
+//  All event logic and definitions are in C++ (rac_analytics_events.h).
+//  This Swift protocol only provides the interface for bridged events.
 //
 
 import Foundation
 
 // MARK: - Event Destination
 
-/// Where an event should be routed
+/// Where an event should be routed (mirrors C++ rac_event_destination_t)
 public enum EventDestination: Sendable {
     /// Only to public EventBus (app developers)
     case publicOnly
@@ -22,7 +23,7 @@ public enum EventDestination: Sendable {
 
 // MARK: - Event Category
 
-/// Event categories for filtering/grouping
+/// Event categories for filtering/grouping (mirrors C++ categories)
 public enum EventCategory: String, Sendable {
     case sdk
     case model
@@ -38,23 +39,15 @@ public enum EventCategory: String, Sendable {
 
 // MARK: - SDK Event Protocol
 
-/// Single protocol for ALL SDK events.
+/// Minimal protocol for SDK events.
 ///
-/// Every event in the SDK conforms to this protocol. The `destination` property
-/// tells the router where to send the event:
-/// - `.all` (default) → EventBus + Analytics
-/// - `.publicOnly` → EventBus only
-/// - `.analyticsOnly` → Analytics only
-///
-/// Usage:
-/// ```swift
-/// EventPublisher.shared.track(LLMEvent.generationCompleted(...))
-/// ```
+/// Events originate from C++ and are bridged to Swift via EventBridge.
+/// App developers can subscribe to events via EventPublisher or EventBus.
 public protocol SDKEvent: Sendable {
     /// Unique identifier for this event instance
     var id: String { get }
 
-    /// Event type string (used for analytics categorization)
+    /// Event type string (from C++ event types)
     var type: String { get }
 
     /// Category for filtering/routing
@@ -69,7 +62,7 @@ public protocol SDKEvent: Sendable {
     /// Where to route this event
     var destination: EventDestination { get }
 
-    /// Event properties as key-value pairs (for analytics serialization)
+    /// Event properties as key-value pairs
     var properties: [String: String] { get }
 }
 

@@ -46,23 +46,25 @@ class ModelListViewModel: ObservableObject {
 
     /// Handle SDK events to update model state
     private func handleSDKEvent(_ event: any SDKEvent) {
-        // Check for LLM model load/unload events
-        if let llmEvent = event as? LLMEvent {
-            switch llmEvent {
-            case .modelLoadCompleted(let modelId, _, _, _):
-                // Find the matching model and set as current
-                if let matchingModel = availableModels.first(where: { $0.id == modelId }) {
-                    currentModel = matchingModel
-                    print("✅ ModelListViewModel: Model loaded: \(matchingModel.name)")
-                }
-            case .modelUnloaded(let modelId):
-                if currentModel?.id == modelId {
-                    currentModel = nil
-                    print("ℹ️ ModelListViewModel: Model unloaded: \(modelId)")
-                }
-            default:
-                break
+        // Events now come from C++ via generic BridgedEvent
+        guard event.category == .llm else { return }
+
+        let modelId = event.properties["model_id"] ?? ""
+
+        switch event.type {
+        case "llm_model_load_completed":
+            // Find the matching model and set as current
+            if let matchingModel = availableModels.first(where: { $0.id == modelId }) {
+                currentModel = matchingModel
+                print("✅ ModelListViewModel: Model loaded: \(matchingModel.name)")
             }
+        case "llm_model_unloaded":
+            if currentModel?.id == modelId {
+                currentModel = nil
+                print("ℹ️ ModelListViewModel: Model unloaded: \(modelId)")
+            }
+        default:
+            break
         }
     }
 
@@ -77,7 +79,7 @@ class ModelListViewModel: ObservableObject {
             // Get all models from SDK registry
             // This now includes:
             // 1. Models from remote configuration (if available)
-            // 2. Models from framework adapters (like WhisperKit)
+            // 2. Models from framework adapters
             // 3. Models from local storage
             // 4. User-added models
             let allModels = try await RunAnywhere.availableModels()
@@ -87,7 +89,7 @@ class ModelListViewModel: ObservableObject {
 
             // Filter out Foundation Models for older iOS versions
             if #unavailable(iOS 26.0) {
-                filteredModels = allModels.filter { $0.preferredFramework != .foundationModels }
+                filteredModels = allModels.filter { $0.framework != .foundationModels }
                 print("iOS < 26 - Foundation Models not available")
             }
 
@@ -95,7 +97,7 @@ class ModelListViewModel: ObservableObject {
             print("Loaded \(availableModels.count) models from registry")
 
             for model in availableModels {
-                print("  - \(model.name) (\(model.preferredFramework?.displayName ?? "Unknown"))")
+                print("  - \(model.name) (\(model.framework.displayName))")
             }
 
             // Sync currentModel with SDK's current model state
@@ -147,17 +149,11 @@ class ModelListViewModel: ObservableObject {
     }
 
     func downloadModel(_ model: ModelInfo) async throws {
-        // Get the model info and use the Download service
-        let allModels = try await RunAnywhere.availableModels()
-        guard let modelInfo = allModels.first(where: { $0.id == model.id }) else {
-            throw RunAnywhereError.modelNotFound(model.id)
-        }
-
-        // Use the SDK's download mechanism via the Download class
-        let task = try await Download.shared.downloadModel(modelInfo)
+        // Use the SDK's public download API
+        let progressStream = try await RunAnywhere.downloadModel(model.id)
 
         // Wait for completion
-        for await progress in task.progress {
+        for await progress in progressStream {
             print("Download progress: \(Int(progress.overallProgress * 100))%")
             if progress.stage == .completed {
                 break
@@ -169,10 +165,7 @@ class ModelListViewModel: ObservableObject {
     }
 
     func deleteModel(_ model: ModelInfo) async throws {
-        guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
-            throw RunAnywhereError.modelNotFound("Model has no associated framework")
-        }
-        try await RunAnywhere.deleteStoredModel(model.id, framework: framework)
+        try await RunAnywhere.deleteStoredModel(model.id, framework: model.framework)
         // Reload models after deletion
         await loadModelsFromRegistry()
     }

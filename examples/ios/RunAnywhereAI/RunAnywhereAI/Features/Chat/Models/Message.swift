@@ -54,6 +54,6 @@ public struct MessageModelInfo: Codable, Sendable {
     public init(from modelInfo: ModelInfo) {
         self.modelId = modelInfo.id
         self.modelName = modelInfo.name
-        self.framework = modelInfo.compatibleFrameworks.first?.rawValue ?? "unknown"
+        self.framework = modelInfo.framework.rawValue
     }
 }

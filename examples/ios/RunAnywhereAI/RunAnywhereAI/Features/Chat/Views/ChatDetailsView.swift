@@ -12,7 +12,10 @@ import SwiftUI
 struct ChatDetailsView: View {
     let messages: [Message]
     let conversation: Conversation?
-    @Environment(\.dismiss) private var dismiss
+
+    @Environment(\.dismiss)
+    private var dismiss
+
     @State private var selectedTab = 0
 
     var body: some View {
@@ -225,7 +228,7 @@ struct ChatOverviewTab: View {
     }
 
     private var totalTokens: Int {
-        return analyticsMessages.reduce(0) { $0 + $1.inputTokens + $1.outputTokens }
+        analyticsMessages.reduce(0) { $0 + $1.inputTokens + $1.outputTokens }
     }
 
     private var completionRate: Double {
@@ -410,38 +413,41 @@ struct PerformanceTab: View {
                         let modelGroups = Dictionary(grouping: analyticsMessages) { $0.modelName }
 
                         ForEach(modelGroups.keys.sorted(), id: \.self) { modelName in
-                            let modelMessages = modelGroups[modelName]!
-                            let avgSpeed = modelMessages.map { $0.averageTokensPerSecond }.reduce(0, +) / Double(modelMessages.count)
-                            let avgTime = modelMessages.map { $0.totalGenerationTime }.reduce(0, +) / Double(modelMessages.count)
+                            if let modelMessages = modelGroups[modelName] {
+                                let totalSpeed = modelMessages.map { $0.averageTokensPerSecond }.reduce(0, +)
+                                let avgSpeed = totalSpeed / Double(modelMessages.count)
+                                let totalTime = modelMessages.map { $0.totalGenerationTime }.reduce(0, +)
+                                let avgTime = totalTime / Double(modelMessages.count)
 
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(modelName)
-                                        .font(AppTypography.subheadline)
-                                        .fontWeight(.medium)
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(modelName)
+                                            .font(AppTypography.subheadline)
+                                            .fontWeight(.medium)
 
-                                    Text("\(modelMessages.count) message\(modelMessages.count == 1 ? "" : "s")")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        Text("\(modelMessages.count) message\(modelMessages.count == 1 ? "" : "s")")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    VStack(alignment: .trailing, spacing: 4) {
+                                        Text(String(format: "%.1fs avg", avgTime))
+                                            .font(.caption)
+                                            .foregroundColor(.green)
+
+                                        Text("\(Int(avgSpeed)) tok/s")
+                                            .font(.caption)
+                                            .foregroundColor(AppColors.primaryAccent)
+                                    }
                                 }
-
-                                Spacer()
-
-                                VStack(alignment: .trailing, spacing: 4) {
-                                    Text(String(format: "%.1fs avg", avgTime))
-                                        .font(.caption)
-                                        .foregroundColor(.green)
-
-                                    Text("\(Int(avgSpeed)) tok/s")
-                                        .font(.caption)
-                                        .foregroundColor(AppColors.primaryAccent)
-                                }
+                                .padding(AppSpacing.large)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(AppColors.backgroundGray6)
+                                )
                             }
-                            .padding(AppSpacing.large)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(AppColors.backgroundGray6)
-                            )
                         }
                     }
 
@@ -452,13 +458,16 @@ struct PerformanceTab: View {
                                 .fontWeight(.semibold)
 
                             let thinkingMessages = analyticsMessages.filter { $0.wasThinkingMode }
-                            let thinkingPercentage = Double(thinkingMessages.count) / Double(analyticsMessages.count) * 100
+                            let thinkingRatio = Double(thinkingMessages.count) / Double(analyticsMessages.count)
+                            let thinkingPercentage = thinkingRatio * 100
 
                             HStack {
                                 Image(systemName: "lightbulb.min")
                                     .foregroundColor(.purple)
 
-                                Text("Used in \(thinkingMessages.count) messages (\(String(format: "%.0f", thinkingPercentage))%)")
+                                let percentageText = String(format: "%.0f", thinkingPercentage)
+                                let messageText = "Used in \(thinkingMessages.count) messages (\(percentageText)%)"
+                                Text(messageText)
                                     .font(AppTypography.subheadline)
                             }
                             .padding(AppSpacing.large)

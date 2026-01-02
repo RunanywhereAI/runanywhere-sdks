@@ -13,7 +13,6 @@ import Combine
 
 @MainActor
 class SettingsViewModel: ObservableObject {
-
     // MARK: - Published Properties
 
     // Generation Settings
@@ -133,7 +132,7 @@ class SettingsViewModel: ObservableObject {
 
     /// Get current generation configuration for SDK usage
     func getGenerationConfiguration() -> GenerationConfiguration {
-        return GenerationConfiguration(
+        GenerationConfiguration(
             temperature: temperature,
             maxTokens: maxTokens
         )
@@ -205,7 +204,7 @@ class SettingsViewModel: ObservableObject {
 
             totalStorageSize = storageInfo.appStorage.totalSize
             availableSpace = storageInfo.deviceStorage.freeSpace
-            modelStorageSize = storageInfo.modelStorage.totalSize
+            modelStorageSize = storageInfo.totalModelsSize
             storedModels = storageInfo.storedModels
 
             print("Settings: Loaded storage data - Total: \(totalStorageSize), Available: \(availableSpace)")
@@ -263,12 +262,12 @@ class SettingsViewModel: ObservableObject {
 
     /// Format bytes to human-readable string
     func formatBytes(_ bytes: Int64) -> String {
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 
     /// Format bytes to memory string
     func formatMemory(_ bytes: Int64) -> String {
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory)
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory)
     }
 
     /// Check if storage data is available
