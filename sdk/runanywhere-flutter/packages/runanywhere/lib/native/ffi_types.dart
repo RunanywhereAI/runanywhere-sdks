@@ -11,7 +11,7 @@ import 'package:ffi/ffi.dart';
 /// =============================================================================
 
 // =============================================================================
-// Result Codes (enum ra_result_code)
+// Result Codes (enum ra_result_code / rac_result_code)
 // =============================================================================
 
 abstract class RaResultCode {
@@ -57,6 +57,10 @@ abstract class RaResultCode {
     }
   }
 }
+
+/// Alias for RaResultCode (used by DartBridge* files)
+/// Maps to rac_result_code in C++ commons
+typedef RacResultCode = RaResultCode;
 
 // =============================================================================
 // Device Types (enum ra_device_type)
@@ -654,3 +658,106 @@ typedef RaExtractArchiveDart = int Function(
   Pointer<Utf8> archivePath,
   Pointer<Utf8> destDir,
 );
+
+// =============================================================================
+// Platform Adapter Types (matching rac_platform_adapter.h)
+// =============================================================================
+
+/// Callback type signatures for platform adapter
+typedef RacLogCallbackNative = Void Function(
+  Int32 level,
+  Pointer<Utf8> category,
+  Pointer<Utf8> message,
+  Pointer<Void> userData,
+);
+
+typedef RacFileExistsCallbackNative = Int32 Function(
+  Pointer<Utf8> path,
+  Pointer<Void> userData,
+);
+
+typedef RacFileReadCallbackNative = Int32 Function(
+  Pointer<Utf8> path,
+  Pointer<Pointer<Void>> outData,
+  Pointer<IntPtr> outSize,
+  Pointer<Void> userData,
+);
+
+typedef RacFileWriteCallbackNative = Int32 Function(
+  Pointer<Utf8> path,
+  Pointer<Void> data,
+  IntPtr size,
+  Pointer<Void> userData,
+);
+
+typedef RacFileDeleteCallbackNative = Int32 Function(
+  Pointer<Utf8> path,
+  Pointer<Void> userData,
+);
+
+typedef RacSecureGetCallbackNative = Int32 Function(
+  Pointer<Utf8> key,
+  Pointer<Pointer<Utf8>> outValue,
+  Pointer<Void> userData,
+);
+
+typedef RacSecureSetCallbackNative = Int32 Function(
+  Pointer<Utf8> key,
+  Pointer<Utf8> value,
+  Pointer<Void> userData,
+);
+
+typedef RacSecureDeleteCallbackNative = Int32 Function(
+  Pointer<Utf8> key,
+  Pointer<Void> userData,
+);
+
+typedef RacNowMsCallbackNative = Int64 Function(
+  Pointer<Void> userData,
+);
+
+typedef RacGetMemoryInfoCallbackNative = Int32 Function(
+  Pointer<Void> outInfo,
+  Pointer<Void> userData,
+);
+
+typedef RacTrackErrorCallbackNative = Void Function(
+  Pointer<Utf8> errorJson,
+  Pointer<Void> userData,
+);
+
+/// Platform adapter struct matching rac_platform_adapter_t
+base class RacPlatformAdapter extends Struct {
+  // File System Operations
+  external Pointer<NativeFunction<RacFileExistsCallbackNative>> fileExists;
+  external Pointer<NativeFunction<RacFileReadCallbackNative>> fileRead;
+  external Pointer<NativeFunction<RacFileWriteCallbackNative>> fileWrite;
+  external Pointer<NativeFunction<RacFileDeleteCallbackNative>> fileDelete;
+
+  // Secure Storage
+  external Pointer<NativeFunction<RacSecureGetCallbackNative>> secureGet;
+  external Pointer<NativeFunction<RacSecureSetCallbackNative>> secureSet;
+  external Pointer<NativeFunction<RacSecureDeleteCallbackNative>> secureDelete;
+
+  // Logging
+  external Pointer<NativeFunction<RacLogCallbackNative>> log;
+
+  // Error Tracking
+  external Pointer<NativeFunction<RacTrackErrorCallbackNative>> trackError;
+
+  // Clock
+  external Pointer<NativeFunction<RacNowMsCallbackNative>> nowMs;
+
+  // Memory Info
+  external Pointer<NativeFunction<RacGetMemoryInfoCallbackNative>> getMemoryInfo;
+
+  // HTTP Download (optional - can be nullptr)
+  external Pointer<Void> httpDownload;
+  external Pointer<Void> httpDownloadCancel;
+
+  // Archive Extraction (optional - can be nullptr)
+  external Pointer<Void> extractArchive;
+
+  // User data
+  external Pointer<Void> userData;
+}

@@ -1,19 +1,28 @@
+/// Simple Energy VAD
+///
+/// Simple energy-based Voice Activity Detection.
+/// Based on iOS WhisperKit's EnergyVAD implementation.
+library simple_energy_vad;
+
 import 'dart:async';
 import 'dart:math' as math;
-// VADService and SpeechActivityEvent are exported from module_registry (sourced from vad_service.dart)
+
 import 'package:runanywhere/core/module_registry.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+
+/// Speech activity events
+enum SpeechActivityEvent {
+  started,
+  ended,
+}
 
 /// Simple energy-based Voice Activity Detection
 /// Based on iOS WhisperKit's EnergyVAD implementation but simplified for real-time audio processing
 class SimpleEnergyVAD implements VADService {
-  final SDKLogger _logger = SDKLogger(category: 'SimpleEnergyVAD');
+  final SDKLogger _logger = SDKLogger('SimpleEnergyVAD');
 
   /// Energy threshold for voice activity detection (0.0 to 1.0)
-  /// Values above this threshold indicate voice activity
-  @override
-  double energyThreshold =
-      0.005; // Even lower threshold for better short phrase detection
+  double energyThreshold = 0.005;
 
   /// Base threshold before any adjustments
   double _baseEnergyThreshold = 0.005;
@@ -22,22 +31,18 @@ class SimpleEnergyVAD implements VADService {
   double _ttsThresholdMultiplier = 3.0;
 
   /// Sample rate of the audio (typically 16000 Hz)
-  @override
   final int sampleRate;
 
   /// Length of each analysis frame in samples
   final int frameLengthSamples;
 
   /// Frame length in seconds
-  @override
   double get frameLength => frameLengthSamples / sampleRate;
 
   /// Speech activity callback
-  @override
   void Function(SpeechActivityEvent)? onSpeechActivity;
 
   /// Optional callback for processed audio buffers
-  @override
   void Function(List<int>)? onAudioBuffer;
 
   // State tracking
@@ -45,33 +50,28 @@ class SimpleEnergyVAD implements VADService {
   bool _isCurrentlySpeaking = false;
   int _consecutiveSilentFrames = 0;
   int _consecutiveVoiceFrames = 0;
-  bool _isPaused = false; // Track paused state
-  bool _isTTSActive = false; // Track if TTS is currently playing
+  bool _isPaused = false;
+  bool _isTTSActive = false;
 
-  // Hysteresis parameters to prevent rapid on/off switching
-  final int _voiceStartThreshold =
-      1; // frames of voice to start - reduced to 1 frame for better short phrase detection
-  final int _voiceEndThreshold =
-      8; // frames of silence to end (0.8 seconds at 100ms frames) - shorter for quicker responsiveness
-
-  // Enhanced hysteresis for TTS mode
-  final int _ttsVoiceStartThreshold =
-      10; // Much more frames needed during TTS to prevent feedback
-  final int _ttsVoiceEndThreshold = 5; // Quicker end during TTS
+  // Hysteresis parameters
+  final int _voiceStartThreshold = 1;
+  final int _voiceEndThreshold = 8;
+  final int _ttsVoiceStartThreshold = 10;
+  final int _ttsVoiceEndThreshold = 5;
 
   // Calibration properties
   bool _isCalibrating = false;
   final List<double> _calibrationSamples = [];
   int _calibrationFrameCount = 0;
-  final int _calibrationFramesNeeded = 20; // ~2 seconds at 100ms frames
+  final int _calibrationFramesNeeded = 20;
   double _ambientNoiseLevel = 0.0;
-  double _calibrationMultiplier =
-      2.5; // Threshold = ambientNoise * multiplier - higher to reduce false positives
+  double _calibrationMultiplier = 2.5;
 
   // Debug statistics
   final List<double> _recentEnergyValues = [];
   final int _maxRecentValues = 50;
   int _debugFrameCount = 0;
+  double _lastEnergyLevel = 0.0;
 
   /// Initialize the VAD with specified parameters
   SimpleEnergyVAD({
@@ -84,27 +84,21 @@ class SimpleEnergyVAD implements VADService {
     );
   }
 
-  // VADService interface implementation
   @override
   Future<void> initialize({String? modelPath}) async {
     start();
-    // Start automatic calibration
     await startCalibration();
   }
 
   @override
   bool get isReady => _isActive;
 
-  // Track most recent energy level for confidence calculation
-  double _lastEnergyLevel = 0.0;
-
   @override
-  Future<VADResult> detect({required List<int> audioData}) async {
+  Future<VADResult> process(List<int> audioData) async {
     processAudioBuffer(audioData);
-    // Calculate confidence based on energy level relative to threshold
     final confidence = _calculateConfidence(_lastEnergyLevel);
     return VADResult(
-      hasSpeech: _isCurrentlySpeaking,
+      isSpeech: _isCurrentlySpeaking,
       confidence: confidence,
     );
   }
@@ -117,11 +111,9 @@ class SimpleEnergyVAD implements VADService {
   }
 
   /// Current speech activity state
-  @override
   bool get isSpeechActive => _isCurrentlySpeaking;
 
   /// Reset the VAD state
-  @override
   void reset() {
     stop();
     _isCurrentlySpeaking = false;
@@ -130,7 +122,6 @@ class SimpleEnergyVAD implements VADService {
   }
 
   /// Start voice activity detection
-  @override
   void start() {
     if (_isActive) return;
 
@@ -143,11 +134,9 @@ class SimpleEnergyVAD implements VADService {
   }
 
   /// Stop voice activity detection
-  @override
   void stop() {
     if (!_isActive) return;
 
-    // If currently speaking, send end event
     if (_isCurrentlySpeaking) {
       _isCurrentlySpeaking = false;
       _logger.info('🎙️ VAD: SPEECH ENDED (stopped)');
@@ -162,45 +151,26 @@ class SimpleEnergyVAD implements VADService {
   }
 
   /// Process an audio buffer for voice activity detection
-  @override
   void processAudioBuffer(List<int> buffer) {
     if (!_isActive) return;
-
-    // Complete audio blocking during TTS - don't process at all
-    if (_isTTSActive) {
-      return;
-    }
-
-    if (_isPaused) {
-      return;
-    }
-
+    if (_isTTSActive) return;
+    if (_isPaused) return;
     if (buffer.isEmpty) return;
 
-    // Convert 16-bit PCM samples to Float32
     final audioData = _convertPCMToFloat(buffer);
-
-    // Calculate energy of the entire buffer
     final energy = _calculateAverageEnergy(audioData);
     _lastEnergyLevel = energy;
 
-    // Update debug statistics
     _updateDebugStatistics(energy);
 
-    // Handle calibration if active
     if (_isCalibrating) {
       _handleCalibrationFrame(energy);
-      return; // Don't process voice activity during calibration
+      return;
     }
 
     final hasVoice = energy > energyThreshold;
 
-    // Enhanced logging with more context
-    final percentAboveThreshold =
-        ((energy - energyThreshold) / energyThreshold) * 100;
-
     if (_debugFrameCount % 10 == 0) {
-      // Log every 10th frame to reduce noise
       final avgRecent = _recentEnergyValues.isEmpty
           ? 0.0
           : _recentEnergyValues.reduce((a, b) => a + b) /
@@ -208,73 +178,22 @@ class SimpleEnergyVAD implements VADService {
       final maxRecent = _recentEnergyValues.isEmpty
           ? 0.0
           : _recentEnergyValues.reduce(math.max);
-      final minRecent = _recentEnergyValues.isEmpty
-          ? 0.0
-          : _recentEnergyValues.reduce(math.min);
 
       _logger.info(
         '📊 VAD Stats - Current: ${energy.toStringAsFixed(6)} | '
         'Threshold: ${energyThreshold.toStringAsFixed(6)} | '
         'Voice: ${hasVoice ? "✅" : "❌"} | '
-        '%Above: ${percentAboveThreshold.toStringAsFixed(1)}% | '
         'Avg: ${avgRecent.toStringAsFixed(6)} | '
-        'Range: [${minRecent.toStringAsFixed(6)}-${maxRecent.toStringAsFixed(6)}]',
+        'Max: ${maxRecent.toStringAsFixed(6)}',
       );
     }
     _debugFrameCount++;
 
-    // Update state based on voice detection
     _updateVoiceActivityState(hasVoice);
-
-    // Call audio buffer callback if provided
     onAudioBuffer?.call(buffer);
   }
 
-  /// Process a raw audio array for voice activity detection
-  @override
-  bool processAudioData(List<double> audioData) {
-    if (!_isActive) return false;
-
-    // Complete audio blocking during TTS - don't process at all
-    if (_isTTSActive) {
-      return false;
-    }
-
-    if (_isPaused) return false;
-    if (audioData.isEmpty) return false;
-
-    // Calculate energy
-    final energy = _calculateAverageEnergy(audioData);
-    _lastEnergyLevel = energy;
-
-    // Update debug statistics
-    _updateDebugStatistics(energy);
-
-    // Handle calibration if active
-    if (_isCalibrating) {
-      _handleCalibrationFrame(energy);
-      return false; // Don't process voice activity during calibration
-    }
-
-    final hasVoice = energy > energyThreshold;
-
-    // Enhanced debug logging
-    final ratio = energy / energyThreshold;
-    _logger.debug(
-      '🎤 VAD: Energy=${energy.toStringAsFixed(6)} | '
-      'Threshold=${energyThreshold.toStringAsFixed(6)} | '
-      'Ratio=${ratio.toStringAsFixed(2)}x | '
-      'Voice=${hasVoice ? "YES✅" : "NO❌"} | '
-      'Ambient=${_ambientNoiseLevel.toStringAsFixed(6)}',
-    );
-
-    // Update state
-    _updateVoiceActivityState(hasVoice);
-
-    return hasVoice;
-  }
-
-  /// Calculate the RMS (Root Mean Square) energy of an audio signal
+  /// Calculate the RMS energy of an audio signal
   double _calculateAverageEnergy(List<double> signal) {
     if (signal.isEmpty) return 0.0;
 
@@ -286,43 +205,24 @@ class SimpleEnergyVAD implements VADService {
     return math.sqrt(sumSquares / signal.length);
   }
 
-  /// Calculate confidence value between 0.0 and 1.0 based on energy level relative to threshold
-  /// Confidence represents how certain we are about the speech detection result:
-  /// - When energy is far above threshold: high confidence in speech presence
-  /// - When energy is near threshold: low confidence (uncertain)
-  /// - When energy is far below threshold: high confidence in speech absence
+  /// Calculate confidence value (0.0 to 1.0)
   double _calculateConfidence(double energyLevel) {
-    if (energyThreshold == 0.0) {
-      return 0.0;
-    }
+    if (energyThreshold == 0.0) return 0.0;
 
-    // Calculate ratio of energy to threshold
     final ratio = energyLevel / energyThreshold;
 
-    // Map ratio to confidence value (0.0 to 1.0)
-    // ratio < 0.5: very confident no speech (maps to ~0.0-0.3)
-    // ratio ~ 1.0: uncertain, near threshold (maps to ~0.5)
-    // ratio > 2.0: very confident speech present (maps to ~0.7-1.0)
-
     if (ratio < 0.5) {
-      // Far below threshold: high confidence in silence
-      // Map [0, 0.5] -> [0.0, 0.3]
       return ratio * 0.6;
     } else if (ratio < 2.0) {
-      // Near threshold: uncertain
-      // Map [0.5, 2.0] -> [0.3, 0.7]
       return 0.3 + (ratio - 0.5) * 0.267;
     } else {
-      // Far above threshold: high confidence in speech
-      // Map [2.0, inf] -> [0.7, 1.0] with asymptotic approach to 1.0
       final normalized = math.min((ratio - 2.0) / 3.0, 1.0);
       return 0.7 + normalized * 0.3;
     }
   }
 
-  /// Update voice activity state with hysteresis to prevent rapid switching
+  /// Update voice activity state with hysteresis
   void _updateVoiceActivityState(bool hasVoice) {
-    // Use different thresholds based on TTS state
     final startThreshold =
         _isTTSActive ? _ttsVoiceStartThreshold : _voiceStartThreshold;
     final endThreshold =
@@ -332,268 +232,155 @@ class SimpleEnergyVAD implements VADService {
       _consecutiveVoiceFrames++;
       _consecutiveSilentFrames = 0;
 
-      // Start speaking if we have enough consecutive voice frames
       if (!_isCurrentlySpeaking && _consecutiveVoiceFrames >= startThreshold) {
-        // Extra validation during TTS to prevent false positives
         if (_isTTSActive) {
-          _logger.warning(
-            '⚠️ Voice detected during TTS playback - likely feedback! Ignoring.',
-          );
+          _logger.warning('⚠️ Voice detected during TTS - ignoring.');
           return;
         }
 
         _isCurrentlySpeaking = true;
-        _logger.info(
-          '🎙️ VAD: SPEECH STARTED (energy above threshold for $_consecutiveVoiceFrames frames)',
-        );
+        _logger.info('🎙️ VAD: SPEECH STARTED');
         onSpeechActivity?.call(SpeechActivityEvent.started);
       }
     } else {
       _consecutiveSilentFrames++;
       _consecutiveVoiceFrames = 0;
 
-      // Stop speaking if we have enough consecutive silent frames
       if (_isCurrentlySpeaking && _consecutiveSilentFrames >= endThreshold) {
         _isCurrentlySpeaking = false;
-        _logger.info(
-          '🎙️ VAD: SPEECH ENDED (silence for $_consecutiveSilentFrames frames)',
-        );
+        _logger.info('🎙️ VAD: SPEECH ENDED');
         onSpeechActivity?.call(SpeechActivityEvent.ended);
       }
     }
   }
 
-  /// Convert 16-bit PCM samples to Float32 (-1.0 to 1.0)
+  /// Convert 16-bit PCM samples to Float32
   List<double> _convertPCMToFloat(List<int> pcmSamples) {
     final floatSamples = <double>[];
     for (final sample in pcmSamples) {
-      // Convert from 16-bit int (-32768 to 32767) to float (-1.0 to 1.0)
       floatSamples.add(sample / 32768.0);
     }
     return floatSamples;
   }
 
-  // MARK: - Calibration Methods
-
-  /// Start automatic calibration to determine ambient noise level
+  /// Start automatic calibration
   Future<void> startCalibration() async {
-    _logger.info(
-      '🎯 Starting VAD calibration - measuring ambient noise for ${_calibrationFramesNeeded * frameLength} seconds...',
-    );
+    _logger.info('🎯 Starting VAD calibration...');
 
     _isCalibrating = true;
     _calibrationSamples.clear();
     _calibrationFrameCount = 0;
 
-    // Wait for calibration to complete
     final timeoutSeconds = _calibrationFramesNeeded * frameLength + 2.0;
     await Future<void>.delayed(
         Duration(milliseconds: (timeoutSeconds * 1000).toInt()));
 
     if (_isCalibrating) {
-      // Force complete calibration if still running
       _completeCalibration();
     }
   }
 
-  /// Handle a frame during calibration
   void _handleCalibrationFrame(double energy) {
     if (!_isCalibrating) return;
 
     _calibrationSamples.add(energy);
     _calibrationFrameCount++;
 
-    _logger.debug(
-      '📏 Calibration frame $_calibrationFrameCount/$_calibrationFramesNeeded: energy=${energy.toStringAsFixed(6)}',
-    );
-
     if (_calibrationFrameCount >= _calibrationFramesNeeded) {
       _completeCalibration();
     }
   }
 
-  /// Complete the calibration process
   void _completeCalibration() {
     if (!_isCalibrating || _calibrationSamples.isEmpty) return;
 
-    // Calculate statistics from calibration samples
     final sortedSamples = List<double>.from(_calibrationSamples)..sort();
-    final mean = _calibrationSamples.reduce((a, b) => a + b) /
-        _calibrationSamples.length;
-    final median = sortedSamples[sortedSamples.length ~/ 2];
-    final percentile75 = sortedSamples[math.min(
-        sortedSamples.length - 1, (sortedSamples.length * 0.75).toInt())];
     final percentile90 = sortedSamples[math.min(
         sortedSamples.length - 1, (sortedSamples.length * 0.90).toInt())];
-    final max = sortedSamples.last;
 
-    // Use 90th percentile as ambient noise level (robust to occasional spikes)
     _ambientNoiseLevel = percentile90;
 
-    // Calculate dynamic threshold with better minimum
     final oldThreshold = energyThreshold;
-    // Ensure minimum threshold is high enough to avoid false positives
-    // but low enough to detect actual speech
-    final minimumThreshold = math.max(
-        _ambientNoiseLevel * 2.5, 0.006); // At least 2.5x ambient or 0.006
+    final minimumThreshold = math.max(_ambientNoiseLevel * 2.5, 0.006);
     final calculatedThreshold = _ambientNoiseLevel * _calibrationMultiplier;
 
-    // Apply threshold with sensible bounds
     energyThreshold = math.max(calculatedThreshold, minimumThreshold);
 
-    // Cap at reasonable maximum - balanced for speech detection without false positives
     if (energyThreshold > 0.020) {
       energyThreshold = 0.020;
-      _logger.warning(
-        '⚠️ Calibration detected high ambient noise. Capping threshold at 0.020',
-      );
     }
 
-    _logger.info('✅ VAD Calibration Complete:');
     _logger.info(
-      '  📊 Statistics: Mean=${mean.toStringAsFixed(6)}, Median=${median.toStringAsFixed(6)}',
-    );
-    _logger.info(
-      '  📊 Percentiles: 75th=${percentile75.toStringAsFixed(6)}, 90th=${percentile90.toStringAsFixed(6)}, Max=${max.toStringAsFixed(6)}',
-    );
-    _logger.info(
-      '  🎯 Ambient Noise Level: ${_ambientNoiseLevel.toStringAsFixed(6)}',
-    );
-    _logger.info(
-      '  🔧 Threshold: ${oldThreshold.toStringAsFixed(6)} → ${energyThreshold.toStringAsFixed(6)}',
+      '✅ VAD Calibration Complete: ${oldThreshold.toStringAsFixed(6)} → ${energyThreshold.toStringAsFixed(6)}',
     );
 
     _isCalibrating = false;
     _calibrationSamples.clear();
   }
 
-  /// Manually set calibration parameters
-  void setCalibrationParameters({double multiplier = 2.5}) {
-    _calibrationMultiplier =
-        math.max(2.0, math.min(4.0, multiplier)); // Clamp between 2.0x and 4.0x
-    _logger.info('📝 Calibration multiplier set to ${_calibrationMultiplier}x');
-  }
-
-  /// Get current VAD statistics for debugging
-  Map<String, double> getStatistics() {
-    final recent = _recentEnergyValues.isEmpty
-        ? 0.0
-        : _recentEnergyValues.reduce((a, b) => a + b) /
-            _recentEnergyValues.length;
-    final maxValue = _recentEnergyValues.isEmpty
-        ? 0.0
-        : _recentEnergyValues.reduce(math.max);
-    final current =
-        _recentEnergyValues.isEmpty ? 0.0 : _recentEnergyValues.last;
-
-    return {
-      'current': current,
-      'threshold': energyThreshold,
-      'ambient': _ambientNoiseLevel,
-      'recentAvg': recent,
-      'recentMax': maxValue,
-    };
-  }
-
-  // MARK: - Pause and Resume
-
   /// Pause VAD processing
-  @override
   void pause() {
     if (_isPaused) return;
     _isPaused = true;
     _logger.info('⏸️ VAD paused');
 
-    // If currently speaking, send end event
     if (_isCurrentlySpeaking) {
       _isCurrentlySpeaking = false;
       onSpeechActivity?.call(SpeechActivityEvent.ended);
     }
 
-    // Clear recent energy values to avoid false positives when resuming
     _recentEnergyValues.clear();
     _consecutiveSilentFrames = 0;
     _consecutiveVoiceFrames = 0;
   }
 
   /// Resume VAD processing
-  @override
   void resume() {
     if (!_isPaused) return;
 
     _isPaused = false;
-
-    // Reset state for clean resumption
     _isCurrentlySpeaking = false;
     _consecutiveSilentFrames = 0;
     _consecutiveVoiceFrames = 0;
-    // Clear any accumulated energy values to start fresh
     _recentEnergyValues.clear();
     _debugFrameCount = 0;
 
     _logger.info('▶️ VAD resumed');
   }
 
-  // MARK: - TTS Feedback Prevention
-
-  /// Notify VAD that TTS is about to start playing
+  /// Notify VAD that TTS is about to start
   void notifyTTSWillStart() {
     _isTTSActive = true;
-
-    // Save base threshold
     _baseEnergyThreshold = energyThreshold;
 
-    // Increase threshold significantly to prevent TTS audio from triggering VAD
     final newThreshold = energyThreshold * _ttsThresholdMultiplier;
-    energyThreshold =
-        math.min(newThreshold, 0.1); // Cap at 0.1 to prevent complete deafness
+    energyThreshold = math.min(newThreshold, 0.1);
 
-    _logger.info(
-      '🔊 TTS starting - VAD completely blocked and threshold increased from ${_baseEnergyThreshold.toStringAsFixed(6)} to ${energyThreshold.toStringAsFixed(6)}',
-    );
+    _logger.info('🔊 TTS starting - VAD blocked');
 
-    // End any current speech detection
     if (_isCurrentlySpeaking) {
       _isCurrentlySpeaking = false;
       onSpeechActivity?.call(SpeechActivityEvent.ended);
     }
 
-    // Reset counters
     _consecutiveSilentFrames = 0;
     _consecutiveVoiceFrames = 0;
   }
 
-  /// Notify VAD that TTS has finished playing
+  /// Notify VAD that TTS has finished
   void notifyTTSDidFinish() {
     _isTTSActive = false;
-
-    // Immediately restore threshold for instant response
     energyThreshold = _baseEnergyThreshold;
 
-    _logger.info(
-      '🔇 TTS finished - VAD threshold restored to ${energyThreshold.toStringAsFixed(6)}',
-    );
+    _logger.info('🔇 TTS finished - VAD restored');
 
-    // Reset state for immediate readiness
     _recentEnergyValues.clear();
     _consecutiveSilentFrames = 0;
     _consecutiveVoiceFrames = 0;
     _isCurrentlySpeaking = false;
-
-    // Prime the VAD to be ready for immediate detection
     _debugFrameCount = 0;
   }
 
-  /// Set TTS threshold multiplier for feedback prevention
-  void setTTSThresholdMultiplier(double multiplier) {
-    _ttsThresholdMultiplier = math.max(2.0, math.min(5.0, multiplier));
-    _logger
-        .info('📝 TTS threshold multiplier set to ${_ttsThresholdMultiplier}x');
-  }
-
-  // MARK: - Debug Helpers
-
-  /// Update debug statistics with new energy value
   void _updateDebugStatistics(double energy) {
     _recentEnergyValues.add(energy);
     if (_recentEnergyValues.length > _maxRecentValues) {

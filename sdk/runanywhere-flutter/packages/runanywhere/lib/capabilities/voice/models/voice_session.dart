@@ -5,7 +5,29 @@
 library voice_session;
 
 import 'dart:typed_data';
-import 'package:runanywhere/features/stt/stt_capability.dart' show STTOutput;
+
+/// Output from Speech-to-Text transcription
+/// Matches Swift STTOutput from Public/Extensions/STT/STTTypes.swift
+class STTOutput {
+  /// Transcribed text
+  final String text;
+
+  /// Confidence score (0.0 to 1.0)
+  final double confidence;
+
+  /// Detected language if auto-detected
+  final String? detectedLanguage;
+
+  /// Timestamp of the transcription
+  final DateTime timestamp;
+
+  const STTOutput({
+    required this.text,
+    required this.confidence,
+    this.detectedLanguage,
+    required this.timestamp,
+  });
+}
 
 /// Events emitted during a voice session
 /// Matches iOS VoiceSessionEvent from RunAnywhere+VoiceSession.swift

@@ -1,4 +1,4 @@
-import 'package:runanywhere/foundation/logging/models/log_level.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// SDK Environment mode - determines how data is handled
 enum SDKEnvironment {

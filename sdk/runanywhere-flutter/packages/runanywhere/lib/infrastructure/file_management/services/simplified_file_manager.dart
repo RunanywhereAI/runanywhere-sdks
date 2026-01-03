@@ -1,12 +1,16 @@
+/// Simplified File Manager
+///
+/// File manager for RunAnywhere SDK.
+/// Matches iOS SimplifiedFileManager from Infrastructure/FileManagement/Services/.
+library simplified_file_manager;
+
 import 'dart:async';
 import 'dart:io';
 
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import 'package:runanywhere/core/models/storage/device_storage_info.dart';
+import 'package:runanywhere/core/types/storage_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/infrastructure/file_management/protocol/file_management_error.dart';
-import 'package:runanywhere/infrastructure/file_management/protocol/file_management_service.dart';
 
 /// File manager for RunAnywhere SDK
 /// Matches iOS SimplifiedFileManager from Infrastructure/FileManagement/Services/SimplifiedFileManager.swift
@@ -22,8 +26,8 @@ import 'package:runanywhere/infrastructure/file_management/protocol/file_managem
 ///   Temp/
 ///   Downloads/
 /// ```
-class SimplifiedFileManager implements FileManagementService {
-  final SDKLogger _logger = SDKLogger(category: 'FileManager');
+class SimplifiedFileManager {
+  final SDKLogger _logger = SDKLogger('FileManager');
 
   Directory? _baseDirectory;
 
@@ -48,7 +52,7 @@ class SimplifiedFileManager implements FileManagementService {
     }
   }
 
-  @override
+  /// Get the model folder path, creating it if necessary
   Future<String> getModelFolder({
     required String modelId,
     required String framework,
@@ -67,7 +71,7 @@ class SimplifiedFileManager implements FileManagementService {
     return folderPath;
   }
 
-  @override
+  /// Get the model folder path without creating
   String getModelFolderPath({
     required String modelId,
     required String framework,
@@ -76,138 +80,106 @@ class SimplifiedFileManager implements FileManagementService {
     return path.join(_baseDirectory!.path, 'Models', framework, modelId);
   }
 
-  @override
+  /// Check if model folder exists
   bool modelFolderExists({
     required String modelId,
     required String framework,
   }) {
     _ensureInitialized();
-    final folderPath =
-        getModelFolderPath(modelId: modelId, framework: framework);
-    final folder = Directory(folderPath);
-    if (!folder.existsSync()) return false;
-    final contents = folder.listSync();
-    return contents.isNotEmpty;
+    final folderPath = path.join(
+      _baseDirectory!.path,
+      'Models',
+      framework,
+      modelId,
+    );
+    return Directory(folderPath).existsSync();
   }
 
-  @override
-  Future<void> deleteModel({
-    required String modelId,
-    required String framework,
-  }) async {
+  /// Get the models root directory
+  Future<String> getModelsDirectory() async {
     _ensureInitialized();
-    final folderPath =
-        getModelFolderPath(modelId: modelId, framework: framework);
-    final folder = Directory(folderPath);
-    if (await folder.exists()) {
-      await folder.delete(recursive: true);
-      _logger.info('Deleted model: $modelId from $framework');
-    }
+    return path.join(_baseDirectory!.path, 'Models');
   }
 
-  @override
-  Map<String, List<String>> getDownloadedModels() {
-    _ensureInitialized();
-    final result = <String, List<String>>{};
-
-    final modelsDir = Directory(path.join(_baseDirectory!.path, 'Models'));
-    if (!modelsDir.existsSync()) return result;
-
-    for (final frameworkDir in modelsDir.listSync().whereType<Directory>()) {
-      final framework = path.basename(frameworkDir.path);
-      final modelIds = <String>[];
-
-      for (final modelDir in frameworkDir.listSync().whereType<Directory>()) {
-        if (modelDir.listSync().isNotEmpty) {
-          modelIds.add(path.basename(modelDir.path));
-        }
-      }
-
-      if (modelIds.isNotEmpty) {
-        result[framework] = modelIds;
-      }
-    }
-
-    return result;
-  }
-
-  @override
-  bool isModelDownloaded({
-    required String modelId,
-    required String framework,
-  }) {
-    return modelFolderExists(modelId: modelId, framework: framework);
-  }
-
-  @override
-  Future<String> getDownloadFolder() async {
+  /// Get the downloads directory
+  Future<String> getDownloadsDirectory() async {
     _ensureInitialized();
     return path.join(_baseDirectory!.path, 'Downloads');
   }
 
-  @override
-  Future<String> createTempDownloadFile(String modelId) async {
+  /// Get the cache directory
+  Future<String> getCacheDirectory() async {
     _ensureInitialized();
-    final downloadFolder = await getDownloadFolder();
-    final tempFileName =
-        '${modelId}_${DateTime.now().millisecondsSinceEpoch}.tmp';
-    return path.join(downloadFolder, tempFileName);
+    return path.join(_baseDirectory!.path, 'Cache');
   }
 
-  @override
-  Future<void> storeCache(
-      {required String key, required List<int> data}) async {
+  /// Get the temp directory
+  Future<String> getTempDirectory() async {
     _ensureInitialized();
-    final cacheDir = Directory(path.join(_baseDirectory!.path, 'Cache'));
-    final cacheFile = File(path.join(cacheDir.path, '$key.cache'));
-    await cacheFile.writeAsBytes(data);
+    return path.join(_baseDirectory!.path, 'Temp');
   }
 
-  @override
-  Future<List<int>?> loadCache(String key) async {
-    _ensureInitialized();
-    final cacheDir = Directory(path.join(_baseDirectory!.path, 'Cache'));
-    final cacheFile = File(path.join(cacheDir.path, '$key.cache'));
-    if (await cacheFile.exists()) {
-      return cacheFile.readAsBytes();
+  /// Check if a file exists
+  Future<bool> fileExists(String filePath) async {
+    return File(filePath).exists();
+  }
+
+  /// Get file size in bytes
+  Future<int> getFileSize(String filePath) async {
+    final file = File(filePath);
+    if (await file.exists()) {
+      return file.length();
     }
-    return null;
-  }
-
-  @override
-  Future<void> clearCache() async {
-    _ensureInitialized();
-    final cacheDir = Directory(path.join(_baseDirectory!.path, 'Cache'));
-    if (await cacheDir.exists()) {
-      for (final file in cacheDir.listSync().whereType<File>()) {
-        await file.delete();
-      }
-    }
-    _logger.info('Cleared cache');
-  }
-
-  @override
-  Future<void> cleanTempFiles() async {
-    _ensureInitialized();
-    final tempDir = Directory(path.join(_baseDirectory!.path, 'Temp'));
-    if (await tempDir.exists()) {
-      for (final file in tempDir.listSync().whereType<File>()) {
-        await file.delete();
-      }
-    }
-    _logger.info('Cleaned temp files');
-  }
-
-  @override
-  int getAvailableSpace() {
-    // This would need platform-specific implementation
-    // For now, return a default value
     return 0;
   }
 
-  @override
+  /// Delete a file
+  Future<void> deleteFile(String filePath) async {
+    final file = File(filePath);
+    if (await file.exists()) {
+      await file.delete();
+      _logger.info('Deleted file: $filePath');
+    }
+  }
+
+  /// Delete a model folder
+  Future<void> deleteModelFolder({
+    required String modelId,
+    required String framework,
+  }) async {
+    _ensureInitialized();
+    final folderPath = path.join(
+      _baseDirectory!.path,
+      'Models',
+      framework,
+      modelId,
+    );
+    final folder = Directory(folderPath);
+    if (await folder.exists()) {
+      await folder.delete(recursive: true);
+      _logger.info('Deleted model folder: $folderPath');
+    }
+  }
+
+  /// Calculate total size of all models
+  Future<int> calculateModelsSize() async {
+    _ensureInitialized();
+    final modelsDir = Directory(path.join(_baseDirectory!.path, 'Models'));
+    if (!await modelsDir.exists()) return 0;
+
+    int totalSize = 0;
+    await for (final entity in modelsDir.list(recursive: true)) {
+      if (entity is File) {
+        totalSize += await entity.length();
+      }
+    }
+    return totalSize;
+  }
+
+  /// Get device storage info
   DeviceStorageInfo getDeviceStorageInfo() {
-    // This would need platform-specific implementation
+    // Get device storage stats
+    // Note: This is a simplified implementation
     return const DeviceStorageInfo(
       totalSpace: 0,
       freeSpace: 0,
@@ -215,32 +187,42 @@ class SimplifiedFileManager implements FileManagementService {
     );
   }
 
-  @override
-  int calculateDirectorySize(String dirPath) {
-    final dir = Directory(dirPath);
-    if (!dir.existsSync()) return 0;
-
-    int totalSize = 0;
-    for (final entity in dir.listSync(recursive: true)) {
-      if (entity is File) {
-        totalSize += entity.lengthSync();
+  /// Clear all cache
+  Future<void> clearCache() async {
+    _ensureInitialized();
+    final cacheDir = Directory(path.join(_baseDirectory!.path, 'Cache'));
+    if (await cacheDir.exists()) {
+      await for (final entity in cacheDir.list()) {
+        if (entity is File) {
+          await entity.delete();
+        } else if (entity is Directory) {
+          await entity.delete(recursive: true);
+        }
       }
+      _logger.info('Cache cleared');
     }
-    return totalSize;
   }
 
-  @override
-  String getBaseDirectoryPath() {
+  /// Clear all temporary files
+  Future<void> clearTemp() async {
     _ensureInitialized();
-    return _baseDirectory!.path;
+    final tempDir = Directory(path.join(_baseDirectory!.path, 'Temp'));
+    if (await tempDir.exists()) {
+      await for (final entity in tempDir.list()) {
+        if (entity is File) {
+          await entity.delete();
+        } else if (entity is Directory) {
+          await entity.delete(recursive: true);
+        }
+      }
+      _logger.info('Temp directory cleared');
+    }
   }
 
   void _ensureInitialized() {
     if (_baseDirectory == null) {
-      throw FileManagementError(
-        'FileManager not initialized. Call initialize() first.',
-        FileManagementErrorType.directoryNotFound,
-      );
+      throw StateError(
+          'SimplifiedFileManager not initialized. Call initialize() first.');
     }
   }
 }

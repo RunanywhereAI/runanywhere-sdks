@@ -23,7 +23,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 /// }
 /// ```
 class AudioCaptureManager {
-  final SDKLogger _logger = SDKLogger(category: 'AudioCapture');
+  final SDKLogger _logger = SDKLogger('AudioCapture');
 
   /// Audio recorder instance
   final AudioRecorder _recorder = AudioRecorder();

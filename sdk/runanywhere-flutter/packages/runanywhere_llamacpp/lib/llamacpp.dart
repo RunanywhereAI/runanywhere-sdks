@@ -3,15 +3,15 @@
 /// This module provides LLM (Language Model) capabilities via llama.cpp
 /// through the native runanywhere-core library using Dart FFI.
 ///
-/// ## Quick Start (matches iOS LlamaCPP API exactly)
+/// ## Quick Start (matches Swift LlamaCPP API exactly)
 ///
 /// ```dart
 /// import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 ///
-/// // Register the module (matches iOS LlamaCPP.register())
+/// // Register the module (matches Swift: LlamaCPP.register())
 /// await LlamaCpp.register();
 ///
-/// // Add models (matches iOS LlamaCPP.addModel())
+/// // Add models (matches Swift: LlamaCPP.addModel())
 /// LlamaCpp.addModel(
 ///   name: 'SmolLM2 360M Q8_0',
 ///   url: 'https://huggingface.co/.../model.gguf',
@@ -26,11 +26,15 @@
 /// - **Template Support**: Auto-detection of model templates (ChatML, Llama, etc.)
 library runanywhere_llamacpp;
 
-import 'package:runanywhere/core/models/framework/model_artifact_type.dart';
-import 'package:runanywhere/core/models/model/model_category.dart';
-import 'package:runanywhere/core/models/model/model_info.dart';
+import 'dart:ffi';
+
+import 'package:ffi/ffi.dart';
+import 'package:runanywhere/core/module/capability_type.dart';
+import 'package:runanywhere/core/module/inference_framework.dart';
+import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/core/module_registry.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_backend.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere_llamacpp/providers/llamacpp_llm_provider.dart';
@@ -42,7 +46,7 @@ export 'services/llamacpp_llm_service.dart';
 
 // ============================================================================
 // LlamaCpp Module Implementation
-// Matches iOS LlamaCPP enum from LlamaCPPRuntime/LlamaCPPServiceProvider.swift
+// Matches Swift LlamaCPP enum from LlamaCPPRuntime/LlamaCPP.swift
 // ============================================================================
 
 /// LlamaCpp module for LLM text generation.
@@ -50,27 +54,20 @@ export 'services/llamacpp_llm_service.dart';
 /// Provides large language model capabilities using llama.cpp
 /// with GGUF/GGML models and Metal/GPU acceleration.
 ///
-/// Matches iOS `LlamaCPP` enum from LlamaCPPRuntime/LlamaCPPServiceProvider.swift.
+/// Matches Swift `LlamaCPP` enum from LlamaCPPRuntime/LlamaCPP.swift.
 ///
-/// ## Registration (matches iOS LlamaCPP pattern exactly)
+/// ## Registration (matches Swift LlamaCPP pattern exactly)
 ///
 /// ```dart
-/// // Register module (matches iOS: LlamaCPP.register())
+/// // Register module (matches Swift: LlamaCPP.register())
 /// await LlamaCpp.register();
 ///
 /// // Or with custom priority
 /// await LlamaCpp.register(priority: 150);
-///
-/// // Add models (matches iOS: LlamaCPP.addModel())
-/// LlamaCpp.addModel(
-///   name: 'SmolLM2 360M Q8_0',
-///   url: 'https://huggingface.co/.../model.gguf',
-///   memoryRequirement: 500000000,
-/// );
 /// ```
-class LlamaCpp extends RunAnywhereModule {
+class LlamaCpp implements RunAnywhereModule {
   // ============================================================================
-  // Singleton Pattern (matches iOS enum pattern)
+  // Singleton Pattern (matches Swift enum pattern)
   // ============================================================================
 
   /// Singleton instance for module metadata
@@ -85,12 +82,12 @@ class LlamaCpp extends RunAnywhereModule {
   // Module State
   // ============================================================================
 
-  static final SDKLogger _logger = SDKLogger(category: 'LlamaCpp');
+  static final SDKLogger _logger = SDKLogger('LlamaCpp');
   static bool _isRegistered = false;
   static NativeBackend? _backend;
 
   // ============================================================================
-  // RunAnywhereModule Implementation (matches iOS LlamaCPP enum)
+  // RunAnywhereModule Implementation (matches Swift LlamaCPP enum)
   // ============================================================================
 
   @override
@@ -108,14 +105,8 @@ class LlamaCpp extends RunAnywhereModule {
   @override
   int get defaultPriority => 100;
 
-  @override
-  ModelStorageStrategy? get storageStrategy => null;
-
-  @override
-  DownloadStrategy? get downloadStrategy => null;
-
   // ============================================================================
-  // Static API (matches iOS LlamaCPP static methods exactly)
+  // Static API (matches Swift LlamaCPP static methods exactly)
   // ============================================================================
 
   /// Whether the module is registered
@@ -194,12 +185,13 @@ class LlamaCpp extends RunAnywhereModule {
   }
 
   // ============================================================================
-  // Registration (matches iOS LlamaCPP.register() exactly)
+  // Registration (matches Swift LlamaCPP.register() exactly)
   // ============================================================================
 
   /// Register LlamaCpp module with the SDK.
   ///
-  /// Matches iOS `LlamaCPP.register(priority:)` pattern exactly.
+  /// Matches Swift `LlamaCPP.register(priority:)` pattern exactly.
+  /// Calls the C++ `rac_backend_llamacpp_register()` function via FFI.
   ///
   /// [priority] - Registration priority (higher = preferred). Default: 100.
   static Future<void> register({int priority = 100}) async {
@@ -214,14 +206,36 @@ class LlamaCpp extends RunAnywhereModule {
       return;
     }
 
-    // Create native backend
+    final lib = PlatformLoader.load();
+
+    // Step 1: Call C++ registration function via FFI (matches Swift exactly)
+    try {
+      final registerFn = lib.lookupFunction<
+          Int32 Function(),
+          int Function()>('rac_backend_llamacpp_register');
+
+      final result = registerFn();
+
+      // RAC_SUCCESS = 0, RAC_ERROR_MODULE_ALREADY_REGISTERED = specific code
+      if (result != RacResultCode.success && result != -100) {
+        // -100 = already registered, which is OK
+        _logger.warning('C++ backend registration returned: $result');
+      } else {
+        _logger.debug('C++ backend registered successfully');
+      }
+    } catch (e) {
+      _logger.debug('rac_backend_llamacpp_register not available: $e');
+      // Continue with Dart-side registration as fallback
+    }
+
+    // Step 2: Create native backend for operations
     _backend = NativeBackend();
     _backend!.create('llamacpp');
 
-    // Register as a module with ModuleRegistry (matches iOS pattern)
+    // Step 3: Register with Dart ModuleRegistry
     ModuleRegistry.shared.registerModule(_instance, priority: priority);
 
-    // Register LLM provider
+    // Step 4: Register LLM provider
     ModuleRegistry.shared.registerLLM(
       LlamaCppLLMServiceProvider(_backend!),
       priority: priority,
@@ -229,44 +243,6 @@ class LlamaCpp extends RunAnywhereModule {
 
     _isRegistered = true;
     _logger.info('LlamaCpp registered with capabilities: LLM');
-  }
-
-  // ============================================================================
-  // Model Registration (matches iOS LlamaCPP.addModel() exactly)
-  // ============================================================================
-
-  /// Add a model to this module.
-  ///
-  /// Matches iOS `LlamaCPP.addModel()` pattern exactly.
-  /// Uses the module's inferenceFramework automatically.
-  ///
-  /// [id] - Explicit model ID. If null, generated from URL filename.
-  /// [name] - Display name for the model.
-  /// [url] - Download URL string for the model.
-  /// [modality] - Model category (defaults to language for LLM).
-  /// [artifactType] - How the model is packaged.
-  /// [memoryRequirement] - Estimated memory usage in bytes.
-  /// [supportsThinking] - Whether the model supports reasoning/thinking.
-  ///
-  /// Returns the created ModelInfo, or null if URL is invalid.
-  static ModelInfo? addModel({
-    String? id,
-    required String name,
-    required String url,
-    ModelCategory? modality,
-    ModelArtifactType? artifactType,
-    int? memoryRequirement,
-    bool supportsThinking = false,
-  }) {
-    return _instance.addModelInternal(
-      id: id,
-      name: name,
-      url: url,
-      modality: modality,
-      artifactType: artifactType,
-      memoryRequirement: memoryRequirement,
-      supportsThinking: supportsThinking,
-    );
   }
 
   // ============================================================================

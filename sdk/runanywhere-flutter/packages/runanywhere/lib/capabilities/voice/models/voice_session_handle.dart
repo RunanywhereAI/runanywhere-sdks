@@ -16,7 +16,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 /// Handle to control an active voice session
 /// Matches iOS VoiceSessionHandle from RunAnywhere+VoiceSession.swift
 class VoiceSessionHandle {
-  final SDKLogger _logger = SDKLogger(category: 'VoiceSessionHandle');
+  final SDKLogger _logger = SDKLogger('VoiceSessionHandle');
   final VoiceSessionConfig config;
 
   bool _isRunning = false;

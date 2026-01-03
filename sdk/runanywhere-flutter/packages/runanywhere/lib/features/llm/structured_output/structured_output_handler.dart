@@ -4,7 +4,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 /// Handles structured output generation and validation
 /// Matches iOS StructuredOutputHandler from Features/LLM/StructuredOutput/StructuredOutputHandler.swift
 class StructuredOutputHandler {
-  final SDKLogger _logger = SDKLogger(category: 'StructuredOutputHandler');
+  final SDKLogger _logger = SDKLogger('StructuredOutputHandler');
 
   StructuredOutputHandler();
 

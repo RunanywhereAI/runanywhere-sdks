@@ -3,12 +3,12 @@
 /// This module provides STT, TTS, VAD, and LLM capabilities via the native
 /// runanywhere-core library using Dart FFI.
 ///
-/// ## Quick Start (matches iOS ONNX API exactly)
+/// ## Quick Start (matches Swift ONNX API exactly)
 ///
 /// ```dart
 /// import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 ///
-/// // Register the module (matches iOS ONNX.register())
+/// // Register the module (matches Swift: ONNX.register())
 /// await Onnx.register();
 ///
 /// // Add STT models
@@ -17,14 +17,6 @@
 ///   url: 'https://github.com/.../sherpa-onnx-whisper-tiny.en.tar.gz',
 ///   modality: ModelCategory.speechRecognition,
 ///   memoryRequirement: 75000000,
-/// );
-///
-/// // Add TTS models
-/// Onnx.addModel(
-///   name: 'Piper TTS (US English)',
-///   url: 'https://github.com/.../vits-piper-en_US-lessac-medium.tar.gz',
-///   modality: ModelCategory.speechSynthesis,
-///   memoryRequirement: 65000000,
 /// );
 /// ```
 ///
@@ -36,14 +28,17 @@
 /// - **LLM (Language Models)**: Text generation
 library runanywhere_onnx;
 
-import 'package:runanywhere/core/models/framework/model_artifact_type.dart';
-import 'package:runanywhere/core/models/model/model_category.dart';
-import 'package:runanywhere/core/models/model/model_info.dart';
+import 'dart:ffi';
+
+import 'package:ffi/ffi.dart';
+import 'package:runanywhere/core/module/capability_type.dart';
+import 'package:runanywhere/core/module/inference_framework.dart';
+import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/core/module_registry.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_backend.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere_onnx/onnx_download_strategy.dart';
 import 'package:runanywhere_onnx/providers/onnx_llm_provider.dart';
 import 'package:runanywhere_onnx/providers/onnx_stt_provider.dart';
 import 'package:runanywhere_onnx/providers/onnx_tts_provider.dart';
@@ -61,7 +56,7 @@ export 'services/onnx_vad_service.dart';
 
 // ============================================================================
 // ONNX Module Implementation
-// Matches iOS ONNX enum from ONNXRuntime/ONNXServiceProvider.swift
+// Matches Swift ONNX enum from ONNXRuntime/ONNX.swift
 // ============================================================================
 
 /// ONNX module for STT, TTS, VAD, and LLM capabilities.
@@ -69,27 +64,20 @@ export 'services/onnx_vad_service.dart';
 /// Provides speech-to-text, text-to-speech, voice activity detection,
 /// and language model services using ONNX Runtime with Sherpa-ONNX models.
 ///
-/// Matches iOS `ONNX` enum from ONNXRuntime/ONNXServiceProvider.swift.
+/// Matches Swift `ONNX` enum from ONNXRuntime/ONNX.swift.
 ///
-/// ## Registration (matches iOS ONNX pattern exactly)
+/// ## Registration (matches Swift ONNX pattern exactly)
 ///
 /// ```dart
-/// // Register module (matches iOS: ONNX.register())
+/// // Register module (matches Swift: ONNX.register())
 /// await Onnx.register();
 ///
 /// // Or with custom priority
 /// await Onnx.register(priority: 150);
-///
-/// // Add models (matches iOS: ONNX.addModel())
-/// Onnx.addModel(
-///   name: 'Sherpa Whisper Tiny',
-///   url: 'https://github.com/.../model.tar.gz',
-///   modality: ModelCategory.speechRecognition,
-/// );
 /// ```
-class Onnx extends RunAnywhereModule {
+class Onnx implements RunAnywhereModule {
   // ============================================================================
-  // Singleton Pattern (matches iOS enum pattern)
+  // Singleton Pattern (matches Swift enum pattern)
   // ============================================================================
 
   /// Singleton instance for module metadata
@@ -104,13 +92,12 @@ class Onnx extends RunAnywhereModule {
   // Module State
   // ============================================================================
 
-  static final SDKLogger _logger = SDKLogger(category: 'Onnx');
+  static final SDKLogger _logger = SDKLogger('Onnx');
   static bool _isRegistered = false;
   static NativeBackend? _backend;
-  static OnnxDownloadStrategy? _downloadStrategyInstance;
 
   // ============================================================================
-  // RunAnywhereModule Implementation (matches iOS ONNX enum)
+  // RunAnywhereModule Implementation (matches Swift ONNX enum)
   // ============================================================================
 
   @override
@@ -133,17 +120,8 @@ class Onnx extends RunAnywhereModule {
   @override
   int get defaultPriority => 100;
 
-  @override
-  ModelStorageStrategy? get storageStrategy => null;
-
-  @override
-  DownloadStrategy? get downloadStrategy {
-    _downloadStrategyInstance ??= OnnxDownloadStrategy();
-    return _downloadStrategyInstance;
-  }
-
   // ============================================================================
-  // Static API (matches iOS ONNX static methods exactly)
+  // Static API (matches Swift ONNX static methods exactly)
   // ============================================================================
 
   /// Whether the module is registered
@@ -193,12 +171,13 @@ class Onnx extends RunAnywhereModule {
   }
 
   // ============================================================================
-  // Registration (matches iOS ONNX.register() exactly)
+  // Registration (matches Swift ONNX.register() exactly)
   // ============================================================================
 
   /// Register ONNX module with the SDK.
   ///
-  /// Matches iOS `ONNX.register(priority:)` pattern exactly.
+  /// Matches Swift `ONNX.register(priority:)` pattern exactly.
+  /// Calls the C++ `rac_backend_onnx_register()` function via FFI.
   /// Registers STT, TTS, VAD, and LLM providers.
   ///
   /// [priority] - Registration priority (higher = preferred). Default: 100.
@@ -214,14 +193,36 @@ class Onnx extends RunAnywhereModule {
       return;
     }
 
-    // Create native backend
+    final lib = PlatformLoader.load();
+
+    // Step 1: Call C++ registration function via FFI (matches Swift exactly)
+    try {
+      final registerFn = lib.lookupFunction<
+          Int32 Function(),
+          int Function()>('rac_backend_onnx_register');
+
+      final result = registerFn();
+
+      // RAC_SUCCESS = 0, RAC_ERROR_MODULE_ALREADY_REGISTERED = specific code
+      if (result != RacResultCode.success && result != -100) {
+        // -100 = already registered, which is OK
+        _logger.warning('C++ backend registration returned: $result');
+      } else {
+        _logger.debug('C++ backend registered successfully');
+      }
+    } catch (e) {
+      _logger.debug('rac_backend_onnx_register not available: $e');
+      // Continue with Dart-side registration as fallback
+    }
+
+    // Step 2: Create native backend for operations
     _backend = NativeBackend();
     _backend!.create('onnx');
 
-    // Register as a module with ModuleRegistry (matches iOS pattern)
+    // Step 3: Register with Dart ModuleRegistry
     ModuleRegistry.shared.registerModule(_instance, priority: priority);
 
-    // Register all capability providers
+    // Step 4: Register all capability providers
     final registry = ModuleRegistry.shared;
 
     registry.registerSTT(
@@ -245,13 +246,12 @@ class Onnx extends RunAnywhereModule {
     );
 
     _isRegistered = true;
-    _logger
-        .info('ONNX Runtime registered with capabilities: STT, TTS, VAD, LLM');
+    _logger.info('ONNX Runtime registered with capabilities: STT, TTS, VAD, LLM');
   }
 
   /// Register only ONNX STT service.
   ///
-  /// Matches iOS `ONNX.registerSTT(priority:)` pattern.
+  /// Matches Swift `ONNX.registerSTT(priority:)` pattern.
   static Future<void> registerSTT({int priority = 100}) async {
     await _ensureBackendInitialized();
 
@@ -264,7 +264,7 @@ class Onnx extends RunAnywhereModule {
 
   /// Register only ONNX TTS service.
   ///
-  /// Matches iOS `ONNX.registerTTS(priority:)` pattern.
+  /// Matches Swift `ONNX.registerTTS(priority:)` pattern.
   static Future<void> registerTTS({int priority = 100}) async {
     await _ensureBackendInitialized();
 
@@ -307,44 +307,6 @@ class Onnx extends RunAnywhereModule {
 
     _backend = NativeBackend();
     _backend!.create('onnx');
-  }
-
-  // ============================================================================
-  // Model Registration (matches iOS ONNX.addModel() exactly)
-  // ============================================================================
-
-  /// Add a model to this module.
-  ///
-  /// Matches iOS `ONNX.addModel()` pattern exactly.
-  /// Uses the module's inferenceFramework automatically.
-  ///
-  /// [id] - Explicit model ID. If null, generated from URL filename.
-  /// [name] - Display name for the model.
-  /// [url] - Download URL string for the model.
-  /// [modality] - Model category (speechRecognition, speechSynthesis, etc.).
-  /// [artifactType] - How the model is packaged (e.g., tarGzArchive).
-  /// [memoryRequirement] - Estimated memory usage in bytes.
-  /// [supportsThinking] - Whether the model supports reasoning/thinking.
-  ///
-  /// Returns the created ModelInfo, or null if URL is invalid.
-  static ModelInfo? addModel({
-    String? id,
-    required String name,
-    required String url,
-    ModelCategory? modality,
-    ModelArtifactType? artifactType,
-    int? memoryRequirement,
-    bool supportsThinking = false,
-  }) {
-    return _instance.addModelInternal(
-      id: id,
-      name: name,
-      url: url,
-      modality: modality,
-      artifactType: artifactType,
-      memoryRequirement: memoryRequirement,
-      supportsThinking: supportsThinking,
-    );
   }
 
   // ============================================================================

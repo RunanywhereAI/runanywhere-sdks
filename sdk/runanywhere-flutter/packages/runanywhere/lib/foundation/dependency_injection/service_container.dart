@@ -1,26 +1,17 @@
+/// Service Container
+///
+/// Dependency injection container for SDK services.
+/// Matches iOS ServiceContainer from Foundation/DependencyInjection/ServiceContainer.swift
+///
+/// Note: Most services are now handled via FFI through DartBridge.
+/// This container provides minimal DI for platform-specific services.
+library service_container;
+
 import 'dart:async';
 
-import 'package:runanywhere/capabilities/analytics/analytics_service.dart';
-// TODO: Memory management has been moved/removed - using stub from model_loading_service
-// import '../../capabilities/memory/memory_service.dart';
-// import '../../capabilities/memory/allocation_manager.dart';
-// import '../../capabilities/memory/pressure_handler.dart';
-// import '../../capabilities/memory/cache_eviction.dart';
-import 'package:runanywhere/capabilities/download/download_service.dart';
-import 'package:runanywhere/capabilities/model_loading/model_loading_service.dart';
-import 'package:runanywhere/capabilities/registry/registry_service.dart';
-import 'package:runanywhere/capabilities/streaming/streaming_service.dart';
-import 'package:runanywhere/capabilities/text_generation/generation_service.dart';
-import 'package:runanywhere/capabilities/voice/voice_capability_service.dart';
-import 'package:runanywhere/core/models/model/model_registration.dart';
-import 'package:runanywhere/core/protocols/frameworks/unified_framework_adapter.dart';
-import 'package:runanywhere/core/protocols/storage/storage_analyzer.dart';
-import 'package:runanywhere/core/service_registry/unified_service_registry.dart';
 import 'package:runanywhere/data/network/api_client.dart';
 import 'package:runanywhere/data/network/network_service.dart';
-import 'package:runanywhere/data/network/services/authentication_service.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/infrastructure/analytics/sdk_analytics_initializer.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// Service container for dependency injection
@@ -31,102 +22,19 @@ class ServiceContainer {
 
   ServiceContainer._();
 
-  // Core services (lazy initialization)
-  RegistryService? _modelRegistry;
-  ModelLoadingService? _modelLoadingService;
-  GenerationService? _generationService;
-  StreamingService? _streamingService;
-  VoiceCapabilityService? _voiceCapabilityService;
-  MemoryService? _memoryService;
-  DownloadService? _downloadService;
-  AnalyticsService? _analyticsService;
-  StorageAnalyzer? _storageAnalyzer;
-  SDKLogger? _logger;
-
-  // Analytics pipeline
-  SDKAnalyticsInitializer? _analyticsInitializer;
-
   // Network services
   APIClient? _apiClient;
   NetworkService? _networkService;
-  AuthenticationService? _authenticationService;
 
-  /// Single adapter registry for all frameworks (text and voice)
-  /// Matches iOS adapterRegistry pattern
-  final UnifiedServiceRegistry _adapterRegistry = UnifiedServiceRegistry();
-
-  /// Public access to adapter registry
-  UnifiedServiceRegistry get adapterRegistry => _adapterRegistry;
+  // Logger
+  SDKLogger? _logger;
 
   // Internal state
   SDKInitParams? _initParams;
 
-  /// Model registry
-  RegistryService get modelRegistry {
-    return _modelRegistry ??= RegistryService();
-  }
-
-  /// Model loading service
-  ModelLoadingService get modelLoadingService {
-    return _modelLoadingService ??= ModelLoadingService(
-      registry: modelRegistry,
-      adapterRegistry: _adapterRegistry,
-      memoryService: memoryService,
-    );
-  }
-
-  /// Generation service
-  GenerationService get generationService {
-    return _generationService ??= GenerationService(
-      modelLoadingService: modelLoadingService,
-    );
-  }
-
-  /// Streaming service
-  StreamingService get streamingService {
-    return _streamingService ??= StreamingService(
-      generationService: generationService,
-      modelLoadingService: modelLoadingService,
-    );
-  }
-
-  /// Voice capability service
-  VoiceCapabilityService get voiceCapabilityService {
-    return _voiceCapabilityService ??= VoiceCapabilityService();
-  }
-
-  /// Memory service (stubbed - using temporary implementation from model_loading_service)
-  MemoryService get memoryService {
-    return _memoryService ??= MemoryService();
-  }
-
-  /// Download service
-  DownloadService get downloadService {
-    return _downloadService ??= DownloadService(
-      modelRegistry: modelRegistry,
-    );
-  }
-
-  /// Storage analyzer for storage info
-  StorageAnalyzer get storageAnalyzer {
-    return _storageAnalyzer ??= DefaultStorageAnalyzer();
-  }
-
-  /// Analytics service
-  AnalyticsService get analyticsService {
-    return _analyticsService ??= AnalyticsService(
-      initParams: _initParams,
-    );
-  }
-
   /// Logger
   SDKLogger get logger {
     return _logger ??= SDKLogger();
-  }
-
-  /// Analytics initializer
-  SDKAnalyticsInitializer get analyticsInitializer {
-    return _analyticsInitializer ??= SDKAnalyticsInitializer();
   }
 
   /// API client
@@ -135,13 +43,10 @@ class ServiceContainer {
   /// Network service for HTTP operations
   NetworkService? get networkService => _networkService;
 
-  /// Set network service (called during Phase 2 initialization)
+  /// Set network service (called during initialization)
   void setNetworkService(NetworkService service) {
     _networkService = service;
   }
-
-  /// Authentication service for token management
-  AuthenticationService? get authenticationService => _authenticationService;
 
   /// Create an API client with the given configuration
   APIClient createAPIClient({
@@ -154,128 +59,45 @@ class ServiceContainer {
     return client;
   }
 
-  /// Create and configure an authentication service
-  Future<AuthenticationService> createAuthenticationService({
-    required Uri baseURL,
-    required String apiKey,
-  }) async {
-    // Create API client first if needed
-    final client =
-        _apiClient ?? createAPIClient(baseURL: baseURL, apiKey: apiKey);
-
-    // Create authentication service
-    final authService = AuthenticationService(apiClient: client);
-    _authenticationService = authService;
-
-    return authService;
-  }
-
   /// Setup local services (no network calls)
   Future<void> setupLocalServices({
     required String apiKey,
     required Uri baseURL,
     required SDKEnvironment environment,
   }) async {
-    // Store init params for analytics
+    // Store init params
     _initParams = SDKInitParams(
       apiKey: apiKey,
       baseURL: baseURL,
       environment: environment,
     );
 
-    // Initialize local services only
-    // Network services are initialized lazily on first API call
-    await modelRegistry.initialize(apiKey: apiKey);
-
     // Create API client for network services
     _apiClient = APIClient(
       baseURL: baseURL,
       apiKey: apiKey,
     );
-
-    // Initialize analytics pipeline
-    // This wires EventPublisher -> AnalyticsQueueManager -> TelemetryRepository
-    await analyticsInitializer.initialize(
-      apiClient: _apiClient,
-      environment: environment,
-    );
-  }
-
-  /// Initialize network services
-  Future<void> initializeNetworkServices({
-    required String apiKey,
-    required Uri baseURL,
-  }) async {
-    // Initialize network services for production mode
-  }
-
-  /// Register a framework adapter with optional priority
-  /// Higher priority adapters are preferred when multiple can handle the same model
-  /// Matches iOS RunAnywhere.registerFrameworkAdapter pattern
-  void registerFrameworkAdapter(UnifiedFrameworkAdapter adapter,
-      {int priority = 100}) {
-    _adapterRegistry.register(adapter, priority: priority);
-
-    // Call adapter's onRegistration callback
-    adapter.onRegistration();
-
-    // Register download strategy if adapter provides one
-    final downloadStrategy = adapter.getDownloadStrategy();
-    if (downloadStrategy != null) {
-      downloadService.registerStrategy(downloadStrategy);
-      logger.info(
-          'Registered download strategy for ${adapter.framework.displayName}');
-    }
-
-    // Register any models provided by the adapter
-    final providedModels = adapter.getProvidedModels();
-    for (final model in providedModels) {
-      modelRegistry.registerModel(model);
-    }
-
-    logger
-        .info('Registered framework adapter: ${adapter.framework.displayName}');
-  }
-
-  /// Register a framework adapter with models
-  /// Matches iOS RunAnywhere.registerFramework pattern
-  Future<void> registerFramework(
-    UnifiedFrameworkAdapter adapter, {
-    List<ModelRegistration>? models,
-    int priority = 100,
-  }) async {
-    // Register the adapter
-    registerFrameworkAdapter(adapter, priority: priority);
-
-    // Register provided models
-    if (models != null) {
-      for (final registration in models) {
-        final modelInfo = registration.toModelInfo();
-        modelRegistry.registerModel(modelInfo);
-        logger.info('Registered model: ${modelInfo.name} (${modelInfo.id})');
-      }
-    }
+    _networkService = _apiClient;
   }
 
   /// Reset all services (for testing)
   void reset() {
-    // Stop analytics pipeline
-    _analyticsInitializer?.dispose();
-    _analyticsInitializer = null;
-
-    // Reset core services
-    _modelRegistry = null;
-    _modelLoadingService = null;
-    _generationService = null;
-    _streamingService = null;
-    _voiceCapabilityService = null;
-    _memoryService = null;
-    _logger = null;
-    _initParams = null;
-
-    // Reset network services
     _apiClient = null;
     _networkService = null;
-    _authenticationService = null;
+    _logger = null;
+    _initParams = null;
   }
+}
+
+/// SDK initialization parameters
+class SDKInitParams {
+  final String apiKey;
+  final Uri baseURL;
+  final SDKEnvironment environment;
+
+  const SDKInitParams({
+    required this.apiKey,
+    required this.baseURL,
+    required this.environment,
+  });
 }

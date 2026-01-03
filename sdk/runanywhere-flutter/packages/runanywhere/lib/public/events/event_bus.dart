@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:runanywhere/public/events/component_initialization_event.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// Central event bus for SDK-wide event distribution
@@ -20,13 +19,8 @@ class EventBus {
       StreamController<SDKGenerationEvent>.broadcast();
   final _modelController = StreamController<SDKModelEvent>.broadcast();
   final _voiceController = StreamController<SDKVoiceEvent>.broadcast();
-  final _performanceController =
-      StreamController<SDKPerformanceEvent>.broadcast();
-  final _networkController = StreamController<SDKNetworkEvent>.broadcast();
   final _storageController = StreamController<SDKStorageEvent>.broadcast();
-  final _frameworkController = StreamController<SDKFrameworkEvent>.broadcast();
-  final _componentController =
-      StreamController<ComponentInitializationEvent>.broadcast();
+  final _deviceController = StreamController<SDKDeviceEvent>.broadcast();
   final _allEventsController = StreamController<SDKEvent>.broadcast();
 
   /// Public streams for subscribing to events
@@ -43,17 +37,9 @@ class EventBus {
 
   Stream<SDKVoiceEvent> get voiceEvents => _voiceController.stream;
 
-  Stream<SDKPerformanceEvent> get performanceEvents =>
-      _performanceController.stream;
-
-  Stream<SDKNetworkEvent> get networkEvents => _networkController.stream;
-
   Stream<SDKStorageEvent> get storageEvents => _storageController.stream;
 
-  Stream<SDKFrameworkEvent> get frameworkEvents => _frameworkController.stream;
-
-  Stream<ComponentInitializationEvent> get componentEvents =>
-      _componentController.stream;
+  Stream<SDKDeviceEvent> get deviceEvents => _deviceController.stream;
 
   Stream<SDKEvent> get allEvents => _allEventsController.stream;
 
@@ -71,16 +57,10 @@ class EventBus {
       _modelController.add(event);
     } else if (event is SDKVoiceEvent) {
       _voiceController.add(event);
-    } else if (event is SDKPerformanceEvent) {
-      _performanceController.add(event);
-    } else if (event is SDKNetworkEvent) {
-      _networkController.add(event);
     } else if (event is SDKStorageEvent) {
       _storageController.add(event);
-    } else if (event is SDKFrameworkEvent) {
-      _frameworkController.add(event);
-    } else if (event is ComponentInitializationEvent) {
-      _componentController.add(event);
+    } else if (event is SDKDeviceEvent) {
+      _deviceController.add(event);
     }
   }
 
@@ -91,11 +71,8 @@ class EventBus {
     await _generationController.close();
     await _modelController.close();
     await _voiceController.close();
-    await _performanceController.close();
-    await _networkController.close();
     await _storageController.close();
-    await _frameworkController.close();
-    await _componentController.close();
+    await _deviceController.close();
     await _allEventsController.close();
   }
 }
