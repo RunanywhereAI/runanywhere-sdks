@@ -3,16 +3,13 @@ def getExtOrDefault(name) {
 }
 
 // Only arm64-v8a is supported - native libraries are only built for 64-bit ARM
-// This overrides any reactNativeArchitectures from root project
 def reactNativeArchitectures() {
-    // Native libraries are only available for arm64-v8a
     return ["arm64-v8a"]
 }
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 apply from: '../nitrogen/generated/android/runanywhere+autolinking.gradle'
-
 apply plugin: 'com.facebook.react'
 
 def getExtOrIntegerDefault(name) {
@@ -21,7 +18,6 @@ def getExtOrIntegerDefault(name) {
     } else if (project.properties.containsKey('RunAnywhere_' + name)) {
         return (project.properties['RunAnywhere_' + name]).toInteger()
     }
-    // Defaults for standalone builds
     def defaults = [
         'compileSdkVersion': 36,
         'minSdkVersion': 24,
@@ -31,28 +27,28 @@ def getExtOrIntegerDefault(name) {
 }
 
 // =============================================================================
-// Native Library Configuration
+// Version Constants (MUST match Swift Package.swift and iOS Podspec)
 // =============================================================================
+def commonsVersion = "0.1.0"
 
-// Version of pre-built native libraries to download
-// First check SDK root native-version.txt, then android/ subdirectory, then fallback
-def nativeLibVersion = project.findProperty("runanywhere.native.version") ?:
-    (file("../native-version.txt").exists() ? file("../native-version.txt").text.trim() :
-     file("native-version.txt").exists() ? file("native-version.txt").text.trim() : "0.0.1-dev.e6b7a2f")
+// =============================================================================
+// Binary Source
+// =============================================================================
+def githubOrg = "RunanywhereAI"
+def commonsRepo = "runanywhere-sdks"
 
-// Use local build mode (requires runanywhere-core to be built locally)
-def useLocalBuild = project.findProperty("runanywhere.testLocal")?.toBoolean() ?: false
-
-// GitHub configuration for downloads
-def githubOrg = project.findProperty("runanywhere.github.org") ?: "RunanywhereAI"
-def githubRepo = project.findProperty("runanywhere.github.repo") ?: "runanywhere-binaries"
+// =============================================================================
+// testLocal Toggle
+// =============================================================================
+def useLocalBuild = project.findProperty("runanywhere.testLocal")?.toBoolean() ?:
+                    System.getenv("RA_TEST_LOCAL") == "1" ?: false
 
 // Native libraries directory
 def jniLibsDir = file("src/main/jniLibs")
 def downloadedLibsDir = file("build/downloaded-libs")
 
-// Local runanywhere-core path (for local builds)
-def runAnywhereCoreDir = file("../../../../runanywhere-core")
+// Local runanywhere-commons path (for local builds)
+def runAnywhereCommonsDir = file("../../../../runanywhere-commons")
 
 android {
     namespace "com.margelo.nitro.runanywhere"
@@ -63,7 +59,6 @@ android {
         minSdkVersion getExtOrIntegerDefault('minSdkVersion')
         targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
 
-        // Only arm64-v8a is supported - native libraries are only built for 64-bit ARM
         ndk {
             abiFilters 'arm64-v8a'
         }
@@ -88,7 +83,6 @@ android {
             "META-INF",
             "META-INF/**"
         ]
-        // React Native libraries that may conflict - prefer React Native's version
         pickFirsts = [
             "**/libc++_shared.so",
             "**/libjsi.so",
@@ -96,7 +90,6 @@ android {
             "**/libfolly_runtime.so"
         ]
         jniLibs {
-            // Use legacy packaging to extract libraries to filesystem
             useLegacyPackaging = true
         }
     }
@@ -132,28 +125,13 @@ android {
                 "generated/jni"
             ]
 
-            // Configure jniLibs source based on build mode
             if (useLocalBuild) {
-                // Local mode: use locally built libraries from runanywhere-core
-                def unifiedDistDir = new File(runAnywhereCoreDir, "dist/android/unified")
-                if (unifiedDistDir.exists()) {
-                    jniLibs.srcDirs = [unifiedDistDir]
-                    logger.lifecycle("Using local unified native libraries from: $unifiedDistDir")
+                def commonsDistDir = new File(runAnywhereCommonsDir, "dist/android")
+                if (commonsDistDir.exists()) {
+                    jniLibs.srcDirs = [commonsDistDir]
+                    logger.lifecycle("[RunAnywhereNative] Using LOCAL native libraries from: $commonsDistDir")
                 } else {
-                    // Fallback: combine jni + llamacpp + onnx directories
-                    def sourceDirs = []
-                    def jniDir = new File(runAnywhereCoreDir, "dist/android/jni")
-                    def llamacppDir = new File(runAnywhereCoreDir, "dist/android/llamacpp")
-                    def onnxDir = new File(runAnywhereCoreDir, "dist/android/onnx")
-
-                    if (jniDir.exists()) sourceDirs.add(jniDir)
-                    if (llamacppDir.exists()) sourceDirs.add(llamacppDir)
-                    if (onnxDir.exists()) sourceDirs.add(onnxDir)
-
-                    if (!sourceDirs.isEmpty()) {
-                        jniLibs.srcDirs = sourceDirs
-                        logger.lifecycle("Using local native libraries from: ${sourceDirs.join(', ')}")
-                    }
+                    logger.warn("[RunAnywhereNative] Local commons dist not found at: $commonsDistDir")
                 }
             } else {
                 jniLibs.srcDirs = [jniLibsDir]
@@ -163,100 +141,82 @@ android {
 }
 
 // =============================================================================
-// Download Native Libraries Task
+// Download RACommons Only (Backend modules are in separate packages)
 // =============================================================================
 
 task downloadNativeLibs {
-    description = "Downloads pre-built unified native library from GitHub releases"
+    description = "Downloads RACommons from GitHub releases (runanywhere-sdks)"
     group = "build setup"
 
     def versionFile = file("${jniLibsDir}/.version")
 
-    // Extract just the commit hash from version (e.g., "0.0.1-dev.2cd70fc" -> "2cd70fc")
-    def shortVersion = nativeLibVersion.contains(".") ? nativeLibVersion.substring(nativeLibVersion.lastIndexOf(".") + 1) : nativeLibVersion
-
-    // Unified archive with all backends in one package
-    def unifiedArchive = "RunAnywhereUnified-android-${shortVersion}.zip"
-
     outputs.dir(jniLibsDir)
     outputs.upToDateWhen {
-        versionFile.exists() && versionFile.text.trim() == nativeLibVersion
+        versionFile.exists() && versionFile.text.trim() == commonsVersion
     }
 
     doLast {
         if (useLocalBuild) {
-            logger.lifecycle("Skipping download - using local build mode")
+            logger.lifecycle("[RunAnywhereNative] Skipping download - using local build mode")
             return
         }
 
         def currentVersion = versionFile.exists() ? versionFile.text.trim() : ""
-        if (currentVersion == nativeLibVersion) {
-            logger.lifecycle("Native libraries version $nativeLibVersion already downloaded")
+        if (currentVersion == commonsVersion) {
+            logger.lifecycle("[RunAnywhereNative] RACommons version $commonsVersion already downloaded")
             return
         }
 
-        logger.lifecycle("Downloading unified native library version $nativeLibVersion...")
+        logger.lifecycle("[RunAnywhereNative] Downloading RACommons...")
+        logger.lifecycle("  Version: $commonsVersion")
 
-        // Create download directory
         downloadedLibsDir.mkdirs()
-
-        // Clear existing jniLibs
         jniLibsDir.deleteDir()
         jniLibsDir.mkdirs()
 
-        // Download unified archive
-        def unifiedUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/$unifiedArchive"
-        def unifiedZipFile = file("$downloadedLibsDir/$unifiedArchive")
+        // Download RACommons only - backend modules are separate
+        def downloadUrl = "https://github.com/${githubOrg}/${commonsRepo}/releases/download/commons-v${commonsVersion}/RACommons-android-${commonsVersion}.zip"
+        def zipFile = file("${downloadedLibsDir}/RACommons.zip")
+
+        logger.lifecycle("📦 Downloading RACommons...")
+        logger.lifecycle("   URL: $downloadUrl")
 
         try {
-            logger.lifecycle("Downloading unified archive: $unifiedArchive")
-            logger.lifecycle("URL: $unifiedUrl")
-
-            new URL(unifiedUrl).withInputStream { input ->
-                unifiedZipFile.withOutputStream { output ->
+            new URL(downloadUrl).withInputStream { input ->
+                zipFile.withOutputStream { output ->
                     output << input
                 }
             }
-            logger.lifecycle("Downloaded: ${unifiedZipFile.length() / 1024}KB")
+            logger.lifecycle("   Downloaded: ${zipFile.length() / 1024}KB")
 
-            // Extract unified archive directly to jniLibs
-            logger.lifecycle("Extracting unified archive...")
             copy {
-                from zipTree(unifiedZipFile)
+                from zipTree(zipFile)
                 into jniLibsDir
             }
 
-            // List extracted files
-            jniLibsDir.listFiles()?.findAll { it.isDirectory() }?.each { abiDir ->
-                logger.lifecycle("  ${abiDir.name}/")
-                abiDir.listFiles()?.findAll { it.name.endsWith(".so") }?.each { soFile ->
-                    logger.lifecycle("    ${soFile.name} (${soFile.length() / 1024}KB)")
-                }
-            }
-
-            logger.lifecycle("✅ Unified native library installed successfully")
+            logger.lifecycle("✅ RACommons installed")
         } catch (Exception e) {
-            logger.error("Failed to download unified native library: ${e.message}")
-            logger.error("Download URL: $unifiedUrl")
-            logger.error("")
-            logger.error("Resolution options:")
-            logger.error("  1. Check that version $nativeLibVersion exists in GitHub releases")
-            logger.error("  2. Build locally: cd runanywhere-core && ./scripts/android/build.sh all")
-            logger.error("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
-            throw new GradleException("Failed to download unified native library: $unifiedArchive", e)
+            logger.error("❌ Failed to download RACommons: ${e.message}")
+            throw new GradleException("Failed to download RACommons", e)
         }
 
-        // Write version marker
-        versionFile.text = nativeLibVersion
-        logger.lifecycle("Unified native library version $nativeLibVersion installed")
+        // List installed files
+        logger.lifecycle("\nInstalled native libraries:")
+        jniLibsDir.listFiles()?.findAll { it.isDirectory() }?.each { abiDir ->
+            logger.lifecycle("  ${abiDir.name}/")
+            abiDir.listFiles()?.findAll { it.name.endsWith(".so") }?.each { soFile ->
+                logger.lifecycle("    ${soFile.name} (${soFile.length() / 1024}KB)")
+            }
+        }
+
+        versionFile.text = commonsVersion
+        logger.lifecycle("\n✅ RACommons version $commonsVersion installed")
     }
 }
 
-// Make preBuild depend on download task when not using local build
 if (!useLocalBuild) {
     preBuild.dependsOn downloadNativeLibs
 
-    // Ensure codegen tasks also wait for native libs download
     afterEvaluate {
         tasks.matching {
             it.name.contains("generateCodegen") || it.name.contains("Codegen")
@@ -265,10 +225,6 @@ if (!useLocalBuild) {
         }
     }
 }
-
-// =============================================================================
-// Clean Task
-// =============================================================================
 
 task cleanNativeLibs(type: Delete) {
     description = "Removes downloaded native libraries"
@@ -287,9 +243,4 @@ repositories {
 dependencies {
     implementation "com.facebook.react:react-android"
     implementation project(":react-native-nitro-modules")
-
-    // Apache Commons Compress for archive extraction on Android
-    // (same library used by runanywhere-kotlin SDK)
-    // Needed because Android pre-built binaries don't have libarchive linked
-    implementation "org.apache.commons:commons-compress:1.26.0"
 }

@@ -11,13 +11,7 @@ export {
   type AddModelFromURLOptions,
 } from './ModelRegistry';
 
-// JS Download Service - JavaScript-based download using react-native-fs
-export {
-  JSDownloadService,
-  type JSDownloadProgress,
-} from './JSDownloadService';
-
-// Download Service - Native-based download (requires native module implementation)
+// Download Service - Native-based download (delegates to native commons)
 export {
   DownloadService,
   DownloadState,

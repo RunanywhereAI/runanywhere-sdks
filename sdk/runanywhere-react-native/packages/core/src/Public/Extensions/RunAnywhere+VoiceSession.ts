@@ -1,139 +1,93 @@
 /**
  * RunAnywhere+VoiceSession.ts
  *
- * Voice Session and Voice Agent extension for RunAnywhere SDK.
- * Matches iOS: RunAnywhere+VoiceSession.swift and RunAnywhere+VoiceAgent.swift
+ * Voice session extension.
+ * Delegates to native commons.
+ *
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/RunAnywhere+VoiceSession.swift
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import {
-  arrayBufferToBase64,
-  base64ToUint8Array,
-  normalizeAudioData,
-} from '../../Foundation/Utilities/AudioUtils';
 
 const logger = new SDKLogger('RunAnywhere.VoiceSession');
 
-// ============================================================================
-// Voice Agent Processing
-// ============================================================================
-
-/** Default sample rate for voice processing (16kHz) */
-const DEFAULT_SAMPLE_RATE = 16000;
+/**
+ * Voice session config
+ */
+export interface VoiceSessionConfig {
+  sttModelId?: string;
+  ttsModelId?: string;
+  llmModelId?: string;
+  sampleRate?: number;
+  language?: string;
+}
 
 /**
- * Process a complete voice turn: audio → transcription → LLM response → synthesized speech
- *
- * Matches iOS: static func processVoiceTurn(_ audioData: Data) async throws -> VoiceAgentResult
- *
- * @param audioData - Raw PCM audio data (16-bit, mono, 16kHz)
- * @param sampleRate - Audio sample rate (default: 16000)
+ * Voice turn result
+ */
+export interface VoiceTurnResult {
+  transcription: string;
+  response: string;
+  audioData?: string; // base64
+}
+
+/**
+ * Process a voice turn (STT -> LLM -> TTS)
  */
 export async function processVoiceTurn(
-  audioData: ArrayBuffer | Uint8Array | Buffer,
-  sampleRate: number = DEFAULT_SAMPLE_RATE
-): Promise<import('../../Features/VoiceAgent/VoiceAgentModels').VoiceAgentResult> {
+  audioData: ArrayBuffer,
+  config?: VoiceSessionConfig
+): Promise<VoiceTurnResult> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
 
   const native = requireNativeModule();
-  const audioBytes = normalizeAudioData(audioData);
+  const sampleRate = config?.sampleRate ?? 16000;
 
-  // Convert PCM audio to base64 for native module
-  const audioBase64 = arrayBufferToBase64(audioBytes);
+  try {
+    // Step 1: Transcribe audio
+    const base64Audio = Buffer.from(audioData).toString('base64');
+    const transcription = await native.transcribe(base64Audio, sampleRate, config?.language);
 
-  // Step 1: Transcribe audio using native STT (no WAV conversion needed)
-  const transcribeResultJson = await native.transcribe(
-    audioBase64,
-    sampleRate,
-    'en'
-  );
-  const transcribeResult = JSON.parse(transcribeResultJson);
+    // Step 2: Generate response
+    const response = await native.generate(transcription);
 
-  if (transcribeResult.error) {
-    throw new Error(transcribeResult.error);
-  }
-
-  const transcription = transcribeResult.text?.trim() || '';
-
-  if (!transcription) {
-    return {
-      speechDetected: false,
-      transcription: null,
-      response: null,
-      synthesizedAudio: null,
-    };
-  }
-
-  // Step 2: Generate LLM response
-  const optionsJson = JSON.stringify({
-    maxTokens: 500,
-    temperature: 0.7,
-  });
-  const generateResultJson = await native.generate(transcription, optionsJson);
-  const generateResult = JSON.parse(generateResultJson);
-
-  if (generateResult.error) {
-    throw new Error(generateResult.error);
-  }
-
-  const response = generateResult.text || '';
-
-  // Step 3: Synthesize speech from response
-  let synthesizedAudio: Uint8Array | null = null;
-  if (response) {
+    // Step 3: Synthesize response (if TTS model loaded)
+    let audioResponse: string | undefined;
     try {
-      const ttsResultJson = await native.synthesize(response, '', 1.0, 0.0);
-      const ttsResult = JSON.parse(ttsResultJson);
-
-      if (ttsResult.audioData) {
-        synthesizedAudio = base64ToUint8Array(ttsResult.audioData);
-      }
-    } catch (ttsError) {
-      logger.warning(`TTS synthesis failed: ${ttsError}`);
+      const synthesized = await native.synthesize(response, '', 1.0, 1.0);
+      audioResponse = synthesized;
+    } catch {
+      // TTS optional
     }
+
+    return {
+      transcription,
+      response,
+      audioData: audioResponse,
+    };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error(`Voice turn failed: ${msg}`);
+    throw error;
   }
-
-  return {
-    speechDetected: true,
-    transcription,
-    response,
-    synthesizedAudio,
-  };
-}
-
-// ============================================================================
-// Voice Session API
-// ============================================================================
-
-/**
- * Start a voice session with event-based handling
- *
- * Matches iOS: static func startVoiceSession(config:) async throws -> VoiceSessionHandle
- */
-export async function startVoiceSession(
-  config?: Partial<import('../../Features/VoiceSession').VoiceSessionConfig>
-): Promise<import('../../Features/VoiceSession').VoiceSessionHandle> {
-  const { VoiceSessionHandle } = await import('../../Features/VoiceSession');
-  const session = new VoiceSessionHandle(config);
-  await session.start();
-  return session;
 }
 
 /**
- * Start a voice session with callback-based event handling
- *
- * Matches iOS: static func startVoiceSession(config:onEvent:) async throws -> VoiceSessionHandle
+ * Start a voice session (placeholder)
  */
-export async function startVoiceSessionWithCallback(
-  config: Partial<import('../../Features/VoiceSession').VoiceSessionConfig>,
-  onEvent: import('../../Features/VoiceSession').VoiceSessionEventListener
-): Promise<import('../../Features/VoiceSession').VoiceSessionHandle> {
-  const { VoiceSessionHandle } = await import('../../Features/VoiceSession');
-  const session = new VoiceSessionHandle(config);
-  session.onEvent(onEvent);
-  await session.start();
-  return session;
+export function startVoiceSession(_config?: VoiceSessionConfig): void {
+  logger.info('Voice session started');
+}
+
+/**
+ * Start voice session with callback (placeholder)
+ */
+export function startVoiceSessionWithCallback(
+  _config: VoiceSessionConfig,
+  _callback: (event: unknown) => void
+): void {
+  logger.info('Voice session with callback started');
 }

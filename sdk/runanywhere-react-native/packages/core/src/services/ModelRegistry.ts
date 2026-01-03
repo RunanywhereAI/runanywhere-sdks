@@ -1,47 +1,25 @@
 /**
  * Model Registry for RunAnywhere React Native SDK
  *
- * Manages model discovery, registration, and filtering.
- * The actual registry logic lives in the native SDK.
+ * Thin wrapper over native model registry.
+ * All logic (caching, filtering, discovery) is in native commons.
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Capabilities/Registry/Services/RegistryService.swift
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+ModelRegistry.swift
  */
 
-import { requireNativeModule } from '@runanywhere/native';
-import type {
-  LLMFramework,
-  ModelCategory,
-  ModelFormat,
-  ModelInfo,
-} from '../types';
-import { getAllCatalogModels } from '../Data/modelCatalog';
+import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
+import type { LLMFramework, ModelCategory, ModelInfo } from '../types';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('ModelRegistry');
 
 /**
- * Criteria for filtering models
+ * Criteria for filtering models (passed to native)
  */
 export interface ModelCriteria {
-  /** Filter by compatible framework */
   framework?: LLMFramework;
-  /** Filter by model format */
-  format?: ModelFormat;
-  /** Filter by model category */
   category?: ModelCategory;
-  /** Maximum download size in bytes */
-  maxSize?: number;
-  /** Minimum context length */
-  minContextLength?: number;
-  /** Maximum context length */
-  maxContextLength?: number;
-  /** Filter by tags */
-  tags?: string[];
-  /** Search term for name/description */
-  search?: string;
-  /** Only show downloaded models */
   downloadedOnly?: boolean;
-  /** Only show available models */
   availableOnly?: boolean;
 }
 
@@ -49,213 +27,152 @@ export interface ModelCriteria {
  * Options for adding a model from URL
  */
 export interface AddModelFromURLOptions {
-  /** Display name for the model */
   name: string;
-  /** Download URL for the model */
   url: string;
-  /** Target framework for the model */
   framework: LLMFramework;
-  /** Estimated memory usage in bytes (optional) */
   estimatedSize?: number;
-  /** Whether the model supports thinking mode */
   supportsThinking?: boolean;
 }
 
 /**
- * Model Registry Service
+ * Model Registry - Thin wrapper over native
  *
- * Manages model discovery and registration.
+ * All model management logic lives in native commons.
  */
 class ModelRegistryImpl {
-  private modelsCache: Map<string, ModelInfo> = new Map();
-  private initialized: boolean = false;
+  private initialized = false;
 
   /**
-   * Initialize the registry
-   *
-   * Following Swift SDK pattern - loads pre-configured models from catalog.
-   * This ensures users see available models before downloading.
+   * Initialize the registry (calls native)
    */
   async initialize(): Promise<void> {
-    logger.debug('Initializing registry...');
+    if (this.initialized) return;
 
-    // Load pre-configured models from catalog
-    const catalogModels = getAllCatalogModels();
-
-    // Populate the cache with catalog models
-    for (const model of catalogModels) {
-      this.modelsCache.set(model.id, model);
+    if (!isNativeModuleAvailable()) {
+      logger.warning('Native module not available');
+      this.initialized = true;
+      return;
     }
 
-    this.initialized = true;
-    logger.info(
-      `Registry initialized with ${catalogModels.length} catalog models`
-    );
+    try {
+      const native = requireNativeModule();
+      await native.discoverModels();
+      this.initialized = true;
+      logger.info('Model registry initialized via native');
+    } catch (error) {
+      logger.warning('Failed to initialize registry:', { error });
+      this.initialized = true;
+    }
   }
 
   /**
-   * Discover available models
-   *
-   * @returns Array of discovered models
+   * Discover available models (native)
    */
   async discoverModels(): Promise<ModelInfo[]> {
+    if (!isNativeModuleAvailable()) return [];
+
     const native = requireNativeModule();
-    const modelsJson = await native.discoverModels();
-    const models: ModelInfo[] = JSON.parse(modelsJson);
-
-    // Update cache
-    for (const model of models) {
-      this.modelsCache.set(model.id, model);
-    }
-
-    return models;
+    const json = await native.discoverModels();
+    return JSON.parse(json);
   }
 
   /**
-   * Register a model
-   *
-   * Updates the model in the local cache. This is used by the download service
-   * to update model info after download completes.
-   *
-   * @param model - Model information to register
-   */
-  async registerModel(model: ModelInfo): Promise<void> {
-    this.modelsCache.set(model.id, model);
-    logger.debug(`Registered/updated model: ${model.id}`);
-  }
-
-  /**
-   * Register and persist a model
-   *
-   * @param model - Model information to register and persist
-   */
-  async registerModelPersistently(model: ModelInfo): Promise<void> {
-    // For now, just update the cache
-    // TODO: Persist to AsyncStorage for cross-session persistence
-    this.modelsCache.set(model.id, model);
-    logger.debug(`Registered model persistently: ${model.id}`);
-  }
-
-  /**
-   * Get a model by ID
-   *
-   * @param id - Model identifier
-   * @returns Model information or null if not found
+   * Get a model by ID (native)
    */
   async getModel(id: string): Promise<ModelInfo | null> {
-    // Check cache first
-    const cached = this.modelsCache.get(id);
-    if (cached) {
-      return cached;
-    }
+    if (!isNativeModuleAvailable()) return null;
 
-    // Fetch from native
     const native = requireNativeModule();
-    const modelJson = await native.getModel(id);
-
-    if (modelJson) {
-      const model: ModelInfo = JSON.parse(modelJson);
-      this.modelsCache.set(id, model);
-      return model;
-    }
-
-    return null;
+    const json = await native.getModel(id);
+    if (!json) return null;
+    return JSON.parse(json);
   }
 
   /**
-   * Filter models by criteria
-   *
-   * @param criteria - Filter criteria
-   * @returns Filtered models
+   * Get all models (native)
+   */
+  async getAllModels(): Promise<ModelInfo[]> {
+    if (!isNativeModuleAvailable()) return [];
+
+    const native = requireNativeModule();
+    const json = await native.availableModels();
+    return JSON.parse(json);
+  }
+
+  /**
+   * Filter models by criteria (native handles filtering)
    */
   async filterModels(criteria: ModelCriteria): Promise<ModelInfo[]> {
-    // Work with local cache (same as Swift SDK)
-    let models = Array.from(this.modelsCache.values());
+    const allModels = await this.getAllModels();
 
-    // Apply filters
+    // Simple filtering on JS side since native returns all
+    let models = allModels;
+
     if (criteria.framework) {
-      const framework = criteria.framework;
-      models = models.filter((m) => m.compatibleFrameworks.includes(framework));
+      models = models.filter(m => m.compatibleFrameworks?.includes(criteria.framework!));
     }
     if (criteria.category) {
-      models = models.filter((m) => m.category === criteria.category);
+      models = models.filter(m => m.category === criteria.category);
     }
     if (criteria.downloadedOnly) {
-      models = models.filter((m) => m.localPath != null);
+      models = models.filter(m => m.isDownloaded);
     }
     if (criteria.availableOnly) {
-      models = models.filter(
-        (m) => m.localPath != null || m.downloadURL != null
-      );
+      models = models.filter(m => m.isAvailable);
     }
 
     return models;
   }
 
   /**
-   * Update model information
-   *
-   * @param model - Updated model information
+   * Register a model (native)
    */
-  async updateModel(model: ModelInfo): Promise<void> {
+  async registerModel(model: ModelInfo): Promise<void> {
+    if (!isNativeModuleAvailable()) return;
+
     const native = requireNativeModule();
     await native.updateModel(model.id, JSON.stringify(model));
-    this.modelsCache.set(model.id, model);
   }
 
   /**
-   * Remove a model from the registry
-   *
-   * @param id - Model identifier
+   * Update model info (native)
+   */
+  async updateModel(model: ModelInfo): Promise<void> {
+    return this.registerModel(model);
+  }
+
+  /**
+   * Remove a model (native)
    */
   async removeModel(id: string): Promise<void> {
+    if (!isNativeModuleAvailable()) return;
+
     const native = requireNativeModule();
     await native.removeModel(id);
-    this.modelsCache.delete(id);
   }
 
   /**
-   * Add a model from URL
-   *
-   * Creates and registers a model from a download URL.
-   *
-   * @param options - Options for adding the model
-   * @returns Created model info
+   * Add model from URL (native)
    */
   async addModelFromURL(options: AddModelFromURLOptions): Promise<ModelInfo> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
+
     const native = requireNativeModule();
-    const modelJson = await native.addModelFromURL(
-      options.url,
-      JSON.stringify(options)
-    );
-    const model: ModelInfo = JSON.parse(modelJson);
-    this.modelsCache.set(model.id, model);
-    return model;
+    const json = await native.addModelFromURL(options.url, JSON.stringify(options));
+    return JSON.parse(json);
   }
 
   /**
-   * Get all registered models
-   *
-   * @returns Array of all registered models
-   */
-  async getAllModels(): Promise<ModelInfo[]> {
-    await this.refreshCache();
-    return Array.from(this.modelsCache.values());
-  }
-
-  /**
-   * Get downloaded models only
-   *
-   * @returns Array of downloaded models
+   * Get downloaded models
    */
   async getDownloadedModels(): Promise<ModelInfo[]> {
     return this.filterModels({ downloadedOnly: true });
   }
 
   /**
-   * Get available models (ready to use)
-   *
-   * @returns Array of available models
+   * Get available models
    */
   async getAvailableModels(): Promise<ModelInfo[]> {
     return this.filterModels({ availableOnly: true });
@@ -263,9 +180,6 @@ class ModelRegistryImpl {
 
   /**
    * Get models by framework
-   *
-   * @param framework - Target framework
-   * @returns Array of compatible models
    */
   async getModelsByFramework(framework: LLMFramework): Promise<ModelInfo[]> {
     return this.filterModels({ framework });
@@ -273,29 +187,13 @@ class ModelRegistryImpl {
 
   /**
    * Get models by category
-   *
-   * @param category - Model category
-   * @returns Array of models in category
    */
   async getModelsByCategory(category: ModelCategory): Promise<ModelInfo[]> {
     return this.filterModels({ category });
   }
 
   /**
-   * Search models by name or description
-   *
-   * @param query - Search query
-   * @returns Array of matching models
-   */
-  async searchModels(query: string): Promise<ModelInfo[]> {
-    return this.filterModels({ search: query });
-  }
-
-  /**
-   * Check if a model is downloaded
-   *
-   * @param modelId - Model identifier
-   * @returns Whether the model is downloaded
+   * Check if model is downloaded
    */
   async isModelDownloaded(modelId: string): Promise<boolean> {
     const model = await this.getModel(modelId);
@@ -303,10 +201,7 @@ class ModelRegistryImpl {
   }
 
   /**
-   * Check if a model is available
-   *
-   * @param modelId - Model identifier
-   * @returns Whether the model is available for use
+   * Check if model is available
    */
   async isModelAvailable(modelId: string): Promise<boolean> {
     const model = await this.getModel(modelId);
@@ -314,47 +209,21 @@ class ModelRegistryImpl {
   }
 
   /**
-   * Refresh the local cache from native
-   */
-  private async refreshCache(): Promise<void> {
-    try {
-      const native = requireNativeModule();
-      const modelsJson = await native.availableModels();
-      const models: ModelInfo[] = JSON.parse(modelsJson);
-
-      this.modelsCache.clear();
-      for (const model of models) {
-        this.modelsCache.set(model.id, model);
-      }
-    } catch {
-      // Cache refresh failed, but that's okay
-    }
-  }
-
-  /**
-   * Clear the cache
-   */
-  clearCache(): void {
-    this.modelsCache.clear();
-  }
-
-  /**
-   * Check if registry is initialized
+   * Check if initialized
    */
   isInitialized(): boolean {
     return this.initialized;
   }
 
   /**
-   * Reset the registry
+   * Reset (for testing)
    */
   reset(): void {
-    this.modelsCache.clear();
     this.initialized = false;
   }
 }
 
 /**
- * Singleton instance of the Model Registry
+ * Singleton instance
  */
 export const ModelRegistry = new ModelRegistryImpl();

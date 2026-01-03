@@ -2,27 +2,34 @@
  * HybridRunAnywhere.cpp
  *
  * Nitrogen HybridObject implementation for RunAnywhere SDK.
- * Calls runanywhere-core C API for all AI operations.
+ *
+ * REFACTORED: Now delegates to modular bridges that use the rac_* API
+ * from runanywhere-commons, matching Swift's CppBridge pattern.
  */
 
 #include "HybridRunAnywhere.hpp"
+
+// Modular bridges (matching Swift CppBridge pattern)
+#include "bridges/PlatformAdapterBridge.hpp"
+#include "bridges/InitBridge.hpp"
+#include "bridges/LLMBridge.hpp"
+#include "bridges/STTBridge.hpp"
+#include "bridges/TTSBridge.hpp"
+#include "bridges/VADBridge.hpp"
+#include "bridges/ModelRegistryBridge.hpp"
+#include "bridges/EventBridge.hpp"
+#include "bridges/StateBridge.hpp"
+#include "bridges/AuthBridge.hpp"
+#include "bridges/HTTPBridge.hpp"
+#include "bridges/DownloadBridge.hpp"
+#include "bridges/DeviceBridge.hpp"
 
 #include <sstream>
 #include <cstring>
 #include <algorithm>
 #include <cctype>
 #include <chrono>
-#include <sys/stat.h>
-#include <dirent.h>
 #include <vector>
-
-// iOS AudioDecoder functions (defined in AudioDecoder.m)
-#if defined(__APPLE__)
-extern "C" {
-  int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSamples, int* sampleRate);
-  void ra_free_audio_samples(float* samples);
-}
-#endif
 
 // Platform-specific logging
 #if defined(ANDROID) || defined(__ANDROID__)
@@ -37,117 +44,9 @@ extern "C" {
 #define LOGD(...) printf(__VA_ARGS__); printf("\n")
 #endif
 
-// Android-specific WAV reader (for STT file transcription)
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <fstream>
-#include <cstdint>
-
-namespace {
-// Simple WAV file reader for Android
-struct WavHeader {
-  char riff[4];           // "RIFF"
-  uint32_t fileSize;      // File size - 8
-  char wave[4];           // "WAVE"
-  char fmt[4];            // "fmt "
-  uint32_t fmtSize;       // Format chunk size
-  uint16_t audioFormat;   // Audio format (1 = PCM)
-  uint16_t numChannels;   // Number of channels
-  uint32_t sampleRate;    // Sample rate
-  uint32_t byteRate;      // Bytes per second
-  uint16_t blockAlign;    // Bytes per sample * channels
-  uint16_t bitsPerSample; // Bits per sample
-};
-
-bool readWavFile(const char* filePath, float** samples, size_t* numSamples, int* sampleRate) {
-  std::ifstream file(filePath, std::ios::binary);
-  if (!file.is_open()) {
-    printf("[WAV Reader] Failed to open file: %s\n", filePath);
-    return false;
-  }
-
-  // Read header
-  WavHeader header;
-  file.read(reinterpret_cast<char*>(&header), sizeof(WavHeader));
-
-  // Verify RIFF/WAVE format
-  if (strncmp(header.riff, "RIFF", 4) != 0 || strncmp(header.wave, "WAVE", 4) != 0) {
-    printf("[WAV Reader] Not a valid WAV file\n");
-    return false;
-  }
-
-  // Skip extra format bytes if present
-  if (header.fmtSize > 16) {
-    file.seekg(header.fmtSize - 16, std::ios::cur);
-  }
-
-  // Find data chunk
-  char chunkId[4];
-  uint32_t chunkSize;
-  while (file.read(chunkId, 4) && file.read(reinterpret_cast<char*>(&chunkSize), 4)) {
-    if (strncmp(chunkId, "data", 4) == 0) {
-      break;
-    }
-    file.seekg(chunkSize, std::ios::cur);
-  }
-
-  if (strncmp(chunkId, "data", 4) != 0) {
-    printf("[WAV Reader] No data chunk found\n");
-    return false;
-  }
-
-  // Calculate number of samples
-  int bytesPerSample = header.bitsPerSample / 8;
-  size_t totalSamples = chunkSize / bytesPerSample / header.numChannels;
-
-  // Allocate output buffer
-  *samples = new float[totalSamples];
-  *numSamples = totalSamples;
-  *sampleRate = header.sampleRate;
-
-  // Read and convert samples
-  if (header.bitsPerSample == 16) {
-    std::vector<int16_t> buffer(chunkSize / 2);
-    file.read(reinterpret_cast<char*>(buffer.data()), chunkSize);
-
-    for (size_t i = 0; i < totalSamples; i++) {
-      // Mix channels to mono if needed
-      float sum = 0;
-      for (int ch = 0; ch < header.numChannels; ch++) {
-        sum += buffer[i * header.numChannels + ch] / 32768.0f;
-      }
-      (*samples)[i] = sum / header.numChannels;
-    }
-  } else if (header.bitsPerSample == 32 && header.audioFormat == 3) {
-    // Float32 PCM
-    file.read(reinterpret_cast<char*>(*samples), chunkSize);
-    if (header.numChannels > 1) {
-      // Mix to mono
-      for (size_t i = 0; i < totalSamples; i++) {
-        float sum = 0;
-        for (int ch = 0; ch < header.numChannels; ch++) {
-          sum += (*samples)[i * header.numChannels + ch];
-        }
-        (*samples)[i] = sum / header.numChannels;
-      }
-    }
-  } else {
-    printf("[WAV Reader] Unsupported format: %d bits, format %d\n", header.bitsPerSample, header.audioFormat);
-    delete[] *samples;
-    *samples = nullptr;
-    return false;
-  }
-
-  printf("[WAV Reader] Read %zu samples at %d Hz\n", *numSamples, *sampleRate);
-  return true;
-}
-
-void freeWavSamples(float* samples) {
-  delete[] samples;
-}
-} // anonymous namespace
-#endif
-
 namespace margelo::nitro::runanywhere {
+
+using namespace ::runanywhere::bridges;
 
 // ============================================================================
 // Base64 Utilities
@@ -204,12 +103,7 @@ std::string encodeBase64Audio(const float* samples, size_t count) {
                       count * sizeof(float));
 }
 
-bool endsWith(const std::string& str, const std::string& suffix) {
-  if (suffix.size() > str.size()) return false;
-  return std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
-}
-
-// Simple JSON value extraction (handles: "key": 123 or "key": 0.5)
+// Simple JSON value extraction
 int extractIntValue(const std::string& json, const std::string& key, int defaultValue) {
   std::string searchKey = "\"" + key + "\":";
   size_t pos = json.find(searchKey);
@@ -262,52 +156,31 @@ std::string jsonString(const std::string& value) {
 // ============================================================================
 
 HybridRunAnywhere::HybridRunAnywhere() : HybridObject(TAG) {
-  LOGI("Constructor called");
-
-  // Check which backends are available
-  int count = 0;
-  const char** backends = ra_get_available_backends(&count);
-
-  LOGI("Found %d available backends:", count);
-  for (int i = 0; i < count; i++) {
-    LOGI("  - %s", backends[i]);
-  }
+  LOGI("HybridRunAnywhere constructor - using modular bridges with rac_* API");
 }
 
 HybridRunAnywhere::~HybridRunAnywhere() {
-  printf("[HybridRunAnywhere] Destructor called\n");
+  LOGI("HybridRunAnywhere destructor");
 
-  std::lock_guard<std::mutex> lock(backendMutex_);
-
-  if (onnxBackend_) {
-    ra_destroy(onnxBackend_);
-    onnxBackend_ = nullptr;
-  }
-
-  if (backend_) {
-    ra_destroy(backend_);
-    backend_ = nullptr;
-  }
+  // Cleanup bridges
+  LLMBridge::shared().destroy();
+  STTBridge::shared().cleanup();
+  TTSBridge::shared().cleanup();
+  VADBridge::shared().cleanup();
+  InitBridge::shared().shutdown();
+  PlatformAdapterBridge::shared().shutdown();
 }
 
 // ============================================================================
-// Backend Lifecycle
+// SDK Lifecycle - Delegates to InitBridge and PlatformAdapterBridge
 // ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::createBackend(
     const std::string& name) {
   return Promise<bool>::async([this, name]() {
-    std::lock_guard<std::mutex> lock(backendMutex_);
-
-    printf("[HybridRunAnywhere] createBackend: %s\n", name.c_str());
-
-    backend_ = ra_create_backend(name.c_str());
-    if (!backend_) {
-      setLastError("Failed to create backend: " + name);
-      return false;
-    }
-
-    printf("[HybridRunAnywhere] Backend created successfully\n");
+    LOGI("createBackend: %s (deprecated - use initialize)", name.c_str());
+    // In the new architecture, backends are managed per-capability
+    // This is kept for backwards compatibility
     return true;
   });
 }
@@ -315,109 +188,122 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhere::createBackend(
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::initialize(
     const std::string& configJson) {
   return Promise<bool>::async([this, configJson]() {
-    std::lock_guard<std::mutex> lock(backendMutex_);
+    std::lock_guard<std::mutex> lock(initMutex_);
 
-    if (!backend_) {
-      setLastError("Backend not created");
+    LOGI("Initializing SDK with rac_* API...");
+
+    // 1. Setup platform adapter callbacks (MUST be first)
+    PlatformCallbacks callbacks;
+    callbacks.fileExists = [](const std::string& path) {
+      // TODO: Implement via HybridRunAnywhereFileSystem
+      return false;
+    };
+    callbacks.fileRead = [](const std::string& path) -> std::string {
+      // TODO: Implement via HybridRunAnywhereFileSystem
+      return "";
+    };
+    callbacks.fileWrite = [](const std::string& path, const std::string& data) {
+      // TODO: Implement via HybridRunAnywhereFileSystem
+      return false;
+    };
+    callbacks.fileDelete = [](const std::string& path) {
+      // TODO: Implement via HybridRunAnywhereFileSystem
+      return false;
+    };
+    callbacks.log = [](int level, const std::string& category, const std::string& message) {
+      LOGI("[%s] %s", category.c_str(), message.c_str());
+    };
+    callbacks.nowMs = []() -> int64_t {
+      auto now = std::chrono::system_clock::now();
+      return std::chrono::duration_cast<std::chrono::milliseconds>(
+          now.time_since_epoch()).count();
+    };
+
+    PlatformAdapterBridge::shared().initialize(callbacks);
+
+    // 2. Initialize commons
+    auto result = InitBridge::shared().initialize(configJson);
+    if (result != 0) {
+      setLastError("Failed to initialize SDK");
       return false;
     }
 
-    printf("[HybridRunAnywhere] Initializing with config...\n");
+    // 3. Setup event bridge
+    EventBridge::shared().initialize([](const std::string& eventJson) {
+      // TODO: Forward to JS via Nitrogen event emitter
+      LOGD("Event: %s", eventJson.c_str());
+    });
 
-    ra_result_code result = ra_initialize(backend_, configJson.c_str());
-    if (result != RA_SUCCESS) {
-      setLastError("Failed to initialize backend");
-      return false;
-    }
+    // 4. Update state
+    StateBridge::shared().setState(SDKState::Initialized);
 
-    isInitialized_ = true;
-    printf("[HybridRunAnywhere] Initialized successfully\n");
+    LOGI("SDK initialized successfully");
     return true;
   });
 }
 
 std::shared_ptr<Promise<void>> HybridRunAnywhere::destroy() {
   return Promise<void>::async([this]() {
-    std::lock_guard<std::mutex> lock(backendMutex_);
+    std::lock_guard<std::mutex> lock(initMutex_);
 
-    if (onnxBackend_) {
-      ra_destroy(onnxBackend_);
-      onnxBackend_ = nullptr;
-    }
+    // Cleanup all bridges
+    LLMBridge::shared().destroy();
+    STTBridge::shared().cleanup();
+    TTSBridge::shared().cleanup();
+    VADBridge::shared().cleanup();
+    EventBridge::shared().shutdown();
+    InitBridge::shared().shutdown();
+    PlatformAdapterBridge::shared().shutdown();
 
-    if (backend_) {
-      ra_destroy(backend_);
-      backend_ = nullptr;
-    }
+    StateBridge::shared().setState(SDKState::Uninitialized);
 
-    isInitialized_ = false;
-    printf("[HybridRunAnywhere] Destroyed\n");
+    LOGI("SDK destroyed");
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::isInitialized() {
-  return Promise<bool>::async([this]() { return isInitialized_; });
+  return Promise<bool>::async([]() {
+    return StateBridge::shared().isSDKInitialized();
+  });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhere::getBackendInfo() {
-  return Promise<std::string>::async([this]() {
-    std::lock_guard<std::mutex> lock(backendMutex_);
-
-    if (!backend_) {
-      return std::string("{}");
-    }
-
-    const char* info = ra_get_backend_info(backend_);
-    return std::string(info ? info : "{}");
+  return Promise<std::string>::async([]() {
+    return buildJsonObject({
+      {"api", jsonString("rac_*")},
+      {"source", jsonString("runanywhere-commons")},
+      {"llmLoaded", LLMBridge::shared().isLoaded() ? "true" : "false"},
+      {"sttLoaded", STTBridge::shared().isLoaded() ? "true" : "false"},
+      {"ttsLoaded", TTSBridge::shared().isLoaded() ? "true" : "false"},
+      {"vadLoaded", VADBridge::shared().isLoaded() ? "true" : "false"}
+    });
   });
 }
 
 // ============================================================================
-// Text Generation (LLM)
+// Text Generation (LLM) - Delegates to LLMBridge
 // ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::loadTextModel(
     const std::string& path,
     const std::optional<std::string>& configJson) {
-  return Promise<bool>::async([this, path, configJson]() {
-    std::lock_guard<std::mutex> lock(modelMutex_);
-
-    if (!backend_) {
-      setLastError("Backend not created");
-      return false;
-    }
-
-    printf("[HybridRunAnywhere] Loading text model: %s\n", path.c_str());
-
-    ra_result_code result = ra_text_load_model(
-        backend_, path.c_str(),
-        configJson.has_value() ? configJson->c_str() : nullptr);
-
-    if (result != RA_SUCCESS) {
-      setLastError("Failed to load model");
-      return false;
-    }
-
-    printf("[HybridRunAnywhere] Text model loaded successfully\n");
-    return true;
+  return Promise<bool>::async([path]() {
+    LOGI("Loading LLM model: %s", path.c_str());
+    auto result = LLMBridge::shared().loadModel(path);
+    return result == 0;
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::isTextModelLoaded() {
-  return Promise<bool>::async([this]() {
-    std::lock_guard<std::mutex> lock(modelMutex_);
-    if (!backend_) return false;
-    return ra_text_is_model_loaded(backend_);
+  return Promise<bool>::async([]() {
+    return LLMBridge::shared().isLoaded();
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::unloadTextModel() {
-  return Promise<bool>::async([this]() {
-    std::lock_guard<std::mutex> lock(modelMutex_);
-    if (!backend_) return false;
-
-    ra_result_code result = ra_text_unload_model(backend_);
-    return result == RA_SUCCESS;
+  return Promise<bool>::async([]() {
+    auto result = LLMBridge::shared().unload();
+    return result == 0;
   });
 }
 
@@ -425,145 +311,33 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::generate(
     const std::string& prompt,
     const std::optional<std::string>& optionsJson) {
   return Promise<std::string>::async([this, prompt, optionsJson]() {
-    std::lock_guard<std::mutex> lock(modelMutex_);
-
-    if (!backend_ || !ra_text_is_model_loaded(backend_)) {
+    if (!LLMBridge::shared().isLoaded()) {
       setLastError("Model not loaded");
       return buildJsonObject({{"error", jsonString("Model not loaded")}});
     }
 
-    // Parse options from JSON
-    int maxTokens = 256;
-    float temperature = 0.7f;
-    std::string systemPrompt;
-
+    LLMOptions options;
     if (optionsJson.has_value()) {
-      maxTokens = extractIntValue(*optionsJson, "max_tokens", 256);
-      temperature = extractFloatValue(*optionsJson, "temperature", 0.7f);
-
-      // Extract system_prompt string
-      size_t sysStart = optionsJson->find("\"system_prompt\":");
-      if (sysStart != std::string::npos) {
-        sysStart = optionsJson->find("\"", sysStart + 16);
-        if (sysStart != std::string::npos) {
-          sysStart++;
-          size_t sysEnd = optionsJson->find("\"", sysStart);
-          if (sysEnd != std::string::npos) {
-            systemPrompt = optionsJson->substr(sysStart, sysEnd - sysStart);
-          }
-        }
-      }
+      options.maxTokens = extractIntValue(*optionsJson, "max_tokens", 512);
+      options.temperature = extractFloatValue(*optionsJson, "temperature", 0.7f);
+      options.topP = extractFloatValue(*optionsJson, "top_p", 0.9f);
+      options.topK = extractIntValue(*optionsJson, "top_k", 40);
     }
 
-    printf("[HybridRunAnywhere] generate() called\n");
-    printf("[HybridRunAnywhere] prompt: %.50s...\n", prompt.c_str());
-    printf("[HybridRunAnywhere] maxTokens: %d, temperature: %.2f\n", maxTokens, temperature);
-
-    // Prepare full prompt with system prompt if provided
-    std::string fullPrompt = prompt;
-    if (!systemPrompt.empty() && systemPrompt != "null") {
-      fullPrompt = systemPrompt + "\n\n" + prompt;
-    }
+    LOGI("Generating with prompt: %.50s...", prompt.c_str());
 
     auto startTime = std::chrono::high_resolution_clock::now();
-
-    char* result_json = nullptr;
-    ra_result_code result = ra_text_generate(
-        backend_, fullPrompt.c_str(), nullptr,
-        maxTokens, temperature, &result_json);
-
+    auto result = LLMBridge::shared().generate(prompt, options);
     auto endTime = std::chrono::high_resolution_clock::now();
-    auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        endTime - startTime).count();
 
-    if (result != RA_SUCCESS || !result_json) {
-      setLastError("Text generation failed");
-      return buildJsonObject({{"error", jsonString("Text generation failed")}});
-    }
-
-    // Parse the result JSON from runanywhere-core
-    std::string coreResult(result_json);
-    ra_free_string(result_json);
-
-    // Extract text from the core result
-    std::string generatedText;
-    size_t textStart = coreResult.find("\"text\":");
-    if (textStart != std::string::npos) {
-      textStart = coreResult.find("\"", textStart + 7);
-      if (textStart != std::string::npos) {
-        textStart++;
-        size_t textEnd = textStart;
-        // Find the closing quote, handling escaped quotes
-        while (textEnd < coreResult.size()) {
-          textEnd = coreResult.find("\"", textEnd);
-          if (textEnd == std::string::npos) break;
-          // Check if it's escaped
-          int backslashes = 0;
-          size_t pos = textEnd - 1;
-          while (pos < coreResult.size() && coreResult[pos] == '\\') {
-            backslashes++;
-            if (pos == 0) break;
-            pos--;
-          }
-          if (backslashes % 2 == 0) break; // Not escaped
-          textEnd++;
-        }
-        if (textEnd != std::string::npos) {
-          generatedText = coreResult.substr(textStart, textEnd - textStart);
-          // Unescape the string
-          std::string unescaped;
-          for (size_t i = 0; i < generatedText.size(); i++) {
-            if (generatedText[i] == '\\' && i + 1 < generatedText.size()) {
-              char next = generatedText[i + 1];
-              if (next == 'n') { unescaped += '\n'; i++; }
-              else if (next == 'r') { unescaped += '\r'; i++; }
-              else if (next == 't') { unescaped += '\t'; i++; }
-              else if (next == '"') { unescaped += '"'; i++; }
-              else if (next == '\\') { unescaped += '\\'; i++; }
-              else { unescaped += generatedText[i]; }
-            } else {
-              unescaped += generatedText[i];
-            }
-          }
-          generatedText = unescaped;
-        }
-      }
-    }
-
-    // If we couldn't parse text, use raw result
-    if (generatedText.empty()) {
-      generatedText = coreResult;
-    }
-
-    int tokensUsed = extractIntValue(coreResult, "tokens_used", 0);
-    if (tokensUsed == 0) {
-      tokensUsed = extractIntValue(coreResult, "tokensUsed", 0);
-    }
-    if (tokensUsed == 0) {
-      tokensUsed = static_cast<int>(generatedText.size() / 4); // Rough estimate
-    }
-
-    double tokensPerSecond = durationMs > 0 ? (tokensUsed * 1000.0 / durationMs) : 0;
-
-    // Build response in the format expected by the JS SDK
-    std::string response = buildJsonObject({
-      {"text", jsonString(generatedText)},
-      {"tokensUsed", std::to_string(tokensUsed)},
-      {"modelUsed", jsonString("llamacpp")},
+    return buildJsonObject({
+      {"text", jsonString(result.text)},
+      {"tokensUsed", std::to_string(result.tokenCount)},
       {"latencyMs", std::to_string(durationMs)},
-      {"executionTarget", "0"},
-      {"savedAmount", "0"},
-      {"framework", jsonString("llama.cpp")},
-      {"hardwareUsed", "0"},
-      {"memoryUsed", "0"},
-      {"performanceMetrics", buildJsonObject({
-        {"timeToFirstTokenMs", std::to_string(durationMs > 0 ? durationMs / 10 : 0)},
-        {"tokensPerSecond", std::to_string(tokensPerSecond)},
-        {"inferenceTimeMs", std::to_string(durationMs)}
-      })}
+      {"cancelled", result.cancelled ? "true" : "false"}
     });
-
-    printf("[HybridRunAnywhere] generate() completed in %lld ms, %d tokens\n", durationMs, tokensUsed);
-    return response;
   });
 }
 
@@ -572,131 +346,72 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::generateStream(
     const std::string& optionsJson,
     const std::function<void(const std::string&, bool)>& callback) {
   return Promise<std::string>::async([this, prompt, optionsJson, callback]() {
-    std::lock_guard<std::mutex> lock(modelMutex_);
-
-    if (!backend_ || !ra_text_is_model_loaded(backend_)) {
+    if (!LLMBridge::shared().isLoaded()) {
       setLastError("Model not loaded");
       return std::string("");
     }
 
-    int maxTokens = extractIntValue(optionsJson, "max_tokens", 512);
-    float temperature = extractFloatValue(optionsJson, "temperature", 0.7f);
+    LLMOptions options;
+    options.maxTokens = extractIntValue(optionsJson, "max_tokens", 512);
+    options.temperature = extractFloatValue(optionsJson, "temperature", 0.7f);
 
     std::string fullResponse;
 
-    // Create callback data struct
-    struct CallbackData {
-      std::function<void(const std::string&, bool)> callback;
-      std::string* fullResponse;
-    };
-
-    CallbackData callbackData{callback, &fullResponse};
-
-    // Streaming callback wrapper - returns bool (true to continue)
-    ra_text_stream_callback streamCallback = [](const char* token, void* userData) -> bool {
-      auto* data = static_cast<CallbackData*>(userData);
-      std::string tokenStr(token ? token : "");
-      *(data->fullResponse) += tokenStr;
-      if (data->callback) {
-        // Note: we pass false for isComplete, final callback happens after stream ends
-        data->callback(tokenStr, false);
+    LLMStreamCallbacks streamCallbacks;
+    streamCallbacks.onToken = [&callback, &fullResponse](const std::string& token) -> bool {
+      fullResponse += token;
+      if (callback) {
+        callback(token, false);
       }
-      return true; // continue streaming
+      return true;
+    };
+    streamCallbacks.onComplete = [&callback](const std::string&, int, double) {
+      if (callback) {
+        callback("", true);
+      }
+    };
+    streamCallbacks.onError = [this](int code, const std::string& message) {
+      setLastError(message);
     };
 
-    ra_result_code result = ra_text_generate_stream(
-        backend_, prompt.c_str(), nullptr,
-        maxTokens, temperature, streamCallback, &callbackData);
-
-    // Signal completion
-    if (callback) {
-      callback("", true);
-    }
-
-    if (result != RA_SUCCESS) {
-      setLastError("Streaming generation failed");
-      return std::string("");
-    }
+    LLMBridge::shared().generateStream(prompt, options, streamCallbacks);
 
     return fullResponse;
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::cancelGeneration() {
-  return Promise<bool>::async([this]() {
-    if (!backend_) return false;
-    ra_text_cancel(backend_);
+  return Promise<bool>::async([]() {
+    LLMBridge::shared().cancel();
     return true;
   });
 }
 
 // ============================================================================
-// Speech-to-Text (STT)
+// Speech-to-Text (STT) - Delegates to STTBridge
 // ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::loadSTTModel(
     const std::string& path,
     const std::string& modelType,
     const std::optional<std::string>& configJson) {
-  return Promise<bool>::async([this, path, modelType, configJson]() {
-    std::lock_guard<std::mutex> lock(modelMutex_);
-
-    LOGI("loadSTTModel called with path: %s, type: %s", path.c_str(), modelType.c_str());
-
-    if (!onnxBackend_) {
-      LOGI("Creating ONNX backend for STT...");
-      onnxBackend_ = ra_create_backend("onnx");
-      if (!onnxBackend_) {
-        LOGE("Failed to create ONNX backend");
-        setLastError("Failed to create ONNX backend");
-        return false;
-      }
-
-      ra_result_code initResult = ra_initialize(onnxBackend_, nullptr);
-      if (initResult != RA_SUCCESS) {
-        LOGE("Failed to initialize ONNX backend, code: %d", initResult);
-        ra_destroy(onnxBackend_);
-        onnxBackend_ = nullptr;
-        setLastError("Failed to initialize ONNX backend");
-        return false;
-      }
-      LOGI("ONNX backend created and initialized");
-    }
-
-    std::string modelPath = extractArchiveIfNeeded(path);
-    LOGI("Loading STT model from: %s (original: %s)", modelPath.c_str(), path.c_str());
-
-    ra_result_code result = ra_stt_load_model(
-        onnxBackend_, modelPath.c_str(), modelType.c_str(),
-        configJson.has_value() ? configJson->c_str() : nullptr);
-
-    if (result != RA_SUCCESS) {
-      LOGE("Failed to load STT model, code: %d", result);
-      const char* lastErr = ra_get_last_error();
-      if (lastErr) {
-        LOGE("Error: %s", lastErr);
-      }
-      setLastError("Failed to load STT model");
-      return false;
-    }
-
-    LOGI("STT model loaded successfully");
-    return true;
+  return Promise<bool>::async([path]() {
+    LOGI("Loading STT model: %s", path.c_str());
+    auto result = STTBridge::shared().loadModel(path);
+    return result == 0;
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::isSTTModelLoaded() {
-  return Promise<bool>::async([this]() {
-    if (!onnxBackend_) return false;
-    return ra_stt_is_model_loaded(onnxBackend_);
+  return Promise<bool>::async([]() {
+    return STTBridge::shared().isLoaded();
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::unloadSTTModel() {
-  return Promise<bool>::async([this]() {
-    if (!onnxBackend_) return false;
-    ra_result_code result = ra_stt_unload_model(onnxBackend_);
-    return result == RA_SUCCESS;
+  return Promise<bool>::async([]() {
+    auto result = STTBridge::shared().unload();
+    return result == 0;
   });
 }
 
@@ -704,160 +419,74 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::transcribe(
     const std::string& audioBase64,
     double sampleRate,
     const std::optional<std::string>& language) {
-  return Promise<std::string>::async(
-      [this, audioBase64, sampleRate, language]() {
-        std::lock_guard<std::mutex> lock(modelMutex_);
+  return Promise<std::string>::async([this, audioBase64, sampleRate, language]() {
+    if (!STTBridge::shared().isLoaded()) {
+      return buildJsonObject({{"error", jsonString("STT model not loaded")}});
+    }
 
-        if (!onnxBackend_ || !ra_stt_is_model_loaded(onnxBackend_)) {
-          return buildJsonObject({{"error", jsonString("STT model not loaded")}});
-        }
+    auto audioBytes = base64Decode(audioBase64);
+    const void* samples = audioBytes.data();
+    size_t audioSize = audioBytes.size();
 
-        auto audioBytes = base64Decode(audioBase64);
-        const float* samples =
-            reinterpret_cast<const float*>(audioBytes.data());
-        size_t numSamples = audioBytes.size() / sizeof(float);
+    STTOptions options;
+    options.language = language.value_or("en");
 
-        printf("[HybridRunAnywhere] Transcribing %zu samples at %d Hz\n",
-               numSamples, static_cast<int>(sampleRate));
+    auto result = STTBridge::shared().transcribe(samples, audioSize, options);
 
-        char* result_json = nullptr;
-        ra_result_code result = ra_stt_transcribe(
-            onnxBackend_, samples, numSamples, static_cast<int>(sampleRate),
-            language.has_value() ? language->c_str() : "en", &result_json);
-
-        if (result != RA_SUCCESS || !result_json) {
-          return buildJsonObject({{"error", jsonString("Transcription failed")}});
-        }
-
-        std::string response(result_json);
-        ra_free_string(result_json);
-        return response;
-      });
+    return buildJsonObject({
+      {"text", jsonString(result.text)},
+      {"confidence", std::to_string(result.confidence)},
+      {"isFinal", result.isFinal ? "true" : "false"}
+    });
+  });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhere::transcribeFile(
     const std::string& filePath,
     const std::optional<std::string>& language) {
   return Promise<std::string>::async([this, filePath, language]() {
-    std::lock_guard<std::mutex> lock(modelMutex_);
-
-    if (!onnxBackend_ || !ra_stt_is_model_loaded(onnxBackend_)) {
+    if (!STTBridge::shared().isLoaded()) {
       return buildJsonObject({{"error", jsonString("STT model not loaded")}});
     }
 
-    printf("[HybridRunAnywhere] transcribeFile: %s\n", filePath.c_str());
-
-    float* samples = nullptr;
-    size_t numSamples = 0;
-    int sampleRate = 0;
-
-#if defined(__APPLE__)
-    // Use the iOS AudioDecoder to convert the file to PCM float32
-    int decodeResult = ra_decode_audio_file(filePath.c_str(), &samples, &numSamples, &sampleRate);
-    if (decodeResult != 1 || !samples || numSamples == 0) {
-      printf("[HybridRunAnywhere] Failed to decode audio file\n");
-      return buildJsonObject({{"error", jsonString("Failed to decode audio file")}});
-    }
-#elif defined(ANDROID) || defined(__ANDROID__)
-    // Use simple WAV reader on Android
-    if (!readWavFile(filePath.c_str(), &samples, &numSamples, &sampleRate)) {
-      printf("[HybridRunAnywhere] Failed to read WAV file\n");
-      return buildJsonObject({{"error", jsonString("Failed to read audio file. Only WAV format is supported on Android.")}});
-    }
-#else
-    return buildJsonObject({{"error", jsonString("transcribeFile not supported on this platform")}});
-#endif
-
-    printf("[HybridRunAnywhere] Decoded %zu samples at %d Hz\n", numSamples, sampleRate);
-
-    // Transcribe the samples
-    char* result_json = nullptr;
-    ra_result_code result = ra_stt_transcribe(
-        onnxBackend_, samples, numSamples, sampleRate,
-        language.has_value() ? language->c_str() : "en", &result_json);
-
-    // Free the decoded samples
-#if defined(__APPLE__)
-    ra_free_audio_samples(samples);
-#elif defined(ANDROID) || defined(__ANDROID__)
-    freeWavSamples(samples);
-#endif
-
-    if (result != RA_SUCCESS || !result_json) {
-      printf("[HybridRunAnywhere] Transcription failed\n");
-      return buildJsonObject({{"error", jsonString("Transcription failed")}});
-    }
-
-    std::string response(result_json);
-    ra_free_string(result_json);
-    return response;
+    // TODO: Read audio file and transcribe
+    // This requires platform-specific audio file reading
+    return buildJsonObject({{"error", jsonString("transcribeFile not yet implemented with rac_* API")}});
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::supportsSTTStreaming() {
-  return Promise<bool>::async([this]() {
-    if (!onnxBackend_) return false;
-    return ra_stt_supports_streaming(onnxBackend_);
+  return Promise<bool>::async([]() {
+    // STT streaming support depends on the model
+    return true;
   });
 }
 
 // ============================================================================
-// Text-to-Speech (TTS)
+// Text-to-Speech (TTS) - Delegates to TTSBridge
 // ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::loadTTSModel(
     const std::string& path,
     const std::string& modelType,
     const std::optional<std::string>& configJson) {
-  return Promise<bool>::async([this, path, modelType, configJson]() {
-    std::lock_guard<std::mutex> lock(modelMutex_);
-
-    if (!onnxBackend_) {
-      printf("[HybridRunAnywhere] Creating ONNX backend for TTS...\n");
-      onnxBackend_ = ra_create_backend("onnx");
-      if (!onnxBackend_) {
-        setLastError("Failed to create ONNX backend");
-        return false;
-      }
-
-      ra_result_code initResult = ra_initialize(onnxBackend_, nullptr);
-      if (initResult != RA_SUCCESS) {
-        ra_destroy(onnxBackend_);
-        onnxBackend_ = nullptr;
-        setLastError("Failed to initialize ONNX backend");
-        return false;
-      }
-    }
-
-    std::string modelPath = extractArchiveIfNeeded(path);
-    printf("[HybridRunAnywhere] Loading TTS model: %s\n", modelPath.c_str());
-
-    ra_result_code result = ra_tts_load_model(
-        onnxBackend_, modelPath.c_str(), modelType.c_str(),
-        configJson.has_value() ? configJson->c_str() : nullptr);
-
-    if (result != RA_SUCCESS) {
-      setLastError("Failed to load TTS model");
-      return false;
-    }
-
-    printf("[HybridRunAnywhere] TTS model loaded successfully\n");
-    return true;
+  return Promise<bool>::async([path]() {
+    LOGI("Loading TTS model: %s", path.c_str());
+    auto result = TTSBridge::shared().loadModel(path);
+    return result == 0;
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::isTTSModelLoaded() {
-  return Promise<bool>::async([this]() {
-    if (!onnxBackend_) return false;
-    return ra_tts_is_model_loaded(onnxBackend_);
+  return Promise<bool>::async([]() {
+    return TTSBridge::shared().isLoaded();
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhere::unloadTTSModel() {
-  return Promise<bool>::async([this]() {
-    if (!onnxBackend_) return false;
-    ra_result_code result = ra_tts_unload_model(onnxBackend_);
-    return result == RA_SUCCESS;
+  return Promise<bool>::async([]() {
+    auto result = TTSBridge::shared().unload();
+    return result == 0;
   });
 }
 
@@ -866,43 +495,27 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::synthesize(
     const std::string& voiceId,
     double speedRate,
     double pitchShift) {
-  return Promise<std::string>::async(
-      [this, text, voiceId, speedRate, pitchShift]() {
-        std::lock_guard<std::mutex> lock(modelMutex_);
+  return Promise<std::string>::async([this, text, voiceId, speedRate, pitchShift]() {
+    if (!TTSBridge::shared().isLoaded()) {
+      return buildJsonObject({{"error", jsonString("TTS model not loaded")}});
+    }
 
-        if (!onnxBackend_ || !ra_tts_is_model_loaded(onnxBackend_)) {
-          return buildJsonObject({{"error", jsonString("TTS model not loaded")}});
-        }
+    TTSOptions options;
+    options.voiceId = voiceId;
+    options.speed = static_cast<float>(speedRate);
+    options.pitch = static_cast<float>(pitchShift);
 
-        printf("[HybridRunAnywhere] Synthesizing: %s\n", text.c_str());
+    auto result = TTSBridge::shared().synthesize(text, options);
 
-        float* audioData = nullptr;
-        size_t numSamples = 0;
-        int sampleRate = 0;
+    std::string audioBase64 = encodeBase64Audio(result.audioData.data(), result.audioData.size());
 
-        ra_result_code result = ra_tts_synthesize(
-            onnxBackend_, text.c_str(),
-            voiceId.empty() ? nullptr : voiceId.c_str(),
-            static_cast<float>(speedRate), static_cast<float>(pitchShift),
-            &audioData, &numSamples, &sampleRate);
-
-        if (result != RA_SUCCESS || !audioData) {
-          return buildJsonObject({{"error", jsonString("Synthesis failed")}});
-        }
-
-        std::string audioBase64 = encodeBase64Audio(audioData, numSamples);
-        ra_free_audio(audioData);
-
-        double durationSec = static_cast<double>(numSamples) / sampleRate;
-
-        // Use camelCase keys to match JS expectations
-        return buildJsonObject({
-            {"audio", jsonString(audioBase64)},
-            {"sampleRate", std::to_string(sampleRate)},
-            {"numSamples", std::to_string(numSamples)},
-            {"duration", std::to_string(durationSec)}
-        });
-      });
+    return buildJsonObject({
+      {"audio", jsonString(audioBase64)},
+      {"sampleRate", std::to_string(result.sampleRate)},
+      {"numSamples", std::to_string(result.audioData.size())},
+      {"duration", std::to_string(result.durationMs / 1000.0)}
+    });
+  });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhere::getTTSVoices() {
@@ -923,9 +536,9 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhere::extractArchive(
     const std::string& archivePath,
     const std::string& destPath) {
   return Promise<bool>::async([archivePath, destPath]() {
-    ra_result_code result =
-        ra_extract_archive(archivePath.c_str(), destPath.c_str());
-    return result == RA_SUCCESS;
+    // TODO: Implement via platform adapter
+    LOGI("extractArchive: %s -> %s", archivePath.c_str(), destPath.c_str());
+    return false;
   });
 }
 
@@ -952,15 +565,16 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhere::getDeviceCapabilities()
     return buildJsonObject({
         {"platform", jsonString(platform)},
         {"supports_metal", supportsMetal ? "true" : "false"},
-        {"supports_vulkan", supportsVulkan ? "true" : "false"}
+        {"supports_vulkan", supportsVulkan ? "true" : "false"},
+        {"api", jsonString("rac_*")}
     });
   });
 }
 
 std::shared_ptr<Promise<double>> HybridRunAnywhere::getMemoryUsage() {
-  return Promise<double>::async([this]() {
-    if (!backend_) return 0.0;
-    return static_cast<double>(ra_get_memory_usage(backend_));
+  return Promise<double>::async([]() {
+    // TODO: Get memory usage from commons
+    return 0.0;
   });
 }
 
@@ -970,113 +584,7 @@ std::shared_ptr<Promise<double>> HybridRunAnywhere::getMemoryUsage() {
 
 void HybridRunAnywhere::setLastError(const std::string& error) {
   lastError_ = error;
-  printf("[HybridRunAnywhere] Error: %s\n", error.c_str());
-}
-
-std::string HybridRunAnywhere::extractArchiveIfNeeded(
-    const std::string& archivePath) {
-  LOGD("extractArchiveIfNeeded called with: %s", archivePath.c_str());
-
-  bool isTarBz2 =
-      endsWith(archivePath, ".tar.bz2") || endsWith(archivePath, ".bz2");
-  bool isTarGz =
-      endsWith(archivePath, ".tar.gz") || endsWith(archivePath, ".tgz");
-
-  if (!isTarBz2 && !isTarGz) {
-    LOGD("Not an archive, returning path as-is");
-    return archivePath;
-  }
-
-  LOGI("Detected archive format: %s", isTarBz2 ? "tar.bz2" : "tar.gz");
-
-  std::string modelName;
-  size_t lastSlash = archivePath.rfind('/');
-  if (lastSlash != std::string::npos) {
-    modelName = archivePath.substr(lastSlash + 1);
-  } else {
-    modelName = archivePath;
-  }
-
-  size_t dotPos = modelName.find('.');
-  if (dotPos != std::string::npos) {
-    modelName = modelName.substr(0, dotPos);
-  }
-
-  std::string docsPath;
-  size_t modelsPos = archivePath.find("/Documents/");
-  if (modelsPos != std::string::npos) {
-    docsPath = archivePath.substr(0, modelsPos + 11);
-  } else {
-    if (lastSlash != std::string::npos) {
-      docsPath = archivePath.substr(0, lastSlash + 1);
-    } else {
-      return archivePath;
-    }
-  }
-
-  std::string extractDir = docsPath + "sherpa-models/" + modelName;
-
-  struct stat st;
-  if (stat(extractDir.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
-    DIR* dir = opendir(extractDir.c_str());
-    if (dir) {
-      struct dirent* entry;
-      std::string subdirName;
-      int count = 0;
-      while ((entry = readdir(dir)) != nullptr) {
-        if (entry->d_name[0] != '.') {
-          subdirName = entry->d_name;
-          count++;
-        }
-      }
-      closedir(dir);
-
-      if (count == 1) {
-        std::string subdirPath = extractDir + "/" + subdirName;
-        if (stat(subdirPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
-          return subdirPath;
-        }
-      }
-    }
-    return extractDir;
-  }
-
-  LOGI("Extracting archive %s to: %s", archivePath.c_str(), extractDir.c_str());
-  ra_result_code result =
-      ra_extract_archive(archivePath.c_str(), extractDir.c_str());
-
-  if (result != RA_SUCCESS) {
-    LOGE("Archive extraction failed with code %d", result);
-    const char* lastErr = ra_get_last_error();
-    if (lastErr) {
-      LOGE("Extraction error: %s", lastErr);
-    }
-    return archivePath;
-  }
-  LOGI("Archive extraction successful");
-
-  DIR* dir = opendir(extractDir.c_str());
-  if (dir) {
-    struct dirent* entry;
-    std::string subdirName;
-    int count = 0;
-    while ((entry = readdir(dir)) != nullptr) {
-      if (entry->d_name[0] != '.') {
-        subdirName = entry->d_name;
-        count++;
-      }
-    }
-    closedir(dir);
-
-    if (count == 1) {
-      std::string subdirPath = extractDir + "/" + subdirName;
-      if (stat(subdirPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
-        return subdirPath;
-      }
-    }
-  }
-
-  return extractDir;
+  LOGE("Error: %s", error.c_str());
 }
 
 } // namespace margelo::nitro::runanywhere

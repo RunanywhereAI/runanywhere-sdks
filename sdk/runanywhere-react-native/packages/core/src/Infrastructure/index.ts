@@ -1,29 +1,12 @@
 /**
  * Infrastructure Module
  *
- * Core infrastructure components for the RunAnywhere SDK.
- * Matches iOS SDK Infrastructure layer structure.
- *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/
+ * Core infrastructure for the SDK.
+ * Most logic is in native commons.
  */
 
-// Analytics subsystem
-export * from './Analytics';
-
-// Device subsystem
+// Device
 export * from './Device';
 
-// Download subsystem
-export * from './Download';
-
-// Events subsystem
+// Events
 export * from './Events';
-
-// File Management subsystem
-export * from './FileManagement';
-
-// Logging subsystem
-export * from './Logging';
-
-// Model Management subsystem
-export * from './ModelManagement';

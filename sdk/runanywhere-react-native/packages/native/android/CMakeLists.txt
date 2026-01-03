@@ -3,71 +3,68 @@ cmake_minimum_required(VERSION 3.9.0)
 
 set(PACKAGE_NAME runanywhere)
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 
-# Define C++ library and add all sources
-add_library(${PACKAGE_NAME} SHARED
-    src/main/cpp/cpp-adapter.cpp
-    ../cpp/HybridRunAnywhere.cpp
-)
-
-# Path to pre-built native libraries (downloaded from runanywhere-binaries)
+# Path to pre-built native libraries (downloaded from runanywhere-sdks/runanywhere-binaries)
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 
-# RunAnywhere Bridge - contains all the C API functions (ra_text_*, ra_stt_*, ra_tts_*, etc.)
-if(EXISTS "${JNILIB_DIR}/librunanywhere_bridge.so")
-    add_library(runanywhere_bridge SHARED IMPORTED)
-    set_target_properties(runanywhere_bridge PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/librunanywhere_bridge.so"
+# =============================================================================
+# RACommons - Core SDK functionality (rac_* API)
+# =============================================================================
+if(EXISTS "${JNILIB_DIR}/libracommons.so")
+    add_library(racommons SHARED IMPORTED)
+    set_target_properties(racommons PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/libracommons.so"
         IMPORTED_NO_SONAME TRUE
     )
-    set(HAS_BRIDGE ON)
-    message(STATUS "Found runanywhere_bridge at ${JNILIB_DIR}/librunanywhere_bridge.so")
+    set(HAS_RACOMMONS ON)
+    message(STATUS "Found RACommons at ${JNILIB_DIR}/libracommons.so")
 else()
-    message(WARNING "runanywhere_bridge not found at ${JNILIB_DIR}/librunanywhere_bridge.so")
+    message(WARNING "RACommons not found at ${JNILIB_DIR}/libracommons.so")
     message(WARNING "Run: ./gradlew downloadNativeLibs")
 endif()
 
-# RunAnywhere Loader - handles dynamic library loading
-if(EXISTS "${JNILIB_DIR}/librunanywhere_loader.so")
-    add_library(runanywhere_loader SHARED IMPORTED)
-    set_target_properties(runanywhere_loader PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/librunanywhere_loader.so"
-        IMPORTED_NO_SONAME TRUE
-    )
-    set(HAS_LOADER ON)
-endif()
-
-# LlamaCPP backend
-if(EXISTS "${JNILIB_DIR}/librunanywhere_llamacpp.so")
-    add_library(runanywhere_llamacpp SHARED IMPORTED)
-    set_target_properties(runanywhere_llamacpp PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/librunanywhere_llamacpp.so"
+# =============================================================================
+# RABackendLlamaCPP - LLM backend
+# =============================================================================
+if(EXISTS "${JNILIB_DIR}/librabackend_llamacpp.so")
+    add_library(rabackend_llamacpp SHARED IMPORTED)
+    set_target_properties(rabackend_llamacpp PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/librabackend_llamacpp.so"
         IMPORTED_NO_SONAME TRUE
     )
     set(HAS_LLAMACPP ON)
+    message(STATUS "Found RABackendLlamaCPP at ${JNILIB_DIR}/librabackend_llamacpp.so")
 endif()
 
-# ONNX backend (for STT/TTS)
-if(EXISTS "${JNILIB_DIR}/librunanywhere_onnx.so")
-    add_library(runanywhere_onnx SHARED IMPORTED)
-    set_target_properties(runanywhere_onnx PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/librunanywhere_onnx.so"
+# =============================================================================
+# RABackendONNX - STT/TTS/VAD backend
+# =============================================================================
+if(EXISTS "${JNILIB_DIR}/librabackend_onnx.so")
+    add_library(rabackend_onnx SHARED IMPORTED)
+    set_target_properties(rabackend_onnx PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/librabackend_onnx.so"
         IMPORTED_NO_SONAME TRUE
     )
     set(HAS_ONNX ON)
+    message(STATUS "Found RABackendONNX at ${JNILIB_DIR}/librabackend_onnx.so")
 endif()
 
+# =============================================================================
 # ONNX Runtime
+# =============================================================================
 if(EXISTS "${JNILIB_DIR}/libonnxruntime.so")
     add_library(onnxruntime SHARED IMPORTED)
     set_target_properties(onnxruntime PROPERTIES
         IMPORTED_LOCATION "${JNILIB_DIR}/libonnxruntime.so"
         IMPORTED_NO_SONAME TRUE
     )
+    message(STATUS "Found ONNX Runtime at ${JNILIB_DIR}/libonnxruntime.so")
 endif()
 
-# OpenMP (required by LlamaCPP)
+# =============================================================================
+# OpenMP (required by some backends)
+# =============================================================================
 if(EXISTS "${JNILIB_DIR}/libomp.so")
     add_library(omp SHARED IMPORTED)
     set_target_properties(omp PROPERTIES
@@ -76,40 +73,56 @@ if(EXISTS "${JNILIB_DIR}/libomp.so")
     )
 endif()
 
+# =============================================================================
+# Source files
+# =============================================================================
+# Collect all bridge source files
+file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
+
+add_library(${PACKAGE_NAME} SHARED
+    src/main/cpp/cpp-adapter.cpp
+    ../cpp/HybridRunAnywhere.cpp
+    ${BRIDGE_SOURCES}
+)
+
 # Add Nitrogen specs (this handles all React Native linking)
 include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/runanywhere+autolinking.cmake)
 
-# Set up local includes
+# =============================================================================
+# Include directories
+# =============================================================================
 include_directories(
     "src/main/cpp"
     "../cpp"
-    "../cpp/include"
+    "../cpp/bridges"
+    "${CMAKE_SOURCE_DIR}/include"
 )
 
+# =============================================================================
+# Linking
+# =============================================================================
 find_library(LOG_LIB log)
 
-# Link all libraries together
 target_link_libraries(
     ${PACKAGE_NAME}
     ${LOG_LIB}
     android
 )
 
-# Link native libraries if available
-if(HAS_BRIDGE)
-    target_link_libraries(${PACKAGE_NAME} runanywhere_bridge)
+# Link RACommons if available
+if(HAS_RACOMMONS)
+    target_link_libraries(${PACKAGE_NAME} racommons)
+    target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
 endif()
 
-if(HAS_LOADER)
-    target_link_libraries(${PACKAGE_NAME} runanywhere_loader)
-endif()
-
+# Link LlamaCPP backend if available
 if(HAS_LLAMACPP)
-    target_link_libraries(${PACKAGE_NAME} runanywhere_llamacpp)
+    target_link_libraries(${PACKAGE_NAME} rabackend_llamacpp)
     target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_LLAMACPP=1)
 endif()
 
+# Link ONNX backend if available
 if(HAS_ONNX)
-    target_link_libraries(${PACKAGE_NAME} runanywhere_onnx onnxruntime)
-    target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX_RUNTIME=1)
+    target_link_libraries(${PACKAGE_NAME} rabackend_onnx onnxruntime)
+    target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1)
 endif()
