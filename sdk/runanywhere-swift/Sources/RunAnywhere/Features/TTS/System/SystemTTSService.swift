@@ -3,35 +3,11 @@
 //  RunAnywhere SDK
 //
 //  System TTS Service implementation using AVSpeechSynthesizer
-//  Uses Swift 6 concurrency with actor-based state management
+//  Fully isolated from Swift async context to avoid AVFoundation conflicts
 //
 
 import AVFoundation
 import Foundation
-
-// MARK: - State Actor
-
-/// Actor for managing speech synthesis state (Swift 6 concurrency)
-private actor SpeechState {
-    var continuation: CheckedContinuation<Data, Error>?
-    var isSpeaking = false
-
-    func setContinuation(_ cont: CheckedContinuation<Data, Error>?) {
-        continuation = cont
-        isSpeaking = cont != nil
-    }
-
-    func complete(with result: Result<Data, Error>) {
-        switch result {
-        case .success(let data):
-            continuation?.resume(returning: data)
-        case .failure(let error):
-            continuation?.resume(throwing: error)
-        }
-        continuation = nil
-        isSpeaking = false
-    }
-}
 
 // MARK: - System TTS Service
 
@@ -42,17 +18,23 @@ private actor SpeechState {
 ///
 /// **Note:** System TTS plays audio directly through speakers. The returned `Data`
 /// is a placeholder - use ONNX Piper TTS if you need actual audio data for custom playback.
-public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
+///
+/// **Concurrency:** This service uses `Task.detached` to completely isolate AVFoundation
+/// operations from Swift's async runtime, avoiding "unsafeForcedSync" warnings.
+@MainActor
+public final class SystemTTSService: NSObject {
 
     // MARK: - Framework Identification
 
-    public let inferenceFramework: InferenceFramework = .systemTTS
+    public nonisolated let inferenceFramework: InferenceFramework = .systemTTS
 
     // MARK: - Properties
 
     private let synthesizer = AVSpeechSynthesizer()
     private let logger = SDKLogger(category: "SystemTTS")
-    private let state = SpeechState()
+
+    /// Completion handler for current speech operation
+    private var speechCompletion: ((Result<Data, Error>) -> Void)?
 
     // MARK: - Initialization
 
@@ -61,30 +43,38 @@ public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
         synthesizer.delegate = self
     }
 
-    // MARK: - TTSService Protocol
+    // MARK: - TTS Operations
 
-    public func initialize() async throws {
-        logger.info("System TTS initialized (direct playback mode)")
-    }
-
-    public func synthesize(text: String, options: TTSOptions) async throws -> Data {
-        logger.info("Speaking: '\(text.prefix(50))...'")
-
-        let utterance = createUtterance(text: text, options: options)
-
-        return try await withCheckedThrowingContinuation { continuation in
-            Task {
-                await state.setContinuation(continuation)
-
-                // AVSpeechSynthesizer must be called on main thread
-                await MainActor.run {
-                    self.synthesizer.speak(utterance)
-                }
-            }
+    public nonisolated func initialize() async throws {
+        await MainActor.run {
+            logger.info("System TTS initialized (direct playback mode)")
         }
     }
 
-    public func synthesizeStream(
+    public nonisolated func synthesize(text: String, options: TTSOptions) async throws -> Data {
+        // Use Task.detached to completely break out of any async context
+        // This prevents AVFoundation's internal sync operations from conflicting with Swift concurrency
+        return try await Task.detached { @MainActor [self] in
+            logger.info("Speaking: '\(text.prefix(50))...'")
+
+            let utterance = createUtterance(text: text, options: options)
+
+            return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+                // We're already on MainActor, so this is safe
+                speechCompletion = { result in
+                    switch result {
+                    case .success(let data):
+                        continuation.resume(returning: data)
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+                synthesizer.speak(utterance)
+            }
+        }.value
+    }
+
+    public nonisolated func synthesizeStream(
         text: String,
         options: TTSOptions,
         onChunk: @escaping (Data) -> Void
@@ -95,25 +85,24 @@ public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
     }
 
     public func stop() {
-        Task { @MainActor in
-            synthesizer.stopSpeaking(at: .immediate)
-        }
-        Task {
-            await state.complete(with: .success(Data()))
-        }
+        synthesizer.stopSpeaking(at: .immediate)
+        speechCompletion?(.success(Data()))
+        speechCompletion = nil
     }
 
-    public var isSynthesizing: Bool {
-        // Synchronous approximation using synthesizer state
+    public nonisolated var isSynthesizing: Bool {
+        // Access synthesizer state - this is thread-safe for reading
         synthesizer.isSpeaking
     }
 
-    public var availableVoices: [String] {
+    public nonisolated var availableVoices: [String] {
         AVSpeechSynthesisVoice.speechVoices().map { $0.identifier }
     }
 
-    public func cleanup() async {
-        stop()
+    public nonisolated func cleanup() async {
+        await MainActor.run {
+            stop()
+        }
     }
 
     // MARK: - Private Helpers
@@ -150,30 +139,34 @@ public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
 
 extension SystemTTSService: AVSpeechSynthesizerDelegate {
 
-    public func speechSynthesizer(
+    public nonisolated func speechSynthesizer(
         _ synthesizer: AVSpeechSynthesizer,
         didFinish utterance: AVSpeechUtterance
     ) {
-        logger.info("Speech playback completed")
-        Task {
-            await state.complete(with: .success(Data()))
+        Task { @MainActor in
+            logger.info("Speech playback completed")
+            speechCompletion?(.success(Data()))
+            speechCompletion = nil
         }
     }
 
-    public func speechSynthesizer(
+    public nonisolated func speechSynthesizer(
         _ synthesizer: AVSpeechSynthesizer,
         didCancel utterance: AVSpeechUtterance
     ) {
-        logger.info("Speech playback cancelled")
-        Task {
-            await state.complete(with: .failure(CancellationError()))
+        Task { @MainActor in
+            logger.info("Speech playback cancelled")
+            speechCompletion?(.failure(CancellationError()))
+            speechCompletion = nil
         }
     }
 
-    public func speechSynthesizer(
+    public nonisolated func speechSynthesizer(
         _ synthesizer: AVSpeechSynthesizer,
         didStart utterance: AVSpeechUtterance
     ) {
-        logger.debug("Speech playback started")
+        Task { @MainActor in
+            logger.debug("Speech playback started")
+        }
     }
 }

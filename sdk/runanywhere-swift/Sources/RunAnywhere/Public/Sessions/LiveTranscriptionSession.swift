@@ -120,43 +120,58 @@ public final class LiveTranscriptionSession: ObservableObject {
                 self?.audioLevel = level
             }
 
-        // Create audio stream
-        let audioStream = AsyncStream<Data> { continuation in
-            self.audioContinuation = continuation
-        }
-
-        // Start audio capture
-        try audioCapture.startRecording { [weak self] audioData in
-            self?.audioContinuation?.yield(audioData)
-        }
-
         isActive = true
         error = nil
         currentText = ""
 
-        // Start transcription task
-        transcriptionTask = Task { @MainActor [weak self] in
-            guard let self = self else { return }
-
-            do {
-                let stream = try await RunAnywhere.transcribeStream(audioStream, options: self.options)
-
-                for try await partialText in stream {
-                    guard !Task.isCancelled else { break }
-
-                    self.currentText = partialText
-                    self.onPartialCallback?(partialText)
+        // Start streaming transcription with callbacks
+        do {
+            try await RunAnywhere.startStreamingTranscription(
+                options: options,
+                onPartialResult: { [weak self] result in
+                    Task { @MainActor in
+                        guard let self = self, !Task.isCancelled else { return }
+                        self.currentText = result.transcript
+                        self.onPartialCallback?(result.transcript)
+                    }
+                },
+                onFinalResult: { [weak self] output in
+                    Task { @MainActor in
+                        guard let self = self else { return }
+                        self.currentText = output.text
+                        self.onPartialCallback?(output.text)
+                        self.logger.info("Final transcription: \(output.text)")
+                    }
+                },
+                onError: { [weak self] err in
+                    Task { @MainActor in
+                        guard let self = self else { return }
+                        self.error = err
+                        self.logger.error("Transcription error: \(err.localizedDescription)")
+                    }
                 }
+            )
+        } catch {
+            isActive = false
+            throw error
+        }
 
-                self.logger.info("Live transcription completed")
-            } catch {
-                if !Task.isCancelled {
-                    self.logger.error("Live transcription failed: \(error.localizedDescription)")
-                    self.error = error
+        // Start audio capture that feeds into the streaming transcription
+        try audioCapture.startRecording { [weak self] audioData in
+            Task {
+                guard let self = self else { return }
+                // Convert Data to [Float] for streaming
+                let samples = audioData.withUnsafeBytes { buffer in
+                    Array(buffer.bindMemory(to: Float.self))
+                }
+                do {
+                    try await RunAnywhere.processStreamingAudio(samples)
+                } catch {
+                    Task { @MainActor in
+                        self.error = error
+                    }
                 }
             }
-
-            self.isActive = false
         }
 
         logger.info("Live transcription started")
@@ -167,6 +182,9 @@ public final class LiveTranscriptionSession: ObservableObject {
         guard isActive else { return }
 
         logger.info("Stopping live transcription")
+
+        // Stop streaming transcription
+        await RunAnywhere.stopStreamingTranscription()
 
         // Cancel transcription task
         transcriptionTask?.cancel()

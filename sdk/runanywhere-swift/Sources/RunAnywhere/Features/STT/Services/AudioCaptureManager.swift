@@ -7,6 +7,7 @@
 //
 
 import AVFoundation
+import CRACommons
 import Foundation
 
 /// Manages audio capture from microphone for STT services.
@@ -37,7 +38,7 @@ public class AudioCaptureManager: ObservableObject {
     @Published public var isRecording = false
     @Published public var audioLevel: Float = 0.0
 
-    private let targetSampleRate = Double(STTConstants.defaultSampleRate)
+    private let targetSampleRate = Double(RAC_STT_DEFAULT_SAMPLE_RATE)
 
     public init() {
         logger.info("AudioCaptureManager initialized")

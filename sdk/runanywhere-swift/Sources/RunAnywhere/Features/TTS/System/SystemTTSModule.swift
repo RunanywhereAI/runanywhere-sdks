@@ -3,18 +3,25 @@
 //  RunAnywhere SDK
 //
 //  Built-in System TTS module using AVSpeechSynthesizer.
-//  Auto-registered during SDK initialization as a fallback TTS option.
+//  Platform-specific fallback when no other TTS providers are available.
+//
+//  Registration is now handled by the C++ platform backend. This module
+//  provides the Swift service implementation that the C++ backend calls.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - System TTS Module
 
 /// Built-in System TTS module using Apple's AVSpeechSynthesizer.
 ///
-/// This is automatically registered by the SDK as a low-priority fallback
-/// when no other TTS providers (like ONNX) are available or when
-/// explicitly requested via the "system-tts" model ID.
+/// This is a platform-specific (iOS/macOS) TTS provider that serves as
+/// a fallback when no other TTS providers (like ONNX Piper) are available
+/// or when explicitly requested via the "system-tts" voice ID.
+///
+/// The C++ platform backend handles registration with the service registry.
+/// This Swift module provides the actual implementation through callbacks.
 ///
 /// ## Usage
 ///
@@ -32,54 +39,33 @@ public enum SystemTTS: RunAnywhereModule {
 
     public static let moduleId = "system-tts"
     public static let moduleName = "System TTS"
-    public static let capabilities: Set<CapabilityType> = [.tts]
+    public static let capabilities: Set<SDKComponent> = [.tts]
     public static let defaultPriority: Int = 10  // Low priority - fallback only
 
     /// System TTS uses Apple's built-in speech synthesis
     public static let inferenceFramework: InferenceFramework = .systemTTS
 
-    /// Register System TTS with the ServiceRegistry
-    @MainActor
-    public static func register(priority: Int) {
-        ServiceRegistry.shared.registerTTS(
-            name: moduleName,
-            priority: priority,
-            canHandle: { voiceId in
-                canHandleVoice(voiceId)
-            },
-            factory: { _ in
-                try await createService()
-            }
-        )
-        logger.info("System TTS registered (priority: \(priority))")
-    }
-
-    // MARK: - Private
+    // MARK: - Public API
 
     /// Check if this provider can handle the given voice ID
-    private static func canHandleVoice(_ voiceId: String?) -> Bool {
-        guard let voiceId = voiceId?.lowercased() else {
-            // System TTS can handle nil (fallback)
+    public static func canHandle(voiceId: String?) -> Bool {
+        guard let voiceId = voiceId else {
+            // System TTS can handle nil (fallback for TTS)
             return true
         }
 
-        // Explicitly handle system-tts requests
-        return voiceId == "system-tts" || voiceId == "system_tts" || voiceId == "system"
+        let lowercasedId = voiceId.lowercased()
+        return lowercasedId.contains("system-tts")
+            || lowercasedId.contains("system_tts")
+            || lowercasedId == "system"
+            || lowercasedId == "system-tts-default"
     }
 
     /// Create a SystemTTSService instance
-    private static func createService() async throws -> TTSService {
+    @MainActor
+    public static func createService() async throws -> SystemTTSService {
         let service = SystemTTSService()
         try await service.initialize()
         return service
     }
-}
-
-// MARK: - Auto-Registration
-
-extension SystemTTS {
-    /// Auto-register for discovery when SDK initializes
-    public static let autoRegister: Void = {
-        ModuleDiscovery.register(SystemTTS.self)
-    }()
 }

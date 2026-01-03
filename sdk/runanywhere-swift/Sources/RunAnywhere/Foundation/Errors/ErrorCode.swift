@@ -165,6 +165,15 @@ public enum ErrorCode: String, Sendable, CaseIterable {
     /// Service is busy
     case serviceBusy
 
+    /// Processing failed
+    case processingFailed
+
+    /// Start operation failed
+    case startFailed
+
+    /// Feature/operation is not supported
+    case notSupported
+
     // MARK: - Validation Errors
 
     /// Validation failed

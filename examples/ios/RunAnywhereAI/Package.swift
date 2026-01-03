@@ -57,7 +57,6 @@ let package = Package(
                 // Optional modules - pick what you need:
                 .product(name: "RunAnywhereONNX", package: "runanywhere-swift"),           // ONNX STT/TTS/VAD
                 .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-swift"),       // LlamaCPP LLM (runanywhere-core backend)
-                .product(name: "RunAnywhereAppleAI", package: "runanywhere-swift"),        // Apple Intelligence (iOS 26+)
             ],
             path: "RunAnywhereAI",
             exclude: [
