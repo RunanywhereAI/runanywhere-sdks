@@ -22,7 +22,7 @@ jobs:
     - name: Extract version from tag
       id: version
       run: |
-        VERSION="${GITHUB_REF#refs/tags/ios/v}"
+        VERSION="${GITHUB_REF##refs/tags/ios/v}"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
 
@@ -99,7 +99,7 @@ jobs:
     - name: Extract version from tag
       id: version
       run: |
-        VERSION="${GITHUB_REF#refs/tags/android/v}"
+        VERSION="${GITHUB_REF##refs/tags/android/v}"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
 
@@ -130,9 +130,21 @@ jobs:
         path: sdk/runanywhere-kotlin/build/outputs/aar/*.aar
         retention-days: 90
 
+    - name: Check artifacts exist
+      id: check-artifacts
+      run: |
+        JAR_FOUND=$(ls sdk/runanywhere-kotlin/build/libs/*.jar 2>/dev/null | wc -l)
+        AAR_FOUND=$(ls sdk/runanywhere-kotlin/build/outputs/aar/*.aar 2>/dev/null | wc -l)
+        echo "jar_count=$JAR_FOUND" >> $GITHUB_OUTPUT
+        echo "aar_count=$AAR_FOUND" >> $GITHUB_OUTPUT
+        if [ "$JAR_FOUND" -eq 0 ] && [ "$AAR_FOUND" -eq 0 ]; then
+          echo "Warning: No artifacts found to attach"
+          exit 1
+        fi
+
     - name: Attach artifacts to GitHub Release
       uses: softprops/action-gh-release@v2
-      if: success()
+      if: success() && steps.check-artifacts.outcome == 'success'
       with:
         files: |
           sdk/runanywhere-kotlin/build/libs/*.jar

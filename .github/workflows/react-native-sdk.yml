@@ -72,6 +72,23 @@ jobs:
       working-directory: ./sdk/runanywhere-react-native
       run: yarn install --frozen-lockfile
 
+    - name: Detect available iOS simulator
+      id: detect-simulator
+      run: |
+        # Try to find an iPhone simulator with iOS 18.x runtime
+        SIMULATOR=$(xcrun simctl list devices available | grep -i "iPhone" | grep -i "iOS 18" | head -1 | sed -E 's/.*\(([^)]+)\).*/\1/' || echo "")
+        if [[ -z "$SIMULATOR" ]]; then
+          # Fallback to hardcoded value
+          SIMULATOR="iPhone 16"
+          echo "Using fallback simulator: $SIMULATOR"
+        else
+          echo "Detected simulator: $SIMULATOR"
+        fi
+        echo "simulator=$SIMULATOR" >> $GITHUB_OUTPUT
+        # Determine OS version (default to 18.1)
+        OS_VERSION="18.1"
+        echo "os_version=$OS_VERSION" >> $GITHUB_OUTPUT
+
     - name: Build iOS
       working-directory: ./sdk/runanywhere-react-native/ios
       run: |
@@ -79,7 +96,7 @@ jobs:
         xcodebuild build \
           -workspace RunAnywhereReactNative.xcworkspace \
           -scheme RunAnywhereReactNative \
-          -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' \
+          -destination "platform=iOS Simulator,name=${{ steps.detect-simulator.outputs.simulator }},OS=${{ steps.detect-simulator.outputs.os_version }}" \
           -derivedDataPath build
       continue-on-error: true
 

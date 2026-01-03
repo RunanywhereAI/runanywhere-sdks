@@ -134,11 +134,28 @@ validate_preconditions() {
 
 ### Get current version from build.gradle.kts
 get_current_version() {
-    if [[ -f "$BUILD_FILE" ]]; then
-        grep -E "^\s*version\s*=" "$BUILD_FILE" | sed -E 's/.*version\s*=\s*"([^"]+)".*/\1/' | head -1
-    else
+    if [[ ! -f "$BUILD_FILE" ]]; then
         echo "0.1.0"  # Fallback
+        return
     fi
+
+    # Try to extract version with double quotes first
+    local version
+    version=$(grep -E "^\s*version\s*=" "$BUILD_FILE" | sed -E 's/.*version\s*=\s*"([^"]+)".*/\1/' | head -1)
+
+    # If not found, try single quotes
+    if [[ -z "$version" ]] || [[ "$version" == *"version"* ]]; then
+        version=$(grep -E "^\s*version\s*=" "$BUILD_FILE" | sed -E "s/.*version\s*=\s*'([^']+)'.*/\1/" | head -1)
+    fi
+
+    # Validate version format (semver: x.y.z)
+    if [[ -z "$version" ]] || [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        print_error "Failed to extract version from $BUILD_FILE"
+        print_error "Expected format: version = \"x.y.z\" or version = 'x.y.z'"
+        exit 1
+    fi
+
+    echo "$version"
 }
 
 ### Calculate new version based on bump type
@@ -184,13 +201,13 @@ update_version_references() {
 
     # Update root README.md (if it has Android version references)
     if [[ -f "$README_ROOT" ]]; then
-        sedi "s/com\.runanywhere\.sdk:[^:]*:[0-9]*\.[0-9]*\.[0-9]*/com.runanywhere.sdk:runanywhere-kotlin:$new_version/g" "$README_ROOT" || true
+        sedi "s/com\.runanywhere\.sdk:runanywhere-kotlin:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/com.runanywhere.sdk:runanywhere-kotlin:$new_version/g" "$README_ROOT" || true
         print_success "Updated $README_ROOT"
     fi
 
     # Update SDK README.md
     if [[ -f "$README_SDK" ]]; then
-        sedi "s/com\.runanywhere\.sdk:[^:]*:[0-9]*\.[0-9]*\.[0-9]*/com.runanywhere.sdk:runanywhere-kotlin:$new_version/g" "$README_SDK" || true
+        sedi "s/com\.runanywhere\.sdk:runanywhere-kotlin:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/com.runanywhere.sdk:runanywhere-kotlin:$new_version/g" "$README_SDK" || true
         print_success "Updated $README_SDK"
     fi
 
@@ -212,19 +229,36 @@ run_tests() {
 
     print_header "Building and Testing"
 
-    print_info "Running Gradle build..."
+    print_info "Running SDK build..."
     (
         cd "$SDK_DIR" || { print_error "Failed to change to $SDK_DIR"; exit 1; }
-        if ! ./gradlew build --no-daemon; then
-            print_error "Build failed"
-            exit 1
-        fi
-        print_success "Build successful"
+        # Use sdk.sh wrapper if available, otherwise fall back to direct gradlew
+        if [[ -f "./scripts/sdk.sh" ]]; then
+            if ! ./scripts/sdk.sh build-all; then
+                print_error "Build failed"
+                exit 1
+            fi
+            print_success "Build successful"
 
-        print_info "Running tests..."
-        if ! ./gradlew test --no-daemon; then
-            print_error "Tests failed"
-            exit 1
+            print_info "Running tests..."
+            if ! ./scripts/sdk.sh test; then
+                print_error "Tests failed"
+                exit 1
+            fi
+        else
+            # Fallback to direct gradlew if sdk.sh not found
+            print_warning "sdk.sh not found, using direct gradlew"
+            if ! ./gradlew build --no-daemon; then
+                print_error "Build failed"
+                exit 1
+            fi
+            print_success "Build successful"
+
+            print_info "Running tests..."
+            if ! ./gradlew test --no-daemon; then
+                print_error "Tests failed"
+                exit 1
+            fi
         fi
         print_success "All tests passed"
     )

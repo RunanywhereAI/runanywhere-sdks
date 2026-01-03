@@ -28,7 +28,7 @@ repos:
     hooks:
       - id: android-sdk-lint
         name: Android SDK Lint
-        entry: bash -c 'cd sdk/runanywhere-kotlin && if [ -f "./gradlew" ] && [ -n "$ANDROID_HOME" -o -f "./local.properties" ]; then ./gradlew lint --quiet; else echo "Skipping Android lint (no gradle or SDK)"; exit 0; fi'
+        entry: bash -c 'cd sdk/runanywhere-kotlin && if [[ -f "./gradlew" ]] && ([[ -n "$ANDROID_HOME" ]] || [[ -f "./local.properties" ]]); then ./gradlew lint --quiet; else echo "Skipping Android lint (no gradle or SDK)"; exit 0; fi'
         language: system
         files: ^sdk/runanywhere-kotlin/.*\.(kt|kts|java|xml)$
         pass_filenames: false
@@ -37,7 +37,7 @@ repos:
     hooks:
       - id: android-app-lint
         name: Android App Lint
-        entry: bash -c 'cd examples/android/RunAnywhereAI && if [ -f "./gradlew" ] && [ -n "$ANDROID_HOME" -o -f "local.properties" ]; then ./gradlew :app:lint --quiet; else echo "Skipping Android lint (no gradle or SDK)"; exit 0; fi'
+        entry: bash -c 'cd examples/android/RunAnywhereAI && if [[ -f "./gradlew" ]] && ([[ -n "$ANDROID_HOME" ]] || [[ -f "./local.properties" ]]); then ./gradlew :app:lint --quiet; else echo "Skipping Android lint (no gradle or SDK)"; exit 0; fi'
         language: system
         files: ^examples/android/RunAnywhereAI/.*\.(kt|kts|java|xml)$
         pass_filenames: false

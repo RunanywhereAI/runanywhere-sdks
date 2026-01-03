@@ -53,7 +53,13 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --bump)
-            BUMP_TYPE="${2:-}"
+            if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                print_error "--bump requires a value (major, minor, or patch)"
+                echo ""
+                echo "Usage: $0 --bump <major|minor|patch>"
+                exit 1
+            fi
+            BUMP_TYPE="$2"
             shift 2
             ;;
         --skip-build)
@@ -136,7 +142,7 @@ validate_preconditions() {
     print_success "Authenticated with GitHub CLI"
 
     # Check for psql if DATABASE_URL is set
-    if [[ -n "${DATABASE_URL:-}" && ! $(command -v psql) ]]; then
+    if [[ -n "${DATABASE_URL:-}" && ! command -v psql >/dev/null ]]; then
         print_warning "DATABASE_URL is set but psql not found (will print SQL for manual execution)"
     fi
 
@@ -226,9 +232,9 @@ import Foundation
 /// - Revocable: Backend can mark token as inactive
 /// - Rate-limited: Backend enforces 100 req/min per device
 enum BuildToken {
-        /// Development mode build token
-        /// Generated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        static let token = "$build_token"
+    /// Development mode build token
+    /// Generated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+    static let token = "$build_token"
 }
 EOF
 
@@ -438,9 +444,24 @@ main() {
     # Step 2: Create worktree for tag commit (includes BuildToken.swift)
     print_header "Step 2: Creating Release Tag with BuildToken.swift"
 
+    # Variables for cleanup trap
     local worktree_dir
     worktree_dir="$(mktemp -d)/release-v$new_version"
     local release_branch="release/v$new_version"
+
+    # Cleanup function for worktree
+    cleanup_worktree() {
+        if [[ -n "$worktree_dir" ]] && [[ -d "$worktree_dir" ]]; then
+            print_info "Cleaning up worktree..."
+            git worktree remove "$worktree_dir" --force 2>/dev/null || true
+        fi
+        if [[ -n "$release_branch" ]]; then
+            git branch -D "$release_branch" 2>/dev/null || true
+        fi
+    }
+
+    # Set trap to cleanup on exit (including errors)
+    trap cleanup_worktree EXIT
 
     # Create worktree
     git worktree add -b "$release_branch" "$worktree_dir"
@@ -473,9 +494,9 @@ Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
 
     popd >/dev/null
 
-    # Clean up worktree
-    git worktree remove "$worktree_dir" --force
-    git branch -D "$release_branch"
+    # Clean up worktree (trap will also handle this on exit, but do it explicitly here for success case)
+    cleanup_worktree
+    trap - EXIT  # Remove trap after successful cleanup
     print_success "Cleaned up worktree"
 
     # Step 3: Push main branch

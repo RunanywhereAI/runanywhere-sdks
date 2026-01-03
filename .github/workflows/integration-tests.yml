@@ -85,7 +85,7 @@ jobs:
         xcodebuild build \
           -project RunAnywhereAI.xcodeproj \
           -scheme RunAnywhereAI \
-          -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2' \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=18.1' \
           -configuration Debug \
           -derivedDataPath build
       continue-on-error: true
@@ -96,7 +96,7 @@ jobs:
         xcodebuild test \
           -project RunAnywhereAI.xcodeproj \
           -scheme RunAnywhereAI \
-          -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2' \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=18.1' \
           -resultBundlePath TestResults.xcresult
       continue-on-error: true
 
