@@ -53,7 +53,9 @@ private func analyticsEventCallback(
     data: UnsafePointer<rac_analytics_event_data_t>?,
     userData: UnsafeMutableRawPointer?
 ) {
-    guard let data = data else { return }
+    guard let data = data else {
+        return
+    }
     // Forward to telemetry manager (C++ builds JSON, calls HTTP callback)
     CppBridge.Telemetry.trackAnalyticsEvent(type: type, data: data)
 }
@@ -159,10 +161,20 @@ private func telemetryHttpCallback(
 }
 
 private func performTelemetryHTTP(path: String, json: String, requiresAuth: Bool) async {
+    let logger = SDKLogger(category: "CppBridge.Telemetry")
+    
+    // Check if HTTP is configured before attempting request
+    let isConfigured = await CppBridge.HTTP.shared.isConfigured
+    guard isConfigured else {
+        logger.debug("HTTP not configured, cannot send telemetry to \(path). Events will be queued.")
+        return
+    }
+    
     do {
-        _ = try await CppBridge.HTTP.shared.post(path, json: json, requiresAuth: requiresAuth)
+        let response = try await CppBridge.HTTP.shared.post(path, json: json, requiresAuth: requiresAuth)
+        logger.debug("✅ Telemetry sent to \(path)")
     } catch {
-        SDKLogger(category: "CppBridge.Telemetry").warning("HTTP failed: \(error)")
+        logger.error("❌ HTTP failed for telemetry to \(path): \(error)")
     }
 }
 

@@ -75,7 +75,13 @@ target_include_directories(rac_backend_llamacpp PUBLIC
 )
 
 # Link against runanywhere-core's llamacpp backend
-if(TARGET runanywhere_llamacpp)
+# Use pre-built library if available, otherwise use compiled target
+if(DEFINED RUNANYWHERE_CORE_LLAMACPP_LIB)
+    # Pre-built library mode (USE_PREBUILT_CORE=ON)
+    target_link_libraries(rac_backend_llamacpp PRIVATE ${RUNANYWHERE_CORE_LLAMACPP_LIB})
+    # Include directories are set globally via RUNANYWHERE_CORE_INCLUDE_DIRS
+elseif(TARGET runanywhere_llamacpp)
+    # Source compilation mode (legacy)
     target_link_libraries(rac_backend_llamacpp PRIVATE runanywhere_llamacpp)
     # Include runanywhere-core headers for backend APIs
     target_include_directories(rac_backend_llamacpp PRIVATE
@@ -83,8 +89,6 @@ if(TARGET runanywhere_llamacpp)
         ${RUNANYWHERE_CORE_DIR}/src/capabilities
         ${RUNANYWHERE_CORE_DIR}/src/backends/llamacpp
     )
-elseif(DEFINED RUNANYWHERE_CORE_LLAMACPP_LIB)
-    target_link_libraries(rac_backend_llamacpp PRIVATE ${RUNANYWHERE_CORE_LLAMACPP_LIB})
 endif()
 
 # =============================================================================

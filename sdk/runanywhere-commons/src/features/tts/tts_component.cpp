@@ -201,7 +201,8 @@ extern "C" void rac_tts_component_destroy(rac_handle_t handle) {
 // VOICE LIFECYCLE
 // =============================================================================
 
-extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const char* voice_id) {
+extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const char* voice_path,
+                                                     const char* voice_id, const char* voice_name) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
 
@@ -209,7 +210,7 @@ extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const 
     std::lock_guard<std::mutex> lock(component->mtx);
 
     rac_handle_t service = nullptr;
-    return rac_lifecycle_load(component->lifecycle, voice_id, &service);
+    return rac_lifecycle_load(component->lifecycle, voice_path, voice_id, voice_name, &service);
 }
 
 extern "C" rac_result_t rac_tts_component_unload(rac_handle_t handle) {
@@ -269,6 +270,14 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
     // Generate synthesis ID for event tracking
     std::string synthesis_id = generate_uuid_v4();
     const char* voice_id = rac_lifecycle_get_model_id(component->lifecycle);
+    const char* voice_name = rac_lifecycle_get_model_name(component->lifecycle);
+    
+    // Debug: Log if voice_id is null
+    if (!voice_id) {
+        log_warning("TTS.Component", "rac_lifecycle_get_model_id returned null - voice may not be set in telemetry");
+    } else {
+        log_debug("TTS.Component", "TTS synthesis using voice_id: %s", voice_id);
+    }
 
     // Emit SYNTHESIS_STARTED event
     {
@@ -276,6 +285,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
+        event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.character_count = static_cast<int32_t>(std::strlen(text));
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_STARTED, &event_data);
     }
@@ -289,6 +299,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
+        event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.error_code = result;
         event_data.data.tts_synthesis.error_message = "No voice loaded";
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
@@ -314,6 +325,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
+        event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.processing_duration_ms =
             static_cast<double>(duration.count());
         event_data.data.tts_synthesis.error_code = result;
@@ -336,6 +348,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
+        event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.character_count = char_count;
         event_data.data.tts_synthesis.audio_duration_ms =
             static_cast<double>(out_result->duration_ms);
@@ -367,6 +380,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
     // Generate synthesis ID for event tracking
     std::string synthesis_id = generate_uuid_v4();
     const char* voice_id = rac_lifecycle_get_model_id(component->lifecycle);
+    const char* voice_name = rac_lifecycle_get_model_name(component->lifecycle);
     int32_t char_count = static_cast<int32_t>(std::strlen(text));
 
     // Emit SYNTHESIS_STARTED event
@@ -375,6 +389,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
+        event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.character_count = char_count;
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_STARTED, &event_data);
     }
@@ -388,6 +403,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
+        event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.error_code = result;
         event_data.data.tts_synthesis.error_message = "No voice loaded";
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
@@ -413,6 +429,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
+        event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.processing_duration_ms =
             static_cast<double>(duration.count());
         event_data.data.tts_synthesis.error_code = result;
@@ -427,6 +444,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
+        event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.character_count = char_count;
         event_data.data.tts_synthesis.processing_duration_ms = processing_ms;
         event_data.data.tts_synthesis.characters_per_second = chars_per_sec;
