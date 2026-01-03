@@ -89,6 +89,25 @@ public actor HTTPService: NetworkService {
         _ payload: Data,
         requiresAuth: Bool
     ) async throws -> Data {
+        // For Supabase device registration, use UPSERT (merge-duplicates) to handle existing devices
+        // Supabase PostgREST requires both:
+        // 1. The `Prefer: resolution=merge-duplicates` header
+        // 2. The `?on_conflict=device_id` query parameter to specify the conflict column
+        if path.contains("/rest/v1/sdk_devices") {
+            // Add on_conflict query parameter to the path
+            let upsertPath = path.contains("?") ? "\(path)&on_conflict=device_id" : "\(path)?on_conflict=device_id"
+            return try await postRawWithHeaders(upsertPath, payload, requiresAuth: requiresAuth, additionalHeaders: ["Prefer": "resolution=merge-duplicates"])
+        }
+        return try await postRawWithHeaders(path, payload, requiresAuth: requiresAuth)
+    }
+
+    /// POST request with raw Data body and optional additional headers
+    private func postRawWithHeaders(
+        _ path: String,
+        _ payload: Data,
+        requiresAuth: Bool,
+        additionalHeaders: [String: String] = [:]
+    ) async throws -> Data {
         guard let baseURL = baseURL else {
             throw SDKError.network(.serviceNotAvailable, "HTTP service not configured")
         }
@@ -98,7 +117,7 @@ public actor HTTPService: NetworkService {
         request.httpMethod = "POST"
         request.httpBody = payload
 
-        return try await executeRequest(request, requiresAuth: requiresAuth)
+        return try await executeRequest(request, requiresAuth: requiresAuth, additionalHeaders: additionalHeaders)
     }
 
     /// GET request with raw response
@@ -169,11 +188,35 @@ public actor HTTPService: NetworkService {
         if path.hasPrefix("http://") || path.hasPrefix("https://") {
             return URL(string: path) ?? base.appendingPathComponent(path)
         }
+        
+        // Check if path contains query parameters
+        if path.contains("?") {
+            // Split path and query parameters
+            let components = path.split(separator: "?", maxSplits: 1)
+            let pathPart = String(components[0])
+            let queryPart = String(components[1])
+            
+            // Build URL with query parameters using URLComponents
+            guard var urlComponents = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
+                return base.appendingPathComponent(path)
+            }
+            let existingPath = urlComponents.path
+            urlComponents.path = existingPath + pathPart
+            urlComponents.query = queryPart
+            
+            return urlComponents.url ?? base.appendingPathComponent(path)
+        }
+        
         return base.appendingPathComponent(path)
     }
 
-    private func executeRequest(_ request: URLRequest, requiresAuth: Bool) async throws -> Data {
+    private func executeRequest(_ request: URLRequest, requiresAuth: Bool, additionalHeaders: [String: String] = [:]) async throws -> Data {
         var request = request
+
+        // Add additional headers if provided
+        for (key, value) in additionalHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
 
         // Add authorization header
         let token = try await resolveToken(requiresAuth: requiresAuth)
@@ -190,7 +233,11 @@ public actor HTTPService: NetworkService {
         }
 
         // Check status code
-        guard (200...299).contains(httpResponse.statusCode) else {
+        // For device registration, 409 (Conflict) means device already exists, which is fine
+        let isDeviceRegistration = request.url?.absoluteString.contains("/rest/v1/sdk_devices") ?? false
+        let isSuccess = (200...299).contains(httpResponse.statusCode) || (isDeviceRegistration && httpResponse.statusCode == 409)
+        
+        guard isSuccess else {
             let error = parseHTTPError(
                 statusCode: httpResponse.statusCode,
                 data: data,
@@ -198,6 +245,11 @@ public actor HTTPService: NetworkService {
             )
             logger.error("HTTP \(httpResponse.statusCode): \(request.url?.absoluteString ?? "unknown")")
             throw error
+        }
+        
+        // Log 409 as info for device registration (device already exists)
+        if isDeviceRegistration && httpResponse.statusCode == 409 {
+            logger.info("Device already registered (409) - treating as success")
         }
 
         return data
@@ -215,6 +267,11 @@ public actor HTTPService: NetworkService {
                 if let token = CppBridge.State.accessToken {
                     return token
                 }
+            }
+            // Fallback to API key if no OAuth token available
+            // This supports API key-only authentication for production mode
+            if let key = apiKey, !key.isEmpty {
+                return key
             }
             throw SDKError.authentication(.authenticationFailed, "No valid authentication token")
         }

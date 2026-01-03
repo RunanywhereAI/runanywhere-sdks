@@ -269,12 +269,23 @@ build_commons() {
     if $LOCAL_MODE; then
         local download_script="$COMMONS_DIR/scripts/download-core-prebuilt.sh"
         if [[ -x "$download_script" ]]; then
-            if [[ ! -d "$COMMONS_DIR/third_party/runanywhere-core-prebuilt" ]]; then
+            # Check if directory exists AND has required files
+            local prebuilt_dir="$COMMONS_DIR/third_party/runanywhere-core-prebuilt"
+            local has_libs=false
+            if [[ -d "$prebuilt_dir" ]] && [[ -f "$prebuilt_dir/librunanywhere_bridge.a" ]]; then
+                has_libs=true
+            fi
+            
+            if [[ "$has_libs" == false ]]; then
                 log_info "Local mode: Downloading PRE-BUILT runanywhere-core libraries"
                 log_info "  (Commons will link against pre-built libraries, not compile core)"
                 log_step "Running: $download_script"
                 cd "$COMMONS_DIR"
-                "$download_script"
+                if ! "$download_script"; then
+                    log_warn "Failed to download pre-built core libraries"
+                    log_warn "Pre-built static libraries may not be available for this version"
+                    log_warn "Commons build may fail - you may need to build core locally or use a different version"
+                fi
             else
                 log_info "Local mode: Using downloaded PRE-BUILT core libraries"
                 log_info "  (Commons will link against pre-built libraries, not compile core)"
@@ -286,9 +297,18 @@ build_commons() {
 
     log_step "Running: $COMMONS_BUILD_SCRIPT"
     cd "$COMMONS_DIR"
-    # In local mode, use pre-built core libraries
+    # In local mode, try to use pre-built core libraries
+    # If pre-built libraries aren't available, fall back to building core from source
     if $LOCAL_MODE; then
-        USE_PREBUILT_CORE=ON "$COMMONS_BUILD_SCRIPT"
+        local prebuilt_dir="$COMMONS_DIR/third_party/runanywhere-core-prebuilt"
+        if [[ -d "$prebuilt_dir" ]] && [[ -f "$prebuilt_dir/librunanywhere_bridge.a" ]]; then
+            log_info "Using pre-built core libraries"
+            USE_PREBUILT_CORE=ON "$COMMONS_BUILD_SCRIPT"
+        else
+            log_warn "Pre-built core libraries not available - building core from source (temporary workaround)"
+            log_warn "Note: Pre-built libraries should be published for proper local dev workflow"
+            "$COMMONS_BUILD_SCRIPT"
+        fi
     else
         "$COMMONS_BUILD_SCRIPT"
     fi

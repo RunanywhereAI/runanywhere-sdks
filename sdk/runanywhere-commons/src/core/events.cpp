@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "rac/core/rac_analytics_events.h"
+#include "rac/core/rac_logger.h"
 
 // =============================================================================
 // INTERNAL STATE

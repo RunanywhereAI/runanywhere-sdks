@@ -64,10 +64,13 @@ RAC_API const char* rac_tts_component_get_voice_id(rac_handle_t handle);
  * @brief Load a voice
  *
  * @param handle Component handle
- * @param voice_id Voice ID to load
+ * @param voice_path File path to the voice (used for loading)
+ * @param voice_id Voice identifier (used for telemetry, e.g., "vits-piper-en_GB-alba-medium")
+ * @param voice_name Human-readable voice name (e.g., "Piper TTS (British English)")
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const char* voice_id);
+RAC_API rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const char* voice_path,
+                                                  const char* voice_id, const char* voice_name);
 
 /**
  * @brief Unload the current voice

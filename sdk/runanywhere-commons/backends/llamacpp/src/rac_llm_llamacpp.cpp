@@ -47,7 +47,7 @@ int ra_llamacpp_create(const char* model_path, const ra_llamacpp_config_t* confi
 void ra_llamacpp_destroy(ra_llamacpp_handle handle);
 int ra_llamacpp_generate(ra_llamacpp_handle handle, const char* prompt,
                          const ra_llamacpp_generate_options_t* options, char** out_text,
-                         int* out_tokens_generated);
+                         int* out_tokens_generated, int* out_prompt_tokens);
 int ra_llamacpp_generate_stream(ra_llamacpp_handle handle, const char* prompt,
                                 const ra_llamacpp_generate_options_t* options,
                                 ra_llamacpp_stream_callback callback, void* user_data);
@@ -212,9 +212,10 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
 
     char* generated_text = nullptr;
     int tokens_generated = 0;
+    int prompt_tokens = 0;
 
     int result = ra_llamacpp_generate(core_handle, prompt, &core_options, &generated_text,
-                                      &tokens_generated);
+                                      &tokens_generated, &prompt_tokens);
 
     if (result != 0) {
         rac_error_set_details("LlamaCPP generation failed");
@@ -224,8 +225,8 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     // Fill result struct
     out_result->text = generated_text;  // Caller must free with rac_free
     out_result->completion_tokens = tokens_generated;
-    out_result->prompt_tokens = 0;  // Not available from core API
-    out_result->total_tokens = tokens_generated;
+    out_result->prompt_tokens = prompt_tokens;  // Actual token count from core
+    out_result->total_tokens = prompt_tokens + tokens_generated;
     out_result->time_to_first_token_ms = 0;  // Not available
     out_result->total_time_ms = 0;           // Not available
     out_result->tokens_per_second = 0.0f;    // Not available
