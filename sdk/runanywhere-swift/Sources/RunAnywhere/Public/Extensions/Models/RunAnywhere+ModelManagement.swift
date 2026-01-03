@@ -24,7 +24,7 @@ extension RunAnywhere {
         if modelInfo.isBuiltIn {
             // For built-in models, just pass the model ID to C++
             // The service registry will route to the correct platform provider
-            try await CppBridge.LLM.shared.loadModel(modelId, modelId: modelId)
+            try await CppBridge.LLM.shared.loadModel(modelId, modelId: modelId, modelName: modelInfo.name)
             return
         }
 
@@ -35,7 +35,7 @@ extension RunAnywhere {
 
         // Resolve actual model file path
         let modelPath = try resolveModelFilePath(for: modelInfo)
-        try await CppBridge.LLM.shared.loadModel(modelPath.path, modelId: modelId)
+        try await CppBridge.LLM.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
     }
 
     // MARK: - Private: Model Path Resolution
@@ -204,7 +204,7 @@ extension RunAnywhere {
         let modelPath = try resolveModelFilePath(for: modelInfo)
         let logger = SDKLogger(category: "RunAnywhere.STT")
         logger.info("Loading STT model from resolved path: \(modelPath.path)")
-        try await CppBridge.STT.shared.loadModel(modelPath.path, modelId: modelId)
+        try await CppBridge.STT.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
     }
 
     /// Load a TTS (Text-to-Speech) voice by ID
@@ -227,7 +227,7 @@ extension RunAnywhere {
         if modelInfo.isBuiltIn {
             let logger = SDKLogger(category: "RunAnywhere.TTS")
             logger.info("Loading built-in TTS voice: \(voiceId)")
-            try await CppBridge.TTS.shared.loadVoice(voiceId, voiceId: voiceId)
+            try await CppBridge.TTS.shared.loadVoice(voiceId, voiceId: voiceId, voiceName: modelInfo.name)
             return
         }
 
@@ -239,7 +239,7 @@ extension RunAnywhere {
         let modelPath = try resolveModelFilePath(for: modelInfo)
         let logger = SDKLogger(category: "RunAnywhere.TTS")
         logger.info("Loading TTS voice from resolved path: \(modelPath.path)")
-        try await CppBridge.TTS.shared.loadVoice(modelPath.path, voiceId: voiceId)
+        try await CppBridge.TTS.shared.loadVoice(modelPath.path, voiceId: voiceId, voiceName: modelInfo.name)
     }
 
     /// Get available models

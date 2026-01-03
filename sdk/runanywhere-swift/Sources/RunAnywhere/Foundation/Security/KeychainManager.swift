@@ -141,7 +141,7 @@ public final class KeychainManager {
     /// Retrieve data from the keychain
     /// - Parameter key: Key for the data
     /// - Returns: Stored data
-    /// - Throws: SDKError if retrieval fails
+    /// - Throws: SDKError if retrieval fails (but not for missing items - use retrieveDataIfExists for that)
     public func retrieveData(for key: String) throws -> Data {
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = true
@@ -160,6 +160,49 @@ public final class KeychainManager {
         }
 
         return data
+    }
+
+    /// Retrieve data from the keychain if it exists (returns nil for missing items, no error thrown)
+    /// - Parameter key: Key for the data
+    /// - Returns: Stored data if found, nil if not found
+    /// - Throws: SDKError only for actual keychain errors (not for missing items)
+    public func retrieveDataIfExists(for key: String) throws -> Data? {
+        var query = baseQuery(for: key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        // swiftlint:disable:next avoid_any_object
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        // Item not found is a normal case, return nil
+        if status == errSecItemNotFound {
+            return nil
+        }
+
+        // Other errors are actual problems
+        guard status == errSecSuccess,
+              let data = result as? Data else {
+            throw SDKError.security(.keychainError, "Failed to retrieve item from keychain: OSStatus \(status)")
+        }
+
+        return data
+    }
+
+    /// Retrieve a string value from the keychain if it exists (returns nil for missing items, no error thrown)
+    /// - Parameter key: Key for the value
+    /// - Returns: Stored string value if found, nil if not found
+    /// - Throws: SDKError only for actual keychain errors (not for missing items)
+    public func retrieveIfExists(for key: String) throws -> String? {
+        guard let data = try retrieveDataIfExists(for: key) else {
+            return nil
+        }
+
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw SDKError.security(.decodingError, "Failed to decode string data from keychain")
+        }
+
+        return string
     }
 
     /// Delete an item from the keychain

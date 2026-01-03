@@ -170,22 +170,39 @@ RAC_API void rac_telemetry_batch_response_free(rac_telemetry_batch_response_t* r
  * @brief Device information for registration (telemetry-specific)
  *
  * Platform-specific values are passed in from Swift/Kotlin.
+ * Matches backend schemas/device.py DeviceInfo schema.
  * Note: Named differently from rac_device_info_t to avoid conflict.
  */
 typedef struct rac_device_registration_info {
-    const char* device_id;     // Persistent UUID from Keychain
-    const char* device_type;   // "smartphone", "tablet", etc.
-    const char* device_model;  // "iPhone15,2", "Pixel 7", etc.
-    const char* os_name;       // "iOS", "Android"
-    const char* os_version;    // "17.0", "14"
-    const char* platform;      // "ios", "android"
-    const char* app_version;   // App version
-    int64_t total_memory_bytes;
-    int64_t available_memory_bytes;
+    // Required fields (backend schema)
+    const char* device_id;       // Persistent UUID from Keychain/secure storage
+    const char* device_model;    // "iPhone 16 Pro Max", "Pixel 7", etc.
+    const char* device_name;     // User-assigned device name
+    const char* platform;        // "ios", "android"
+    const char* os_version;      // "17.0", "14"
+    const char* form_factor;     // "phone", "tablet", "laptop", etc.
+    const char* architecture;    // "arm64", "x86_64", etc.
+    const char* chip_name;       // "A18 Pro", "Snapdragon 888", etc.
+    int64_t total_memory;        // Total RAM in bytes
+    int64_t available_memory;    // Available RAM in bytes
+    rac_bool_t has_neural_engine;  // true if device has Neural Engine / NPU
+    int32_t neural_engine_cores;   // Number of Neural Engine cores (0 if none)
+    const char* gpu_family;      // "apple", "adreno", etc.
+    double battery_level;        // 0.0-1.0, negative if unavailable
+    const char* battery_state;   // "charging", "full", "unplugged", NULL if unavailable
+    rac_bool_t is_low_power_mode;  // Low power mode enabled
+    int32_t core_count;          // Total CPU cores
+    int32_t performance_cores;   // Performance (P) cores
+    int32_t efficiency_cores;    // Efficiency (E) cores
+    const char* device_fingerprint;  // Unique device fingerprint (may be same as device_id)
+
+    // Legacy fields (for backward compatibility)
+    const char* device_type;     // "smartphone", "tablet", etc. (deprecated - use form_factor)
+    const char* os_name;         // "iOS", "Android" (deprecated - use platform)
     int64_t total_disk_bytes;
     int64_t available_disk_bytes;
     const char* processor_info;
-    int32_t processor_count;
+    int32_t processor_count;     // Deprecated - use core_count
     rac_bool_t is_simulator;
     const char* locale;
     const char* timezone;

@@ -85,24 +85,52 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 endif()
 
 # =============================================================================
-# FIND RUNANYWHERE-CORE
+# FIND RUNANYWHERE-CORE (Pre-built or Source)
 # =============================================================================
 
-include(FindRunAnywhereCore)
+# Option to use pre-built core libraries instead of compiling from source
+option(USE_PREBUILT_CORE "Use pre-built runanywhere-core libraries instead of compiling from source" OFF)
 
-if(NOT RUNANYWHERE_CORE_FOUND)
-    message(FATAL_ERROR "runanywhere-core not found at ${RUNANYWHERE_CORE_DIR}")
+if(USE_PREBUILT_CORE)
+    # Use pre-built core libraries (downloaded from remote releases)
+    include(FindRunAnywhereCorePrebuilt)
+    
+    if(NOT RUNANYWHERE_CORE_PREBUILT_FOUND)
+        message(FATAL_ERROR "Pre-built runanywhere-core not found. Run: ./scripts/download-core-prebuilt.sh")
+    endif()
+    
+    message(STATUS "Using PRE-BUILT runanywhere-core libraries")
+    message(STATUS "  Bridge: ${RUNANYWHERE_CORE_BRIDGE_LIB}")
+    if(RUNANYWHERE_CORE_HAS_LLAMACPP)
+        message(STATUS "  LlamaCPP: ${RUNANYWHERE_CORE_LLAMACPP_LIB}")
+    endif()
+    if(RUNANYWHERE_CORE_HAS_ONNX)
+        message(STATUS "  ONNX: ${RUNANYWHERE_CORE_ONNX_LIB}")
+    endif()
+    
+    # Set variables for compatibility with existing code
+    set(RUNANYWHERE_CORE_INCLUDE_DIRS ${RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS})
+    set(RUNANYWHERE_CORE_HAS_LLAMACPP ${RUNANYWHERE_CORE_HAS_LLAMACPP})
+    set(RUNANYWHERE_CORE_HAS_ONNX ${RUNANYWHERE_CORE_HAS_ONNX})
+else()
+    # Use source code and compile locally (legacy mode)
+    include(FindRunAnywhereCore)
+    
+    if(NOT RUNANYWHERE_CORE_FOUND)
+        message(FATAL_ERROR "runanywhere-core not found at ${RUNANYWHERE_CORE_DIR}")
+    endif()
+    
+    message(STATUS "Found runanywhere-core source at: ${RUNANYWHERE_CORE_DIR}")
+    message(STATUS "Compiling runanywhere-core from source (legacy mode)")
+    
+    # Build runanywhere-core in modular mode
+    set(RA_BUILD_MODULAR ON CACHE BOOL "" FORCE)
+    set(RA_BUILD_LLAMACPP ${RAC_BUILD_LLAMACPP} CACHE BOOL "" FORCE)
+    set(RA_BUILD_ONNX ${RAC_BUILD_ONNX} CACHE BOOL "" FORCE)
+    set(RA_BUILD_WHISPERCPP ${RAC_BUILD_WHISPERCPP} CACHE BOOL "" FORCE)
+    
+    add_subdirectory(${RUNANYWHERE_CORE_DIR} ${CMAKE_BINARY_DIR}/runanywhere-core)
 endif()
-
-message(STATUS "Found runanywhere-core at: ${RUNANYWHERE_CORE_DIR}")
-
-# Build runanywhere-core in modular mode
-set(RA_BUILD_MODULAR ON CACHE BOOL "" FORCE)
-set(RA_BUILD_LLAMACPP ${RAC_BUILD_LLAMACPP} CACHE BOOL "" FORCE)
-set(RA_BUILD_ONNX ${RAC_BUILD_ONNX} CACHE BOOL "" FORCE)
-set(RA_BUILD_WHISPERCPP ${RAC_BUILD_WHISPERCPP} CACHE BOOL "" FORCE)
-
-add_subdirectory(${RUNANYWHERE_CORE_DIR} ${CMAKE_BINARY_DIR}/runanywhere-core)
 
 # =============================================================================
 # RAC COMMONS CORE LIBRARY
@@ -215,9 +243,28 @@ target_include_directories(rac_commons PUBLIC
 # Private includes for implementation
 target_include_directories(rac_commons PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${RUNANYWHERE_CORE_DIR}/src
-    ${RUNANYWHERE_CORE_DIR}/src/capabilities
 )
+# Core includes (pre-built or source)
+if(USE_PREBUILT_CORE AND DEFINED RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS)
+    target_include_directories(rac_commons PRIVATE
+        ${RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS}
+    )
+elseif(NOT USE_PREBUILT_CORE AND DEFINED RUNANYWHERE_CORE_INCLUDE_DIRS)
+    target_include_directories(rac_commons PRIVATE
+        ${RUNANYWHERE_CORE_INCLUDE_DIRS}
+    )
+endif()
+
+# Include runanywhere-core headers (for pre-built or source mode)
+if(USE_PREBUILT_CORE AND DEFINED RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS)
+    target_include_directories(rac_commons PUBLIC
+        ${RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS}
+    )
+elseif(NOT USE_PREBUILT_CORE AND DEFINED RUNANYWHERE_CORE_INCLUDE_DIRS)
+    target_include_directories(rac_commons PUBLIC
+        ${RUNANYWHERE_CORE_INCLUDE_DIRS}
+    )
+endif()
 
 # Backend headers - needed for vtable dispatch in service files
 # These headers define backend-specific functions called through vtables
@@ -238,9 +285,17 @@ if(APPLE)
     )
 endif()
 
-target_link_libraries(rac_commons PUBLIC
-    runanywhere_bridge
-)
+# Link against runanywhere-core bridge
+# Use pre-built library if available, otherwise use compiled target
+if(DEFINED RUNANYWHERE_CORE_BRIDGE_LIB)
+    # Pre-built library mode (USE_PREBUILT_CORE=ON)
+    target_link_libraries(rac_commons PUBLIC ${RUNANYWHERE_CORE_BRIDGE_LIB})
+elseif(TARGET runanywhere_bridge)
+    # Source compilation mode (legacy)
+    target_link_libraries(rac_commons PUBLIC runanywhere_bridge)
+else()
+    message(FATAL_ERROR "runanywhere-core bridge library not found. Either set USE_PREBUILT_CORE=ON and run download-core-prebuilt.sh, or provide core source.")
+endif()
 
 # Symbol visibility for shared builds
 if(RAC_BUILD_SHARED)

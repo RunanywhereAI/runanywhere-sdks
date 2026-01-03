@@ -34,7 +34,7 @@ extern "C" {
 // Device Management - Development (Supabase REST API)
 // =============================================================================
 
-#define RAC_ENDPOINT_DEV_DEVICE_REGISTER "/rest/v1/device_registrations"
+#define RAC_ENDPOINT_DEV_DEVICE_REGISTER "/rest/v1/sdk_devices"
 #define RAC_ENDPOINT_DEV_TELEMETRY "/rest/v1/telemetry_events"
 
 // =============================================================================

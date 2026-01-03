@@ -85,13 +85,14 @@ rac_result_t rac_tts_onnx_create(const char* model_path, const rac_tts_onnx_conf
     // Create ONNX backend
     ra_backend_handle backend = ra_create_backend("onnx");
     if (backend == nullptr) {
-        rac_error_set_details("Failed to create ONNX TTS backend");
+        rac_error_set_details("Failed to create ONNX TTS backend - backend not registered or unavailable");
         return RAC_ERROR_BACKEND_INIT_FAILED;
     }
 
     // Initialize backend
     ra_result_code result = ra_initialize(backend, nullptr);
     if (result != RA_SUCCESS) {
+        rac_error_set_details("Failed to initialize ONNX backend: handle invalid or initialization failed");
         ra_destroy(backend);
         return from_core_result(result);
     }
