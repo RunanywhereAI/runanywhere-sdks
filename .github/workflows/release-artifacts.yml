@@ -1,0 +1,153 @@
+name: Release Artifacts
+
+on:
+  push:
+    tags:
+      - 'ios/v*'
+      - 'android/v*'
+
+jobs:
+  ios-artifacts:
+    name: Build iOS Release Artifacts
+    if: startsWith(github.ref, 'refs/tags/ios/')
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode_16.1.app
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        VERSION="${GITHUB_REF##refs/tags/ios/v}"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Resolve Swift Package dependencies
+      working-directory: ./sdk/runanywhere-swift
+      run: swift package resolve
+
+    - name: Build XCFramework
+      working-directory: ./sdk/runanywhere-swift
+      id: build-xcframework
+      run: |
+        # Build for iOS
+        xcodebuild archive \
+          -scheme RunAnywhere \
+          -destination "generic/platform=iOS" \
+          -archivePath build/ios.xcarchive \
+          SKIP_INSTALL=NO \
+          BUILD_LIBRARY_FOR_DISTRIBUTION=YES
+
+        # Build for iOS Simulator
+        xcodebuild archive \
+          -scheme RunAnywhere \
+          -destination "generic/platform=iOS Simulator" \
+          -archivePath build/ios-simulator.xcarchive \
+          SKIP_INSTALL=NO \
+          BUILD_LIBRARY_FOR_DISTRIBUTION=YES
+
+        # Verify framework paths exist before creating XCFramework
+        IOS_FRAMEWORK="build/ios.xcarchive/Products/Library/Frameworks/RunAnywhere.framework"
+        SIM_FRAMEWORK="build/ios-simulator.xcarchive/Products/Library/Frameworks/RunAnywhere.framework"
+
+        if [ ! -d "$IOS_FRAMEWORK" ]; then
+          echo "Error: iOS framework not found at $IOS_FRAMEWORK"
+          exit 1
+        fi
+
+        if [ ! -d "$SIM_FRAMEWORK" ]; then
+          echo "Error: Simulator framework not found at $SIM_FRAMEWORK"
+          exit 1
+        fi
+
+        # Create XCFramework
+        xcodebuild -create-xcframework \
+          -archive build/ios.xcarchive \
+          -framework "$IOS_FRAMEWORK" \
+          -archive build/ios-simulator.xcarchive \
+          -framework "$SIM_FRAMEWORK" \
+          -output build/RunAnywhere.xcframework
+      continue-on-error: true
+
+    - name: Upload XCFramework
+      uses: actions/upload-artifact@v4
+      if: steps.build-xcframework.outcome == 'success'
+      with:
+        name: ios-xcframework-${{ steps.version.outputs.version }}
+        path: sdk/runanywhere-swift/build/RunAnywhere.xcframework
+        retention-days: 90
+
+  android-artifacts:
+    name: Build Android Release Artifacts
+    if: startsWith(github.ref, 'refs/tags/android/')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        VERSION="${GITHUB_REF##refs/tags/android/v}"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x ./sdk/runanywhere-kotlin/gradlew
+
+    - name: Build JVM JAR
+      working-directory: ./sdk/runanywhere-kotlin
+      run: ./gradlew jvmJar --no-daemon
+
+    - name: Build Android AAR
+      working-directory: ./sdk/runanywhere-kotlin
+      run: ./gradlew assembleRelease --no-daemon
+
+    - name: Upload JAR artifact
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: android-jar-${{ steps.version.outputs.version }}
+        path: sdk/runanywhere-kotlin/build/libs/*.jar
+        retention-days: 90
+
+    - name: Upload AAR artifact
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: android-aar-${{ steps.version.outputs.version }}
+        path: sdk/runanywhere-kotlin/build/outputs/aar/*.aar
+        retention-days: 90
+
+    - name: Check artifacts exist
+      id: check-artifacts
+      run: |
+        JAR_FOUND=$(find sdk/runanywhere-kotlin/build/libs -name "*.jar" 2>/dev/null | wc -l)
+        AAR_FOUND=$(find sdk/runanywhere-kotlin/build/outputs/aar -name "*.aar" 2>/dev/null | wc -l)
+        echo "jar_count=$JAR_FOUND" >> $GITHUB_OUTPUT
+        echo "aar_count=$AAR_FOUND" >> $GITHUB_OUTPUT
+        if [ "${JAR_FOUND}" -eq 0 ] && [ "${AAR_FOUND}" -eq 0 ]; then
+          echo "Warning: No artifacts found to attach"
+          exit 1
+        fi
+
+    - name: Attach artifacts to GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: success() && steps.check-artifacts.outcome == 'success'
+      with:
+        files: |
+          sdk/runanywhere-kotlin/build/libs/*.jar
+          sdk/runanywhere-kotlin/build/outputs/aar/*.aar
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

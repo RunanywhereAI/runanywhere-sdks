@@ -181,6 +181,59 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+}
+
+// JaCoCo configuration for code coverage
+// Note: JaCoCo works with JVM tests. For full KMP coverage, consider using Kover plugin.
+apply(plugin = "jacoco")
+
+configure<org.gradle.testing.jacoco.plugins.JacocoExtension> {
+    toolVersion = "0.8.11"
+}
+
+tasks.register<org.gradle.testing.jacoco.tasks.JacocoReport>("jacocoTestReport") {
+    dependsOn("jvmTest", "testDebugUnitTest")
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+
+    // Collect execution data from JVM tests
+    val jvmTestTask = tasks.named<Test>("jvmTest")
+    executionData(jvmTestTask)
+
+    // Collect execution data from Android unit tests if available
+    val androidTestTask = tasks.findByName("testDebugUnitTest")
+    if (androidTestTask != null) {
+        executionData(androidTestTask)
+    }
+
+    sourceDirectories.setFrom(
+        files(
+            kotlin.sourceSets.getByName("commonMain").kotlin.srcDirs,
+            kotlin.sourceSets.getByName("jvmMain").kotlin.srcDirs,
+            kotlin.sourceSets.getByName("androidMain").kotlin.srcDirs
+        )
+    )
+
+    classDirectories.setFrom(
+        files(
+            fileTree(layout.buildDirectory.dir("classes/kotlin/jvm/main")) {
+                exclude("**/R.class", "**/R\$*.class", "**/BuildConfig.class")
+            },
+            fileTree(layout.buildDirectory.dir("classes/kotlin/android/main")) {
+                exclude("**/R.class", "**/R\$*.class", "**/BuildConfig.class")
+            }
+        )
+    )
 }
 
 // Include third-party licenses in JVM JAR
