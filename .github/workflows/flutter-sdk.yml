@@ -27,6 +27,15 @@ jobs:
         flutter-version: '3.24.0'
         channel: 'stable'
 
+    - name: Cache Flutter dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pub-cache
+        key: ${{ runner.os }}-flutter-pub-${{ hashFiles('**/pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-flutter-pub-
+
     - name: Get dependencies
       working-directory: ./sdk/runanywhere-flutter
       run: flutter pub get
@@ -57,14 +66,22 @@ jobs:
         flutter-version: '3.24.0'
         channel: 'stable'
 
-    - name: Get dependencies
-      working-directory: ./sdk/runanywhere-flutter
+    - name: Cache Flutter dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pub-cache
+        key: ${{ runner.os }}-flutter-pub-${{ hashFiles('**/pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-flutter-pub-
+
+    - name: Get dependencies (example app)
+      working-directory: ./examples/flutter/RunAnywhereAI
       run: flutter pub get
 
     - name: Build iOS
-      working-directory: ./sdk/runanywhere-flutter
+      working-directory: ./examples/flutter/RunAnywhereAI
       run: flutter build ios --no-codesign
-      continue-on-error: true
 
   build-android:
     name: Build Android Native Module
@@ -87,11 +104,19 @@ jobs:
         flutter-version: '3.24.0'
         channel: 'stable'
 
-    - name: Get dependencies
-      working-directory: ./sdk/runanywhere-flutter
+    - name: Cache Flutter dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pub-cache
+        key: ${{ runner.os }}-flutter-pub-${{ hashFiles('**/pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-flutter-pub-
+
+    - name: Get dependencies (example app)
+      working-directory: ./examples/flutter/RunAnywhereAI
       run: flutter pub get
 
     - name: Build Android
-      working-directory: ./sdk/runanywhere-flutter
+      working-directory: ./examples/flutter/RunAnywhereAI
       run: flutter build apk --debug
-      continue-on-error: true

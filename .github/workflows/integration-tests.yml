@@ -129,7 +129,7 @@ jobs:
 
     - name: Type check example app
       working-directory: ./examples/react-native/RunAnywhereAI
-      run: yarn typecheck || npx tsc --noEmit
+      run: yarn typecheck
       continue-on-error: true
 
   flutter-app:

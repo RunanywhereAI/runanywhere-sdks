@@ -76,18 +76,19 @@ jobs:
       id: detect-simulator
       run: |
         # Try to find an iPhone simulator with iOS 18.x runtime
-        SIMULATOR="$(xcrun simctl list devices available | grep -i "iPhone" | grep -i "iOS 18" | head -1 | sed -E 's/.*\(([^)]+)\).*/\1/' || echo "")"
-        if [[ -z "$SIMULATOR" ]]; then
+        SIMULATOR="$(xcrun simctl list devices available | grep -i "iPhone" | grep -i "iOS 18" | head -1 | sed -E 's/.*\(([^)]+)\).*/\1/' || echo '')"
+        if [[ -z "${SIMULATOR}" ]]; then
           # Fallback to hardcoded value
           SIMULATOR="iPhone 16"
           echo "Using fallback simulator: ${SIMULATOR}"
         else
           echo "Detected simulator: ${SIMULATOR}"
         fi
-        echo "simulator=$SIMULATOR" >> $GITHUB_OUTPUT
-        # Determine OS version (default to 18.1)
-        OS_VERSION="18.1"
-        echo "os_version=$OS_VERSION" >> $GITHUB_OUTPUT
+        echo "simulator=${SIMULATOR}" >> "${GITHUB_OUTPUT}"
+        # Determine OS version dynamically from available runtimes
+        OS_VERSION="$(xcrun simctl list runtimes | grep -i "iOS" | grep -E "iOS [0-9]+\.[0-9]+" | head -1 | sed -E 's/.*iOS ([0-9]+\.[0-9]+).*/\1/' || echo '18.1')"
+        echo "Using OS version: ${OS_VERSION}"
+        echo "os_version=${OS_VERSION}" >> "${GITHUB_OUTPUT}"
 
     - name: Build iOS
       working-directory: ./sdk/runanywhere-react-native/ios
@@ -125,20 +126,8 @@ jobs:
       working-directory: ./sdk/runanywhere-react-native
       run: yarn install --frozen-lockfile
 
-    - name: Generate Gradle wrapper (if needed)
-      working-directory: ./sdk/runanywhere-react-native/android
-      run: |
-        if [ ! -f "./gradlew" ]; then
-          gradle wrapper --gradle-version 8.3 || echo "Gradle wrapper generation skipped (gradle not in PATH)"
-        fi
-
     - name: Build Android
       working-directory: ./sdk/runanywhere-react-native/android
       run: |
-        if [ -f "./gradlew" ]; then
-          chmod +x ./gradlew
-          ./gradlew build
-        else
-          echo "Warning: gradlew not found, skipping Android build"
-        fi
-      continue-on-error: true
+        chmod +x ./gradlew
+        ./gradlew build
