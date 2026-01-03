@@ -43,6 +43,27 @@ group = "com.runanywhere.sdk"
 version = "0.1.3"
 
 // =============================================================================
+// Local vs Remote JNI Library Configuration
+// =============================================================================
+// testLocal = true  → Use locally built JNI libs from src/androidMain/jniLibs/
+//                     Run: ./scripts/build-local.sh to build and copy libs
+//
+// testLocal = false → Download pre-built JNI libs from GitHub releases (default)
+//                     Downloads from: https://github.com/RunanywhereAI/runanywhere-binaries/releases
+//
+// Mirrors Swift SDK's Package.swift testLocal pattern
+// =============================================================================
+val testLocal: Boolean = project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean() ?: false
+
+// Version constants for remote downloads (mirrors Swift's Package.swift)
+// These should match the releases at:
+// - https://github.com/RunanywhereAI/runanywhere-binaries/releases (Android JNI libs)
+val coreVersion: String = project.findProperty("runanywhere.coreVersion")?.toString() ?: "0.1.1-dev.03aacf9"
+
+// Log the build mode
+logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, coreVersion=$coreVersion")
+
+// =============================================================================
 // Project Path Resolution
 // =============================================================================
 // When included as a subproject in composite builds (e.g., from example app or Android Studio),
@@ -166,8 +187,8 @@ kotlin {
         androidMain {
             dependsOn(jvmAndroidMain)
             dependencies {
-                // Unified native library package (all backends)
-                api(project(resolveModulePath("runanywhere-core-native")))
+                // Native libs (.so files) are included directly in jniLibs/
+                // Built from runanywhere-commons/scripts/build-android.sh
 
                 implementation(libs.androidx.core.ktx)
                 implementation(libs.kotlinx.coroutines.android)
@@ -212,6 +233,135 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // ==========================================================================
+    // JNI Libraries Configuration - COMMON/CORE ONLY
+    // ==========================================================================
+    // This main SDK only includes COMMON JNI libraries (mirrors iOS RACommons.xcframework):
+    //   - librunanywhere_jni.so - JNI entry point
+    //   - librunanywhere_bridge.so - C++ bridge layer
+    //   - librunanywhere_loader.so - Dynamic backend loader
+    //   - libc++_shared.so - C++ STL (shared by all backends)
+    //
+    // Backend-specific libs are in their own modules:
+    //   - runanywhere-core-llamacpp: librunanywhere_llamacpp.so (~34MB)
+    //   - runanywhere-core-onnx: libonnxruntime.so, libsherpa-*.so (~25MB)
+    //
+    // This allows apps to only include the backends they need!
+    // ==========================================================================
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs(
+                if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs"
+            )
+        }
+    }
+}
+
+// =============================================================================
+// JNI Library Download Task (for testLocal=false mode)
+// =============================================================================
+// Downloads ONLY the COMMON/CORE JNI libraries from GitHub releases.
+// Backend-specific libs are downloaded by their respective modules:
+//   - runanywhere-core-llamacpp downloads librunanywhere_llamacpp.so
+//   - runanywhere-core-onnx downloads libonnxruntime.so, libsherpa-*.so
+//
+// This mirrors iOS architecture:
+//   - RACommons.xcframework (core) ← This SDK
+//   - RABackendLlamaCPP.xcframework ← runanywhere-core-llamacpp module
+//   - RABackendONNX.xcframework ← runanywhere-core-onnx module
+// =============================================================================
+tasks.register("downloadJniLibs") {
+    group = "runanywhere"
+    description = "Download COMMON JNI libraries from GitHub releases (when testLocal=false)"
+
+    val outputDir = file("build/jniLibs")
+    val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
+
+    // GitHub release URLs (from runanywhere-binaries repo)
+    val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v$coreVersion"
+
+    // Download ONNX package to extract common libs (they're included in both packages)
+    val packageName = "RunAnywhereONNX-android-v$coreVersion.zip"
+
+    // Common libs to extract (shared by all backends)
+    val commonLibs = setOf(
+        "librunanywhere_jni.so",      // JNI entry point
+        "librunanywhere_bridge.so",   // C++ bridge layer
+        "librunanywhere_loader.so",   // Dynamic backend loader
+        "libc++_shared.so"            // C++ STL
+    )
+
+    outputs.dir(outputDir)
+
+    doLast {
+        if (testLocal) {
+            logger.lifecycle("Skipping JNI download: testLocal=true (using local libs)")
+            return@doLast
+        }
+
+        // Clean output directories
+        outputDir.deleteRecursively()
+        tempDir.deleteRecursively()
+        outputDir.mkdirs()
+        tempDir.mkdirs()
+
+        val zipUrl = "$releaseBaseUrl/$packageName"
+        val tempZip = file("$tempDir/$packageName")
+
+        logger.lifecycle("Downloading COMMON JNI libraries (coreVersion=$coreVersion)...")
+        logger.lifecycle("  URL: $zipUrl")
+
+        try {
+            // Download the zip
+            ant.withGroovyBuilder {
+                "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
+            }
+
+            // Extract to temp directory
+            val extractDir = file("$tempDir/extracted")
+            extractDir.mkdirs()
+            ant.withGroovyBuilder {
+                "unzip"("src" to tempZip, "dest" to extractDir)
+            }
+
+            // Extract ONLY common libs
+            extractDir.walkTopDown()
+                .filter { it.isDirectory && it.name in listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
+                .forEach { abiDir ->
+                    val targetAbiDir = file("$outputDir/${abiDir.name}")
+                    targetAbiDir.mkdirs()
+
+                    abiDir.listFiles()?.filter { it.extension == "so" && it.name in commonLibs }?.forEach { soFile ->
+                        val targetFile = file("$targetAbiDir/${soFile.name}")
+                        soFile.copyTo(targetFile, overwrite = true)
+                        logger.lifecycle("  Copied: ${abiDir.name}/${soFile.name}")
+                    }
+                }
+
+            tempDir.deleteRecursively()
+
+            // Verify output
+            val totalLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
+            logger.lifecycle("✓ Common JNI libraries ready: $totalLibs .so files")
+            logger.lifecycle("  Output: $outputDir")
+            logger.lifecycle("")
+            logger.lifecycle("Note: Backend-specific libs are in their modules:")
+            logger.lifecycle("  - runanywhere-core-llamacpp (~34MB)")
+            logger.lifecycle("  - runanywhere-core-onnx (~25MB)")
+
+        } catch (e: Exception) {
+            logger.error("✗ Failed to download common libs: ${e.message}")
+            logger.error("  Check release exists at: $zipUrl")
+        }
+    }
+}
+
+// Ensure JNI libs are available before Android build
+tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
+    if (!testLocal) {
+        dependsOn("downloadJniLibs")
     }
 }
 

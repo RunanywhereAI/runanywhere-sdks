@@ -28,26 +28,20 @@ dependencyResolutionManagement {
 
 rootProject.name = "RunAnywhereKotlinSDK"
 
-// Include JNI module
-include(":jni")
 // =============================================================================
-// RunAnywhere Core Modules (mirrors iOS XCFramework architecture)
+// RunAnywhere Backend Modules (mirrors iOS Swift Package architecture)
 // =============================================================================
 
-// RunAnywhere Core Native module - UNIFIED native library package
-// Contains ALL native libraries (JNI bridge + LlamaCpp + ONNX + dependencies)
-// Similar to iOS RunAnywhereCoreBinary.xcframework - single binary with everything
-include(":modules:runanywhere-core-native")
+// Native libs (.so files) are built from runanywhere-commons and included
+// directly in the main SDK's jniLibs folder. No separate native module needed.
+// See: runanywhere-commons/scripts/build-android.sh
 
-// NOTE: JNI bridge code (RunAnywhereBridge.kt, RunAnywhereLoader.kt) is now in the main SDK
-// at src/jvmAndroidMain/kotlin/com/runanywhere/sdk/native/bridge/
-
-// RunAnywhere Core LlamaCPP module - LLM backend adapter (pure Kotlin)
-// Depends on main SDK (which includes native libs transitively)
-// Provides: LlamaCppAdapter, LlamaCppService
+// LlamaCPP module - thin wrapper that calls C++ backend registration
+// Single file: LlamaCPP.kt which calls rac_backend_llamacpp_register()
+// Matches iOS: Sources/LlamaCPPRuntime/LlamaCPP.swift
 include(":modules:runanywhere-core-llamacpp")
 
-// RunAnywhere Core ONNX module - STT/TTS/VAD backend adapter (pure Kotlin)
-// Depends on main SDK (which includes native libs transitively)
-// Provides: ONNXAdapter, ONNXService
+// ONNX module - thin wrapper that calls C++ backend registration
+// Single file: ONNX.kt which calls rac_backend_onnx_register()
+// Matches iOS: Sources/ONNXRuntime/ONNX.swift
 include(":modules:runanywhere-core-onnx")
