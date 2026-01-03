@@ -105,7 +105,7 @@ public extension RunAnywhere {
 
         // TTS config
         if let ttsVoice = config.ttsVoice {
-            cConfig.tts_config.voice = (ttsVoice as NSString).utf8String
+            cConfig.tts_config.voice_id = (ttsVoice as NSString).utf8String
         }
 
         let result = rac_voice_agent_initialize(handle, &cConfig)
