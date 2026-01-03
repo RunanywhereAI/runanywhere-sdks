@@ -15,7 +15,9 @@
   "react-native": "src/index",
   "source": "src/index",
   "files": [
-    "src"
+    "src",
+    "ios",
+    "android"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",

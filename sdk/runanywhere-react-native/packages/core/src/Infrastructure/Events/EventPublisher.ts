@@ -2,9 +2,8 @@
  * EventPublisher
  *
  * Single entry point for all SDK event tracking.
- * Routes events to appropriate destinations based on event.destination:
- * - EventBus: Public events for app developers
- * - AnalyticsQueueManager: Internal telemetry for backend
+ * Routes events to EventBus for public consumption.
+ * Analytics/telemetry is now handled by native commons.
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Events/EventPublisher.swift
  */
@@ -12,8 +11,6 @@
 import { EventDestination, type SDKEvent } from './SDKEvent';
 import { EventBus } from '../../Public/Events/EventBus';
 import type { AnySDKEvent } from '../../types/events';
-import type { AnalyticsQueueManager } from '../Analytics/AnalyticsQueueManager';
-import type { AnalyticsEvent } from '../../types/analytics';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('EventPublisher');
@@ -27,31 +24,25 @@ const logger = new SDKLogger('EventPublisher');
  *
  * Design:
  * - Single entry point for all event tracking in the SDK
- * - Routes based on event.destination property
- * - Converts SDKEvent to AnalyticsEvent for telemetry backend
+ * - Routes to EventBus for public events
+ * - Analytics/telemetry is handled by native commons
  *
  * Usage:
  * ```typescript
- * // Track an event (routes automatically based on destination)
+ * // Track an event
  * EventPublisher.shared.track(myEvent);
- *
- * // Track asynchronously (for use in async contexts)
- * await EventPublisher.shared.trackAsync(myEvent);
  * ```
  */
 class EventPublisherImpl {
-  private analyticsQueue: AnalyticsQueueManager | null = null;
   private isInitialized = false;
 
   /**
-   * Initialize the publisher with the analytics queue.
+   * Initialize the publisher.
    * Should be called during SDK startup.
-   *
-   * @param analyticsQueue - The analytics queue manager for telemetry
    */
-  initialize(analyticsQueue: AnalyticsQueueManager): void {
-    this.analyticsQueue = analyticsQueue;
+  initialize(): void {
     this.isInitialized = true;
+    logger.debug('EventPublisher initialized');
   }
 
   /**
@@ -63,7 +54,7 @@ class EventPublisherImpl {
 
   /**
    * Track an event synchronously.
-   * Routes to EventBus and/or AnalyticsQueue based on event.destination.
+   * Routes to EventBus based on event.destination.
    *
    * @param event - The SDK event to track
    */
@@ -75,30 +66,18 @@ class EventPublisherImpl {
       this.publishToEventBus(event);
     }
 
-    // Route to Analytics (telemetry) - unless publicOnly
-    if (destination !== EventDestination.PublicOnly) {
-      this.enqueueForAnalytics(event);
-    }
+    // Analytics events are now handled by native commons via
+    // the rac_* API - no JS-side analytics queue needed
   }
 
   /**
    * Track an event asynchronously.
-   * Use this in async contexts where you want to await the analytics enqueue.
+   * Use this in async contexts.
    *
    * @param event - The SDK event to track
    */
   async trackAsync(event: SDKEvent): Promise<void> {
-    const destination = event.destination;
-
-    // Route to EventBus (public) - unless analyticsOnly
-    if (destination !== EventDestination.AnalyticsOnly) {
-      this.publishToEventBus(event);
-    }
-
-    // Route to Analytics (telemetry) - unless publicOnly
-    if (destination !== EventDestination.PublicOnly) {
-      await this.enqueueForAnalyticsAsync(event);
-    }
+    this.track(event);
   }
 
   /**
@@ -144,64 +123,11 @@ class EventPublisherImpl {
   }
 
   /**
-   * Enqueue an event for analytics processing (sync version).
-   */
-  private enqueueForAnalytics(event: SDKEvent): void {
-    if (!this.analyticsQueue) {
-      // Analytics not initialized - log warning but don't block
-      if (process.env.NODE_ENV !== 'production') {
-        logger.debug(
-          `Analytics queue not initialized, event not tracked: ${event.type}`
-        );
-      }
-      return;
-    }
-
-    const analyticsEvent = this.convertToAnalyticsEvent(event);
-    // Fire and forget - don't await
-    this.analyticsQueue.enqueue(analyticsEvent).catch((error) => {
-      logger.warning('Failed to enqueue event:', { error });
-    });
-  }
-
-  /**
-   * Enqueue an event for analytics processing (async version).
-   */
-  private async enqueueForAnalyticsAsync(event: SDKEvent): Promise<void> {
-    if (!this.analyticsQueue) {
-      if (process.env.NODE_ENV !== 'production') {
-        logger.debug(
-          `Analytics queue not initialized, event not tracked: ${event.type}`
-        );
-      }
-      return;
-    }
-
-    const analyticsEvent = this.convertToAnalyticsEvent(event);
-    await this.analyticsQueue.enqueue(analyticsEvent);
-  }
-
-  /**
-   * Convert SDKEvent to AnalyticsEvent for the queue manager.
-   */
-  private convertToAnalyticsEvent(event: SDKEvent): AnalyticsEvent {
-    return {
-      id: event.id,
-      type: event.type,
-      timestamp: event.timestamp,
-      sessionId: event.sessionId,
-      eventData: event.properties,
-    };
-  }
-
-  /**
    * Flush all pending analytics events.
-   * Call this before app shutdown or backgrounding.
+   * No-op since analytics is now in native commons.
    */
   async flush(): Promise<void> {
-    if (this.analyticsQueue) {
-      await this.analyticsQueue.flush();
-    }
+    // Analytics flushing is handled by native commons
   }
 
   /**
@@ -209,7 +135,6 @@ class EventPublisherImpl {
    * Primarily used for testing.
    */
   reset(): void {
-    this.analyticsQueue = null;
     this.isInitialized = false;
   }
 }
@@ -226,7 +151,7 @@ class EventPublisherImpl {
  * import { EventPublisher } from './Infrastructure/Events';
  *
  * // Initialize once during SDK startup
- * EventPublisher.shared.initialize(AnalyticsQueueManager.shared);
+ * EventPublisher.shared.initialize();
  *
  * // Track events anywhere in the SDK
  * EventPublisher.shared.track(myEvent);

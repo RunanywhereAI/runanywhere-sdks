@@ -16,6 +16,11 @@
     "example": "yarn workspace runanywhere-example",
     "native:nitrogen": "yarn workspace @runanywhere/native nitrogen",
     "native:prepare": "yarn workspace @runanywhere/native prepare",
+    "native:local": "export RA_TEST_LOCAL=1",
+    "native:remote": "unset RA_TEST_LOCAL",
+    "native:download-ios": "ruby packages/native/scripts/download-frameworks.rb",
+    "native:download-android": "cd packages/native/android && ./gradlew downloadNativeLibs",
+    "native:clean": "rm -rf packages/native/ios/Frameworks packages/native/android/src/main/jniLibs",
     "release": "lerna publish"
   },
   "repository": {

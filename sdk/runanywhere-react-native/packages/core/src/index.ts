@@ -1,13 +1,8 @@
 /**
  * @runanywhere/core - Core SDK for RunAnywhere React Native
  *
- * This package provides the core SDK infrastructure:
- * - Public API (RunAnywhere main class)
- * - Foundation (logging, DI, errors, security)
- * - Infrastructure (events, analytics, download)
- * - Features (capabilities interfaces)
- * - Data layer (network, repositories)
- * - Core types and models
+ * Thin TypeScript wrapper over native commons.
+ * All business logic is in native C++ (runanywhere-commons).
  *
  * @packageDocumentation
  */
@@ -16,12 +11,7 @@
 // Main SDK
 // =============================================================================
 
-export {
-  RunAnywhere,
-  Conversation,
-  type ModelInfo,
-  type DownloadProgress as ModelDownloadProgress,
-} from './Public/RunAnywhere';
+export { RunAnywhere } from './Public/RunAnywhere';
 
 // =============================================================================
 // Types
@@ -29,41 +19,20 @@ export {
 
 export * from './types';
 
-// Export commonly used enums for easy access
-export {
-  LLMFramework,
-  ModelCategory,
-  ModelFormat,
-  AudioFormat,
-  getAudioFormatMimeType,
-  getAudioFormatFileExtension,
-} from './types/enums';
-
 // =============================================================================
-// Foundation
+// Foundation - Error Types
 // =============================================================================
 
 export {
-  // Initialization
-  InitializationPhase,
-  type SDKInitParams,
-  type InitializationState,
-  isSDKUsable,
-  areServicesReady,
-  isInitializing,
-  createInitialState,
-  markCoreInitialized,
-  markServicesInitializing,
-  markServicesInitialized,
-  markInitializationFailed,
-  resetState,
-  // Error Types
+  // Error Codes
   ErrorCode,
   getErrorCodeMessage,
+  // Error Category
   ErrorCategory,
   allErrorCategories,
   getCategoryFromCode,
   inferCategoryFromError,
+  // Error Context
   type ErrorContext,
   createErrorContext,
   formatStackTrace,
@@ -89,162 +58,29 @@ export {
   authenticationError,
   generationError,
   storageError,
-} from './Foundation';
+} from './Foundation/ErrorTypes';
 
 // =============================================================================
-// Events
-// =============================================================================
-
-export { EventBus, NativeEventNames } from './Public/Events';
-
-// =============================================================================
-// Infrastructure
+// Foundation - Initialization
 // =============================================================================
 
 export {
-  type SDKEvent,
-  EventDestination,
-  EventCategory,
-  createSDKEvent,
-  isSDKEvent,
-  EventPublisher,
-  // Analytics & Telemetry
-  TelemetryEventType,
-  TelemetryRepository,
-  type TelemetryDataEntity,
-  type TelemetryStorage,
-  AnalyticsQueueManager,
-  LLMAnalyticsService,
-  STTAnalyticsService,
-  TTSAnalyticsService,
-} from './Infrastructure';
+  InitializationPhase,
+  type SDKInitParams,
+  type InitializationState,
+  isSDKUsable,
+  areServicesReady,
+  isInitializing,
+  createInitialState,
+  markCoreInitialized,
+  markServicesInitializing,
+  markServicesInitialized,
+  markInitializationFailed,
+  resetState,
+} from './Foundation/Initialization';
 
 // =============================================================================
-// Services
-// =============================================================================
-
-export {
-  ModelRegistry,
-  DownloadService,
-  DownloadState,
-  JSDownloadService,
-  SystemTTSService,
-  getVoicesByLanguage,
-  getDefaultVoice,
-  getPlatformDefaultVoice,
-  PlatformVoices,
-  type ModelCriteria,
-  type AddModelFromURLOptions,
-  type DownloadProgress,
-  type DownloadTask,
-  type DownloadConfiguration,
-  type ProgressCallback,
-  type JSDownloadProgress,
-} from './services';
-
-// =============================================================================
-// Data Layer
-// =============================================================================
-
-// Authentication types from Data/Network
-export { type AuthenticationResponse } from './Data/Network';
-
-// =============================================================================
-// Features
-// =============================================================================
-
-export {
-  // STT Capability
-  STTCapability,
-  STTServiceWrapper,
-  type STTConfiguration,
-  type STTInput,
-  type STTOutput,
-  STTError,
-  // TTS Capability
-  TTSCapability,
-  TTSServiceWrapper,
-  type TTSConfiguration as TTSConfig,
-  type TTSInput,
-  type TTSOutput,
-  type TTSOptions,
-  TTSError,
-  // LLM Capability
-  LLMCapability,
-  LLMServiceWrapper,
-  type LLMConfiguration,
-  type LLMInput,
-  type LLMOutput,
-  type Message,
-  MessageRole,
-  FinishReason,
-  LLMError,
-  // VAD Capability
-  VADCapability,
-  VADError,
-} from './Features';
-
-// =============================================================================
-// Voice Session
-// =============================================================================
-
-export {
-  VoiceSessionHandle,
-  VoiceSessionEventType,
-  VoiceSessionEventFactory,
-  VoiceSessionError,
-  VoiceSessionErrorCode,
-  isVoiceSessionError,
-  DEFAULT_VOICE_SESSION_CONFIG,
-  createVoiceSessionConfig,
-  VoiceSessionConfigPresets,
-  type VoiceSessionEvent,
-  type VoiceSessionConfig,
-  type VoiceSessionEventListener,
-} from './Features/VoiceSession';
-
-// =============================================================================
-// Voice Agent
-// =============================================================================
-
-export {
-  type VoiceAgentResult,
-  type VoiceAgentStreamEvent,
-  type VoiceAgentComponentStates,
-  type ComponentLoadState,
-  VoiceAgentError,
-  VoiceAgentErrorCode,
-  isVoiceAgentFullyReady,
-  getMissingComponents,
-} from './Features/VoiceAgent/VoiceAgentModels';
-
-// =============================================================================
-// Storage Management
-// =============================================================================
-
-export {
-  type StorageInfo,
-  createStorageInfo,
-  createEmptyStorageInfo,
-} from './Infrastructure/FileManagement/Models';
-export {
-  type AppStorageInfo,
-  createAppStorageInfo,
-} from './Infrastructure/FileManagement/Models/AppStorageInfo';
-export {
-  type DeviceStorageInfo,
-  createDeviceStorageInfo,
-} from './Infrastructure/FileManagement/Models/DeviceStorageInfo';
-
-// =============================================================================
-// Core Registry & Containers
-// =============================================================================
-
-export { ServiceRegistry } from './Foundation/DependencyInjection/ServiceRegistry';
-export { ServiceContainer } from './Foundation/DependencyInjection/ServiceContainer';
-
-// =============================================================================
-// Security
+// Foundation - Security
 // =============================================================================
 
 export {
@@ -257,125 +93,57 @@ export {
 } from './Foundation/Security';
 
 // =============================================================================
-// Data/Network
+// Foundation - Logging
+// =============================================================================
+
+export { SDKLogger } from './Foundation/Logging/Logger/SDKLogger';
+export { LogLevel } from './Foundation/Logging/Models/LogLevel';
+export { LoggingManager } from './Foundation/Logging/Services/LoggingManager';
+
+// =============================================================================
+// Foundation - DI
+// =============================================================================
+
+export { ServiceRegistry } from './Foundation/DependencyInjection/ServiceRegistry';
+export { ServiceContainer } from './Foundation/DependencyInjection/ServiceContainer';
+
+// =============================================================================
+// Events
+// =============================================================================
+
+export { EventBus, NativeEventNames } from './Public/Events';
+export {
+  type SDKEvent,
+  EventDestination,
+  EventCategory,
+  createSDKEvent,
+  isSDKEvent,
+  EventPublisher,
+} from './Infrastructure/Events';
+
+// =============================================================================
+// Services (thin wrappers over native)
 // =============================================================================
 
 export {
-  // APIClient
-  APIClient,
-  APIClientError,
-  createAPIClient,
-  type APIClientConfig,
-  type AuthenticationProvider,
-  // Endpoints
-  type APIEndpointType,
-  type APIEndpointDefinition,
-  APIEndpoints,
-  deviceRegistrationEndpointForEnvironment,
-  analyticsEndpointForEnvironment,
-  // Auth Models
-  type AuthenticationRequest,
-  type RefreshTokenRequest,
-  type DeviceRegistrationRequest,
-  type DeviceRegistrationResponse,
-  type HealthCheckResponse,
-  toInternalAuthResponse,
-  createAuthRequest,
-  createRefreshRequest,
-} from './Data/Network';
+  ModelRegistry,
+  DownloadService,
+  DownloadState,
+  SystemTTSService,
+  getVoicesByLanguage,
+  getDefaultVoice,
+  getPlatformDefaultVoice,
+  PlatformVoices,
+  type ModelCriteria,
+  type AddModelFromURLOptions,
+  type DownloadProgress,
+  type DownloadTask,
+  type DownloadConfiguration,
+  type ProgressCallback,
+} from './services';
 
 // =============================================================================
-// Data/Protocols
-// =============================================================================
-
-export {
-  // Repository Protocol
-  type Repository,
-  type SyncableRepository,
-  RepositoryHelpers,
-  // Repository Entity
-  type RepositoryEntity,
-  RepositoryEntityHelpers,
-  // Data Source
-  type DataSource,
-  type RemoteDataSource,
-  type LocalDataSource,
-  type DataSourceStorageInfo,
-  DataSourceError,
-  DataSourceErrorCode,
-  RemoteOperationHelper,
-  // Repository Errors
-  RepositoryError,
-} from './Data/Protocols';
-
-// =============================================================================
-// Data/Repositories
-// =============================================================================
-
-export type { ModelInfoRepository } from './Data/Repositories';
-export { ModelInfoRepositoryImpl } from './Data/Repositories';
-
-// =============================================================================
-// Data/Services
-// =============================================================================
-
-export { ModelInfoService } from './Data/Services';
-
-// =============================================================================
-// Data/Sync
-// =============================================================================
-
-export { SyncCoordinator } from './Data/Sync';
-
-// =============================================================================
-// Core/Capabilities
-// =============================================================================
-
-export {
-  // Capability Protocols
-  type Capability,
-  type ModelLoadableCapability,
-  type ServiceBasedCapability,
-  type CompositeCapability,
-  type ComponentConfiguration,
-  // Loading State
-  type CapabilityLoadingState,
-  isIdle,
-  isLoading,
-  isLoaded,
-  isFailed,
-  // Resource Types
-  CapabilityResourceType,
-  // Managed Lifecycle
-  ManagedLifecycle,
-  ModelLifecycleManager,
-  // Errors
-  CapabilityError,
-  CapabilityErrorCode,
-} from './Core/Capabilities';
-
-// =============================================================================
-// Core/Protocols - Service Providers
-// =============================================================================
-
-export type { LLMServiceProvider } from './Core/Protocols/LLM/LLMServiceProvider';
-export type { LLMService } from './Core/Protocols/LLM/LLMService';
-export type { STTServiceProvider } from './Core/Protocols/Voice/STTServiceProvider';
-export type { STTService } from './Core/Protocols/Voice/STTService';
-export type { TTSServiceProvider } from './Core/Protocols/Voice/TTSServiceProvider';
-export type { TTSService } from './Core/Protocols/Voice/TTSService';
-
-// =============================================================================
-// Capabilities/TextGeneration - Generation Types
-// =============================================================================
-
-export type { GenerationOptions } from './Capabilities/TextGeneration/Models/GenerationOptions';
-export type { GenerationResult } from './Capabilities/TextGeneration/Models/GenerationResult';
-export { PerformanceMetricsImpl } from './Capabilities/TextGeneration/Models/PerformanceMetrics';
-export { ExecutionTarget, HardwareAcceleration } from './types/enums';
-
-// =============================================================================
-// Re-export native module for convenience
+// Native Module (re-export for convenience)
 // =============================================================================
 
 export {

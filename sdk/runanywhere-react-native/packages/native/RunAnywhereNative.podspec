@@ -2,12 +2,22 @@ require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 
-# XCFramework configuration
-XCFRAMEWORK_VERSION = File.exist?(File.join(__dir__, "native-version.txt")) ?
-  File.read(File.join(__dir__, "native-version.txt")).strip : "0.0.1-dev.e6b7a2f"
-XCFRAMEWORK_NAME = "RunAnywhereCore"
+# =============================================================================
+# Version Constants (MUST match Swift Package.swift)
+# =============================================================================
+COMMONS_VERSION = "0.1.0"
+
+# =============================================================================
+# Binary Source
+# =============================================================================
 GITHUB_ORG = "RunanywhereAI"
-GITHUB_REPO = "runanywhere-binaries"
+COMMONS_REPO = "runanywhere-sdks"
+
+# =============================================================================
+# testLocal Toggle
+# Set RA_TEST_LOCAL=1 or create .testlocal file to use local binaries
+# =============================================================================
+TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '.testlocal'))
 
 Pod::Spec.new do |s|
   s.name         = "RunAnywhereNative"
@@ -22,55 +32,62 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/RunanywhereAI/sdks.git", :tag => "#{s.version}" }
 
   # =============================================================================
-  # Download Native XCFramework
+  # Core SDK - RACommons Only
+  # Backend modules (LlamaCPP, ONNX) are in separate optional pods
   # =============================================================================
-  s.prepare_command = <<-CMD
-    set -e
+  if TEST_LOCAL
+    puts "[RunAnywhereNative] Using LOCAL RACommons from ios/Binaries/"
+    s.vendored_frameworks = "ios/Binaries/RACommons.xcframework"
+  else
+    s.prepare_command = <<-CMD
+      set -e
 
-    FRAMEWORK_DIR="ios/Frameworks"
-    FRAMEWORK_NAME="#{XCFRAMEWORK_NAME}"
-    VERSION="#{XCFRAMEWORK_VERSION}"
-    VERSION_FILE="$FRAMEWORK_DIR/.version"
+      FRAMEWORK_DIR="ios/Frameworks"
+      VERSION="#{COMMONS_VERSION}"
+      VERSION_FILE="$FRAMEWORK_DIR/.version"
 
-    # Check if already downloaded with correct version
-    if [ -f "$VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/$FRAMEWORK_NAME.xcframework" ]; then
-      CURRENT_VERSION=$(cat "$VERSION_FILE")
-      if [ "$CURRENT_VERSION" = "$VERSION" ]; then
-        echo "✅ XCFramework version $VERSION already downloaded"
-        exit 0
+      # Check if already downloaded with correct version
+      if [ -f "$VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RACommons.xcframework" ]; then
+        CURRENT_VERSION=$(cat "$VERSION_FILE")
+        if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+          echo "✅ RACommons.xcframework version $VERSION already downloaded"
+          exit 0
+        fi
       fi
-    fi
 
-    echo "📦 Downloading $FRAMEWORK_NAME.xcframework version $VERSION..."
+      echo "📦 Downloading RACommons.xcframework version $VERSION..."
 
-    mkdir -p "$FRAMEWORK_DIR"
+      mkdir -p "$FRAMEWORK_DIR"
+      rm -rf "$FRAMEWORK_DIR/RACommons.xcframework"
+      rm -rf "$FRAMEWORK_DIR/RunAnywhereCore.xcframework"  # Clean up old framework
 
-    DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{GITHUB_REPO}/releases/download/v$VERSION/$FRAMEWORK_NAME.xcframework.zip"
-    ZIP_FILE="/tmp/$FRAMEWORK_NAME.xcframework.zip"
+      # Download RACommons from runanywhere-sdks
+      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/commons-v$VERSION/RACommons-$VERSION.zip"
+      ZIP_FILE="/tmp/RACommons.zip"
 
-    echo "   URL: $DOWNLOAD_URL"
+      echo "   URL: $DOWNLOAD_URL"
 
-    curl -L -f -o "$ZIP_FILE" "$DOWNLOAD_URL" || {
-      echo "❌ Failed to download XCFramework from $DOWNLOAD_URL"
-      exit 1
-    }
+      curl -L -f -o "$ZIP_FILE" "$DOWNLOAD_URL" || {
+        echo "❌ Failed to download RACommons from $DOWNLOAD_URL"
+        exit 1
+      }
 
-    rm -rf "$FRAMEWORK_DIR/$FRAMEWORK_NAME.xcframework"
+      echo "📂 Extracting RACommons.xcframework..."
+      unzip -q -o "$ZIP_FILE" -d "$FRAMEWORK_DIR/"
+      rm -f "$ZIP_FILE"
 
-    echo "📂 Extracting XCFramework..."
-    unzip -q -o "$ZIP_FILE" -d "$FRAMEWORK_DIR/"
+      echo "$VERSION" > "$VERSION_FILE"
 
-    rm -f "$ZIP_FILE"
+      if [ -d "$FRAMEWORK_DIR/RACommons.xcframework" ]; then
+        echo "✅ RACommons.xcframework installed successfully"
+      else
+        echo "❌ RACommons.xcframework extraction failed"
+        exit 1
+      fi
+    CMD
 
-    echo "$VERSION" > "$VERSION_FILE"
-
-    if [ -d "$FRAMEWORK_DIR/$FRAMEWORK_NAME.xcframework" ]; then
-      echo "✅ XCFramework installed successfully"
-    else
-      echo "❌ XCFramework extraction failed"
-      exit 1
-    fi
-  CMD
+    s.vendored_frameworks = "ios/Frameworks/RACommons.xcframework"
+  end
 
   # Source files
   s.source_files = [
@@ -78,18 +95,19 @@ Pod::Spec.new do |s|
     "ios/**/*.{h,m,mm}",
     "cpp/HybridRunAnywhere.cpp",
     "cpp/HybridRunAnywhere.hpp",
-    "cpp/include/**/*.{h,hpp}",
+    "cpp/bridges/**/*.{cpp,hpp}",
   ]
 
-  # XCFramework
-  s.vendored_frameworks = "ios/Frameworks/#{XCFRAMEWORK_NAME}.xcframework"
-
-  # Build settings
+  # Build settings with header paths for RACommons.xcframework
   s.pod_target_xcconfig = {
-    "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
+    "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
     "HEADER_SEARCH_PATHS" => [
       "$(PODS_TARGET_SRCROOT)/cpp",
-      "$(PODS_TARGET_SRCROOT)/cpp/include",
+      "$(PODS_TARGET_SRCROOT)/cpp/bridges",
+      "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RACommons.xcframework/ios-arm64/Headers",
+      "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RACommons.xcframework/ios-arm64_x86_64-simulator/Headers",
+      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64/Headers",
+      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/Headers",
       "$(PODS_ROOT)/Headers/Public",
     ].join(" "),
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited)",

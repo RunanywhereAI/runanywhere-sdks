@@ -11,10 +11,18 @@ import {
   requireFileSystemModule,
 } from '@runanywhere/native';
 import { ModelRegistry } from '../../services/ModelRegistry';
-import { ServiceContainer } from '../../Foundation/DependencyInjection/ServiceContainer';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type { ModelInfo, LLMFramework } from '../../types';
 import { ModelCategory } from '../../types';
+
+/**
+ * Interface for model assignment service methods used in this file
+ */
+interface ModelAssignmentServiceLike {
+  fetchModelAssignments(forceRefresh?: boolean): Promise<ModelInfo[]>;
+  getModelsForCategory(category: ModelCategory): Promise<ModelInfo[]>;
+  clearCache(): void;
+}
 
 const logger = new SDKLogger('RunAnywhere.Models');
 
@@ -143,16 +151,15 @@ export async function fetchModelAssignments(
 
   logger.info('Fetching model assignments...');
 
-  const modelAssignmentService =
-    ServiceContainer.shared.modelAssignmentService;
-  if (!modelAssignmentService) {
-    throw new Error('ModelAssignmentService not available');
+  // Fetch model assignments via native or fallback to ModelRegistry
+  try {
+    const models = await ModelRegistry.getAllModels();
+    logger.info(`Successfully fetched ${models.length} model assignments`);
+    return models;
+  } catch (error) {
+    logger.warning('Failed to fetch model assignments:', { error });
+    return [];
   }
-
-  const models =
-    await modelAssignmentService.fetchModelAssignments(forceRefresh);
-  logger.info(`Successfully fetched ${models.length} model assignments`);
-  return models;
 }
 
 /**
@@ -169,14 +176,9 @@ export async function getModelsForCategory(
 
   await ensureServicesReady();
 
-  const modelAssignmentService =
-    ServiceContainer.shared.modelAssignmentService;
-  if (!modelAssignmentService) {
-    const allModels = await ModelRegistry.getAvailableModels();
-    return allModels.filter((m) => m.category === category);
-  }
-
-  return modelAssignmentService.getModelsForCategory(category);
+  // Get models by category via ModelRegistry (delegates to native)
+  const allModels = await ModelRegistry.getModelsByCategory(category);
+  return allModels;
 }
 
 /**
@@ -189,11 +191,9 @@ export async function clearModelAssignmentsCache(
     return;
   }
 
-  const modelAssignmentService =
-    ServiceContainer.shared.modelAssignmentService;
-  if (modelAssignmentService) {
-    modelAssignmentService.clearCache();
-  }
+  // Cache clearing is handled by native commons
+  // Reset local state if needed
+  ModelRegistry.reset();
 }
 
 /**
