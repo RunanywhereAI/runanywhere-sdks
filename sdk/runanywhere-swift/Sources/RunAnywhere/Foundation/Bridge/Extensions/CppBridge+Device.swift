@@ -34,7 +34,7 @@ extension CppBridge {
 
             var callbacks = rac_device_callbacks_t()
 
-            // Get device info callback
+            // Get device info callback - populates all fields needed by backend
             callbacks.get_device_info = { outInfo, _ in
                 guard let outInfo = outInfo else { return }
 
@@ -49,14 +49,34 @@ extension CppBridge {
 
                 // Fill out the device info struct
                 // Note: C strings are managed by Swift and remain valid during callback
+
+                // Required fields (backend schema)
                 outInfo.pointee.device_id = (deviceId as NSString).utf8String
-                outInfo.pointee.device_type = (deviceInfo.deviceType as NSString).utf8String
                 outInfo.pointee.device_model = (deviceInfo.deviceModel as NSString).utf8String
-                outInfo.pointee.os_name = ("iOS" as NSString).utf8String
-                outInfo.pointee.os_version = (deviceInfo.osVersion as NSString).utf8String
+                outInfo.pointee.device_name = (deviceInfo.deviceName as NSString).utf8String
                 outInfo.pointee.platform = (deviceInfo.platform as NSString).utf8String
-                outInfo.pointee.total_memory_bytes = Int64(deviceInfo.totalMemory)
-                outInfo.pointee.available_memory_bytes = Int64(deviceInfo.availableMemory)
+                outInfo.pointee.os_version = (deviceInfo.osVersion as NSString).utf8String
+                outInfo.pointee.form_factor = (deviceInfo.formFactor as NSString).utf8String
+                outInfo.pointee.architecture = (deviceInfo.architecture as NSString).utf8String
+                outInfo.pointee.chip_name = (deviceInfo.chipName as NSString).utf8String
+                outInfo.pointee.total_memory = Int64(deviceInfo.totalMemory)
+                outInfo.pointee.available_memory = Int64(deviceInfo.availableMemory)
+                outInfo.pointee.has_neural_engine = deviceInfo.hasNeuralEngine ? RAC_TRUE : RAC_FALSE
+                outInfo.pointee.neural_engine_cores = Int32(deviceInfo.neuralEngineCores)
+                outInfo.pointee.gpu_family = (deviceInfo.gpuFamily as NSString).utf8String
+                outInfo.pointee.battery_level = deviceInfo.batteryLevel ?? -1.0
+                if let batteryState = deviceInfo.batteryState {
+                    outInfo.pointee.battery_state = (batteryState as NSString).utf8String
+                }
+                outInfo.pointee.is_low_power_mode = deviceInfo.isLowPowerMode ? RAC_TRUE : RAC_FALSE
+                outInfo.pointee.core_count = Int32(deviceInfo.coreCount)
+                outInfo.pointee.performance_cores = Int32(deviceInfo.performanceCores)
+                outInfo.pointee.efficiency_cores = Int32(deviceInfo.efficiencyCores)
+                outInfo.pointee.device_fingerprint = (deviceId as NSString).utf8String
+
+                // Legacy fields (backward compatibility)
+                outInfo.pointee.device_type = (deviceInfo.deviceType as NSString).utf8String
+                outInfo.pointee.os_name = ("iOS" as NSString).utf8String
                 outInfo.pointee.processor_count = Int32(deviceInfo.coreCount)
                 outInfo.pointee.is_simulator = isSimulator ? RAC_TRUE : RAC_FALSE
             }
@@ -146,7 +166,7 @@ extension CppBridge {
         }
 
         /// Register device with backend if not already registered
-        /// All business logic is in C++
+        /// All business logic is in C++ - this is just a thin wrapper
         public static func registerIfNeeded(environment: SDKEnvironment) async throws {
             guard callbacksRegistered else {
                 throw SDKError.general(.notInitialized, "Device manager callbacks not registered")
@@ -219,9 +239,9 @@ extension CppBridge {
                                             cDeviceInfo.os_name = osName
                                             cDeviceInfo.os_version = osVer
                                             cDeviceInfo.platform = plat
-                                            cDeviceInfo.total_memory_bytes = Int64(deviceInfo.totalMemory)
-                                            cDeviceInfo.available_memory_bytes = Int64(deviceInfo.availableMemory)
-                                            cDeviceInfo.processor_count = Int32(deviceInfo.coreCount)
+                                            cDeviceInfo.total_memory = Int64(deviceInfo.totalMemory)
+                                            cDeviceInfo.available_memory = Int64(deviceInfo.availableMemory)
+                                            cDeviceInfo.core_count = Int32(deviceInfo.coreCount)
                                             cDeviceInfo.is_simulator = isSimulator ? RAC_TRUE : RAC_FALSE
 
                                             request.device_info = cDeviceInfo

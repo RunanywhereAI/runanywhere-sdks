@@ -342,44 +342,102 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
     JsonBuilder json;
     json.start_object();
 
-    // Device info object
-    std::stringstream device_ss;
-    device_ss << "\"device_info\":{";
-    device_ss << "\"device_id\":\""
-              << (request->device_info.device_id ? request->device_info.device_id : "") << "\"";
-    if (request->device_info.device_type) {
-        device_ss << ",\"device_type\":\"" << request->device_info.device_type << "\"";
-    }
-    if (request->device_info.device_model) {
-        device_ss << ",\"device_model\":\"" << request->device_info.device_model << "\"";
-    }
-    if (request->device_info.os_name) {
-        device_ss << ",\"os_name\":\"" << request->device_info.os_name << "\"";
-    }
-    if (request->device_info.os_version) {
-        device_ss << ",\"os_version\":\"" << request->device_info.os_version << "\"";
-    }
-    if (request->device_info.platform) {
-        device_ss << ",\"platform\":\"" << request->device_info.platform << "\"";
-    }
-    if (request->device_info.total_memory_bytes > 0) {
-        device_ss << ",\"total_memory_bytes\":" << request->device_info.total_memory_bytes;
-    }
-    if (request->device_info.processor_count > 0) {
-        device_ss << ",\"processor_count\":" << request->device_info.processor_count;
-    }
-    device_ss << ",\"is_simulator\":" << (request->device_info.is_simulator ? "true" : "false");
-    device_ss << "}";
-    json.add_raw(device_ss.str().c_str());
+    // For development mode (Supabase), flatten the structure to match Supabase schema
+    // For production/staging, use nested device_info structure
+    if (env == RAC_ENV_DEVELOPMENT) {
+        // Flattened structure for Supabase (matches Kotlin SDK DevDeviceRegistrationRequest)
+        const rac_device_registration_info_t* info = &request->device_info;
+        
+        // Required fields (matching Supabase schema)
+        if (info->device_id) {
+            json.add_string("device_id", info->device_id);
+        }
+        if (info->platform) {
+            json.add_string("platform", info->platform);
+        }
+        if (info->os_version) {
+            json.add_string("os_version", info->os_version);
+        }
+        if (info->device_model) {
+            json.add_string("device_model", info->device_model);
+        }
+        if (request->sdk_version) {
+            json.add_string("sdk_version", request->sdk_version);
+        }
+        
+        // Optional fields
+        if (request->build_token) {
+            json.add_string("build_token", request->build_token);
+        }
+        if (info->total_memory > 0) {
+            json.add_int("total_memory", info->total_memory);
+        }
+        if (info->architecture) {
+            json.add_string("architecture", info->architecture);
+        }
+        if (info->chip_name) {
+            json.add_string("chip_name", info->chip_name);
+        }
+        if (info->form_factor) {
+            json.add_string("form_factor", info->form_factor);
+        }
+        // has_neural_engine is always set (rac_bool_t), so we can always include it
+        json.add_bool("has_neural_engine", info->has_neural_engine, RAC_TRUE);
+        // Add last_seen_at timestamp for UPSERT to update existing records
+        if (request->last_seen_at_ms > 0) {
+            json.add_timestamp("last_seen_at", request->last_seen_at_ms);
+        }
+    } else {
+        // Nested structure for production/staging
+        // Matches backend schemas/device.py DeviceInfo schema
+        const rac_device_registration_info_t* info = &request->device_info;
+        std::stringstream device_ss;
+        device_ss << "\"device_info\":{";
 
-    json.add_string("sdk_version", request->sdk_version);
+        // Required fields (backend schema expects snake_case)
+        device_ss << "\"device_model\":\"" << (info->device_model ? info->device_model : "") << "\"";
+        device_ss << ",\"device_name\":\"" << (info->device_name ? info->device_name : "") << "\"";
+        device_ss << ",\"platform\":\"" << (info->platform ? info->platform : "") << "\"";
+        device_ss << ",\"os_version\":\"" << (info->os_version ? info->os_version : "") << "\"";
+        device_ss << ",\"form_factor\":\"" << (info->form_factor ? info->form_factor : "phone") << "\"";
+        device_ss << ",\"architecture\":\"" << (info->architecture ? info->architecture : "") << "\"";
+        device_ss << ",\"chip_name\":\"" << (info->chip_name ? info->chip_name : "") << "\"";
+        device_ss << ",\"total_memory\":" << info->total_memory;
+        device_ss << ",\"available_memory\":" << info->available_memory;
+        device_ss << ",\"has_neural_engine\":" << (info->has_neural_engine ? "true" : "false");
+        device_ss << ",\"neural_engine_cores\":" << info->neural_engine_cores;
+        device_ss << ",\"gpu_family\":\"" << (info->gpu_family ? info->gpu_family : "unknown") << "\"";
 
-    // Development mode includes build token
-    if (env == RAC_ENV_DEVELOPMENT && request->build_token) {
-        json.add_string("build_token", request->build_token);
+        // Battery info (may be unavailable)
+        if (info->battery_level >= 0) {
+            device_ss << ",\"battery_level\":" << info->battery_level;
+        } else {
+            device_ss << ",\"battery_level\":null";
+        }
+        if (info->battery_state) {
+            device_ss << ",\"battery_state\":\"" << info->battery_state << "\"";
+        } else {
+            device_ss << ",\"battery_state\":null";
+        }
+
+        device_ss << ",\"is_low_power_mode\":" << (info->is_low_power_mode ? "true" : "false");
+        device_ss << ",\"core_count\":" << info->core_count;
+        device_ss << ",\"performance_cores\":" << info->performance_cores;
+        device_ss << ",\"efficiency_cores\":" << info->efficiency_cores;
+
+        // Device fingerprint (same as device_id for most cases)
+        device_ss << ",\"device_fingerprint\":\"" << (info->device_fingerprint ? info->device_fingerprint : (info->device_id ? info->device_id : "")) << "\"";
+
+        device_ss << "}";
+        json.add_raw(device_ss.str().c_str());
+
+        json.add_string("sdk_version", request->sdk_version);
+
+        // Add last_seen_at timestamp for UPSERT to update existing records
+        if (request->last_seen_at_ms > 0) {
+            json.add_timestamp("last_seen_at", request->last_seen_at_ms);
+        }
     }
-
-    json.add_timestamp("last_seen_at", request->last_seen_at_ms);
 
     json.end_object();
 

@@ -264,7 +264,7 @@ rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle, con
     rac::events::emit_voice_agent_stt_state_changed(RAC_VOICE_AGENT_STATE_LOADING, model_id,
                                                     nullptr);
 
-    rac_result_t result = rac_stt_component_load_model(handle->stt_handle, model_id);
+    rac_result_t result = rac_stt_component_load_model(handle->stt_handle, model_id, model_id, model_id);
 
     if (result == RAC_SUCCESS) {
         rac::events::emit_voice_agent_stt_state_changed(RAC_VOICE_AGENT_STATE_LOADED, model_id,
@@ -296,7 +296,7 @@ rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle, con
     rac::events::emit_voice_agent_llm_state_changed(RAC_VOICE_AGENT_STATE_LOADING, model_id,
                                                     nullptr);
 
-    rac_result_t result = rac_llm_component_load_model(handle->llm_handle, model_id);
+    rac_result_t result = rac_llm_component_load_model(handle->llm_handle, model_id, model_id, model_id);
 
     if (result == RAC_SUCCESS) {
         rac::events::emit_voice_agent_llm_state_changed(RAC_VOICE_AGENT_STATE_LOADED, model_id,
@@ -328,7 +328,7 @@ rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle, con
     rac::events::emit_voice_agent_tts_state_changed(RAC_VOICE_AGENT_STATE_LOADING, voice_id,
                                                     nullptr);
 
-    rac_result_t result = rac_tts_component_load_voice(handle->tts_handle, voice_id);
+    rac_result_t result = rac_tts_component_load_voice(handle->tts_handle, voice_id, voice_id, voice_id);
 
     if (result == RAC_SUCCESS) {
         rac::events::emit_voice_agent_tts_state_changed(RAC_VOICE_AGENT_STATE_LOADED, voice_id,
@@ -418,7 +418,8 @@ rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
     if (cfg->stt_config.model_id && strlen(cfg->stt_config.model_id) > 0) {
         // Load the specified model
         RAC_LOG_INFO("VoiceAgent", "Loading STT model");
-        result = rac_stt_component_load_model(handle->stt_handle, cfg->stt_config.model_id);
+        result = rac_stt_component_load_model(handle->stt_handle, cfg->stt_config.model_id,
+                                              cfg->stt_config.model_id, cfg->stt_config.model_id);
         if (result != RAC_SUCCESS) {
             RAC_LOG_ERROR("VoiceAgent", "STT component failed to initialize");
             return result;
@@ -429,7 +430,8 @@ rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
     // Step 3: Initialize LLM model (mirrors Swift's initializeLLMModel)
     if (cfg->llm_config.model_id && strlen(cfg->llm_config.model_id) > 0) {
         RAC_LOG_INFO("VoiceAgent", "Loading LLM model");
-        result = rac_llm_component_load_model(handle->llm_handle, cfg->llm_config.model_id);
+        result = rac_llm_component_load_model(handle->llm_handle, cfg->llm_config.model_id,
+                                              cfg->llm_config.model_id, cfg->llm_config.model_id);
         if (result != RAC_SUCCESS) {
             RAC_LOG_ERROR("VoiceAgent", "LLM component failed to initialize");
             return result;
@@ -440,7 +442,8 @@ rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
     // Note: TTS uses load_model with voice as model_id
     if (cfg->tts_config.voice && strlen(cfg->tts_config.voice) > 0) {
         RAC_LOG_INFO("VoiceAgent", "Initializing TTS");
-        result = rac_tts_component_load_voice(handle->tts_handle, cfg->tts_config.voice);
+        result = rac_tts_component_load_voice(handle->tts_handle, cfg->tts_config.voice,
+                                              cfg->tts_config.voice, cfg->tts_config.voice);
         if (result != RAC_SUCCESS) {
             RAC_LOG_ERROR("VoiceAgent", "TTS component failed to initialize");
             return result;
