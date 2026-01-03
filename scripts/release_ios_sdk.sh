@@ -142,7 +142,7 @@ validate_preconditions() {
     print_success "Authenticated with GitHub CLI"
 
     # Check for psql if DATABASE_URL is set
-    if [[ -n "${DATABASE_URL:-}" && ! command -v psql >/dev/null ]]; then
+    if [[ -n "${DATABASE_URL:-}" ]] && ! command -v psql >/dev/null; then
         print_warning "DATABASE_URL is set but psql not found (will print SQL for manual execution)"
     fi
 

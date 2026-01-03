@@ -71,6 +71,9 @@ else
         grep -v ".build/" | \
         grep -v "build/" | \
         grep -v "DerivedData/" | \
+        grep -v "vendor/" | \
+        grep -v "Pods/" | \
+        grep -v ".dart_tool/" | \
         grep -v "scripts/check-todos-hook.sh" | \
         grep -vE "$TODO_WITH_ISSUE_PATTERN"; then
 

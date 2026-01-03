@@ -76,13 +76,13 @@ jobs:
       id: detect-simulator
       run: |
         # Try to find an iPhone simulator with iOS 18.x runtime
-        SIMULATOR=$(xcrun simctl list devices available | grep -i "iPhone" | grep -i "iOS 18" | head -1 | sed -E 's/.*\(([^)]+)\).*/\1/' || echo "")
+        SIMULATOR="$(xcrun simctl list devices available | grep -i "iPhone" | grep -i "iOS 18" | head -1 | sed -E 's/.*\(([^)]+)\).*/\1/' || echo "")"
         if [[ -z "$SIMULATOR" ]]; then
           # Fallback to hardcoded value
           SIMULATOR="iPhone 16"
-          echo "Using fallback simulator: $SIMULATOR"
+          echo "Using fallback simulator: ${SIMULATOR}"
         else
-          echo "Detected simulator: $SIMULATOR"
+          echo "Detected simulator: ${SIMULATOR}"
         fi
         echo "simulator=$SIMULATOR" >> $GITHUB_OUTPUT
         # Determine OS version (default to 18.1)

@@ -24,7 +24,7 @@ jobs:
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.1'
+        flutter-version: '3.24.0'
         channel: 'stable'
 
     - name: Get dependencies
@@ -54,7 +54,7 @@ jobs:
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.1'
+        flutter-version: '3.24.0'
         channel: 'stable'
 
     - name: Get dependencies
@@ -84,7 +84,7 @@ jobs:
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.1'
+        flutter-version: '3.24.0'
         channel: 'stable'
 
     - name: Get dependencies

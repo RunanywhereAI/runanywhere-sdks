@@ -133,11 +133,11 @@ jobs:
     - name: Check artifacts exist
       id: check-artifacts
       run: |
-        JAR_FOUND=$(ls sdk/runanywhere-kotlin/build/libs/*.jar 2>/dev/null | wc -l)
-        AAR_FOUND=$(ls sdk/runanywhere-kotlin/build/outputs/aar/*.aar 2>/dev/null | wc -l)
+        JAR_FOUND=$(find sdk/runanywhere-kotlin/build/libs -name "*.jar" 2>/dev/null | wc -l)
+        AAR_FOUND=$(find sdk/runanywhere-kotlin/build/outputs/aar -name "*.aar" 2>/dev/null | wc -l)
         echo "jar_count=$JAR_FOUND" >> $GITHUB_OUTPUT
         echo "aar_count=$AAR_FOUND" >> $GITHUB_OUTPUT
-        if [ "$JAR_FOUND" -eq 0 ] && [ "$AAR_FOUND" -eq 0 ]; then
+        if [ "${JAR_FOUND}" -eq 0 ] && [ "${AAR_FOUND}" -eq 0 ]; then
           echo "Warning: No artifacts found to attach"
           exit 1
         fi

@@ -81,6 +81,14 @@ done
 validate_preconditions() {
     print_header "Validating Preconditions"
 
+    # Must run at repo root
+    if [[ ! -d "$SDK_DIR" ]]; then
+        print_error "SDK directory not found: $SDK_DIR"
+        print_info "Must run from repository root"
+        exit 1
+    fi
+    print_success "Running from repository root"
+
     # Check if we're in a git repository
     if ! git rev-parse --git-dir >/dev/null 2>&1; then
         print_error "Not in a git repository"
