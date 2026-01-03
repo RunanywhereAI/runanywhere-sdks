@@ -1,0 +1,8 @@
+module CRACommons {
+    umbrella header "CRACommons.h"
+
+    export *
+    module * { export * }
+
+    link framework "Accelerate"
+}

@@ -1,0 +1,59 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+_deps/
+
+# Distribution output
+dist/
+
+# IDE files
+.idea/
+.vscode/
+*.xcodeproj/
+*.xcworkspace/
+
+# Clangd cache
+.cache/
+
+# Compiled objects
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+
+# Debug files
+*.dSYM/
+*.pdb
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Package files
+*.xcframework/
+*.framework/
+*.zip
+
+# Third party dependencies (downloaded separately)
+third_party/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Development config with secrets (use .template file)
+src/infrastructure/network/development_config.cpp

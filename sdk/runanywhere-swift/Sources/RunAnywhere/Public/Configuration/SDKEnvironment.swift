@@ -1,3 +1,4 @@
+import CRACommons
 import Foundation
 
 /// SDK Environment mode - determines how data is handled
@@ -11,6 +12,17 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
     /// Production mode - live environment
     case production
 
+    // MARK: - C++ Bridge
+
+    /// Convert to C++ environment type for cross-platform consistency
+    var cEnvironment: rac_environment_t {
+        switch self {
+        case .development: return RAC_ENV_DEVELOPMENT
+        case .staging: return RAC_ENV_STAGING
+        case .production: return RAC_ENV_PRODUCTION
+        }
+    }
+
     /// Human-readable description
     public var description: String {
         switch self {
@@ -23,19 +35,19 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
         }
     }
 
-    /// Check if this is a production environment
+    /// Check if this is a production environment (uses C++)
     public var isProduction: Bool {
-        self == .production
+        rac_env_is_production(cEnvironment)
     }
 
-    /// Check if this is a testing environment
+    /// Check if this is a testing environment (uses C++)
     public var isTesting: Bool {
-        self == .development || self == .staging
+        rac_env_is_testing(cEnvironment)
     }
 
-    /// Check if this environment requires a valid backend URL
+    /// Check if this environment requires a valid backend URL (uses C++)
     public var requiresBackendURL: Bool {
-        self != .development
+        rac_env_requires_backend_url(cEnvironment)
     }
 
     // MARK: - Build Configuration Validation
@@ -75,24 +87,24 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
         }
     }
 
-    /// Should send telemetry data (production only)
+    /// Should send telemetry data (production only) - uses C++
     public var shouldSendTelemetry: Bool {
-        self == .production
+        rac_env_should_send_telemetry(cEnvironment)
     }
 
     /// Should use mock data sources (development only)
     public var useMockData: Bool {
-        self == .development
+        self == .development // Keep simple - no C++ equivalent
     }
 
-    /// Should sync with backend (non-development)
+    /// Should sync with backend (non-development) - uses C++
     public var shouldSyncWithBackend: Bool {
-        self != .development
+        rac_env_should_sync_with_backend(cEnvironment)
     }
 
-    /// Requires API authentication (non-development)
+    /// Requires API authentication (non-development) - uses C++
     public var requiresAuthentication: Bool {
-        self != .development
+        rac_env_requires_auth(cEnvironment)
     }
 }
 
@@ -127,7 +139,7 @@ public struct SDKInitParams {
     ///   - apiKey: Your RunAnywhere API key (required)
     ///   - baseURL: Base URL for API requests (required, must be valid HTTPS URL)
     ///   - environment: Environment mode (default: production)
-    /// - Throws: RunAnywhereError if validation fails
+    /// - Throws: SDKError if validation fails
     public init(
         apiKey: String,
         baseURL: URL,
@@ -146,14 +158,14 @@ public struct SDKInitParams {
     ///   - apiKey: Your RunAnywhere API key
     ///   - baseURL: Base URL string for API requests
     ///   - environment: Environment mode (default: production)
-    /// - Throws: RunAnywhereError if URL is invalid or validation fails
+    /// - Throws: SDKError if URL is invalid or validation fails
     public init(
         apiKey: String,
         baseURL: String,
         environment: SDKEnvironment = .production
     ) throws {
         guard let url = URL(string: baseURL) else {
-            throw RunAnywhereError.validationFailed("Invalid base URL format: \(baseURL)")
+            throw SDKError.general(.validationFailed, "Invalid base URL format: \(baseURL)")
         }
         try self.init(apiKey: apiKey, baseURL: url, environment: environment)
     }
@@ -167,14 +179,15 @@ public struct SDKInitParams {
         self.environment = .development
     }
 
-    // MARK: - Validation
+    // MARK: - Validation (Uses C++ for cross-platform consistency)
 
     /// Validate initialization parameters based on environment
+    /// Uses C++ validation logic for cross-platform consistency.
     /// - Parameters:
     ///   - apiKey: The API key to validate
     ///   - baseURL: The base URL to validate
     ///   - environment: The target environment
-    /// - Throws: RunAnywhereError if validation fails
+    /// - Throws: SDKError if validation fails
     private static func validate(
         apiKey: String,
         baseURL: URL,
@@ -182,75 +195,56 @@ public struct SDKInitParams {
     ) throws {
         let logger = SDKLogger(category: "SDKInitParams")
 
-        // 1. Check build configuration compatibility for production
+        // 1. Swift-only: Check DEBUG build for production (compile-time check)
         if environment == .production {
             #if DEBUG
-            throw RunAnywhereError.environmentMismatch(
+            throw SDKError.general(.environmentMismatch,
                 "Production environment cannot be used in DEBUG builds. " +
-                "Use .development or .staging for testing, or build in Release mode for production."
-            )
+                "Use .development or .staging for testing, or build in Release mode.")
             #endif
         }
 
-        // 2. Validate API key for staging and production
-        if environment.requiresAuthentication {
-            guard !apiKey.isEmpty else {
-                throw RunAnywhereError.invalidAPIKey("API key is required for \(environment.description)")
-            }
+        // 2. Call C++ validation for API key and URL
+        let cEnv = environment.cEnvironment
 
-            // Basic API key format validation (at least 10 characters)
-            guard apiKey.count >= 10 else {
-                throw RunAnywhereError.invalidAPIKey("API key appears to be invalid (too short)")
+        // Validate API key via C++
+        let apiKeyResult = apiKey.withCString { ptr in
+            rac_validate_api_key(ptr, cEnv)
+        }
+        if apiKeyResult != RAC_VALIDATION_OK {
+            let message = String(cString: rac_validation_error_message(apiKeyResult))
+            switch apiKeyResult {
+            case RAC_VALIDATION_API_KEY_REQUIRED:
+                throw SDKError.general(.invalidAPIKey, "\(message) for \(environment.description)")
+            case RAC_VALIDATION_API_KEY_TOO_SHORT:
+                throw SDKError.general(.invalidAPIKey, message)
+            default:
+                throw SDKError.general(.validationFailed, message)
             }
         }
 
-        // 3. Validate URL for staging and production
-        if environment.requiresBackendURL {
-            // Check for valid scheme (must be HTTPS for production, HTTPS or HTTP for staging)
-            guard let scheme = baseURL.scheme?.lowercased() else {
-                throw RunAnywhereError.validationFailed("Base URL must have a valid scheme (https)")
-            }
-
-            if environment == .production {
-                guard scheme == "https" else {
-                    throw RunAnywhereError.validationFailed(
-                        "Production environment requires HTTPS. Got: \(scheme)"
-                    )
-                }
-            } else if environment == .staging {
-                guard scheme == "https" || scheme == "http" else {
-                    throw RunAnywhereError.validationFailed(
-                        "Staging environment requires HTTP or HTTPS. Got: \(scheme)"
-                    )
-                }
-
-                // Warn if using HTTP in staging
-                if scheme == "http" {
-                    logger.warning("⚠️ Using HTTP for staging environment. Consider using HTTPS for security.")
-                }
-            }
-
-            // Check for valid host
-            guard let host = baseURL.host, !host.isEmpty else {
-                throw RunAnywhereError.validationFailed("Base URL must have a valid host")
-            }
-
-            // Warn about localhost/example URLs
-            let lowercaseHost = host.lowercased()
-            if lowercaseHost.contains("localhost") ||
-               lowercaseHost.contains("127.0.0.1") ||
-               lowercaseHost.contains("example.com") ||
-               lowercaseHost.contains(".local") {
-                if environment == .production {
-                    throw RunAnywhereError.validationFailed(
-                        "Production environment cannot use localhost or example URLs: \(host)"
-                    )
-                } else {
-                    logger.warning("⚠️ Staging environment using local/example URL: \(host)")
-                }
-            }
-
-            logger.info("✅ URL validated for \(environment.description): \(baseURL.absoluteString)")
+        // Validate URL via C++
+        let urlResult = baseURL.absoluteString.withCString { ptr in
+            rac_validate_base_url(ptr, cEnv)
         }
+        if urlResult != RAC_VALIDATION_OK {
+            let message = String(cString: rac_validation_error_message(urlResult))
+            throw SDKError.general(.validationFailed, message)
+        }
+
+        // Log warnings for staging HTTP (C++ validates but doesn't warn)
+        if environment == .staging, baseURL.scheme?.lowercased() == "http" {
+            logger.warning("Using HTTP for staging environment. Consider using HTTPS for security.")
+        }
+
+        // Log warnings for staging localhost (C++ validates but doesn't warn)
+        if environment == .staging, let host = baseURL.host?.lowercased() {
+            if host.contains("localhost") || host.contains("127.0.0.1") ||
+               host.contains("example.com") || host.contains(".local") {
+                logger.warning("Staging environment using local/example URL: \(host)")
+            }
+        }
+
+        logger.info("URL validated for \(environment.description): \(baseURL.absoluteString)")
     }
 }

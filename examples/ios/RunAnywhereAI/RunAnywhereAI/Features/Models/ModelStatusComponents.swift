@@ -130,8 +130,7 @@ struct ModelStatusBanner: View {
     }
 
     /// Streaming mode indicator badge
-    @ViewBuilder
-    private var streamingModeIndicator: some View {
+    @ViewBuilder private var streamingModeIndicator: some View {
         HStack(spacing: 3) {
             Image(systemName: supportsStreaming ? "bolt.fill" : "square.fill")
                 .font(.system(size: 8))
@@ -150,7 +149,6 @@ struct ModelStatusBanner: View {
     private func frameworkIcon(for framework: InferenceFramework) -> String {
         switch framework {
         case .llamaCpp: return "cpu"
-        case .whisperKit: return "waveform"
         case .onnx: return "square.stack.3d.up"
         case .foundationModels: return "apple.logo"
         default: return "cube"
@@ -160,7 +158,6 @@ struct ModelStatusBanner: View {
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .llamaCpp: return AppColors.primaryAccent
-        case .whisperKit: return .green
         case .onnx: return .purple
         case .foundationModels: return .primary
         default: return .gray
@@ -286,9 +283,9 @@ struct ModelRequiredOverlay: View {
 
 /// A setup view specifically for Voice Assistant which requires 3 models
 struct VoicePipelineSetupView: View {
-    @Binding var sttModel: (framework: InferenceFramework, name: String, id: String)?
-    @Binding var llmModel: (framework: InferenceFramework, name: String, id: String)?
-    @Binding var ttsModel: (framework: InferenceFramework, name: String, id: String)?
+    @Binding var sttModel: SelectedModelInfo?
+    @Binding var llmModel: SelectedModelInfo?
+    @Binding var ttsModel: SelectedModelInfo?
 
     // Model loading states from SDK lifecycle tracker
     var sttLoadState: ModelLoadState = .notLoaded
@@ -605,7 +602,6 @@ struct CompactModelIndicator: View {
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .llamaCpp: return AppColors.primaryAccent
-        case .whisperKit: return .green
         case .onnx: return .purple
         case .foundationModels: return .primary
         default: return .gray
@@ -620,27 +616,24 @@ struct CompactModelIndicator: View {
         ModelStatusBanner(
             framework: .llamaCpp,
             modelName: "SmolLM2-135M",
-            isLoading: false,
-            onSelectModel: {}
-        )
+            isLoading: false
+        ) {}
 
         ModelStatusBanner(
             framework: nil,
             modelName: nil,
-            isLoading: false,
-            onSelectModel: {}
-        )
+            isLoading: false
+        ) {}
 
         ModelStatusBanner(
-            framework: .whisperKit,
-            modelName: "Tiny",
-            isLoading: true,
-            onSelectModel: {}
-        )
+            framework: .onnx,
+            modelName: "whisper-tiny",
+            isLoading: true
+        ) {}
     }
     .padding()
 }
 
 #Preview("Model Required Overlay") {
-    ModelRequiredOverlay(modality: .stt, onSelectModel: {})
+    ModelRequiredOverlay(modality: .stt) {}
 }

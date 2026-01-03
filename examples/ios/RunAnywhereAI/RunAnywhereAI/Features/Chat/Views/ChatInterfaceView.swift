@@ -26,9 +26,12 @@ struct ChatInterfaceView: View {
     @State private var debugMessage = ""
     @FocusState private var isTextFieldFocused: Bool
 
-    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "ChatInterfaceView")
+    private let logger = Logger(
+        subsystem: "com.runanywhere.RunAnywhereAI",
+        category: "ChatInterfaceView"
+    )
 
-    private var hasModelSelected: Bool {
+    var hasModelSelected: Bool {
         viewModel.isModelLoaded && viewModel.loadedModelName != nil
     }
 
@@ -57,7 +60,9 @@ struct ChatInterfaceView: View {
         .onAppear {
             setupInitialState()
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ModelLoaded"))) { _ in
+        .onReceive(
+            NotificationCenter.default.publisher(for: Notification.Name("ModelLoaded"))
+        ) { _ in
             Task {
                 await viewModel.checkModelStatus()
             }
@@ -68,116 +73,163 @@ struct ChatInterfaceView: View {
             Text(debugMessage)
         }
     }
+}
 
-    // MARK: - macOS View
+// MARK: - Platform Views
 
-    private var macOSView: some View {
+extension ChatInterfaceView {
+    var macOSView: some View {
         ZStack {
             VStack(spacing: 0) {
-                // Custom toolbar
-                HStack {
-                    Button(action: { showingConversationList = true }) {
-                        Label("Conversations", systemImage: "list.bullet")
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(AppColors.primaryAccent)
-
-                    Spacer()
-
-                    Text("Chat")
-                        .font(AppTypography.headline)
-
-                    Spacer()
-
-                    toolbarButtons
-                }
-                .padding(.horizontal, AppSpacing.large)
-                .padding(.vertical, AppSpacing.smallMedium)
-                .background(AppColors.backgroundPrimary)
-
-                ModelStatusBanner(
-                    framework: viewModel.selectedFramework,
-                    modelName: viewModel.loadedModelName,
-                    isLoading: viewModel.isGenerating && !hasModelSelected,
-                    supportsStreaming: viewModel.modelSupportsStreaming,
-                    onSelectModel: { showingModelSelection = true }
-                )
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-
+                macOSToolbar
+                modelStatusSection
                 Divider()
-
-                if hasModelSelected {
-                    chatMessagesView
-                    inputArea
-                } else {
-                    Spacer()
-                }
+                contentArea
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColors.backgroundPrimary)
 
-            if !hasModelSelected && !viewModel.isGenerating {
-                ModelRequiredOverlay(
-                    modality: .llm,
-                    onSelectModel: { showingModelSelection = true }
-                )
-            }
+            modelRequiredOverlayIfNeeded
         }
     }
 
-    // MARK: - iOS View
-
-    private var iOSView: some View {
+    var iOSView: some View {
         NavigationView {
             ZStack {
                 VStack(spacing: 0) {
-                    ModelStatusBanner(
-                        framework: viewModel.selectedFramework,
-                        modelName: viewModel.loadedModelName,
-                        isLoading: viewModel.isGenerating && !hasModelSelected,
-                        supportsStreaming: viewModel.modelSupportsStreaming,
-                        onSelectModel: { showingModelSelection = true }
-                    )
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-
+                    modelStatusSection
                     Divider()
-
-                    if hasModelSelected {
-                        chatMessagesView
-                        inputArea
-                    } else {
-                        Spacer()
-                    }
+                    contentArea
                 }
-
-                if !hasModelSelected && !viewModel.isGenerating {
-                    ModelRequiredOverlay(
-                        modality: .llm,
-                        onSelectModel: { showingModelSelection = true }
-                    )
-                }
+                modelRequiredOverlayIfNeeded
             }
             .navigationTitle("Chat")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { showingConversationList = true }) {
+                    Button {
+                        showingConversationList = true
+                    } label: {
                         Image(systemName: "list.bullet")
                     }
                 }
-
                 ToolbarItem(placement: .navigationBarTrailing) {
                     toolbarButtons
                 }
             }
         }
     }
+}
 
-    // MARK: - Chat Messages View
+// MARK: - View Components
 
-    private var chatMessagesView: some View {
+extension ChatInterfaceView {
+    var macOSToolbar: some View {
+        HStack {
+            Button {
+                showingConversationList = true
+            } label: {
+                Label("Conversations", systemImage: "list.bullet")
+            }
+            .buttonStyle(.bordered)
+            .tint(AppColors.primaryAccent)
+
+            Spacer()
+
+            Text("Chat")
+                .font(AppTypography.headline)
+
+            Spacer()
+
+            toolbarButtons
+        }
+        .padding(.horizontal, AppSpacing.large)
+        .padding(.vertical, AppSpacing.smallMedium)
+        .background(AppColors.backgroundPrimary)
+    }
+
+    var modelStatusSection: some View {
+        ModelStatusBanner(
+            framework: viewModel.selectedFramework,
+            modelName: viewModel.loadedModelName,
+            isLoading: viewModel.isGenerating && !hasModelSelected,
+            supportsStreaming: viewModel.modelSupportsStreaming
+        ) { showingModelSelection = true }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder var contentArea: some View {
+        if hasModelSelected {
+            chatMessagesView
+            inputArea
+        } else {
+            Spacer()
+        }
+    }
+
+    @ViewBuilder var modelRequiredOverlayIfNeeded: some View {
+        if !hasModelSelected && !viewModel.isGenerating {
+            ModelRequiredOverlay(modality: .llm) { showingModelSelection = true }
+        }
+    }
+
+    var toolbarButtons: some View {
+        HStack(spacing: 8) {
+            detailsButton
+            modelButton
+            clearButton
+        }
+    }
+
+    private var detailsButton: some View {
+        Button {
+            showingChatDetails = true
+        } label: {
+            Image(systemName: "info.circle")
+                .foregroundColor(viewModel.messages.isEmpty ? .gray : AppColors.primaryAccent)
+        }
+        .disabled(viewModel.messages.isEmpty)
+        #if os(macOS)
+        .buttonStyle(.bordered)
+        .tint(AppColors.primaryAccent)
+        #endif
+    }
+
+    private var modelButton: some View {
+        Button {
+            showingModelSelection = true
+        } label: {
+            HStack(spacing: AppSpacing.xSmall) {
+                Image(systemName: "cube")
+                Text(viewModel.isModelLoaded ? "Switch Model" : "Select Model")
+                    .font(AppTypography.caption)
+            }
+        }
+        #if os(macOS)
+        .buttonStyle(.bordered)
+        .tint(AppColors.primaryAccent)
+        #endif
+    }
+
+    private var clearButton: some View {
+        Button {
+            viewModel.clearChat()
+        } label: {
+            Image(systemName: "trash")
+        }
+        .disabled(viewModel.messages.isEmpty)
+        #if os(macOS)
+        .buttonStyle(.bordered)
+        .tint(AppColors.primaryAccent)
+        #endif
+    }
+}
+
+// MARK: - Chat Content Views
+
+extension ChatInterfaceView {
+    var chatMessagesView: some View {
         ScrollViewReader { proxy in
             VStack(spacing: 0) {
                 ScrollView {
@@ -210,13 +262,17 @@ struct ChatInterfaceView: View {
                 }
             }
             #if os(iOS)
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            .onReceive(
+                NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
+            ) { _ in
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     scrollToBottom(proxy: proxy, animated: true)
                 }
             }
             #endif
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("MessageContentUpdated"))) { _ in
+            .onReceive(
+                NotificationCenter.default.publisher(for: Notification.Name("MessageContentUpdated"))
+            ) { _ in
                 if viewModel.isGenerating {
                     proxy.scrollTo("typing", anchor: .bottom)
                 }
@@ -224,9 +280,7 @@ struct ChatInterfaceView: View {
         }
     }
 
-    // MARK: - Empty State
-
-    private var emptyStateView: some View {
+    var emptyStateView: some View {
         VStack(spacing: 16) {
             Spacer()
 
@@ -249,9 +303,7 @@ struct ChatInterfaceView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Message List
-
-    private var messageListView: some View {
+    var messageListView: some View {
         LazyVStack(spacing: AppSpacing.large) {
             Spacer(minLength: 20)
                 .id("top-spacer")
@@ -259,19 +311,13 @@ struct ChatInterfaceView: View {
             ForEach(viewModel.messages) { message in
                 MessageBubbleView(message: message, isGenerating: viewModel.isGenerating)
                     .id(message.id)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .bottom)),
-                        removal: .scale(scale: 0.9).combined(with: .opacity)
-                    ))
+                    .transition(messageTransition)
             }
 
             if viewModel.isGenerating {
                 TypingIndicatorView()
                     .id("typing")
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 0.9).combined(with: .opacity)
-                    ))
+                    .transition(typingTransition)
             }
 
             Spacer(minLength: 20)
@@ -280,51 +326,23 @@ struct ChatInterfaceView: View {
         .padding(AppSpacing.large)
     }
 
-    // MARK: - Toolbar
-
-    private var toolbarButtons: some View {
-        HStack(spacing: 8) {
-            Button(action: { showingChatDetails = true }) {
-                Image(systemName: "info.circle")
-                    .foregroundColor(viewModel.messages.isEmpty ? .gray : AppColors.primaryAccent)
-            }
-            .disabled(viewModel.messages.isEmpty)
-            #if os(macOS)
-            .buttonStyle(.bordered)
-            .tint(AppColors.primaryAccent)
-            #endif
-
-            Button(action: { showingModelSelection = true }) {
-                HStack(spacing: AppSpacing.xSmall) {
-                    Image(systemName: "cube")
-                    if viewModel.isModelLoaded {
-                        Text("Switch Model")
-                            .font(AppTypography.caption)
-                    } else {
-                        Text("Select Model")
-                            .font(AppTypography.caption)
-                    }
-                }
-            }
-            #if os(macOS)
-            .buttonStyle(.bordered)
-            .tint(AppColors.primaryAccent)
-            #endif
-
-            Button(action: { viewModel.clearChat() }) {
-                Image(systemName: "trash")
-            }
-            .disabled(viewModel.messages.isEmpty)
-            #if os(macOS)
-            .buttonStyle(.bordered)
-            .tint(AppColors.primaryAccent)
-            #endif
-        }
+    private var messageTransition: AnyTransition {
+        .asymmetric(
+            insertion: .scale(scale: 0.8)
+                .combined(with: .opacity)
+                .combined(with: .move(edge: .bottom)),
+            removal: .scale(scale: 0.9).combined(with: .opacity)
+        )
     }
 
-    // MARK: - Input Area
+    private var typingTransition: AnyTransition {
+        .asymmetric(
+            insertion: .scale(scale: 0.8).combined(with: .opacity),
+            removal: .scale(scale: 0.9).combined(with: .opacity)
+        )
+    }
 
-    private var inputArea: some View {
+    var inputArea: some View {
         VStack(spacing: 0) {
             Divider()
 
@@ -341,7 +359,9 @@ struct ChatInterfaceView: View {
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(AppTypography.system28)
-                        .foregroundColor(viewModel.canSend ? AppColors.primaryAccent : AppColors.statusGray)
+                        .foregroundColor(
+                            viewModel.canSend ? AppColors.primaryAccent : AppColors.statusGray
+                        )
                 }
                 .disabled(!viewModel.canSend)
             }
@@ -350,17 +370,20 @@ struct ChatInterfaceView: View {
             .animation(.easeInOut(duration: AppLayout.animationFast), value: isTextFieldFocused)
         }
     }
+}
 
-    // MARK: - Helper Methods
+// MARK: - Helper Methods
 
-    private func sendMessage() {
+extension ChatInterfaceView {
+    func sendMessage() {
         guard viewModel.canSend else { return }
 
         Task {
             await viewModel.sendMessage()
 
             Task {
-                try? await Task.sleep(nanoseconds: UInt64(AppLayout.animationSlow * 1_000_000_000))
+                let sleepDuration = UInt64(AppLayout.animationSlow * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: sleepDuration)
                 if let error = viewModel.error {
                     await MainActor.run {
                         debugMessage = "Error occurred: \(error.localizedDescription)"
@@ -371,13 +394,13 @@ struct ChatInterfaceView: View {
         }
     }
 
-    private func setupInitialState() {
+    func setupInitialState() {
         Task {
             await viewModel.checkModelStatus()
         }
     }
 
-    private func handleModelSelected(_ model: ModelInfo) async {
+    func handleModelSelected(_ model: ModelInfo) async {
         await MainActor.run {
             ModelListViewModel.shared.setCurrentModel(model)
         }
@@ -385,7 +408,7 @@ struct ChatInterfaceView: View {
         await viewModel.checkModelStatus()
     }
 
-    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
+    func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
         let scrollToId: String
         if viewModel.isGenerating {
             scrollToId = "typing"
@@ -401,336 +424,6 @@ struct ChatInterfaceView: View {
             }
         } else {
             proxy.scrollTo(scrollToId, anchor: .bottom)
-        }
-    }
-}
-
-// MARK: - Typing Indicator
-
-struct TypingIndicatorView: View {
-    @State private var animationPhase = 0
-
-    var body: some View {
-        HStack {
-            Spacer(minLength: AppSpacing.padding60)
-
-            HStack(spacing: AppSpacing.mediumLarge) {
-                HStack(spacing: AppSpacing.xSmall) {
-                    ForEach(0..<3) { index in
-                        Circle()
-                            .fill(AppColors.primaryAccent.opacity(0.7))
-                            .frame(width: AppSpacing.iconSmall, height: AppSpacing.iconSmall)
-                            .scaleEffect(animationPhase == index ? 1.3 : 0.8)
-                            .animation(
-                                Animation.easeInOut(duration: AppLayout.animationVerySlow)
-                                    .repeatForever(autoreverses: true)
-                                    .delay(Double(index) * 0.2),
-                                value: animationPhase
-                            )
-                    }
-                }
-                .padding(.horizontal, AppSpacing.mediumLarge)
-                .padding(.vertical, AppSpacing.smallMedium)
-                .background(
-                    RoundedRectangle(cornerRadius: AppSpacing.large)
-                        .fill(AppColors.backgroundGray5)
-                        .shadow(color: AppColors.shadowLight, radius: 3, x: 0, y: 2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AppSpacing.large)
-                                .strokeBorder(AppColors.borderLight, lineWidth: AppSpacing.strokeThin)
-                        )
-                )
-
-                Text("AI is thinking...")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
-                    .opacity(0.8)
-            }
-
-            Spacer(minLength: AppSpacing.padding60)
-        }
-        .onAppear {
-            withAnimation {
-                animationPhase = 1
-            }
-        }
-    }
-}
-
-// MARK: - Message Bubble
-
-struct MessageBubbleView: View {
-    let message: Message
-    let isGenerating: Bool
-    @State private var isThinkingExpanded = false
-
-    var hasThinking: Bool {
-        message.thinkingContent != nil && !(message.thinkingContent?.isEmpty ?? true)
-    }
-
-    var body: some View {
-        HStack {
-            if message.role == .user {
-                Spacer(minLength: AppSpacing.padding60)
-            }
-
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 6) {
-                if message.role == .assistant && message.modelInfo != nil {
-                    modelBadgeSection
-                }
-
-                if message.role == .assistant && hasThinking {
-                    thinkingSection
-                }
-
-                if message.role == .assistant &&
-                    message.content.isEmpty &&
-                    message.thinkingContent != nil &&
-                    !message.thinkingContent!.isEmpty &&
-                    isGenerating {
-                    thinkingProgressIndicator
-                }
-
-                mainMessageBubble
-
-                timestampAndAnalyticsSection
-            }
-
-            if message.role != .user {
-                Spacer(minLength: AppSpacing.padding60)
-            }
-        }
-    }
-
-    private var thinkingSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.small) {
-            Button(action: {
-                withAnimation(.easeInOut(duration: AppLayout.animationFast)) {
-                    isThinkingExpanded.toggle()
-                }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "lightbulb.min")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.primaryPurple)
-
-                    Text(isThinkingExpanded ? "Hide reasoning" : thinkingSummary)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.primaryPurple)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Image(systemName: isThinkingExpanded ? "chevron.up" : "chevron.right")
-                        .font(AppTypography.caption2)
-                        .foregroundColor(AppColors.primaryPurple.opacity(0.6))
-                }
-                .padding(.horizontal, AppSpacing.regular)
-                .padding(.vertical, AppSpacing.padding9)
-                .background(
-                    RoundedRectangle(cornerRadius: AppSpacing.mediumLarge)
-                        .fill(LinearGradient(colors: [AppColors.primaryPurple.opacity(0.1), AppColors.primaryPurple.opacity(0.05)],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .shadow(color: AppColors.primaryPurple.opacity(0.2), radius: 2, x: 0, y: 1)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AppSpacing.mediumLarge)
-                                .strokeBorder(AppColors.primaryPurple.opacity(0.2), lineWidth: AppSpacing.strokeThin)
-                        )
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-
-            if isThinkingExpanded {
-                ScrollView {
-                    Text(message.thinkingContent ?? "")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
-                }
-                .frame(maxHeight: AppSpacing.minFrameHeight)
-                .padding(AppSpacing.mediumLarge)
-                .background(
-                    RoundedRectangle(cornerRadius: AppSpacing.medium)
-                        .fill(AppColors.backgroundGray6)
-                )
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .slide),
-                    removal: .opacity.combined(with: .slide)
-                ))
-            }
-        }
-    }
-
-    private var thinkingSummary: String {
-        guard let thinking = message.thinkingContent?.trimmingCharacters(in: .whitespacesAndNewlines) else { return "" }
-
-        let sentences = thinking.components(separatedBy: CharacterSet(charactersIn: ".!?"))
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-
-        if sentences.count >= 2 {
-            let firstSentence = sentences[0].trimmingCharacters(in: .whitespacesAndNewlines)
-            if firstSentence.count > 20 {
-                return firstSentence + "..."
-            }
-        }
-
-        if thinking.count > 80 {
-            let truncated = String(thinking.prefix(80))
-            if let lastSpace = truncated.lastIndex(of: " ") {
-                return String(truncated[..<lastSpace]) + "..."
-            }
-            return truncated + "..."
-        }
-
-        return thinking
-    }
-
-    private var thinkingProgressIndicator: some View {
-        HStack(spacing: AppSpacing.smallMedium) {
-            HStack(spacing: 3) {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .fill(AppColors.primaryPurple)
-                        .frame(width: AppSpacing.small, height: AppSpacing.small)
-                        .scaleEffect(isGenerating ? 1.0 : 0.5)
-                        .animation(
-                            Animation.easeInOut(duration: AppLayout.animationVerySlow)
-                                .repeatForever()
-                                .delay(Double(index) * 0.2),
-                            value: isGenerating
-                        )
-                }
-            }
-
-            Text("Thinking...")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.primaryPurple.opacity(0.8))
-        }
-        .padding(.horizontal, AppSpacing.mediumLarge)
-        .padding(.vertical, AppSpacing.smallMedium)
-        .background(
-            RoundedRectangle(cornerRadius: AppSpacing.medium)
-                .fill(LinearGradient(colors: [AppColors.primaryPurple.opacity(0.12), AppColors.primaryPurple.opacity(0.06)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing))
-                .shadow(color: AppColors.primaryPurple.opacity(0.2), radius: 2, x: 0, y: 1)
-                .overlay(
-                    RoundedRectangle(cornerRadius: AppSpacing.medium)
-                        .strokeBorder(AppColors.primaryPurple.opacity(0.3), lineWidth: AppSpacing.strokeThin)
-                )
-        )
-        .transition(.opacity.combined(with: .scale(scale: 0.9)))
-    }
-
-    private var modelBadgeSection: some View {
-        HStack {
-            if message.role == .assistant {
-                Spacer()
-            }
-
-            HStack(spacing: AppSpacing.small) {
-                Image(systemName: "cube")
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textWhite)
-
-                Text(message.modelInfo?.modelName ?? "Unknown")
-                    .font(AppTypography.caption2Medium)
-                    .foregroundColor(AppColors.textWhite)
-
-                Text(message.modelInfo?.framework ?? "")
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textWhite.opacity(0.8))
-            }
-            .padding(.horizontal, AppSpacing.medium)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: AppSpacing.regular)
-                    .fill(LinearGradient(colors: [AppColors.primaryAccent, AppColors.primaryAccent.opacity(0.8)],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .shadow(color: AppColors.primaryAccent.opacity(0.3), radius: 2, x: 0, y: 1)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: AppSpacing.regular)
-                            .strokeBorder(AppColors.textWhite.opacity(0.2), lineWidth: AppSpacing.strokeThin)
-                    )
-            )
-
-            if message.role == .user {
-                Spacer()
-            }
-        }
-    }
-
-    private var timestampAndAnalyticsSection: some View {
-        HStack(spacing: 8) {
-            if message.role == .assistant {
-                Spacer()
-            }
-
-            Text(message.timestamp, style: .time)
-                .font(AppTypography.caption2)
-                .foregroundColor(AppColors.textSecondary)
-
-            if let analytics = message.analytics {
-                Group {
-                    Text("•")
-                        .foregroundColor(AppColors.textSecondary.opacity(0.5))
-
-                    Text("\(String(format: "%.1f", analytics.totalGenerationTime))s")
-                        .font(AppTypography.caption2)
-                        .foregroundColor(AppColors.textSecondary)
-
-                    if analytics.averageTokensPerSecond > 0 {
-                        Text("•")
-                            .foregroundColor(AppColors.textSecondary.opacity(0.5))
-
-                        Text("\(Int(analytics.averageTokensPerSecond)) tok/s")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-
-                    if analytics.wasThinkingMode {
-                        Image(systemName: "lightbulb.min")
-                            .font(AppTypography.caption2)
-                            .foregroundColor(AppColors.primaryPurple.opacity(0.7))
-                    }
-                }
-            }
-
-            if message.role == .user {
-                Spacer()
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var mainMessageBubble: some View {
-        if !message.content.isEmpty {
-            Text(message.content)
-                .padding(.horizontal, AppSpacing.large)
-                .padding(.vertical, AppSpacing.mediumLarge)
-                .background(
-                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
-                        .fill(message.role == .user ?
-                              LinearGradient(colors: [AppColors.userBubbleGradientStart, AppColors.userBubbleGradientEnd],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing) :
-                              LinearGradient(colors: [AppColors.backgroundGray5, AppColors.backgroundGray6],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .shadow(color: AppColors.shadowMedium, radius: 4, x: 0, y: 2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
-                                .strokeBorder(
-                                    message.role == .user ?
-                                    AppColors.borderLight :
-                                    AppColors.borderMedium,
-                                    lineWidth: AppSpacing.strokeThin
-                                )
-                        )
-                )
-                .foregroundColor(message.role == .user ? AppColors.textWhite : AppColors.textPrimary)
-                .scaleEffect(isGenerating && message.role == .assistant && message.content.count < 50 ? 1.02 : 1.0)
-                .animation(.easeInOut(duration: AppLayout.animationLoopSlow).repeatForever(autoreverses: true), value: isGenerating)
         }
     }
 }

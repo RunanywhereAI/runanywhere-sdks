@@ -315,8 +315,14 @@ extension View {
 
     func adaptiveFrame() -> some View {
         #if os(macOS)
-        self.frame(minWidth: 400, idealWidth: 600, maxWidth: 900,
-                   minHeight: 300, idealHeight: 500, maxHeight: 800)
+        self.frame(
+            minWidth: 400,
+            idealWidth: 600,
+            maxWidth: 900,
+            minHeight: 300,
+            idealHeight: 500,
+            maxHeight: 800
+        )
         #else
         self
         #endif
