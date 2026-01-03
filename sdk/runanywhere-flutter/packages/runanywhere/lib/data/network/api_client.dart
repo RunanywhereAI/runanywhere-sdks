@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
-import 'package:runanywhere/data/errors/repository_error.dart';
 import 'package:runanywhere/data/network/api_endpoint.dart';
+import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/data/network/network_service.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
@@ -45,7 +45,7 @@ class APIClient implements NetworkService {
     required this.apiKey,
     http.Client? httpClient,
   })  : _httpClient = httpClient ?? http.Client(),
-        _logger = SDKLogger(category: 'APIClient');
+        _logger = SDKLogger('APIClient');
 
   /// Set the authentication token provider (called after AuthenticationService is created).
   void setAuthTokenProvider(AuthTokenProvider provider) {
@@ -152,9 +152,9 @@ class APIClient implements NetworkService {
       _validateResponse(response);
       return response.bodyBytes;
     } catch (e) {
-      if (e is RepositoryError) rethrow;
+      if (e is SDKError) rethrow;
       _logger.error('POST $path failed: $e');
-      throw RepositorySyncFailureError(e.toString());
+      throw SDKError.networkError(e.toString());
     }
   }
 
@@ -181,9 +181,9 @@ class APIClient implements NetworkService {
       _validateResponse(response);
       return response.bodyBytes;
     } catch (e) {
-      if (e is RepositoryError) rethrow;
+      if (e is SDKError) rethrow;
       _logger.error('GET $path failed: $e');
-      throw RepositorySyncFailureError(e.toString());
+      throw SDKError.networkError(e.toString());
     }
   }
 
@@ -250,7 +250,7 @@ class APIClient implements NetworkService {
     }
 
     _logger.warning('Request failed: $errorMessage');
-    throw RepositorySyncFailureError(errorMessage);
+    throw SDKError.networkError(errorMessage);
   }
 }
 

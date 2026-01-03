@@ -1,9 +1,29 @@
-import 'package:runanywhere/infrastructure/events/event_category.dart';
-import 'package:runanywhere/infrastructure/events/event_destination.dart';
 import 'package:uuid/uuid.dart';
 
-export '../../infrastructure/events/event_category.dart';
-export '../../infrastructure/events/event_destination.dart';
+/// Event categories for routing and filtering
+enum EventCategory {
+  sdk,
+  llm,
+  stt,
+  tts,
+  vad,
+  voice,
+  model,
+  device,
+  network,
+  storage,
+  error,
+}
+
+/// Event destination for routing
+enum EventDestination {
+  /// Send to both public EventBus and analytics
+  all,
+  /// Send only to public EventBus
+  publicOnly,
+  /// Send only to analytics (internal)
+  analyticsOnly,
+}
 
 /// Base protocol for all SDK events.
 ///
@@ -347,8 +367,7 @@ abstract class SDKVoiceEvent with SDKEventDefaults {
     return SDKVoiceTranscriptionStarted();
   }
 
-  static SDKVoiceTranscriptionPartial transcriptionPartial(
-      {required String text}) {
+  static SDKVoiceTranscriptionPartial transcriptionPartial({required String text}) {
     return SDKVoiceTranscriptionPartial(text: text);
   }
 
@@ -382,30 +401,6 @@ abstract class SDKVoiceEvent with SDKEventDefaults {
 
   static SDKVoicePipelineCompleted pipelineCompleted() {
     return SDKVoicePipelineCompleted();
-  }
-
-  static SDKVoiceVADStarted vadStarted() {
-    return SDKVoiceVADStarted();
-  }
-
-  static SDKVoiceVADDetected vadDetected() {
-    return SDKVoiceVADDetected();
-  }
-
-  static SDKVoiceVADEnded vadEnded() {
-    return SDKVoiceVADEnded();
-  }
-
-  static SDKVoiceSTTProcessing sttProcessing() {
-    return SDKVoiceSTTProcessing();
-  }
-
-  static SDKVoiceLLMProcessing llmProcessing() {
-    return SDKVoiceLLMProcessing();
-  }
-
-  static SDKVoiceTTSProcessing ttsProcessing() {
-    return SDKVoiceTTSProcessing();
   }
 }
 
@@ -527,45 +522,6 @@ class SDKVoicePipelineCompleted extends SDKVoiceEvent {
   String get type => 'voice.pipeline.completed';
 }
 
-class SDKVoiceVADStarted extends SDKVoiceEvent {
-  @override
-  String get type => 'voice.vad.started';
-}
-
-class SDKVoiceVADDetected extends SDKVoiceEvent {
-  @override
-  String get type => 'voice.vad.detected';
-}
-
-class SDKVoiceVADEnded extends SDKVoiceEvent {
-  @override
-  String get type => 'voice.vad.ended';
-}
-
-class SDKVoiceSTTProcessing extends SDKVoiceEvent {
-  @override
-  String get type => 'voice.stt.processing';
-
-  @override
-  EventCategory get category => EventCategory.stt;
-}
-
-class SDKVoiceLLMProcessing extends SDKVoiceEvent {
-  @override
-  String get type => 'voice.llm.processing';
-
-  @override
-  EventCategory get category => EventCategory.llm;
-}
-
-class SDKVoiceTTSProcessing extends SDKVoiceEvent {
-  @override
-  String get type => 'voice.tts.processing';
-
-  @override
-  EventCategory get category => EventCategory.tts;
-}
-
 // ============================================================================
 // SDK Device Events
 // ============================================================================
@@ -616,26 +572,6 @@ class DeviceRegistrationFailed extends SDKDeviceEvent {
 }
 
 // ============================================================================
-// SDK Performance Events
-// ============================================================================
-
-/// SDK performance events
-abstract class SDKPerformanceEvent with SDKEventDefaults {
-  @override
-  EventCategory get category => EventCategory.sdk;
-}
-
-// ============================================================================
-// SDK Network Events
-// ============================================================================
-
-/// SDK network events
-abstract class SDKNetworkEvent with SDKEventDefaults {
-  @override
-  EventCategory get category => EventCategory.network;
-}
-
-// ============================================================================
 // SDK Storage Events
 // ============================================================================
 
@@ -663,14 +599,4 @@ class SDKStorageCacheCleared extends SDKStorageEvent {
 class SDKStorageTempFilesCleaned extends SDKStorageEvent {
   @override
   String get type => 'storage.temp_files.cleaned';
-}
-
-// ============================================================================
-// SDK Framework Events
-// ============================================================================
-
-/// SDK framework events
-abstract class SDKFrameworkEvent with SDKEventDefaults {
-  @override
-  EventCategory get category => EventCategory.sdk;
 }

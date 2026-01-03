@@ -2,13 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:runanywhere/capabilities/text_generation/generation_service.dart';
 import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
 import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
 import 'package:runanywhere/core/models/storage/storage_info.dart';
 import 'package:runanywhere/core/models/storage/stored_model.dart';
 import 'package:runanywhere/core/module_registry.dart' hide TTSService;
-import 'package:runanywhere/core/protocols/downloading/download_progress.dart';
 import 'package:runanywhere/features/llm/llm_capability.dart'
     show LLMConfiguration;
 import 'package:runanywhere/features/llm/structured_output/generatable.dart';
@@ -29,15 +27,15 @@ import 'package:runanywhere/foundation/logging/models/log_level.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/foundation/logging/services/logging_manager.dart';
 import 'package:runanywhere/foundation/security/keychain_manager.dart';
-import 'package:runanywhere/infrastructure/analytics/analytics_queue_manager.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/models/models.dart';
 
-// Export generation options
-export '../capabilities/text_generation/generation_service.dart'
-    show RunAnywhereGenerationOptions, GenerationResult;
+// Export generation types (from canonical module_registry.dart location)
+export '../core/module_registry.dart'
+    show LLMGenerationOptions, LLMGenerationResult;
 // Export voice session types for public use
 export '../capabilities/voice/models/voice_session.dart'
     show
@@ -73,9 +71,8 @@ export '../core/models/storage/storage_info.dart';
 export '../core/models/storage/stored_model.dart';
 // Export capability type for framework queries
 export '../core/module/capability_type.dart';
-// Export download progress types
-export '../core/protocols/downloading/download_progress.dart';
-export '../core/protocols/downloading/download_state.dart';
+// Download progress types are now handled via FFI through DartBridge
+// Types from C++ commons layer (via rac_download_manager.h)
 export '../features/llm/llm_capability.dart'
     show
         LLMCapability,
@@ -263,27 +260,38 @@ class RunAnywhere {
   }
 
   /// Initialize the SDK with parameters
+  ///
+  /// Matches iOS RunAnywhere.performCoreInit() pattern.
+  /// Phase 1 (sync): Validates params, sets up logging, stores config, initializes DartBridge
+  /// Phase 2 (async): Network auth, service creation, device registration (background)
   static Future<void> initializeWithParams(SDKInitParams params) async {
     if (_isInitialized) {
       return;
     }
 
-    final logger = SDKLogger(category: 'RunAnywhere.Init');
+    final initStartTime = DateTime.now();
+
+    // Step 1: Set environment FIRST (matches Swift pattern)
+    _currentEnvironment = params.environment;
+    _initParams = params;
+
+    // Step 2: Initialize DartBridge (core bridges - matches CppBridge.initialize)
+    // This registers platform callbacks, events, telemetry, device before any C++ calls
+    DartBridge.initialize(params.environment);
+
+    // Now safe to create logger and track events
+    final logger = SDKLogger('RunAnywhere.Init');
     EventBus.shared.publish(SDKInitializationStarted());
 
     try {
-      // Step 1: Validate API key (skip in development mode)
+      // Step 3: Validate API key (skip in development mode)
       if (params.environment != SDKEnvironment.development) {
         if (params.apiKey.isEmpty) {
           throw SDKError.invalidAPIKey('API key cannot be empty');
         }
       }
 
-      // Step 2: Store parameters locally
-      _initParams = params;
-      _currentEnvironment = params.environment;
-
-      // Only store in keychain for non-development environments
+      // Step 4: Persist to Keychain (production/staging only)
       if (params.environment != SDKEnvironment.development) {
         await KeychainManager.shared.storeSDKParams(
           apiKey: params.apiKey,
@@ -292,35 +300,45 @@ class RunAnywhere {
         );
       }
 
-      // Step 3: Setup local services only (no network calls)
+      // Step 5: Setup local services only (no network calls)
       await serviceContainer.setupLocalServices(
         apiKey: params.apiKey,
         baseURL: params.baseURL,
         environment: params.environment,
       );
 
-      // Mark as initialized
+      // Mark Phase 1 complete
       _isInitialized = true;
 
+      final initDurationMs =
+          DateTime.now().difference(initStartTime).inMilliseconds;
       logger.info(
-        '✅ SDK initialization completed successfully (${params.environment.description} mode)',
+        '✅ Phase 1 complete in ${initDurationMs}ms (${params.environment.description})',
       );
       EventBus.shared.publish(SDKInitializationCompleted());
 
-      // Step 4: Device registration (after marking as initialized)
-      // For development mode: Register immediately
-      // For production/staging: Lazy registration on first API call
-      if (params.environment == SDKEnvironment.development) {
-        // Trigger device registration in background (non-blocking)
-        unawaited(_ensureDeviceRegistered());
-      }
+      // Step 6: Start Phase 2 in background (matches Swift Task.detached pattern)
+      logger.debug('Starting Phase 2 (services) in background...');
+      unawaited(_startBackgroundServicesInit());
     } catch (e) {
       logger.error('❌ SDK initialization failed: $e');
       _initParams = null;
       _currentEnvironment = null;
       _isInitialized = false;
+      DartBridge.shutdown();
       EventBus.shared.publish(SDKInitializationFailed(e));
       rethrow;
+    }
+  }
+
+  /// Start Phase 2 services initialization in background
+  static Future<void> _startBackgroundServicesInit() async {
+    try {
+      await completeServicesInitialization();
+      SDKLogger('RunAnywhere.Init').info('✅ Phase 2 complete (background)');
+    } catch (e) {
+      SDKLogger('RunAnywhere.Init')
+          .warning('⚠️ Phase 2 failed (non-critical): $e');
     }
   }
 
@@ -328,10 +346,10 @@ class RunAnywhere {
   static Future<void> _ensureDeviceRegistered() async {
     try {
       final deviceId = await DeviceManager.shared.getDeviceId();
-      final logger = SDKLogger(category: 'RunAnywhere.DeviceReg');
+      final logger = SDKLogger('RunAnywhere.DeviceReg');
       logger.info('✅ Device registered: ${deviceId.substring(0, 8)}...');
     } catch (e) {
-      final logger = SDKLogger(category: 'RunAnywhere.DeviceReg');
+      final logger = SDKLogger('RunAnywhere.DeviceReg');
       logger.warning('⚠️ Device registration failed (non-critical): $e');
     }
   }
@@ -345,12 +363,13 @@ class RunAnywhere {
   /// Called automatically in background by `initialize()`, or can be awaited directly.
   /// Safe to call multiple times - returns immediately if already done.
   ///
+  /// Matches iOS RunAnywhere.completeServicesInitialization() pattern.
+  ///
   /// This method:
-  /// 1. Sets up API client (with authentication for production/staging)
-  /// 2. Creates core services (telemetry, models, sync)
-  /// 3. Loads model catalog from remote + local storage
-  /// 4. Initializes analytics pipeline
-  /// 5. Registers device with backend
+  /// 1. Sets up HTTP transport (via DartBridge.HTTP)
+  /// 2. Initializes DartBridge state (via DartBridge.State)
+  /// 3. Initializes service bridges (ModelAssignment, Platform)
+  /// 4. Registers device with backend (via DartBridge.Device)
   static Future<void> completeServicesInitialization() async {
     // Fast path: already completed
     if (_hasCompletedServicesInit) {
@@ -364,48 +383,31 @@ class RunAnywhere {
       throw SDKError.notInitialized();
     }
 
-    final logger = SDKLogger(category: 'RunAnywhere.Services');
+    final logger = SDKLogger('RunAnywhere.Services');
+    logger.info('Initializing services for ${environment.description} mode...');
 
-    // Check if services need initialization
-    // For development: check if networkService is null
-    // For production/staging: check if authenticationService is null
-    final needsInit = environment == SDKEnvironment.development
-        ? serviceContainer.networkService == null
-        : serviceContainer.authenticationService == null;
+    try {
+      // Step 1: Setup API client / HTTP transport
+      await _setupAPIClient(
+        params: params,
+        environment: environment,
+        logger: logger,
+      );
 
-    if (needsInit) {
-      logger
-          .info('Initializing services for ${environment.description} mode...');
+      // Step 2: Initialize DartBridge services (ModelAssignment, Platform)
+      // This is Phase 2 of DartBridge initialization
+      await DartBridge.initializeServices();
+      logger.debug('Service bridges initialized');
 
-      try {
-        // Step 1: Setup API client
-        await _setupAPIClient(
-          params: params,
-          environment: environment,
-          logger: logger,
-        );
+      // Step 3: Register device via DartBridge
+      await _ensureDeviceRegistered();
+      logger.debug('Device registration check completed');
 
-        // Step 2: Create and inject core services
-        await _setupCoreServices(
-          environment: environment,
-          logger: logger,
-        );
-
-        // Step 3: Load models
-        await _loadModels(logger: logger);
-
-        // Step 4: Initialize analytics
-        await _initializeAnalytics(apiKey: params.apiKey, logger: logger);
-
-        logger.info('✅ Services initialized');
-      } catch (e) {
-        logger.error('❌ Services initialization failed: $e');
-        rethrow;
-      }
+      logger.info('✅ Services initialized');
+    } catch (e) {
+      logger.error('❌ Services initialization failed: $e');
+      rethrow;
     }
-
-    // Step 5: Register device
-    await _ensureDeviceRegistered();
 
     // Mark Phase 2 complete
     _hasCompletedServicesInit = true;
@@ -518,9 +520,9 @@ class RunAnywhere {
   /// [prompt] The text prompt
   /// [options] Generation options (optional, defaults to maxTokens: 100)
   /// Returns Generated response
-  static Future<GenerationResult> generate(
+  static Future<LLMGenerationResult> generate(
     String prompt, {
-    RunAnywhereGenerationOptions? options,
+    LLMGenerationOptions? options,
   }) async {
     EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt));
 
@@ -534,7 +536,7 @@ class RunAnywhere {
       await _ensureServicesReady();
 
       // Use options directly or defaults
-      final genOptions = options ?? RunAnywhereGenerationOptions();
+      final genOptions = options ?? LLMGenerationOptions();
       final result = await serviceContainer.generationService.generate(
         prompt: prompt,
         options: genOptions,
@@ -566,7 +568,7 @@ class RunAnywhere {
   /// Returns Stream of tokens
   static Stream<String> generateStream(
     String prompt, {
-    RunAnywhereGenerationOptions? options,
+    LLMGenerationOptions? options,
   }) {
     EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt));
 
@@ -578,7 +580,7 @@ class RunAnywhere {
     // Lazy device registration on first API call
     unawaited(_ensureDeviceRegistered());
 
-    final genOptions = options ?? RunAnywhereGenerationOptions();
+    final genOptions = options ?? LLMGenerationOptions();
     return serviceContainer.streamingService.generateStream(
       prompt: prompt,
       options: genOptions,
@@ -692,7 +694,7 @@ class RunAnywhere {
       throw SDKError.notInitialized();
     }
 
-    final logger = SDKLogger(category: 'RunAnywhere.VAD');
+    final logger = SDKLogger('RunAnywhere.VAD');
     logger.info('Initializing VAD...');
 
     try {
@@ -1007,7 +1009,7 @@ class RunAnywhere {
       return;
     }
 
-    final logger = SDKLogger(category: 'RunAnywhere.STT');
+    final logger = SDKLogger('RunAnywhere.STT');
     logger.info('Unloading STT model...');
 
     try {
@@ -1029,7 +1031,7 @@ class RunAnywhere {
       return;
     }
 
-    final logger = SDKLogger(category: 'RunAnywhere.TTS');
+    final logger = SDKLogger('RunAnywhere.TTS');
     logger.info('Unloading TTS voice...');
 
     try {
@@ -1340,7 +1342,7 @@ class RunAnywhere {
     required T Function(Map<String, dynamic>) fromJson,
     required String schema,
     required String prompt,
-    RunAnywhereGenerationOptions? options,
+    LLMGenerationOptions? options,
   }) async {
     // Import structured output handler
     final handler = StructuredOutputHandler();
@@ -1361,7 +1363,7 @@ class RunAnywhere {
     // Generate text
     final result = await generate(
       enhancedPrompt,
-      options: options ?? RunAnywhereGenerationOptions(),
+      options: options ?? LLMGenerationOptions(),
     );
 
     // Parse structured output
@@ -1379,8 +1381,10 @@ class RunAnywhere {
 
   /// Reset SDK state (for testing purposes)
   /// Clears all initialization state and cached data
+  ///
+  /// Matches iOS RunAnywhere.reset() pattern.
   static void reset() {
-    final logger = SDKLogger(category: 'RunAnywhere.Reset');
+    final logger = SDKLogger('RunAnywhere.Reset');
     logger.info('Resetting SDK state...');
 
     // Clear initialization state (Phase 1 + Phase 2)
@@ -1398,7 +1402,10 @@ class RunAnywhere {
     _voiceAgentCapability = null;
     _speakerDiarizationService = null;
 
-    // Reset service container if needed
+    // Shutdown all DartBridge bridges (matches CppBridge.shutdown())
+    DartBridge.shutdown();
+
+    // Reset service container
     serviceContainer.reset();
 
     logger.info('SDK state reset completed');
@@ -1674,8 +1681,7 @@ class RunAnywhere {
   }) {
     final url = Uri.tryParse(urlString);
     if (url == null) {
-      SDKLogger(category: 'RunAnywhere.Models')
-          .error('Invalid URL: $urlString');
+      SDKLogger('RunAnywhere.Models').error('Invalid URL: $urlString');
       return null;
     }
     return registerModelWithURL(
@@ -1777,8 +1783,8 @@ class RunAnywhere {
     // Flush SDK logs
     LoggingManager.shared.flush();
 
-    // Flush analytics events
-    await AnalyticsQueueManager.shared.flush();
+    // Analytics events are flushed via DartBridge.Telemetry (C++ layer)
+    // No separate Dart-side analytics queue needed
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2298,7 +2304,7 @@ class RunAnywhere {
     required String schema,
     required T Function(Map<String, dynamic>) fromJson,
     required String content,
-    RunAnywhereGenerationOptions? options,
+    LLMGenerationOptions? options,
   }) {
     if (!_isInitialized) {
       final errorController = StreamController<String>();
@@ -2333,7 +2339,7 @@ class RunAnywhere {
     // Generate streaming text
     final tokenStream = generateStream(
       enhancedPrompt,
-      options: options ?? RunAnywhereGenerationOptions(),
+      options: options ?? LLMGenerationOptions(),
     );
 
     // Forward tokens and accumulate

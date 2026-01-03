@@ -1,11 +1,91 @@
+/// System TTS Service
+///
+/// Implementation using flutter_tts for platform Text-to-Speech.
+/// Matches iOS SystemTTSService from Features/TTS/System/.
+library system_tts_service;
+
 import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:runanywhere/features/tts/models/tts_configuration.dart';
-import 'package:runanywhere/features/tts/models/tts_input.dart';
-import 'package:runanywhere/features/tts/protocol/tts_service.dart';
-import 'package:runanywhere/features/tts/tts_output.dart';
+import 'package:runanywhere/core/module_registry.dart';
+
+/// Configuration for TTS synthesis
+class TTSConfiguration {
+  final String voice;
+  final String language;
+  final double speakingRate;
+  final double pitch;
+  final double volume;
+  final String audioFormat;
+
+  const TTSConfiguration({
+    this.voice = 'system',
+    this.language = 'en-US',
+    this.speakingRate = 0.5,
+    this.pitch = 1.0,
+    this.volume = 1.0,
+    this.audioFormat = 'pcm',
+  });
+}
+
+/// Input for TTS synthesis
+class TTSSynthesisInput {
+  final String? text;
+  final String? ssml;
+  final String? voiceId;
+  final String? language;
+
+  const TTSSynthesisInput({
+    this.text,
+    this.ssml,
+    this.voiceId,
+    this.language,
+  });
+}
+
+/// Voice information
+class TTSVoice {
+  final String id;
+  final String name;
+  final String language;
+
+  const TTSVoice({
+    required this.id,
+    required this.name,
+    required this.language,
+  });
+}
+
+/// Synthesis metadata
+class SynthesisMetadata {
+  final String voice;
+  final String language;
+  final double processingTime;
+  final int characterCount;
+
+  const SynthesisMetadata({
+    required this.voice,
+    required this.language,
+    required this.processingTime,
+    required this.characterCount,
+  });
+}
+
+/// Extended TTS output
+class TTSSynthesisOutput {
+  final Uint8List audioData;
+  final String format;
+  final double duration;
+  final SynthesisMetadata metadata;
+
+  const TTSSynthesisOutput({
+    required this.audioData,
+    required this.format,
+    required this.duration,
+    required this.metadata,
+  });
+}
 
 /// System TTS Service implementation using flutter_tts
 /// Matches iOS SystemTTSService from TTSComponent.swift
@@ -17,22 +97,19 @@ class SystemTTSService implements TTSService {
 
   SystemTTSService();
 
-  @override
   String get inferenceFramework => 'system';
 
   @override
   bool get isReady => _configuration != null;
 
-  @override
   bool get isSynthesizing => _isSynthesizing;
 
-  @override
   List<String> get availableVoices =>
       _availableVoicesList.map((v) => v.id).toList();
 
   @override
-  Future<void> initialize(TTSConfiguration configuration) async {
-    _configuration = configuration;
+  Future<void> initialize({String? modelPath}) async {
+    _configuration = const TTSConfiguration();
 
     // Configure TTS engine
     await _flutterTts.setSharedInstance(true);
@@ -91,11 +168,11 @@ class SystemTTSService implements TTSService {
     });
 
     // Get text to synthesize
-    final text = input.ssml ?? input.text ?? '';
+    final text = input.text;
 
     // Configure voice
     final voice = input.voiceId ?? _configuration!.voice;
-    final language = input.language ?? _configuration!.language;
+    final language = _configuration!.language;
 
     if (voice != 'system') {
       await _flutterTts.setVoice({
@@ -117,40 +194,20 @@ class SystemTTSService implements TTSService {
     // Wait for synthesis to complete
     await completer.future;
 
-    final processingTime =
-        DateTime.now().difference(startTime).inMilliseconds / 1000.0;
-
     // Note: flutter_tts doesn't provide direct audio data access
     // It plays audio directly through the system
-    // For now, return empty data to indicate completion
     return TTSOutput(
-      audioData: Uint8List(0),
+      audioData: const [],
       format: _configuration!.audioFormat,
-      duration: 0.0,
-      metadata: SynthesisMetadata(
-        voice: voice,
-        language: language,
-        processingTime: processingTime,
-        characterCount: text.length,
-      ),
+      sampleRate: 22050,
     );
   }
 
-  @override
-  Stream<Uint8List> synthesizeStream(TTSInput input) async* {
-    // System TTS doesn't support true streaming
-    // Just synthesize the complete text and return as single chunk
-    final output = await synthesize(input);
-    yield output.audioData;
-  }
-
-  @override
   Future<void> stop() async {
     await _flutterTts.stop();
     _isSynthesizing = false;
   }
 
-  @override
   Future<List<TTSVoice>> getAvailableVoices() async {
     return _availableVoicesList;
   }

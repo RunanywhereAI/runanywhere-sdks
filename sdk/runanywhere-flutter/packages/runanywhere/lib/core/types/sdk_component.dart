@@ -1,45 +1,67 @@
-/// SDK component types
-enum SDKComponent {
-  /// Speech-to-Text component
-  stt,
+/// Component Types
+///
+/// Core type definitions for component models.
+/// Matches Swift ComponentTypes.swift from Core/Types/
+library component_types;
 
-  /// Text-to-Speech component
-  tts,
+import 'model_types.dart';
 
-  /// Language Model component
-  llm,
+// MARK: - Component Protocols
 
-  /// Voice Activity Detection component
-  vad,
+/// Protocol for component configuration and initialization
+///
+/// All component configurations (LLM, STT, TTS, VAD, etc.) implement this.
+/// Provides common properties needed for model selection and framework preference.
+abstract class ComponentConfiguration {
+  /// Model identifier (optional - uses default if not specified)
+  String? get modelId;
 
-  /// Voice Agent component
-  voiceAgent,
+  /// Preferred inference framework for this component (optional)
+  InferenceFramework? get preferredFramework => null;
 
-  /// Speaker Diarization component
-  speakerDiarization,
-
-  /// Vision Language Model component
-  vlm,
+  /// Validates the configuration
+  void validate();
 }
 
-extension SDKComponentExtension on SDKComponent {
-  /// Get string representation
-  String get value {
-    switch (this) {
-      case SDKComponent.stt:
-        return 'stt';
-      case SDKComponent.tts:
-        return 'tts';
-      case SDKComponent.llm:
-        return 'llm';
-      case SDKComponent.vad:
-        return 'vad';
-      case SDKComponent.voiceAgent:
-        return 'voice_agent';
-      case SDKComponent.speakerDiarization:
-        return 'speaker_diarization';
-      case SDKComponent.vlm:
-        return 'vlm';
-    }
+/// Protocol for component output data
+abstract class ComponentOutput {
+  DateTime get timestamp;
+}
+
+// MARK: - SDK Component Enum
+
+/// SDK component types for identification.
+///
+/// This enum consolidates what was previously `CapabilityType` and provides
+/// a unified type for all AI capabilities in the SDK.
+///
+/// ## Usage
+///
+/// ```dart
+/// // Check what capabilities a module provides
+/// final capabilities = MyModule.capabilities;
+/// if (capabilities.contains(SDKComponent.llm)) {
+///   // Module provides LLM services
+/// }
+/// ```
+enum SDKComponent {
+  llm('LLM', 'Language Model', 'llm'),
+  stt('STT', 'Speech to Text', 'stt'),
+  tts('TTS', 'Text to Speech', 'tts'),
+  vad('VAD', 'Voice Activity Detection', 'vad'),
+  voice('VOICE', 'Voice Agent', 'voice'),
+  embedding('EMBEDDING', 'Embedding', 'embedding');
+
+  final String rawValue;
+  final String displayName;
+  final String analyticsKey;
+
+  const SDKComponent(this.rawValue, this.displayName, this.analyticsKey);
+
+  static SDKComponent? fromRawValue(String value) {
+    return SDKComponent.values.cast<SDKComponent?>().firstWhere(
+          (c) => c?.rawValue == value || c?.analyticsKey == value.toLowerCase(),
+          orElse: () => null,
+        );
   }
 }

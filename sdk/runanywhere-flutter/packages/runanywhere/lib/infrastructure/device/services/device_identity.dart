@@ -9,7 +9,7 @@ import 'package:uuid/uuid.dart';
 /// Mirrors iOS `DeviceIdentity` from RunAnywhere SDK.
 /// Provides persistent UUID that survives app reinstalls.
 class DeviceIdentity {
-  static final _logger = SDKLogger(category: 'DeviceIdentity');
+  static final _logger = SDKLogger('DeviceIdentity');
   static const _uuid = Uuid();
 
   // Cached value for performance
