@@ -22,7 +22,7 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 //                     (default for end users and CI/CD)
 //
 // =============================================================================
-let testLocal = true  // Local development mode: use local frameworks from Binaries/
+let testLocal = false  // PRODUCTION: download XCFrameworks from GitHub releases
 
 // Version constants for remote XCFrameworks (must be defined before package)
 let commonsVersion = "0.1.0"

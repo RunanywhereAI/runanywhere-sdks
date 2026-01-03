@@ -44,6 +44,22 @@ class JsonBuilder {
         ss_ << "\"" << key << "\":\"" << escape_string(value) << "\"";
     }
 
+    // Always outputs a string, using empty string if value is null
+    void add_string_always(const char* key, const char* value) {
+        comma();
+        ss_ << "\"" << key << "\":\"" << escape_string(value ? value : "") << "\"";
+    }
+
+    // Outputs a string if value is non-null, otherwise outputs null
+    void add_string_or_null(const char* key, const char* value) {
+        comma();
+        if (value) {
+            ss_ << "\"" << key << "\":\"" << escape_string(value) << "\"";
+        } else {
+            ss_ << "\"" << key << "\":null";
+        }
+    }
+
     void add_int(const char* key, int64_t value) {
         if (value == 0)
             return;  // Skip zero values
@@ -54,6 +70,16 @@ class JsonBuilder {
     void add_int_always(const char* key, int64_t value) {
         comma();
         ss_ << "\"" << key << "\":" << value;
+    }
+
+    // Outputs integer if is_valid is true, otherwise outputs null
+    void add_int_or_null(const char* key, int64_t value, bool is_valid) {
+        comma();
+        if (is_valid) {
+            ss_ << "\"" << key << "\":" << value;
+        } else {
+            ss_ << "\"" << key << "\":null";
+        }
     }
 
     void add_double(const char* key, double value) {
@@ -68,6 +94,19 @@ class JsonBuilder {
             return;
         comma();
         ss_ << "\"" << key << "\":" << (value ? "true" : "false");
+    }
+
+    // Always outputs a boolean value
+    void add_bool_always(const char* key, bool value) {
+        comma();
+        ss_ << "\"" << key << "\":" << (value ? "true" : "false");
+    }
+
+    // Start a nested object with a key
+    void start_nested(const char* key) {
+        comma();
+        ss_ << "\"" << key << "\":{";
+        first_ = true;
     }
 
     void add_timestamp(const char* key, int64_t ms) {
@@ -391,45 +430,46 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         // Nested structure for production/staging
         // Matches backend schemas/device.py DeviceInfo schema
         const rac_device_registration_info_t* info = &request->device_info;
-        std::stringstream device_ss;
-        device_ss << "\"device_info\":{";
 
-        // Required fields (backend schema expects snake_case)
-        device_ss << "\"device_model\":\"" << (info->device_model ? info->device_model : "") << "\"";
-        device_ss << ",\"device_name\":\"" << (info->device_name ? info->device_name : "") << "\"";
-        device_ss << ",\"platform\":\"" << (info->platform ? info->platform : "") << "\"";
-        device_ss << ",\"os_version\":\"" << (info->os_version ? info->os_version : "") << "\"";
-        device_ss << ",\"form_factor\":\"" << (info->form_factor ? info->form_factor : "phone") << "\"";
-        device_ss << ",\"architecture\":\"" << (info->architecture ? info->architecture : "") << "\"";
-        device_ss << ",\"chip_name\":\"" << (info->chip_name ? info->chip_name : "") << "\"";
-        device_ss << ",\"total_memory\":" << info->total_memory;
-        device_ss << ",\"available_memory\":" << info->available_memory;
-        device_ss << ",\"has_neural_engine\":" << (info->has_neural_engine ? "true" : "false");
-        device_ss << ",\"neural_engine_cores\":" << info->neural_engine_cores;
-        device_ss << ",\"gpu_family\":\"" << (info->gpu_family ? info->gpu_family : "unknown") << "\"";
+        // Build device_info as nested object with proper escaping
+        json.start_nested("device_info");
 
-        // Battery info (may be unavailable)
-        if (info->battery_level >= 0) {
-            device_ss << ",\"battery_level\":" << info->battery_level;
-        } else {
-            device_ss << ",\"battery_level\":null";
-        }
-        if (info->battery_state) {
-            device_ss << ",\"battery_state\":\"" << info->battery_state << "\"";
-        } else {
-            device_ss << ",\"battery_state\":null";
-        }
+        // Required string fields (use add_string_always to output empty string if null)
+        json.add_string_always("device_model", info->device_model);
+        json.add_string_always("device_name", info->device_name);
+        json.add_string_always("platform", info->platform);
+        json.add_string_always("os_version", info->os_version);
+        json.add_string_always("form_factor", info->form_factor ? info->form_factor : "phone");
+        json.add_string_always("architecture", info->architecture);
+        json.add_string_always("chip_name", info->chip_name);
 
-        device_ss << ",\"is_low_power_mode\":" << (info->is_low_power_mode ? "true" : "false");
-        device_ss << ",\"core_count\":" << info->core_count;
-        device_ss << ",\"performance_cores\":" << info->performance_cores;
-        device_ss << ",\"efficiency_cores\":" << info->efficiency_cores;
+        // Integer fields (always present)
+        json.add_int_always("total_memory", info->total_memory);
+        json.add_int_always("available_memory", info->available_memory);
 
-        // Device fingerprint (same as device_id for most cases)
-        device_ss << ",\"device_fingerprint\":\"" << (info->device_fingerprint ? info->device_fingerprint : (info->device_id ? info->device_id : "")) << "\"";
+        // Boolean fields
+        json.add_bool_always("has_neural_engine", info->has_neural_engine);
+        json.add_int_always("neural_engine_cores", info->neural_engine_cores);
 
-        device_ss << "}";
-        json.add_raw(device_ss.str().c_str());
+        // GPU family with default
+        json.add_string_always("gpu_family", info->gpu_family ? info->gpu_family : "unknown");
+
+        // Battery info (may be unavailable - use nullable methods)
+        json.add_int_or_null("battery_level", info->battery_level, info->battery_level >= 0);
+        json.add_string_or_null("battery_state", info->battery_state);
+
+        // More boolean and integer fields
+        json.add_bool_always("is_low_power_mode", info->is_low_power_mode);
+        json.add_int_always("core_count", info->core_count);
+        json.add_int_always("performance_cores", info->performance_cores);
+        json.add_int_always("efficiency_cores", info->efficiency_cores);
+
+        // Device fingerprint (fallback to device_id if not set)
+        const char* fingerprint = info->device_fingerprint ? info->device_fingerprint
+                                                           : (info->device_id ? info->device_id : "");
+        json.add_string_always("device_fingerprint", fingerprint);
+
+        json.end_object();  // Close device_info
 
         json.add_string("sdk_version", request->sdk_version);
 
