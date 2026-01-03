@@ -105,8 +105,6 @@ elseif(TARGET runanywhere_onnx)
         ${RUNANYWHERE_CORE_DIR}/src/capabilities
         ${RUNANYWHERE_CORE_DIR}/src/backends/onnx
     )
-elseif(DEFINED RUNANYWHERE_CORE_ONNX_LIB)
-    target_link_libraries(rac_backend_onnx PRIVATE ${RUNANYWHERE_CORE_ONNX_LIB})
 endif()
 
 # =============================================================================
