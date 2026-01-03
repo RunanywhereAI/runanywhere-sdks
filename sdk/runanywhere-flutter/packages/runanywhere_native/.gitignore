@@ -1,0 +1,15 @@
+# Native binaries (downloaded during build)
+android/src/main/jniLibs/
+ios/Frameworks/
+
+# Build outputs
+build/
+.gradle/
+*.log
+
+# IDE
+.idea/
+*.iml
+
+# macOS
+.DS_Store

@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 
-import 'model_types.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// ModelListViewModel (mirroring iOS ModelListViewModel.swift)
 ///
@@ -11,7 +13,7 @@ class ModelListViewModel extends ChangeNotifier {
   static final ModelListViewModel shared = ModelListViewModel._();
 
   ModelListViewModel._() {
-    _initialize();
+    unawaited(_initialize());
   }
 
   // State
@@ -52,7 +54,7 @@ class ModelListViewModel extends ChangeNotifier {
 
       // Convert SDK ModelInfo to app ModelInfo
       _availableModels =
-          sdkModels.map((sdkModel) => _convertSDKModel(sdkModel)).toList();
+          sdkModels.map(_convertSDKModel).toList();
 
       debugPrint(
           '✅ Loaded ${_availableModels.length} models from SDK registry');
@@ -82,7 +84,7 @@ class ModelListViewModel extends ChangeNotifier {
       localPath: sdkModel.localPath?.toFilePath(),
       memoryRequired: sdkModel.memoryRequired,
       compatibleFrameworks: sdkModel.compatibleFrameworks
-          .map((f) => _convertFramework(f))
+          .map(_convertFramework)
           .toList(),
       preferredFramework: sdkModel.preferredFramework != null
           ? _convertFramework(sdkModel.preferredFramework!)
@@ -333,7 +335,7 @@ class ModelListViewModel extends ChangeNotifier {
           await sdk.RunAnywhere.loadSTTModel(model.id);
           break;
         case ModelCategory.speechSynthesis:
-          await sdk.RunAnywhere.loadTTSModel(model.id);
+          await sdk.RunAnywhere.loadTTSVoice(model.id);
           break;
         default:
           // Default to LLM model loading

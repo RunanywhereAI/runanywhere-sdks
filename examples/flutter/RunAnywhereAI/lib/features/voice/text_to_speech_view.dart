@@ -4,13 +4,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/services/audio_player_service.dart';
-import '../models/model_selection_sheet.dart';
-import '../models/model_status_components.dart';
-import '../models/model_types.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/services/audio_player_service.dart';
+import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
+import 'package:runanywhere_ai/features/models/model_status_components.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// TTSMetadata (matching iOS TTSMetadata)
 class TTSMetadata {
@@ -78,14 +78,14 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   @override
   void initState() {
     super.initState();
-    _initializeAudioPlayer();
+    unawaited(_initializeAudioPlayer());
   }
 
   @override
   void dispose() {
     _textController.dispose();
-    _playingSubscription?.cancel();
-    _progressSubscription?.cancel();
+    unawaited(_playingSubscription?.cancel());
+    unawaited(_progressSubscription?.cancel());
     super.dispose();
   }
 
@@ -113,7 +113,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   }
 
   void _showModelSelectionSheet() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -123,7 +123,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
           await _loadModel(model);
         },
       ),
-    );
+    ));
   }
 
   /// Load TTS model using RunAnywhere SDK
@@ -134,10 +134,10 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     });
 
     try {
-      debugPrint('🔄 Loading TTS model: ${model.name}');
+      debugPrint('🔄 Loading TTS voice: ${model.name}');
 
-      // Load TTS model via RunAnywhere SDK
-      await sdk.RunAnywhere.loadTTSModel(model.id);
+      // Load TTS voice via RunAnywhere SDK
+      await sdk.RunAnywhere.loadTTSVoice(model.id);
 
       setState(() {
         _selectedFramework = model.preferredFramework ?? LLMFramework.systemTTS;
@@ -175,8 +175,8 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     try {
       debugPrint('🔊 Generating speech with SDK...');
 
-      // Get the TTS component from SDK
-      final ttsComponent = sdk.RunAnywhere.loadedTTSComponent;
+      // Get the TTS capability from SDK
+      final ttsComponent = sdk.RunAnywhere.loadedTTSCapability;
 
       if (ttsComponent == null) {
         throw Exception('TTS component not loaded');
@@ -236,7 +236,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     }
   }
 
-  void _togglePlayback() async {
+  Future<void> _togglePlayback() async {
     if (_isPlaying) {
       await _stopPlayback();
     }

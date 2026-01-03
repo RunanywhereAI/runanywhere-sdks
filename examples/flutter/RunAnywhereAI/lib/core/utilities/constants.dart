@@ -69,23 +69,6 @@ class _UI {
   Duration get streamingTokenDelay => const Duration(milliseconds: 100);
 }
 
-/// Quiz constants
-class QuizConstants {
-  QuizConstants._();
-
-  /// Maximum input characters
-  static const int maxInputCharacters = 12000;
-
-  /// Minimum number of questions
-  static const int minQuestions = 3;
-
-  /// Maximum number of questions
-  static const int maxQuestions = 10;
-
-  /// Swipe threshold in pixels
-  static const double swipeThreshold = 100;
-}
-
 /// Keychain keys for secure storage
 class KeychainKeys {
   KeychainKeys._();
