@@ -961,14 +961,32 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentDestroy(
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentLoadModel(JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring configJson) {
+    LOGi("racSttComponentLoadModel called with handle=%lld", (long long)handle);
     if (handle == 0) return RAC_ERROR_INVALID_HANDLE;
 
     std::string path = getCString(env, modelPath);
+    LOGi("racSttComponentLoadModel model_id=%s", path.c_str());
 
-    return static_cast<jint>(rac_stt_component_load_model(
+    // Debug: List registered providers BEFORE loading
+    const char** provider_names = nullptr;
+    size_t provider_count = 0;
+    rac_result_t list_result = rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
+    LOGi("Before load_model - STT providers: count=%zu, list_result=%d", provider_count, list_result);
+    if (provider_names && provider_count > 0) {
+        for (size_t i = 0; i < provider_count; i++) {
+            LOGi("  Provider[%zu]: %s", i, provider_names[i] ? provider_names[i] : "NULL");
+        }
+    } else {
+        LOGw("NO providers registered for STT!");
+    }
+
+    rac_result_t result = rac_stt_component_load_model(
         reinterpret_cast<rac_handle_t>(handle),
         path.c_str()
-    ));
+    );
+    LOGi("rac_stt_component_load_model returned: %d", result);
+
+    return static_cast<jint>(result);
 }
 
 JNIEXPORT void JNICALL

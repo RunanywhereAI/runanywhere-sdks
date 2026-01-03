@@ -231,20 +231,28 @@ const char* const VAD_PROVIDER_NAME = "ONNXVADService";
 rac_bool_t onnx_stt_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
+    RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle called");
+
     if (request == nullptr) {
+        RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: request is null -> FALSE");
         return RAC_FALSE;
     }
 
     if (request->identifier == nullptr || request->identifier[0] == '\0') {
+        RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: no identifier -> TRUE (default)");
         return RAC_TRUE;  // Default provider
     }
 
     const char* path = request->identifier;
+    RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: checking path=%s", path);
+
     if (strstr(path, "whisper") != nullptr || strstr(path, "zipformer") != nullptr ||
         strstr(path, "paraformer") != nullptr || strstr(path, ".onnx") != nullptr) {
+        RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: path matches -> TRUE");
         return RAC_TRUE;
     }
 
+    RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: path doesn't match -> FALSE");
     return RAC_FALSE;
 }
 
@@ -252,7 +260,10 @@ rac_bool_t onnx_stt_can_handle(const rac_service_request_t* request, void* user_
 rac_handle_t onnx_stt_create(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
+    RAC_LOG_INFO(LOG_CAT, "onnx_stt_create ENTRY - provider create callback invoked");
+
     if (request == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "onnx_stt_create: request is null");
         return nullptr;
     }
 
@@ -261,15 +272,18 @@ rac_handle_t onnx_stt_create(const rac_service_request_t* request, void* user_da
 
     // Create backend handle
     rac_handle_t backend_handle = nullptr;
+    RAC_LOG_INFO(LOG_CAT, "Calling rac_stt_onnx_create...");
     rac_result_t result = rac_stt_onnx_create(request->identifier, nullptr, &backend_handle);
     if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create ONNX STT backend: %d", result);
+        RAC_LOG_ERROR(LOG_CAT, "rac_stt_onnx_create failed with result: %d", result);
         return nullptr;
     }
+    RAC_LOG_INFO(LOG_CAT, "rac_stt_onnx_create succeeded, backend_handle=%p", backend_handle);
 
     // Allocate service with vtable
     auto* service = static_cast<rac_stt_service_t*>(malloc(sizeof(rac_stt_service_t)));
     if (!service) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to allocate rac_stt_service_t");
         rac_stt_onnx_destroy(backend_handle);
         return nullptr;
     }
@@ -278,7 +292,7 @@ rac_handle_t onnx_stt_create(const rac_service_request_t* request, void* user_da
     service->impl = backend_handle;
     service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
 
-    RAC_LOG_INFO(LOG_CAT, "ONNX STT service created successfully");
+    RAC_LOG_INFO(LOG_CAT, "ONNX STT service created successfully, service=%p", service);
     return service;
 }
 

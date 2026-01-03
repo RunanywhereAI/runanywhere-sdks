@@ -97,8 +97,10 @@ endif()
 
 message(STATUS "Found runanywhere-core at: ${RUNANYWHERE_CORE_DIR}")
 
-# Build runanywhere-core in modular mode
+# Build runanywhere-core in modular mode with STATIC libraries
+# This matches iOS where we combine static .a files into xcframeworks
 set(RA_BUILD_MODULAR ON CACHE BOOL "" FORCE)
+set(RA_BUILD_SHARED OFF CACHE BOOL "" FORCE)  # Force static libs for static linking
 set(RA_BUILD_LLAMACPP ${RAC_BUILD_LLAMACPP} CACHE BOOL "" FORCE)
 set(RA_BUILD_ONNX ${RAC_BUILD_ONNX} CACHE BOOL "" FORCE)
 set(RA_BUILD_WHISPERCPP ${RAC_BUILD_WHISPERCPP} CACHE BOOL "" FORCE)
